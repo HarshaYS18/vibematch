@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: vibematch_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: vibematch_user
+      POSTGRES_PASSWORD: vibematch_pass
+      POSTGRES_DB: vibematch_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - vibematch_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: vibematch_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  vibematch_postgres_data:

@@ -1,0 +1,1791 @@
+﻿import 'package:flutter/material.dart';
+
+import '../../auth/models/current_user.dart';
+
+class HomePage extends StatefulWidget {
+  const HomePage({
+    super.key,
+    required this.user,
+  });
+
+  final CurrentUser user;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  late final PageController _bannerController;
+  late final ScrollController _scrollController;
+
+  int _currentBannerIndex = 0;
+  int _visibleRoomCount = 8;
+  bool _isLoadingMore = false;
+
+  String _selectedCategory = 'Trending';
+  String _selectedLanguage = 'All';
+
+  @override
+  void initState() {
+    super.initState();
+    _bannerController = PageController(viewportFraction: 0.90);
+    _scrollController = ScrollController();
+    _scrollController.addListener(_handleInfiniteScroll);
+  }
+
+  @override
+  void dispose() {
+    _bannerController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  bool get _canManageBanners {
+    return widget.user.primaryRole == 'founder_owner' ||
+        widget.user.primaryRole == 'owner';
+  }
+
+  List<_RoomItem> get _filteredRooms {
+    Iterable<_RoomItem> rooms = _roomItems;
+
+    if (_selectedCategory == 'Following') {
+      rooms = rooms.where((room) => room.followedFriendsInside.isNotEmpty);
+    } else if (_selectedCategory != 'Trending') {
+      rooms = rooms.where((room) => room.type == _selectedCategory);
+    }
+
+    if (_selectedLanguage != 'All') {
+      rooms = rooms.where((room) => room.language == _selectedLanguage);
+    }
+
+    final list = rooms.toList()
+      ..sort((a, b) => b.trendingScore.compareTo(a.trendingScore));
+
+    return list;
+  }
+
+  List<_RoomItem> get _visibleRooms {
+    final rooms = _filteredRooms;
+    final end = _visibleRoomCount > rooms.length ? rooms.length : _visibleRoomCount;
+    return rooms.take(end).toList();
+  }
+
+  void _handleInfiniteScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_isLoadingMore) return;
+
+    final position = _scrollController.position;
+    final nearBottom = position.pixels >= position.maxScrollExtent - 280;
+
+    if (!nearBottom) return;
+    if (_visibleRoomCount >= _filteredRooms.length) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+
+      setState(() {
+        _visibleRoomCount += 6;
+        _isLoadingMore = false;
+      });
+    });
+  }
+
+  void _selectCategory(String category) {
+    setState(() {
+      _selectedCategory = category;
+      _visibleRoomCount = 8;
+    });
+  }
+
+  void _selectLanguage(String language) {
+    setState(() {
+      _selectedLanguage = language;
+      _visibleRoomCount = 8;
+    });
+  }
+
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF251538),
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+  }
+
+  void _openLanguageSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.72,
+          minChildSize: 0.42,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (context, scrollController) {
+            return _LanguageSheet(
+              scrollController: scrollController,
+              selectedLanguage: _selectedLanguage,
+              onSelected: (language) {
+                Navigator.pop(context);
+                _selectLanguage(language);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openFollowingRooms() {
+    _selectCategory('Following');
+    _showToast('Showing rooms where people you follow are active.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleRooms = _visibleRooms;
+    final totalRooms = _filteredRooms.length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAF7F1),
+      body: SafeArea(
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HomeHeader(
+                      user: widget.user,
+                      onSearchTap: () => _showToast('Search will open here.'),
+                      onNotificationsTap: () =>
+                          _showToast('Notifications will open here.'),
+                    ),
+                    const SizedBox(height: 22),
+                    _BannerModule(
+                      controller: _bannerController,
+                      currentIndex: _currentBannerIndex,
+                      canManageBanners: _canManageBanners,
+                      onManageTap: () => _showToast(
+                        _canManageBanners
+                            ? 'Banner management opens here for Super Owner / Owner.'
+                            : 'All active banners will open here.',
+                      ),
+                      onBannerTap: (banner) => _showToast(
+                        '${banner.title.replaceAll('\n', ' ')} opened.',
+                      ),
+                      onPageChanged: (index) {
+                        setState(() {
+                          _currentBannerIndex = index;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    _FollowingRoomsModule(
+                      onTap: _openFollowingRooms,
+                      activeCount: _roomItems
+                          .where((room) => room.followedFriendsInside.isNotEmpty)
+                          .length,
+                    ),
+                    const SizedBox(height: 22),
+                    _CategoryChips(
+                      selectedCategory: _selectedCategory,
+                      onSelected: _selectCategory,
+                    ),
+                    const SizedBox(height: 16),
+                    _LanguageSelector(
+                      selectedLanguage: _selectedLanguage,
+                      onTap: _openLanguageSheet,
+                    ),
+                    const SizedBox(height: 20),
+                    _SectionHeader(
+                      title: _selectedCategory == 'Following'
+                          ? 'Following Rooms'
+                          : 'Trending Rooms',
+                      actionText: 'See All',
+                      onActionTap: () {
+                        setState(() {
+                          _visibleRoomCount = _filteredRooms.length;
+                        });
+                        _showToast('Showing all matching rooms.');
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '$totalRooms rooms â€¢ $_selectedLanguage language â€¢ ranked by live trend score',
+                      style: const TextStyle(
+                        color: Color(0xFF8B8098),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ),
+            if (visibleRooms.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyRoomsState(),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 130),
+                sliver: SliverList.separated(
+                  itemCount: visibleRooms.length + (_isLoadingMore ? 1 : 0),
+                  separatorBuilder: (context, index) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    if (index >= visibleRooms.length) {
+                      return const _LoadingMoreCard();
+                    }
+
+                    final room = visibleRooms[index];
+
+                    return _RoomCard(
+                      room: room,
+                      rank: index + 1,
+                      onJoinTap: () => _showToast('Joining ${room.title}...'),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({
+    required this.user,
+    required this.onSearchTap,
+    required this.onNotificationsTap,
+  });
+
+  final CurrentUser user;
+  final VoidCallback onSearchTap;
+  final VoidCallback onNotificationsTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const _BrandMark(),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Vibe Match',
+                style: TextStyle(
+                  color: Color(0xFF251538),
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'Welcome, ${user.displayName ?? 'Vibe User'}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF8B8098),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _CircleIconButton(
+          icon: Icons.search_rounded,
+          onTap: onSearchTap,
+        ),
+        const SizedBox(width: 10),
+        _CircleIconButton(
+          icon: Icons.notifications_none_rounded,
+          badgeText: '2',
+          onTap: onNotificationsTap,
+        ),
+      ],
+    );
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF12C7B7),
+            Color(0xFF55B7FF),
+            Color(0xFF8C5CF6),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8C5CF6).withValues(alpha: 0.22),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.favorite_rounded,
+        color: Colors.white,
+        size: 27,
+      ),
+    );
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  const _CircleIconButton({
+    required this.icon,
+    required this.onTap,
+    this.badgeText,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? badgeText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFEDE3D7),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4A2A63).withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFF251538),
+              size: 23,
+            ),
+          ),
+        ),
+        if (badgeText != null)
+          Positioned(
+            right: -2,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE84C72),
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text(
+                badgeText!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _BannerModule extends StatelessWidget {
+  const _BannerModule({
+    required this.controller,
+    required this.currentIndex,
+    required this.canManageBanners,
+    required this.onManageTap,
+    required this.onBannerTap,
+    required this.onPageChanged,
+  });
+
+  final PageController controller;
+  final int currentIndex;
+  final bool canManageBanners;
+  final VoidCallback onManageTap;
+  final ValueChanged<_BannerItem> onBannerTap;
+  final ValueChanged<int> onPageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _SectionHeader(
+          title: 'Highlights',
+          actionText: canManageBanners ? 'Manage' : 'View All',
+          onActionTap: onManageTap,
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 174,
+          child: PageView.builder(
+            controller: controller,
+            itemCount: _bannerItems.length,
+            onPageChanged: onPageChanged,
+            itemBuilder: (context, index) {
+              final banner = _bannerItems[index];
+
+              return Padding(
+                padding: EdgeInsets.only(
+                  right: index == _bannerItems.length - 1 ? 0 : 10,
+                ),
+                child: _HomeBannerCard(
+                  banner: banner,
+                  onTap: () => onBannerTap(banner),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            ...List.generate(
+              _bannerItems.length,
+              (index) {
+                final selected = currentIndex == index;
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  margin: const EdgeInsets.only(right: 6),
+                  width: selected ? 24 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xFF12C7B7)
+                        : const Color(0xFFE3D8CA),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                );
+              },
+            ),
+            const Spacer(),
+            if (canManageBanners)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF6E6),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                    color: const Color(0xFFEFD4A1),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.admin_panel_settings_rounded,
+                      size: 14,
+                      color: Color(0xFF9C6B16),
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Owner banner module',
+                      style: TextStyle(
+                        color: Color(0xFF9C6B16),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _HomeBannerCard extends StatelessWidget {
+  const _HomeBannerCard({
+    required this.banner,
+    required this.onTap,
+  });
+
+  final _BannerItem banner;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(30),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          gradient: LinearGradient(
+            colors: banner.colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: banner.shadowColor.withValues(alpha: 0.25),
+              blurRadius: 26,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -44,
+              top: -52,
+              child: Container(
+                width: 154,
+                height: 154,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Positioned(
+              right: 22,
+              bottom: 20,
+              child: Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.15),
+                  ),
+                ),
+                child: Icon(
+                  banner.icon,
+                  color: Colors.white,
+                  size: 29,
+                ),
+              ),
+            ),
+            Positioned(
+              left: 18,
+              top: 16,
+              child: _BannerTag(label: banner.tag),
+            ),
+            Positioned(
+              left: 18,
+              top: 52,
+              right: 96,
+              child: Text(
+                banner.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 25,
+                  height: 0.98,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+            Positioned(
+              left: 18,
+              right: 104,
+              top: 110,
+              child: Text(
+                banner.subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.83),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Positioned(
+              left: 18,
+              bottom: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  banner.cta,
+                  style: TextStyle(
+                    color: banner.ctaTextColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BannerTag extends StatelessWidget {
+  const _BannerTag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 5,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.6,
+        ),
+      ),
+    );
+  }
+}
+
+class _FollowingRoomsModule extends StatelessWidget {
+  const _FollowingRoomsModule({
+    required this.onTap,
+    required this.activeCount,
+  });
+
+  final VoidCallback onTap;
+  final int activeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFFFFFDF7),
+              Color(0xFFF5EEFF),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFEDE3D7)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4A2A63).withValues(alpha: 0.06),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 72,
+              height: 44,
+              child: Stack(
+                children: const [
+                  Positioned(
+                    left: 0,
+                    child: _MiniAvatar(
+                      label: 'A',
+                      color: Color(0xFF6D5DF6),
+                    ),
+                  ),
+                  Positioned(
+                    left: 22,
+                    child: _MiniAvatar(
+                      label: 'L',
+                      color: Color(0xFFE84C72),
+                    ),
+                  ),
+                  Positioned(
+                    left: 44,
+                    child: _MiniAvatar(
+                      label: 'M',
+                      color: Color(0xFF12C7B7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Friends are live',
+                    style: TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '$activeCount rooms have people you follow inside',
+                    style: const TextStyle(
+                      color: Color(0xFF8B8098),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF251538),
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: const Text(
+                'View',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniAvatar extends StatelessWidget {
+  const _MiniAvatar({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: Colors.white,
+      child: CircleAvatar(
+        radius: 19,
+        backgroundColor: color,
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryChips extends StatelessWidget {
+  const _CategoryChips({
+    required this.selectedCategory,
+    required this.onSelected,
+  });
+
+  final String selectedCategory;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _ChipData('Trending', Icons.local_fire_department_rounded),
+      _ChipData('Following', Icons.people_alt_rounded),
+      _ChipData('Music', Icons.music_note_rounded),
+      _ChipData('Gaming', Icons.sports_esports_rounded),
+      _ChipData('Chat', Icons.chat_bubble_rounded),
+      _ChipData('PK', Icons.bolt_rounded),
+    ];
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 9),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final selected = item.label == selectedCategory;
+
+          return InkWell(
+            onTap: () => onSelected(item.label),
+            borderRadius: BorderRadius.circular(99),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              decoration: BoxDecoration(
+                gradient: selected
+                    ? const LinearGradient(
+                        colors: [
+                          Color(0xFF12C7B7),
+                          Color(0xFF6D5DF6),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: selected ? null : Colors.white,
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(
+                  color: selected
+                      ? Colors.transparent
+                      : const Color(0xFFECE2D8),
+                ),
+                boxShadow: [
+                  if (selected)
+                    BoxShadow(
+                      color: const Color(0xFF12C7B7).withValues(alpha: 0.20),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    item.icon,
+                    size: 18,
+                    color: selected ? Colors.white : const Color(0xFF8B8098),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      color: selected ? Colors.white : const Color(0xFF8B8098),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _LanguageSelector extends StatelessWidget {
+  const _LanguageSelector({
+    required this.selectedLanguage,
+    required this.onTap,
+  });
+
+  final String selectedLanguage;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFECE2D8)),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.language_rounded,
+              color: Color(0xFF12C7B7),
+              size: 22,
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Room Language',
+                style: TextStyle(
+                  color: Color(0xFF251538),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            Text(
+              selectedLanguage,
+              style: const TextStyle(
+                color: Color(0xFF6D5DF6),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF8B8098),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageSheet extends StatelessWidget {
+  const _LanguageSheet({
+    required this.scrollController,
+    required this.selectedLanguage,
+    required this.onSelected,
+  });
+
+  final ScrollController scrollController;
+  final String selectedLanguage;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFFAF7F1),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(28),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+          children: [
+            Center(
+              child: Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6CCBE),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Select room language',
+              style: TextStyle(
+                color: Color(0xFF251538),
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Trending rooms will update based on this language.',
+              style: TextStyle(
+                color: Color(0xFF8B8098),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+            ..._languages.map(
+              (language) {
+                final selected = selectedLanguage == language;
+
+                return InkWell(
+                  onTap: () => onSelected(language),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 9),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: selected
+                            ? const Color(0xFF12C7B7)
+                            : const Color(0xFFECE2D8),
+                        width: selected ? 1.4 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            language,
+                            style: TextStyle(
+                              color: selected
+                                  ? const Color(0xFF251538)
+                                  : const Color(0xFF8B8098),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        if (selected)
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            color: Color(0xFF12C7B7),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.actionText,
+    this.onActionTap,
+  });
+
+  final String title;
+  final String actionText;
+  final VoidCallback? onActionTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF251538),
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.45,
+          ),
+        ),
+        const Spacer(),
+        InkWell(
+          onTap: onActionTap,
+          borderRadius: BorderRadius.circular(99),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Text(
+              actionText,
+              style: const TextStyle(
+                color: Color(0xFF6D5DF6),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RoomCard extends StatelessWidget {
+  const _RoomCard({
+    required this.room,
+    required this.rank,
+    required this.onJoinTap,
+  });
+
+  final _RoomItem room;
+  final int rank;
+  final VoidCallback onJoinTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final followedText = room.followedFriendsInside.isEmpty
+        ? 'No followed friends inside'
+        : '${room.followedFriendsInside.join(', ')} inside';
+
+    return Container(
+      height: 128,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(
+          color: const Color(0xFFEDE3D7),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A2A63).withValues(alpha: 0.07),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 92,
+            height: 108,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: room.colors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Icon(
+                    room.icon,
+                    color: Colors.white,
+                    size: 38,
+                  ),
+                ),
+                Positioned(
+                  left: 7,
+                  top: 7,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      '#$rank',
+                      style: const TextStyle(
+                        color: Color(0xFFE84C72),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 7,
+                  bottom: 7,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: const Text(
+                      'Live',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  room.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF251538),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    _SmallTag(
+                      label: room.type,
+                      textColor: const Color(0xFF9B6614),
+                      backgroundColor: const Color(0xFFFFF3D6),
+                    ),
+                    const SizedBox(width: 6),
+                    _SmallTag(
+                      label: room.language,
+                      textColor: const Color(0xFF05796D),
+                      backgroundColor: const Color(0xFFDDF9F4),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  room.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF8B8098),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  followedText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: room.followedFriendsInside.isEmpty
+                        ? const Color(0xFFB1A9BC)
+                        : const Color(0xFF6D5DF6),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.local_fire_department_rounded,
+                    color: Color(0xFFE84C72),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    room.trendingScoreLabel,
+                    style: const TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.equalizer_rounded,
+                    color: Color(0xFF12C7B7),
+                    size: 17,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    room.onlineCount,
+                    style: const TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: onJoinTap,
+                borderRadius: BorderRadius.circular(99),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF251538),
+                        Color(0xFF4A2A63),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const Text(
+                    'Join',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallTag extends StatelessWidget {
+  const _SmallTag({
+    required this.label,
+    required this.textColor,
+    required this.backgroundColor,
+  });
+
+  final String label;
+  final Color textColor;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 7,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadingMoreCard extends StatelessWidget {
+  const _LoadingMoreCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 18),
+      child: Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF12C7B7),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyRoomsState extends StatelessWidget {
+  const _EmptyRoomsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFEDE3D7)),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.search_off_rounded,
+                size: 42,
+                color: Color(0xFF8B8098),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'No rooms found',
+                style: TextStyle(
+                  color: Color(0xFF251538),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'Try another category or language.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF8B8098),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChipData {
+  const _ChipData(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
+class _BannerItem {
+  const _BannerItem({
+    required this.tag,
+    required this.title,
+    required this.subtitle,
+    required this.cta,
+    required this.icon,
+    required this.colors,
+    required this.shadowColor,
+    this.ctaTextColor = const Color(0xFF251538),
+  });
+
+  final String tag;
+  final String title;
+  final String subtitle;
+  final String cta;
+  final IconData icon;
+  final List<Color> colors;
+  final Color shadowColor;
+  final Color ctaTextColor;
+}
+
+class _RoomItem {
+  const _RoomItem({
+    required this.title,
+    required this.subtitle,
+    required this.type,
+    required this.language,
+    required this.onlineCount,
+    required this.trendingScore,
+    required this.trendingScoreLabel,
+    required this.icon,
+    required this.colors,
+    this.followedFriendsInside = const [],
+  });
+
+  final String title;
+  final String subtitle;
+  final String type;
+  final String language;
+  final String onlineCount;
+  final int trendingScore;
+  final String trendingScoreLabel;
+  final IconData icon;
+  final List<Color> colors;
+  final List<String> followedFriendsInside;
+}
+
+const _languages = [
+  'All',
+  'Telugu',
+  'Hindi',
+  'English',
+  'Tamil',
+  'Malayalam',
+  'Kannada',
+  'Bengali',
+  'Marathi',
+  'Punjabi',
+  'Gujarati',
+  'Odia',
+  'Urdu',
+  'Arabic',
+  'Spanish',
+  'French',
+  'Other',
+];
+
+const _bannerItems = [
+  _BannerItem(
+    tag: 'LIVE EVENT',
+    title: 'IPL Prediction\nChallenge',
+    subtitle: 'Join live rooms and win premium rewards.',
+    cta: 'Join Now',
+    icon: Icons.sports_cricket_rounded,
+    colors: [
+      Color(0xFF251538),
+      Color(0xFF563B87),
+      Color(0xFF0F9F97),
+    ],
+    shadowColor: Color(0xFF563B87),
+    ctaTextColor: Color(0xFF251538),
+  ),
+  _BannerItem(
+    tag: 'VIBESYNC 2.0',
+    title: 'Pulse Match\nRooms',
+    subtitle: 'Feel the timing. Match the chemistry.',
+    cta: 'Explore',
+    icon: Icons.favorite_rounded,
+    colors: [
+      Color(0xFF3B2063),
+      Color(0xFF7B4BE8),
+      Color(0xFFE84C72),
+    ],
+    shadowColor: Color(0xFF7B4BE8),
+    ctaTextColor: Color(0xFF4A2A63),
+  ),
+  _BannerItem(
+    tag: 'REWARDS',
+    title: 'Weekly Gift\nCarnival',
+    subtitle: 'Unlock bonuses, badges, and surprise gifts.',
+    cta: 'View Rewards',
+    icon: Icons.card_giftcard_rounded,
+    colors: [
+      Color(0xFF174C52),
+      Color(0xFF0F9F97),
+      Color(0xFFC99A3B),
+    ],
+    shadowColor: Color(0xFF0F9F97),
+    ctaTextColor: Color(0xFF174C52),
+  ),
+];
+
+const _roomItems = [
+  _RoomItem(
+    title: 'Late Night Chill',
+    subtitle: 'Music, soft talks, and relaxed premium vibes.',
+    type: 'Music',
+    language: 'English',
+    onlineCount: '12.6K',
+    trendingScore: 9860,
+    trendingScoreLabel: '98.6K',
+    icon: Icons.nightlife_rounded,
+    colors: [
+      Color(0xFF251538),
+      Color(0xFF6D5DF6),
+    ],
+    followedFriendsInside: ['Lyra', 'Arjun'],
+  ),
+  _RoomItem(
+    title: 'Telugu Beats',
+    subtitle: 'Songs, comedy, and friendly live talks.',
+    type: 'Music',
+    language: 'Telugu',
+    onlineCount: '11.4K',
+    trendingScore: 9650,
+    trendingScoreLabel: '96.5K',
+    icon: Icons.music_note_rounded,
+    colors: [
+      Color(0xFF8F2354),
+      Color(0xFFE84C72),
+    ],
+    followedFriendsInside: ['Naga'],
+  ),
+  _RoomItem(
+    title: 'Hindi Music Adda',
+    subtitle: 'Bollywood songs and open mic vibes.',
+    type: 'Music',
+    language: 'Hindi',
+    onlineCount: '10.9K',
+    trendingScore: 9410,
+    trendingScoreLabel: '94.1K',
+    icon: Icons.mic_external_on_rounded,
+    colors: [
+      Color(0xFF3B2063),
+      Color(0xFFE84C72),
+    ],
+  ),
+  _RoomItem(
+    title: 'Game On Arena',
+    subtitle: 'Mini games, friendly fun, and live energy.',
+    type: 'Gaming',
+    language: 'English',
+    onlineCount: '8.7K',
+    trendingScore: 8990,
+    trendingScoreLabel: '89.9K',
+    icon: Icons.sports_esports_rounded,
+    colors: [
+      Color(0xFF0F766E),
+      Color(0xFF12C7B7),
+    ],
+    followedFriendsInside: ['Meera'],
+  ),
+  _RoomItem(
+    title: 'Tamil Chill Room',
+    subtitle: 'Talk, music, friendship, and good vibes.',
+    type: 'Chat',
+    language: 'Tamil',
+    onlineCount: '7.8K',
+    trendingScore: 8420,
+    trendingScoreLabel: '84.2K',
+    icon: Icons.chat_bubble_rounded,
+    colors: [
+      Color(0xFF174C52),
+      Color(0xFF0F9F97),
+    ],
+  ),
+  _RoomItem(
+    title: 'Love Lounge',
+    subtitle: 'Make friends, CP vibes, and conversations.',
+    type: 'Chat',
+    language: 'Hindi',
+    onlineCount: '7.2K',
+    trendingScore: 8180,
+    trendingScoreLabel: '81.8K',
+    icon: Icons.favorite_rounded,
+    colors: [
+      Color(0xFF4A2A63),
+      Color(0xFFD946EF),
+    ],
+    followedFriendsInside: ['Tanya', 'Vikram'],
+  ),
+  _RoomItem(
+    title: 'Kannada Friends Hub',
+    subtitle: 'Meet friends and enjoy room games.',
+    type: 'Chat',
+    language: 'Kannada',
+    onlineCount: '6.9K',
+    trendingScore: 7840,
+    trendingScoreLabel: '78.4K',
+    icon: Icons.people_alt_rounded,
+    colors: [
+      Color(0xFF251538),
+      Color(0xFF0F9F97),
+    ],
+  ),
+  _RoomItem(
+    title: 'Malayalam Melody',
+    subtitle: 'Soft songs and night conversations.',
+    type: 'Music',
+    language: 'Malayalam',
+    onlineCount: '6.1K',
+    trendingScore: 7520,
+    trendingScoreLabel: '75.2K',
+    icon: Icons.queue_music_rounded,
+    colors: [
+      Color(0xFF563B87),
+      Color(0xFFC99A3B),
+    ],
+  ),
+  _RoomItem(
+    title: 'PK Battle Stars',
+    subtitle: 'Live PK battle rooms and gifts.',
+    type: 'PK',
+    language: 'Telugu',
+    onlineCount: '5.9K',
+    trendingScore: 7190,
+    trendingScoreLabel: '71.9K',
+    icon: Icons.bolt_rounded,
+    colors: [
+      Color(0xFF8F2354),
+      Color(0xFFC99A3B),
+    ],
+    followedFriendsInside: ['Ravi'],
+  ),
+  _RoomItem(
+    title: 'English Talk Cafe',
+    subtitle: 'Practice English and meet new friends.',
+    type: 'Chat',
+    language: 'English',
+    onlineCount: '5.4K',
+    trendingScore: 6900,
+    trendingScoreLabel: '69.0K',
+    icon: Icons.coffee_rounded,
+    colors: [
+      Color(0xFF0F766E),
+      Color(0xFF6D5DF6),
+    ],
+  ),
+  _RoomItem(
+    title: 'Tamil Gaming Squad',
+    subtitle: 'Games, jokes, and room challenges.',
+    type: 'Gaming',
+    language: 'Tamil',
+    onlineCount: '4.8K',
+    trendingScore: 6420,
+    trendingScoreLabel: '64.2K',
+    icon: Icons.sports_esports_rounded,
+    colors: [
+      Color(0xFF3B2063),
+      Color(0xFF12C7B7),
+    ],
+    followedFriendsInside: ['Suriya'],
+  ),
+  _RoomItem(
+    title: 'Hindi CP Lounge',
+    subtitle: 'Couple vibes, music, and gifts.',
+    type: 'Chat',
+    language: 'Hindi',
+    onlineCount: '4.2K',
+    trendingScore: 6080,
+    trendingScoreLabel: '60.8K',
+    icon: Icons.favorite_border_rounded,
+    colors: [
+      Color(0xFF4A2A63),
+      Color(0xFFE84C72),
+    ],
+  ),
+];

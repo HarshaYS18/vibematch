@@ -1,0 +1,86 @@
+# System
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# FastAPI / Backend secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Database / local data
+*.sqlite3
+*.db
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# Flutter generated
+frontend/vibematch_app/.dart_tool/
+frontend/vibematch_app/build/
+frontend/vibematch_app/.flutter-plugins
+frontend/vibematch_app/.flutter-plugins-dependencies
+
+# Android/Gradle
+.gradle/
+**/android/.gradle/
+**/android/app/build/
+
+# iOS/macOS build
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/macos/Pods/
+**/macos/.symlinks/
+
+# Windows build
+**/windows/flutter/ephemeral/
+
+# Web build
+**/web/.dart_tool/
+
+# Secrets / keys
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+google-services.json
+GoogleService-Info.plist
+
+# Docker local volumes
+postgres_data/
+redis_data/
+
+# Node if later used
+node_modules/
