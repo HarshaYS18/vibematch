@@ -33,21 +33,34 @@ class RoomSeatLayout extends StatelessWidget {
   static const double _seatHeight = 80;
   static const double _rowHeight = 92;
   static const double _hostRowHeight = 92;
-  static const double _actionHeight = 40;
+  static const double _actionHeight = 42;
   static const double _actionWidth = 238;
 
   @override
   Widget build(BuildContext context) {
     final spec = SeatLayoutSpec.parse(layoutId);
-    final hasSelectedEmptyManageableSeat = _selectedSeatForActions != null;
+    final selectedSeat = _selectedSeatForActions;
+    final hasSelectedEmptyManageableSeat = selectedSeat != null;
     final hostHeight = spec.hasHostSeats ? _hostRowHeight : 0.0;
     final gridHeight = hostHeight + (spec.rows * _rowHeight);
-    final layoutHeight = gridHeight + (hasSelectedEmptyManageableSeat ? _actionHeight + 6 : 0);
+    final layoutHeight = gridHeight + (hasSelectedEmptyManageableSeat ? _actionHeight + 8 : 0);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final children = <Widget>[];
+
+        if (hasSelectedEmptyManageableSeat) {
+          children.add(
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => onSeatTap(selectedSeat.index),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          );
+        }
 
         if (spec.hasHostSeats) {
           final hostCellWidth = width / spec.topSeatCount;
@@ -84,13 +97,8 @@ class RoomSeatLayout extends StatelessWidget {
           }
         }
 
-        final selectedSeat = _selectedSeatForActions;
         if (selectedSeat != null) {
-          final position = _seatCenterPosition(
-            selectedSeat.index,
-            spec: spec,
-            width: width,
-          );
+          final position = _seatCenterPosition(selectedSeat.index, spec: spec, width: width);
           final left = (position.dx - (_actionWidth / 2)).clamp(0.0, width - _actionWidth);
           final top = (position.dy + 36).clamp(0.0, layoutHeight - _actionHeight);
 
@@ -134,10 +142,7 @@ class RoomSeatLayout extends StatelessWidget {
         return SizedBox(
           height: layoutHeight,
           width: width,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: children,
-          ),
+          child: Stack(clipBehavior: Clip.none, children: children),
         );
       },
     );
@@ -246,18 +251,8 @@ class _SeatAvatar extends StatelessWidget {
             gradient: user == null ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
             border: Border.all(color: borderColor, width: selected ? 2 : 1),
             boxShadow: [
-              if (selected)
-                BoxShadow(
-                  color: RoomColors.gold.withValues(alpha: 0.24),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              if (user != null)
-                BoxShadow(
-                  color: user.avatarColors.first.withValues(alpha: 0.23),
-                  blurRadius: 14,
-                  offset: const Offset(0, 7),
-                ),
+              if (selected) BoxShadow(color: RoomColors.gold.withValues(alpha: 0.24), blurRadius: 18, offset: const Offset(0, 8)),
+              if (user != null) BoxShadow(color: user.avatarColors.first.withValues(alpha: 0.23), blurRadius: 14, offset: const Offset(0, 7)),
             ],
           ),
           child: Center(
@@ -346,32 +341,27 @@ class _SeatActionCapsule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {},
-        child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: RoomColors.gold.withValues(alpha: 0.34)),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.66), blurRadius: 22, offset: const Offset(0, 10)),
-              BoxShadow(color: RoomColors.gold.withValues(alpha: 0.12), blurRadius: 20),
+      color: Colors.black,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: RoomColors.gold.withValues(alpha: 0.38)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.78), blurRadius: 24, offset: const Offset(0, 10)),
+            BoxShadow(color: RoomColors.gold.withValues(alpha: 0.13), blurRadius: 20),
+          ],
+        ),
+        child: Row(
+          children: [
+            for (var i = 0; i < actions.length; i++) ...[
+              Expanded(child: _SeatActionButton(action: actions[i])),
+              if (i != actions.length - 1) Container(width: 1, height: 20, color: Colors.white.withValues(alpha: 0.12)),
             ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < actions.length; i++) ...[
-                Expanded(child: _SeatActionButton(action: actions[i])),
-                if (i != actions.length - 1)
-                  Container(width: 1, height: 19, color: Colors.white.withValues(alpha: 0.10)),
-              ],
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -385,27 +375,23 @@ class _SeatActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
+    return InkWell(
       borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: action.onTap,
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(action.icon, color: Colors.white, size: 14),
-              const SizedBox(width: 4),
-              Text(
-                action.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 11.3, fontWeight: FontWeight.w900, height: 1, letterSpacing: -0.15),
-              ),
-            ],
-          ),
+      onTap: action.onTap,
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(action.icon, color: Colors.white, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              action.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 11.3, fontWeight: FontWeight.w900, height: 1, letterSpacing: -0.15),
+            ),
+          ],
         ),
       ),
     );
