@@ -1,10 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
 import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/public_profile_view_page.dart';
+import 'controllers/live_room_gift_controller.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_body.dart';
@@ -47,6 +46,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final TextEditingController _messageController;
   late final TextEditingController _announcementController;
   late final FocusNode _messageFocusNode;
+  late final LiveRoomGiftController _giftController;
 
   late String _roomName;
   late String _roomId;
@@ -64,7 +64,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool _leaveSheetOpen = false;
   bool _exitingRoom = false;
   bool _applyOnlyModeEnabled = false;
-  int _coinBalance = 35494;
   int _inboxUnreadCount = 4;
 
   Offset _bubbleOffset = const Offset(24, 120);
@@ -74,14 +73,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     mockInviteUsers[0],
     mockInviteUsers[1],
   ];
-
-  GiftCategory _selectedGiftCategory = GiftCategory.classic;
-  GiftItem? _selectedGift = mockGiftItems.first;
-  final Set<String> _selectedReceiverIds = <String>{};
-  int _selectedCombo = 1;
-  final List<GiftSlide> _giftSlides = <GiftSlide>[];
-  final Map<String, Timer> _giftTimers = <String, Timer>{};
-  final Set<String> _finishedGiftMessageIds = <String>{};
 
   final SeatUser _currentUser = mockRoomUsers.first;
 
@@ -118,23 +109,37 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         : _allRoomUsers.length;
   }
 
-  GiftSlide? get _activeComboSlide =>
-      _giftSlides.isEmpty ? null : _giftSlides.first;
-
   @override
   void initState() {
     super.initState();
+
     _messageController = TextEditingController();
     _announcementController = TextEditingController();
     _messageFocusNode = FocusNode();
+
     _roomName = widget.roomName;
     _roomId = widget.roomId;
     _privacyMode = privacyModeFromTitle(widget.modeTitle);
     _messages = List<ChatEntry>.from(mockChatEntries);
     _seats = _buildSeatsForLayout(_layoutId);
 
+    _giftController = LiveRoomGiftController(
+      currentUser: _currentUser,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+      onFinalGiftMessage: (entry) {
+        if (!mounted) return;
+        setState(() => _messages.insert(0, entry));
+      },
+      onToast: (message) {
+        if (!mounted) return;
+        RoomToast.show(context, message);
+      },
+    );
+
     if (_roomUsers.isNotEmpty) {
-      _selectedReceiverIds.add(_roomUsers.first.id);
+      _giftController.selectedReceiverIds.add(_roomUsers.first.id);
     }
   }
 
@@ -143,10 +148,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _messageController.dispose();
     _announcementController.dispose();
     _messageFocusNode.dispose();
-
-    for (final timer in _giftTimers.values) {
-      timer.cancel();
-    }
+    _giftController.dispose();
 
     super.dispose();
   }
@@ -272,14 +274,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onGiftTap: _openGiftPanel,
             ),
             LiveRoomGiftOverlay(
-              slides: _giftSlides,
-              activeComboSlide: _activeComboSlide,
+              slides: _giftController.giftSlides,
+              activeComboSlide: _giftController.activeComboSlide,
               bottomPadding: MediaQuery.paddingOf(context).bottom,
-              onComboTap: _tapGiftCombo,
+              onComboTap: _giftController.tapGiftCombo,
               onComboButtonTap: () {
                 dismissRoomSeatActionPill();
-                final slide = _activeComboSlide;
-                if (slide != null) _tapGiftCombo(slide);
+                final slide = _giftController.activeComboSlide;
+                if (slide != null) _giftController.tapGiftCombo(slide);
               },
             ),
           ],
@@ -724,7 +726,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onGiftTap: () {
           Navigator.pop(context);
           setState(() {
-            _selectedReceiverIds
+            _giftController.selectedReceiverIds
               ..clear()
               ..add(user.id);
           });
@@ -1014,10 +1016,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openGiftPanel() {
     _clearRoomFocus();
-
-    if (_selectedReceiverIds.isEmpty && _roomUsers.isNotEmpty) {
-      _selectedReceiverIds.add(_roomUsers.first.id);
-    }
+    _giftController.ensureDefaultReceiver(_roomUsers);
 
     showModalBottomSheet<void>(
       context: context,
@@ -1029,57 +1028,30 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             return GiftPanel(
               gifts: mockGiftItems,
               users: _roomUsers,
-              selectedCategory: _selectedGiftCategory,
-              selectedGift: _selectedGift,
-              selectedReceiverIds: _selectedReceiverIds,
-              selectedCombo: _selectedCombo,
-              coinBalance: _coinBalance,
+              selectedCategory: _giftController.selectedCategory,
+              selectedGift: _giftController.selectedGift,
+              selectedReceiverIds: _giftController.selectedReceiverIds,
+              selectedCombo: _giftController.selectedCombo,
+              coinBalance: _giftController.coinBalance,
               onCategoryChanged: (category) {
                 setSheetState(() {
-                  _selectedGiftCategory = category;
-
-                  final categoryGifts = mockGiftItems
-                      .where((gift) => gift.category == category)
-                      .toList();
-
-                  if (categoryGifts.isNotEmpty) {
-                    _selectedGift = categoryGifts.first;
-                  }
-
-                  if (category == GiftCategory.lucky && _selectedCombo < 9) {
-                    _selectedCombo = 9;
-                  }
+                  _giftController.selectCategory(category);
                 });
               },
               onGiftSelected: (gift) {
-                setSheetState(() => _selectedGift = gift);
+                setSheetState(() => _giftController.selectGift(gift));
               },
               onReceiverToggle: (id) {
                 setSheetState(() {
-                  if (id == '__all__') {
-                    if (_selectedReceiverIds.length == _roomUsers.length) {
-                      _selectedReceiverIds.clear();
-                    } else {
-                      _selectedReceiverIds
-                        ..clear()
-                        ..addAll(_roomUsers.map((user) => user.id));
-                    }
-                    return;
-                  }
-
-                  if (_selectedReceiverIds.contains(id)) {
-                    _selectedReceiverIds.remove(id);
-                  } else {
-                    _selectedReceiverIds.add(id);
-                  }
+                  _giftController.toggleReceiver(id, _roomUsers);
                 });
               },
               onComboChanged: (combo) {
-                setSheetState(() => _selectedCombo = combo);
+                setSheetState(() => _giftController.setCombo(combo));
               },
               onSend: () {
                 Navigator.pop(context);
-                _sendGift();
+                _giftController.sendGift(_roomUsers);
               },
               onRecharge: () {
                 RoomToast.show(context, 'Wallet / coin recharge opened');
@@ -1089,110 +1061,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         );
       },
     );
-  }
-
-  void _sendGift() {
-    final gift = _selectedGift;
-    if (gift == null) return;
-
-    final receivers = _roomUsers
-        .where((user) => _selectedReceiverIds.contains(user.id))
-        .toList();
-
-    if (receivers.isEmpty) {
-      RoomToast.show(context, 'Select a receiver');
-      return;
-    }
-
-    final totalCost = gift.coins * _selectedCombo * receivers.length;
-
-    if (_coinBalance < totalCost) {
-      RoomToast.show(context, 'Not enough coins');
-      return;
-    }
-
-    setState(() => _coinBalance -= totalCost);
-
-    final sentToAll =
-        receivers.length == _roomUsers.length && _roomUsers.isNotEmpty;
-    final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
-
-    for (final receiver in targets) {
-      final slide = GiftSlide(
-        id: '${receiver?.id ?? 'all'}-${DateTime.now().microsecondsSinceEpoch}',
-        senderName: _currentUser.name,
-        receiverName: receiver?.name ?? 'all',
-        giftName: gift.name,
-        giftIcon: gift.icon,
-        colors: gift.colors,
-        combo: _selectedCombo,
-        remainingSeconds: 15,
-      );
-      _startGiftSlide(slide);
-    }
-  }
-
-  void _startGiftSlide(GiftSlide slide) {
-    setState(() => _giftSlides.insert(0, slide));
-
-    _giftTimers[slide.id]?.cancel();
-    _giftTimers[slide.id] = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final index = _giftSlides.indexWhere((item) => item.id == slide.id);
-
-      if (index < 0) {
-        timer.cancel();
-        return;
-      }
-
-      final active = _giftSlides[index];
-
-      if (active.remainingSeconds <= 1) {
-        timer.cancel();
-        setState(() => _giftSlides.removeAt(index));
-        _giftTimers.remove(slide.id);
-        _insertFinalGiftMessage(active);
-        return;
-      }
-
-      setState(
-        () => _giftSlides[index] = active.copyWith(
-          remainingSeconds: active.remainingSeconds - 1,
-        ),
-      );
-    });
-  }
-
-  void _tapGiftCombo(GiftSlide slide) {
-    final index = _giftSlides.indexWhere((item) => item.id == slide.id);
-    if (index < 0) return;
-
-    final active = _giftSlides[index];
-
-    setState(() {
-      _giftSlides[index] = active.copyWith(
-        combo: active.combo + 1,
-        remainingSeconds: 15,
-      );
-    });
-  }
-
-  void _insertFinalGiftMessage(GiftSlide slide) {
-    if (!_finishedGiftMessageIds.add(slide.id)) return;
-
-    setState(() {
-      _messages.insert(
-        0,
-        ChatEntry(
-          senderName: slide.senderName,
-          senderId: _currentUser.id,
-          message: 'sent to ${slide.receiverName} 🎁 x${slide.combo}',
-          vipLevel: _currentUser.vipLevel,
-          sendingLevel: _currentUser.sendingLevel,
-          receivingLevel: _currentUser.receivingLevel,
-          isGift: true,
-        ),
-      );
-    });
   }
 
   void _openInboxPage() {
