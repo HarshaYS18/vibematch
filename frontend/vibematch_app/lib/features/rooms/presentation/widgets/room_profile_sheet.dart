@@ -76,51 +76,13 @@ class UserMiniProfileSheet extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  height: 32,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _showAdminMenu
-                            ? _MoreMenuButton(
-                                user: user,
-                                onSetAdminTap: onSetAdminTap,
-                                onRemoveAdminTap: onRemoveAdminTap,
-                                onReportTap: onReportTap,
-                              )
-                            : _ReportIconButton(onTap: onReportTap),
-                      ),
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 46),
-                          child: Text(
-                            user.name,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: RoomColors.plum,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: MiniProfileCornerButton(
-                          icon: Icons.alternate_email_rounded,
-                          color: RoomColors.aqua,
-                          size: 32,
-                          iconSize: 17,
-                          onTap: onMentionTap,
-                        ),
-                      ),
-                    ],
-                  ),
+                _HeaderRow(
+                  user: user,
+                  showAdminMenu: _showAdminMenu,
+                  onMentionTap: onMentionTap,
+                  onReportTap: onReportTap,
+                  onSetAdminTap: onSetAdminTap,
+                  onRemoveAdminTap: onRemoveAdminTap,
                 ),
                 const SizedBox(height: 7),
                 _LevelRow(
@@ -146,10 +108,10 @@ class UserMiniProfileSheet extends StatelessWidget {
                         title: 'Sent',
                         value: compactNumber(user.sentExp),
                         onTap: onSentRankingTap,
-                        tint: const Color(0xFFEAF8F0),
-                        borderColor: const Color(0xFFBFE5CC),
-                        titleColor: const Color(0xFF5C7A66),
-                        valueColor: const Color(0xFF1E7A45),
+                        tint: const Color(0xFFEFF7FF),
+                        borderColor: const Color(0xFFC8DEF3),
+                        titleColor: const Color(0xFF6B8198),
+                        valueColor: const Color(0xFF326B9E),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -172,7 +134,9 @@ class UserMiniProfileSheet extends StatelessWidget {
                 _InfoCard(
                   icon: Icons.favorite_rounded,
                   title: 'Love & Bonds',
-                  value: user.relationshipText.trim().isEmpty ? 'No active bonds yet' : user.relationshipText,
+                  value: user.relationshipText.trim().isEmpty
+                      ? 'No active bonds yet'
+                      : user.relationshipText,
                   onTap: onRelationshipTap,
                 ),
                 const SizedBox(height: 7),
@@ -199,6 +163,74 @@ class UserMiniProfileSheet extends StatelessWidget {
               size: 66,
               showHeartBadge: false,
               showOnlineRing: false,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderRow extends StatelessWidget {
+  const _HeaderRow({
+    required this.user,
+    required this.showAdminMenu,
+    required this.onMentionTap,
+    required this.onReportTap,
+    required this.onSetAdminTap,
+    required this.onRemoveAdminTap,
+  });
+
+  final SeatUser user;
+  final bool showAdminMenu;
+  final VoidCallback onMentionTap;
+  final VoidCallback onReportTap;
+  final VoidCallback onSetAdminTap;
+  final VoidCallback onRemoveAdminTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 32,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: showAdminMenu
+                ? _MoreMenuButton(
+                    user: user,
+                    onSetAdminTap: onSetAdminTap,
+                    onRemoveAdminTap: onRemoveAdminTap,
+                    onReportTap: onReportTap,
+                  )
+                : _ReportIconButton(onTap: onReportTap),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 46),
+              child: Text(
+                user.name,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: RoomColors.plum,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: MiniProfileCornerButton(
+              icon: Icons.alternate_email_rounded,
+              color: RoomColors.aqua,
+              size: 32,
+              iconSize: 17,
+              onTap: onMentionTap,
             ),
           ),
         ],
@@ -237,12 +269,12 @@ class _LevelRow extends StatelessWidget {
         ),
       _CleanLevelPill(
         label: 'Lv ${user.sendingLevel}',
-        icon: Icons.north_east_rounded,
+        icon: Icons.emoji_events_rounded,
         width: 68,
-        background: const Color(0xFF241E45),
-        border: const Color(0xFF7364D9),
-        textColor: const Color(0xFFEDEAFF),
-        shineColor: const Color(0xFFC9C2FF),
+        background: const Color(0xFFEFF3FF),
+        border: const Color(0xFF91A9E8),
+        textColor: const Color(0xFF465B9D),
+        shineColor: Colors.white,
         active: user.sendingLevel > 0,
         onTap: onSendingLevelTap,
       ),
@@ -342,22 +374,37 @@ class _MoreMenuButton extends StatelessWidget {
         if (canRemoveAdmin)
           const PopupMenuItem<String>(
             value: 'remove_admin',
-            child: _MenuRow(icon: Icons.shield_moon_rounded, color: RoomColors.coral, label: 'Remove admin'),
+            child: _MenuRow(
+              icon: Icons.shield_moon_rounded,
+              color: RoomColors.coral,
+              label: 'Remove admin',
+            ),
           )
         else if (!user.isRoomAdmin && !user.isHost)
           const PopupMenuItem<String>(
             value: 'set_admin',
-            child: _MenuRow(icon: Icons.shield_rounded, color: RoomColors.aqua, label: 'Set as admin'),
+            child: _MenuRow(
+              icon: Icons.shield_rounded,
+              color: RoomColors.aqua,
+              label: 'Set as admin',
+            ),
           ),
         const PopupMenuItem<String>(
           value: 'report',
-          child: _MenuRow(icon: Icons.report_gmailerrorred_rounded, color: RoomColors.coral, label: 'Report'),
+          child: _MenuRow(
+            icon: Icons.report_gmailerrorred_rounded,
+            color: RoomColors.coral,
+            label: 'Report',
+          ),
         ),
       ],
       child: Container(
         width: 32,
         height: 32,
-        decoration: BoxDecoration(color: RoomColors.plum.withValues(alpha: 0.07), shape: BoxShape.circle),
+        decoration: BoxDecoration(
+          color: RoomColors.plum.withValues(alpha: 0.07),
+          shape: BoxShape.circle,
+        ),
         child: const Icon(Icons.more_horiz_rounded, color: RoomColors.plum, size: 20),
       ),
     );
@@ -421,12 +468,15 @@ class _CleanLevelPill extends StatelessWidget {
         decoration: BoxDecoration(
           color: effectiveBackground,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: effectiveBorder.withValues(alpha: active ? 0.72 : 0.65), width: 0.8),
+          border: Border.all(
+            color: effectiveBorder.withValues(alpha: active ? 0.72 : 0.65),
+            width: 0.8,
+          ),
           boxShadow: active
               ? [
                   BoxShadow(
-                    color: effectiveBorder.withValues(alpha: 0.18),
-                    blurRadius: 10,
+                    color: effectiveBorder.withValues(alpha: 0.12),
+                    blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
                 ]
@@ -445,7 +495,7 @@ class _CleanLevelPill extends StatelessWidget {
                   height: 6,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
-                    color: Colors.white.withValues(alpha: active ? 0.18 : 0.22),
+                    color: Colors.white.withValues(alpha: active ? 0.28 : 0.22),
                   ),
                 ),
               ),
@@ -524,9 +574,9 @@ class _PillShineState extends State<_PillShine> with SingleTickerProviderStateMi
                     gradient: LinearGradient(
                       colors: [
                         widget.color.withValues(alpha: 0.0),
-                        widget.color.withValues(alpha: 0.36),
-                        Colors.white.withValues(alpha: 0.52),
-                        widget.color.withValues(alpha: 0.22),
+                        widget.color.withValues(alpha: 0.28),
+                        Colors.white.withValues(alpha: 0.40),
+                        widget.color.withValues(alpha: 0.18),
                         widget.color.withValues(alpha: 0.0),
                       ],
                     ),
@@ -579,7 +629,11 @@ class _LocationPill extends StatelessWidget {
                 location,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: RoomColors.plum, fontSize: 10.5, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  color: RoomColors.plum,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -691,14 +745,17 @@ class _VipStatCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'VIP Level',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Color(0xFF7B7282),
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w800,
+                  const Center(
+                    child: Text(
+                      'VIP Level',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Color(0xFF7B7282),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1010,6 +1067,7 @@ class _ActionRow extends StatelessWidget {
       if (isSelf || canModerate)
         _IconActionChip(icon: Icons.lock_rounded, tooltip: 'Leave and lock', onTap: onLeaveAndLock),
     ];
+
     return Wrap(spacing: 12, runSpacing: 10, alignment: WrapAlignment.center, children: actions);
   }
 }
