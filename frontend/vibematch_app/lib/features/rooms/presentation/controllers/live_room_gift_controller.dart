@@ -49,10 +49,14 @@ class LiveRoomGiftController {
     if (category == GiftCategory.lucky && selectedCombo < 9) {
       selectedCombo = 9;
     }
+
+    onChanged();
   }
 
   void selectGift(GiftItem gift) {
     selectedGift = gift;
+    selectedCategory = gift.category;
+    onChanged();
   }
 
   void toggleReceiver(String id, List<SeatUser> roomUsers) {
@@ -64,6 +68,7 @@ class LiveRoomGiftController {
           ..clear()
           ..addAll(roomUsers.map((user) => user.id));
       }
+      onChanged();
       return;
     }
 
@@ -72,10 +77,12 @@ class LiveRoomGiftController {
     } else {
       selectedReceiverIds.add(id);
     }
+    onChanged();
   }
 
   void setCombo(int combo) {
     selectedCombo = combo;
+    onChanged();
   }
 
   void sendGift(List<SeatUser> roomUsers) {
@@ -124,8 +131,11 @@ class LiveRoomGiftController {
     if (index < 0) return;
 
     final active = giftSlides[index];
+    final multiplier = selectedCombo < 1 ? 1 : selectedCombo;
+    final nextCombo = active.combo * multiplier;
+
     giftSlides[index] = active.copyWith(
-      combo: active.combo + 1,
+      combo: nextCombo,
       remainingSeconds: 15,
     );
     onChanged();
