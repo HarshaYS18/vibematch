@@ -52,12 +52,6 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onBackgroundTap: onBackgroundTap,
       onPrivacyTap: onPrivacyTap,
       onSeatLayoutTap: onSeatLayoutTap,
-      onAdminsTap: () => LiveRoomProfileNavigator.openModulePage(
-        context: context,
-        title: 'Admins',
-        subtitle: 'Room administrator management will connect here.',
-        icon: Icons.shield_rounded,
-      ),
       onAnnouncementTap: onAnnouncementTap,
       onInboxTap: onInboxTap,
       onJoinRequestsTap: onJoinRequestsTap,
