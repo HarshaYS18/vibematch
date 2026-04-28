@@ -56,6 +56,11 @@ class LiveRoomGiftController {
   void selectGift(GiftItem gift) {
     selectedGift = gift;
     selectedCategory = gift.category;
+
+    if (gift.category == GiftCategory.lucky && selectedCombo < 9) {
+      selectedCombo = 9;
+    }
+
     onChanged();
   }
 
@@ -120,6 +125,7 @@ class LiveRoomGiftController {
         giftIcon: gift.icon,
         colors: gift.colors,
         combo: selectedCombo,
+        baseCombo: selectedCombo,
         remainingSeconds: 15,
       );
       _startGiftSlide(slide);
@@ -131,8 +137,7 @@ class LiveRoomGiftController {
     if (index < 0) return;
 
     final active = giftSlides[index];
-    final multiplier = selectedCombo < 1 ? 1 : selectedCombo;
-    final nextCombo = active.combo * multiplier;
+    final nextCombo = active.combo + active.baseCombo;
 
     giftSlides[index] = active.copyWith(
       combo: nextCombo,
