@@ -10,11 +10,13 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.roomImagesEnabled,
     required this.guestMessagesEnabled,
     required this.applyOnlyModeEnabled,
+    this.isVibeSyncActive = false,
     required this.joinRequestCount,
     required this.onBackgroundTap,
     required this.onPrivacyTap,
     required this.onSeatLayoutTap,
     required this.onAdminsTap,
+    this.onVibeSyncTap,
     required this.onToggleRoomImages,
     required this.onToggleGuestMessages,
     required this.onToggleApplyOnlyMode,
@@ -32,11 +34,17 @@ class RoomSettingsSheet extends StatelessWidget {
   final bool roomImagesEnabled;
   final bool guestMessagesEnabled;
   final bool applyOnlyModeEnabled;
+
+  /// Kept temporarily so older LiveRoomPage call sites compile while VibeSync is hidden.
+  final bool isVibeSyncActive;
   final int joinRequestCount;
   final VoidCallback onBackgroundTap;
   final VoidCallback onPrivacyTap;
   final VoidCallback onSeatLayoutTap;
   final VoidCallback onAdminsTap;
+
+  /// Kept temporarily so older LiveRoomPage call sites compile while VibeSync is hidden.
+  final VoidCallback? onVibeSyncTap;
   final ValueChanged<bool> onToggleRoomImages;
   final ValueChanged<bool> onToggleGuestMessages;
   final ValueChanged<bool> onToggleApplyOnlyMode;
@@ -149,10 +157,7 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
               const SizedBox(height: 8),
               const Text('Password & Privacy', style: TextStyle(color: RoomColors.plum, fontSize: 17, fontWeight: FontWeight.w900)),
               const SizedBox(height: 4),
-              const Text(
-                'Locked mode applies only after a password is saved.',
-                style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800),
-              ),
+              const Text('Locked mode applies only after a password is saved.', style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
               Expanded(
                 child: ListView(
@@ -163,9 +168,7 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
                     ...RoomPrivacyMode.values.map((mode) {
                       return _PrivacyTile(mode: mode, selected: _mode == mode, onTap: () {
                         setState(() => _mode = mode);
-                        if (mode != RoomPrivacyMode.locked) {
-                          widget.onModeChanged(mode);
-                        }
+                        if (mode != RoomPrivacyMode.locked) widget.onModeChanged(mode);
                       });
                     }),
                     if (_mode == RoomPrivacyMode.locked) ...[
