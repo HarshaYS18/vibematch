@@ -800,7 +800,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _stayAndMinimize(BuildContext sheetContext) {
-    final navigator = Navigator.of(context, rootNavigator: true);
+    dismissRoomSeatActionPill();
+
+    final roomNavigator = Navigator.of(context);
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
 
     final roomName = _roomName;
     final roomId = _roomId;
@@ -809,9 +812,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final onlineCount = widget.onlineCount;
 
     LiveRoomMinimizedOverlayService.show(
-      context: context,
+      context: rootNavigator.context,
       onRestore: () {
-        navigator.push(
+        rootNavigator.push(
           MaterialPageRoute(
             builder: (_) => LiveRoomPage(
               roomName: roomName,
@@ -831,8 +834,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     setState(() => _allowRoomPop = true);
 
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (mounted) Navigator.maybePop(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (roomNavigator.canPop()) {
+        roomNavigator.pop();
+      } else {
+        setState(() => _minimized = true);
+      }
     });
   }
 
