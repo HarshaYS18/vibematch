@@ -18,16 +18,14 @@ class RoomBackgroundTheme {
   const RoomBackgroundTheme({
     required this.id,
     required this.name,
-    required this.colors,
+    required this.assetPath,
     required this.accent,
-    this.assetPath,
   });
 
   final String id;
   final String name;
-  final List<Color> colors;
+  final String assetPath;
   final Color accent;
-  final String? assetPath;
 }
 
 const String roomBackgroundAssetBase = 'assets/images/rooms/backgrounds';
@@ -35,53 +33,35 @@ const String roomBackgroundAssetBase = 'assets/images/rooms/backgrounds';
 const RoomBackgroundTheme defaultRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'default_luxury',
   name: 'Default Luxury',
-  colors: [Color(0xFF050716), Color(0xFF171034), Color(0xFF0B0613)],
-  accent: RoomColors.violet,
   assetPath: '$roomBackgroundAssetBase/default_luxury.png',
+  accent: RoomColors.violet,
 );
 
 const RoomBackgroundTheme defaultDarkRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'default_dark',
   name: 'Default Dark',
-  colors: [Color(0xFF070414), Color(0xFF251538), Color(0xFF0A0710)],
-  accent: RoomColors.gold,
   assetPath: '$roomBackgroundAssetBase/default_dark.png',
+  accent: RoomColors.gold,
 );
 
 const RoomBackgroundTheme vibeSyncRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'vibe_sync',
-  name: 'VibeSync Glow',
-  colors: [Color(0xFF16051F), Color(0xFF3A0D4E), Color(0xFF061B33)],
-  accent: Color(0xFFFF4FB8),
+  name: 'VibeSync',
   assetPath: '$roomBackgroundAssetBase/vibe_sync.png',
+  accent: Color(0xFFFF4FB8),
 );
 
-const List<RoomBackgroundTheme> mockRoomBackgroundThemes = [
+const List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
   defaultRoomBackgroundTheme,
   defaultDarkRoomBackgroundTheme,
   vibeSyncRoomBackgroundTheme,
-  RoomBackgroundTheme(
-    id: 'royal_night',
-    name: 'Royal Night',
-    colors: [Color(0xFF070414), Color(0xFF251538), Color(0xFF0A0710)],
-    accent: RoomColors.gold,
-    assetPath: '$roomBackgroundAssetBase/royal_night.png',
-  ),
-  RoomBackgroundTheme(
-    id: 'ocean_mood',
-    name: 'Ocean Mood',
-    colors: [Color(0xFF021419), Color(0xFF08384A), Color(0xFF041018)],
-    accent: RoomColors.aqua,
-    assetPath: '$roomBackgroundAssetBase/ocean_mood.png',
-  ),
-  RoomBackgroundTheme(
-    id: 'rose_private',
-    name: 'Rose Private',
-    colors: [Color(0xFF120713), Color(0xFF3B102A), Color(0xFF08040A)],
-    accent: RoomColors.coral,
-    assetPath: '$roomBackgroundAssetBase/rose_private.png',
-  ),
 ];
+
+const List<RoomBackgroundTheme> mockRoomBackgroundThemes = ownedRoomBackgroundThemes;
+
+final ValueNotifier<RoomBackgroundTheme> activeRoomBackgroundTheme = ValueNotifier<RoomBackgroundTheme>(
+  defaultRoomBackgroundTheme,
+);
 
 class RoomBackground extends StatelessWidget {
   const RoomBackground({super.key, this.theme = defaultRoomBackgroundTheme});
@@ -90,73 +70,60 @@ class RoomBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
     return RepaintBoundary(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _fallbackGradient(),
-          if (theme.assetPath != null)
-            Image.asset(
-              theme.assetPath!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-            ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.10),
-                  Colors.black.withValues(alpha: 0.34),
-                  Colors.black.withValues(alpha: 0.62),
-                ],
-              ),
-            ),
+      child: OverflowBox(
+        alignment: Alignment.topCenter,
+        minWidth: screenSize.width,
+        maxWidth: screenSize.width,
+        minHeight: screenSize.height,
+        maxHeight: screenSize.height,
+        child: SizedBox(
+          width: screenSize.width,
+          height: screenSize.height,
+          child: ValueListenableBuilder<RoomBackgroundTheme>(
+            valueListenable: activeRoomBackgroundTheme,
+            builder: (context, activeTheme, _) {
+              return _AssetOnlyRoomBackground(theme: activeTheme);
+            },
           ),
-          Positioned(
-            right: -150,
-            top: 90,
-            child: _GlowCircle(size: 315, color: theme.accent.withValues(alpha: 0.14)),
-          ),
-          Positioned(
-            left: -115,
-            bottom: 130,
-            child: _GlowCircle(size: 230, color: RoomColors.aqua.withValues(alpha: 0.10)),
-          ),
-          Positioned(
-            right: 52,
-            bottom: -120,
-            child: _GlowCircle(size: 235, color: RoomColors.coral.withValues(alpha: 0.08)),
-          ),
-          ...List.generate(18, (index) {
-            final left = ((index * 47) % 360).toDouble();
-            final top = (58 + ((index * 71) % 700)).toDouble();
-            final size = 1.4 + (index % 3);
-            return Positioned(
-              left: left,
-              top: top,
-              child: Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), shape: BoxShape.circle),
-              ),
-            );
-          }),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _fallbackGradient() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: theme.colors,
+class _AssetOnlyRoomBackground extends StatelessWidget {
+  const _AssetOnlyRoomBackground({required this.theme});
+
+  final RoomBackgroundTheme theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(color: RoomColors.deep),
+        Image.asset(
+          theme.assetPath,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          errorBuilder: (context, error, stackTrace) => Container(color: RoomColors.deep),
         ),
-      ),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.05),
+                Colors.black.withValues(alpha: 0.16),
+                Colors.black.withValues(alpha: 0.50),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -166,54 +133,73 @@ class RoomBackgroundPickerSheet extends StatelessWidget {
     super.key,
     required this.currentTheme,
     required this.onThemeSelected,
+    required this.onStoreTap,
   });
 
   final RoomBackgroundTheme currentTheme;
   final ValueChanged<RoomBackgroundTheme> onThemeSelected;
+  final VoidCallback onStoreTap;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.62),
+      height: MediaQuery.sizeOf(context).height * 0.62,
       padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 14),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SheetHandle(width: 44),
           const SizedBox(height: 14),
-          const Text(
-            'Room Backgrounds',
-            style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.3),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Choose an asset background for this room.',
-            style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800),
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Room Backgrounds',
+                      style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.3),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Owned asset backgrounds only',
+                      style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              ),
+              _StorePill(onTap: onStoreTap),
+            ],
           ),
           const SizedBox(height: 14),
-          Flexible(
+          const Text(
+            'Owned',
+            style: TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
             child: GridView.builder(
-              shrinkWrap: true,
+              padding: EdgeInsets.zero,
               physics: const BouncingScrollPhysics(),
-              itemCount: mockRoomBackgroundThemes.length,
+              itemCount: ownedRoomBackgroundThemes.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                mainAxisExtent: 124,
+                childAspectRatio: 1.18,
               ),
               itemBuilder: (context, index) {
-                final theme = mockRoomBackgroundThemes[index];
+                final theme = ownedRoomBackgroundThemes[index];
                 final selected = theme.id == currentTheme.id;
                 return _BackgroundThemeTile(
                   theme: theme,
                   selected: selected,
                   onTap: () {
+                    activeRoomBackgroundTheme.value = theme;
                     onThemeSelected(theme);
                     Navigator.pop(context);
                   },
@@ -258,14 +244,13 @@ class _BackgroundThemeTile extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: theme.colors))),
-                      if (theme.assetPath != null)
-                        Image.asset(
-                          theme.assetPath!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                        ),
-                      Container(color: Colors.black.withValues(alpha: 0.18)),
+                      Container(color: RoomColors.deep),
+                      Image.asset(
+                        theme.assetPath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(color: RoomColors.deep),
+                      ),
+                      Container(color: Colors.black.withValues(alpha: 0.12)),
                       if (selected)
                         const Align(
                           alignment: Alignment.topRight,
@@ -293,15 +278,33 @@ class _BackgroundThemeTile extends StatelessWidget {
   }
 }
 
-class _GlowCircle extends StatelessWidget {
-  const _GlowCircle({required this.size, required this.color});
+class _StorePill extends StatelessWidget {
+  const _StorePill({required this.onTap});
 
-  final double size;
-  final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+    return Material(
+      color: RoomColors.plum,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 11),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.storefront_rounded, color: Colors.white, size: 14),
+              SizedBox(width: 5),
+              Text('Store', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -319,7 +322,7 @@ class SheetHandle extends StatelessWidget {
   }
 }
 
-class RoundRoomButton extends StatelessWidget {
+class RoundRoomButton extends StatefulWidget {
   const RoundRoomButton({
     super.key,
     required this.icon,
@@ -338,11 +341,29 @@ class RoundRoomButton extends StatelessWidget {
   final double iconSize;
 
   @override
+  State<RoundRoomButton> createState() => _RoundRoomButtonState();
+}
+
+class _RoundRoomButtonState extends State<RoundRoomButton> {
+  bool _tapLocked = false;
+
+  @override
   Widget build(BuildContext context) {
     return Material(
-      color: background ?? Colors.white.withValues(alpha: 0.075),
+      color: widget.background ?? Colors.white.withValues(alpha: 0.075),
       shape: const CircleBorder(),
-      child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: SizedBox(width: size, height: size, child: Icon(icon, color: color, size: iconSize))),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () {
+          if (_tapLocked) return;
+          _tapLocked = true;
+          widget.onTap();
+          Future<void>.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) _tapLocked = false;
+          });
+        },
+        child: SizedBox(width: widget.size, height: widget.size, child: Icon(widget.icon, color: widget.color, size: widget.iconSize)),
+      ),
     );
   }
 }
