@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'room_action_pages.dart';
 import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
@@ -48,7 +49,9 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
   @override
   void didUpdateWidget(covariant RoomChatFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.messages.length < _clearedMessageCount) _clearedMessageCount = widget.messages.length;
+    if (widget.messages.length < _clearedMessageCount) {
+      _clearedMessageCount = widget.messages.length;
+    }
     if (widget.messages.length != _lastMessageCount) {
       _lastMessageCount = widget.messages.length;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -73,7 +76,11 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
     if (jump) {
       _scrollController.jumpTo(target);
     } else {
-      _scrollController.animateTo(target, duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic);
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
     }
   }
 
@@ -126,70 +133,161 @@ class _CompactChatLine extends StatelessWidget {
 
     final row = Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          if (!isSystem) ...[
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onSenderTap,
-              child: CircleAvatar(
-                radius: 13.5,
-                backgroundColor: message.isGift
-                    ? RoomColors.gold
-                    : message.isSeatApplication
-                        ? RoomColors.aqua
-                        : RoomColors.violet,
-                child: Text(avatarLetter(message.senderName), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+      child: Container(
+        // Transparent square hit-area around every chat message by default.
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
+          shape: BoxShape.rectangle,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (!isSystem) ...[
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onSenderTap,
+                child: CircleAvatar(
+                  radius: 13.5,
+                  backgroundColor: message.isGift
+                      ? RoomColors.gold
+                      : message.isSeatApplication
+                          ? RoomColors.aqua
+                          : RoomColors.violet,
+                  child: Text(
+                    avatarLetter(message.senderName),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Expanded(
-            child: RichText(
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                children: [
-                  if (isSystem)
-                    TextSpan(text: message.message, style: const TextStyle(color: RoomColors.gold, fontSize: 14.5, fontWeight: FontWeight.w900, height: 1.15))
-                  else ...[
-                    TextSpan(
-                      text: message.senderName,
-                      recognizer: TapGestureRecognizer()..onTap = onSenderTap,
-                      style: const TextStyle(color: Colors.white, fontSize: 14.8, fontWeight: FontWeight.w900, height: 1.15),
-                    ),
-                    const TextSpan(text: '  '),
-                    WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: VipBadge(level: message.vipLevel, size: VipBadgeSize.tiny),
-                    ),
-                    const TextSpan(text: '  '),
-                    ..._messageSpans(message),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: RichText(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                text: TextSpan(
+                  children: [
+                    if (isSystem)
+                      TextSpan(
+                        text: message.message,
+                        style: const TextStyle(
+                          color: RoomColors.gold,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                        ),
+                      )
+                    else ...[
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _openVipSvipCenter(context),
+                          child: VipBadge(
+                            level: message.vipLevel,
+                            size: VipBadgeSize.tiny,
+                            showWhenZero: true,
+                          ),
+                        ),
+                      ),
+                      const TextSpan(text: '  '),
+                      TextSpan(
+                        text: message.senderName,
+                        recognizer: TapGestureRecognizer()..onTap = onSenderTap,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14.8,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                        ),
+                      ),
+                      const TextSpan(text: '  '),
+                      ..._messageSpans(message),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-          if (showAgree) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: onApproveSeatApplication,
-              child: Container(
-                height: 28,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: RoomColors.aqua, borderRadius: BorderRadius.circular(999), boxShadow: [BoxShadow(color: RoomColors.aqua.withValues(alpha: 0.24), blurRadius: 10, offset: const Offset(0, 4))]),
-                child: const Text('Agree', style: TextStyle(color: RoomColors.deep, fontSize: 11, fontWeight: FontWeight.w900)),
+            if (showAgree) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onApproveSeatApplication,
+                child: Container(
+                  height: 28,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: RoomColors.aqua,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: RoomColors.aqua.withValues(alpha: 0.24),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    'Agree',
+                    style: TextStyle(
+                      color: RoomColors.deep,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
 
     if (isSystem) return row;
-    return GestureDetector(behavior: HitTestBehavior.translucent, onTap: onSenderTap, child: row);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onSenderTap,
+      child: row,
+    );
+  }
+
+  void _openVipSvipCenter(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RoomActionPage(
+          title: 'VIP & SVIP Centre',
+          subtitle:
+              '${message.senderName} is VIP ${message.vipLevel}. VIP benefits, SVIP rules, badge upgrades, recharge progress and frozen VIP status will connect here.',
+          icon: Icons.workspace_premium_rounded,
+          cards: [
+            RoomActionCard(
+              title: 'Current VIP',
+              value: 'VIP ${message.vipLevel}',
+              icon: Icons.workspace_premium_rounded,
+              color: RoomColors.gold,
+            ),
+            RoomActionCard(
+              title: 'Monthly SVIP',
+              value: 'SVIP status connects from backend',
+              icon: Icons.auto_awesome_rounded,
+              color: RoomColors.violet,
+            ),
+            const RoomActionCard(
+              title: 'VIP 30+ shine',
+              value: 'Premium badge shine and extra glow unlock at VIP 30+',
+              icon: Icons.auto_awesome_rounded,
+              color: RoomColors.aqua,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   List<TextSpan> _messageSpans(ChatEntry message) {
@@ -199,8 +297,20 @@ class _CompactChatLine extends StatelessWidget {
     var cursor = 0;
 
     for (final match in mentionRegex.allMatches(text)) {
-      if (match.start > cursor) spans.add(_normalSpan(text.substring(cursor, match.start), message));
-      spans.add(TextSpan(text: text.substring(match.start, match.end), style: const TextStyle(color: RoomColors.aqua, fontSize: 14.2, fontWeight: FontWeight.w900, height: 1.15)));
+      if (match.start > cursor) {
+        spans.add(_normalSpan(text.substring(cursor, match.start), message));
+      }
+      spans.add(
+        TextSpan(
+          text: text.substring(match.start, match.end),
+          style: const TextStyle(
+            color: RoomColors.aqua,
+            fontSize: 14.2,
+            fontWeight: FontWeight.w900,
+            height: 1.15,
+          ),
+        ),
+      );
       cursor = match.end;
     }
 
@@ -277,24 +387,51 @@ class RoomInputDock extends StatelessWidget {
 
           return Container(
             padding: EdgeInsets.fromLTRB(horizontalPadding, 5, horizontalPadding, 6),
-            decoration: BoxDecoration(color: RoomColors.deep.withValues(alpha: 0.94), border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05)))),
+            decoration: BoxDecoration(
+              color: RoomColors.deep.withValues(alpha: 0.94),
+              border: Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+            ),
             child: Row(
               children: [
-                _DockButton(icon: Icons.mail_outline_rounded, onTap: () => _runAndHideSeatActions(onInboxTap), badgeCount: inboxUnreadCount, size: dockButtonSize, iconSize: dockIconSize),
+                _DockButton(
+                  icon: Icons.mail_outline_rounded,
+                  onTap: () => _runAndHideSeatActions(onInboxTap),
+                  badgeCount: inboxUnreadCount,
+                  size: dockButtonSize,
+                  iconSize: dockIconSize,
+                ),
                 SizedBox(width: gap),
                 Expanded(
                   child: Container(
                     height: inputHeight,
                     padding: EdgeInsets.only(left: tiny ? 8 : 10),
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(19), border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.30),
+                      borderRadius: BorderRadius.circular(19),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    ),
                     child: Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: controller,
                             focusNode: focusNode,
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: tiny ? 12.8 : 13.5),
-                            decoration: InputDecoration(hintText: 'Message...', hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w800), border: InputBorder.none, isDense: true),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: tiny ? 12.8 : 13.5,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Message...',
+                              hintStyle: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.36),
+                                fontWeight: FontWeight.w800,
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
                             onTap: dismissRoomSeatActionPill,
                             onSubmitted: (_) => _runAndHideSeatActions(onSendTap),
                           ),
@@ -304,8 +441,16 @@ class RoomInputDock extends StatelessWidget {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: BoxConstraints(minWidth: inputIconMin, minHeight: inputIconMin),
-                            onPressed: imagesEnabled ? () => _runAndHideSeatActions(() => RoomToast.show(context, 'Image message picker will connect here')) : null,
-                            icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22), size: inputIconSize),
+                            onPressed: imagesEnabled
+                                ? () => _runAndHideSeatActions(
+                                      () => RoomToast.show(context, 'Image message picker will connect here'),
+                                    )
+                                : null,
+                            icon: Icon(
+                              Icons.image_rounded,
+                              color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22),
+                              size: inputIconSize,
+                            ),
                           ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
@@ -326,11 +471,29 @@ class RoomInputDock extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: gap),
-                _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(onMicTap), active: !micMuted, muted: micMuted, size: dockButtonSize, iconSize: dockIconSize),
+                _DockButton(
+                  icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                  onTap: () => _runAndHideSeatActions(onMicTap),
+                  active: !micMuted,
+                  muted: micMuted,
+                  size: dockButtonSize,
+                  iconSize: dockIconSize,
+                ),
                 SizedBox(width: gap),
-                _DockButton(icon: Icons.sports_esports_rounded, onTap: () => _runAndHideSeatActions(onGamesTap), size: dockButtonSize, iconSize: dockIconSize),
+                _DockButton(
+                  icon: Icons.sports_esports_rounded,
+                  onTap: () => _runAndHideSeatActions(onGamesTap),
+                  size: dockButtonSize,
+                  iconSize: dockIconSize,
+                ),
                 SizedBox(width: gap),
-                _DockButton(icon: Icons.card_giftcard_rounded, onTap: () => _runAndHideSeatActions(onGiftTap), gift: true, size: dockButtonSize, iconSize: dockIconSize),
+                _DockButton(
+                  icon: Icons.card_giftcard_rounded,
+                  onTap: () => _runAndHideSeatActions(onGiftTap),
+                  gift: true,
+                  size: dockButtonSize,
+                  iconSize: dockIconSize,
+                ),
               ],
             ),
           );
@@ -341,7 +504,16 @@ class RoomInputDock extends StatelessWidget {
 }
 
 class _DockButton extends StatelessWidget {
-  const _DockButton({required this.icon, required this.onTap, this.active = false, this.muted = false, this.gift = false, this.badgeCount = 0, this.size = 36, this.iconSize = 19});
+  const _DockButton({
+    required this.icon,
+    required this.onTap,
+    this.active = false,
+    this.muted = false,
+    this.gift = false,
+    this.badgeCount = 0,
+    this.size = 36,
+    this.iconSize = 19,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
@@ -354,7 +526,11 @@ class _DockButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = muted ? RoomColors.coral.withValues(alpha: 0.22) : active ? RoomColors.aqua.withValues(alpha: 0.24) : Colors.white.withValues(alpha: 0.055);
+    final bg = muted
+        ? RoomColors.coral.withValues(alpha: 0.22)
+        : active
+            ? RoomColors.aqua.withValues(alpha: 0.24)
+            : Colors.white.withValues(alpha: 0.055);
     final iconColor = muted ? RoomColors.coral : active ? RoomColors.aqua : Colors.white;
 
     return Material(
@@ -369,7 +545,12 @@ class _DockButton extends StatelessWidget {
             Container(
               width: size,
               height: size,
-              decoration: BoxDecoration(shape: BoxShape.circle, gradient: gift ? const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]) : null, color: gift ? null : bg, border: Border.all(color: Colors.white.withValues(alpha: 0.09))),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: gift ? const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]) : null,
+                color: gift ? null : bg,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+              ),
               child: Icon(icon, color: gift ? Colors.white : iconColor, size: iconSize),
             ),
             if (badgeCount > 0)
@@ -380,8 +561,19 @@ class _DockButton extends StatelessWidget {
                   constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: RoomColors.coral, borderRadius: BorderRadius.circular(999), border: Border.all(color: RoomColors.deep, width: 1)),
-                  child: Text(badgeCount > 99 ? '99+' : '$badgeCount', style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900)),
+                  decoration: BoxDecoration(
+                    color: RoomColors.coral,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: RoomColors.deep, width: 1),
+                  ),
+                  child: Text(
+                    badgeCount > 99 ? '99+' : '$badgeCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ),
           ],
