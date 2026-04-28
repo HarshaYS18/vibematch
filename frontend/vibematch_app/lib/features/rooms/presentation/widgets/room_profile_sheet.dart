@@ -68,7 +68,7 @@ class UserMiniProfileSheet extends StatelessWidget {
           SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               14,
-              84,
+              52,
               14,
               MediaQuery.paddingOf(context).bottom + 12,
             ),
@@ -185,11 +185,11 @@ class UserMiniProfileSheet extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: 10,
+            top: -32,
             child: MiniProfileAvatarDecoration(
               user: user,
               onTap: onAvatarTap,
-              size: 62,
+              size: 66,
               showHeartBadge: false,
               showOnlineRing: true,
             ),
