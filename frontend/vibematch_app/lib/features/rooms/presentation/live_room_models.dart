@@ -64,6 +64,30 @@ extension GiftCategoryX on GiftCategory {
   }
 }
 
+extension RoomUserGenderX on RoomUserGender {
+  IconData get icon {
+    switch (this) {
+      case RoomUserGender.male:
+        return Icons.male_rounded;
+      case RoomUserGender.female:
+        return Icons.female_rounded;
+      case RoomUserGender.undisclosed:
+        return Icons.person_rounded;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case RoomUserGender.male:
+        return const Color(0xFF4A9BFF);
+      case RoomUserGender.female:
+        return const Color(0xFFE84C72);
+      case RoomUserGender.undisclosed:
+        return const Color(0xFF8C8198);
+    }
+  }
+}
+
 class SeatUser {
   const SeatUser({
     required this.id,
@@ -78,6 +102,10 @@ class SeatUser {
     required this.receivedExp,
     required this.medals,
     required this.avatarColors,
+    this.svipLevel = 0,
+    this.age,
+    this.locationLabel,
+    this.locationVisible = true,
     this.gender = RoomUserGender.undisclosed,
     this.isCurrentUser = false,
     this.isHost = false,
@@ -98,6 +126,10 @@ class SeatUser {
   final int receivedExp;
   final List<String> medals;
   final List<Color> avatarColors;
+  final int svipLevel;
+  final int? age;
+  final String? locationLabel;
+  final bool locationVisible;
   final RoomUserGender gender;
   final bool isCurrentUser;
   final bool isHost;
@@ -106,6 +138,7 @@ class SeatUser {
   final bool adminMuted;
 
   bool get muted => selfMuted || adminMuted;
+  bool get showLocation => locationVisible && (locationLabel?.trim().isNotEmpty ?? false);
 
   SeatUser copyWith({
     String? roleLabel,
@@ -115,6 +148,10 @@ class SeatUser {
     bool? selfMuted,
     bool? adminMuted,
     RoomUserGender? gender,
+    int? svipLevel,
+    int? age,
+    String? locationLabel,
+    bool? locationVisible,
   }) {
     return SeatUser(
       id: id,
@@ -129,6 +166,10 @@ class SeatUser {
       receivedExp: receivedExp ?? this.receivedExp,
       medals: medals,
       avatarColors: avatarColors,
+      svipLevel: svipLevel ?? this.svipLevel,
+      age: age ?? this.age,
+      locationLabel: locationLabel ?? this.locationLabel,
+      locationVisible: locationVisible ?? this.locationVisible,
       gender: gender ?? this.gender,
       isCurrentUser: isCurrentUser,
       isHost: isHost,
@@ -326,6 +367,7 @@ const List<SeatUser> mockRoomUsers = [
     familyName: 'Moon Fam',
     relationshipText: 'Love: Riya • Bonds: Arjun, Kiran',
     vipLevel: 32,
+    svipLevel: 3,
     sendingLevel: 52,
     receivingLevel: 44,
     sentExp: 98200,
@@ -333,6 +375,8 @@ const List<SeatUser> mockRoomUsers = [
     medals: ['🏆', '💎', '🔥'],
     avatarColors: [Color(0xFFFFC857), Color(0xFFFF5F7E)],
     gender: RoomUserGender.male,
+    age: 27,
+    locationLabel: 'Vijayawada, India',
     isCurrentUser: true,
     isHost: true,
     isRoomAdmin: true,
@@ -344,6 +388,7 @@ const List<SeatUser> mockRoomUsers = [
     familyName: 'Moon Fam',
     relationshipText: 'Love: Harsha • Bonds: Meera',
     vipLevel: 28,
+    svipLevel: 1,
     sendingLevel: 41,
     receivingLevel: 38,
     sentExp: 65400,
@@ -351,6 +396,8 @@ const List<SeatUser> mockRoomUsers = [
     medals: ['🌙', '🎖️'],
     avatarColors: [Color(0xFF18C7B7), Color(0xFF5E6DFF)],
     gender: RoomUserGender.female,
+    age: 24,
+    locationLabel: 'Hyderabad, India',
     isRoomAdmin: true,
   ),
   SeatUser(
@@ -360,6 +407,7 @@ const List<SeatUser> mockRoomUsers = [
     familyName: 'Moon Fam',
     relationshipText: 'Bond: Harsha',
     vipLevel: 18,
+    svipLevel: 0,
     sendingLevel: 22,
     receivingLevel: 17,
     sentExp: 22500,
@@ -367,6 +415,8 @@ const List<SeatUser> mockRoomUsers = [
     medals: ['⭐'],
     avatarColors: [Color(0xFFE84C72), Color(0xFFB13C77)],
     gender: RoomUserGender.male,
+    age: 25,
+    locationLabel: 'Bengaluru, India',
   ),
 ];
 
@@ -378,6 +428,7 @@ const List<SeatUser> mockInviteUsers = [
     familyName: 'Star House',
     relationshipText: 'Bond: Riya',
     vipLevel: 9,
+    svipLevel: 0,
     sendingLevel: 14,
     receivingLevel: 11,
     sentExp: 8800,
@@ -385,6 +436,8 @@ const List<SeatUser> mockInviteUsers = [
     medals: ['🌟'],
     avatarColors: [Color(0xFF7A5CFF), Color(0xFF12C7B7)],
     gender: RoomUserGender.female,
+    age: 23,
+    locationLabel: 'Chennai, India',
   ),
   SeatUser(
     id: 'nikhil',
@@ -393,6 +446,7 @@ const List<SeatUser> mockInviteUsers = [
     familyName: '',
     relationshipText: '',
     vipLevel: 4,
+    svipLevel: 0,
     sendingLevel: 7,
     receivingLevel: 5,
     sentExp: 2100,
@@ -400,6 +454,8 @@ const List<SeatUser> mockInviteUsers = [
     medals: [],
     avatarColors: [Color(0xFFFF7A45), Color(0xFFE84C72)],
     gender: RoomUserGender.male,
+    age: 22,
+    locationLabel: 'Nandyal, India',
   ),
   SeatUser(
     id: 'kiran',
@@ -408,6 +464,7 @@ const List<SeatUser> mockInviteUsers = [
     familyName: 'Moon Fam',
     relationshipText: 'Bond: Harsha',
     vipLevel: 13,
+    svipLevel: 0,
     sendingLevel: 20,
     receivingLevel: 16,
     sentExp: 14800,
@@ -415,6 +472,9 @@ const List<SeatUser> mockInviteUsers = [
     medals: ['🔥'],
     avatarColors: [Color(0xFFFFC857), Color(0xFF7A5CFF)],
     gender: RoomUserGender.male,
+    age: 26,
+    locationLabel: 'Vizag, India',
+    locationVisible: false,
   ),
 ];
 
