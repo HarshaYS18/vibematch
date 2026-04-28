@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../live_room_models.dart';
 import 'mini_profile_decoration.dart';
 import 'room_theme.dart';
-import 'vip_badge.dart';
 
 class UserMiniProfileSheet extends StatelessWidget {
   const UserMiniProfileSheet({
@@ -626,6 +625,35 @@ class _VipStatCard extends StatelessWidget {
   final int vipLevel;
   final VoidCallback onTap;
 
+  static const String _assetBase = 'assets/images/vip_badges';
+
+  String get _assetPath {
+    if (vipLevel >= 41) return '$_assetBase/vip_purple.png';
+    if (vipLevel >= 30) return '$_assetBase/vip_green.png';
+    if (vipLevel >= 21) return '$_assetBase/vip_blue.png';
+    if (vipLevel >= 11) return '$_assetBase/vip_red.png';
+    if (vipLevel >= 6) return '$_assetBase/vip_black_gold.png';
+    return '$_assetBase/vip_silver.png';
+  }
+
+  Color get _accentColor {
+    if (vipLevel >= 41) return const Color(0xFF9C3BCE);
+    if (vipLevel >= 30) return const Color(0xFF0F9A5A);
+    if (vipLevel >= 21) return const Color(0xFF0C78CF);
+    if (vipLevel >= 11) return const Color(0xFFD33B47);
+    if (vipLevel >= 6) return const Color(0xFFC99A3B);
+    return const Color(0xFF89909A);
+  }
+
+  Color get _tintColor {
+    if (vipLevel >= 41) return const Color(0xFFF6E9FF);
+    if (vipLevel >= 30) return const Color(0xFFE8FFF3);
+    if (vipLevel >= 21) return const Color(0xFFEAF6FF);
+    if (vipLevel >= 11) return const Color(0xFFFFECEF);
+    if (vipLevel >= 6) return const Color(0xFFFFF7E3);
+    return const Color(0xFFF2F4F7);
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -635,14 +663,62 @@ class _VipStatCard extends StatelessWidget {
         height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _tintColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: RoomColors.softLine),
+          border: Border.all(color: _accentColor.withValues(alpha: 0.20)),
         ),
-        alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: VipBadge(level: vipLevel, size: VipBadgeSize.small),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Text(
+              'VIP Level',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Color(0xFF7B7282),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 3),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    _assetPath,
+                    width: 31,
+                    height: 31,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.shield_rounded,
+                        color: _accentColor,
+                        size: 28,
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    'VIP $vipLevel',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _accentColor,
+                      fontSize: 14.2,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
