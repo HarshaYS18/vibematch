@@ -21,11 +21,13 @@ class LiveRoomGiftOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+
     return Stack(
       children: [
         Positioned(
           left: 12,
-          top: 218,
+          top: size.height * 0.50,
           child: GiftSlideStack(
             slides: slides,
             onComboTap: onComboTap,
