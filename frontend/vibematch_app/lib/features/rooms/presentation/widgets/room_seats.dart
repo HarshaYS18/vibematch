@@ -47,7 +47,6 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   static const double _rowHeight = 118;
   static const double _hostRowHeight = 118;
   static const double _avatarSize = 66;
-  static const double _actionWidth = 108;
   static const double _actionItemHeight = 30;
   static const double _actionPaddingY = 7;
   static const double _actionDividerAndMargin = 7;
@@ -83,13 +82,14 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   Widget build(BuildContext context) {
     final spec = SeatLayoutSpec.parse(widget.layoutId);
     final selectedSeat = _selectedSeatForActions;
-    final actionHeight = selectedSeat == null ? 0.0 : _actionMenuHeight(selectedSeat.locked ? 1 : 3);
     final hostHeight = spec.hasHostSeats ? _hostRowHeight : 0.0;
     final gridHeight = hostHeight + (spec.rows * _rowHeight);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
+        final actionWidth = _adaptiveActionWidth(width);
+        final actionHeight = selectedSeat == null ? 0.0 : _actionMenuHeight(selectedSeat.locked ? 1 : 3);
         final children = <Widget>[];
 
         if (selectedSeat != null) {
@@ -144,6 +144,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
             seatCenter: position,
             width: width,
             gridHeight: gridHeight,
+            actionWidth: actionWidth,
             actionHeight: actionHeight,
           );
 
@@ -151,7 +152,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
             Positioned(
               left: placement.dx,
               top: placement.dy,
-              width: _actionWidth,
+              width: actionWidth,
               child: _SeatActionMenu(
                 actions: selectedSeat.locked
                     ? [
@@ -186,10 +187,17 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
         return SizedBox(
           height: gridHeight,
           width: width,
-          child: Stack(clipBehavior: Clip.none, children: children),
+          child: ClipRect(
+            child: Stack(clipBehavior: Clip.none, children: children),
+          ),
         );
       },
     );
+  }
+
+  double _adaptiveActionWidth(double availableWidth) {
+    if (availableWidth <= 0) return 96;
+    return availableWidth < 330 ? 96 : 108;
   }
 
   double _actionMenuHeight(int actionCount) {
@@ -201,11 +209,14 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     required Offset seatCenter,
     required double width,
     required double gridHeight,
+    required double actionWidth,
     required double actionHeight,
   }) {
-    final left = (seatCenter.dx - (_actionWidth / 2)).clamp(0.0, width - _actionWidth);
-    final desiredBelow = seatCenter.dy + (_avatarSize / 2) + 12;
-    final desiredAbove = seatCenter.dy - (_avatarSize / 2) - actionHeight - 12;
+    final safeWidth = width <= 0 ? actionWidth : width;
+    final maxLeft = (safeWidth - actionWidth).clamp(0.0, safeWidth);
+    final left = (seatCenter.dx - (actionWidth / 2)).clamp(0.0, maxLeft);
+    final desiredBelow = seatCenter.dy + (_avatarSize / 2) + 10;
+    final desiredAbove = seatCenter.dy - (_avatarSize / 2) - actionHeight - 10;
 
     final top = desiredBelow + actionHeight <= gridHeight
         ? desiredBelow
