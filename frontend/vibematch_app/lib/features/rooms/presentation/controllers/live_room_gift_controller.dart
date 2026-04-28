@@ -116,6 +116,13 @@ class LiveRoomGiftController {
     final sentToAll = receivers.length == roomUsers.length && roomUsers.isNotEmpty;
     final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
 
+    // If a gift is sent to All, the visible combo should represent the total
+    // number of gifts delivered: selected combo x number of receivers.
+    // Example: x9 sent to 3 people shows x27, then each combo trigger adds x27.
+    final deliveredCombo = sentToAll
+        ? selectedCombo * receivers.length
+        : selectedCombo;
+
     for (final receiver in targets) {
       final slide = GiftSlide(
         id: '${receiver?.id ?? 'all'}-${DateTime.now().microsecondsSinceEpoch}',
@@ -124,8 +131,8 @@ class LiveRoomGiftController {
         giftName: gift.name,
         giftIcon: gift.icon,
         colors: gift.colors,
-        combo: selectedCombo,
-        baseCombo: selectedCombo,
+        combo: deliveredCombo,
+        baseCombo: deliveredCombo,
         remainingSeconds: 15,
       );
       _startGiftSlide(slide);
