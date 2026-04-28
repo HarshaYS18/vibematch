@@ -1,6 +1,8 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'room_text_bubbles.dart';
 import 'room_theme.dart';
 
 class RoomChatFeed extends StatelessWidget {
@@ -9,11 +11,13 @@ class RoomChatFeed extends StatelessWidget {
     required this.messages,
     required this.canManageSeatApplications,
     required this.onApproveSeatApplication,
+    this.onSenderTap,
   });
 
   final List<ChatEntry> messages;
   final bool canManageSeatApplications;
   final ValueChanged<ChatEntry> onApproveSeatApplication;
+  final ValueChanged<ChatEntry>? onSenderTap;
 
   @override
   Widget build(BuildContext context) {
@@ -27,10 +31,14 @@ class RoomChatFeed extends StatelessWidget {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
-        return _CompactChatLine(
-          message: message,
-          canManageSeatApplications: canManageSeatApplications,
-          onApproveSeatApplication: () => onApproveSeatApplication(message),
+        return RoomTextBubbleHost(
+          bubble: null,
+          child: _CompactChatLine(
+            message: message,
+            canManageSeatApplications: canManageSeatApplications,
+            onSenderTap: onSenderTap == null ? null : () => onSenderTap!(message),
+            onApproveSeatApplication: () => onApproveSeatApplication(message),
+          ),
         );
       },
     );
@@ -38,55 +46,60 @@ class RoomChatFeed extends StatelessWidget {
 }
 
 class _CompactChatLine extends StatelessWidget {
-  const _CompactChatLine({required this.message, required this.canManageSeatApplications, required this.onApproveSeatApplication});
+  const _CompactChatLine({
+    required this.message,
+    required this.canManageSeatApplications,
+    required this.onApproveSeatApplication,
+    this.onSenderTap,
+  });
 
   final ChatEntry message;
   final bool canManageSeatApplications;
   final VoidCallback onApproveSeatApplication;
+  final VoidCallback? onSenderTap;
 
   @override
   Widget build(BuildContext context) {
     final showAgree = message.isSeatApplication && canManageSeatApplications && !message.applicationApproved;
+    final isSystem = message.senderId == 'system';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-      decoration: BoxDecoration(
-        color: message.isGift
-            ? RoomColors.gold.withValues(alpha: 0.13)
-            : message.isSeatApplication
-                ? RoomColors.aqua.withValues(alpha: 0.12)
-                : Colors.black.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: message.isGift
-              ? RoomColors.gold.withValues(alpha: 0.24)
-              : message.isSeatApplication
-                  ? RoomColors.aqua.withValues(alpha: 0.24)
-                  : Colors.white.withValues(alpha: 0.07),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: message.isGift
-                ? RoomColors.gold
-                : message.isSeatApplication
-                    ? RoomColors.aqua
-                    : RoomColors.violet,
-            child: Text(avatarLetter(message.senderName), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-          ),
-          const SizedBox(width: 7),
+          if (!isSystem) ...[
+            GestureDetector(
+              onTap: onSenderTap,
+              child: CircleAvatar(
+                radius: 11.5,
+                backgroundColor: message.isGift
+                    ? RoomColors.gold
+                    : message.isSeatApplication
+                        ? RoomColors.aqua
+                        : RoomColors.violet,
+                child: Text(avatarLetter(message.senderName), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
           Expanded(
             child: RichText(
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               text: TextSpan(
                 children: [
-                  TextSpan(text: '${message.senderName}  ', style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)),
-                  TextSpan(text: 'VIP ${message.vipLevel}  S${message.sendingLevel}  R${message.receivingLevel}: ', style: TextStyle(color: RoomColors.gold.withValues(alpha: 0.92), fontSize: 10.5, fontWeight: FontWeight.w900)),
-                  TextSpan(text: message.message, style: TextStyle(color: message.isGift ? RoomColors.gold : message.isSeatApplication ? RoomColors.aqua : Colors.white.withValues(alpha: 0.88), fontSize: 12.5, fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w700)),
+                  if (isSystem)
+                    TextSpan(text: message.message, style: const TextStyle(color: RoomColors.gold, fontSize: 12.3, fontWeight: FontWeight.w900))
+                  else ...[
+                    TextSpan(
+                      text: message.senderName,
+                      recognizer: TapGestureRecognizer()..onTap = onSenderTap,
+                      style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900),
+                    ),
+                    TextSpan(text: '  VIP ${message.vipLevel}: ', style: TextStyle(color: RoomColors.gold.withValues(alpha: 0.94), fontSize: 10.8, fontWeight: FontWeight.w900)),
+                    ..._messageSpans(message),
+                  ],
                 ],
               ),
             ),
@@ -108,6 +121,42 @@ class _CompactChatLine extends StatelessWidget {
       ),
     );
   }
+
+  List<TextSpan> _messageSpans(ChatEntry message) {
+    final text = message.message;
+    final mentionRegex = RegExp(r'@\w+');
+    final spans = <TextSpan>[];
+    var cursor = 0;
+
+    for (final match in mentionRegex.allMatches(text)) {
+      if (match.start > cursor) {
+        spans.add(_normalSpan(text.substring(cursor, match.start), message));
+      }
+      spans.add(TextSpan(
+        text: text.substring(match.start, match.end),
+        style: const TextStyle(color: RoomColors.aqua, fontSize: 12.5, fontWeight: FontWeight.w900),
+      ));
+      cursor = match.end;
+    }
+
+    if (cursor < text.length) spans.add(_normalSpan(text.substring(cursor), message));
+    return spans;
+  }
+
+  TextSpan _normalSpan(String text, ChatEntry message) {
+    return TextSpan(
+      text: text,
+      style: TextStyle(
+        color: message.isGift
+            ? RoomColors.gold
+            : message.isSeatApplication
+                ? RoomColors.aqua
+                : Colors.white.withValues(alpha: 0.88),
+        fontSize: 12.5,
+        fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w700,
+      ),
+    );
+  }
 }
 
 class RoomInputDock extends StatelessWidget {
@@ -123,6 +172,7 @@ class RoomInputDock extends StatelessWidget {
     required this.onMicTap,
     required this.onGamesTap,
     required this.onGiftTap,
+    this.imagesEnabled = true,
   });
 
   final TextEditingController controller;
@@ -135,6 +185,7 @@ class RoomInputDock extends StatelessWidget {
   final VoidCallback onMicTap;
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
+  final bool imagesEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -175,8 +226,8 @@ class RoomInputDock extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                      onPressed: () => RoomToast.show(context, 'Image message picker will connect here'),
-                      icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: 0.78), size: 19),
+                      onPressed: imagesEnabled ? () => RoomToast.show(context, 'Image message picker will connect here') : null,
+                      icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22), size: 19),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
