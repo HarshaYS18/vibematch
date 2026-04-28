@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../auth/models/current_user.dart';
 import '../../../profile/presentation/public_profile_view_page.dart';
 import '../live_room_models.dart';
+import '../widgets/followers_followed_page.dart';
 import '../widgets/room_action_pages.dart';
 import '../widgets/room_theme.dart';
 
@@ -21,7 +22,7 @@ class LiveRoomProfileNavigator {
         builder: (_) => PublicProfileViewPage(
           user: seatUserToCurrentUser(user),
           vipLevel: user.vipLevel,
-          svipLevel: user.vipLevel >= 25 ? 3 : 0,
+          svipLevel: user.svipLevel,
           presenceLabel: 'online',
           currentRoomName: privacyMode == RoomPrivacyMode.privateVibe
               ? null
@@ -91,6 +92,36 @@ class LiveRoomProfileNavigator {
     }
   }
 
+  static void openFollowersPage({
+    required BuildContext context,
+    required SeatUser user,
+    required List<SeatUser> users,
+  }) {
+    _pushRoomActionPageFromSheet(
+      context,
+      FollowersFollowedPage(
+        user: user,
+        users: users,
+        initialTabIndex: 0,
+      ),
+    );
+  }
+
+  static void openFollowedPage({
+    required BuildContext context,
+    required SeatUser user,
+    required List<SeatUser> users,
+  }) {
+    _pushRoomActionPageFromSheet(
+      context,
+      FollowersFollowedPage(
+        user: user,
+        users: users,
+        initialTabIndex: 1,
+      ),
+    );
+  }
+
   static void openVipCentrePage({
     required BuildContext context,
     required SeatUser user,
@@ -110,10 +141,8 @@ class LiveRoomProfileNavigator {
             color: RoomColors.gold,
           ),
           RoomActionCard(
-            title: 'Monthly status',
-            value: user.vipLevel >= 25
-                ? 'Dynamic avatar unlocked'
-                : 'Recharge to unlock more perks',
+            title: 'Monthly SVIP',
+            value: user.svipLevel > 0 ? 'SVIP ${user.svipLevel}' : 'Not active',
             icon: Icons.auto_awesome_rounded,
             color: RoomColors.violet,
           ),
