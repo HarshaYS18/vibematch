@@ -17,7 +17,7 @@ import 'widgets/live_room_info_sheet.dart';
 import 'widgets/live_room_invite_sheet.dart';
 import 'widgets/live_room_join_requests_sheet.dart';
 import 'widgets/live_room_leave_sheet.dart';
-import 'widgets/live_room_mini_profile_sheet.dart';
+import 'widgets/live_room_mini_profile_launcher.dart';
 import 'widgets/live_room_minimized_bubble.dart';
 import 'widgets/live_room_privacy_sheet.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
@@ -459,82 +459,38 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _openMiniProfile(SeatUser user, int seatIndex) {
     _clearRoomFocus();
 
-    showModalBottomSheet<void>(
+    LiveRoomMiniProfileLauncher.open(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => LiveRoomMiniProfileSheet(
-        user: user,
-        currentUser: _currentUser,
-        canModerate: _viewerCanManageRoom,
-        onAvatarTap: () {
-          Navigator.pop(context);
-          LiveRoomProfileNavigator.openExistingPublicProfile(
-            context: context,
-            user: user,
-            privacyMode: _privacyMode,
-            roomName: _roomName,
-          );
-        },
-        onVipTap: () => LiveRoomProfileNavigator.openVipCentrePage(
-          context: context,
-          user: user,
-        ),
-        onSendingLevelTap:
-            () => LiveRoomProfileNavigator.openSendingExperiencePage(
-                  context: context,
-                  user: user,
-                ),
-        onReceivingLevelTap:
-            () => LiveRoomProfileNavigator.openReceivingExperiencePage(
-                  context: context,
-                  user: user,
-                ),
-        onSentRankingTap: () => LiveRoomProfileNavigator.openSentRankingsPage(
-          context: context,
-          users: _allRoomUsers,
-        ),
-        onReceivedRankingTap:
-            () => LiveRoomProfileNavigator.openReceivedRankingsPage(
-                  context: context,
-                  users: _allRoomUsers,
-                ),
-        onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
-          context: context,
-          user: user,
-        ),
-        onRelationshipTap: () => LiveRoomProfileNavigator.openLoveAndBondCentre(
-          context: context,
-          user: user,
-        ),
-        onMedalsTap: () => LiveRoomProfileNavigator.openMedalsPage(
-          context: context,
-          user: user,
-        ),
-        onMentionTap: () => _mentionUser(user),
-        onSetAdminTap: () => _setUserAsAdmin(user.id),
-        onLeaveAndLock: () {
-          Navigator.pop(context);
-          _seatController.leaveAndLockSeat(seatIndex);
-        },
-        onSelfMuteToggle: () {
-          Navigator.pop(context);
-          _seatController.toggleSelfMute(user.id);
-        },
-        onAdminMuteToggle: () {
-          Navigator.pop(context);
-          _seatController.toggleAdminMute(user.id);
-        },
-        onGiftTap: () {
-          Navigator.pop(context);
-          setState(() {
-            _giftController.selectedReceiverIds
-              ..clear()
-              ..add(user.id);
-          });
-          _openGiftPanel();
-        },
-      ),
+      user: user,
+      seatIndex: seatIndex,
+      currentUser: _currentUser,
+      canModerate: _viewerCanManageRoom,
+      allRoomUsers: _allRoomUsers,
+      privacyMode: _privacyMode,
+      roomName: _roomName,
+      onMentionTap: _mentionUser,
+      onSetAdminTap: _setUserAsAdmin,
+      onLeaveAndLock: (targetSeatIndex) {
+        Navigator.pop(context);
+        _seatController.leaveAndLockSeat(targetSeatIndex);
+      },
+      onSelfMuteToggle: (userId) {
+        Navigator.pop(context);
+        _seatController.toggleSelfMute(userId);
+      },
+      onAdminMuteToggle: (userId) {
+        Navigator.pop(context);
+        _seatController.toggleAdminMute(userId);
+      },
+      onGiftTap: (userId) {
+        Navigator.pop(context);
+        setState(() {
+          _giftController.selectedReceiverIds
+            ..clear()
+            ..add(userId);
+        });
+        _openGiftPanel();
+      },
     );
   }
 
