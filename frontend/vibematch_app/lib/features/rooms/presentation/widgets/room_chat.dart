@@ -361,6 +361,8 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
   final VoidCallback? onTap;
 
   Future<void> _showMessageActionPill(BuildContext context, Offset globalPosition) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
     final overlaySize = overlay?.size ?? MediaQuery.sizeOf(context);
     final left = (globalPosition.dx + 16).clamp(8.0, overlaySize.width - 172);
@@ -368,9 +370,12 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
 
     final selected = await showMenu<_ChatMessageAction>(
       context: context,
-      color: Colors.white,
+      color: Colors.white.withValues(alpha: 0.40),
       elevation: 14,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.30), width: 0.8),
+      ),
       position: RelativeRect.fromLTRB(
         left,
         top,
@@ -401,10 +406,13 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
       ],
     );
 
+    FocusManager.instance.primaryFocus?.unfocus();
     if (!context.mounted || selected == null) return;
 
     if (selected == _ChatMessageAction.copy) {
+      FocusManager.instance.primaryFocus?.unfocus();
       await Clipboard.setData(ClipboardData(text: messageText));
+      FocusManager.instance.primaryFocus?.unfocus();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -418,6 +426,7 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
       return;
     }
 
+    FocusManager.instance.primaryFocus?.unfocus();
     RoomToast.show(context, 'Report message will connect here');
   }
 
@@ -426,7 +435,10 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: onTap,
-      onLongPressStart: (details) => _showMessageActionPill(context, details.globalPosition),
+      onLongPressStart: (details) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        _showMessageActionPill(context, details.globalPosition);
+      },
       child: Container(
         // Dynamic user-message flex box with a very light foggy white fill.
         // It improves message readability while keeping the chat background visible.
