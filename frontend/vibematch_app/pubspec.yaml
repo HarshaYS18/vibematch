@@ -28,6 +28,7 @@ flutter:
 
   assets:
     - assets/images/branding/
+    - assets/images/vip_badges/
     - assets/images/rooms/backgrounds/
 
     - assets/images/room_backgrounds/chat_room/default/
