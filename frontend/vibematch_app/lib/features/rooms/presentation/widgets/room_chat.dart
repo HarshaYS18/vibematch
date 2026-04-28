@@ -139,15 +139,19 @@ class _CompactChatLine extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Flexible(
-              child: Text(
-                message.message,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: RoomColors.gold,
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w900,
-                  height: 1.15,
+              fit: FlexFit.loose,
+              child: _TransparentUserMessageFlexBox(
+                messageText: message.message,
+                child: Text(
+                  message.message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: RoomColors.gold,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
+                  ),
                 ),
               ),
             ),
