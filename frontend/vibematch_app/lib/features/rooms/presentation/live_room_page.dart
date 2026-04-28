@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../inbox/presentation/inbox_page.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_profile_navigator.dart';
+import 'controllers/live_room_seat_controller.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_body.dart';
@@ -45,18 +46,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final TextEditingController _announcementController;
   late final FocusNode _messageFocusNode;
   late final LiveRoomGiftController _giftController;
+  late final LiveRoomSeatController _seatController;
 
   late String _roomName;
   late String _roomId;
   late RoomPrivacyMode _privacyMode;
-  late List<RoomSeat> _seats;
   late List<ChatEntry> _messages;
 
-  String _layoutId = '5x2';
-  int? _selectedSeatIndex;
   bool _roomImagesEnabled = true;
   bool _guestMessagesEnabled = true;
-  bool _micMuted = false;
   bool _minimized = false;
   bool _allowRoomPop = false;
   bool _leaveSheetOpen = false;
@@ -74,12 +72,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   final SeatUser _currentUser = mockRoomUsers.first;
 
-  List<SeatUser> get _roomUsers {
-    return _seats
-        .where((seat) => seat.user != null)
-        .map((seat) => seat.user!)
-        .toList();
-  }
+  List<SeatUser> get _roomUsers => _seatController.roomUsers;
 
   List<SeatUser> get _allRoomUsers {
     final users = <SeatUser>[];
@@ -119,7 +112,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _roomId = widget.roomId;
     _privacyMode = privacyModeFromTitle(widget.modeTitle);
     _messages = List<ChatEntry>.from(mockChatEntries);
-    _seats = _buildSeatsForLayout(_layoutId);
+
+    _seatController = LiveRoomSeatController(
+      currentUser: _currentUser,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+      onToast: (message) {
+        if (!mounted) return;
+        RoomToast.show(context, message);
+      },
+    )..initialize('5x2');
 
     _giftController = LiveRoomGiftController(
       currentUser: _currentUser,
@@ -226,15 +229,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               roomId: _roomId,
               privacyMode: _privacyMode,
               onlineCount: _safeOnlineCount,
-              seats: _seats,
-              layoutId: _layoutId,
-              selectedSeatIndex: _selectedSeatIndex,
+              seats: _seatController.seats,
+              layoutId: _seatController.layoutId,
+              selectedSeatIndex: _seatController.selectedSeatIndex,
               canManageSeats: _viewerCanManageRoom,
               messages: _messages,
               canManageSeatApplications: _viewerCanManageRoom,
               messageController: _messageController,
               messageFocusNode: _messageFocusNode,
-              micMuted: _micMuted,
+              micMuted: _seatController.micMuted,
               inboxUnreadCount: _inboxUnreadCount,
               imagesEnabled: _roomImagesEnabled,
               onBack: _openLeaveSheet,
@@ -258,9 +261,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onSeatTap: _onSeatTap,
               onUserTap: _onUserTap,
               onInvite: _inviteSeat,
-              onSwitch: _switchSeat,
-              onLock: _lockSeat,
-              onUnlock: _unlockSeat,
+              onSwitch: _seatController.switchSeat,
+              onLock: _seatController.lockSeat,
+              onUnlock: _seatController.unlockSeat,
               onApproveSeatApplication: _approveSeatApplication,
               onSenderTap: _openMiniProfileFromChat,
               onDismissOverlays: _dismissRoomOverlays,
@@ -288,28 +291,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 
-  List<RoomSeat> _buildSeatsForLayout(String layoutId) {
-    final spec = SeatLayoutSpec.parse(layoutId);
-    final seats = List<RoomSeat>.generate(
-      spec.totalSeats,
-      (index) => RoomSeat(index: index),
-    );
-
-    for (var i = 0; i < mockRoomUsers.length && i < seats.length; i++) {
-      seats[i] = RoomSeat(index: i, user: mockRoomUsers[i]);
-    }
-
-    return seats;
-  }
-
   void _onSeatTap(int index) {
-    final seat = _seats[index];
+    final seat = _seatController.seats[index];
 
     if (seat.locked) {
       if (_viewerCanManageRoom) {
-        setState(
-          () => _selectedSeatIndex = _selectedSeatIndex == index ? null : index,
-        );
+        _seatController.toggleSelectedSeat(index);
       } else {
         RoomToast.show(context, 'This seat is locked');
       }
@@ -318,118 +305,37 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     if (seat.user == null && !_viewerCanManageRoom) {
       if (_applyOnlyModeEnabled) {
-        _applyForSeat(index);
+        _seatController.applyForSeat(
+          index: index,
+          messages: _messages,
+        );
       } else {
-        _occupySeat(index);
+        _seatController.occupySeat(index);
       }
       return;
     }
 
     if (seat.user == null && _viewerCanManageRoom) {
-      setState(
-        () => _selectedSeatIndex = _selectedSeatIndex == index ? null : index,
-      );
+      _seatController.toggleSelectedSeat(index);
     }
   }
 
   void _onUserTap(int index) {
-    final user = _seats[index].user;
+    final user = _seatController.seats[index].user;
     if (user == null) return;
     _openMiniProfile(user, index);
   }
 
-  void _occupySeat(int index) {
-    setState(() {
-      final oldIndex = _seats.indexWhere(
-        (seat) => seat.user?.id == _currentUser.id,
-      );
-      if (oldIndex >= 0) {
-        _seats[oldIndex] = _seats[oldIndex].copyWith(clearUser: true);
-      }
-      _seats[index] = _seats[index].copyWith(
-        user: _currentUser,
-        locked: false,
-      );
-      _selectedSeatIndex = null;
-    });
-  }
-
-  void _applyForSeat(int index) {
-    final alreadyApplied = _messages.any(
-      (message) =>
-          message.isSeatApplication &&
-          !message.applicationApproved &&
-          message.senderId == _currentUser.id &&
-          message.seatIndex == index,
-    );
-
-    if (alreadyApplied) {
-      RoomToast.show(context, 'Seat application already sent');
-      return;
-    }
-
-    setState(() {
-      _selectedSeatIndex = null;
-      _messages.insert(
-        0,
-        ChatEntry(
-          senderName: _currentUser.name,
-          senderId: _currentUser.id,
-          message: 'applied for seat ${index + 1}',
-          vipLevel: _currentUser.vipLevel,
-          sendingLevel: _currentUser.sendingLevel,
-          receivingLevel: _currentUser.receivingLevel,
-          isSeatApplication: true,
-          seatIndex: index,
-        ),
-      );
-    });
-
-    RoomToast.show(context, 'Seat application sent');
-  }
-
   void _approveSeatApplication(ChatEntry entry) {
-    final seatIndex = entry.seatIndex;
-    if (seatIndex == null || seatIndex < 0 || seatIndex >= _seats.length) {
-      return;
-    }
-
-    if (_seats[seatIndex].user != null || _seats[seatIndex].locked) {
-      setState(() {
-        final index = _messages.indexOf(entry);
-        if (index >= 0) {
-          _messages[index] = entry.copyWith(
-            message: '${entry.message} • seat unavailable',
-            applicationApproved: true,
-          );
-        }
-      });
-      return;
-    }
-
-    final applicant = _allRoomUsers.firstWhere(
-      (user) => user.id == entry.senderId,
-      orElse: () => _currentUser,
+    _seatController.approveSeatApplication(
+      entry: entry,
+      messages: _messages,
+      allRoomUsers: _allRoomUsers,
     );
-
-    setState(() {
-      _seats[seatIndex] = _seats[seatIndex].copyWith(
-        user: applicant,
-        locked: false,
-      );
-
-      final index = _messages.indexOf(entry);
-      if (index >= 0) {
-        _messages[index] = entry.copyWith(
-          message: '${entry.senderName} approved for seat ${seatIndex + 1}',
-          applicationApproved: true,
-        );
-      }
-    });
   }
 
   void _inviteSeat(int index) {
-    setState(() => _selectedSeatIndex = null);
+    _seatController.clearSelectedSeat();
     _openSeatInviteSheet(index);
   }
 
@@ -458,27 +364,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 
-  void _switchSeat(int index) {
-    _occupySeat(index);
-    RoomToast.show(context, 'Switched to seat ${index + 1}');
-  }
-
-  void _lockSeat(int index) {
-    setState(() {
-      _seats[index] = _seats[index].copyWith(locked: true, clearUser: true);
-      _selectedSeatIndex = null;
-    });
-    RoomToast.show(context, 'Seat ${index + 1} locked');
-  }
-
-  void _unlockSeat(int index) {
-    setState(() {
-      _seats[index] = _seats[index].copyWith(locked: false);
-      _selectedSeatIndex = null;
-    });
-    RoomToast.show(context, 'Seat ${index + 1} unlocked');
-  }
-
   void _dismissRoomOverlays() {
     dismissRoomSeatActionPill();
     _clearRoomFocus();
@@ -504,21 +389,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _toggleMic() {
     _clearRoomFocus();
-
-    setState(() {
-      _micMuted = !_micMuted;
-
-      final index = _seats.indexWhere(
-        (seat) => seat.user?.id == _currentUser.id,
-      );
-
-      if (index >= 0) {
-        final user = _seats[index].user!;
-        _seats[index] = _seats[index].copyWith(
-          user: user.copyWith(selfMuted: _micMuted),
-        );
-      }
-    });
+    _seatController.toggleMic();
   }
 
   void _handleJoinRoom() {
@@ -601,7 +472,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       ),
     );
 
-    final seatIndex = _seats.indexWhere((seat) => seat.user?.id == user.id);
+    final seatIndex = _seatController.seats.indexWhere(
+      (seat) => seat.user?.id == user.id,
+    );
     _openMiniProfile(user, seatIndex);
   }
 
@@ -664,22 +537,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onSetAdminTap: () => _setUserAsAdmin(user.id),
         onLeaveAndLock: () {
           Navigator.pop(context);
-          if (seatIndex >= 0 && seatIndex < _seats.length) {
-            setState(
-              () => _seats[seatIndex] = RoomSeat(
-                index: seatIndex,
-                locked: true,
-              ),
-            );
-          }
+          _seatController.leaveAndLockSeat(seatIndex);
         },
         onSelfMuteToggle: () {
           Navigator.pop(context);
-          _toggleSelfMute(user.id);
+          _seatController.toggleSelfMute(user.id);
         },
         onAdminMuteToggle: () {
           Navigator.pop(context);
-          _toggleAdminMute(user.id);
+          _seatController.toggleAdminMute(user.id);
         },
         onGiftTap: () {
           Navigator.pop(context);
@@ -690,39 +556,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           });
           _openGiftPanel();
         },
-      ),
-    );
-  }
-
-  void _toggleSelfMute(String userId) {
-    final index = _seats.indexWhere((seat) => seat.user?.id == userId);
-    if (index < 0) return;
-
-    final user = _seats[index].user!;
-    setState(
-      () => _seats[index] = _seats[index].copyWith(
-        user: user.copyWith(selfMuted: !user.selfMuted),
-      ),
-    );
-  }
-
-  void _toggleAdminMute(String userId) {
-    final index = _seats.indexWhere((seat) => seat.user?.id == userId);
-    if (index < 0) return;
-
-    final user = _seats[index].user!;
-
-    if (user.selfMuted) {
-      RoomToast.show(
-        context,
-        'User muted themselves. Admin cannot unmute self mute.',
-      );
-      return;
-    }
-
-    setState(
-      () => _seats[index] = _seats[index].copyWith(
-        user: user.copyWith(adminMuted: !user.adminMuted),
       ),
     );
   }
@@ -746,21 +579,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _setUserAsAdmin(String userId) {
     Navigator.pop(context);
-
-    setState(() {
-      for (var i = 0; i < _seats.length; i++) {
-        final user = _seats[i].user;
-        if (user?.id == userId) {
-          _seats[i] = _seats[i].copyWith(
-            user: user!.copyWith(
-              isRoomAdmin: true,
-              roleLabel: 'Administrator',
-            ),
-          );
-        }
-      }
-    });
-
+    _seatController.setUserAsAdmin(userId);
     _clearRoomFocus();
   }
 
@@ -1030,13 +849,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => SeatLayoutSheet(
-        selectedLayout: _layoutId,
+        selectedLayout: _seatController.layoutId,
         onSelected: (layout) {
-          setState(() {
-            _layoutId = layout;
-            _seats = _buildSeatsForLayout(layout);
-            _selectedSeatIndex = null;
-          });
+          _seatController.changeLayout(layout);
           Navigator.pop(context);
         },
       ),
