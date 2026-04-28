@@ -6,7 +6,7 @@ import 'room_theme.dart';
 final ValueNotifier<String> roomBroadcastAnnouncementNotifier =
     ValueNotifier<String>('Welcome to the room. Respect everyone and enjoy the vibe.');
 
-class RoomInfoSheet extends StatefulWidget {
+class RoomInfoSheet extends StatelessWidget {
   const RoomInfoSheet({
     super.key,
     required this.roomName,
@@ -14,6 +14,10 @@ class RoomInfoSheet extends StatefulWidget {
     required this.language,
     required this.privacyMode,
     required this.canManageAdmins,
+    required this.admins,
+    required this.availableAdminUsers,
+    required this.onAddAdmin,
+    required this.onRemoveAdmin,
     this.broadcastAnnouncement = 'Welcome to the room. Respect everyone and enjoy the vibe.',
   });
 
@@ -22,29 +26,18 @@ class RoomInfoSheet extends StatefulWidget {
   final String language;
   final RoomPrivacyMode privacyMode;
   final bool canManageAdmins;
+  final List<SeatUser> admins;
+  final List<SeatUser> availableAdminUsers;
+  final ValueChanged<SeatUser> onAddAdmin;
+  final ValueChanged<SeatUser> onRemoveAdmin;
   final String broadcastAnnouncement;
 
   @override
-  State<RoomInfoSheet> createState() => _RoomInfoSheetState();
-}
-
-class _RoomInfoSheetState extends State<RoomInfoSheet> {
-  late final List<SeatUser> _admins;
-  late final List<SeatUser> _availableUsers;
-
-  @override
-  void initState() {
-    super.initState();
-    _admins = mockRoomUsers.where((user) => user.isHost || user.isRoomAdmin).toList();
-    _availableUsers = mockInviteUsers.where((user) => !_admins.any((admin) => admin.id == user.id)).toList();
-
-    if (roomBroadcastAnnouncementNotifier.value.trim().isEmpty) {
-      roomBroadcastAnnouncementNotifier.value = widget.broadcastAnnouncement;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    if (roomBroadcastAnnouncementNotifier.value.trim().isEmpty) {
+      roomBroadcastAnnouncementNotifier.value = broadcastAnnouncement;
+    }
+
     return Container(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.72),
       padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 14),
@@ -68,7 +61,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
                   gradient: const LinearGradient(colors: [RoomColors.violet, RoomColors.aqua]),
                   boxShadow: [BoxShadow(color: RoomColors.violet.withValues(alpha: 0.22), blurRadius: 16, offset: const Offset(0, 8))],
                 ),
-                child: Icon(widget.privacyMode.icon, color: Colors.white, size: 21),
+                child: Icon(privacyMode.icon, color: Colors.white, size: 21),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -76,14 +69,14 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.roomName,
+                      roomName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.3),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${widget.roomId} • ${widget.language} • ${widget.privacyMode.label}',
+                      '$roomId • $language • ${privacyMode.label}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800),
@@ -107,10 +100,10 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
             title: 'Room Details',
             child: Column(
               children: [
-                _InfoRow(label: 'Room name', value: widget.roomName),
-                _InfoRow(label: 'Room ID', value: widget.roomId),
-                _InfoRow(label: 'Language', value: widget.language),
-                _InfoRow(label: 'Mode', value: widget.privacyMode.label),
+                _InfoRow(label: 'Room name', value: roomName),
+                _InfoRow(label: 'Room ID', value: roomId),
+                _InfoRow(label: 'Language', value: language),
+                _InfoRow(label: 'Mode', value: privacyMode.label),
               ],
             ),
           ),
@@ -122,7 +115,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
               valueListenable: roomBroadcastAnnouncementNotifier,
               builder: (context, announcement, _) {
                 final cleanAnnouncement = announcement.trim().isEmpty
-                    ? widget.broadcastAnnouncement
+                    ? broadcastAnnouncement
                     : announcement.trim();
 
                 return Text(
@@ -141,11 +134,11 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
                   style: TextStyle(color: RoomColors.plum, fontSize: 15, fontWeight: FontWeight.w900),
                 ),
               ),
-              if (widget.canManageAdmins)
+              if (canManageAdmins)
                 _SmallActionPill(
                   icon: Icons.person_add_alt_1_rounded,
                   label: 'Add Admin',
-                  onTap: _addAdmin,
+                  onTap: () => _openAddAdminSheet(context),
                 ),
             ],
           ),
@@ -154,15 +147,14 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
             child: ListView.separated(
               shrinkWrap: true,
               physics: const BouncingScrollPhysics(),
-              itemCount: _admins.length,
+              itemCount: admins.length,
               separatorBuilder: (context, index) => const SizedBox(height: 7),
               itemBuilder: (context, index) {
-                final admin = _admins[index];
+                final admin = admins[index];
                 return _AdminTile(
                   user: admin,
-                  canManage: widget.canManageAdmins && !admin.isHost,
-                  onEdit: () => RoomToast.show(context, 'Edit admin permissions for ${admin.name} will connect here'),
-                  onRemove: () => setState(() => _admins.removeAt(index)),
+                  canManage: canManageAdmins && !admin.isHost,
+                  onRemove: () => onRemoveAdmin(admin),
                 );
               },
             ),
@@ -172,14 +164,74 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
     );
   }
 
-  void _addAdmin() {
-    if (_availableUsers.isEmpty) {
-      RoomToast.show(context, 'No available users to add as admin');
-      return;
-    }
-    final user = _availableUsers.removeAt(0).copyWith(isRoomAdmin: true, roleLabel: 'Administrator');
-    setState(() => _admins.add(user));
-    RoomToast.show(context, '${user.name} added as admin locally');
+  void _openAddAdminSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        padding: EdgeInsets.fromLTRB(
+          14,
+          10,
+          14,
+          MediaQuery.paddingOf(sheetContext).bottom + 14,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(width: 42),
+            const SizedBox(height: 12),
+            const Text(
+              'Add Room Admin',
+              style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose a room member to promote as room admin.',
+              style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            if (availableAdminUsers.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: RoomColors.pearl,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: RoomColors.softLine),
+                ),
+                child: const Text(
+                  'No eligible users available right now.',
+                  style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w800),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: availableAdminUsers.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 7),
+                  itemBuilder: (context, index) {
+                    final user = availableAdminUsers[index];
+                    return _AddAdminTile(
+                      user: user,
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        onAddAdmin(user);
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -240,11 +292,10 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _AdminTile extends StatelessWidget {
-  const _AdminTile({required this.user, required this.canManage, required this.onEdit, required this.onRemove});
+  const _AdminTile({required this.user, required this.canManage, required this.onRemove});
 
   final SeatUser user;
   final bool canManage;
-  final VoidCallback onEdit;
   final VoidCallback onRemove;
 
   @override
@@ -272,21 +323,49 @@ class _AdminTile extends StatelessWidget {
               ],
             ),
           ),
-          if (canManage) ...[
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: 'Edit admin',
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_rounded, color: RoomColors.violet, size: 18),
-            ),
+          if (canManage)
             IconButton(
               visualDensity: VisualDensity.compact,
               tooltip: 'Remove admin',
               onPressed: onRemove,
-              icon: const Icon(Icons.remove_circle_rounded, color: RoomColors.coral, size: 19),
+              icon: const Icon(Icons.remove_circle_rounded, color: RoomColors.coral, size: 20),
             ),
-          ],
         ],
+      ),
+    );
+  }
+}
+
+class _AddAdminTile extends StatelessWidget {
+  const _AddAdminTile({required this.user, required this.onTap});
+
+  final SeatUser user;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(9),
+        decoration: BoxDecoration(color: const Color(0xFFFCFAF6), borderRadius: BorderRadius.circular(18), border: Border.all(color: RoomColors.softLine)),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
+              child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)),
+            ),
+            const Icon(Icons.add_moderator_rounded, color: RoomColors.aqua, size: 21),
+          ],
+        ),
       ),
     );
   }
