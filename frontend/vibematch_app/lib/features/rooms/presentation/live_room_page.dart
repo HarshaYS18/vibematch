@@ -24,6 +24,7 @@ import 'widgets/live_room_privacy_sheet.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
 import 'widgets/live_room_users_sheet.dart';
+import 'widgets/room_contribution_rankings_sheet.dart';
 import 'widgets/room_seats.dart';
 import 'widgets/room_theme.dart';
 
@@ -281,6 +282,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 dismissRoomSeatActionPill();
                 _openRoomUsersSheet();
               },
+              onRoomRankingsTap: () {
+                dismissRoomSeatActionPill();
+                _openRoomRankingsSheet();
+              },
               onSeatTap: _onSeatTap,
               onUserTap: _onUserTap,
               onInvite: _inviteSeat,
@@ -417,7 +422,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openRoomUsersSheet() {
-    final users = _allRoomUsers;
+    final users = _roomUsers;
 
     showModalBottomSheet<void>(
       context: context,
@@ -427,12 +432,31 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         users: users,
         onUserTap: (user) {
           Navigator.pop(context);
-          LiveRoomProfileNavigator.openExistingPublicProfile(
-            context: context,
-            user: user,
-            privacyMode: _privacyMode,
-            roomName: _roomName,
-          );
+          Future<void>.delayed(const Duration(milliseconds: 80), () {
+            if (!mounted) return;
+            _openMiniProfileForUser(user);
+          });
+        },
+      ),
+    );
+  }
+
+  void _openRoomRankingsSheet() {
+    final users = _allRoomUsers;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RoomContributionRankingsSheet(
+        roomName: _roomName,
+        users: users,
+        onUserTap: (user) {
+          Navigator.pop(context);
+          Future<void>.delayed(const Duration(milliseconds: 80), () {
+            if (!mounted) return;
+            _openMiniProfileForUser(user);
+          });
         },
       ),
     );
@@ -467,10 +491,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       ),
     );
 
-    final seatIndex = _seatController.seats.indexWhere(
-      (seat) => seat.user?.id == user.id,
+    _openMiniProfileForUser(user);
+  }
+
+  void _openMiniProfileForUser(SeatUser user) {
+    final liveUser = _allRoomUsers.firstWhere(
+      (item) => item.id == user.id,
+      orElse: () => user,
     );
-    _openMiniProfile(user, seatIndex);
+    final seatIndex = _seatController.seats.indexWhere(
+      (seat) => seat.user?.id == liveUser.id,
+    );
+    _openMiniProfile(liveUser, seatIndex);
   }
 
   void _openMiniProfile(SeatUser user, int seatIndex) {
