@@ -6,9 +6,13 @@ import '../../auth/models/current_user.dart';
 import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/public_profile_view_page.dart';
 import 'live_room_models.dart';
+import 'widgets/live_room_announcement_sheet.dart';
+import 'widgets/live_room_emoji_sheet.dart';
 import 'widgets/live_room_games_sheet.dart';
+import 'widgets/live_room_gift_overlay.dart';
 import 'widgets/live_room_invite_sheet.dart';
 import 'widgets/live_room_join_requests_sheet.dart';
+import 'widgets/live_room_leave_sheet.dart';
 import 'widgets/live_room_minimized_bubble.dart';
 import 'widgets/room_action_pages.dart';
 import 'widgets/room_chat.dart';
@@ -296,25 +300,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 ],
               ),
             ),
-            Positioned(
-              left: 12,
-              top: 218,
-              child: GiftSlideStack(
-                slides: _giftSlides,
-                onComboTap: _tapGiftCombo,
-              ),
-            ),
-            Positioned(
-              right: 18,
-              bottom: 52 + MediaQuery.paddingOf(context).bottom,
-              child: ComboBuzzer(
-                slide: _activeComboSlide,
-                onTap: () {
-                  dismissRoomSeatActionPill();
-                  final slide = _activeComboSlide;
-                  if (slide != null) _tapGiftCombo(slide);
-                },
-              ),
+            LiveRoomGiftOverlay(
+              slides: _giftSlides,
+              activeComboSlide: _activeComboSlide,
+              bottomPadding: MediaQuery.paddingOf(context).bottom,
+              onComboTap: _tapGiftCombo,
+              onComboButtonTap: () {
+                dismissRoomSeatActionPill();
+                final slide = _activeComboSlide;
+                if (slide != null) _tapGiftCombo(slide);
+              },
             ),
           ],
         ),
@@ -974,7 +969,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         cards: [
           RoomActionCard(
             title: 'Current medals',
-            value: user.medals.isEmpty ? 'No medals yet' : user.medals.join('  '),
+            value:
+                user.medals.isEmpty ? 'No medals yet' : user.medals.join('  '),
             icon: Icons.military_tech_rounded,
             color: RoomColors.gold,
           ),
@@ -1253,45 +1249,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: EdgeInsets.fromLTRB(
-          18,
-          12,
-          18,
-          MediaQuery.paddingOf(context).bottom + 16,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: ['😍', '😂', '🔥', '👏', '💖', '😎', '🎉', '💎'].map(
-            (emoji) {
-              return GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                  RoomToast.show(
-                    context,
-                    '$emoji reaction will animate over avatar',
-                  );
-                },
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: RoomColors.pearl,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: RoomColors.softLine),
-                  ),
-                  child: Text(emoji, style: const TextStyle(fontSize: 28)),
-                ),
-              );
-            },
-          ).toList(),
-        ),
+      builder: (_) => LiveRoomEmojiSheet(
+        onEmojiTap: (emoji) {
+          Navigator.pop(context);
+          RoomToast.show(
+            context,
+            '$emoji reaction will animate over avatar',
+          );
+        },
       ),
     );
   }
@@ -1507,78 +1472,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(
-            18,
-            12,
-            18,
-            MediaQuery.paddingOf(context).bottom + 16,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SheetHandle(),
-              const SizedBox(height: 16),
-              const Text(
-                'Broad Announcement',
-                style: TextStyle(
-                  color: RoomColors.plum,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _announcementController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Type announcement...',
-                  filled: true,
-                  fillColor: RoomColors.pearl,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final message = _announcementController.text.trim();
-                    Navigator.pop(context);
+      builder: (_) => LiveRoomAnnouncementSheet(
+        controller: _announcementController,
+        onSubmit: (message) {
+          Navigator.pop(context);
 
-                    if (message.isNotEmpty) {
-                      _insertSystemMessage(message);
-                      _announcementController.clear();
-                    }
+          if (message.isNotEmpty) {
+            _insertSystemMessage(message);
+            _announcementController.clear();
+          }
 
-                    RoomToast.show(context, 'Announcement saved');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: RoomColors.plum,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
-                  child: const Text('Submit'),
-                ),
-              ),
-            ],
-          ),
-        ),
+          RoomToast.show(context, 'Announcement saved');
+        },
       ),
     );
   }
@@ -1594,69 +1499,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => Container(
-        padding: EdgeInsets.fromLTRB(
-          18,
-          12,
-          18,
-          MediaQuery.paddingOf(context).bottom + 16,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SheetHandle(),
-            const SizedBox(height: 16),
-            const Text(
-              'Leave room?',
-              style: TextStyle(
-                color: RoomColors.plum,
-                fontSize: 23,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Stay will minimize this chatroom into a floating bubble.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF7B6A86),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      dismissRoomSeatActionPill();
-                      _stayAndMinimize(sheetContext);
-                    },
-                    child: const Text('Stay'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      dismissRoomSeatActionPill();
-                      _leaveRoomFromSheet(sheetContext);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: RoomColors.plum,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Leave'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+      builder: (sheetContext) => LiveRoomLeaveSheet(
+        onStay: () {
+          dismissRoomSeatActionPill();
+          _stayAndMinimize(sheetContext);
+        },
+        onLeave: () {
+          dismissRoomSeatActionPill();
+          _leaveRoomFromSheet(sheetContext);
+        },
       ),
     ).whenComplete(() => _leaveSheetOpen = false);
   }
