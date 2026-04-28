@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
 import 'room_theme.dart';
+import 'vip_badge.dart';
 
 class UserMiniProfileSheet extends StatelessWidget {
   const UserMiniProfileSheet({
@@ -82,12 +83,13 @@ class UserMiniProfileSheet extends StatelessWidget {
                 const SizedBox(height: 7),
                 Wrap(
                   alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    _TextPill(label: 'VIP ${user.vipLevel}', color: RoomColors.gold, onTap: onVipTap),
-                    _TextPill(label: 'Lv ${user.sendingLevel}', color: RoomColors.violet, onTap: onSendingLevelTap),
-                    _TextPill(label: 'Lv ${user.receivingLevel}', color: RoomColors.coral, onTap: onReceivingLevelTap),
+                    VipBadge(level: user.vipLevel, size: VipBadgeSize.medium, onTap: onVipTap),
+                    _TextPill(label: 'Send Lv ${user.sendingLevel}', color: RoomColors.violet, onTap: onSendingLevelTap),
+                    _TextPill(label: 'Receive Lv ${user.receivingLevel}', color: RoomColors.coral, onTap: onReceivingLevelTap),
                     _TextPill(
                       label: user.familyName.trim().isEmpty ? 'No Family' : user.familyName,
                       color: RoomColors.aqua,
