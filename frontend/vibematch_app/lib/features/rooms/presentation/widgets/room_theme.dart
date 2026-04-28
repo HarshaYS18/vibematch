@@ -27,8 +27,6 @@ class RoomBackgroundTheme {
   final String assetPath;
   final Color accent;
 
-  // Compatibility for older preview widgets that still read theme.colors.
-  // The real room background remains asset-only.
   List<Color> get colors => [RoomColors.deep, RoomColors.deep];
 }
 
@@ -85,12 +83,7 @@ class RoomBackground extends StatelessWidget {
         child: SizedBox(
           width: screenSize.width,
           height: screenSize.height,
-          child: ValueListenableBuilder<RoomBackgroundTheme>(
-            valueListenable: activeRoomBackgroundTheme,
-            builder: (context, activeTheme, _) {
-              return _AssetOnlyRoomBackground(theme: activeTheme);
-            },
-          ),
+          child: _AssetOnlyRoomBackground(theme: theme),
         ),
       ),
     );
