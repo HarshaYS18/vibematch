@@ -254,70 +254,86 @@ class RoomInputDock extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
-        decoration: BoxDecoration(color: RoomColors.deep.withValues(alpha: 0.94), border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05)))),
-        child: Row(
-          children: [
-            _DockButton(icon: Icons.mail_outline_rounded, onTap: () => _runAndHideSeatActions(onInboxTap), badgeCount: inboxUnreadCount),
-            const SizedBox(width: 5),
-            Expanded(
-              child: Container(
-                height: 38,
-                padding: const EdgeInsets.only(left: 10),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(19), border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
-                        decoration: InputDecoration(hintText: 'Message...', hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w800), border: InputBorder.none, isDense: true),
-                        onTap: dismissRoomSeatActionPill,
-                        onSubmitted: (_) => _runAndHideSeatActions(onSendTap),
-                      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tiny = constraints.maxWidth < 340;
+          final compact = constraints.maxWidth < 380;
+          final gap = tiny ? 3.0 : compact ? 4.0 : 5.0;
+          final horizontalPadding = tiny ? 6.0 : 8.0;
+          final dockButtonSize = tiny ? 31.0 : compact ? 33.0 : 36.0;
+          final dockIconSize = tiny ? 17.0 : compact ? 18.0 : 19.0;
+          final inputHeight = tiny ? 36.0 : 38.0;
+          final inputIconMin = tiny ? 26.0 : 30.0;
+          final inputIconSize = tiny ? 18.0 : 20.0;
+          final showImageButton = constraints.maxWidth >= 330;
+
+          return Container(
+            padding: EdgeInsets.fromLTRB(horizontalPadding, 5, horizontalPadding, 6),
+            decoration: BoxDecoration(color: RoomColors.deep.withValues(alpha: 0.94), border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05)))),
+            child: Row(
+              children: [
+                _DockButton(icon: Icons.mail_outline_rounded, onTap: () => _runAndHideSeatActions(onInboxTap), badgeCount: inboxUnreadCount, size: dockButtonSize, iconSize: dockIconSize),
+                SizedBox(width: gap),
+                Expanded(
+                  child: Container(
+                    height: inputHeight,
+                    padding: EdgeInsets.only(left: tiny ? 8 : 10),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(19), border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: tiny ? 12.8 : 13.5),
+                            decoration: InputDecoration(hintText: 'Message...', hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w800), border: InputBorder.none, isDense: true),
+                            onTap: dismissRoomSeatActionPill,
+                            onSubmitted: (_) => _runAndHideSeatActions(onSendTap),
+                          ),
+                        ),
+                        if (showImageButton)
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(minWidth: inputIconMin, minHeight: inputIconMin),
+                            onPressed: imagesEnabled ? () => _runAndHideSeatActions(() => RoomToast.show(context, 'Image message picker will connect here')) : null,
+                            icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22), size: inputIconSize),
+                          ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: BoxConstraints(minWidth: inputIconMin, minHeight: inputIconMin),
+                          onPressed: () => _runAndHideSeatActions(onEmojiTap),
+                          icon: Icon(Icons.emoji_emotions_rounded, color: RoomColors.gold, size: inputIconSize),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: BoxConstraints(minWidth: inputIconMin, minHeight: inputIconMin),
+                          onPressed: () => _runAndHideSeatActions(onSendTap),
+                          icon: Icon(Icons.send_rounded, color: RoomColors.aqua, size: inputIconSize + 1),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                      onPressed: imagesEnabled ? () => _runAndHideSeatActions(() => RoomToast.show(context, 'Image message picker will connect here')) : null,
-                      icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22), size: 20),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                      onPressed: () => _runAndHideSeatActions(onEmojiTap),
-                      icon: const Icon(Icons.emoji_emotions_rounded, color: RoomColors.gold, size: 20),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                      onPressed: () => _runAndHideSeatActions(onSendTap),
-                      icon: const Icon(Icons.send_rounded, color: RoomColors.aqua, size: 21),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                SizedBox(width: gap),
+                _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(onMicTap), active: !micMuted, muted: micMuted, size: dockButtonSize, iconSize: dockIconSize),
+                SizedBox(width: gap),
+                _DockButton(icon: Icons.sports_esports_rounded, onTap: () => _runAndHideSeatActions(onGamesTap), size: dockButtonSize, iconSize: dockIconSize),
+                SizedBox(width: gap),
+                _DockButton(icon: Icons.card_giftcard_rounded, onTap: () => _runAndHideSeatActions(onGiftTap), gift: true, size: dockButtonSize, iconSize: dockIconSize),
+              ],
             ),
-            const SizedBox(width: 5),
-            _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(onMicTap), active: !micMuted, muted: micMuted),
-            const SizedBox(width: 5),
-            _DockButton(icon: Icons.sports_esports_rounded, onTap: () => _runAndHideSeatActions(onGamesTap)),
-            const SizedBox(width: 5),
-            _DockButton(icon: Icons.card_giftcard_rounded, onTap: () => _runAndHideSeatActions(onGiftTap), gift: true),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
 class _DockButton extends StatelessWidget {
-  const _DockButton({required this.icon, required this.onTap, this.active = false, this.muted = false, this.gift = false, this.badgeCount = 0});
+  const _DockButton({required this.icon, required this.onTap, this.active = false, this.muted = false, this.gift = false, this.badgeCount = 0, this.size = 36, this.iconSize = 19});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -325,6 +341,8 @@ class _DockButton extends StatelessWidget {
   final bool muted;
   final bool gift;
   final int badgeCount;
+  final double size;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -341,10 +359,10 @@ class _DockButton extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: size,
+              height: size,
               decoration: BoxDecoration(shape: BoxShape.circle, gradient: gift ? const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]) : null, color: gift ? null : bg, border: Border.all(color: Colors.white.withValues(alpha: 0.09))),
-              child: Icon(icon, color: gift ? Colors.white : iconColor, size: 19),
+              child: Icon(icon, color: gift ? Colors.white : iconColor, size: iconSize),
             ),
             if (badgeCount > 0)
               Positioned(
