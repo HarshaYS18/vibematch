@@ -29,23 +29,26 @@ class _VipBadgeState extends State<VipBadge>
 
   int get _safeLevel => widget.level.clamp(0, 50);
   bool get _visible => widget.level > 0 || widget.showWhenZero;
-  bool get _premiumShine => _safeLevel >= 30;
+  bool get _isChatSize => widget.size == VipBadgeSize.tiny;
+  bool get _premiumShine => _safeLevel >= 30 && !_isChatSize;
+  bool get _basicShine => !_premiumShine;
 
   @override
   void initState() {
     super.initState();
     _shineController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: _premiumShine ? 1500 : 3200),
+      duration: Duration(milliseconds: _premiumShine ? 1700 : 3800),
     )..repeat();
   }
 
   @override
   void didUpdateWidget(covariant VipBadge oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((oldWidget.level >= 30) != _premiumShine) {
+    final oldPremium = oldWidget.level >= 30 && oldWidget.size != VipBadgeSize.tiny;
+    if (oldPremium != _premiumShine || oldWidget.size != widget.size) {
       _shineController.duration = Duration(
-        milliseconds: _premiumShine ? 1500 : 3200,
+        milliseconds: _premiumShine ? 1700 : 3800,
       );
       _shineController.repeat();
     }
@@ -131,12 +134,18 @@ class _VipBadgeState extends State<VipBadge>
               end: _fallbackEnd,
             ),
           ),
-          _StaticGlass(width: _width, height: _height, premium: _premiumShine),
+          _StaticGlass(
+            width: _width,
+            height: _height,
+            premium: _premiumShine,
+            chatSize: _isChatSize,
+          ),
           _MovingGlassShine(
             animation: _shineController,
             width: _width,
             height: _height,
             premium: _premiumShine,
+            chatSize: _isChatSize,
           ),
           if (_premiumShine)
             _SecondMovingGlassShine(
@@ -153,6 +162,7 @@ class _VipBadgeState extends State<VipBadge>
                   label: 'VIP $_safeLevel',
                   fontSize: _fontSize,
                   premium: _premiumShine,
+                  chatSize: _isChatSize,
                 ),
               ),
             ),
@@ -180,11 +190,13 @@ class _GoldVipText extends StatelessWidget {
     required this.label,
     required this.fontSize,
     required this.premium,
+    required this.chatSize,
   });
 
   final String label;
   final double fontSize;
   final bool premium;
+  final bool chatSize;
 
   @override
   Widget build(BuildContext context) {
@@ -199,7 +211,7 @@ class _GoldVipText extends StatelessWidget {
             letterSpacing: -0.05,
             foreground: Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = premium ? 2.45 : 2.05
+              ..strokeWidth = chatSize ? 1.55 : premium ? 2.45 : 2.05
               ..color = const Color(0xFF5F3300),
           ),
         ),
@@ -213,12 +225,12 @@ class _GoldVipText extends StatelessWidget {
             shadows: [
               Shadow(
                 color: const Color(0xFFFFD56A),
-                blurRadius: premium ? 14 : 8,
+                blurRadius: chatSize ? 5 : premium ? 14 : 8,
                 offset: const Offset(0, 0.8),
               ),
               Shadow(
                 color: const Color(0xFF8A5200),
-                blurRadius: premium ? 4 : 2,
+                blurRadius: chatSize ? 1.2 : premium ? 4 : 2,
                 offset: const Offset(0, 1.1),
               ),
             ],
@@ -234,14 +246,19 @@ class _StaticGlass extends StatelessWidget {
     required this.width,
     required this.height,
     required this.premium,
+    required this.chatSize,
   });
 
   final double width;
   final double height;
   final bool premium;
+  final bool chatSize;
 
   @override
   Widget build(BuildContext context) {
+    final highlightAlpha = chatSize ? 0.16 : premium ? 0.42 : 0.26;
+    final dotAlpha = chatSize ? 0.0 : premium ? 0.22 : 0.10;
+
     return Stack(
       children: [
         Positioned(
@@ -250,15 +267,15 @@ class _StaticGlass extends StatelessWidget {
           right: width * 0.14,
           child: IgnorePointer(
             child: Container(
-              height: height * (premium ? 0.24 : 0.18),
+              height: height * (chatSize ? 0.12 : premium ? 0.24 : 0.18),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.white.withValues(alpha: premium ? 0.42 : 0.26),
-                    Colors.white.withValues(alpha: premium ? 0.18 : 0.10),
+                    Colors.white.withValues(alpha: highlightAlpha),
+                    Colors.white.withValues(alpha: chatSize ? 0.04 : premium ? 0.18 : 0.10),
                     Colors.white.withValues(alpha: 0.0),
                   ],
                 ),
@@ -266,20 +283,21 @@ class _StaticGlass extends StatelessWidget {
             ),
           ),
         ),
-        Positioned(
-          left: width * 0.18,
-          top: height * 0.20,
-          child: IgnorePointer(
-            child: Container(
-              width: width * (premium ? 0.20 : 0.13),
-              height: height * (premium ? 0.22 : 0.14),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: premium ? 0.22 : 0.10),
+        if (!chatSize)
+          Positioned(
+            left: width * 0.18,
+            top: height * 0.20,
+            child: IgnorePointer(
+              child: Container(
+                width: width * (premium ? 0.20 : 0.13),
+                height: height * (premium ? 0.22 : 0.14),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: dotAlpha),
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -291,12 +309,14 @@ class _MovingGlassShine extends StatelessWidget {
     required this.width,
     required this.height,
     required this.premium,
+    required this.chatSize,
   });
 
   final Animation<double> animation;
   final double width;
   final double height;
   final bool premium;
+  final bool chatSize;
 
   @override
   Widget build(BuildContext context) {
@@ -307,7 +327,7 @@ class _MovingGlassShine extends StatelessWidget {
           child: AnimatedBuilder(
             animation: animation,
             builder: (context, child) {
-              final travel = width * (premium ? 1.95 : 1.62) * animation.value;
+              final travel = width * (chatSize ? 1.45 : premium ? 1.95 : 1.62) * animation.value;
               return Stack(
                 children: [
                   Transform.translate(
@@ -315,19 +335,19 @@ class _MovingGlassShine extends StatelessWidget {
                     child: Transform.rotate(
                       angle: -0.34,
                       child: Container(
-                        width: width * (premium ? 0.34 : 0.18),
-                        height: height * 2.7,
+                        width: width * (chatSize ? 0.11 : premium ? 0.34 : 0.18),
+                        height: height * (chatSize ? 2.0 : 2.7),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                             colors: [
                               Colors.white.withValues(alpha: 0.0),
-                              Colors.white.withValues(alpha: premium ? 0.12 : 0.04),
-                              Colors.white.withValues(alpha: premium ? 0.34 : 0.12),
-                              Colors.white.withValues(alpha: premium ? 0.62 : 0.24),
-                              Colors.white.withValues(alpha: premium ? 0.34 : 0.12),
-                              Colors.white.withValues(alpha: premium ? 0.12 : 0.04),
+                              Colors.white.withValues(alpha: chatSize ? 0.02 : premium ? 0.12 : 0.04),
+                              Colors.white.withValues(alpha: chatSize ? 0.06 : premium ? 0.34 : 0.12),
+                              Colors.white.withValues(alpha: chatSize ? 0.12 : premium ? 0.62 : 0.24),
+                              Colors.white.withValues(alpha: chatSize ? 0.06 : premium ? 0.34 : 0.12),
+                              Colors.white.withValues(alpha: chatSize ? 0.02 : premium ? 0.12 : 0.04),
                               Colors.white.withValues(alpha: 0.0),
                             ],
                           ),
