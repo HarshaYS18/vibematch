@@ -19,6 +19,7 @@ import 'widgets/live_room_join_requests_sheet.dart';
 import 'widgets/live_room_leave_sheet.dart';
 import 'widgets/live_room_mini_profile_launcher.dart';
 import 'widgets/live_room_minimized_bubble.dart';
+import 'widgets/live_room_minimized_overlay_service.dart';
 import 'widgets/live_room_privacy_sheet.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
@@ -799,8 +800,40 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _stayAndMinimize(BuildContext sheetContext) {
+    final navigator = Navigator.of(context, rootNavigator: true);
+
+    final roomName = _roomName;
+    final roomId = _roomId;
+    final language = widget.language;
+    final modeTitle = widget.modeTitle;
+    final onlineCount = widget.onlineCount;
+
+    LiveRoomMinimizedOverlayService.show(
+      context: context,
+      onRestore: () {
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => LiveRoomPage(
+              roomName: roomName,
+              roomId: roomId,
+              language: language,
+              modeTitle: modeTitle,
+              onlineCount: onlineCount,
+            ),
+          ),
+        );
+      },
+    );
+
     Navigator.pop(sheetContext);
-    setState(() => _minimized = true);
+
+    if (!mounted) return;
+
+    setState(() => _allowRoomPop = true);
+
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) Navigator.maybePop(context);
+    });
   }
 
   void _leaveRoomFromSheet(BuildContext sheetContext) {
