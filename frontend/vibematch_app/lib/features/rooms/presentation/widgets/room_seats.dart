@@ -42,11 +42,15 @@ class RoomSeatLayout extends StatefulWidget {
 }
 
 class _RoomSeatLayoutState extends State<RoomSeatLayout> {
-  static const double _seatWidth = 74;
-  static const double _seatHeight = 80;
-  static const double _rowHeight = 92;
-  static const double _hostRowHeight = 92;
-  static const double _actionWidth = 122;
+  static const double _seatWidth = 76;
+  static const double _seatHeight = 88;
+  static const double _rowHeight = 106;
+  static const double _hostRowHeight = 106;
+  static const double _avatarSize = 56;
+  static const double _actionWidth = 108;
+  static const double _actionItemHeight = 30;
+  static const double _actionPaddingY = 7;
+  static const double _actionDividerAndMargin = 7;
 
   int? _visuallyHiddenSeatIndex;
 
@@ -72,19 +76,16 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
 
   void _hideActionMenuOnly() {
     if (widget.selectedSeatIndex == null) return;
-    if (mounted) {
-      setState(() => _visuallyHiddenSeatIndex = widget.selectedSeatIndex);
-    }
+    if (mounted) setState(() => _visuallyHiddenSeatIndex = widget.selectedSeatIndex);
   }
 
   @override
   Widget build(BuildContext context) {
     final spec = SeatLayoutSpec.parse(widget.layoutId);
     final selectedSeat = _selectedSeatForActions;
-    final actionHeight = selectedSeat == null ? 0.0 : (selectedSeat.locked ? 54.0 : 154.0);
+    final actionHeight = selectedSeat == null ? 0.0 : _actionMenuHeight(selectedSeat.locked ? 1 : 3);
     final hostHeight = spec.hasHostSeats ? _hostRowHeight : 0.0;
     final gridHeight = hostHeight + (spec.rows * _rowHeight);
-    final layoutHeight = gridHeight;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -96,9 +97,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: () {
-                  setState(() => _visuallyHiddenSeatIndex = selectedSeat.index);
-                },
+                onTap: () => setState(() => _visuallyHiddenSeatIndex = selectedSeat.index),
                 child: const SizedBox.expand(),
               ),
             ),
@@ -141,13 +140,17 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
 
         if (selectedSeat != null) {
           final position = _seatCenterPosition(selectedSeat.index, spec: spec, width: width);
-          final left = (position.dx - (_actionWidth / 2)).clamp(0.0, width - _actionWidth);
-          final top = (position.dy + 28).clamp(0.0, gridHeight - actionHeight);
+          final placement = _actionMenuPlacement(
+            seatCenter: position,
+            width: width,
+            gridHeight: gridHeight,
+            actionHeight: actionHeight,
+          );
 
           children.add(
             Positioned(
-              left: left,
-              top: top,
+              left: placement.dx,
+              top: placement.dy,
               width: _actionWidth,
               child: _SeatActionMenu(
                 actions: selectedSeat.locked
@@ -181,12 +184,36 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
         }
 
         return SizedBox(
-          height: layoutHeight,
+          height: gridHeight,
           width: width,
           child: Stack(clipBehavior: Clip.none, children: children),
         );
       },
     );
+  }
+
+  double _actionMenuHeight(int actionCount) {
+    final dividers = actionCount <= 1 ? 0.0 : (actionCount - 1) * _actionDividerAndMargin;
+    return (_actionPaddingY * 2) + (actionCount * _actionItemHeight) + dividers;
+  }
+
+  Offset _actionMenuPlacement({
+    required Offset seatCenter,
+    required double width,
+    required double gridHeight,
+    required double actionHeight,
+  }) {
+    final left = (seatCenter.dx - (_actionWidth / 2)).clamp(0.0, width - _actionWidth);
+    final desiredBelow = seatCenter.dy + (_avatarSize / 2) + 12;
+    final desiredAbove = seatCenter.dy - (_avatarSize / 2) - actionHeight - 12;
+
+    final top = desiredBelow + actionHeight <= gridHeight
+        ? desiredBelow
+        : desiredAbove >= 0
+            ? desiredAbove
+            : (gridHeight - actionHeight).clamp(0.0, gridHeight);
+
+    return Offset(left, top);
   }
 
   RoomSeat? get _selectedSeatForActions {
@@ -201,7 +228,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   Offset _seatCenterPosition(int index, {required SeatLayoutSpec spec, required double width}) {
     if (spec.hasHostSeats && index < spec.topSeatCount) {
       final hostCellWidth = width / spec.topSeatCount;
-      return Offset((hostCellWidth * index) + (hostCellWidth / 2), 28);
+      return Offset((hostCellWidth * index) + (hostCellWidth / 2), _avatarSize / 2);
     }
 
     final cursor = spec.hasHostSeats ? spec.topSeatCount : 0;
@@ -210,7 +237,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     final col = gridIndex % spec.columns;
     final cellWidth = width / spec.columns;
     final hostHeight = spec.hasHostSeats ? _hostRowHeight : 0.0;
-    return Offset((cellWidth * col) + (cellWidth / 2), hostHeight + (row * _rowHeight) + 28);
+    return Offset((cellWidth * col) + (cellWidth / 2), hostHeight + (row * _rowHeight) + (_avatarSize / 2));
   }
 
   Widget _buildSeat(RoomSeat seat) {
@@ -224,10 +251,11 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _SeatAvatar(seat: seat, selected: selected),
-          const SizedBox(height: 5),
+          _SeatAvatar(seat: seat, selected: selected, size: _avatarSize),
+          const SizedBox(height: 6),
           SizedBox(
             width: _seatWidth,
+            height: 18,
             child: user == null ? _EmptySeatLabel(index: seat.index) : _GenderNameLabel(user: user, index: seat.index),
           ),
         ],
@@ -305,15 +333,15 @@ class _GenderNameLabel extends StatelessWidget {
 }
 
 class _SeatAvatar extends StatelessWidget {
-  const _SeatAvatar({required this.seat, required this.selected});
+  const _SeatAvatar({required this.seat, required this.selected, required this.size});
 
   final RoomSeat seat;
   final bool selected;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final user = seat.user;
-    const size = 56.0;
     final borderColor = selected
         ? RoomColors.gold
         : user == null
@@ -414,25 +442,23 @@ class _SeatActionMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.black,
-      borderRadius: BorderRadius.circular(22),
-      elevation: 12,
-      shadowColor: Colors.black.withValues(alpha: 0.70),
+      borderRadius: BorderRadius.circular(20),
+      elevation: 10,
+      shadowColor: Colors.black.withValues(alpha: 0.65),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: _RoomSeatLayoutState._actionPaddingY),
         decoration: BoxDecoration(
           color: Colors.black,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: RoomColors.gold.withValues(alpha: 0.38)),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.72), blurRadius: 18, offset: const Offset(0, 8)),
-          ],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.70), blurRadius: 16, offset: const Offset(0, 8))],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             for (var i = 0; i < actions.length; i++) ...[
               _SeatActionButton(action: actions[i]),
-              if (i != actions.length - 1) Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 5), color: Colors.white.withValues(alpha: 0.10)),
+              if (i != actions.length - 1) Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 3), color: Colors.white.withValues(alpha: 0.10)),
             ],
           ],
         ),
@@ -449,20 +475,20 @@ class _SeatActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(13),
       onTap: action.onTap,
       child: SizedBox(
-        height: 38,
+        height: _RoomSeatLayoutState._actionItemHeight,
         child: Row(
           children: [
-            Icon(action.icon, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
+            Icon(action.icon, color: Colors.white, size: 14),
+            const SizedBox(width: 7),
             Expanded(
               child: Text(
                 action.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900, height: 1),
+                style: const TextStyle(color: Colors.white, fontSize: 11.4, fontWeight: FontWeight.w900, height: 1),
               ),
             ),
           ],
