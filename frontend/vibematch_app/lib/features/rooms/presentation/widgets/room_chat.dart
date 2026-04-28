@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../live_room_models.dart';
 import 'room_action_pages.dart';
@@ -163,6 +164,7 @@ class _CompactChatLine extends StatelessWidget {
           Flexible(
             fit: FlexFit.loose,
             child: _TransparentUserMessageFlexBox(
+              messageText: message.message,
               onTap: onSenderTap,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -348,17 +350,92 @@ class _CompactChatLine extends StatelessWidget {
 class _TransparentUserMessageFlexBox extends StatelessWidget {
   const _TransparentUserMessageFlexBox({
     required this.child,
+    required this.messageText,
     this.onTap,
   });
 
   final Widget child;
+  final String messageText;
   final VoidCallback? onTap;
+
+  void _showCopyMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.30),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF171024).withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                leading: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(Icons.copy_rounded, color: RoomColors.aqua, size: 20),
+                ),
+                title: const Text(
+                  'Copy message',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Copy this chat text to clipboard',
+                  style: TextStyle(
+                    color: Color(0xFFBDB4CC),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await Clipboard.setData(ClipboardData(text: messageText));
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Message copied'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(milliseconds: 1200),
+                      backgroundColor: const Color(0xFF171024).withValues(alpha: 0.96),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: onTap,
+      onLongPress: () => _showCopyMenu(context),
       child: Container(
         // Dynamic user-message flex box with a very light foggy white fill.
         // It improves message readability while keeping the chat background visible.
