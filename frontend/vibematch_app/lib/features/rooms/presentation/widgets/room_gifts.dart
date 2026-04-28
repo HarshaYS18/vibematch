@@ -39,13 +39,21 @@ class GiftPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = gifts.where((gift) => gift.category == selectedCategory).toList();
-    final allSelected = users.isNotEmpty && selectedReceiverIds.length == users.length;
+    final filtered = gifts
+        .where((gift) => gift.category == selectedCategory)
+        .toList();
+    final allSelected =
+        users.isNotEmpty && selectedReceiverIds.length == users.length;
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.30,
       child: Container(
-        padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
+        padding: EdgeInsets.fromLTRB(
+          10,
+          7,
+          10,
+          MediaQuery.paddingOf(context).bottom + 8,
+        ),
         decoration: const BoxDecoration(
           color: Color(0xFF12101D),
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -57,12 +65,32 @@ class GiftPanel extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.card_giftcard_rounded, color: RoomColors.gold, size: 18),
+                const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: RoomColors.gold,
+                  size: 18,
+                ),
                 const SizedBox(width: 6),
-                const Text('Gifts', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
+                const Text(
+                  'Gifts',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: _CategoryStrip(selectedCategory: selectedCategory, onChanged: onCategoryChanged)),
-                _TinyIconButton(icon: Icons.apps_rounded, onTap: () => RoomToast.show(context, 'Bag / inventory opened')),
+                Expanded(
+                  child: _CategoryStrip(
+                    selectedCategory: selectedCategory,
+                    onChanged: onCategoryChanged,
+                  ),
+                ),
+                _TinyIconButton(
+                  icon: Icons.apps_rounded,
+                  onTap: () =>
+                      RoomToast.show(context, 'Bag / inventory opened'),
+                ),
               ],
             ),
             const SizedBox(height: 7),
@@ -71,7 +99,7 @@ class GiftPanel extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: users.length + 1,
-                separatorBuilder: (_, __) => const SizedBox(width: 7),
+                separatorBuilder: (context, index) => const SizedBox(width: 7),
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return _ReceiverAvatar(
@@ -96,7 +124,7 @@ class GiftPanel extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   final gift = filtered[index];
                   return CompactGiftCard(
@@ -117,9 +145,20 @@ class GiftPanel extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(15),
-                      gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
+                      gradient: const LinearGradient(
+                        colors: [RoomColors.gold, RoomColors.coral],
+                      ),
                     ),
-                    child: const Center(child: Text('Send', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900))),
+                    child: const Center(
+                      child: Text(
+                        'Send',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -136,8 +175,19 @@ class GiftPanel extends StatelessWidget {
                       value: selectedCombo,
                       dropdownColor: const Color(0xFF201A2C),
                       iconEnabledColor: Colors.white,
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
-                      items: combos.map((combo) => DropdownMenuItem(value: combo, child: Text('x$combo'))).toList(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                      items: combos
+                          .map(
+                            (combo) => DropdownMenuItem(
+                              value: combo,
+                              child: Text('x$combo'),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (value) {
                         if (value != null) onComboChanged(value);
                       },
@@ -157,11 +207,26 @@ class GiftPanel extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.add_circle_rounded, color: RoomColors.aqua, size: 17),
+                        const Icon(
+                          Icons.add_circle_rounded,
+                          color: RoomColors.aqua,
+                          size: 17,
+                        ),
                         const SizedBox(width: 5),
-                        const Icon(Icons.toll_rounded, color: RoomColors.gold, size: 15),
+                        const Icon(
+                          Icons.toll_rounded,
+                          color: RoomColors.gold,
+                          size: 15,
+                        ),
                         const SizedBox(width: 4),
-                        Text('$coinBalance', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+                        Text(
+                          '$coinBalance',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -176,7 +241,10 @@ class GiftPanel extends StatelessWidget {
 }
 
 class _CategoryStrip extends StatelessWidget {
-  const _CategoryStrip({required this.selectedCategory, required this.onChanged});
+  const _CategoryStrip({
+    required this.selectedCategory,
+    required this.onChanged,
+  });
 
   final GiftCategory selectedCategory;
   final ValueChanged<GiftCategory> onChanged;
@@ -188,7 +256,7 @@ class _CategoryStrip extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: GiftCategory.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 5),
+        separatorBuilder: (context, index) => const SizedBox(width: 5),
         itemBuilder: (context, index) {
           final category = GiftCategory.values[index];
           final selected = category == selectedCategory;
@@ -198,12 +266,18 @@ class _CategoryStrip extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 9),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: selected ? RoomColors.gold : Colors.white.withValues(alpha: 0.08),
+                color: selected
+                    ? RoomColors.gold
+                    : Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 category.label,
-                style: TextStyle(color: selected ? RoomColors.deep : Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  color: selected ? RoomColors.deep : Colors.white,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           );
@@ -214,7 +288,12 @@ class _CategoryStrip extends StatelessWidget {
 }
 
 class _ReceiverAvatar extends StatelessWidget {
-  const _ReceiverAvatar({required this.selected, required this.label, required this.colors, required this.onTap});
+  const _ReceiverAvatar({
+    required this.selected,
+    required this.label,
+    required this.colors,
+    required this.onTap,
+  });
 
   final bool selected;
   final String label;
@@ -231,12 +310,25 @@ class _ReceiverAvatar extends StatelessWidget {
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: selected ? RoomColors.gold : Colors.white24, width: selected ? 2 : 1),
+          border: Border.all(
+            color: selected ? RoomColors.gold : Colors.white24,
+            width: selected ? 2 : 1,
+          ),
         ),
         child: Container(
           alignment: Alignment.center,
-          decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: colors)),
-          child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(colors: colors),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ),
       ),
     );
@@ -244,7 +336,12 @@ class _ReceiverAvatar extends StatelessWidget {
 }
 
 class CompactGiftCard extends StatelessWidget {
-  const CompactGiftCard({super.key, required this.gift, required this.selected, required this.onTap});
+  const CompactGiftCard({
+    super.key,
+    required this.gift,
+    required this.selected,
+    required this.onTap,
+  });
 
   final GiftItem gift;
   final bool selected;
@@ -261,20 +358,43 @@ class CompactGiftCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: selected ? 0.13 : 0.07),
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: selected ? gift.colors.first : Colors.white12, width: selected ? 1.4 : 1),
+          border: Border.all(
+            color: selected ? gift.colors.first : Colors.white12,
+            width: selected ? 1.4 : 1,
+          ),
         ),
         child: Column(
           children: [
             GradientIconBox(icon: gift.icon, colors: gift.colors, size: 34),
             const SizedBox(height: 5),
-            Text(gift.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)),
+            Text(
+              gift.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.toll_rounded, color: RoomColors.gold, size: 11),
+                const Icon(
+                  Icons.toll_rounded,
+                  color: RoomColors.gold,
+                  size: 11,
+                ),
                 const SizedBox(width: 2),
-                Text('${gift.coins}', style: const TextStyle(color: RoomColors.gold, fontSize: 10, fontWeight: FontWeight.w900)),
+                Text(
+                  '${gift.coins}',
+                  style: const TextStyle(
+                    color: RoomColors.gold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ],
             ),
           ],
@@ -397,11 +517,7 @@ class GiftSlideCard extends StatelessWidget {
 }
 
 class ComboBuzzer extends StatelessWidget {
-  const ComboBuzzer({
-    super.key,
-    required this.slide,
-    required this.onTap,
-  });
+  const ComboBuzzer({super.key, required this.slide, required this.onTap});
 
   final GiftSlide? slide;
   final VoidCallback onTap;
@@ -415,13 +531,16 @@ class ComboBuzzer extends StatelessWidget {
         tween: Tween(begin: 0.90, end: 1),
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutBack,
-        builder: (context, value, child) => Transform.scale(scale: value, child: child),
+        builder: (context, value, child) =>
+            Transform.scale(scale: value, child: child),
         child: Container(
-          width: 66,
-          height: 66,
+          width: 82,
+          height: 82,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
+            gradient: const LinearGradient(
+              colors: [RoomColors.gold, RoomColors.coral],
+            ),
             boxShadow: [
               BoxShadow(
                 color: RoomColors.coral.withValues(alpha: 0.34),
@@ -433,15 +552,25 @@ class ComboBuzzer extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.bolt_rounded, color: Colors.white, size: 18),
+              const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
               Text(
                 'x${slide!.combo}',
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, height: 1),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 '${slide!.remainingSeconds}s',
-                style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w900, height: 1),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
               ),
             ],
           ),
@@ -464,7 +593,11 @@ class _TinyIconButton extends StatelessWidget {
       child: Container(
         width: 30,
         height: 30,
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), shape: BoxShape.circle, border: Border.all(color: Colors.white12)),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white12),
+        ),
         child: Icon(icon, color: Colors.white70, size: 17),
       ),
     );

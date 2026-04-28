@@ -50,7 +50,9 @@ class RoomActionPage extends StatelessWidget {
                   width: 54,
                   height: 54,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [RoomColors.violet, RoomColors.aqua]),
+                    gradient: const LinearGradient(
+                      colors: [RoomColors.violet, RoomColors.aqua],
+                    ),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Icon(icon, color: Colors.white, size: 26),
@@ -71,7 +73,12 @@ class RoomActionPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          ...cards.map((card) => Padding(padding: const EdgeInsets.only(bottom: 10), child: card)),
+          ...cards.map(
+            (card) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: card,
+            ),
+          ),
         ],
       ),
     );
@@ -113,7 +120,10 @@ class RoomActionCard extends StatelessWidget {
               Container(
                 width: 42,
                 height: 42,
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(15)),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: Icon(icon, color: color, size: 21),
               ),
               const SizedBox(width: 12),
@@ -121,13 +131,31 @@ class RoomActionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: RoomColors.plum,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                     const SizedBox(height: 3),
-                    Text(value, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        color: Color(0xFF7B6A86),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              if (onTap != null) const Icon(Icons.chevron_right_rounded, color: Color(0xFF96899F)),
+              if (onTap != null)
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF96899F),
+                ),
             ],
           ),
         ),
@@ -150,7 +178,8 @@ class RoomRankingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...users]..sort((a, b) {
+    final sorted = [...users]
+      ..sort((a, b) {
         final left = sentRanking ? a.sentExp : a.receivedExp;
         final right = sentRanking ? b.sentExp : b.receivedExp;
         return right.compareTo(left);
@@ -167,7 +196,7 @@ class RoomRankingsPage extends StatelessWidget {
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         itemCount: sorted.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (context, index) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
           final user = sorted[index];
           final value = sentRanking ? user.sentExp : user.receivedExp;
@@ -185,7 +214,9 @@ class RoomRankingsPage extends StatelessWidget {
                   height: 34,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: index == 0 ? RoomColors.gold : RoomColors.violet.withValues(alpha: 0.12),
+                    color: index == 0
+                        ? RoomColors.gold
+                        : RoomColors.violet.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Text(
@@ -201,23 +232,52 @@ class RoomRankingsPage extends StatelessWidget {
                   width: 44,
                   height: 44,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
-                  child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: user.avatarColors),
+                  ),
+                  child: Text(
+                    avatarLetter(user.name),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user.name, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
+                      Text(
+                        user.name,
+                        style: const TextStyle(
+                          color: RoomColors.plum,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                       const SizedBox(height: 3),
-                      Text(user.familyName.trim().isEmpty ? 'No family' : user.familyName, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      Text(
+                        user.familyName.trim().isEmpty
+                            ? 'No family'
+                            : user.familyName,
+                        style: const TextStyle(
+                          color: Color(0xFF7B6A86),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Text(
                   compactNumber(value),
-                  style: const TextStyle(color: RoomColors.plum, fontSize: 15, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    color: RoomColors.plum,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ],
             ),

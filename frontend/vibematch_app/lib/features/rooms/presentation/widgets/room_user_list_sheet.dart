@@ -19,7 +19,12 @@ class RoomUserListSheet extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.74,
       ),
-      padding: EdgeInsets.fromLTRB(18, 12, 18, MediaQuery.paddingOf(context).bottom + 18),
+      padding: EdgeInsets.fromLTRB(
+        18,
+        12,
+        18,
+        MediaQuery.paddingOf(context).bottom + 18,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
@@ -43,7 +48,7 @@ class RoomUserListSheet extends StatelessWidget {
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: users.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final user = users[index];
                 return Material(
@@ -53,7 +58,10 @@ class RoomUserListSheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(22),
                     onTap: () => onUserTap(user),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       child: Row(
                         children: [
                           GestureDetector(
@@ -63,7 +71,9 @@ class RoomUserListSheet extends StatelessWidget {
                               height: 52,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient: LinearGradient(colors: user.avatarColors),
+                                gradient: LinearGradient(
+                                  colors: user.avatarColors,
+                                ),
                               ),
                               alignment: Alignment.center,
                               child: Text(
@@ -105,7 +115,10 @@ class RoomUserListSheet extends StatelessWidget {
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
                             decoration: BoxDecoration(
                               color: RoomColors.gold.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(999),

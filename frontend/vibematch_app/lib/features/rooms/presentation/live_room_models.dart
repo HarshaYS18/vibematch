@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../vibesync/models/vibesync_models.dart';
+
 enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
 
 enum GiftCategory { classic, lucky, event, svip, premium }
@@ -76,6 +78,7 @@ class SeatUser {
     required this.receivedExp,
     required this.medals,
     required this.avatarColors,
+    this.gender = VibeSyncGender.undisclosed,
     this.isCurrentUser = false,
     this.isHost = false,
     this.isRoomAdmin = false,
@@ -95,6 +98,7 @@ class SeatUser {
   final int receivedExp;
   final List<String> medals;
   final List<Color> avatarColors;
+  final VibeSyncGender gender;
   final bool isCurrentUser;
   final bool isHost;
   final bool isRoomAdmin;
@@ -110,6 +114,7 @@ class SeatUser {
     bool? isRoomAdmin,
     bool? selfMuted,
     bool? adminMuted,
+    VibeSyncGender? gender,
   }) {
     return SeatUser(
       id: id,
@@ -124,6 +129,7 @@ class SeatUser {
       receivedExp: receivedExp ?? this.receivedExp,
       medals: medals,
       avatarColors: avatarColors,
+      gender: gender ?? this.gender,
       isCurrentUser: isCurrentUser,
       isHost: isHost,
       isRoomAdmin: isRoomAdmin ?? this.isRoomAdmin,
@@ -134,11 +140,7 @@ class SeatUser {
 }
 
 class RoomSeat {
-  const RoomSeat({
-    required this.index,
-    this.user,
-    this.locked = false,
-  });
+  const RoomSeat({required this.index, this.user, this.locked = false});
 
   final int index;
   final SeatUser? user;
@@ -178,10 +180,7 @@ class ChatEntry {
   final int? seatIndex;
   final bool applicationApproved;
 
-  ChatEntry copyWith({
-    String? message,
-    bool? applicationApproved,
-  }) {
+  ChatEntry copyWith({String? message, bool? applicationApproved}) {
     return ChatEntry(
       senderName: senderName,
       message: message ?? this.message,
@@ -268,10 +267,16 @@ class SeatLayoutSpec {
   int get topSeatCount => hasHostSeats ? 2 : 0;
   int get totalSeats => topSeatCount + (columns * rows);
 
-  String get label => hasHostSeats ? 'Host + ${columns}x$rows' : '${columns}x$rows';
+  String get label =>
+      hasHostSeats ? 'Host + ${columns}x$rows' : '${columns}x$rows';
 
   static const List<String> withoutHostLayouts = ['4x2', '5x2', '4x3', '5x3'];
-  static const List<String> withHostLayouts = ['host_4x2', 'host_5x2', 'host_4x3', 'host_5x3'];
+  static const List<String> withHostLayouts = [
+    'host_4x2',
+    'host_5x2',
+    'host_4x3',
+    'host_5x3',
+  ];
 
   static SeatLayoutSpec parse(String id) {
     final hasHost = id.startsWith('host_');
@@ -279,7 +284,12 @@ class SeatLayoutSpec {
     final parts = raw.split('x');
     final columns = int.tryParse(parts.first) ?? 4;
     final rows = int.tryParse(parts.length > 1 ? parts.last : '2') ?? 2;
-    return SeatLayoutSpec(id: id, columns: columns, rows: rows, hasHostSeats: hasHost);
+    return SeatLayoutSpec(
+      id: id,
+      columns: columns,
+      rows: rows,
+      hasHostSeats: hasHost,
+    );
   }
 }
 
@@ -290,8 +300,12 @@ String avatarLetter(String input) {
 }
 
 String compactNumber(int value) {
-  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-  if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+  if (value >= 1000000) {
+    return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+  }
+  if (value >= 1000) {
+    return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+  }
   return '$value';
 }
 
@@ -299,7 +313,9 @@ RoomPrivacyMode privacyModeFromTitle(String title) {
   final value = title.toLowerCase();
   if (value.contains('lock')) return RoomPrivacyMode.locked;
   if (value.contains('member')) return RoomPrivacyMode.membersOnly;
-  if (value.contains('private') || value.contains('secret')) return RoomPrivacyMode.privateVibe;
+  if (value.contains('private') || value.contains('secret')) {
+    return RoomPrivacyMode.privateVibe;
+  }
   return RoomPrivacyMode.open;
 }
 
@@ -317,6 +333,7 @@ const List<SeatUser> mockRoomUsers = [
     receivedExp: 124500,
     medals: ['🏆', '💎', '🔥'],
     avatarColors: [Color(0xFFFFC857), Color(0xFFFF5F7E)],
+    gender: VibeSyncGender.male,
     isCurrentUser: true,
     isHost: true,
     isRoomAdmin: true,
@@ -334,6 +351,7 @@ const List<SeatUser> mockRoomUsers = [
     receivedExp: 90500,
     medals: ['🌙', '🎖️'],
     avatarColors: [Color(0xFF18C7B7), Color(0xFF5E6DFF)],
+    gender: VibeSyncGender.female,
     isRoomAdmin: true,
   ),
   SeatUser(
@@ -349,9 +367,9 @@ const List<SeatUser> mockRoomUsers = [
     receivedExp: 34100,
     medals: ['⭐'],
     avatarColors: [Color(0xFFE84C72), Color(0xFFB13C77)],
+    gender: VibeSyncGender.male,
   ),
 ];
-
 
 const List<SeatUser> mockInviteUsers = [
   SeatUser(
@@ -367,6 +385,7 @@ const List<SeatUser> mockInviteUsers = [
     receivedExp: 12300,
     medals: ['🌟'],
     avatarColors: [Color(0xFF7A5CFF), Color(0xFF12C7B7)],
+    gender: VibeSyncGender.female,
   ),
   SeatUser(
     id: 'nikhil',
@@ -381,6 +400,7 @@ const List<SeatUser> mockInviteUsers = [
     receivedExp: 1700,
     medals: [],
     avatarColors: [Color(0xFFFF7A45), Color(0xFFE84C72)],
+    gender: VibeSyncGender.male,
   ),
   SeatUser(
     id: 'kiran',
@@ -395,9 +415,9 @@ const List<SeatUser> mockInviteUsers = [
     receivedExp: 11600,
     medals: ['🔥'],
     avatarColors: [Color(0xFFFFC857), Color(0xFF7A5CFF)],
+    gender: VibeSyncGender.male,
   ),
 ];
-
 
 const List<ChatEntry> mockChatEntries = [];
 

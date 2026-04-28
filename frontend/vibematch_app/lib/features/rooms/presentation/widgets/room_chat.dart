@@ -52,7 +52,10 @@ class _CompactChatLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showAgree = message.isSeatApplication && canManageSeatApplications && !message.applicationApproved;
+    final showAgree =
+        message.isSeatApplication &&
+        canManageSeatApplications &&
+        !message.applicationApproved;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 5),
@@ -61,15 +64,15 @@ class _CompactChatLine extends StatelessWidget {
         color: message.isGift
             ? RoomColors.gold.withValues(alpha: 0.13)
             : message.isSeatApplication
-                ? RoomColors.aqua.withValues(alpha: 0.12)
-                : Colors.black.withValues(alpha: 0.22),
+            ? RoomColors.aqua.withValues(alpha: 0.12)
+            : Colors.black.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
           color: message.isGift
               ? RoomColors.gold.withValues(alpha: 0.24)
               : message.isSeatApplication
-                  ? RoomColors.aqua.withValues(alpha: 0.24)
-                  : Colors.white.withValues(alpha: 0.07),
+              ? RoomColors.aqua.withValues(alpha: 0.24)
+              : Colors.white.withValues(alpha: 0.07),
         ),
       ),
       child: Row(
@@ -79,11 +82,15 @@ class _CompactChatLine extends StatelessWidget {
             backgroundColor: message.isGift
                 ? RoomColors.gold
                 : message.isSeatApplication
-                    ? RoomColors.aqua
-                    : RoomColors.violet,
+                ? RoomColors.aqua
+                : RoomColors.violet,
             child: Text(
               avatarLetter(message.senderName),
-              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           const SizedBox(width: 7),
@@ -95,11 +102,20 @@ class _CompactChatLine extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: '${message.senderName}  ',
-                    style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   TextSpan(
-                    text: 'VIP ${message.vipLevel}  S${message.sendingLevel}  R${message.receivingLevel}: ',
-                    style: TextStyle(color: RoomColors.gold.withValues(alpha: 0.92), fontSize: 10.5, fontWeight: FontWeight.w900),
+                    text:
+                        'VIP ${message.vipLevel}  S${message.sendingLevel}  R${message.receivingLevel}: ',
+                    style: TextStyle(
+                      color: RoomColors.gold.withValues(alpha: 0.92),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   TextSpan(
                     text: message.message,
@@ -107,10 +123,12 @@ class _CompactChatLine extends StatelessWidget {
                       color: message.isGift
                           ? RoomColors.gold
                           : message.isSeatApplication
-                              ? RoomColors.aqua
-                              : Colors.white.withValues(alpha: 0.88),
+                          ? RoomColors.aqua
+                          : Colors.white.withValues(alpha: 0.88),
                       fontSize: 12.5,
-                      fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w700,
+                      fontWeight: message.isGift || message.isSeatApplication
+                          ? FontWeight.w900
+                          : FontWeight.w700,
                     ),
                   ),
                 ],
@@ -138,7 +156,11 @@ class _CompactChatLine extends StatelessWidget {
                 ),
                 child: const Text(
                   'Agree',
-                  style: TextStyle(color: RoomColors.deep, fontSize: 11, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                    color: RoomColors.deep,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ),
@@ -156,9 +178,7 @@ class RoomInputDock extends StatelessWidget {
     this.focusNode,
     required this.micMuted,
     required this.inboxUnreadCount,
-    required this.showImageButton,
     required this.onInboxTap,
-    required this.onImageTap,
     required this.onEmojiTap,
     required this.onSendTap,
     required this.onMicTap,
@@ -170,9 +190,7 @@ class RoomInputDock extends StatelessWidget {
   final FocusNode? focusNode;
   final bool micMuted;
   final int inboxUnreadCount;
-  final bool showImageButton;
   final VoidCallback onInboxTap;
-  final VoidCallback onImageTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onSendTap;
   final VoidCallback onMicTap;
@@ -187,7 +205,9 @@ class RoomInputDock extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
         decoration: BoxDecoration(
           color: RoomColors.deep.withValues(alpha: 0.94),
-          border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+          border: Border(
+            top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+          ),
         ),
         child: Row(
           children: [
@@ -196,10 +216,6 @@ class RoomInputDock extends StatelessWidget {
               onTap: onInboxTap,
               badgeCount: inboxUnreadCount,
             ),
-            if (showImageButton) ...[
-              const SizedBox(width: 5),
-              _DockButton(icon: Icons.image_rounded, onTap: onImageTap),
-            ],
             const SizedBox(width: 5),
             Expanded(
               child: Container(
@@ -208,7 +224,9 @@ class RoomInputDock extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.30),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -216,10 +234,17 @@ class RoomInputDock extends StatelessWidget {
                       child: TextField(
                         controller: controller,
                         focusNode: focusNode,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Message...',
-                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w700),
+                          hintStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.36),
+                            fontWeight: FontWeight.w700,
+                          ),
                           border: InputBorder.none,
                           isDense: true,
                         ),
@@ -229,16 +254,30 @@ class RoomInputDock extends StatelessWidget {
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
                       onPressed: onEmojiTap,
-                      icon: const Icon(Icons.emoji_emotions_rounded, color: RoomColors.gold, size: 19),
+                      icon: const Icon(
+                        Icons.emoji_emotions_rounded,
+                        color: RoomColors.gold,
+                        size: 19,
+                      ),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
                       onPressed: onSendTap,
-                      icon: const Icon(Icons.send_rounded, color: RoomColors.aqua, size: 20),
+                      icon: const Icon(
+                        Icons.send_rounded,
+                        color: RoomColors.aqua,
+                        size: 20,
+                      ),
                     ),
                   ],
                 ),
@@ -254,7 +293,11 @@ class RoomInputDock extends StatelessWidget {
             const SizedBox(width: 5),
             _DockButton(icon: Icons.sports_esports_rounded, onTap: onGamesTap),
             const SizedBox(width: 5),
-            _DockButton(icon: Icons.card_giftcard_rounded, onTap: onGiftTap, gift: true),
+            _DockButton(
+              icon: Icons.card_giftcard_rounded,
+              onTap: onGiftTap,
+              gift: true,
+            ),
           ],
         ),
       ),
@@ -284,13 +327,13 @@ class _DockButton extends StatelessWidget {
     final bg = muted
         ? RoomColors.coral.withValues(alpha: 0.22)
         : active
-            ? RoomColors.aqua.withValues(alpha: 0.24)
-            : Colors.white.withValues(alpha: 0.055);
+        ? RoomColors.aqua.withValues(alpha: 0.24)
+        : Colors.white.withValues(alpha: 0.055);
     final iconColor = muted
         ? RoomColors.coral
         : active
-            ? RoomColors.aqua
-            : Colors.white;
+        ? RoomColors.aqua
+        : Colors.white;
 
     return Material(
       color: Colors.transparent,
@@ -306,18 +349,29 @@ class _DockButton extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: gift ? const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]) : null,
+                gradient: gift
+                    ? const LinearGradient(
+                        colors: [RoomColors.gold, RoomColors.coral],
+                      )
+                    : null,
                 color: gift ? null : bg,
                 border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
               ),
-              child: Icon(icon, color: gift ? Colors.white : iconColor, size: 19),
+              child: Icon(
+                icon,
+                color: gift ? Colors.white : iconColor,
+                size: 19,
+              ),
             ),
             if (badgeCount > 0)
               Positioned(
                 right: -2,
                 top: -3,
                 child: Container(
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
@@ -327,7 +381,11 @@ class _DockButton extends StatelessWidget {
                   ),
                   child: Text(
                     badgeCount > 99 ? '99+' : '$badgeCount',
-                    style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
