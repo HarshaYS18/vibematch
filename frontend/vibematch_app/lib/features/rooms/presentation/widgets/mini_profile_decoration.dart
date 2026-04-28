@@ -36,20 +36,18 @@ class MiniProfileDecoration extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(topRadius)),
-        child: Stack(
-          children: [
-            if (showTopGlow)
-              const Positioned(
-                top: -90,
-                left: -60,
-                right: -60,
-                child: _MiniProfileTopGlow(),
-              ),
-            child,
-          ],
-        ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (showTopGlow)
+            const Positioned(
+              top: -90,
+              left: -60,
+              right: -60,
+              child: _MiniProfileTopGlow(),
+            ),
+          child,
+        ],
       ),
     );
   }
