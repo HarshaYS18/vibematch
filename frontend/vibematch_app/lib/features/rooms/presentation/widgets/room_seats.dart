@@ -33,24 +33,23 @@ class RoomSeatLayout extends StatelessWidget {
   static const double _seatHeight = 80;
   static const double _rowHeight = 92;
   static const double _hostRowHeight = 92;
-  static const double _actionHeight = 42;
-  static const double _actionWidth = 238;
+  static const double _actionWidth = 122;
 
   @override
   Widget build(BuildContext context) {
     final spec = SeatLayoutSpec.parse(layoutId);
     final selectedSeat = _selectedSeatForActions;
-    final hasSelectedEmptyManageableSeat = selectedSeat != null;
+    final actionHeight = selectedSeat == null ? 0.0 : (selectedSeat.locked ? 54.0 : 154.0);
     final hostHeight = spec.hasHostSeats ? _hostRowHeight : 0.0;
     final gridHeight = hostHeight + (spec.rows * _rowHeight);
-    final layoutHeight = gridHeight + (hasSelectedEmptyManageableSeat ? _actionHeight + 8 : 0);
+    final layoutHeight = gridHeight + (selectedSeat == null ? 0 : actionHeight + 8);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final children = <Widget>[];
 
-        if (hasSelectedEmptyManageableSeat) {
+        if (selectedSeat != null) {
           children.add(
             Positioned.fill(
               child: GestureDetector(
@@ -84,7 +83,6 @@ class RoomSeatLayout extends StatelessWidget {
           for (var col = 0; col < spec.columns; col++) {
             final seatIndex = cursor + (row * spec.columns) + col;
             if (seatIndex >= seats.length) continue;
-
             children.add(
               Positioned(
                 left: (cellWidth * col) + ((cellWidth - _seatWidth) / 2),
@@ -100,15 +98,14 @@ class RoomSeatLayout extends StatelessWidget {
         if (selectedSeat != null) {
           final position = _seatCenterPosition(selectedSeat.index, spec: spec, width: width);
           final left = (position.dx - (_actionWidth / 2)).clamp(0.0, width - _actionWidth);
-          final top = (position.dy + 36).clamp(0.0, layoutHeight - _actionHeight);
+          final top = (position.dy + 36).clamp(0.0, layoutHeight - actionHeight);
 
           children.add(
             Positioned(
               left: left,
               top: top,
               width: _actionWidth,
-              height: _actionHeight,
-              child: _SeatActionCapsule(
+              child: _SeatActionMenu(
                 actions: selectedSeat.locked
                     ? [
                         _SeatActionData(
@@ -139,10 +136,15 @@ class RoomSeatLayout extends StatelessWidget {
           );
         }
 
-        return SizedBox(
-          height: layoutHeight,
-          width: width,
-          child: Stack(clipBehavior: Clip.none, children: children),
+        return AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            height: layoutHeight,
+            width: width,
+            child: Stack(clipBehavior: Clip.none, children: children),
+          ),
         );
       },
     );
@@ -333,8 +335,8 @@ class _SeatRoleBadge extends StatelessWidget {
   }
 }
 
-class _SeatActionCapsule extends StatelessWidget {
-  const _SeatActionCapsule({required this.actions});
+class _SeatActionMenu extends StatelessWidget {
+  const _SeatActionMenu({required this.actions});
 
   final List<_SeatActionData> actions;
 
@@ -342,24 +344,26 @@ class _SeatActionCapsule extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.black,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(22),
+      elevation: 12,
+      shadowColor: Colors.black.withValues(alpha: 0.70),
       child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.black,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: RoomColors.gold.withValues(alpha: 0.38)),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.78), blurRadius: 24, offset: const Offset(0, 10)),
             BoxShadow(color: RoomColors.gold.withValues(alpha: 0.13), blurRadius: 20),
           ],
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             for (var i = 0; i < actions.length; i++) ...[
-              Expanded(child: _SeatActionButton(action: actions[i])),
-              if (i != actions.length - 1) Container(width: 1, height: 20, color: Colors.white.withValues(alpha: 0.12)),
+              _SeatActionButton(action: actions[i]),
+              if (i != actions.length - 1) Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 5), color: Colors.white.withValues(alpha: 0.10)),
             ],
           ],
         ),
@@ -376,20 +380,21 @@ class _SeatActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(15),
       onTap: action.onTap,
-      child: Center(
+      child: SizedBox(
+        height: 38,
         child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(action.icon, color: Colors.white, size: 14),
-            const SizedBox(width: 4),
-            Text(
-              action.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 11.3, fontWeight: FontWeight.w900, height: 1, letterSpacing: -0.15),
+            Icon(action.icon, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                action.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900, height: 1),
+              ),
             ),
           ],
         ),
