@@ -131,129 +131,139 @@ class _CompactChatLine extends StatelessWidget {
     final showAgree = message.isSeatApplication && canManageSeatApplications && !message.applicationApproved;
     final isSystem = message.senderId == 'system';
 
-    final row = Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Container(
-        // Transparent square hit-area around every chat message by default.
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-        decoration: const BoxDecoration(
-          color: Colors.transparent,
-          shape: BoxShape.rectangle,
-        ),
+    if (isSystem) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (!isSystem) ...[
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onSenderTap,
-                child: CircleAvatar(
-                  radius: 13.5,
-                  backgroundColor: message.isGift
-                      ? RoomColors.gold
-                      : message.isSeatApplication
-                          ? RoomColors.aqua
-                          : RoomColors.violet,
-                  child: Text(
-                    avatarLetter(message.senderName),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-            Expanded(
-              child: RichText(
+            Flexible(
+              child: Text(
+                message.message,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                text: TextSpan(
-                  children: [
-                    if (isSystem)
-                      TextSpan(
-                        text: message.message,
-                        style: const TextStyle(
-                          color: RoomColors.gold,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w900,
-                          height: 1.15,
-                        ),
-                      )
-                    else ...[
-                      WidgetSpan(
-                        alignment: PlaceholderAlignment.middle,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => _openVipSvipCenter(context),
-                          child: VipBadge(
-                            level: message.vipLevel,
-                            size: VipBadgeSize.tiny,
-                            showWhenZero: true,
-                          ),
-                        ),
-                      ),
-                      const TextSpan(text: '  '),
-                      TextSpan(
-                        text: message.senderName,
-                        recognizer: TapGestureRecognizer()..onTap = onSenderTap,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14.8,
-                          fontWeight: FontWeight.w900,
-                          height: 1.15,
-                        ),
-                      ),
-                      const TextSpan(text: '  '),
-                      ..._messageSpans(message),
-                    ],
-                  ],
+                style: const TextStyle(
+                  color: RoomColors.gold,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
                 ),
               ),
             ),
-            if (showAgree) ...[
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onApproveSeatApplication,
-                child: Container(
-                  height: 28,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: RoomColors.aqua,
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: RoomColors.aqua.withValues(alpha: 0.24),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+          ],
+        ),
+      );
+    }
+
+    final row = Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Flexible(
+            fit: FlexFit.loose,
+            child: _TransparentUserMessageFlexBox(
+              onTap: onSenderTap,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onSenderTap,
+                    child: CircleAvatar(
+                      radius: 13.5,
+                      backgroundColor: message.isGift
+                          ? RoomColors.gold
+                          : message.isSeatApplication
+                              ? RoomColors.aqua
+                              : RoomColors.violet,
+                      child: Text(
+                        avatarLetter(message.senderName),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ],
-                  ),
-                  child: const Text(
-                    'Agree',
-                    style: TextStyle(
-                      color: RoomColors.deep,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: RichText(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        children: [
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => _openVipSvipCenter(context),
+                              child: VipBadge(
+                                level: message.vipLevel,
+                                size: VipBadgeSize.tiny,
+                                showWhenZero: true,
+                              ),
+                            ),
+                          ),
+                          const TextSpan(text: '  '),
+                          TextSpan(
+                            text: message.senderName,
+                            recognizer: TapGestureRecognizer()..onTap = onSenderTap,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14.8,
+                              fontWeight: FontWeight.w900,
+                              height: 1.15,
+                            ),
+                          ),
+                          const TextSpan(text: '  '),
+                          ..._messageSpans(message),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (showAgree) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onApproveSeatApplication,
+              child: Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: RoomColors.aqua,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: RoomColors.aqua.withValues(alpha: 0.24),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  'Agree',
+                  style: TextStyle(
+                    color: RoomColors.deep,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
 
-    if (isSystem) return row;
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: onSenderTap,
-      child: row,
-    );
+    return row;
   }
 
   void _openVipSvipCenter(BuildContext context) {
@@ -330,6 +340,35 @@ class _CompactChatLine extends StatelessWidget {
         fontSize: 14.2,
         height: 1.15,
         fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w800,
+      ),
+    );
+  }
+}
+
+class _TransparentUserMessageFlexBox extends StatelessWidget {
+  const _TransparentUserMessageFlexBox({
+    required this.child,
+    this.onTap,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onTap,
+      child: Container(
+        // Complete transparent dynamic flex box around every user chat message.
+        // It sizes to the user's message content, but still flexes/shrinks safely
+        // when the message is long.
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
+          shape: BoxShape.rectangle,
+        ),
+        child: child,
       ),
     );
   }
