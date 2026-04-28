@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../live_room_models.dart';
 import 'room_action_pages.dart';
+import 'room_gifts.dart';
 import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
@@ -179,22 +180,26 @@ class _CompactChatLine extends StatelessWidget {
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: onSenderTap,
-                    child: CircleAvatar(
-                      radius: 13.5,
-                      backgroundColor: message.isGift
-                          ? RoomColors.gold
-                          : message.isSeatApplication
-                              ? RoomColors.aqua
-                              : RoomColors.violet,
-                      child: Text(
-                        avatarLetter(message.senderName),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
+                    child: message.isGift
+                        ? GiftVisual(
+                            icon: Icons.card_giftcard_rounded,
+                            colors: const [RoomColors.gold, RoomColors.coral],
+                            assetPath: message.giftAssetPath,
+                            size: 28,
+                            padding: 2,
+                          )
+                        : CircleAvatar(
+                            radius: 13.5,
+                            backgroundColor: message.isSeatApplication ? RoomColors.aqua : RoomColors.violet,
+                            child: Text(
+                              avatarLetter(message.senderName),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
                   ),
                   const SizedBox(width: 8),
                   Flexible(
@@ -385,32 +390,19 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         side: BorderSide(color: Colors.white.withValues(alpha: 0.30), width: 0.8),
       ),
-      position: RelativeRect.fromLTRB(
-        left,
-        top,
-        overlaySize.width - left,
-        overlaySize.height - top,
-      ),
+      position: RelativeRect.fromLTRB(left, top, overlaySize.width - left, overlaySize.height - top),
       items: const [
         PopupMenuItem<_ChatMessageAction>(
           value: _ChatMessageAction.copy,
           height: 36,
           padding: EdgeInsets.symmetric(horizontal: 14),
-          child: _MessageActionPillItem(
-            icon: Icons.copy_rounded,
-            label: 'Copy',
-            color: RoomColors.aqua,
-          ),
+          child: _MessageActionPillItem(icon: Icons.copy_rounded, label: 'Copy', color: RoomColors.aqua),
         ),
         PopupMenuItem<_ChatMessageAction>(
           value: _ChatMessageAction.report,
           height: 36,
           padding: EdgeInsets.symmetric(horizontal: 14),
-          child: _MessageActionPillItem(
-            icon: Icons.report_gmailerrorred_rounded,
-            label: 'Report',
-            color: RoomColors.coral,
-          ),
+          child: _MessageActionPillItem(icon: Icons.report_gmailerrorred_rounded, label: 'Report', color: RoomColors.coral),
         ),
       ],
     );
@@ -451,28 +443,15 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
             }
           : null,
       child: Container(
-        // Dynamic user-message flex box with a very light foggy white fill.
-        // It improves message readability while keeping the chat background visible.
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.105),
           shape: BoxShape.rectangle,
           borderRadius: BorderRadius.circular(7),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.34),
-            width: 0.9,
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.34), width: 0.9),
           boxShadow: [
-            BoxShadow(
-              color: Colors.white.withValues(alpha: 0.045),
-              blurRadius: 10,
-              spreadRadius: 0.5,
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+            BoxShadow(color: Colors.white.withValues(alpha: 0.045), blurRadius: 10, spreadRadius: 0.5),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: child,
@@ -482,11 +461,7 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
 }
 
 class _MessageActionPillItem extends StatelessWidget {
-  const _MessageActionPillItem({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _MessageActionPillItem({required this.icon, required this.label, required this.color});
 
   final IconData icon;
   final String label;
@@ -499,14 +474,7 @@ class _MessageActionPillItem extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 17),
         const SizedBox(width: 7),
-        Text(
-          label,
-          style: const TextStyle(
-            color: RoomColors.plum,
-            fontSize: 12.4,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
+        Text(label, style: const TextStyle(color: RoomColors.plum, fontSize: 12.4, fontWeight: FontWeight.w900)),
       ],
     );
   }
@@ -566,19 +534,11 @@ class RoomInputDock extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(horizontalPadding, 5, horizontalPadding, 6),
             decoration: BoxDecoration(
               color: RoomColors.deep.withValues(alpha: 0.94),
-              border: Border(
-                top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-              ),
+              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
             ),
             child: Row(
               children: [
-                _DockButton(
-                  icon: Icons.mail_outline_rounded,
-                  onTap: () => _runAndHideSeatActions(onInboxTap),
-                  badgeCount: inboxUnreadCount,
-                  size: dockButtonSize,
-                  iconSize: dockIconSize,
-                ),
+                _DockButton(icon: Icons.mail_outline_rounded, onTap: () => _runAndHideSeatActions(onInboxTap), badgeCount: inboxUnreadCount, size: dockButtonSize, iconSize: dockIconSize),
                 SizedBox(width: gap),
                 Expanded(
                   child: Container(
@@ -595,17 +555,10 @@ class RoomInputDock extends StatelessWidget {
                           child: TextField(
                             controller: controller,
                             focusNode: focusNode,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: tiny ? 12.8 : 13.5,
-                            ),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: tiny ? 12.8 : 13.5),
                             decoration: InputDecoration(
                               hintText: 'Message...',
-                              hintStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.36),
-                                fontWeight: FontWeight.w800,
-                              ),
+                              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w800),
                               border: InputBorder.none,
                               isDense: true,
                             ),
@@ -618,16 +571,8 @@ class RoomInputDock extends StatelessWidget {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: BoxConstraints(minWidth: inputIconMin, minHeight: inputIconMin),
-                            onPressed: imagesEnabled
-                                ? () => _runAndHideSeatActions(
-                                      () => RoomToast.show(context, 'Image message picker will connect here'),
-                                    )
-                                : null,
-                            icon: Icon(
-                              Icons.image_rounded,
-                              color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22),
-                              size: inputIconSize,
-                            ),
+                            onPressed: imagesEnabled ? () => _runAndHideSeatActions(() => RoomToast.show(context, 'Image message picker will connect here')) : null,
+                            icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22), size: inputIconSize),
                           ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
@@ -648,29 +593,11 @@ class RoomInputDock extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: gap),
-                _DockButton(
-                  icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-                  onTap: () => _runAndHideSeatActions(onMicTap),
-                  active: !micMuted,
-                  muted: micMuted,
-                  size: dockButtonSize,
-                  iconSize: dockIconSize,
-                ),
+                _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(onMicTap), active: !micMuted, muted: micMuted, size: dockButtonSize, iconSize: dockIconSize),
                 SizedBox(width: gap),
-                _DockButton(
-                  icon: Icons.sports_esports_rounded,
-                  onTap: () => _runAndHideSeatActions(onGamesTap),
-                  size: dockButtonSize,
-                  iconSize: dockIconSize,
-                ),
+                _DockButton(icon: Icons.sports_esports_rounded, onTap: () => _runAndHideSeatActions(onGamesTap), size: dockButtonSize, iconSize: dockIconSize),
                 SizedBox(width: gap),
-                _DockButton(
-                  icon: Icons.card_giftcard_rounded,
-                  onTap: () => _runAndHideSeatActions(onGiftTap),
-                  gift: true,
-                  size: dockButtonSize,
-                  iconSize: dockIconSize,
-                ),
+                _DockButton(icon: Icons.card_giftcard_rounded, onTap: () => _runAndHideSeatActions(onGiftTap), gift: true, size: dockButtonSize, iconSize: dockIconSize),
               ],
             ),
           );
@@ -745,11 +672,7 @@ class _DockButton extends StatelessWidget {
                   ),
                   child: Text(
                     badgeCount > 99 ? '99+' : '$badgeCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900),
                   ),
                 ),
               ),
