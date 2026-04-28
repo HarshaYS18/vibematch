@@ -26,6 +26,10 @@ class RoomBackgroundTheme {
   final String name;
   final String assetPath;
   final Color accent;
+
+  // Compatibility for older preview widgets that still read theme.colors.
+  // The real room background remains asset-only.
+  List<Color> get colors => [RoomColors.deep, RoomColors.deep];
 }
 
 const String roomBackgroundAssetBase = 'assets/images/rooms/backgrounds';
