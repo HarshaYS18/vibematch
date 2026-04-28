@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
 import 'room_contribution_rankings_sheet.dart';
+import 'room_info_sheet.dart';
 import 'room_theme.dart';
 
 class RoomTopBar extends StatelessWidget {
@@ -19,6 +20,8 @@ class RoomTopBar extends StatelessWidget {
     required this.onUsersTap,
     this.onRoomRankingsTap,
     this.roomLevel = 12,
+    this.language = 'Telugu',
+    this.canManageAdmins = true,
   });
 
   final String roomName;
@@ -33,6 +36,8 @@ class RoomTopBar extends StatelessWidget {
   final VoidCallback onUsersTap;
   final VoidCallback? onRoomRankingsTap;
   final int roomLevel;
+  final String language;
+  final bool canManageAdmins;
 
   @override
   Widget build(BuildContext context) {
@@ -45,64 +50,55 @@ class RoomTopBar extends StatelessWidget {
             RoundRoomButton(
               icon: Icons.arrow_back_rounded,
               onTap: onBack,
-              size: 32,
+              size: 31,
               iconSize: 18,
-              background: Colors.black.withValues(alpha: 0.24),
+              background: Colors.black.withValues(alpha: 0.26),
             ),
             const SizedBox(width: 7),
             Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _RoomIdentityPill(
-                      roomName: roomName,
-                      roomId: roomId,
-                      privacyMode: privacyMode,
-                    ),
-                    const SizedBox(width: 6),
-                    _TrophyButton(
-                      onTap: onRoomRankingsTap ?? () => _openDefaultRoomRankings(context),
-                    ),
-                    const SizedBox(width: 6),
-                    _OnlineButton(count: onlineCount, onTap: onUsersTap),
-                    const SizedBox(width: 6),
-                    _RoomLevelBadge(level: roomLevel),
-                    const SizedBox(width: 6),
-                    _JoinButton(onTap: onJoinTap),
-                  ],
-                ),
+              child: _RoomNamePill(
+                roomName: roomName,
+                privacyMode: privacyMode,
+                onTap: () => _openRoomInfo(context),
               ),
             ),
-            const SizedBox(width: 7),
-            RoundRoomButton(
-              icon: Icons.reply_rounded,
-              onTap: onShare,
-              size: 31,
-              iconSize: 15,
-              background: Colors.black.withValues(alpha: 0.22),
-            ),
-            const SizedBox(width: 5),
-            RoundRoomButton(
-              icon: Icons.campaign_rounded,
-              onTap: onAnnouncement,
-              size: 31,
-              iconSize: 15,
-              background: Colors.black.withValues(alpha: 0.22),
-            ),
-            const SizedBox(width: 5),
-            RoundRoomButton(
-              icon: Icons.settings_rounded,
-              onTap: onSettings,
-              size: 31,
-              iconSize: 15,
-              background: Colors.black.withValues(alpha: 0.22),
-            ),
+            const SizedBox(width: 6),
+            _TrophyButton(onTap: onRoomRankingsTap ?? () => _openDefaultRoomRankings(context)),
+            const SizedBox(width: 6),
+            _OnlineButton(count: onlineCount, onTap: onUsersTap),
+            const SizedBox(width: 6),
+            _RoomLevelBadge(level: roomLevel),
+            const SizedBox(width: 6),
+            _JoinButton(onTap: onJoinTap),
+          ],
+        ),
+        const SizedBox(height: 7),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            RoundRoomButton(icon: Icons.reply_rounded, onTap: onShare, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
+            const SizedBox(width: 6),
+            RoundRoomButton(icon: Icons.campaign_rounded, onTap: onAnnouncement, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
+            const SizedBox(width: 6),
+            RoundRoomButton(icon: Icons.settings_rounded, onTap: onSettings, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
           ],
         ),
       ],
+    );
+  }
+
+  void _openRoomInfo(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RoomInfoSheet(
+        roomName: roomName,
+        roomId: roomId,
+        language: language,
+        privacyMode: privacyMode,
+        canManageAdmins: canManageAdmins,
+      ),
     );
   }
 
@@ -120,24 +116,17 @@ class RoomTopBar extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RoomContributionRankingsSheet(
-        roomName: roomName,
-        users: users,
-      ),
+      builder: (_) => RoomContributionRankingsSheet(roomName: roomName, users: users),
     );
   }
 }
 
-class _RoomIdentityPill extends StatelessWidget {
-  const _RoomIdentityPill({
-    required this.roomName,
-    required this.roomId,
-    required this.privacyMode,
-  });
+class _RoomNamePill extends StatelessWidget {
+  const _RoomNamePill({required this.roomName, required this.privacyMode, required this.onTap});
 
   final String roomName;
-  final String roomId;
   final RoomPrivacyMode privacyMode;
+  final VoidCallback onTap;
 
   String get _cleanRoomName {
     final trimmed = roomName.trim();
@@ -147,53 +136,38 @@ class _RoomIdentityPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 30, minWidth: 82, maxWidth: 190),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        color: Colors.black.withValues(alpha: 0.34),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 16,
-            offset: const Offset(0, 7),
+        onTap: onTap,
+        child: Container(
+          height: 31,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            color: Colors.black.withValues(alpha: 0.36),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 14, offset: const Offset(0, 7))],
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _PrivacyIcon(mode: privacyMode),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: _cleanRoomName),
-                  const TextSpan(
-                    text: '  ·  ',
-                    style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900),
-                  ),
-                  TextSpan(
-                    text: roomId,
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.74), fontWeight: FontWeight.w900),
-                  ),
-                ],
+          child: Row(
+            children: [
+              _PrivacyIcon(mode: privacyMode),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _cleanRoomName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 10.8, fontWeight: FontWeight.w900, letterSpacing: 0.02, height: 1),
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10.8,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.02,
-                height: 1,
-              ),
-            ),
+              const SizedBox(width: 5),
+              Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.72), size: 15),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -206,23 +180,12 @@ class _PrivacyIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = switch (mode) {
-      RoomPrivacyMode.open => Icons.public_rounded,
-      RoomPrivacyMode.locked => Icons.lock_rounded,
-      RoomPrivacyMode.membersOnly => Icons.verified_user_rounded,
-      RoomPrivacyMode.privateVibe => Icons.visibility_off_rounded,
-    };
     final color = mode == RoomPrivacyMode.open ? RoomColors.aqua : RoomColors.gold;
-
     return Container(
       width: 18,
       height: 18,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: 0.26), width: 0.8),
-      ),
-      child: Icon(icon, color: color, size: 10),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.16), shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.26), width: 0.8)),
+      child: Icon(mode.icon, color: color, size: 10),
     );
   }
 }
@@ -241,16 +204,11 @@ class _RoomLevelBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: () => RoomToast.show(context, 'Room level details will connect here'),
         child: Container(
-          height: 30,
+          height: 31,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            gradient: LinearGradient(
-              colors: [
-                RoomColors.gold.withValues(alpha: 0.30),
-                RoomColors.violet.withValues(alpha: 0.22),
-              ],
-            ),
+            gradient: LinearGradient(colors: [RoomColors.gold.withValues(alpha: 0.30), RoomColors.violet.withValues(alpha: 0.22)]),
             border: Border.all(color: RoomColors.gold.withValues(alpha: 0.28)),
           ),
           child: Row(
@@ -258,10 +216,7 @@ class _RoomLevelBadge extends StatelessWidget {
             children: [
               const Icon(Icons.local_fire_department_rounded, color: RoomColors.gold, size: 13),
               const SizedBox(width: 3),
-              Text(
-                'Lv.$level',
-                style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900, height: 1),
-              ),
+              Text('Lv.$level', style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900, height: 1)),
             ],
           ),
         ),
@@ -287,11 +242,7 @@ class _JoinButton extends StatelessWidget {
           width: 31,
           height: 31,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: RoomColors.aqua.withValues(alpha: 0.42)),
-            boxShadow: [BoxShadow(color: RoomColors.aqua.withValues(alpha: 0.14), blurRadius: 14, offset: const Offset(0, 5))],
-          ),
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: RoomColors.aqua.withValues(alpha: 0.42)), boxShadow: [BoxShadow(color: RoomColors.aqua.withValues(alpha: 0.14), blurRadius: 14, offset: const Offset(0, 5))]),
           child: const Icon(Icons.add_rounded, color: RoomColors.aqua, size: 21),
         ),
       ),
@@ -318,11 +269,7 @@ class _TrophyButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [RoomColors.gold.withValues(alpha: 0.96), RoomColors.coral.withValues(alpha: 0.84)],
-            ),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [RoomColors.gold.withValues(alpha: 0.96), RoomColors.coral.withValues(alpha: 0.84)]),
             border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
             boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.20), blurRadius: 14, offset: const Offset(0, 5))],
           ),
@@ -348,22 +295,15 @@ class _OnlineButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          height: 30,
+          height: 31,
           padding: const EdgeInsets.symmetric(horizontal: 9),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.32),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.11)),
-          ),
+          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.32), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white.withValues(alpha: 0.11))),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.groups_rounded, color: RoomColors.aqua, size: 13),
               const SizedBox(width: 4),
-              Text(
-                '$count',
-                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
-              ),
+              Text('$count', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
             ],
           ),
         ),
