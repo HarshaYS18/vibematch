@@ -146,6 +146,10 @@ class UserMiniProfileSheet extends StatelessWidget {
                         title: 'Sent',
                         value: compactNumber(user.sentExp),
                         onTap: onSentRankingTap,
+                        tint: const Color(0xFFEAF8F0),
+                        borderColor: const Color(0xFFBFE5CC),
+                        titleColor: const Color(0xFF5C7A66),
+                        valueColor: const Color(0xFF1E7A45),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -154,6 +158,10 @@ class UserMiniProfileSheet extends StatelessWidget {
                         title: 'Received',
                         value: compactNumber(user.receivedExp),
                         onTap: onReceivedRankingTap,
+                        tint: const Color(0xFFFFF7E7),
+                        borderColor: const Color(0xFFEFD79B),
+                        titleColor: const Color(0xFF8B7440),
+                        valueColor: const Color(0xFFB6841E),
                       ),
                     ),
                   ],
@@ -646,11 +654,11 @@ class _VipStatCard extends StatelessWidget {
   }
 
   Color get _tintColor {
-    if (vipLevel >= 41) return const Color(0xFFF6E9FF);
-    if (vipLevel >= 30) return const Color(0xFFE8FFF3);
-    if (vipLevel >= 21) return const Color(0xFFEAF6FF);
+    if (vipLevel >= 41) return const Color(0xFFF5EBFF);
+    if (vipLevel >= 30) return const Color(0xFFE8F8EF);
+    if (vipLevel >= 21) return const Color(0xFFEAF4FF);
     if (vipLevel >= 11) return const Color(0xFFFFECEF);
-    if (vipLevel >= 6) return const Color(0xFFFFF7E3);
+    if (vipLevel >= 6) return const Color(0xFFFFF7E8);
     return const Color(0xFFF2F4F7);
   }
 
@@ -660,62 +668,136 @@ class _VipStatCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
-        height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        height: 72,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: _tintColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _accentColor.withValues(alpha: 0.20)),
+          border: Border.all(color: _accentColor.withValues(alpha: 0.22)),
+          boxShadow: [
+            BoxShadow(
+              color: _accentColor.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Stack(
+            children: [
+              const _MiniStatCardShine(),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'VIP Level',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Color(0xFF7B7282),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      Image.asset(
+                        _assetPath,
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.shield_rounded,
+                            color: _accentColor,
+                            size: 26,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'VIP $vipLevel',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: _accentColor,
+                            fontSize: 13.4,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MonthStatCard extends StatelessWidget {
+  const _MonthStatCard({
+    required this.title,
+    required this.value,
+    required this.onTap,
+    required this.tint,
+    required this.borderColor,
+    required this.titleColor,
+    required this.valueColor,
+  });
+
+  final String title;
+  final String value;
+  final VoidCallback onTap;
+  final Color tint;
+  final Color borderColor;
+  final Color titleColor;
+  final Color valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        height: 72,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: tint,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text(
-              'VIP Level',
+            Text(
+              title,
               textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Color(0xFF7B7282),
+                color: titleColor,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 3),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    _assetPath,
-                    width: 31,
-                    height: 31,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.shield_rounded,
-                        color: _accentColor,
-                        size: 28,
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    'VIP $vipLevel',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: _accentColor,
-                      fontSize: 14.2,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.25,
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 4),
+            Text(
+              value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: valueColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ],
@@ -725,34 +807,31 @@ class _VipStatCard extends StatelessWidget {
   }
 }
 
-class _MonthStatCard extends StatelessWidget {
-  const _MonthStatCard({required this.title, required this.value, required this.onTap});
-
-  final String title;
-  final String value;
-  final VoidCallback onTap;
+class _MiniStatCardShine extends StatelessWidget {
+  const _MiniStatCardShine();
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: RoomColors.softLine),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B7282), fontSize: 10.5, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text(value, textAlign: TextAlign.center, style: const TextStyle(color: RoomColors.plum, fontSize: 15, fontWeight: FontWeight.w900)),
-          ],
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Container(
+            height: 18,
+            margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.28),
+                  Colors.white.withValues(alpha: 0.10),
+                  Colors.white.withValues(alpha: 0.00),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
