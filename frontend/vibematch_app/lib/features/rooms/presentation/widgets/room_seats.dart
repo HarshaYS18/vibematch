@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../vibesync/models/vibesync_models.dart';
+import '../../../vibesync/models/vibesync_models.dart';
 import '../live_room_models.dart';
 import 'room_avatar_frames.dart';
 import 'room_theme.dart';
