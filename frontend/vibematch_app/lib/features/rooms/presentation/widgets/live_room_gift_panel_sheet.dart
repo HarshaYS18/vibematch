@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../live_room_models.dart';
 import 'room_gifts.dart';
 
-class LiveRoomGiftPanelSheet extends StatelessWidget {
+class LiveRoomGiftPanelSheet extends StatefulWidget {
   const LiveRoomGiftPanelSheet({
     super.key,
     required this.gifts,
@@ -37,37 +37,65 @@ class LiveRoomGiftPanelSheet extends StatelessWidget {
   final VoidCallback onRecharge;
 
   @override
+  State<LiveRoomGiftPanelSheet> createState() => _LiveRoomGiftPanelSheetState();
+}
+
+class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
+  late GiftCategory _selectedCategory;
+  late GiftItem? _selectedGift;
+  late int _selectedCombo;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategory = widget.selectedCategory;
+    _selectedGift = widget.selectedGift;
+    _selectedCombo = widget.selectedCombo;
+  }
+
+  GiftItem? _firstGiftForCategory(GiftCategory category) {
+    for (final gift in GiftPanel.withMockExtras(widget.gifts)) {
+      if (gift.category == category) return gift;
+    }
+    return null;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return StatefulBuilder(
-      builder: (context, setSheetState) {
-        return GiftPanel(
-          gifts: gifts,
-          users: users,
-          selectedCategory: selectedCategory,
-          selectedGift: selectedGift,
-          selectedReceiverIds: selectedReceiverIds,
-          selectedCombo: selectedCombo,
-          coinBalance: coinBalance,
-          onCategoryChanged: (category) {
-            onCategoryChanged(category);
-            setSheetState(() {});
-          },
-          onGiftSelected: (gift) {
-            onGiftSelected(gift);
-            setSheetState(() {});
-          },
-          onReceiverToggle: (id) {
-            onReceiverToggle(id);
-            setSheetState(() {});
-          },
-          onComboChanged: (combo) {
-            onComboChanged(combo);
-            setSheetState(() {});
-          },
-          onSend: onSend,
-          onRecharge: onRecharge,
-        );
+    return GiftPanel(
+      gifts: widget.gifts,
+      users: widget.users,
+      selectedCategory: _selectedCategory,
+      selectedGift: _selectedGift,
+      selectedReceiverIds: widget.selectedReceiverIds,
+      selectedCombo: _selectedCombo,
+      coinBalance: widget.coinBalance,
+      onCategoryChanged: (category) {
+        widget.onCategoryChanged(category);
+        setState(() {
+          _selectedCategory = category;
+          _selectedGift = _firstGiftForCategory(category) ?? _selectedGift;
+          if (_selectedGift != null) widget.onGiftSelected(_selectedGift!);
+          if (category == GiftCategory.lucky && _selectedCombo < 9) {
+            _selectedCombo = 9;
+            widget.onComboChanged(_selectedCombo);
+          }
+        });
       },
+      onGiftSelected: (gift) {
+        widget.onGiftSelected(gift);
+        setState(() => _selectedGift = gift);
+      },
+      onReceiverToggle: (id) {
+        widget.onReceiverToggle(id);
+        setState(() {});
+      },
+      onComboChanged: (combo) {
+        widget.onComboChanged(combo);
+        setState(() => _selectedCombo = combo);
+      },
+      onSend: widget.onSend,
+      onRecharge: widget.onRecharge,
     );
   }
 }
