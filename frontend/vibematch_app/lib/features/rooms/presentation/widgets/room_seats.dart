@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'room_avatar_frames.dart';
 import 'room_theme.dart';
 
 class RoomSeatLayout extends StatelessWidget {
@@ -136,15 +137,10 @@ class RoomSeatLayout extends StatelessWidget {
           );
         }
 
-        return AnimatedSize(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            height: layoutHeight,
-            width: width,
-            child: Stack(clipBehavior: Clip.none, children: children),
-          ),
+        return SizedBox(
+          height: layoutHeight,
+          width: width,
+          child: Stack(clipBehavior: Clip.none, children: children),
         );
       },
     );
@@ -243,37 +239,37 @@ class _SeatAvatar extends StatelessWidget {
               ),
             ),
           ),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.09 : 0.12) : null,
-            gradient: user == null ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
-            border: Border.all(color: borderColor, width: selected ? 2 : 1),
-            boxShadow: [
-              if (selected) BoxShadow(color: RoomColors.gold.withValues(alpha: 0.24), blurRadius: 18, offset: const Offset(0, 8)),
-              if (user != null) BoxShadow(color: user.avatarColors.first.withValues(alpha: 0.23), blurRadius: 14, offset: const Offset(0, 7)),
-            ],
-          ),
-          child: Center(
-            child: user == null
-                ? Icon(
-                    seat.locked ? Icons.lock_rounded : Icons.add_rounded,
-                    color: Colors.white.withValues(alpha: seat.locked ? 0.50 : 0.70),
-                    size: seat.locked ? 22 : 25,
-                  )
-                : Text(
-                    avatarLetter(user.name),
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
-                  ),
+        RoomAvatarFrameHost(
+          frame: user == null ? null : defaultStaticAvatarFrame,
+          size: size,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.09 : 0.12) : null,
+              gradient: user == null ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
+              border: Border.all(color: borderColor, width: selected ? 2 : 1),
+              boxShadow: [
+                if (selected) BoxShadow(color: RoomColors.gold.withValues(alpha: 0.20), blurRadius: 14, offset: const Offset(0, 7)),
+                if (user != null) BoxShadow(color: user.avatarColors.first.withValues(alpha: 0.18), blurRadius: 12, offset: const Offset(0, 6)),
+              ],
+            ),
+            child: Center(
+              child: user == null
+                  ? Icon(
+                      seat.locked ? Icons.lock_rounded : Icons.add_rounded,
+                      color: Colors.white.withValues(alpha: seat.locked ? 0.50 : 0.70),
+                      size: seat.locked ? 22 : 25,
+                    )
+                  : Text(
+                      avatarLetter(user.name),
+                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                    ),
+            ),
           ),
         ),
-        if (user?.isHost ?? false)
-          const Positioned(top: -5, child: _SeatRoleBadge(label: 'HOST', color: RoomColors.gold))
-        else if (user?.isRoomAdmin ?? false)
-          const Positioned(top: -5, child: _SeatRoleBadge(label: 'ADMIN', color: RoomColors.aqua)),
         if (user?.muted ?? false)
           Positioned(
             right: -2,
@@ -309,32 +305,6 @@ class _SeatAvatar extends StatelessWidget {
   }
 }
 
-class _SeatRoleBadge extends StatelessWidget {
-  const _SeatRoleBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 15,
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.32), width: 0.7),
-        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 8, offset: const Offset(0, 3))],
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: const TextStyle(color: Colors.white, fontSize: 7.4, fontWeight: FontWeight.w900, height: 1, letterSpacing: 0.15),
-      ),
-    );
-  }
-}
-
 class _SeatActionMenu extends StatelessWidget {
   const _SeatActionMenu({required this.actions});
 
@@ -354,8 +324,7 @@ class _SeatActionMenu extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: RoomColors.gold.withValues(alpha: 0.38)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.78), blurRadius: 24, offset: const Offset(0, 10)),
-            BoxShadow(color: RoomColors.gold.withValues(alpha: 0.13), blurRadius: 20),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.72), blurRadius: 18, offset: const Offset(0, 8)),
           ],
         ),
         child: Column(
