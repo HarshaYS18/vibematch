@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
 
-class GiftPanel extends StatelessWidget {
+class GiftPanel extends StatefulWidget {
   const GiftPanel({
     super.key,
     required this.gifts,
@@ -37,16 +37,167 @@ class GiftPanel extends StatelessWidget {
 
   static const List<int> combos = [1, 9, 69, 99, 999];
 
+  static List<GiftItem> withMockExtras(List<GiftItem> gifts) {
+    const extras = <GiftItem>[
+      GiftItem(
+        id: 'rose_rain',
+        name: 'Rose Rain',
+        category: GiftCategory.classic,
+        coins: 5,
+        icon: Icons.local_florist_rounded,
+        chatSymbol: '🌹',
+        colors: [Color(0xFFFF6B9A), Color(0xFFFFC2D8)],
+      ),
+      GiftItem(
+        id: 'star_kiss',
+        name: 'Star Kiss',
+        category: GiftCategory.classic,
+        coins: 15,
+        icon: Icons.star_rounded,
+        chatSymbol: '⭐',
+        colors: [Color(0xFFFFD166), Color(0xFFFF8A3D)],
+      ),
+      GiftItem(
+        id: 'music_wave',
+        name: 'Music Wave',
+        category: GiftCategory.classic,
+        coins: 29,
+        icon: Icons.music_note_rounded,
+        chatSymbol: '🎵',
+        colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      ),
+      GiftItem(
+        id: 'lucky_packet',
+        name: 'Lucky Packet',
+        category: GiftCategory.lucky,
+        coins: 39,
+        icon: Icons.redeem_rounded,
+        chatSymbol: '🧧',
+        colors: [Color(0xFFE84C72), Color(0xFFFFB545)],
+      ),
+      GiftItem(
+        id: 'gold_spinner',
+        name: 'Gold Spin',
+        category: GiftCategory.lucky,
+        coins: 59,
+        icon: Icons.casino_rounded,
+        chatSymbol: '🎰',
+        colors: [Color(0xFFFFD166), Color(0xFFC99A3B)],
+      ),
+      GiftItem(
+        id: 'crystal_hunt',
+        name: 'Crystal Hunt',
+        category: GiftCategory.lucky,
+        coins: 89,
+        icon: Icons.diamond_rounded,
+        chatSymbol: '💠',
+        colors: [Color(0xFF16D9E3), Color(0xFF6D5DF6)],
+      ),
+      GiftItem(
+        id: 'event_firework',
+        name: 'Firework',
+        category: GiftCategory.event,
+        coins: 129,
+        icon: Icons.celebration_rounded,
+        chatSymbol: '🎆',
+        colors: [Color(0xFFFF7A45), Color(0xFF8C5CF6)],
+      ),
+      GiftItem(
+        id: 'event_trophy',
+        name: 'Trophy',
+        category: GiftCategory.event,
+        coins: 299,
+        icon: Icons.emoji_events_rounded,
+        chatSymbol: '🏆',
+        colors: [Color(0xFFFFD166), Color(0xFFFF5F7E)],
+      ),
+      GiftItem(
+        id: 'svip_dragon',
+        name: 'SVIP Dragon',
+        category: GiftCategory.svip,
+        coins: 699,
+        icon: Icons.auto_awesome_rounded,
+        chatSymbol: '🐉',
+        colors: [Color(0xFF8C5CF6), Color(0xFF111827)],
+      ),
+      GiftItem(
+        id: 'svip_throne',
+        name: 'SVIP Throne',
+        category: GiftCategory.svip,
+        coins: 899,
+        icon: Icons.chair_rounded,
+        chatSymbol: '🪑',
+        colors: [Color(0xFFFFD166), Color(0xFF8C5CF6)],
+      ),
+      GiftItem(
+        id: 'premium_yacht',
+        name: 'Yacht',
+        category: GiftCategory.premium,
+        coins: 1299,
+        icon: Icons.sailing_rounded,
+        chatSymbol: '🛥️',
+        colors: [Color(0xFF12C7B7), Color(0xFF111827)],
+      ),
+      GiftItem(
+        id: 'premium_castle',
+        name: 'Castle',
+        category: GiftCategory.premium,
+        coins: 1999,
+        icon: Icons.castle_rounded,
+        chatSymbol: '🏰',
+        colors: [Color(0xFFC99A3B), Color(0xFF251538)],
+      ),
+    ];
+
+    final seen = gifts.map((gift) => gift.id).toSet();
+    return <GiftItem>[
+      ...gifts,
+      ...extras.where((gift) => seen.add(gift.id)),
+    ];
+  }
+
+  @override
+  State<GiftPanel> createState() => _GiftPanelState();
+}
+
+class _GiftPanelState extends State<GiftPanel> {
+  late final PageController _categoryPageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _categoryPageController = PageController(
+      initialPage: GiftCategory.values.indexOf(widget.selectedCategory),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant GiftPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedCategory != widget.selectedCategory &&
+        _categoryPageController.hasClients) {
+      _categoryPageController.animateToPage(
+        GiftCategory.values.indexOf(widget.selectedCategory),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _categoryPageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final filtered = gifts
-        .where((gift) => gift.category == selectedCategory)
-        .toList();
-    final allSelected =
-        users.isNotEmpty && selectedReceiverIds.length == users.length;
+    final allGifts = GiftPanel.withMockExtras(widget.gifts);
+    final allSelected = widget.users.isNotEmpty &&
+        widget.selectedReceiverIds.length == widget.users.length;
 
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.30,
+      height: MediaQuery.sizeOf(context).height * 0.345,
       child: Container(
         padding: EdgeInsets.fromLTRB(
           10,
@@ -82,14 +233,20 @@ class GiftPanel extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _CategoryStrip(
-                    selectedCategory: selectedCategory,
-                    onChanged: onCategoryChanged,
+                    selectedCategory: widget.selectedCategory,
+                    onChanged: (category) {
+                      widget.onCategoryChanged(category);
+                      _categoryPageController.animateToPage(
+                        GiftCategory.values.indexOf(category),
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                      );
+                    },
                   ),
                 ),
                 _TinyIconButton(
                   icon: Icons.apps_rounded,
-                  onTap: () =>
-                      RoomToast.show(context, 'Bag / inventory opened'),
+                  onTap: () => RoomToast.show(context, 'Bag / inventory opened'),
                 ),
               ],
             ),
@@ -98,7 +255,7 @@ class GiftPanel extends StatelessWidget {
               height: 36,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: users.length + 1,
+                itemCount: widget.users.length + 1,
                 separatorBuilder: (context, index) => const SizedBox(width: 7),
                 itemBuilder: (context, index) {
                   if (index == 0) {
@@ -106,31 +263,55 @@ class GiftPanel extends StatelessWidget {
                       selected: allSelected,
                       label: 'All',
                       colors: const [RoomColors.gold, RoomColors.coral],
-                      onTap: () => onReceiverToggle('__all__'),
+                      onTap: () => widget.onReceiverToggle('__all__'),
                     );
                   }
-                  final user = users[index - 1];
+                  final user = widget.users[index - 1];
                   return _ReceiverAvatar(
-                    selected: selectedReceiverIds.contains(user.id),
+                    selected: widget.selectedReceiverIds.contains(user.id),
                     label: avatarLetter(user.name),
                     colors: user.avatarColors,
-                    onTap: () => onReceiverToggle(user.id),
+                    onTap: () => widget.onReceiverToggle(user.id),
                   );
                 },
               ),
             ),
             const SizedBox(height: 7),
             Expanded(
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: filtered.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
+              child: PageView.builder(
+                controller: _categoryPageController,
+                physics: const BouncingScrollPhysics(),
+                itemCount: GiftCategory.values.length,
+                onPageChanged: (index) {
+                  final category = GiftCategory.values[index];
+                  if (category != widget.selectedCategory) {
+                    widget.onCategoryChanged(category);
+                  }
+                },
                 itemBuilder: (context, index) {
-                  final gift = filtered[index];
-                  return CompactGiftCard(
-                    gift: gift,
-                    selected: selectedGift?.id == gift.id,
-                    onTap: () => onGiftSelected(gift),
+                  final category = GiftCategory.values[index];
+                  final filtered = allGifts
+                      .where((gift) => gift.category == category)
+                      .toList();
+
+                  return GridView.builder(
+                    padding: EdgeInsets.zero,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: filtered.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 0.78,
+                    ),
+                    itemBuilder: (context, giftIndex) {
+                      final gift = filtered[giftIndex];
+                      return CompactGiftCard(
+                        gift: gift,
+                        selected: widget.selectedGift?.id == gift.id,
+                        onTap: () => widget.onGiftSelected(gift),
+                      );
+                    },
                   );
                 },
               ),
@@ -139,7 +320,7 @@ class GiftPanel extends StatelessWidget {
             Row(
               children: [
                 GestureDetector(
-                  onTap: onSend,
+                  onTap: widget.onSend,
                   child: Container(
                     height: 34,
                     padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -172,7 +353,7 @@ class GiftPanel extends StatelessWidget {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<int>(
-                      value: selectedCombo,
+                      value: widget.selectedCombo,
                       dropdownColor: const Color(0xFF201A2C),
                       iconEnabledColor: Colors.white,
                       style: const TextStyle(
@@ -180,7 +361,7 @@ class GiftPanel extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
                       ),
-                      items: combos
+                      items: GiftPanel.combos
                           .map(
                             (combo) => DropdownMenuItem(
                               value: combo,
@@ -189,14 +370,14 @@ class GiftPanel extends StatelessWidget {
                           )
                           .toList(),
                       onChanged: (value) {
-                        if (value != null) onComboChanged(value);
+                        if (value != null) widget.onComboChanged(value);
                       },
                     ),
                   ),
                 ),
                 const Spacer(),
                 GestureDetector(
-                  onTap: onRecharge,
+                  onTap: widget.onRecharge,
                   child: Container(
                     height: 34,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -220,7 +401,7 @@ class GiftPanel extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '$coinBalance',
+                          '${widget.coinBalance}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -262,7 +443,8 @@ class _CategoryStrip extends StatelessWidget {
           final selected = category == selectedCategory;
           return GestureDetector(
             onTap: () => onChanged(category),
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
               padding: const EdgeInsets.symmetric(horizontal: 9),
               alignment: Alignment.center,
               decoration: BoxDecoration(
@@ -270,6 +452,11 @@ class _CategoryStrip extends StatelessWidget {
                     ? RoomColors.gold
                     : Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.26)
+                      : Colors.white.withValues(alpha: 0.06),
+                ),
               ),
               child: Text(
                 category.label,
@@ -353,15 +540,23 @@ class CompactGiftCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        width: 76,
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: selected ? 0.13 : 0.07),
+          color: Colors.white.withValues(alpha: selected ? 0.15 : 0.07),
           borderRadius: BorderRadius.circular(17),
           border: Border.all(
             color: selected ? gift.colors.first : Colors.white12,
-            width: selected ? 1.4 : 1,
+            width: selected ? 1.6 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: gift.colors.first.withValues(alpha: 0.20),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           children: [
@@ -371,6 +566,7 @@ class CompactGiftCard extends StatelessWidget {
               gift.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 10.5,
