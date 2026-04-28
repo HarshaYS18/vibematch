@@ -6,6 +6,12 @@ import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
 
+final ValueNotifier<int> roomChatClearSignal = ValueNotifier<int>(0);
+
+void clearRoomChatHistory() {
+  roomChatClearSignal.value++;
+}
+
 class RoomChatFeed extends StatefulWidget {
   const RoomChatFeed({
     super.key,
@@ -27,18 +33,23 @@ class RoomChatFeed extends StatefulWidget {
 class _RoomChatFeedState extends State<RoomChatFeed> {
   late final ScrollController _scrollController;
   int _lastMessageCount = 0;
+  int _clearedMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
     _lastMessageCount = widget.messages.length;
+    roomChatClearSignal.addListener(_handleClearChat);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(jump: true));
   }
 
   @override
   void didUpdateWidget(covariant RoomChatFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.messages.length < _clearedMessageCount) {
+      _clearedMessageCount = widget.messages.length;
+    }
     if (widget.messages.length != _lastMessageCount) {
       _lastMessageCount = widget.messages.length;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -47,8 +58,14 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
 
   @override
   void dispose() {
+    roomChatClearSignal.removeListener(_handleClearChat);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleClearChat() {
+    if (!mounted) return;
+    setState(() => _clearedMessageCount = widget.messages.length);
   }
 
   void _scrollToBottom({bool jump = false}) {
@@ -58,17 +75,14 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
       _scrollController.jumpTo(target);
       return;
     }
-    _scrollController.animateTo(
-      target,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-    );
+    _scrollController.animateTo(target, duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.messages.isEmpty) return const SizedBox.expand();
-    final visibleMessages = widget.messages.reversed.toList(growable: false);
+    final newMessageCount = (widget.messages.length - _clearedMessageCount).clamp(0, widget.messages.length);
+    if (newMessageCount == 0) return const SizedBox.expand();
+    final visibleMessages = widget.messages.take(newMessageCount).toList(growable: false).reversed.toList(growable: false);
 
     return ListView.builder(
       controller: _scrollController,
@@ -126,10 +140,7 @@ class _CompactChatLine extends StatelessWidget {
                     : message.isSeatApplication
                         ? RoomColors.aqua
                         : RoomColors.violet,
-                child: Text(
-                  avatarLetter(message.senderName),
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
-                ),
+                child: Text(avatarLetter(message.senderName), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
               ),
             ),
             const SizedBox(width: 8),
@@ -180,13 +191,8 @@ class _CompactChatLine extends StatelessWidget {
     var cursor = 0;
 
     for (final match in mentionRegex.allMatches(text)) {
-      if (match.start > cursor) {
-        spans.add(_normalSpan(text.substring(cursor, match.start), message));
-      }
-      spans.add(TextSpan(
-        text: text.substring(match.start, match.end),
-        style: const TextStyle(color: RoomColors.aqua, fontSize: 14.2, fontWeight: FontWeight.w900, height: 1.15),
-      ));
+      if (match.start > cursor) spans.add(_normalSpan(text.substring(cursor, match.start), message));
+      spans.add(TextSpan(text: text.substring(match.start, match.end), style: const TextStyle(color: RoomColors.aqua, fontSize: 14.2, fontWeight: FontWeight.w900, height: 1.15)));
       cursor = match.end;
     }
 
@@ -250,10 +256,7 @@ class RoomInputDock extends StatelessWidget {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
-        decoration: BoxDecoration(
-          color: RoomColors.deep.withValues(alpha: 0.94),
-          border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
-        ),
+        decoration: BoxDecoration(color: RoomColors.deep.withValues(alpha: 0.94), border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05)))),
         child: Row(
           children: [
             _DockButton(icon: Icons.mail_outline_rounded, onTap: () => _runAndHideSeatActions(onInboxTap), badgeCount: inboxUnreadCount),
@@ -270,12 +273,7 @@ class RoomInputDock extends StatelessWidget {
                         controller: controller,
                         focusNode: focusNode,
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
-                        decoration: InputDecoration(
-                          hintText: 'Message...',
-                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w800),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
+                        decoration: InputDecoration(hintText: 'Message...', hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w800), border: InputBorder.none, isDense: true),
                         onTap: dismissRoomSeatActionPill,
                         onSubmitted: (_) => _runAndHideSeatActions(onSendTap),
                       ),
