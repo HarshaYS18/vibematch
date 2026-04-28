@@ -19,6 +19,10 @@ class RoomTopBar extends StatelessWidget {
     required this.onAnnouncement,
     required this.onSettings,
     required this.onUsersTap,
+    required this.admins,
+    required this.availableAdminUsers,
+    required this.onAddAdmin,
+    required this.onRemoveAdmin,
     this.onRoomRankingsTap,
     this.roomLevel = 12,
     this.language = 'Telugu',
@@ -35,6 +39,10 @@ class RoomTopBar extends StatelessWidget {
   final VoidCallback onAnnouncement;
   final VoidCallback onSettings;
   final VoidCallback onUsersTap;
+  final List<SeatUser> admins;
+  final List<SeatUser> availableAdminUsers;
+  final ValueChanged<SeatUser> onAddAdmin;
+  final ValueChanged<SeatUser> onRemoveAdmin;
   final VoidCallback? onRoomRankingsTap;
   final int roomLevel;
   final String language;
@@ -109,6 +117,10 @@ class RoomTopBar extends StatelessWidget {
         language: language,
         privacyMode: privacyMode,
         canManageAdmins: canManageAdmins,
+        admins: admins,
+        availableAdminUsers: availableAdminUsers,
+        onAddAdmin: onAddAdmin,
+        onRemoveAdmin: onRemoveAdmin,
       ),
     );
   }
