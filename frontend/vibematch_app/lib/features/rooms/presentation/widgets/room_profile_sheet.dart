@@ -120,10 +120,10 @@ class UserMiniProfileSheet extends StatelessWidget {
                         title: 'Received',
                         value: compactNumber(user.receivedExp),
                         onTap: onReceivedRankingTap,
-                        tint: const Color(0xFFFFF7E7),
-                        borderColor: const Color(0xFFEFD79B),
-                        titleColor: const Color(0xFF8B7440),
-                        valueColor: const Color(0xFFB6841E),
+                        tint: const Color(0xFFFFDCEB),
+                        borderColor: const Color(0xFFEAB5CA),
+                        titleColor: const Color(0xFF8F5D70),
+                        valueColor: const Color(0xFFB93F6C),
                       ),
                     ),
                   ],
@@ -743,54 +743,56 @@ class _VipStatCard extends StatelessWidget {
               const _MiniStatCardShine(),
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Center(
-                    child: Text(
-                      'VIP Level',
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Color(0xFF7B7282),
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  const Text(
+                    'VIP Level',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Color(0xFF7B7282),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      Image.asset(
-                        _assetPath,
-                        width: 28,
-                        height: 28,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.shield_rounded,
-                            color: _accentColor,
-                            size: 26,
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          'VIP $vipLevel',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: _accentColor,
-                            fontSize: 13.4,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.2,
+                  const SizedBox(height: 3),
+                  Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            _assetPath,
+                            width: 34,
+                            height: 34,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(
+                                Icons.shield_rounded,
+                                color: _accentColor,
+                                size: 31,
+                              );
+                            },
                           ),
-                        ),
+                          const SizedBox(width: 1.5),
+                          Text(
+                            'VIP $vipLevel',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _accentColor,
+                              fontSize: 13.8,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.25,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
