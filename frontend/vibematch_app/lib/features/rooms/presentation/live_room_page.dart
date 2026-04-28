@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../inbox/presentation/inbox_page.dart';
 import 'controllers/live_room_gift_controller.dart';
+import 'controllers/live_room_message_controller.dart';
 import 'controllers/live_room_profile_navigator.dart';
 import 'controllers/live_room_seat_controller.dart';
 import 'live_room_models.dart';
@@ -48,11 +49,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final FocusNode _messageFocusNode;
   late final LiveRoomGiftController _giftController;
   late final LiveRoomSeatController _seatController;
+  late final LiveRoomMessageController _roomMessageController;
 
   late String _roomName;
   late String _roomId;
   late RoomPrivacyMode _privacyMode;
-  late List<ChatEntry> _messages;
 
   bool _roomImagesEnabled = true;
   bool _guestMessagesEnabled = true;
@@ -65,11 +66,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   Offset _bubbleOffset = const Offset(24, 120);
   RoomBackgroundTheme _selectedBackgroundTheme = defaultRoomBackgroundTheme;
-
-  final List<SeatUser> _joinRequestUsers = <SeatUser>[
-    mockInviteUsers[0],
-    mockInviteUsers[1],
-  ];
 
   final SeatUser _currentUser = mockRoomUsers.first;
 
@@ -112,7 +108,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _roomName = widget.roomName;
     _roomId = widget.roomId;
     _privacyMode = privacyModeFromTitle(widget.modeTitle);
-    _messages = List<ChatEntry>.from(mockChatEntries);
+
+    _roomMessageController = LiveRoomMessageController(
+      currentUser: _currentUser,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
 
     _seatController = LiveRoomSeatController(
       currentUser: _currentUser,
@@ -132,7 +134,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       },
       onFinalGiftMessage: (entry) {
         if (!mounted) return;
-        setState(() => _messages.insert(0, entry));
+        _roomMessageController.insertEntry(entry);
       },
       onToast: (message) {
         if (!mounted) return;
@@ -234,7 +236,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               layoutId: _seatController.layoutId,
               selectedSeatIndex: _seatController.selectedSeatIndex,
               canManageSeats: _viewerCanManageRoom,
-              messages: _messages,
+              messages: _roomMessageController.messages,
               canManageSeatApplications: _viewerCanManageRoom,
               messageController: _messageController,
               messageFocusNode: _messageFocusNode,
@@ -308,7 +310,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       if (_applyOnlyModeEnabled) {
         _seatController.applyForSeat(
           index: index,
-          messages: _messages,
+          messages: _roomMessageController.messages,
         );
       } else {
         _seatController.occupySeat(index);
@@ -330,7 +332,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _approveSeatApplication(ChatEntry entry) {
     _seatController.approveSeatApplication(
       entry: entry,
-      messages: _messages,
+      messages: _roomMessageController.messages,
       allRoomUsers: _allRoomUsers,
     );
   }
@@ -371,16 +373,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _insertSystemMessage(String message) {
-    setState(() {
-      _messages.insert(
-        0,
-        ChatEntry(
-          senderName: 'System',
-          senderId: 'system',
-          message: message,
-        ),
-      );
-    });
+    _roomMessageController.insertSystemMessage(message);
   }
 
   void _clearRoomFocus() {
@@ -395,14 +388,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _handleJoinRoom() {
     _clearRoomFocus();
-
-    final alreadyRequested = _joinRequestUsers.any(
-      (user) => user.id == _currentUser.id,
-    );
-
-    if (!alreadyRequested) {
-      setState(() => _joinRequestUsers.add(_currentUser));
-    }
+    _roomMessageController.requestJoin();
 
     _openInfoSheet(
       'Join request sent',
@@ -436,20 +422,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    setState(() {
-      _messages.insert(
-        0,
-        ChatEntry(
-          senderName: _currentUser.name,
-          senderId: _currentUser.id,
-          message: text,
-          vipLevel: _currentUser.vipLevel,
-          sendingLevel: _currentUser.sendingLevel,
-          receivingLevel: _currentUser.receivingLevel,
-        ),
-      );
-      _messageController.clear();
-    });
+    _roomMessageController.sendMessage(text);
+    _messageController.clear();
   }
 
   void _openMiniProfileFromChat(ChatEntry entry) {
@@ -684,7 +658,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             roomImagesEnabled: _roomImagesEnabled,
             guestMessagesEnabled: _guestMessagesEnabled,
             applyOnlyModeEnabled: _applyOnlyModeEnabled,
-            joinRequestCount: _joinRequestUsers.length,
+            joinRequestCount: _roomMessageController.joinRequestUsers.length,
             onBackgroundTap: _openBackgroundSheet,
             onPrivacyTap: _openPrivacySheet,
             onSeatLayoutTap: _openSeatLayoutSheet,
@@ -760,7 +734,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       builder: (_) => StatefulBuilder(
         builder: (context, setSheetState) {
           return LiveRoomJoinRequestsSheet(
-            users: _joinRequestUsers,
+            users: _roomMessageController.joinRequestUsers,
             onApprove: (user) {
               _resolveJoinRequest(user, approved: true);
               setSheetState(() {});
@@ -776,22 +750,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _resolveJoinRequest(SeatUser user, {required bool approved}) {
-    setState(() {
-      _joinRequestUsers.removeWhere((item) => item.id == user.id);
-      _messages.insert(
-        0,
-        ChatEntry(
-          senderName: _currentUser.name,
-          senderId: _currentUser.id,
-          message: approved
-              ? 'approved ${user.name} to join $_roomName'
-              : 'rejected ${user.name}\'s join request',
-          vipLevel: _currentUser.vipLevel,
-          sendingLevel: _currentUser.sendingLevel,
-          receivingLevel: _currentUser.receivingLevel,
-        ),
-      );
-    });
+    _roomMessageController.resolveJoinRequest(
+      user: user,
+      approved: approved,
+      roomName: _roomName,
+    );
 
     RoomToast.show(
       context,
