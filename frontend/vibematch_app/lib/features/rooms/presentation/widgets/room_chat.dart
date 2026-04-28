@@ -5,6 +5,7 @@ import '../live_room_models.dart';
 import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
+import 'vip_badge.dart';
 
 final ValueNotifier<int> roomChatClearSignal = ValueNotifier<int>(0);
 
@@ -158,7 +159,12 @@ class _CompactChatLine extends StatelessWidget {
                       recognizer: TapGestureRecognizer()..onTap = onSenderTap,
                       style: const TextStyle(color: Colors.white, fontSize: 14.8, fontWeight: FontWeight.w900, height: 1.15),
                     ),
-                    TextSpan(text: '  VIP ${message.vipLevel}: ', style: TextStyle(color: RoomColors.gold.withValues(alpha: 0.96), fontSize: 13.2, fontWeight: FontWeight.w900, height: 1.15)),
+                    const TextSpan(text: '  '),
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: VipBadge(level: message.vipLevel, size: VipBadgeSize.tiny),
+                    ),
+                    const TextSpan(text: '  '),
                     ..._messageSpans(message),
                   ],
                 ],
