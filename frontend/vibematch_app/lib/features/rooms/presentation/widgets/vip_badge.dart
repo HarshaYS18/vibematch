@@ -114,9 +114,10 @@ class _VipBadgeState extends State<VipBadge>
     };
   }
 
-  double get _chatBadgeSize => 20;
-  double get _chatPillWidth => 28;
-  double get _chatPillHeight => 12;
+  // Chat badge is intentionally tiny, but slightly bigger than the previous pass.
+  double get _chatBadgeSize => 22;
+  double get _chatPillWidth => 32;
+  double get _chatPillHeight => 13;
   double get _chatTotalWidth => _chatPillWidth + (_chatBadgeSize * 0.52);
 
   double get _iconTextHeight {
@@ -148,7 +149,7 @@ class _VipBadgeState extends State<VipBadge>
 
   double get _fontSize {
     return switch (widget.size) {
-      VipBadgeSize.tiny => 6.2,
+      VipBadgeSize.tiny => 6.6,
       VipBadgeSize.small => 10.8,
       VipBadgeSize.medium => 14.2,
       VipBadgeSize.large => 18.8,
@@ -223,12 +224,17 @@ class _VipBadgeState extends State<VipBadge>
                   premiumShine: _premiumShine,
                   shineValue: _shineController.value,
                   sharpCorners: true,
-                  child: _GoldenVipText(
-                    label: 'VIP $_safeLevel',
-                    fontSize: _fontSize,
-                    premiumShine: _premiumShine,
-                    shineValue: _shineController.value,
-                    compact: true,
+                  child: Padding(
+                    // Moves the VIP text a little right so there is a clean gap
+                    // between the shield badge edge and the text.
+                    padding: const EdgeInsets.only(left: 4),
+                    child: _GoldenVipText(
+                      label: 'VIP $_safeLevel',
+                      fontSize: _fontSize,
+                      premiumShine: _premiumShine,
+                      shineValue: _shineController.value,
+                      compact: true,
+                    ),
                   ),
                 ),
               ),
