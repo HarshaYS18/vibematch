@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
-import 'premium_mini_profile_sheet.dart';
+import 'room_profile_sheet.dart';
 
 class LiveRoomMiniProfileSheet extends StatelessWidget {
   const LiveRoomMiniProfileSheet({
