@@ -57,7 +57,7 @@ class UserMiniProfileSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MiniProfileDecoration(
-      maxHeightFactor: 0.64,
+      maxHeightFactor: 0.66,
       topRadius: 26,
       backgroundColor: const Color(0xFFFDFBF7),
       showTopGlow: false,
@@ -68,7 +68,7 @@ class UserMiniProfileSheet extends StatelessWidget {
           SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               14,
-              48,
+              84,
               14,
               MediaQuery.paddingOf(context).bottom + 12,
             ),
@@ -123,53 +123,25 @@ class UserMiniProfileSheet extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    VipBadge(level: user.vipLevel, size: VipBadgeSize.small, onTap: onVipTap),
-                    if (user.svipLevel > 0)
-                      _CleanLevelPill(
-                        label: 'SVIP ${user.svipLevel}',
-                        icon: Icons.diamond_rounded,
-                        width: 76,
-                        background: const Color(0xFF30220B),
-                        border: const Color(0xFFD7AA45),
-                        textColor: const Color(0xFFFFE2A1),
-                        onTap: onVipTap,
-                      ),
-                    _CleanLevelPill(
-                      label: 'Lv ${user.sendingLevel}',
-                      icon: Icons.north_east_rounded,
-                      width: 68,
-                      background: const Color(0xFF241E45),
-                      border: const Color(0xFF7364D9),
-                      textColor: const Color(0xFFEDEAFF),
-                      onTap: onSendingLevelTap,
-                    ),
-                    _CleanLevelPill(
-                      label: 'Lv ${user.receivingLevel}',
-                      icon: Icons.favorite_rounded,
-                      width: 68,
-                      background: const Color(0xFF411B2C),
-                      border: const Color(0xFFD95E8E),
-                      textColor: const Color(0xFFFFE8F1),
-                      onTap: onReceivingLevelTap,
-                    ),
-                  ],
+                const SizedBox(height: 7),
+                _LevelRow(
+                  user: user,
+                  onVipTap: onVipTap,
+                  onSendingLevelTap: onSendingLevelTap,
+                  onReceivingLevelTap: onReceivingLevelTap,
                 ),
                 const SizedBox(height: 10),
                 _MetaRow(user: user),
-                if (user.showLocation) ...[
-                  const SizedBox(height: 7),
-                  _LocationPill(location: user.locationLabel!),
-                ],
                 const SizedBox(height: 10),
                 Row(
                   children: [
+                    Expanded(
+                      child: _VipStatCard(
+                        vipLevel: user.vipLevel,
+                        onTap: onVipTap,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _MonthStatCard(
                         title: 'Sent',
@@ -208,23 +180,84 @@ class UserMiniProfileSheet extends StatelessWidget {
                   onSelfMuteToggle: onSelfMuteToggle,
                   onAdminMuteToggle: onAdminMuteToggle,
                   onGiftTap: onGiftTap,
-                  onProfileTap: onAvatarTap,
                 ),
               ],
             ),
           ),
           Positioned(
-            top: -32,
+            top: 10,
             child: MiniProfileAvatarDecoration(
               user: user,
               onTap: onAvatarTap,
-              size: 66,
+              size: 62,
               showHeartBadge: false,
               showOnlineRing: true,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LevelRow extends StatelessWidget {
+  const _LevelRow({
+    required this.user,
+    required this.onVipTap,
+    required this.onSendingLevelTap,
+    required this.onReceivingLevelTap,
+  });
+
+  final SeatUser user;
+  final VoidCallback onVipTap;
+  final VoidCallback onSendingLevelTap;
+  final VoidCallback onReceivingLevelTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <Widget>[
+      if (user.svipLevel > 0)
+        _CleanLevelPill(
+          label: 'SVIP ${user.svipLevel}',
+          icon: Icons.diamond_rounded,
+          width: 76,
+          background: const Color(0xFF30220B),
+          border: const Color(0xFFD7AA45),
+          textColor: const Color(0xFFFFE2A1),
+          active: true,
+          onTap: onVipTap,
+        ),
+      _CleanLevelPill(
+        label: 'Lv ${user.sendingLevel}',
+        icon: Icons.north_east_rounded,
+        width: 68,
+        background: const Color(0xFF241E45),
+        border: const Color(0xFF7364D9),
+        textColor: const Color(0xFFEDEAFF),
+        active: user.sendingLevel > 0,
+        onTap: onSendingLevelTap,
+      ),
+      _CleanLevelPill(
+        label: 'Lv ${user.receivingLevel}',
+        icon: Icons.favorite_rounded,
+        width: 68,
+        background: const Color(0xFF411B2C),
+        border: const Color(0xFFD95E8E),
+        textColor: const Color(0xFFFFE8F1),
+        active: user.receivingLevel > 0,
+        onTap: onReceivingLevelTap,
+      ),
+    ];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i != 0) const SizedBox(width: 6),
+          items[i],
+        ],
+      ],
     );
   }
 }
@@ -236,26 +269,33 @@ class _MetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        if (user.roleLabel.isNotEmpty)
-          Flexible(
-            fit: FlexFit.tight,
+    return SizedBox(
+      height: 30,
+      child: Row(
+        children: [
+          Expanded(
             child: Align(
               alignment: Alignment.centerLeft,
-              child: _MetaPill(icon: Icons.shield_rounded, label: user.roleLabel),
+              child: user.roleLabel.isEmpty
+                  ? const SizedBox.shrink()
+                  : _MetaPill(icon: Icons.shield_rounded, label: user.roleLabel),
             ),
-          )
-        else
-          const Spacer(),
-        Flexible(
-          fit: FlexFit.tight,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: _GenderAgePill(user: user),
           ),
-        ),
-      ],
+          Expanded(
+            child: Center(
+              child: user.showLocation
+                  ? _LocationPill(location: user.locationLabel!)
+                  : const SizedBox.shrink(),
+            ),
+          ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _GenderAgePill(user: user),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -358,6 +398,7 @@ class _CleanLevelPill extends StatelessWidget {
     required this.border,
     required this.textColor,
     required this.onTap,
+    this.active = true,
   });
 
   final String label;
@@ -367,9 +408,14 @@ class _CleanLevelPill extends StatelessWidget {
   final Color border;
   final Color textColor;
   final VoidCallback onTap;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveBackground = active ? background : const Color(0xFFE6E1E8);
+    final effectiveBorder = active ? border : const Color(0xFFC7BEC9);
+    final effectiveTextColor = active ? textColor : const Color(0xFF8D8392);
+
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
@@ -377,16 +423,18 @@ class _CleanLevelPill extends StatelessWidget {
         width: width,
         height: 26,
         decoration: BoxDecoration(
-          color: background,
+          color: effectiveBackground,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: border.withValues(alpha: 0.72), width: 0.8),
-          boxShadow: [
-            BoxShadow(
-              color: border.withValues(alpha: 0.13),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          border: Border.all(color: effectiveBorder.withValues(alpha: active ? 0.72 : 0.65), width: 0.8),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: effectiveBorder.withValues(alpha: 0.13),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(999),
@@ -401,7 +449,7 @@ class _CleanLevelPill extends StatelessWidget {
                   height: 6,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
-                    color: Colors.white.withValues(alpha: 0.16),
+                    color: Colors.white.withValues(alpha: active ? 0.16 : 0.22),
                   ),
                 ),
               ),
@@ -409,7 +457,7 @@ class _CleanLevelPill extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, color: textColor, size: 11.5),
+                  Icon(icon, color: effectiveTextColor, size: 11.5),
                   const SizedBox(width: 3),
                   Flexible(
                     child: Text(
@@ -417,7 +465,7 @@ class _CleanLevelPill extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: textColor,
+                        color: effectiveTextColor,
                         fontSize: 10.2,
                         fontWeight: FontWeight.w900,
                       ),
@@ -452,10 +500,10 @@ class _LocationPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 150),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 220),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
           color: RoomColors.aqua.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(999),
@@ -490,27 +538,65 @@ class _MetaPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.14)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 12.5),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 130),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.14)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 12.5),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VipStatCard extends StatelessWidget {
+  const _VipStatCard({required this.vipLevel, required this.onTap});
+
+  final int vipLevel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: RoomColors.softLine),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('VIP', style: TextStyle(color: Color(0xFF7B7282), fontSize: 10.5, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 5),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: VipBadge(level: vipLevel, size: VipBadgeSize.tiny),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -529,6 +615,7 @@ class _MonthStatCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
+        height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -536,6 +623,7 @@ class _MonthStatCard extends StatelessWidget {
           border: Border.all(color: RoomColors.softLine),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B7282), fontSize: 10.5, fontWeight: FontWeight.w800)),
@@ -584,17 +672,20 @@ class _BadgesInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badges = user.medals.isEmpty ? '—' : user.medals.join('  ');
+    final badges = user.medals.isEmpty ? '—' : user.medals.join('   ');
 
     return _CleanInfoCard(
       iconWidget: const Icon(Icons.military_tech_rounded, color: RoomColors.gold, size: 20),
       title: 'Badges',
-      valueWidget: Text(
-        badges,
-        textAlign: TextAlign.right,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Color(0xFF675C70), fontSize: 13, fontWeight: FontWeight.w900),
+      valueWidget: Align(
+        alignment: Alignment.centerRight,
+        child: Text(
+          badges,
+          textAlign: TextAlign.right,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Color(0xFF675C70), fontSize: 13, fontWeight: FontWeight.w900),
+        ),
       ),
       onTap: onTap,
     );
@@ -648,6 +739,7 @@ class _CleanInfoCard extends StatelessWidget {
           SizedBox(width: 36, child: Center(child: iconWidget)),
           const SizedBox(width: 9),
           Expanded(
+            flex: valueWidget == null ? 1 : 0,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -665,8 +757,8 @@ class _CleanInfoCard extends StatelessWidget {
             ),
           ),
           if (valueWidget != null) ...[
-            const SizedBox(width: 8),
-            Flexible(child: valueWidget!),
+            const Spacer(),
+            SizedBox(width: 92, child: valueWidget!),
           ],
           const SizedBox(width: 5),
           const Icon(Icons.chevron_right_rounded, color: Color(0xFFB3A9B9), size: 19),
@@ -686,7 +778,6 @@ class _ActionRow extends StatelessWidget {
     required this.onSelfMuteToggle,
     required this.onAdminMuteToggle,
     required this.onGiftTap,
-    required this.onProfileTap,
   });
 
   final bool isSelf;
@@ -697,12 +788,10 @@ class _ActionRow extends StatelessWidget {
   final VoidCallback onSelfMuteToggle;
   final VoidCallback onAdminMuteToggle;
   final VoidCallback onGiftTap;
-  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
-      _IconActionChip(icon: Icons.person_rounded, tooltip: 'Profile', onTap: onProfileTap),
       _IconActionChip(icon: Icons.card_giftcard_rounded, tooltip: 'Gift', onTap: onGiftTap),
       if (isSelf)
         _IconActionChip(
