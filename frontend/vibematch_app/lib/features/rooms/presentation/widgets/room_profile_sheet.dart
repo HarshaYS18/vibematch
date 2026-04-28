@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'mini_profile_decoration.dart';
 import 'room_theme.dart';
 import 'vip_badge.dart';
 
@@ -55,19 +56,22 @@ class UserMiniProfileSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.80),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
+    return MiniProfileDecoration(
+      maxHeightFactor: 0.80,
+      backgroundColor: const Color(0xFFFCFAF7),
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.topCenter,
         children: [
           SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(14, 58, 14, MediaQuery.paddingOf(context).bottom + 12),
+            padding: EdgeInsets.fromLTRB(
+              14,
+              58,
+              14,
+              MediaQuery.paddingOf(context).bottom + 12,
+            ),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            physics: const BouncingScrollPhysics(),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -106,7 +110,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                       ),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: _CircleToolButton(
+                        child: MiniProfileCornerButton(
                           icon: Icons.alternate_email_rounded,
                           color: RoomColors.aqua,
                           onTap: onMentionTap,
@@ -124,23 +128,50 @@ class UserMiniProfileSheet extends StatelessWidget {
                   children: [
                     VipBadge(level: user.vipLevel, size: VipBadgeSize.medium, onTap: onVipTap),
                     if (user.svipLevel > 0)
-                      _SvipPill(level: user.svipLevel, onTap: onVipTap),
-                    _TextPill(label: 'Send Lv ${user.sendingLevel}', color: RoomColors.violet, onTap: onSendingLevelTap),
-                    _TextPill(label: 'Receive Lv ${user.receivingLevel}', color: RoomColors.coral, onTap: onReceivingLevelTap),
+                      _GlassyLevelPill(
+                        label: 'SVIP ${user.svipLevel}',
+                        icon: Icons.diamond_rounded,
+                        width: 78,
+                        gradient: const [
+                          Color(0xFFFFF3BA),
+                          Color(0xFFFFD35A),
+                          Color(0xFF9E6D00),
+                        ],
+                        textColor: const Color(0xFF3E2700),
+                        onTap: onVipTap,
+                      ),
+                    _GlassyLevelPill(
+                      label: 'Lv ${user.sendingLevel}',
+                      icon: Icons.north_east_rounded,
+                      width: 70,
+                      gradient: const [
+                        Color(0xFFEFEAFF),
+                        Color(0xFF8C5CF6),
+                        Color(0xFF12C7B7),
+                      ],
+                      textColor: Colors.white,
+                      onTap: onSendingLevelTap,
+                    ),
+                    _GlassyLevelPill(
+                      label: 'Lv ${user.receivingLevel}',
+                      icon: Icons.favorite_rounded,
+                      width: 70,
+                      gradient: const [
+                        Color(0xFFFFEAF3),
+                        Color(0xFFFF6B9A),
+                        Color(0xFFE84C72),
+                      ],
+                      textColor: Colors.white,
+                      onTap: onReceivingLevelTap,
+                    ),
                   ],
                 ),
-                const SizedBox(height: 9),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    _GenderAgePill(user: user),
-                    if (user.showLocation) _LocationPill(location: user.locationLabel!),
-                    if (user.roleLabel.isNotEmpty) _RolePill(label: user.roleLabel),
-                  ],
-                ),
+                const SizedBox(height: 10),
+                _MetaRow(user: user),
+                if (user.showLocation) ...[
+                  const SizedBox(height: 7),
+                  _LocationPill(location: user.locationLabel!),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -164,12 +195,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 9),
-                _InfoCard(
-                  title: 'Family',
-                  value: user.familyName.trim().isEmpty ? 'Join or create a family' : user.familyName,
-                  color: const Color(0xFFFFF8EA),
-                  onTap: onFamilyTap,
-                ),
+                _FamilyInfoCard(user: user, onTap: onFamilyTap),
                 const SizedBox(height: 8),
                 _InfoCard(
                   title: 'Love & Bonds',
@@ -178,12 +204,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                   onTap: onRelationshipTap,
                 ),
                 const SizedBox(height: 8),
-                _InfoCard(
-                  title: 'Badges',
-                  value: user.medals.isEmpty ? 'No badges yet' : user.medals.join('  '),
-                  color: const Color(0xFFF0EEFF),
-                  onTap: onMedalsTap,
-                ),
+                _BadgesInfoCard(user: user, onTap: onMedalsTap),
                 const SizedBox(height: 12),
                 _ActionRow(
                   isSelf: _isSelf,
@@ -199,65 +220,43 @@ class UserMiniProfileSheet extends StatelessWidget {
               ],
             ),
           ),
-          Positioned(top: -40, child: _ProfileAvatar(user: user, onTap: onAvatarTap)),
+          Positioned(
+            top: -40,
+            child: MiniProfileAvatarDecoration(user: user, onTap: onAvatarTap),
+          ),
         ],
       ),
     );
   }
 }
 
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({required this.user, required this.onTap});
+class _MetaRow extends StatelessWidget {
+  const _MetaRow({required this.user});
 
   final SeatUser user;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 84,
-        height: 84,
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: user.avatarColors.first.withValues(alpha: 0.28),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
+    return Row(
+      children: [
+        if (user.roleLabel.isNotEmpty)
+          Flexible(
+            fit: FlexFit.tight,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _RolePill(label: user.roleLabel),
             ),
-          ],
+          )
+        else
+          const Spacer(),
+        Flexible(
+          fit: FlexFit.tight,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: _GenderAgePill(user: user),
+          ),
         ),
-        child: Container(
-          decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
-          alignment: Alignment.center,
-          child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 29, fontWeight: FontWeight.w900)),
-        ),
-      ),
-    );
-  }
-}
-
-class _CircleToolButton extends StatelessWidget {
-  const _CircleToolButton({required this.icon, required this.color, required this.onTap});
-
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: color.withValues(alpha: 0.12),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(width: 36, height: 36, child: Icon(icon, color: color, size: 19)),
-      ),
+      ],
     );
   }
 }
@@ -269,7 +268,7 @@ class _ReportIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _CircleToolButton(
+    return MiniProfileCornerButton(
       icon: Icons.report_gmailerrorred_rounded,
       color: RoomColors.coral,
       onTap: onTap,
@@ -349,11 +348,21 @@ class _MenuRow extends StatelessWidget {
   }
 }
 
-class _TextPill extends StatelessWidget {
-  const _TextPill({required this.label, required this.color, required this.onTap});
+class _GlassyLevelPill extends StatelessWidget {
+  const _GlassyLevelPill({
+    required this.label,
+    required this.icon,
+    required this.width,
+    required this.gradient,
+    required this.textColor,
+    required this.onTap,
+  });
 
   final String label;
-  final Color color;
+  final IconData icon;
+  final double width;
+  final List<Color> gradient;
+  final Color textColor;
   final VoidCallback onTap;
 
   @override
@@ -362,38 +371,77 @@ class _TextPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.13),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withValues(alpha: 0.20)),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4))],
-        ),
-        child: Text(label, style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w900)),
-      ),
-    );
-  }
-}
-
-class _SvipPill extends StatelessWidget {
-  const _SvipPill({required this.level, required this.onTap});
-
-  final int level;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        width: width,
+        height: 28,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          gradient: const LinearGradient(colors: [RoomColors.violet, RoomColors.aqua]),
-          boxShadow: [BoxShadow(color: RoomColors.violet.withValues(alpha: 0.22), blurRadius: 12, offset: const Offset(0, 5))],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradient,
+          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.42), width: 0.8),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.last.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
-        child: Text('SVIP $level', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                left: 9,
+                right: 9,
+                top: 3,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.46),
+                        Colors.white.withValues(alpha: 0.12),
+                        Colors.white.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: textColor, size: 12),
+                  const SizedBox(width: 3),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: textColor == Colors.white ? 0.24 : 0.08),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -445,7 +493,14 @@ class _LocationPill extends StatelessWidget {
         children: [
           const Icon(Icons.location_on_rounded, color: RoomColors.aqua, size: 13),
           const SizedBox(width: 4),
-          Text(location, style: const TextStyle(color: RoomColors.plum, fontSize: 10.5, fontWeight: FontWeight.w900)),
+          Flexible(
+            child: Text(
+              location,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: RoomColors.plum, fontSize: 10.5, fontWeight: FontWeight.w900),
+            ),
+          ),
         ],
       ),
     );
@@ -466,7 +521,12 @@ class _RolePill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: RoomColors.gold.withValues(alpha: 0.20)),
       ),
-      child: Text(label, style: const TextStyle(color: RoomColors.plum, fontSize: 10.5, fontWeight: FontWeight.w900)),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: RoomColors.plum, fontSize: 10.5, fontWeight: FontWeight.w900),
+      ),
     );
   }
 }
@@ -504,6 +564,96 @@ class _MonthStatCard extends StatelessWidget {
   }
 }
 
+class _FamilyInfoCard extends StatelessWidget {
+  const _FamilyInfoCard({required this.user, required this.onTap});
+
+  final SeatUser user;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final familyName = user.familyName.trim().isEmpty ? 'Join or create a family' : user.familyName;
+
+    return MiniProfileSectionCard(
+      backgroundColor: const Color(0xFFFFF8EA),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(13),
+              gradient: LinearGradient(colors: user.avatarColors),
+              boxShadow: [
+                BoxShadow(
+                  color: RoomColors.gold.withValues(alpha: 0.16),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.groups_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Family', style: TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(
+                  familyName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF96899F), size: 20),
+        ],
+      ),
+    );
+  }
+}
+
+class _BadgesInfoCard extends StatelessWidget {
+  const _BadgesInfoCard({required this.user, required this.onTap});
+
+  final SeatUser user;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final badges = user.medals.isEmpty ? 'No badges yet' : user.medals.join('  ');
+
+    return MiniProfileSectionCard(
+      backgroundColor: const Color(0xFFF0EEFF),
+      onTap: onTap,
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text('Badges', style: TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)),
+          ),
+          Flexible(
+            child: Text(
+              badges,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 13, fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(width: 5),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF96899F), size: 20),
+        ],
+      ),
+    );
+  }
+}
+
 class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.title, required this.value, required this.color, required this.onTap});
 
@@ -514,22 +664,17 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
+    return MiniProfileSectionCard(
+      backgroundColor: color,
       onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16), border: Border.all(color: RoomColors.softLine)),
-        child: Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 3),
-            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800)),
-          ])),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF96899F), size: 20),
-        ]),
-      ),
+      child: Row(children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 3),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800)),
+        ])),
+        const Icon(Icons.chevron_right_rounded, color: Color(0xFF96899F), size: 20),
+      ]),
     );
   }
 }
@@ -560,36 +705,58 @@ class _ActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
-      _ActionChip(icon: Icons.person_rounded, label: 'Profile', onTap: onProfileTap),
-      _ActionChip(icon: Icons.card_giftcard_rounded, label: 'Gift', onTap: onGiftTap),
-      if (isSelf) _ActionChip(icon: selfMuted ? Icons.mic_rounded : Icons.mic_off_rounded, label: selfMuted ? 'Turn on' : 'Turn off', onTap: onSelfMuteToggle),
-      if (canModerate && !isSelf) _ActionChip(icon: adminMuted ? Icons.mic_rounded : Icons.admin_panel_settings_rounded, label: adminMuted ? 'Unmute' : 'Admin mute', onTap: onAdminMuteToggle),
-      if (isSelf || canModerate) _ActionChip(icon: Icons.lock_rounded, label: 'Leave & Lock', onTap: onLeaveAndLock),
+      _IconActionChip(icon: Icons.person_rounded, tooltip: 'Profile', onTap: onProfileTap),
+      _IconActionChip(icon: Icons.card_giftcard_rounded, tooltip: 'Gift', onTap: onGiftTap),
+      if (isSelf)
+        _IconActionChip(
+          icon: selfMuted ? Icons.mic_rounded : Icons.mic_off_rounded,
+          tooltip: selfMuted ? 'Turn on mic' : 'Turn off mic',
+          onTap: onSelfMuteToggle,
+        ),
+      if (canModerate && !isSelf)
+        _IconActionChip(
+          icon: adminMuted ? Icons.mic_rounded : Icons.admin_panel_settings_rounded,
+          tooltip: adminMuted ? 'Unmute' : 'Admin mute',
+          onTap: onAdminMuteToggle,
+        ),
+      if (isSelf || canModerate)
+        _IconActionChip(icon: Icons.lock_rounded, tooltip: 'Leave and lock', onTap: onLeaveAndLock),
     ];
-    return Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: actions);
+    return Wrap(spacing: 10, runSpacing: 10, alignment: WrapAlignment.center, children: actions);
   }
 }
 
-class _ActionChip extends StatelessWidget {
-  const _ActionChip({required this.icon, required this.label, required this.onTap});
+class _IconActionChip extends StatelessWidget {
+  const _IconActionChip({required this.icon, required this.tooltip, required this.onTap});
 
   final IconData icon;
-  final String label;
+  final String tooltip;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        decoration: BoxDecoration(color: RoomColors.plum.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(999), border: Border.all(color: RoomColors.softLine)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, color: RoomColors.plum, size: 15),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(color: RoomColors.plum, fontSize: 11, fontWeight: FontWeight.w900)),
-        ]),
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: RoomColors.plum.withValues(alpha: 0.07),
+            shape: BoxShape.circle,
+            border: Border.all(color: RoomColors.softLine),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: RoomColors.plum, size: 19),
+        ),
       ),
     );
   }
