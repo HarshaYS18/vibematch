@@ -31,7 +31,6 @@ class _VipBadgeState extends State<VipBadge>
   bool get _visible => widget.level > 0 || widget.showWhenZero;
   bool get _isChatSize => widget.size == VipBadgeSize.tiny;
   bool get _premiumShine => _safeLevel >= 30 && !_isChatSize;
-  bool get _basicShine => !_premiumShine;
 
   @override
   void initState() {
