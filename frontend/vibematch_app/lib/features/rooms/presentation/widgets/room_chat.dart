@@ -347,6 +347,8 @@ class _CompactChatLine extends StatelessWidget {
   }
 }
 
+enum _ChatMessageAction { copy, report }
+
 class _TransparentUserMessageFlexBox extends StatelessWidget {
   const _TransparentUserMessageFlexBox({
     required this.child,
@@ -358,76 +360,65 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
   final String messageText;
   final VoidCallback? onTap;
 
-  void _showCopyMenu(BuildContext context) {
-    showModalBottomSheet<void>(
+  Future<void> _showMessageActionPill(BuildContext context, Offset globalPosition) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final overlaySize = overlay?.size ?? MediaQuery.sizeOf(context);
+    final left = (globalPosition.dx + 16).clamp(8.0, overlaySize.width - 172);
+    final top = (globalPosition.dy - 18).clamp(8.0, overlaySize.height - 72);
+
+    final selected = await showMenu<_ChatMessageAction>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.30),
-      builder: (sheetContext) {
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF171024).withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                leading: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: const Icon(Icons.copy_rounded, color: RoomColors.aqua, size: 20),
-                ),
-                title: const Text(
-                  'Copy message',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                subtitle: const Text(
-                  'Copy this chat text to clipboard',
-                  style: TextStyle(
-                    color: Color(0xFFBDB4CC),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  await Clipboard.setData(ClipboardData(text: messageText));
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Message copied'),
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(milliseconds: 1200),
-                      backgroundColor: const Color(0xFF171024).withValues(alpha: 0.96),
-                    ),
-                  );
-                },
-              ),
-            ),
+      color: Colors.white,
+      elevation: 14,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      position: RelativeRect.fromLTRB(
+        left,
+        top,
+        overlaySize.width - left,
+        overlaySize.height - top,
+      ),
+      items: const [
+        PopupMenuItem<_ChatMessageAction>(
+          value: _ChatMessageAction.copy,
+          height: 36,
+          padding: EdgeInsets.symmetric(horizontal: 14),
+          child: _MessageActionPillItem(
+            icon: Icons.copy_rounded,
+            label: 'Copy',
+            color: RoomColors.aqua,
           ),
-        );
-      },
+        ),
+        PopupMenuItem<_ChatMessageAction>(
+          value: _ChatMessageAction.report,
+          height: 36,
+          padding: EdgeInsets.symmetric(horizontal: 14),
+          child: _MessageActionPillItem(
+            icon: Icons.report_gmailerrorred_rounded,
+            label: 'Report',
+            color: RoomColors.coral,
+          ),
+        ),
+      ],
     );
+
+    if (!context.mounted || selected == null) return;
+
+    if (selected == _ChatMessageAction.copy) {
+      await Clipboard.setData(ClipboardData(text: messageText));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Message copied'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 1100),
+          backgroundColor: const Color(0xFF171024).withValues(alpha: 0.96),
+        ),
+      );
+      return;
+    }
+
+    RoomToast.show(context, 'Report message will connect here');
   }
 
   @override
@@ -435,7 +426,7 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: onTap,
-      onLongPress: () => _showCopyMenu(context),
+      onLongPressStart: (details) => _showMessageActionPill(context, details.globalPosition),
       child: Container(
         // Dynamic user-message flex box with a very light foggy white fill.
         // It improves message readability while keeping the chat background visible.
@@ -463,6 +454,37 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
         ),
         child: child,
       ),
+    );
+  }
+}
+
+class _MessageActionPillItem extends StatelessWidget {
+  const _MessageActionPillItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 17),
+        const SizedBox(width: 7),
+        Text(
+          label,
+          style: const TextStyle(
+            color: RoomColors.plum,
+            fontSize: 12.4,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }
