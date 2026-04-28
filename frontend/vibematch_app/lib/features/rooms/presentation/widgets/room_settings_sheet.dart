@@ -10,13 +10,11 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.roomImagesEnabled,
     required this.guestMessagesEnabled,
     required this.applyOnlyModeEnabled,
-    required this.isVibeSyncActive,
     required this.joinRequestCount,
     required this.onBackgroundTap,
     required this.onPrivacyTap,
     required this.onSeatLayoutTap,
     required this.onAdminsTap,
-    required this.onVibeSyncTap,
     required this.onToggleRoomImages,
     required this.onToggleGuestMessages,
     required this.onToggleApplyOnlyMode,
@@ -34,13 +32,11 @@ class RoomSettingsSheet extends StatelessWidget {
   final bool roomImagesEnabled;
   final bool guestMessagesEnabled;
   final bool applyOnlyModeEnabled;
-  final bool isVibeSyncActive;
   final int joinRequestCount;
   final VoidCallback onBackgroundTap;
   final VoidCallback onPrivacyTap;
   final VoidCallback onSeatLayoutTap;
   final VoidCallback onAdminsTap;
-  final VoidCallback onVibeSyncTap;
   final ValueChanged<bool> onToggleRoomImages;
   final ValueChanged<bool> onToggleGuestMessages;
   final ValueChanged<bool> onToggleApplyOnlyMode;
@@ -60,7 +56,6 @@ class RoomSettingsSheet extends StatelessWidget {
       _SettingsCard(icon: privacyMode.icon, title: 'Privacy', badge: privacyMode.shortLabel, onTap: onPrivacyTap),
       _SettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
       _SettingsCard(icon: Icons.campaign_rounded, title: 'Notice', onTap: onAnnouncementTap),
-      _SettingsCard(icon: Icons.favorite_rounded, title: 'VibeSync', badge: isVibeSyncActive ? 'Live' : null, iconColor: RoomColors.coral, onTap: onVibeSyncTap),
       _SettingsCard(icon: Icons.shield_rounded, title: 'Admins', onTap: onAdminsTap),
       _SettingsCard(icon: Icons.how_to_reg_rounded, title: 'Requests', badge: joinRequestCount > 0 ? '$joinRequestCount' : null, onTap: onJoinRequestsTap),
       _SettingsCard(icon: Icons.auto_awesome_rounded, title: 'Effects', onTap: onEffectsTap),
