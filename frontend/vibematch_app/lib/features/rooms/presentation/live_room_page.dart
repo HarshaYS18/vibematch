@@ -7,21 +7,24 @@ import 'controllers/live_room_profile_navigator.dart';
 import 'controllers/live_room_seat_controller.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
+import 'widgets/live_room_background_sheet.dart';
 import 'widgets/live_room_body.dart';
 import 'widgets/live_room_emoji_sheet.dart';
 import 'widgets/live_room_games_sheet.dart';
 import 'widgets/live_room_gift_overlay.dart';
+import 'widgets/live_room_gift_panel_sheet.dart';
 import 'widgets/live_room_info_sheet.dart';
 import 'widgets/live_room_invite_sheet.dart';
 import 'widgets/live_room_join_requests_sheet.dart';
 import 'widgets/live_room_leave_sheet.dart';
+import 'widgets/live_room_mini_profile_sheet.dart';
 import 'widgets/live_room_minimized_bubble.dart';
-import 'widgets/room_gifts.dart';
-import 'widgets/room_profile_sheet.dart';
+import 'widgets/live_room_privacy_sheet.dart';
+import 'widgets/live_room_seat_layout_picker_sheet.dart';
+import 'widgets/live_room_users_sheet.dart';
 import 'widgets/room_seats.dart';
 import 'widgets/room_settings_sheet.dart';
 import 'widgets/room_theme.dart';
-import 'widgets/room_user_list_sheet.dart';
 
 class LiveRoomPage extends StatefulWidget {
   const LiveRoomPage({
@@ -403,7 +406,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RoomUserListSheet(
+      builder: (_) => LiveRoomUsersSheet(
         users: users,
         onUserTap: (user) {
           Navigator.pop(context);
@@ -460,7 +463,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => UserMiniProfileSheet(
+      builder: (_) => LiveRoomMiniProfileSheet(
         user: user,
         currentUser: _currentUser,
         canModerate: _viewerCanManageRoom,
@@ -566,44 +569,28 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return GiftPanel(
-              gifts: mockGiftItems,
-              users: _roomUsers,
-              selectedCategory: _giftController.selectedCategory,
-              selectedGift: _giftController.selectedGift,
-              selectedReceiverIds: _giftController.selectedReceiverIds,
-              selectedCombo: _giftController.selectedCombo,
-              coinBalance: _giftController.coinBalance,
-              onCategoryChanged: (category) {
-                setSheetState(() {
-                  _giftController.selectCategory(category);
-                });
-              },
-              onGiftSelected: (gift) {
-                setSheetState(() => _giftController.selectGift(gift));
-              },
-              onReceiverToggle: (id) {
-                setSheetState(() {
-                  _giftController.toggleReceiver(id, _roomUsers);
-                });
-              },
-              onComboChanged: (combo) {
-                setSheetState(() => _giftController.setCombo(combo));
-              },
-              onSend: () {
-                Navigator.pop(context);
-                _giftController.sendGift(_roomUsers);
-              },
-              onRecharge: () {
-                RoomToast.show(context, 'Wallet / coin recharge opened');
-              },
-            );
-          },
-        );
-      },
+      builder: (_) => LiveRoomGiftPanelSheet(
+        gifts: mockGiftItems,
+        users: _roomUsers,
+        selectedCategory: _giftController.selectedCategory,
+        selectedGift: _giftController.selectedGift,
+        selectedReceiverIds: _giftController.selectedReceiverIds,
+        selectedCombo: _giftController.selectedCombo,
+        coinBalance: _giftController.coinBalance,
+        onCategoryChanged: _giftController.selectCategory,
+        onGiftSelected: _giftController.selectGift,
+        onReceiverToggle: (id) {
+          _giftController.toggleReceiver(id, _roomUsers);
+        },
+        onComboChanged: _giftController.setCombo,
+        onSend: () {
+          Navigator.pop(context);
+          _giftController.sendGift(_roomUsers);
+        },
+        onRecharge: () {
+          RoomToast.show(context, 'Wallet / coin recharge opened');
+        },
+      ),
     );
   }
 
@@ -769,7 +756,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => PrivacySettingsSheet(
+      builder: (_) => LiveRoomPrivacySheet(
         currentMode: _privacyMode,
         onModeChanged: (mode) {
           setState(() => _privacyMode = mode);
@@ -812,7 +799,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => SeatLayoutSheet(
+      builder: (_) => LiveRoomSeatLayoutPickerSheet(
         selectedLayout: _seatController.layoutId,
         onSelected: (layout) {
           _seatController.changeLayout(layout);
@@ -829,7 +816,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RoomBackgroundPickerSheet(
+      builder: (_) => LiveRoomBackgroundSheet(
         currentTheme: _selectedBackgroundTheme,
         onThemeSelected: (theme) {
           setState(() => _selectedBackgroundTheme = theme);
