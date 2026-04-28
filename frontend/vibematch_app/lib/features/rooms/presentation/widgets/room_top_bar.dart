@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../controllers/live_room_message_controller.dart';
 import '../live_room_models.dart';
 import 'room_contribution_rankings_sheet.dart';
 import 'room_info_sheet.dart';
@@ -68,6 +69,16 @@ class RoomTopBar extends StatelessWidget {
             RoundRoomButton(icon: Icons.reply_rounded, onTap: onShare, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
             const SizedBox(width: 6),
             RoundRoomButton(icon: Icons.campaign_rounded, onTap: onAnnouncement, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
+            if (canManageAdmins) ...[
+              const SizedBox(width: 6),
+              RoundRoomButton(
+                icon: Icons.delete_sweep_rounded,
+                onTap: () => _confirmClearChat(context),
+                size: 30,
+                iconSize: 15,
+                background: RoomColors.coral.withValues(alpha: 0.24),
+              ),
+            ],
             const SizedBox(width: 6),
             RoundRoomButton(icon: Icons.settings_rounded, onTap: onSettings, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
           ],
@@ -99,6 +110,100 @@ class RoomTopBar extends StatelessWidget {
         privacyMode: privacyMode,
         canManageAdmins: canManageAdmins,
       ),
+    );
+  }
+
+  void _confirmClearChat(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          padding: EdgeInsets.fromLTRB(
+            18,
+            12,
+            18,
+            MediaQuery.paddingOf(sheetContext).bottom + 18,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SheetHandle(width: 42),
+              const SizedBox(height: 14),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: RoomColors.coral.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.delete_sweep_rounded,
+                  color: RoomColors.coral,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Clear chat for everyone?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: RoomColors.plum,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 7),
+              const Text(
+                'Only room owner/admins can use this. It removes all visible room chat messages for every user in this room.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF7B6A86),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        LiveRoomMessageController.clearActiveRoomChatForEveryone();
+                        RoomToast.show(context, 'Chat cleared for everyone');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: RoomColors.coral,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: const Text(
+                        'Clear',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
