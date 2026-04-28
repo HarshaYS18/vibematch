@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'room_info_sheet.dart';
 import 'room_theme.dart';
 
 class LiveRoomAnnouncementSheet extends StatelessWidget {
@@ -63,6 +64,9 @@ class LiveRoomAnnouncementSheet extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {
                   final message = controller.text.trim();
+                  if (message.isNotEmpty) {
+                    roomBroadcastAnnouncementNotifier.value = message;
+                  }
                   onSubmit(message);
                 },
                 style: ElevatedButton.styleFrom(
