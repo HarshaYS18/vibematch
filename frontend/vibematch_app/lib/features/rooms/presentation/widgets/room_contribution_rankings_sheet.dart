@@ -8,10 +8,12 @@ class RoomContributionRankingsSheet extends StatefulWidget {
     super.key,
     required this.roomName,
     required this.users,
+    this.onUserTap,
   });
 
   final String roomName;
   final List<SeatUser> users;
+  final ValueChanged<SeatUser>? onUserTap;
 
   @override
   State<RoomContributionRankingsSheet> createState() => _RoomContributionRankingsSheetState();
@@ -134,7 +136,14 @@ class _RoomContributionRankingsSheetState extends State<RoomContributionRankings
               itemBuilder: (context, index) {
                 final user = rankedUsers[index];
                 final score = _scoreFor(user);
-                return _ContributionRankTile(rank: index + 1, user: user, score: score);
+                return _ContributionRankTile(
+                  rank: index + 1,
+                  user: user,
+                  score: score,
+                  onTap: widget.onUserTap == null
+                      ? null
+                      : () => widget.onUserTap!(user),
+                );
               },
             ),
           ),
@@ -207,11 +216,17 @@ class _PeriodChip extends StatelessWidget {
 }
 
 class _ContributionRankTile extends StatelessWidget {
-  const _ContributionRankTile({required this.rank, required this.user, required this.score});
+  const _ContributionRankTile({
+    required this.rank,
+    required this.user,
+    required this.score,
+    this.onTap,
+  });
 
   final int rank;
   final SeatUser user;
   final int score;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -223,107 +238,118 @@ class _ContributionRankTile extends StatelessWidget {
       _ => const Color(0xFF8C7B99),
     };
 
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: isTopThree ? rankColor.withValues(alpha: 0.10) : RoomColors.pearl,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isTopThree ? rankColor.withValues(alpha: 0.22) : RoomColors.softLine),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isTopThree ? rankColor : Colors.white,
-              border: Border.all(color: isTopThree ? Colors.transparent : RoomColors.softLine),
-            ),
-            child: Text(
-              '$rank',
-              style: TextStyle(
-                color: isTopThree ? Colors.white : RoomColors.plum,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isTopThree ? rankColor.withValues(alpha: 0.10) : RoomColors.pearl,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isTopThree ? rankColor.withValues(alpha: 0.22) : RoomColors.softLine),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isTopThree ? rankColor : Colors.white,
+                  border: Border.all(color: isTopThree ? Colors.transparent : RoomColors.softLine),
+                ),
+                child: Text(
+                  '$rank',
+                  style: TextStyle(
+                    color: isTopThree ? Colors.white : RoomColors.plum,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(colors: user.avatarColors),
-              boxShadow: [BoxShadow(color: user.avatarColors.first.withValues(alpha: 0.18), blurRadius: 12, offset: const Offset(0, 6))],
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              avatarLetter(user.name),
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: user.avatarColors),
+                    boxShadow: [BoxShadow(color: user.avatarColors.first.withValues(alpha: 0.18), blurRadius: 12, offset: const Offset(0, 6))],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    avatarLetter(user.name),
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        user.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900),
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                        if (user.vipLevel > 0) ...[
+                          const SizedBox(width: 5),
+                          Container(
+                            height: 17,
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: RoomColors.violet.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              'VIP ${user.vipLevel}',
+                              style: const TextStyle(color: RoomColors.violet, fontSize: 8.5, fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (user.vipLevel > 0) ...[
-                      const SizedBox(width: 5),
-                      Container(
-                        height: 17,
-                        padding: const EdgeInsets.symmetric(horizontal: 5),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: RoomColors.violet.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          'VIP ${user.vipLevel}',
-                          style: const TextStyle(color: RoomColors.violet, fontSize: 8.5, fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                    ],
+                    const SizedBox(height: 3),
+                    Text(
+                      user.roleLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFF8C7B99), fontSize: 10.5, fontWeight: FontWeight.w800),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  user.roleLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF8C7B99), fontSize: 10.5, fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                compactNumber(score),
-                style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 2),
-              const Text(
-                'points',
-                style: TextStyle(color: Color(0xFF8C7B99), fontSize: 9.5, fontWeight: FontWeight.w800),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    compactNumber(score),
+                    style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'points',
+                    style: TextStyle(color: Color(0xFF8C7B99), fontSize: 9.5, fontWeight: FontWeight.w800),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
