@@ -47,9 +47,7 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
   @override
   void didUpdateWidget(covariant RoomChatFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.messages.length < _clearedMessageCount) {
-      _clearedMessageCount = widget.messages.length;
-    }
+    if (widget.messages.length < _clearedMessageCount) _clearedMessageCount = widget.messages.length;
     if (widget.messages.length != _lastMessageCount) {
       _lastMessageCount = widget.messages.length;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -73,9 +71,9 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
     final target = _scrollController.position.maxScrollExtent;
     if (jump) {
       _scrollController.jumpTo(target);
-      return;
+    } else {
+      _scrollController.animateTo(target, duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic);
     }
-    _scrollController.animateTo(target, duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic);
   }
 
   @override
@@ -125,13 +123,14 @@ class _CompactChatLine extends StatelessWidget {
     final showAgree = message.isSeatApplication && canManageSeatApplications && !message.applicationApproved;
     final isSystem = message.senderId == 'system';
 
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (!isSystem) ...[
             GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: onSenderTap,
               child: CircleAvatar(
                 radius: 13.5,
@@ -182,6 +181,9 @@ class _CompactChatLine extends StatelessWidget {
         ],
       ),
     );
+
+    if (isSystem) return row;
+    return GestureDetector(behavior: HitTestBehavior.translucent, onTap: onSenderTap, child: row);
   }
 
   List<TextSpan> _messageSpans(ChatEntry message) {
