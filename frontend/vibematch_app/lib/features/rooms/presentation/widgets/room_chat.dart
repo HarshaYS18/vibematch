@@ -360,13 +360,17 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
       behavior: HitTestBehavior.translucent,
       onTap: onTap,
       child: Container(
-        // Complete transparent dynamic flex box around every user chat message.
-        // It sizes to the user's message content, but still flexes/shrinks safely
-        // when the message is long.
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: const BoxDecoration(
+        // Dynamic user-message flex box. Fill stays transparent, but the outline
+        // is visible by default so message bounds are clear in the chat window.
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
           color: Colors.transparent,
           shape: BoxShape.rectangle,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.32),
+            width: 0.9,
+          ),
         ),
         child: child,
       ),
