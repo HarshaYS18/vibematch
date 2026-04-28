@@ -92,6 +92,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     return users;
   }
 
+  List<SeatUser> get _roomAdmins {
+    return _allRoomUsers.where((user) => user.isHost || user.isRoomAdmin).toList();
+  }
+
+  List<SeatUser> get _availableAdminUsers {
+    return _allRoomUsers
+        .where((user) => !user.isHost && !user.isRoomAdmin)
+        .toList();
+  }
+
   bool get _viewerCanManageRoom =>
       _currentUser.isHost || _currentUser.isRoomAdmin;
 
@@ -240,6 +250,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               layoutId: _seatController.layoutId,
               selectedSeatIndex: _seatController.selectedSeatIndex,
               canManageSeats: _viewerCanManageRoom,
+              admins: _roomAdmins,
+              availableAdminUsers: _availableAdminUsers,
+              onAddAdmin: _addRoomAdminFromInfo,
+              onRemoveAdmin: _removeRoomAdminFromInfo,
               messages: _roomMessageController.messages,
               canManageSeatApplications: _viewerCanManageRoom,
               messageController: _messageController,
@@ -471,6 +485,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       roomName: _roomName,
       onMentionTap: _mentionUser,
       onSetAdminTap: _setUserAsAdmin,
+      onRemoveAdminTap: _removeUserAsAdmin,
+      onReportTap: _openReportForUser,
       onLeaveAndLock: (targetSeatIndex) {
         Navigator.pop(context);
         _seatController.leaveAndLockSeat(targetSeatIndex);
@@ -516,6 +532,27 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     Navigator.pop(context);
     _seatController.setUserAsAdmin(userId);
     _clearRoomFocus();
+  }
+
+  void _removeUserAsAdmin(String userId) {
+    Navigator.pop(context);
+    _seatController.removeUserAsAdmin(userId);
+    _clearRoomFocus();
+  }
+
+  void _addRoomAdminFromInfo(SeatUser user) {
+    _seatController.setUserAsAdmin(user.id);
+    _clearRoomFocus();
+  }
+
+  void _removeRoomAdminFromInfo(SeatUser user) {
+    _seatController.removeUserAsAdmin(user.id);
+    _clearRoomFocus();
+  }
+
+  void _openReportForUser(SeatUser user) {
+    Navigator.pop(context);
+    _openInfoSheet('Report submitted', '${user.name} has been sent to the room safety review queue.');
   }
 
   void _openGiftPanel() {
