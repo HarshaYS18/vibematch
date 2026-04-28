@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../vibesync/models/vibesync_models.dart';
 import '../live_room_models.dart';
 import 'room_avatar_frames.dart';
 import 'room_theme.dart';
 
-class RoomSeatLayout extends StatelessWidget {
+final ValueNotifier<int> roomSeatActionDismissSignal = ValueNotifier<int>(0);
+
+void dismissRoomSeatActionPill() {
+  roomSeatActionDismissSignal.value++;
+}
+
+class RoomSeatLayout extends StatefulWidget {
   const RoomSeatLayout({
     super.key,
     required this.seats,
@@ -30,20 +37,54 @@ class RoomSeatLayout extends StatelessWidget {
   final ValueChanged<int> onLock;
   final ValueChanged<int> onUnlock;
 
+  @override
+  State<RoomSeatLayout> createState() => _RoomSeatLayoutState();
+}
+
+class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   static const double _seatWidth = 74;
   static const double _seatHeight = 80;
   static const double _rowHeight = 92;
   static const double _hostRowHeight = 92;
   static const double _actionWidth = 122;
 
+  int? _visuallyHiddenSeatIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    roomSeatActionDismissSignal.addListener(_hideActionMenuOnly);
+  }
+
+  @override
+  void didUpdateWidget(covariant RoomSeatLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedSeatIndex != widget.selectedSeatIndex) {
+      _visuallyHiddenSeatIndex = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    roomSeatActionDismissSignal.removeListener(_hideActionMenuOnly);
+    super.dispose();
+  }
+
+  void _hideActionMenuOnly() {
+    if (widget.selectedSeatIndex == null) return;
+    if (mounted) {
+      setState(() => _visuallyHiddenSeatIndex = widget.selectedSeatIndex);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final spec = SeatLayoutSpec.parse(layoutId);
+    final spec = SeatLayoutSpec.parse(widget.layoutId);
     final selectedSeat = _selectedSeatForActions;
     final actionHeight = selectedSeat == null ? 0.0 : (selectedSeat.locked ? 54.0 : 154.0);
     final hostHeight = spec.hasHostSeats ? _hostRowHeight : 0.0;
     final gridHeight = hostHeight + (spec.rows * _rowHeight);
-    final layoutHeight = gridHeight + (selectedSeat == null ? 0 : actionHeight + 8);
+    final layoutHeight = gridHeight;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -55,7 +96,9 @@ class RoomSeatLayout extends StatelessWidget {
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: () => onSeatTap(selectedSeat.index),
+                onTap: () {
+                  setState(() => _visuallyHiddenSeatIndex = selectedSeat.index);
+                },
                 child: const SizedBox.expand(),
               ),
             ),
@@ -65,14 +108,14 @@ class RoomSeatLayout extends StatelessWidget {
         if (spec.hasHostSeats) {
           final hostCellWidth = width / spec.topSeatCount;
           for (var i = 0; i < spec.topSeatCount; i++) {
-            if (i >= seats.length) continue;
+            if (i >= widget.seats.length) continue;
             children.add(
               Positioned(
                 left: (hostCellWidth * i) + ((hostCellWidth - _seatWidth) / 2),
                 top: 0,
                 width: _seatWidth,
                 height: _seatHeight,
-                child: _buildSeat(seats[i]),
+                child: _buildSeat(widget.seats[i]),
               ),
             );
           }
@@ -83,14 +126,14 @@ class RoomSeatLayout extends StatelessWidget {
         for (var row = 0; row < spec.rows; row++) {
           for (var col = 0; col < spec.columns; col++) {
             final seatIndex = cursor + (row * spec.columns) + col;
-            if (seatIndex >= seats.length) continue;
+            if (seatIndex >= widget.seats.length) continue;
             children.add(
               Positioned(
                 left: (cellWidth * col) + ((cellWidth - _seatWidth) / 2),
                 top: hostHeight + (row * _rowHeight),
                 width: _seatWidth,
                 height: _seatHeight,
-                child: _buildSeat(seats[seatIndex]),
+                child: _buildSeat(widget.seats[seatIndex]),
               ),
             );
           }
@@ -99,7 +142,7 @@ class RoomSeatLayout extends StatelessWidget {
         if (selectedSeat != null) {
           final position = _seatCenterPosition(selectedSeat.index, spec: spec, width: width);
           final left = (position.dx - (_actionWidth / 2)).clamp(0.0, width - _actionWidth);
-          final top = (position.dy + 36).clamp(0.0, layoutHeight - actionHeight);
+          final top = (position.dy + 28).clamp(0.0, gridHeight - actionHeight);
 
           children.add(
             Positioned(
@@ -112,24 +155,24 @@ class RoomSeatLayout extends StatelessWidget {
                         _SeatActionData(
                           icon: Icons.lock_open_rounded,
                           label: 'Unlock',
-                          onTap: () => onUnlock(selectedSeat.index),
+                          onTap: () => widget.onUnlock(selectedSeat.index),
                         ),
                       ]
                     : [
                         _SeatActionData(
                           icon: Icons.person_add_alt_1_rounded,
                           label: 'Invite',
-                          onTap: () => onInvite(selectedSeat.index),
+                          onTap: () => widget.onInvite(selectedSeat.index),
                         ),
                         _SeatActionData(
                           icon: Icons.swap_horiz_rounded,
                           label: 'Switch',
-                          onTap: () => onSwitch(selectedSeat.index),
+                          onTap: () => widget.onSwitch(selectedSeat.index),
                         ),
                         _SeatActionData(
                           icon: Icons.lock_outline_rounded,
                           label: 'Lock',
-                          onTap: () => onLock(selectedSeat.index),
+                          onTap: () => widget.onLock(selectedSeat.index),
                         ),
                       ],
               ),
@@ -147,9 +190,10 @@ class RoomSeatLayout extends StatelessWidget {
   }
 
   RoomSeat? get _selectedSeatForActions {
-    final index = selectedSeatIndex;
-    if (index == null || !canManageSeats || index < 0 || index >= seats.length) return null;
-    final seat = seats[index];
+    final index = widget.selectedSeatIndex;
+    if (index == null || !widget.canManageSeats || index < 0 || index >= widget.seats.length) return null;
+    if (_visuallyHiddenSeatIndex == index) return null;
+    final seat = widget.seats[index];
     if (seat.user != null) return null;
     return seat;
   }
@@ -170,12 +214,13 @@ class RoomSeatLayout extends StatelessWidget {
   }
 
   Widget _buildSeat(RoomSeat seat) {
-    final selected = selectedSeatIndex == seat.index;
+    final selected = widget.selectedSeatIndex == seat.index && _visuallyHiddenSeatIndex != seat.index;
     final user = seat.user;
 
     return GestureDetector(
+      key: ValueKey('room_seat_${seat.index}_${user?.id ?? 'empty'}_${seat.locked}'),
       behavior: HitTestBehavior.opaque,
-      onTap: () => user == null ? onSeatTap(seat.index) : onUserTap(seat.index),
+      onTap: () => user == null ? widget.onSeatTap(seat.index) : widget.onUserTap(seat.index),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -183,22 +228,78 @@ class RoomSeatLayout extends StatelessWidget {
           const SizedBox(height: 5),
           SizedBox(
             width: _seatWidth,
-            child: Text(
-              user?.name ?? 'NO.${seat.index + 1}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: user == null ? 0.56 : 0.96),
-                fontSize: 10.4,
-                fontWeight: FontWeight.w900,
-                height: 1,
-                letterSpacing: -0.1,
-              ),
-            ),
+            child: user == null ? _EmptySeatLabel(index: seat.index) : _GenderNameLabel(user: user, index: seat.index),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EmptySeatLabel extends StatelessWidget {
+  const _EmptySeatLabel({required this.index});
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'NO.${index + 1}',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.56),
+        fontSize: 10.4,
+        fontWeight: FontWeight.w900,
+        height: 1,
+        letterSpacing: -0.1,
+      ),
+    );
+  }
+}
+
+class _GenderNameLabel extends StatelessWidget {
+  const _GenderNameLabel({required this.user, required this.index});
+
+  final SeatUser user;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final isFemale = user.gender == VibeSyncGender.female;
+    final color = isFemale ? RoomColors.coral : RoomColors.aqua;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          child: Text(
+            '${index + 1}',
+            style: const TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.w900, height: 1),
+          ),
+        ),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            user.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10.4,
+              fontWeight: FontWeight.w900,
+              height: 1,
+              letterSpacing: -0.1,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -242,8 +343,7 @@ class _SeatAvatar extends StatelessWidget {
         RoomAvatarFrameHost(
           frame: user == null ? null : defaultStaticAvatarFrame,
           size: size,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
+          child: Container(
             width: size,
             height: size,
             decoration: BoxDecoration(
