@@ -73,17 +73,15 @@ class RoomTopBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 7),
-        Padding(
-          padding: const EdgeInsets.only(left: 38),
-          child: Row(
-            children: [
-              _TrophyButton(onTap: onRoomRankingsTap ?? () => _openDefaultRoomRankings(context)),
-              const SizedBox(width: 7),
-              _RoomLevelBadge(level: roomLevel),
-              const SizedBox(width: 7),
-              _OnlineButton(count: onlineCount, onTap: onUsersTap),
-            ],
-          ),
+        Row(
+          children: [
+            const SizedBox(width: 2),
+            _TrophyButton(onTap: onRoomRankingsTap ?? () => _openDefaultRoomRankings(context)),
+            const SizedBox(width: 7),
+            _RoomLevelBadge(level: roomLevel),
+            const SizedBox(width: 7),
+            _OnlineButton(count: onlineCount, onTap: onUsersTap),
+          ],
         ),
       ],
     );
