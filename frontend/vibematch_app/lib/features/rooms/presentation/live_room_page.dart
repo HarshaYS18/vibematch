@@ -21,9 +21,9 @@ import 'widgets/live_room_mini_profile_launcher.dart';
 import 'widgets/live_room_minimized_bubble.dart';
 import 'widgets/live_room_privacy_sheet.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
+import 'widgets/live_room_settings_sheet_module.dart';
 import 'widgets/live_room_users_sheet.dart';
 import 'widgets/room_seats.dart';
-import 'widgets/room_settings_sheet.dart';
 import 'widgets/room_theme.dart';
 
 class LiveRoomPage extends StatefulWidget {
@@ -596,7 +596,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) {
-          return RoomSettingsSheet(
+          return LiveRoomSettingsSheetModule(
             privacyMode: _privacyMode,
             roomImagesEnabled: _roomImagesEnabled,
             guestMessagesEnabled: _guestMessagesEnabled,
@@ -605,41 +605,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             onBackgroundTap: _openBackgroundSheet,
             onPrivacyTap: _openPrivacySheet,
             onSeatLayoutTap: _openSeatLayoutSheet,
-            onAdminsTap: () => LiveRoomProfileNavigator.openModulePage(
-              context: context,
-              title: 'Admins',
-              subtitle: 'Room administrator management will connect here.',
-              icon: Icons.shield_rounded,
-            ),
             onAnnouncementTap: _openAnnouncementSheet,
             onInboxTap: () => _openInboxPageFromSheet(sheetContext),
             onJoinRequestsTap: _openJoinRequestsSheet,
-            onReportsTap: () => LiveRoomProfileNavigator.openModulePage(
-              context: context,
-              title: 'Reports',
-              subtitle:
-                  'Room safety, reports, and moderation queue will connect here.',
-              icon: Icons.report_gmailerrorred_rounded,
-            ),
-            onBlockedTap: () => LiveRoomProfileNavigator.openModulePage(
-              context: context,
-              title: 'Blocked users',
-              subtitle: 'Blocked and restricted room users will connect here.',
-              icon: Icons.block_rounded,
-            ),
-            onEffectsTap: () => LiveRoomProfileNavigator.openModulePage(
-              context: context,
-              title: 'Room effects',
-              subtitle:
-                  'Room entrance effects, seat effects, and background effects will connect here.',
-              icon: Icons.auto_awesome_rounded,
-            ),
-            onMusicTap: () => LiveRoomProfileNavigator.openModulePage(
-              context: context,
-              title: 'Music',
-              subtitle: 'Room music controls and playlist will connect here.',
-              icon: Icons.music_note_rounded,
-            ),
             onToggleRoomImages: (value) {
               setState(() => _roomImagesEnabled = value);
               setSheetState(() {});
