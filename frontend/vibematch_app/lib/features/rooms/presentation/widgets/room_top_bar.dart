@@ -16,6 +16,7 @@ class RoomTopBar extends StatelessWidget {
     required this.onAnnouncement,
     required this.onSettings,
     required this.onUsersTap,
+    this.onRoomRankingsTap,
     this.roomLevel = 12,
   });
 
@@ -29,6 +30,7 @@ class RoomTopBar extends StatelessWidget {
   final VoidCallback onAnnouncement;
   final VoidCallback onSettings;
   final VoidCallback onUsersTap;
+  final VoidCallback? onRoomRankingsTap;
   final int roomLevel;
 
   @override
@@ -60,6 +62,8 @@ class RoomTopBar extends StatelessWidget {
             const SizedBox(width: 5),
             _JoinButton(onTap: onJoinTap),
             const Spacer(),
+            _TrophyButton(onTap: onRoomRankingsTap ?? () => RoomToast.show(context, 'Room rankings will connect here')),
+            const SizedBox(width: 5),
             _OnlineButton(count: onlineCount, onTap: onUsersTap),
             const SizedBox(width: 5),
             RoundRoomButton(
@@ -253,6 +257,49 @@ class _JoinButton extends StatelessWidget {
             ],
           ),
           child: const Icon(Icons.add_rounded, color: RoomColors.aqua, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+class _TrophyButton extends StatelessWidget {
+  const _TrophyButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Container(
+          width: 29,
+          height: 29,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                RoomColors.gold.withValues(alpha: 0.95),
+                RoomColors.coral.withValues(alpha: 0.82),
+              ],
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+            boxShadow: [
+              BoxShadow(
+                color: RoomColors.gold.withValues(alpha: 0.20),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 16),
         ),
       ),
     );
