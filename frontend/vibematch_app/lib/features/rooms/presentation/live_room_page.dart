@@ -7,6 +7,7 @@ import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/public_profile_view_page.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
+import 'widgets/live_room_body.dart';
 import 'widgets/live_room_emoji_sheet.dart';
 import 'widgets/live_room_games_sheet.dart';
 import 'widgets/live_room_gift_overlay.dart';
@@ -15,13 +16,11 @@ import 'widgets/live_room_join_requests_sheet.dart';
 import 'widgets/live_room_leave_sheet.dart';
 import 'widgets/live_room_minimized_bubble.dart';
 import 'widgets/room_action_pages.dart';
-import 'widgets/room_chat.dart';
 import 'widgets/room_gifts.dart';
 import 'widgets/room_profile_sheet.dart';
 import 'widgets/room_seats.dart';
 import 'widgets/room_settings_sheet.dart';
 import 'widgets/room_theme.dart';
-import 'widgets/room_top_bar.dart';
 import 'widgets/room_user_list_sheet.dart';
 
 class LiveRoomPage extends StatefulWidget {
@@ -222,83 +221,55 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 child: const SizedBox.expand(),
               ),
             ),
-            SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                    child: RoomTopBar(
-                      roomName: _roomName,
-                      roomId: _roomId,
-                      privacyMode: _privacyMode,
-                      onlineCount: _safeOnlineCount,
-                      onBack: _openLeaveSheet,
-                      onJoinTap: _handleJoinRoom,
-                      onShare: () {
-                        dismissRoomSeatActionPill();
-                        RoomToast.show(context, 'Share room invite opened');
-                      },
-                      onAnnouncement: () {
-                        dismissRoomSeatActionPill();
-                        _openAnnouncementSheet();
-                      },
-                      onSettings: () {
-                        dismissRoomSeatActionPill();
-                        _openSettingsSheet();
-                      },
-                      onUsersTap: () {
-                        dismissRoomSeatActionPill();
-                        _openRoomUsersSheet();
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: RoomSeatLayout(
-                      seats: _seats,
-                      layoutId: _layoutId,
-                      selectedSeatIndex: _selectedSeatIndex,
-                      canManageSeats: _viewerCanManageRoom,
-                      onSeatTap: _onSeatTap,
-                      onUserTap: _onUserTap,
-                      onInvite: _inviteSeat,
-                      onSwitch: _switchSeat,
-                      onLock: _lockSeat,
-                      onUnlock: _unlockSeat,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: _dismissRoomOverlays,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        child: RoomChatFeed(
-                          messages: _messages,
-                          canManageSeatApplications: _viewerCanManageRoom,
-                          onApproveSeatApplication: _approveSeatApplication,
-                          onSenderTap: _openMiniProfileFromChat,
-                        ),
-                      ),
-                    ),
-                  ),
-                  RoomInputDock(
-                    controller: _messageController,
-                    focusNode: _messageFocusNode,
-                    micMuted: _micMuted,
-                    inboxUnreadCount: _inboxUnreadCount,
-                    imagesEnabled: _roomImagesEnabled,
-                    onInboxTap: _openInboxPage,
-                    onEmojiTap: _openEmojiTray,
-                    onSendTap: _sendMessage,
-                    onMicTap: _toggleMic,
-                    onGamesTap: _openGamesSheet,
-                    onGiftTap: _openGiftPanel,
-                  ),
-                ],
-              ),
+            LiveRoomBody(
+              roomName: _roomName,
+              roomId: _roomId,
+              privacyMode: _privacyMode,
+              onlineCount: _safeOnlineCount,
+              seats: _seats,
+              layoutId: _layoutId,
+              selectedSeatIndex: _selectedSeatIndex,
+              canManageSeats: _viewerCanManageRoom,
+              messages: _messages,
+              canManageSeatApplications: _viewerCanManageRoom,
+              messageController: _messageController,
+              messageFocusNode: _messageFocusNode,
+              micMuted: _micMuted,
+              inboxUnreadCount: _inboxUnreadCount,
+              imagesEnabled: _roomImagesEnabled,
+              onBack: _openLeaveSheet,
+              onJoinTap: _handleJoinRoom,
+              onShare: () {
+                dismissRoomSeatActionPill();
+                RoomToast.show(context, 'Share room invite opened');
+              },
+              onAnnouncement: () {
+                dismissRoomSeatActionPill();
+                _openAnnouncementSheet();
+              },
+              onSettings: () {
+                dismissRoomSeatActionPill();
+                _openSettingsSheet();
+              },
+              onUsersTap: () {
+                dismissRoomSeatActionPill();
+                _openRoomUsersSheet();
+              },
+              onSeatTap: _onSeatTap,
+              onUserTap: _onUserTap,
+              onInvite: _inviteSeat,
+              onSwitch: _switchSeat,
+              onLock: _lockSeat,
+              onUnlock: _unlockSeat,
+              onApproveSeatApplication: _approveSeatApplication,
+              onSenderTap: _openMiniProfileFromChat,
+              onDismissOverlays: _dismissRoomOverlays,
+              onInboxTap: _openInboxPage,
+              onEmojiTap: _openEmojiTray,
+              onSendTap: _sendMessage,
+              onMicTap: _toggleMic,
+              onGamesTap: _openGamesSheet,
+              onGiftTap: _openGiftPanel,
             ),
             LiveRoomGiftOverlay(
               slides: _giftSlides,
