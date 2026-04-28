@@ -58,6 +58,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool _micMuted = false;
   bool _minimized = false;
   bool _allowRoomPop = false;
+  bool _leaveSheetOpen = false;
+  bool _exitingRoom = false;
   bool _applyOnlyModeEnabled = false;
   bool _isVibeSyncActive = false;
   int _coinBalance = 35494;
@@ -82,6 +84,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   int _selectedCombo = 1;
   final List<GiftSlide> _giftSlides = <GiftSlide>[];
   final Map<String, Timer> _giftTimers = <String, Timer>{};
+  final Set<String> _finishedGiftMessageIds = <String>{};
 
   final SeatUser _currentUser = mockRoomUsers.first;
 
@@ -167,7 +170,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       return PopScope<void>(
         canPop: _allowRoomPop,
         onPopInvokedWithResult: (didPop, result) {
-          if (!didPop) _openLeaveSheet();
+          if (!didPop) {
+            dismissRoomSeatActionPill();
+            _openLeaveSheet();
+          }
         },
         child: Scaffold(
           backgroundColor: Colors.transparent,
@@ -180,8 +186,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 left: _bubbleOffset.dx,
                 top: _bubbleOffset.dy,
                 child: GestureDetector(
-                  onTap: () => setState(() => _minimized = false),
+                  onTap: () {
+                    dismissRoomSeatActionPill();
+                    setState(() => _minimized = false);
+                  },
                   onPanUpdate: (details) {
+                    dismissRoomSeatActionPill();
                     final size = MediaQuery.sizeOf(context);
                     setState(() {
                       _bubbleOffset = Offset(
@@ -244,7 +254,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     return PopScope<void>(
       canPop: _allowRoomPop,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _openLeaveSheet();
+        if (!didPop) {
+          dismissRoomSeatActionPill();
+          _openLeaveSheet();
+        }
       },
       child: Scaffold(
         resizeToAvoidBottomInset: true,
@@ -253,6 +266,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           children: [
             Positioned.fill(
               child: RoomBackground(theme: _selectedBackgroundTheme),
+            ),
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _dismissRoomOverlays,
+                child: const SizedBox.expand(),
+              ),
             ),
             SafeArea(
               child: Column(
@@ -266,14 +286,25 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       onlineCount: _safeOnlineCount,
                       onBack: _openLeaveSheet,
                       onJoinTap: _handleJoinRoom,
-                      onShare: () =>
-                          RoomToast.show(context, 'Share room invite opened'),
-                      onAnnouncement: _openAnnouncementSheet,
-                      onSettings: _openSettingsSheet,
-                      onUsersTap: _openRoomUsersSheet,
+                      onShare: () {
+                        dismissRoomSeatActionPill();
+                        RoomToast.show(context, 'Share room invite opened');
+                      },
+                      onAnnouncement: () {
+                        dismissRoomSeatActionPill();
+                        _openAnnouncementSheet();
+                      },
+                      onSettings: () {
+                        dismissRoomSeatActionPill();
+                        _openSettingsSheet();
+                      },
+                      onUsersTap: () {
+                        dismissRoomSeatActionPill();
+                        _openRoomUsersSheet();
+                      },
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 22),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: RoomSeatLayout(
@@ -291,12 +322,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   ),
                   const SizedBox(height: 6),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: RoomChatFeed(
-                        messages: _messages,
-                        canManageSeatApplications: _viewerCanManageRoom,
-                        onApproveSeatApplication: _approveSeatApplication,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: _dismissRoomOverlays,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: RoomChatFeed(
+                          messages: _messages,
+                          canManageSeatApplications: _viewerCanManageRoom,
+                          onApproveSeatApplication: _approveSeatApplication,
+                          onSenderTap: _openMiniProfileFromChat,
+                        ),
                       ),
                     ),
                   ),
@@ -305,6 +341,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     focusNode: _messageFocusNode,
                     micMuted: _micMuted,
                     inboxUnreadCount: _inboxUnreadCount,
+                    imagesEnabled: _roomImagesEnabled,
                     onInboxTap: _openInboxPage,
                     onEmojiTap: _openEmojiTray,
                     onSendTap: _sendMessage,
@@ -331,6 +368,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               child: ComboBuzzer(
                 slide: _activeComboSlide,
                 onTap: () {
+                  dismissRoomSeatActionPill();
                   final slide = _activeComboSlide;
                   if (slide != null) _tapGiftCombo(slide);
                 },
@@ -347,16 +385,31 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   pickLocked: _currentUserPickLocked,
                   roundAnnounced: _vibeSyncRoundAnnounced,
                   canManage: _viewerCanManageRoom,
-                  onPick: _openVibeSyncPickSheet,
-                  onAnnounce: _announceVibeSyncRound,
-                  onNewRound: _startNewVibeSyncRound,
-                  onEnd: _endVibeSync,
+                  onPick: () {
+                    dismissRoomSeatActionPill();
+                    _openVibeSyncPickSheet();
+                  },
+                  onAnnounce: () {
+                    dismissRoomSeatActionPill();
+                    _announceVibeSyncRound();
+                  },
+                  onNewRound: () {
+                    dismissRoomSeatActionPill();
+                    _startNewVibeSyncRound();
+                  },
+                  onEnd: () {
+                    dismissRoomSeatActionPill();
+                    _endVibeSync();
+                  },
                 ),
               ),
             Positioned.fill(
               child: VibeSyncMatchOverlay(
                 match: _activeVibeSyncMatch,
-                onDismiss: () => setState(() => _activeVibeSyncMatch = null),
+                onDismiss: () {
+                  dismissRoomSeatActionPill();
+                  setState(() => _activeVibeSyncMatch = null);
+                },
               ),
             ),
           ],
@@ -613,6 +666,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   GiftSlide? get _activeComboSlide =>
       _giftSlides.isEmpty ? null : _giftSlides.first;
 
+  void _dismissRoomOverlays() {
+    dismissRoomSeatActionPill();
+    _clearRoomFocus();
+  }
+
+  void _insertSystemMessage(String message) {
+    setState(() {
+      _messages.insert(
+        0,
+        ChatEntry(senderName: 'System', senderId: 'system', message: message),
+      );
+    });
+  }
+
   void _clearRoomFocus() {
     _messageFocusNode.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
@@ -756,6 +823,29 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       );
       _messageController.clear();
     });
+  }
+
+  void _openMiniProfileFromChat(ChatEntry entry) {
+    if (entry.senderId == null || entry.senderId == 'system') return;
+    final user = _allRoomUsers.firstWhere(
+      (item) => item.id == entry.senderId,
+      orElse: () => SeatUser(
+        id: entry.senderId!,
+        name: entry.senderName,
+        roleLabel: 'Member',
+        familyName: '',
+        relationshipText: '',
+        vipLevel: entry.vipLevel,
+        sendingLevel: entry.sendingLevel,
+        receivingLevel: entry.receivingLevel,
+        sentExp: 0,
+        receivedExp: 0,
+        medals: const [],
+        avatarColors: const [RoomColors.violet, RoomColors.aqua],
+      ),
+    );
+    final seatIndex = _seats.indexWhere((seat) => seat.user?.id == user.id);
+    _openMiniProfile(user, seatIndex);
   }
 
   void _openMiniProfile(SeatUser user, int seatIndex) {
@@ -1036,7 +1126,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _messageController.selection = TextSelection.collapsed(
       offset: _messageController.text.length,
     );
-    _clearRoomFocus();
+    _messageFocusNode.requestFocus();
   }
 
   void _setUserAsAdmin(String userId) {
@@ -1157,12 +1247,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     }
 
     setState(() => _coinBalance -= totalCost);
+    final sentToAll = receivers.length == _roomUsers.length && _roomUsers.isNotEmpty;
+    final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
 
-    for (final receiver in receivers) {
+    for (final receiver in targets) {
       final slide = GiftSlide(
-        id: '${receiver.id}-${DateTime.now().microsecondsSinceEpoch}',
+        id: '${receiver?.id ?? 'all'}-${DateTime.now().microsecondsSinceEpoch}',
         senderName: _currentUser.name,
-        receiverName: receiver.name,
+        receiverName: receiver?.name ?? 'all',
         giftName: gift.name,
         giftIcon: gift.icon,
         colors: gift.colors,
@@ -1170,20 +1262,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         remainingSeconds: 15,
       );
       _startGiftSlide(slide);
-      setState(() {
-        _messages.insert(
-          0,
-          ChatEntry(
-            senderName: _currentUser.name,
-            message:
-                'sent ${receiver.name} ${gift.chatSymbol} x$_selectedCombo',
-            vipLevel: _currentUser.vipLevel,
-            sendingLevel: _currentUser.sendingLevel,
-            receivingLevel: _currentUser.receivingLevel,
-            isGift: true,
-          ),
-        );
-      });
     }
   }
 
@@ -1201,6 +1279,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         timer.cancel();
         setState(() => _giftSlides.removeAt(index));
         _giftTimers.remove(slide.id);
+        _insertFinalGiftMessage(active);
         return;
       }
       setState(
@@ -1220,11 +1299,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         combo: active.combo + 1,
         remainingSeconds: 15,
       );
+    });
+  }
+
+  void _insertFinalGiftMessage(GiftSlide slide) {
+    if (!_finishedGiftMessageIds.add(slide.id)) return;
+    setState(() {
       _messages.insert(
         0,
         ChatEntry(
-          senderName: active.senderName,
-          message: 'sent ${active.receiverName} 🎁 x${active.combo + 1}',
+          senderName: slide.senderName,
+          senderId: _currentUser.id,
+          message: 'sent to ${slide.receiverName} 🎁 x${slide.combo}',
           vipLevel: _currentUser.vipLevel,
           sendingLevel: _currentUser.sendingLevel,
           receivingLevel: _currentUser.receivingLevel,
@@ -1594,14 +1680,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             onToggleRoomImages: (value) {
               setState(() => _roomImagesEnabled = value);
               setSheetState(() {});
+              _insertSystemMessage(value ? 'Images enabled' : 'Images disabled');
             },
             onToggleGuestMessages: (value) {
               setState(() => _guestMessagesEnabled = value);
               setSheetState(() {});
+              _insertSystemMessage(value ? 'Guest messages enabled' : 'Guest messages disabled');
             },
             onToggleApplyOnlyMode: (value) {
               setState(() => _applyOnlyModeEnabled = value);
               setSheetState(() {});
+              _insertSystemMessage(value ? 'Applymode enabled' : 'Free mode enabled');
             },
             onCloseRoom: () => _leaveRoomFromSheet(context),
           );
@@ -1725,7 +1814,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       backgroundColor: Colors.transparent,
       builder: (_) => PrivacySettingsSheet(
         currentMode: _privacyMode,
-        onModeChanged: (mode) => setState(() => _privacyMode = mode),
+        onModeChanged: (mode) {
+          setState(() => _privacyMode = mode);
+          _insertSystemMessage('Room mode changed to ${mode.label}');
+        },
       ),
     );
   }
@@ -1817,106 +1909,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _clearRoomFocus();
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: EdgeInsets.fromLTRB(
-          14,
-          10,
-          14,
-          MediaQuery.paddingOf(context).bottom + 12,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SheetHandle(width: 42),
-            const SizedBox(height: 12),
-            const Text(
-              'Room Backgrounds',
-              style: TextStyle(
-                color: RoomColors.plum,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 10),
-            ...mockRoomBackgroundThemes.map(
-              (theme) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: RoomColors.pearl,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: RoomColors.softLine),
-                ),
-                child: ListTile(
-                  dense: true,
-                  leading: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: theme.colors),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  title: Text(
-                    theme.name,
-                    style: const TextStyle(
-                      color: RoomColors.plum,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  subtitle: Text(
-                    theme.id == _selectedBackgroundTheme.id
-                        ? 'Applied now'
-                        : 'Owned background',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  trailing: TextButton(
-                    onPressed: () {
-                      setState(() => _selectedBackgroundTheme = theme);
-                      Navigator.pop(context);
-                    },
-                    child: Text(
-                      theme.id == _selectedBackgroundTheme.id
-                          ? 'Applied'
-                          : 'Apply',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            ListTile(
-              dense: true,
-              leading: const Icon(
-                Icons.storefront_rounded,
-                color: RoomColors.gold,
-              ),
-              title: const Text(
-                'Open Theme Store',
-                style: TextStyle(
-                  color: RoomColors.plum,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              subtitle: const Text(
-                'Purchase more backgrounds',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => RoomToast.show(context, 'Theme store opened'),
-            ),
-          ],
-        ),
+      builder: (_) => RoomBackgroundPickerSheet(
+        currentTheme: _selectedBackgroundTheme,
+        onThemeSelected: (theme) {
+          setState(() => _selectedBackgroundTheme = theme);
+          RoomToast.show(context, '${theme.name} applied');
+        },
+        onStoreTap: () => RoomToast.show(context, 'Theme store opened'),
       ),
     );
   }
@@ -1997,6 +1998,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openLeaveSheet() {
+    dismissRoomSeatActionPill();
+
+    if (_leaveSheetOpen || _exitingRoom) return;
+    _leaveSheetOpen = true;
     _clearRoomFocus();
     showModalBottomSheet<void>(
       context: context,
@@ -2040,8 +2045,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      Navigator.pop(sheetContext);
-                      setState(() => _minimized = true);
+                      dismissRoomSeatActionPill();
+                      _stayAndReturn(sheetContext);
                     },
                     child: const Text('Stay'),
                   ),
@@ -2049,7 +2054,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _leaveRoomFromSheet(sheetContext),
+                    onPressed: () {
+                      dismissRoomSeatActionPill();
+                      _leaveRoomFromSheet(sheetContext);
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: RoomColors.plum,
                       foregroundColor: Colors.white,
@@ -2062,14 +2070,28 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           ],
         ),
       ),
-    );
+    ).whenComplete(() => _leaveSheetOpen = false);
+  }
+
+  void _stayAndReturn(BuildContext sheetContext) {
+    if (_exitingRoom) return;
+    _exitingRoom = true;
+    Navigator.pop(sheetContext);
+    setState(() => _allowRoomPop = true);
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) Navigator.maybePop(context);
+    });
   }
 
   void _leaveRoomFromSheet(BuildContext sheetContext) {
+    if (_exitingRoom) return;
+    _exitingRoom = true;
     Navigator.pop(sheetContext);
     if (!mounted) return;
     setState(() => _allowRoomPop = true);
-    Navigator.maybePop(context);
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) Navigator.maybePop(context);
+    });
   }
 
   void _openInfoSheet(String title, String body) {
