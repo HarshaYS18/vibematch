@@ -120,10 +120,10 @@ class UserMiniProfileSheet extends StatelessWidget {
                         title: 'Received',
                         value: compactNumber(user.receivedExp),
                         onTap: onReceivedRankingTap,
-                        tint: const Color(0xFFFFDCEB),
-                        borderColor: const Color(0xFFEAB5CA),
-                        titleColor: const Color(0xFF8F5D70),
-                        valueColor: const Color(0xFFB93F6C),
+                        tint: const Color(0xFFFFEEF5),
+                        borderColor: const Color(0xFFF3D3DF),
+                        titleColor: const Color(0xFF9A7483),
+                        valueColor: const Color(0xFFC45A80),
                       ),
                     ),
                   ],
@@ -758,39 +758,42 @@ class _VipStatCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            _assetPath,
-                            width: 34,
-                            height: 34,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                Icons.shield_rounded,
-                                color: _accentColor,
-                                size: 31,
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 1.5),
-                          Text(
-                            'VIP $vipLevel',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: _accentColor,
-                              fontSize: 13.8,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.25,
+                    child: Transform.translate(
+                      offset: const Offset(2, 0),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Image.asset(
+                              _assetPath,
+                              width: 34,
+                              height: 34,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.shield_rounded,
+                                  color: _accentColor,
+                                  size: 31,
+                                );
+                              },
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 1.5),
+                            Text(
+                              'VIP $vipLevel',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _accentColor,
+                                fontSize: 13.8,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.25,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
