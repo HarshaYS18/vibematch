@@ -242,6 +242,22 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  void removeUserAsAdmin(String userId) {
+    for (var i = 0; i < seats.length; i++) {
+      final user = seats[i].user;
+      if (user?.id == userId && !user!.isHost) {
+        seats[i] = seats[i].copyWith(
+          user: user.copyWith(
+            isRoomAdmin: false,
+            roleLabel: 'Member',
+          ),
+        );
+      }
+    }
+
+    onChanged();
+  }
+
   void leaveAndLockSeat(int seatIndex) {
     if (seatIndex < 0 || seatIndex >= seats.length) return;
 
