@@ -210,6 +210,7 @@ class ChatEntry {
     this.isSeatApplication = false,
     this.seatIndex,
     this.applicationApproved = false,
+    this.giftAssetPath,
   });
 
   final String senderName;
@@ -222,6 +223,7 @@ class ChatEntry {
   final bool isSeatApplication;
   final int? seatIndex;
   final bool applicationApproved;
+  final String? giftAssetPath;
 
   ChatEntry copyWith({String? message, bool? applicationApproved}) {
     return ChatEntry(
@@ -235,6 +237,7 @@ class ChatEntry {
       isSeatApplication: isSeatApplication,
       seatIndex: seatIndex,
       applicationApproved: applicationApproved ?? this.applicationApproved,
+      giftAssetPath: giftAssetPath,
     );
   }
 }
@@ -248,6 +251,7 @@ class GiftItem {
     required this.icon,
     required this.chatSymbol,
     required this.colors,
+    this.assetPath,
   });
 
   final String id;
@@ -257,6 +261,7 @@ class GiftItem {
   final IconData icon;
   final String chatSymbol;
   final List<Color> colors;
+  final String? assetPath;
 }
 
 class GiftSlide {
@@ -266,6 +271,7 @@ class GiftSlide {
     required this.receiverName,
     required this.giftName,
     required this.giftIcon,
+    this.giftAssetPath,
     required this.colors,
     required this.combo,
     this.baseCombo = 1,
@@ -277,6 +283,7 @@ class GiftSlide {
   final String receiverName;
   final String giftName;
   final IconData giftIcon;
+  final String? giftAssetPath;
   final List<Color> colors;
   final int combo;
   final int baseCombo;
@@ -289,6 +296,7 @@ class GiftSlide {
       receiverName: receiverName,
       giftName: giftName,
       giftIcon: giftIcon,
+      giftAssetPath: giftAssetPath,
       colors: colors,
       combo: combo ?? this.combo,
       baseCombo: baseCombo ?? this.baseCombo,
@@ -493,6 +501,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 1,
     icon: Icons.favorite_rounded,
     chatSymbol: '❤️',
+    assetPath: 'assets/images/gifts/love_bomb.png',
     colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)],
   ),
   GiftItem(
@@ -502,6 +511,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 99,
     icon: Icons.rocket_launch_rounded,
     chatSymbol: '🚀',
+    assetPath: 'assets/images/gifts/rocket.png',
     colors: [Color(0xFF18C7B7), Color(0xFF6C63FF)],
   ),
   GiftItem(
@@ -511,6 +521,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 19,
     icon: Icons.auto_awesome_rounded,
     chatSymbol: '✨',
+    assetPath: 'assets/images/gifts/lucky_star.png',
     colors: [Color(0xFFFFD166), Color(0xFFFF7A45)],
   ),
   GiftItem(
@@ -520,6 +531,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 199,
     icon: Icons.emoji_events_rounded,
     chatSymbol: '🏆',
+    assetPath: 'assets/images/gifts/event_crown.png',
     colors: [Color(0xFFC99A3B), Color(0xFFE84C72)],
   ),
   GiftItem(
@@ -529,6 +541,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 399,
     icon: Icons.diamond_rounded,
     chatSymbol: '💎',
+    assetPath: 'assets/images/gifts/svip_aura.png',
     colors: [Color(0xFF8C5CF6), Color(0xFF12C7B7)],
   ),
   GiftItem(
@@ -538,6 +551,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 999,
     icon: Icons.workspace_premium_rounded,
     chatSymbol: '👑',
+    assetPath: 'assets/images/gifts/royal_crown.png',
     colors: [Color(0xFFFFD166), Color(0xFF111827)],
   ),
   GiftItem(
@@ -547,6 +561,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 0,
     icon: Icons.inventory_2_rounded,
     chatSymbol: '🎒',
+    assetPath: 'assets/images/gifts/rose_pack.png',
     colors: [Color(0xFFFF6B9A), Color(0xFFFFC2D8)],
   ),
   GiftItem(
@@ -556,6 +571,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 0,
     icon: Icons.card_giftcard_rounded,
     chatSymbol: '🎁',
+    assetPath: 'assets/images/gifts/lucky_box.png',
     colors: [Color(0xFFFFD166), Color(0xFFFF7A45)],
   ),
 ];
