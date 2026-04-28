@@ -33,6 +33,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.onAnnouncement,
     required this.onSettings,
     required this.onUsersTap,
+    required this.onRoomRankingsTap,
     required this.onSeatTap,
     required this.onUserTap,
     required this.onInvite,
@@ -79,6 +80,7 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onAnnouncement;
   final VoidCallback onSettings;
   final VoidCallback onUsersTap;
+  final VoidCallback onRoomRankingsTap;
 
   final ValueChanged<int> onSeatTap;
   final ValueChanged<int> onUserTap;
@@ -121,6 +123,7 @@ class LiveRoomBody extends StatelessWidget {
               onAnnouncement: onAnnouncement,
               onSettings: onSettings,
               onUsersTap: onUsersTap,
+              onRoomRankingsTap: onRoomRankingsTap,
             ),
           ),
           const SizedBox(height: 22),
