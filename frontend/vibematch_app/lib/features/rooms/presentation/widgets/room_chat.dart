@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
 
@@ -22,15 +23,16 @@ class RoomChatFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (messages.isEmpty) return const SizedBox.expand();
+    final visibleMessages = messages.reversed.toList(growable: false);
 
     return ListView.builder(
-      reverse: true,
-      padding: const EdgeInsets.only(top: 6, bottom: 8),
+      reverse: false,
+      padding: const EdgeInsets.only(top: 8, bottom: 10),
       physics: const BouncingScrollPhysics(),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      itemCount: messages.length,
+      itemCount: visibleMessages.length,
       itemBuilder: (context, index) {
-        final message = messages[index];
+        final message = visibleMessages[index];
         return RoomTextBubbleHost(
           bubble: null,
           child: _CompactChatLine(
@@ -64,7 +66,7 @@ class _CompactChatLine extends StatelessWidget {
     final isSystem = message.senderId == 'system';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -72,16 +74,19 @@ class _CompactChatLine extends StatelessWidget {
             GestureDetector(
               onTap: onSenderTap,
               child: CircleAvatar(
-                radius: 11.5,
+                radius: 16,
                 backgroundColor: message.isGift
                     ? RoomColors.gold
                     : message.isSeatApplication
                         ? RoomColors.aqua
                         : RoomColors.violet,
-                child: Text(avatarLetter(message.senderName), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                child: Text(
+                  avatarLetter(message.senderName),
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
+                ),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 10),
           ],
           Expanded(
             child: RichText(
@@ -90,14 +95,14 @@ class _CompactChatLine extends StatelessWidget {
               text: TextSpan(
                 children: [
                   if (isSystem)
-                    TextSpan(text: message.message, style: const TextStyle(color: RoomColors.gold, fontSize: 12.3, fontWeight: FontWeight.w900))
+                    TextSpan(text: message.message, style: const TextStyle(color: RoomColors.gold, fontSize: 18, fontWeight: FontWeight.w900, height: 1.16))
                   else ...[
                     TextSpan(
                       text: message.senderName,
                       recognizer: TapGestureRecognizer()..onTap = onSenderTap,
-                      style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900),
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, height: 1.16),
                     ),
-                    TextSpan(text: '  VIP ${message.vipLevel}: ', style: TextStyle(color: RoomColors.gold.withValues(alpha: 0.94), fontSize: 10.8, fontWeight: FontWeight.w900)),
+                    TextSpan(text: '  VIP ${message.vipLevel}: ', style: TextStyle(color: RoomColors.gold.withValues(alpha: 0.96), fontSize: 15.5, fontWeight: FontWeight.w900, height: 1.16)),
                     ..._messageSpans(message),
                   ],
                 ],
@@ -109,11 +114,11 @@ class _CompactChatLine extends StatelessWidget {
             GestureDetector(
               onTap: onApproveSeatApplication,
               child: Container(
-                height: 28,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: RoomColors.aqua, borderRadius: BorderRadius.circular(999), boxShadow: [BoxShadow(color: RoomColors.aqua.withValues(alpha: 0.24), blurRadius: 10, offset: const Offset(0, 4))]),
-                child: const Text('Agree', style: TextStyle(color: RoomColors.deep, fontSize: 11, fontWeight: FontWeight.w900)),
+                child: const Text('Agree', style: TextStyle(color: RoomColors.deep, fontSize: 12, fontWeight: FontWeight.w900)),
               ),
             ),
           ],
@@ -134,7 +139,7 @@ class _CompactChatLine extends StatelessWidget {
       }
       spans.add(TextSpan(
         text: text.substring(match.start, match.end),
-        style: const TextStyle(color: RoomColors.aqua, fontSize: 12.5, fontWeight: FontWeight.w900),
+        style: const TextStyle(color: RoomColors.aqua, fontSize: 17, fontWeight: FontWeight.w900, height: 1.16),
       ));
       cursor = match.end;
     }
@@ -151,9 +156,10 @@ class _CompactChatLine extends StatelessWidget {
             ? RoomColors.gold
             : message.isSeatApplication
                 ? RoomColors.aqua
-                : Colors.white.withValues(alpha: 0.88),
-        fontSize: 12.5,
-        fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w700,
+                : Colors.white.withValues(alpha: 0.90),
+        fontSize: 17,
+        height: 1.16,
+        fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w800,
       ),
     );
   }
@@ -187,6 +193,11 @@ class RoomInputDock extends StatelessWidget {
   final VoidCallback onGiftTap;
   final bool imagesEnabled;
 
+  void _runAndHideSeatActions(VoidCallback action) {
+    dismissRoomSeatActionPill();
+    action();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -199,60 +210,61 @@ class RoomInputDock extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _DockButton(icon: Icons.mail_outline_rounded, onTap: onInboxTap, badgeCount: inboxUnreadCount),
+            _DockButton(icon: Icons.mail_outline_rounded, onTap: () => _runAndHideSeatActions(onInboxTap), badgeCount: inboxUnreadCount),
             const SizedBox(width: 5),
             Expanded(
               child: Container(
-                height: 36,
+                height: 38,
                 padding: const EdgeInsets.only(left: 10),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
+                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(19), border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: controller,
                         focusNode: focusNode,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
                         decoration: InputDecoration(
                           hintText: 'Message...',
-                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w700),
+                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w800),
                           border: InputBorder.none,
                           isDense: true,
                         ),
-                        onSubmitted: (_) => onSendTap(),
+                        onTap: dismissRoomSeatActionPill,
+                        onSubmitted: (_) => _runAndHideSeatActions(onSendTap),
                       ),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                      onPressed: imagesEnabled ? () => RoomToast.show(context, 'Image message picker will connect here') : null,
-                      icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22), size: 19),
+                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                      onPressed: imagesEnabled ? () => _runAndHideSeatActions(() => RoomToast.show(context, 'Image message picker will connect here')) : null,
+                      icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: imagesEnabled ? 0.78 : 0.22), size: 20),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                      onPressed: onEmojiTap,
-                      icon: const Icon(Icons.emoji_emotions_rounded, color: RoomColors.gold, size: 19),
+                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                      onPressed: () => _runAndHideSeatActions(onEmojiTap),
+                      icon: const Icon(Icons.emoji_emotions_rounded, color: RoomColors.gold, size: 20),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                      onPressed: onSendTap,
-                      icon: const Icon(Icons.send_rounded, color: RoomColors.aqua, size: 20),
+                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                      onPressed: () => _runAndHideSeatActions(onSendTap),
+                      icon: const Icon(Icons.send_rounded, color: RoomColors.aqua, size: 21),
                     ),
                   ],
                 ),
               ),
             ),
             const SizedBox(width: 5),
-            _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: onMicTap, active: !micMuted, muted: micMuted),
+            _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(onMicTap), active: !micMuted, muted: micMuted),
             const SizedBox(width: 5),
-            _DockButton(icon: Icons.sports_esports_rounded, onTap: onGamesTap),
+            _DockButton(icon: Icons.sports_esports_rounded, onTap: () => _runAndHideSeatActions(onGamesTap)),
             const SizedBox(width: 5),
-            _DockButton(icon: Icons.card_giftcard_rounded, onTap: onGiftTap, gift: true),
+            _DockButton(icon: Icons.card_giftcard_rounded, onTap: () => _runAndHideSeatActions(onGiftTap), gift: true),
           ],
         ),
       ),
