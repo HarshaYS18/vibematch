@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
 
+final ValueNotifier<String> roomBroadcastAnnouncementNotifier =
+    ValueNotifier<String>('Welcome to the room. Respect everyone and enjoy the vibe.');
+
 class RoomInfoSheet extends StatefulWidget {
   const RoomInfoSheet({
     super.key,
@@ -34,6 +37,10 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
     super.initState();
     _admins = mockRoomUsers.where((user) => user.isHost || user.isRoomAdmin).toList();
     _availableUsers = mockInviteUsers.where((user) => !_admins.any((admin) => admin.id == user.id)).toList();
+
+    if (roomBroadcastAnnouncementNotifier.value.trim().isEmpty) {
+      roomBroadcastAnnouncementNotifier.value = widget.broadcastAnnouncement;
+    }
   }
 
   @override
@@ -110,10 +117,19 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
           const SizedBox(height: 10),
           _InfoCard(
             icon: Icons.campaign_rounded,
-            title: 'Broadcast Announcement',
-            child: Text(
-              widget.broadcastAnnouncement,
-              style: const TextStyle(color: Color(0xFF5D5068), fontSize: 12.2, fontWeight: FontWeight.w700, height: 1.28),
+            title: 'Broad Announcement',
+            child: ValueListenableBuilder<String>(
+              valueListenable: roomBroadcastAnnouncementNotifier,
+              builder: (context, announcement, _) {
+                final cleanAnnouncement = announcement.trim().isEmpty
+                    ? widget.broadcastAnnouncement
+                    : announcement.trim();
+
+                return Text(
+                  cleanAnnouncement,
+                  style: const TextStyle(color: Color(0xFF5D5068), fontSize: 12.2, fontWeight: FontWeight.w700, height: 1.28),
+                );
+              },
             ),
           ),
           const SizedBox(height: 10),
