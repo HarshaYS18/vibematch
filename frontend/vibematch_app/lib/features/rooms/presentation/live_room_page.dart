@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../auth/models/current_user.dart';
 import '../../inbox/presentation/inbox_page.dart';
-import '../../profile/presentation/public_profile_view_page.dart';
 import 'controllers/live_room_gift_controller.dart';
+import 'controllers/live_room_profile_navigator.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_body.dart';
@@ -14,7 +13,6 @@ import 'widgets/live_room_invite_sheet.dart';
 import 'widgets/live_room_join_requests_sheet.dart';
 import 'widgets/live_room_leave_sheet.dart';
 import 'widgets/live_room_minimized_bubble.dart';
-import 'widgets/room_action_pages.dart';
 import 'widgets/room_gifts.dart';
 import 'widgets/room_profile_sheet.dart';
 import 'widgets/room_seats.dart';
@@ -551,87 +549,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         users: users,
         onUserTap: (user) {
           Navigator.pop(context);
-          _openExistingPublicProfile(user);
+          LiveRoomProfileNavigator.openExistingPublicProfile(
+            context: context,
+            user: user,
+            privacyMode: _privacyMode,
+            roomName: _roomName,
+          );
         },
       ),
     );
-  }
-
-  void _openExistingPublicProfile(SeatUser user) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PublicProfileViewPage(
-          user: _seatUserToCurrentUser(user),
-          vipLevel: user.vipLevel,
-          svipLevel: user.vipLevel >= 25 ? 3 : 0,
-          presenceLabel: 'online',
-          currentRoomName: _privacyMode == RoomPrivacyMode.privateVibe
-              ? null
-              : _roomName,
-          relationshipLabel: user.relationshipText,
-          familyName: user.familyName,
-          familyLevel: 12,
-        ),
-      ),
-    );
-  }
-
-  CurrentUser _seatUserToCurrentUser(SeatUser user) {
-    final isFounder = user.id == 'founder_owner';
-    final isAdmin = user.isRoomAdmin || user.isHost;
-
-    final role = isFounder
-        ? 'founder_owner'
-        : user.isHost
-            ? 'owner'
-            : isAdmin
-                ? 'admin'
-                : 'user';
-
-    return CurrentUser(
-      id: _mockInternalUserId(user),
-      publicUserId: _mockPublicUserId(user),
-      displayCustomId: isFounder ? 6922022 : null,
-      username: user.name.toLowerCase().replaceAll(' ', '_'),
-      displayName: user.name,
-      avatarUrl: null,
-      roles: [role],
-      primaryRole: role,
-      isActive: true,
-      isBanned: false,
-      lastDeviceId: null,
-      lastLoginAt: DateTime.now(),
-      lastSeenAt: DateTime.now(),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-  }
-
-  int _mockInternalUserId(SeatUser user) {
-    switch (user.id) {
-      case 'founder_owner':
-        return 1;
-      case 'riya':
-        return 2;
-      case 'arjun':
-        return 3;
-      default:
-        return user.id.hashCode.abs() % 900000 + 100000;
-    }
-  }
-
-  int _mockPublicUserId(SeatUser user) {
-    switch (user.id) {
-      case 'founder_owner':
-        return 6922022;
-      case 'riya':
-        return 6418001245;
-      case 'arjun':
-        return 6418002480;
-      default:
-        return 6418000000 + (user.id.hashCode.abs() % 999999);
-    }
   }
 
   void _sendMessage() {
@@ -692,16 +618,48 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         canModerate: _viewerCanManageRoom,
         onAvatarTap: () {
           Navigator.pop(context);
-          _openExistingPublicProfile(user);
+          LiveRoomProfileNavigator.openExistingPublicProfile(
+            context: context,
+            user: user,
+            privacyMode: _privacyMode,
+            roomName: _roomName,
+          );
         },
-        onVipTap: () => _openVipCentrePage(user),
-        onSendingLevelTap: () => _openSendingExperiencePage(user),
-        onReceivingLevelTap: () => _openReceivingExperiencePage(user),
-        onSentRankingTap: _openSentRankingsPage,
-        onReceivedRankingTap: _openReceivedRankingsPage,
-        onFamilyTap: () => _openFamilyPage(user),
-        onRelationshipTap: () => _openLoveAndBondCentre(user),
-        onMedalsTap: () => _openMedalsPage(user),
+        onVipTap: () => LiveRoomProfileNavigator.openVipCentrePage(
+          context: context,
+          user: user,
+        ),
+        onSendingLevelTap:
+            () => LiveRoomProfileNavigator.openSendingExperiencePage(
+                  context: context,
+                  user: user,
+                ),
+        onReceivingLevelTap:
+            () => LiveRoomProfileNavigator.openReceivingExperiencePage(
+                  context: context,
+                  user: user,
+                ),
+        onSentRankingTap: () => LiveRoomProfileNavigator.openSentRankingsPage(
+          context: context,
+          users: _allRoomUsers,
+        ),
+        onReceivedRankingTap:
+            () => LiveRoomProfileNavigator.openReceivedRankingsPage(
+                  context: context,
+                  users: _allRoomUsers,
+                ),
+        onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
+          context: context,
+          user: user,
+        ),
+        onRelationshipTap: () => LiveRoomProfileNavigator.openLoveAndBondCentre(
+          context: context,
+          user: user,
+        ),
+        onMedalsTap: () => LiveRoomProfileNavigator.openMedalsPage(
+          context: context,
+          user: user,
+        ),
         onMentionTap: () => _mentionUser(user),
         onSetAdminTap: () => _setUserAsAdmin(user.id),
         onLeaveAndLock: () {
@@ -769,195 +727,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 
-  void _pushRoomActionPageFromSheet(Widget page) {
-    _clearRoomFocus();
-    Navigator.pop(context);
-
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (!mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-    });
-  }
-
-  void _openVipCentrePage(SeatUser user) {
-    _pushRoomActionPageFromSheet(
-      RoomActionPage(
-        title: 'VIP Centre',
-        subtitle:
-            '${user.name} is VIP ${user.vipLevel}. VIP benefits, SVIP rules, badges, and recharge progress will connect here.',
-        icon: Icons.workspace_premium_rounded,
-        cards: [
-          RoomActionCard(
-            title: 'Current VIP',
-            value: 'VIP ${user.vipLevel}',
-            icon: Icons.workspace_premium_rounded,
-            color: RoomColors.gold,
-          ),
-          RoomActionCard(
-            title: 'Monthly status',
-            value: user.vipLevel >= 25
-                ? 'Dynamic avatar unlocked'
-                : 'Recharge to unlock more perks',
-            icon: Icons.auto_awesome_rounded,
-            color: RoomColors.violet,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openSendingExperiencePage(SeatUser user) {
-    _pushRoomActionPageFromSheet(
-      RoomActionPage(
-        title: 'Sending Experience',
-        subtitle:
-            '${user.name}\'s total sending level progress and monthly coin-send history.',
-        icon: Icons.north_east_rounded,
-        cards: [
-          RoomActionCard(
-            title: 'Send level',
-            value: 'Lv ${user.sendingLevel}',
-            icon: Icons.north_east_rounded,
-            color: RoomColors.violet,
-          ),
-          RoomActionCard(
-            title: 'This month sent',
-            value: compactNumber(user.sentExp),
-            icon: Icons.toll_rounded,
-            color: RoomColors.gold,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openReceivingExperiencePage(SeatUser user) {
-    _pushRoomActionPageFromSheet(
-      RoomActionPage(
-        title: 'Receiving Experience',
-        subtitle:
-            '${user.name}\'s receiving level progress and monthly received coin history.',
-        icon: Icons.favorite_rounded,
-        cards: [
-          RoomActionCard(
-            title: 'Receive level',
-            value: 'Lv ${user.receivingLevel}',
-            icon: Icons.favorite_rounded,
-            color: RoomColors.coral,
-          ),
-          RoomActionCard(
-            title: 'This month received',
-            value: compactNumber(user.receivedExp),
-            icon: Icons.toll_rounded,
-            color: RoomColors.gold,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openSentRankingsPage() {
-    _pushRoomActionPageFromSheet(
-      RoomRankingsPage(
-        title: 'Sent Rankings',
-        users: _allRoomUsers,
-        sentRanking: true,
-      ),
-    );
-  }
-
-  void _openReceivedRankingsPage() {
-    _pushRoomActionPageFromSheet(
-      RoomRankingsPage(
-        title: 'Received Rankings',
-        users: _allRoomUsers,
-        sentRanking: false,
-      ),
-    );
-  }
-
-  void _openFamilyPage(SeatUser user) {
-    final hasFamily = user.familyName.trim().isNotEmpty;
-
-    _pushRoomActionPageFromSheet(
-      RoomActionPage(
-        title: hasFamily ? user.familyName : 'Join Family',
-        subtitle: hasFamily
-            ? '${user.name}\'s family profile, contribution, family rooms, events, and rankings.'
-            : '${user.name} is not in a family yet. Family discovery and create/join flow will connect here.',
-        icon: Icons.groups_rounded,
-        cards: [
-          RoomActionCard(
-            title: hasFamily ? 'Family name' : 'Status',
-            value: hasFamily ? user.familyName : 'No family joined',
-            icon: Icons.groups_rounded,
-            color: RoomColors.aqua,
-          ),
-          RoomActionCard(
-            title: 'Family events',
-            value: 'Family-vs-family activities and rewards connect here',
-            icon: Icons.emoji_events_rounded,
-            color: RoomColors.gold,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openLoveAndBondCentre(SeatUser user) {
-    _pushRoomActionPageFromSheet(
-      RoomActionPage(
-        title: 'Love & Bond Centre',
-        subtitle: user.relationshipText.trim().isEmpty
-            ? '${user.name} has no active love or bond relationship yet.'
-            : user.relationshipText,
-        icon: Icons.favorite_rounded,
-        cards: [
-          RoomActionCard(
-            title: 'Relationship',
-            value: user.relationshipText.trim().isEmpty
-                ? 'No love or bonds yet'
-                : user.relationshipText,
-            icon: Icons.favorite_rounded,
-            color: RoomColors.coral,
-          ),
-          RoomActionCard(
-            title: 'Cards',
-            value: 'Relationship cards and bond actions connect here',
-            icon: Icons.style_rounded,
-            color: RoomColors.violet,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openMedalsPage(SeatUser user) {
-    _pushRoomActionPageFromSheet(
-      RoomActionPage(
-        title: 'Medals',
-        subtitle:
-            '${user.name}\'s earned medals and upcoming achievement badges.',
-        icon: Icons.military_tech_rounded,
-        cards: [
-          RoomActionCard(
-            title: 'Current medals',
-            value:
-                user.medals.isEmpty ? 'No medals yet' : user.medals.join('  '),
-            icon: Icons.military_tech_rounded,
-            color: RoomColors.gold,
-          ),
-          RoomActionCard(
-            title: 'Achievement centre',
-            value: 'Medal progress and rules connect here',
-            icon: Icons.auto_graph_rounded,
-            color: RoomColors.aqua,
-          ),
-        ],
-      ),
-    );
-  }
-
   void _mentionUser(SeatUser user) {
     Navigator.pop(context);
 
@@ -993,25 +762,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     });
 
     _clearRoomFocus();
-  }
-
-  void _openModulePage(String title, String subtitle, IconData icon) {
-    _clearRoomFocus();
-    Navigator.pop(context);
-
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => RoomActionPage(
-            title: title,
-            subtitle: subtitle,
-            icon: icon,
-          ),
-        ),
-      );
-    });
   }
 
   void _openGiftPanel() {
@@ -1118,33 +868,40 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             onBackgroundTap: _openBackgroundSheet,
             onPrivacyTap: _openPrivacySheet,
             onSeatLayoutTap: _openSeatLayoutSheet,
-            onAdminsTap: () => _openModulePage(
-              'Admins',
-              'Room administrator management will connect here.',
-              Icons.shield_rounded,
+            onAdminsTap: () => LiveRoomProfileNavigator.openModulePage(
+              context: context,
+              title: 'Admins',
+              subtitle: 'Room administrator management will connect here.',
+              icon: Icons.shield_rounded,
             ),
             onAnnouncementTap: _openAnnouncementSheet,
             onInboxTap: () => _openInboxPageFromSheet(sheetContext),
             onJoinRequestsTap: _openJoinRequestsSheet,
-            onReportsTap: () => _openModulePage(
-              'Reports',
-              'Room safety, reports, and moderation queue will connect here.',
-              Icons.report_gmailerrorred_rounded,
+            onReportsTap: () => LiveRoomProfileNavigator.openModulePage(
+              context: context,
+              title: 'Reports',
+              subtitle:
+                  'Room safety, reports, and moderation queue will connect here.',
+              icon: Icons.report_gmailerrorred_rounded,
             ),
-            onBlockedTap: () => _openModulePage(
-              'Blocked users',
-              'Blocked and restricted room users will connect here.',
-              Icons.block_rounded,
+            onBlockedTap: () => LiveRoomProfileNavigator.openModulePage(
+              context: context,
+              title: 'Blocked users',
+              subtitle: 'Blocked and restricted room users will connect here.',
+              icon: Icons.block_rounded,
             ),
-            onEffectsTap: () => _openModulePage(
-              'Room effects',
-              'Room entrance effects, seat effects, and background effects will connect here.',
-              Icons.auto_awesome_rounded,
+            onEffectsTap: () => LiveRoomProfileNavigator.openModulePage(
+              context: context,
+              title: 'Room effects',
+              subtitle:
+                  'Room entrance effects, seat effects, and background effects will connect here.',
+              icon: Icons.auto_awesome_rounded,
             ),
-            onMusicTap: () => _openModulePage(
-              'Music',
-              'Room music controls and playlist will connect here.',
-              Icons.music_note_rounded,
+            onMusicTap: () => LiveRoomProfileNavigator.openModulePage(
+              context: context,
+              title: 'Music',
+              subtitle: 'Room music controls and playlist will connect here.',
+              icon: Icons.music_note_rounded,
             ),
             onToggleRoomImages: (value) {
               setState(() => _roomImagesEnabled = value);
