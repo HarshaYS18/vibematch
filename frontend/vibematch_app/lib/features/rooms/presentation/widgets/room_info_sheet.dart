@@ -6,7 +6,7 @@ import 'room_theme.dart';
 final ValueNotifier<String> roomBroadcastAnnouncementNotifier =
     ValueNotifier<String>('Welcome to the room. Respect everyone and enjoy the vibe.');
 
-class RoomInfoSheet extends StatelessWidget {
+class RoomInfoSheet extends StatefulWidget {
   const RoomInfoSheet({
     super.key,
     required this.roomName,
@@ -33,9 +33,71 @@ class RoomInfoSheet extends StatelessWidget {
   final String broadcastAnnouncement;
 
   @override
+  State<RoomInfoSheet> createState() => _RoomInfoSheetState();
+}
+
+class _RoomInfoSheetState extends State<RoomInfoSheet> {
+  late List<SeatUser> _admins;
+  late List<SeatUser> _availableAdminUsers;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncFromWidget();
+  }
+
+  @override
+  void didUpdateWidget(covariant RoomInfoSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.admins != widget.admins ||
+        oldWidget.availableAdminUsers != widget.availableAdminUsers) {
+      _syncFromWidget();
+    }
+  }
+
+  void _syncFromWidget() {
+    _admins = List<SeatUser>.from(widget.admins);
+    _availableAdminUsers = List<SeatUser>.from(widget.availableAdminUsers);
+  }
+
+  void _addAdmin(SeatUser user) {
+    final updatedUser = user.copyWith(
+      isRoomAdmin: true,
+      roleLabel: 'Administrator',
+    );
+
+    setState(() {
+      _availableAdminUsers.removeWhere((item) => item.id == user.id);
+      if (!_admins.any((item) => item.id == user.id)) {
+        _admins.add(updatedUser);
+      }
+    });
+
+    widget.onAddAdmin(user);
+  }
+
+  void _removeAdmin(SeatUser user) {
+    if (user.isHost) return;
+
+    final updatedUser = user.copyWith(
+      isRoomAdmin: false,
+      roleLabel: 'Member',
+    );
+
+    setState(() {
+      _admins.removeWhere((item) => item.id == user.id);
+      if (!_availableAdminUsers.any((item) => item.id == user.id)) {
+        _availableAdminUsers.add(updatedUser);
+      }
+    });
+
+    widget.onRemoveAdmin(user);
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (roomBroadcastAnnouncementNotifier.value.trim().isEmpty) {
-      roomBroadcastAnnouncementNotifier.value = broadcastAnnouncement;
+      roomBroadcastAnnouncementNotifier.value = widget.broadcastAnnouncement;
     }
 
     return Container(
@@ -61,7 +123,7 @@ class RoomInfoSheet extends StatelessWidget {
                   gradient: const LinearGradient(colors: [RoomColors.violet, RoomColors.aqua]),
                   boxShadow: [BoxShadow(color: RoomColors.violet.withValues(alpha: 0.22), blurRadius: 16, offset: const Offset(0, 8))],
                 ),
-                child: Icon(privacyMode.icon, color: Colors.white, size: 21),
+                child: Icon(widget.privacyMode.icon, color: Colors.white, size: 21),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -69,14 +131,14 @@ class RoomInfoSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      roomName,
+                      widget.roomName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.3),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$roomId • $language • ${privacyMode.label}',
+                      '${widget.roomId} • ${widget.language} • ${widget.privacyMode.label}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800),
@@ -100,10 +162,10 @@ class RoomInfoSheet extends StatelessWidget {
             title: 'Room Details',
             child: Column(
               children: [
-                _InfoRow(label: 'Room name', value: roomName),
-                _InfoRow(label: 'Room ID', value: roomId),
-                _InfoRow(label: 'Language', value: language),
-                _InfoRow(label: 'Mode', value: privacyMode.label),
+                _InfoRow(label: 'Room name', value: widget.roomName),
+                _InfoRow(label: 'Room ID', value: widget.roomId),
+                _InfoRow(label: 'Language', value: widget.language),
+                _InfoRow(label: 'Mode', value: widget.privacyMode.label),
               ],
             ),
           ),
@@ -115,7 +177,7 @@ class RoomInfoSheet extends StatelessWidget {
               valueListenable: roomBroadcastAnnouncementNotifier,
               builder: (context, announcement, _) {
                 final cleanAnnouncement = announcement.trim().isEmpty
-                    ? broadcastAnnouncement
+                    ? widget.broadcastAnnouncement
                     : announcement.trim();
 
                 return Text(
@@ -134,7 +196,7 @@ class RoomInfoSheet extends StatelessWidget {
                   style: TextStyle(color: RoomColors.plum, fontSize: 15, fontWeight: FontWeight.w900),
                 ),
               ),
-              if (canManageAdmins)
+              if (widget.canManageAdmins)
                 _SmallActionPill(
                   icon: Icons.person_add_alt_1_rounded,
                   label: 'Add Admin',
@@ -147,14 +209,14 @@ class RoomInfoSheet extends StatelessWidget {
             child: ListView.separated(
               shrinkWrap: true,
               physics: const BouncingScrollPhysics(),
-              itemCount: admins.length,
+              itemCount: _admins.length,
               separatorBuilder: (context, index) => const SizedBox(height: 7),
               itemBuilder: (context, index) {
-                final admin = admins[index];
+                final admin = _admins[index];
                 return _AdminTile(
                   user: admin,
-                  canManage: canManageAdmins && !admin.isHost,
-                  onRemove: () => onRemoveAdmin(admin),
+                  canManage: widget.canManageAdmins && !admin.isHost,
+                  onRemove: () => _removeAdmin(admin),
                 );
               },
             ),
@@ -195,7 +257,7 @@ class RoomInfoSheet extends StatelessWidget {
               style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
-            if (availableAdminUsers.isEmpty)
+            if (_availableAdminUsers.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
@@ -214,15 +276,15 @@ class RoomInfoSheet extends StatelessWidget {
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const BouncingScrollPhysics(),
-                  itemCount: availableAdminUsers.length,
+                  itemCount: _availableAdminUsers.length,
                   separatorBuilder: (context, index) => const SizedBox(height: 7),
                   itemBuilder: (context, index) {
-                    final user = availableAdminUsers[index];
+                    final user = _availableAdminUsers[index];
                     return _AddAdminTile(
                       user: user,
                       onTap: () {
                         Navigator.pop(sheetContext);
-                        onAddAdmin(user);
+                        _addAdmin(user);
                       },
                     );
                   },
