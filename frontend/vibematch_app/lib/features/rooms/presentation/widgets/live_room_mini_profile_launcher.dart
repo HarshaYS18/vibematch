@@ -57,13 +57,15 @@ class LiveRoomMiniProfileLauncher {
                   context: context,
                   user: user,
                 ),
-        onSentRankingTap: () => LiveRoomProfileNavigator.openSentRankingsPage(
+        onSentRankingTap: () => LiveRoomProfileNavigator.openFollowedPage(
           context: context,
+          user: user,
           users: allRoomUsers,
         ),
         onReceivedRankingTap:
-            () => LiveRoomProfileNavigator.openReceivedRankingsPage(
+            () => LiveRoomProfileNavigator.openFollowersPage(
                   context: context,
+                  user: user,
                   users: allRoomUsers,
                 ),
         onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
