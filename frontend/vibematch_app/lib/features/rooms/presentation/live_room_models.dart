@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../vibesync/models/vibesync_models.dart';
-
 enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
 
 enum GiftCategory { classic, lucky, event, svip, premium }
+
+enum RoomUserGender { male, female, undisclosed }
 
 extension RoomPrivacyModeX on RoomPrivacyMode {
   String get label {
@@ -78,7 +78,7 @@ class SeatUser {
     required this.receivedExp,
     required this.medals,
     required this.avatarColors,
-    this.gender = VibeSyncGender.undisclosed,
+    this.gender = RoomUserGender.undisclosed,
     this.isCurrentUser = false,
     this.isHost = false,
     this.isRoomAdmin = false,
@@ -98,7 +98,7 @@ class SeatUser {
   final int receivedExp;
   final List<String> medals;
   final List<Color> avatarColors;
-  final VibeSyncGender gender;
+  final RoomUserGender gender;
   final bool isCurrentUser;
   final bool isHost;
   final bool isRoomAdmin;
@@ -114,7 +114,7 @@ class SeatUser {
     bool? isRoomAdmin,
     bool? selfMuted,
     bool? adminMuted,
-    VibeSyncGender? gender,
+    RoomUserGender? gender,
   }) {
     return SeatUser(
       id: id,
@@ -267,8 +267,7 @@ class SeatLayoutSpec {
   int get topSeatCount => hasHostSeats ? 2 : 0;
   int get totalSeats => topSeatCount + (columns * rows);
 
-  String get label =>
-      hasHostSeats ? 'Host + ${columns}x$rows' : '${columns}x$rows';
+  String get label => hasHostSeats ? 'Host + ${columns}x$rows' : '${columns}x$rows';
 
   static const List<String> withoutHostLayouts = ['4x2', '5x2', '4x3', '5x3'];
   static const List<String> withHostLayouts = [
@@ -333,7 +332,7 @@ const List<SeatUser> mockRoomUsers = [
     receivedExp: 124500,
     medals: ['🏆', '💎', '🔥'],
     avatarColors: [Color(0xFFFFC857), Color(0xFFFF5F7E)],
-    gender: VibeSyncGender.male,
+    gender: RoomUserGender.male,
     isCurrentUser: true,
     isHost: true,
     isRoomAdmin: true,
@@ -351,7 +350,7 @@ const List<SeatUser> mockRoomUsers = [
     receivedExp: 90500,
     medals: ['🌙', '🎖️'],
     avatarColors: [Color(0xFF18C7B7), Color(0xFF5E6DFF)],
-    gender: VibeSyncGender.female,
+    gender: RoomUserGender.female,
     isRoomAdmin: true,
   ),
   SeatUser(
@@ -367,7 +366,7 @@ const List<SeatUser> mockRoomUsers = [
     receivedExp: 34100,
     medals: ['⭐'],
     avatarColors: [Color(0xFFE84C72), Color(0xFFB13C77)],
-    gender: VibeSyncGender.male,
+    gender: RoomUserGender.male,
   ),
 ];
 
@@ -385,7 +384,7 @@ const List<SeatUser> mockInviteUsers = [
     receivedExp: 12300,
     medals: ['🌟'],
     avatarColors: [Color(0xFF7A5CFF), Color(0xFF12C7B7)],
-    gender: VibeSyncGender.female,
+    gender: RoomUserGender.female,
   ),
   SeatUser(
     id: 'nikhil',
@@ -400,7 +399,7 @@ const List<SeatUser> mockInviteUsers = [
     receivedExp: 1700,
     medals: [],
     avatarColors: [Color(0xFFFF7A45), Color(0xFFE84C72)],
-    gender: VibeSyncGender.male,
+    gender: RoomUserGender.male,
   ),
   SeatUser(
     id: 'kiran',
@@ -415,7 +414,7 @@ const List<SeatUser> mockInviteUsers = [
     receivedExp: 11600,
     medals: ['🔥'],
     avatarColors: [Color(0xFFFFC857), Color(0xFF7A5CFF)],
-    gender: VibeSyncGender.male,
+    gender: RoomUserGender.male,
   ),
 ];
 

@@ -279,7 +279,7 @@ class _UserSeatLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFemale = user.gender.toString().toLowerCase().contains('female');
+    final isFemale = user.gender == RoomUserGender.female;
     final chipColor = isFemale ? RoomColors.coral : RoomColors.aqua;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,

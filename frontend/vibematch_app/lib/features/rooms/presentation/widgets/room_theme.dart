@@ -46,17 +46,9 @@ const RoomBackgroundTheme defaultDarkRoomBackgroundTheme = RoomBackgroundTheme(
   accent: RoomColors.gold,
 );
 
-const RoomBackgroundTheme vibeSyncRoomBackgroundTheme = RoomBackgroundTheme(
-  id: 'vibe_sync',
-  name: 'VibeSync',
-  assetPath: '$roomBackgroundAssetBase/vibe_sync.png',
-  accent: Color(0xFFFF4FB8),
-);
-
 const List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
   defaultRoomBackgroundTheme,
   defaultDarkRoomBackgroundTheme,
-  vibeSyncRoomBackgroundTheme,
 ];
 
 const List<RoomBackgroundTheme> mockRoomBackgroundThemes = ownedRoomBackgroundThemes;
