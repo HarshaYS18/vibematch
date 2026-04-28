@@ -102,6 +102,7 @@ class LiveRoomBody extends StatelessWidget {
               roomId: roomId,
               privacyMode: privacyMode,
               onlineCount: onlineCount,
+              canManageAdmins: canManageSeats,
               onBack: onBack,
               onJoinTap: onJoinTap,
               onShare: onShare,
