@@ -4,7 +4,7 @@ import 'room_theme.dart';
 
 enum VipBadgeSize { tiny, small, medium, large }
 
-class VipBadge extends StatelessWidget {
+class VipBadge extends StatefulWidget {
   const VipBadge({
     super.key,
     required this.level,
@@ -18,11 +18,49 @@ class VipBadge extends StatelessWidget {
   final VoidCallback? onTap;
   final bool showWhenZero;
 
+  @override
+  State<VipBadge> createState() => _VipBadgeState();
+}
+
+class _VipBadgeState extends State<VipBadge>
+    with SingleTickerProviderStateMixin {
   static const String _assetBase = 'assets/images/vip_badges';
+  late final AnimationController _shineController;
 
-  bool get _visible => level > 0 || showWhenZero;
+  int get _safeLevel => widget.level.clamp(0, 50);
+  bool get _visible => widget.level > 0 || widget.showWhenZero;
+  bool get _shineEnabled => _safeLevel >= 30;
 
-  int get _safeLevel => level.clamp(0, 50);
+  @override
+  void initState() {
+    super.initState();
+    _shineController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    );
+    _syncShine();
+  }
+
+  @override
+  void didUpdateWidget(covariant VipBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncShine();
+  }
+
+  @override
+  void dispose() {
+    _shineController.dispose();
+    super.dispose();
+  }
+
+  void _syncShine() {
+    if (_shineEnabled) {
+      if (!_shineController.isAnimating) _shineController.repeat();
+    } else {
+      _shineController.stop();
+      _shineController.value = 0;
+    }
+  }
 
   String get _assetPath {
     final value = _safeLevel;
@@ -51,57 +89,33 @@ class VipBadge extends StatelessWidget {
     return const Color(0xFFFFC857);
   }
 
-  double get _width {
-    switch (size) {
-      case VipBadgeSize.tiny:
-        return 50;
-      case VipBadgeSize.small:
-        return 62;
-      case VipBadgeSize.medium:
-        return 82;
-      case VipBadgeSize.large:
-        return 112;
-    }
-  }
+  double get _width => switch (widget.size) {
+        VipBadgeSize.tiny => 50,
+        VipBadgeSize.small => 62,
+        VipBadgeSize.medium => 82,
+        VipBadgeSize.large => 112,
+      };
 
-  double get _height {
-    switch (size) {
-      case VipBadgeSize.tiny:
-        return 22;
-      case VipBadgeSize.small:
-        return 28;
-      case VipBadgeSize.medium:
-        return 38;
-      case VipBadgeSize.large:
-        return 52;
-    }
-  }
+  double get _height => switch (widget.size) {
+        VipBadgeSize.tiny => 22,
+        VipBadgeSize.small => 28,
+        VipBadgeSize.medium => 38,
+        VipBadgeSize.large => 52,
+      };
 
-  double get _fontSize {
-    switch (size) {
-      case VipBadgeSize.tiny:
-        return 8.5;
-      case VipBadgeSize.small:
-        return 10;
-      case VipBadgeSize.medium:
-        return 13;
-      case VipBadgeSize.large:
-        return 17;
-    }
-  }
+  double get _fontSize => switch (widget.size) {
+        VipBadgeSize.tiny => 8.5,
+        VipBadgeSize.small => 10,
+        VipBadgeSize.medium => 13,
+        VipBadgeSize.large => 17,
+      };
 
-  EdgeInsets get _textPadding {
-    switch (size) {
-      case VipBadgeSize.tiny:
-        return const EdgeInsets.only(top: 2);
-      case VipBadgeSize.small:
-        return const EdgeInsets.only(top: 3);
-      case VipBadgeSize.medium:
-        return const EdgeInsets.only(top: 4);
-      case VipBadgeSize.large:
-        return const EdgeInsets.only(top: 6);
-    }
-  }
+  EdgeInsets get _textPadding => switch (widget.size) {
+        VipBadgeSize.tiny => const EdgeInsets.only(top: 2),
+        VipBadgeSize.small => const EdgeInsets.only(top: 3),
+        VipBadgeSize.medium => const EdgeInsets.only(top: 4),
+        VipBadgeSize.large => const EdgeInsets.only(top: 6),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -122,23 +136,21 @@ class VipBadge extends StatelessWidget {
               end: _fallbackEnd,
             ),
           ),
+          _StaticGlass(width: _width, height: _height),
+          if (_shineEnabled)
+            _MovingGlassShine(
+              animation: _shineController,
+              width: _width,
+              height: _height,
+            ),
           Padding(
             padding: _textPadding,
             child: Center(
-              child: Text(
-                'VIP $_safeLevel',
-                maxLines: 1,
-                overflow: TextOverflow.fade,
-                softWrap: false,
-                style: TextStyle(
-                  color: Colors.white,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: _GoldVipText(
+                  label: 'VIP $_safeLevel',
                   fontSize: _fontSize,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.1,
-                  shadows: const [
-                    Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
-                    Shadow(color: RoomColors.gold, blurRadius: 7),
-                  ],
                 ),
               ),
             ),
@@ -147,15 +159,155 @@ class VipBadge extends StatelessWidget {
       ),
     );
 
-    if (onTap == null) return child;
+    if (widget.onTap == null) return child;
 
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
+        onTap: widget.onTap,
         child: child,
+      ),
+    );
+  }
+}
+
+class _GoldVipText extends StatelessWidget {
+  const _GoldVipText({required this.label, required this.fontSize});
+
+  final String label;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.05,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.1
+              ..color = const Color(0xFF6B3A00),
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: const Color(0xFFFFE8A3),
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.05,
+            shadows: const [
+              Shadow(
+                color: Color(0xFFFFC857),
+                blurRadius: 8,
+                offset: Offset(0, 0.8),
+              ),
+              Shadow(
+                color: Color(0xFF8A5200),
+                blurRadius: 2,
+                offset: Offset(0, 1.1),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StaticGlass extends StatelessWidget {
+  const _StaticGlass({required this.width, required this.height});
+
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: height * 0.15,
+      left: width * 0.18,
+      right: width * 0.18,
+      child: IgnorePointer(
+        child: Container(
+          height: height * 0.18,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white.withValues(alpha: 0.28),
+                Colors.white.withValues(alpha: 0.10),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MovingGlassShine extends StatelessWidget {
+  const _MovingGlassShine({
+    required this.animation,
+    required this.width,
+    required this.height,
+  });
+
+  final Animation<double> animation;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: AnimatedBuilder(
+            animation: animation,
+            builder: (context, child) {
+              final travel = width * 1.75 * animation.value;
+              return Stack(
+                children: [
+                  Transform.translate(
+                    offset: Offset(-width * 0.72 + travel, -height * 0.66),
+                    child: Transform.rotate(
+                      angle: -0.34,
+                      child: Container(
+                        width: width * 0.26,
+                        height: height * 2.5,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.white.withValues(alpha: 0.0),
+                              Colors.white.withValues(alpha: 0.08),
+                              Colors.white.withValues(alpha: 0.22),
+                              Colors.white.withValues(alpha: 0.42),
+                              Colors.white.withValues(alpha: 0.22),
+                              Colors.white.withValues(alpha: 0.08),
+                              Colors.white.withValues(alpha: 0.0),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
