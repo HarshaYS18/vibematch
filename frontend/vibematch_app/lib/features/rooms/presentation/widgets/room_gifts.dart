@@ -628,13 +628,13 @@ class GiftSlideCard extends StatelessWidget {
         final opacity = (1 - value).clamp(0.0, 1.0);
         return Opacity(
           opacity: opacity,
-          child: Transform.translate(offset: Offset(value * 130, 0), child: child),
+          child: Transform.translate(offset: Offset(-value * 132, 0), child: child),
         );
       },
       child: GestureDetector(
         onTap: onComboTap,
         child: Container(
-          width: 252,
+          width: 258,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
@@ -642,16 +642,17 @@ class GiftSlideCard extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withValues(alpha: 0.36),
-                slide.colors.first.withValues(alpha: 0.58),
-                slide.colors.last.withValues(alpha: 0.44),
-                Colors.black.withValues(alpha: 0.18),
+                Colors.white.withValues(alpha: 0.42),
+                slide.colors.first.withValues(alpha: 0.34),
+                slide.colors.last.withValues(alpha: 0.30),
+                Colors.white.withValues(alpha: 0.12),
               ],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.42), width: 1.15),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.56), width: 1.2),
             boxShadow: [
-              BoxShadow(color: slide.colors.first.withValues(alpha: 0.36), blurRadius: 22, offset: const Offset(0, 10)),
-              BoxShadow(color: Colors.white.withValues(alpha: 0.22), blurRadius: 16, spreadRadius: 1.0),
+              BoxShadow(color: slide.colors.first.withValues(alpha: 0.46), blurRadius: 28, offset: const Offset(0, 10)),
+              BoxShadow(color: slide.colors.last.withValues(alpha: 0.30), blurRadius: 24, offset: const Offset(0, 4)),
+              BoxShadow(color: Colors.white.withValues(alpha: 0.34), blurRadius: 22, spreadRadius: 1.4),
             ],
           ),
           child: ClipRRect(
@@ -665,27 +666,28 @@ class GiftSlideCard extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Colors.white.withValues(alpha: 0.26),
+                          Colors.white.withValues(alpha: 0.34),
                           Colors.white.withValues(alpha: 0.05),
-                          Colors.white.withValues(alpha: 0.16),
+                          slide.colors.first.withValues(alpha: 0.10),
+                          Colors.white.withValues(alpha: 0.20),
                         ],
                       ),
                     ),
                   ),
                 ),
                 Positioned(
-                  left: -40,
-                  top: -22,
+                  left: -28,
+                  top: -26,
                   child: Transform.rotate(
-                    angle: -0.45,
+                    angle: -0.42,
                     child: Container(
-                      width: 46,
-                      height: 120,
+                      width: 52,
+                      height: 130,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
                             Colors.white.withValues(alpha: 0.0),
-                            Colors.white.withValues(alpha: 0.42),
+                            Colors.white.withValues(alpha: 0.62),
                             Colors.white.withValues(alpha: 0.0),
                           ],
                         ),
@@ -693,6 +695,33 @@ class GiftSlideCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                Positioned(
+                  right: 30,
+                  top: -34,
+                  child: Transform.rotate(
+                    angle: 0.42,
+                    child: Container(
+                      width: 34,
+                      height: 135,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.0),
+                            Colors.white.withValues(alpha: 0.36),
+                            Colors.white.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const _GiftSparkle(left: 34, top: 4, size: 10, opacity: 0.95),
+                const _GiftSparkle(left: 84, top: 30, size: 7, opacity: 0.70),
+                const _GiftSparkle(left: 142, top: 8, size: 9, opacity: 0.85),
+                const _GiftSparkle(left: 196, top: 31, size: 6, opacity: 0.70),
+                const _GiftGlitterDot(left: 20, top: 32, size: 3.8, opacity: 0.80),
+                const _GiftGlitterDot(left: 116, top: 6, size: 3.2, opacity: 0.65),
+                const _GiftGlitterDot(left: 232, top: 12, size: 3.8, opacity: 0.85),
                 Row(
                   children: [
                     GiftVisual(icon: slide.giftIcon, colors: slide.colors, assetPath: slide.giftAssetPath, size: 38, padding: 2),
@@ -702,24 +731,93 @@ class GiftSlideCard extends StatelessWidget {
                         '${slide.senderName} sent ${slide.receiverName} ${slide.giftName}',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, height: 1.1, shadows: [Shadow(color: Colors.black38, blurRadius: 6)]),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                          height: 1.1,
+                          shadows: [
+                            Shadow(color: Colors.black45, blurRadius: 7),
+                            Shadow(color: Colors.white54, blurRadius: 10),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 7),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.24),
+                        color: Colors.white.withValues(alpha: 0.28),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.34)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.50)),
+                        boxShadow: [
+                          BoxShadow(color: Colors.white.withValues(alpha: 0.22), blurRadius: 12, spreadRadius: 0.4),
+                        ],
                       ),
-                      child: Text('x${slide.combo}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+                      child: Text('x${slide.combo}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.white70, blurRadius: 8)])),
                     ),
                   ],
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GiftSparkle extends StatelessWidget {
+  const _GiftSparkle({required this.left, required this.top, required this.size, required this.opacity});
+
+  final double left;
+  final double top;
+  final double size;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: left,
+      top: top,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.45, end: 1),
+        duration: const Duration(milliseconds: 850),
+        curve: Curves.easeInOut,
+        builder: (context, value, child) {
+          return Opacity(
+            opacity: (opacity * value).clamp(0.0, 1.0),
+            child: Transform.scale(scale: value, child: child),
+          );
+        },
+        child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: size, shadows: const [Shadow(color: Colors.white, blurRadius: 8)]),
+      ),
+    );
+  }
+}
+
+class _GiftGlitterDot extends StatelessWidget {
+  const _GiftGlitterDot({required this.left, required this.top, required this.size, required this.opacity});
+
+  final double left;
+  final double top;
+  final double size;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: left,
+      top: top,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: opacity),
+          boxShadow: [
+            BoxShadow(color: Colors.white.withValues(alpha: 0.80), blurRadius: 9, spreadRadius: 1.0),
+          ],
         ),
       ),
     );
