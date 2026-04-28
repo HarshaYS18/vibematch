@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'room_contribution_rankings_sheet.dart';
 import 'room_theme.dart';
 
 class RoomTopBar extends StatelessWidget {
@@ -62,7 +63,9 @@ class RoomTopBar extends StatelessWidget {
             const SizedBox(width: 5),
             _JoinButton(onTap: onJoinTap),
             const Spacer(),
-            _TrophyButton(onTap: onRoomRankingsTap ?? () => RoomToast.show(context, 'Room rankings will connect here')),
+            _TrophyButton(
+              onTap: onRoomRankingsTap ?? () => _openDefaultRoomRankings(context),
+            ),
             const SizedBox(width: 5),
             _OnlineButton(count: onlineCount, onTap: onUsersTap),
             const SizedBox(width: 5),
@@ -96,6 +99,27 @@ class RoomTopBar extends StatelessWidget {
           _PrivacyStatusChip(mode: privacyMode),
         ],
       ],
+    );
+  }
+
+  void _openDefaultRoomRankings(BuildContext context) {
+    final users = <SeatUser>[];
+    final ids = <String>{};
+    for (final user in mockRoomUsers) {
+      if (ids.add(user.id)) users.add(user);
+    }
+    for (final user in mockInviteUsers) {
+      if (ids.add(user.id)) users.add(user);
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RoomContributionRankingsSheet(
+        roomName: roomName,
+        users: users,
+      ),
     );
   }
 }
