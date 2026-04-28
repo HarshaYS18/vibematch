@@ -31,7 +31,11 @@ class _VipBadgeState extends State<VipBadge>
   late final AnimationController _shineController;
 
   int get _safeLevel => widget.level.clamp(0, 50).toInt();
-  bool get _visible => widget.level > 0 || widget.showWhenZero;
+
+  // VIP 0 is intentionally visible now. It uses the silver badge.
+  bool get _visible => widget.level >= 0 || widget.showWhenZero;
+
+  bool get _isChatBadge => widget.size == VipBadgeSize.tiny;
   bool get _premiumShine => _safeLevel >= 30;
 
   _VipBadgeTier get _tier {
@@ -42,6 +46,8 @@ class _VipBadgeState extends State<VipBadge>
     if (value >= 21) return _VipBadgeTier.blue;
     if (value >= 11) return _VipBadgeTier.red;
     if (value >= 6) return _VipBadgeTier.blackGold;
+
+    // VIP 0, frozen VIP, and VIP 1-5 use the silver family.
     return _VipBadgeTier.silver;
   }
 
@@ -108,43 +114,46 @@ class _VipBadgeState extends State<VipBadge>
     };
   }
 
-  double get _height {
+  double get _chatBadgeSize => 20;
+  double get _chatPillWidth => 28;
+  double get _chatPillHeight => 12;
+  double get _chatTotalWidth => _chatPillWidth + (_chatBadgeSize * 0.52);
+
+  double get _iconTextHeight {
     return switch (widget.size) {
-      VipBadgeSize.tiny => 21,
-      VipBadgeSize.small => 31,
-      VipBadgeSize.medium => 42,
-      VipBadgeSize.large => 56,
+      VipBadgeSize.tiny => _chatBadgeSize,
+      VipBadgeSize.small => 28,
+      VipBadgeSize.medium => 38,
+      VipBadgeSize.large => 52,
     };
   }
 
-  double get _pillWidth {
+  double get _iconTextWidth {
     return switch (widget.size) {
-      VipBadgeSize.tiny => 51,
+      VipBadgeSize.tiny => _chatTotalWidth,
       VipBadgeSize.small => 72,
-      VipBadgeSize.medium => 95,
+      VipBadgeSize.medium => 94,
       VipBadgeSize.large => 126,
     };
   }
 
-  double get _badgeSize {
+  double get _iconSize {
     return switch (widget.size) {
-      VipBadgeSize.tiny => 32,
-      VipBadgeSize.small => 47,
-      VipBadgeSize.medium => 64,
-      VipBadgeSize.large => 86,
+      VipBadgeSize.tiny => _chatBadgeSize,
+      VipBadgeSize.small => 24,
+      VipBadgeSize.medium => 34,
+      VipBadgeSize.large => 46,
     };
   }
 
   double get _fontSize {
     return switch (widget.size) {
-      VipBadgeSize.tiny => 8.2,
-      VipBadgeSize.small => 10.4,
-      VipBadgeSize.medium => 13.6,
-      VipBadgeSize.large => 18,
+      VipBadgeSize.tiny => 6.2,
+      VipBadgeSize.small => 10.8,
+      VipBadgeSize.medium => 14.2,
+      VipBadgeSize.large => 18.8,
     };
   }
-
-  double get _totalWidth => _pillWidth + (_badgeSize * 0.58);
 
   @override
   void initState() {
@@ -178,9 +187,25 @@ class _VipBadgeState extends State<VipBadge>
   Widget build(BuildContext context) {
     if (!_visible) return const SizedBox.shrink();
 
-    final child = SizedBox(
-      width: _totalWidth,
-      height: _badgeSize,
+    final child = _isChatBadge ? _buildChatPillBadge() : _buildMiniProfileIconBadge();
+
+    if (widget.onTap == null) return child;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(_isChatBadge ? 3 : 999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(_isChatBadge ? 3 : 999),
+        onTap: widget.onTap,
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildChatPillBadge() {
+    return SizedBox(
+      width: _chatTotalWidth,
+      height: _chatBadgeSize,
       child: AnimatedBuilder(
         animation: _shineController,
         builder: (context, _) {
@@ -189,21 +214,21 @@ class _VipBadgeState extends State<VipBadge>
             alignment: Alignment.centerLeft,
             children: [
               Positioned(
-                left: _badgeSize * 0.48,
+                left: _chatBadgeSize * 0.47,
                 child: _VipPillBody(
-                  width: _pillWidth,
-                  height: _height,
+                  width: _chatPillWidth,
+                  height: _chatPillHeight,
                   gradient: _pillGradient,
                   glowColor: _glowColor,
                   premiumShine: _premiumShine,
                   shineValue: _shineController.value,
-                  size: widget.size,
+                  sharpCorners: true,
                   child: _GoldenVipText(
                     label: 'VIP $_safeLevel',
                     fontSize: _fontSize,
                     premiumShine: _premiumShine,
                     shineValue: _shineController.value,
-                    size: widget.size,
+                    compact: true,
                   ),
                 ),
               ),
@@ -213,12 +238,11 @@ class _VipBadgeState extends State<VipBadge>
                 bottom: 0,
                 child: _ShieldBadgeImage(
                   assetPath: _assetPath,
-                  size: _badgeSize,
+                  size: _chatBadgeSize,
                   glowColor: _glowColor,
                   premiumShine: _premiumShine,
                   shineValue: _shineController.value,
                   fallbackGradient: _pillGradient,
-                  level: _safeLevel,
                 ),
               ),
             ],
@@ -226,16 +250,40 @@ class _VipBadgeState extends State<VipBadge>
         },
       ),
     );
+  }
 
-    if (widget.onTap == null) return child;
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: widget.onTap,
-        child: child,
+  Widget _buildMiniProfileIconBadge() {
+    return SizedBox(
+      width: _iconTextWidth,
+      height: _iconTextHeight,
+      child: AnimatedBuilder(
+        animation: _shineController,
+        builder: (context, _) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _ShieldBadgeImage(
+                assetPath: _assetPath,
+                size: _iconSize,
+                glowColor: _glowColor,
+                premiumShine: _premiumShine,
+                shineValue: _shineController.value,
+                fallbackGradient: _pillGradient,
+              ),
+              SizedBox(width: widget.size == VipBadgeSize.small ? 4 : 6),
+              Flexible(
+                child: _GoldenVipText(
+                  label: 'VIP $_safeLevel',
+                  fontSize: _fontSize,
+                  premiumShine: _premiumShine,
+                  shineValue: _shineController.value,
+                  compact: false,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -249,7 +297,7 @@ class _VipPillBody extends StatelessWidget {
     required this.glowColor,
     required this.premiumShine,
     required this.shineValue,
-    required this.size,
+    required this.sharpCorners,
     required this.child,
   });
 
@@ -259,14 +307,12 @@ class _VipPillBody extends StatelessWidget {
   final Color glowColor;
   final bool premiumShine;
   final double shineValue;
-  final VipBadgeSize size;
+  final bool sharpCorners;
   final Widget child;
-
-  bool get _tiny => size == VipBadgeSize.tiny;
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(height);
+    final radius = BorderRadius.circular(sharpCorners ? 2.5 : height);
 
     return Container(
       width: width,
@@ -275,14 +321,14 @@ class _VipPillBody extends StatelessWidget {
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: glowColor.withValues(alpha: _tiny ? 0.20 : premiumShine ? 0.55 : 0.28),
-            blurRadius: _tiny ? 7 : premiumShine ? 18 : 11,
-            spreadRadius: _tiny ? 0 : premiumShine ? 1.4 : 0.2,
+            color: glowColor.withValues(alpha: premiumShine ? 0.36 : 0.16),
+            blurRadius: premiumShine ? 9 : 5,
+            spreadRadius: 0,
           ),
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.42),
-            blurRadius: _tiny ? 5 : 12,
-            offset: Offset(0, _tiny ? 2 : 5),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -301,8 +347,8 @@ class _VipPillBody extends StatelessWidget {
                   stops: const [0.0, 0.35, 0.62, 1.0],
                 ),
                 border: Border.all(
-                  color: const Color(0xFFFFD36A).withValues(alpha: _tiny ? 0.55 : 0.82),
-                  width: _tiny ? 0.75 : 1.15,
+                  color: const Color(0xFFFFD36A).withValues(alpha: 0.52),
+                  width: 0.55,
                 ),
               ),
             ),
@@ -314,9 +360,9 @@ class _VipPillBody extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.white.withValues(alpha: _tiny ? 0.14 : 0.28),
-                      Colors.white.withValues(alpha: 0.03),
-                      Colors.black.withValues(alpha: _tiny ? 0.18 : 0.30),
+                      Colors.white.withValues(alpha: 0.12),
+                      Colors.white.withValues(alpha: 0.02),
+                      Colors.black.withValues(alpha: 0.18),
                     ],
                     stops: const [0.0, 0.46, 1.0],
                   ),
@@ -330,14 +376,12 @@ class _VipPillBody extends StatelessWidget {
               child: Transform.rotate(
                 angle: -math.pi / 7,
                 child: Container(
-                  width: height * (_tiny ? 0.28 : premiumShine ? 0.76 : 0.46),
+                  width: height * (premiumShine ? 0.56 : 0.32),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
                         Colors.transparent,
-                        Colors.white.withValues(
-                          alpha: _tiny ? 0.18 : premiumShine ? 0.58 : 0.30,
-                        ),
+                        Colors.white.withValues(alpha: premiumShine ? 0.42 : 0.22),
                         Colors.transparent,
                       ],
                     ),
@@ -361,7 +405,6 @@ class _ShieldBadgeImage extends StatelessWidget {
     required this.premiumShine,
     required this.shineValue,
     required this.fallbackGradient,
-    required this.level,
   });
 
   final String assetPath;
@@ -370,9 +413,8 @@ class _ShieldBadgeImage extends StatelessWidget {
   final bool premiumShine;
   final double shineValue;
   final List<Color> fallbackGradient;
-  final int level;
 
-  bool get _tiny => size <= 34;
+  bool get _compact => size <= 22;
 
   @override
   Widget build(BuildContext context) {
@@ -384,17 +426,17 @@ class _ShieldBadgeImage extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: size * 0.72,
-            height: size * 0.72,
+            width: size * 0.68,
+            height: size * 0.68,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
                   color: glowColor.withValues(
-                    alpha: _tiny ? 0.18 : premiumShine ? 0.72 : 0.34,
+                    alpha: _compact ? 0.16 : premiumShine ? 0.70 : 0.32,
                   ),
-                  blurRadius: _tiny ? 8 : premiumShine ? 25 : 15,
-                  spreadRadius: _tiny ? 0 : premiumShine ? 2.5 : 0.4,
+                  blurRadius: _compact ? 5 : premiumShine ? 22 : 12,
+                  spreadRadius: _compact ? 0 : premiumShine ? 2 : 0.3,
                 ),
               ],
             ),
@@ -408,7 +450,6 @@ class _ShieldBadgeImage extends StatelessWidget {
             errorBuilder: (context, error, stackTrace) => _FallbackShield(
               size: size,
               gradient: fallbackGradient,
-              level: level,
             ),
           ),
           if (premiumShine)
@@ -421,13 +462,13 @@ class _ShieldBadgeImage extends StatelessWidget {
                       angle: -0.55,
                       child: Center(
                         child: Container(
-                          width: _tiny ? size * 0.12 : size * 0.20,
-                          height: size * 1.35,
+                          width: _compact ? size * 0.10 : size * 0.18,
+                          height: size * 1.25,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
                                 Colors.white.withValues(alpha: 0.0),
-                                Colors.white.withValues(alpha: _tiny ? 0.18 : 0.42),
+                                Colors.white.withValues(alpha: _compact ? 0.14 : 0.40),
                                 Colors.white.withValues(alpha: 0.0),
                               ],
                             ),
@@ -439,21 +480,21 @@ class _ShieldBadgeImage extends StatelessWidget {
                 ),
               ),
             ),
-          if (premiumShine && !_tiny) ...[
+          if (premiumShine && !_compact) ...[
             Positioned(
               top: size * 0.08,
               right: size * 0.12,
               child: _Sparkle(
-                size: size * 0.16,
-                opacity: 0.52 + (math.sin(shineValue * math.pi * 2) * 0.24),
+                size: size * 0.14,
+                opacity: 0.50 + (math.sin(shineValue * math.pi * 2) * 0.22),
               ),
             ),
             Positioned(
               bottom: size * 0.10,
               left: size * 0.14,
               child: _Sparkle(
-                size: size * 0.11,
-                opacity: 0.34 + (math.cos(shineValue * math.pi * 2) * 0.18),
+                size: size * 0.10,
+                opacity: 0.32 + (math.cos(shineValue * math.pi * 2) * 0.16),
               ),
             ),
           ],
@@ -469,16 +510,14 @@ class _GoldenVipText extends StatelessWidget {
     required this.fontSize,
     required this.premiumShine,
     required this.shineValue,
-    required this.size,
+    required this.compact,
   });
 
   final String label;
   final double fontSize;
   final bool premiumShine;
   final double shineValue;
-  final VipBadgeSize size;
-
-  bool get _tiny => size == VipBadgeSize.tiny;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -488,13 +527,14 @@ class _GoldenVipText extends StatelessWidget {
         Text(
           label,
           maxLines: 1,
+          overflow: TextOverflow.visible,
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w900,
-            letterSpacing: _tiny ? -0.20 : 0.35,
+            letterSpacing: compact ? -0.50 : 0.25,
             foreground: Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = _tiny ? 1.45 : premiumShine ? 2.5 : 2.0
+              ..strokeWidth = compact ? 1.0 : premiumShine ? 2.4 : 1.9
               ..color = Colors.black.withValues(alpha: 0.68),
           ),
         ),
@@ -515,21 +555,22 @@ class _GoldenVipText extends StatelessWidget {
           child: Text(
             label,
             maxLines: 1,
+            overflow: TextOverflow.visible,
             style: TextStyle(
               color: Colors.white,
               fontSize: fontSize,
               fontWeight: FontWeight.w900,
-              letterSpacing: _tiny ? -0.20 : 0.35,
+              letterSpacing: compact ? -0.50 : 0.25,
               shadows: [
                 Shadow(
                   color: const Color(0xFFFFD766).withValues(
-                    alpha: _tiny ? 0.42 : premiumShine ? 0.95 : 0.52,
+                    alpha: compact ? 0.34 : premiumShine ? 0.94 : 0.52,
                   ),
-                  blurRadius: _tiny ? 4 : premiumShine ? 12 : 6,
+                  blurRadius: compact ? 3 : premiumShine ? 11 : 6,
                 ),
                 Shadow(
-                  color: const Color(0xFF7A4300).withValues(alpha: 0.72),
-                  blurRadius: _tiny ? 1.0 : 2.0,
+                  color: const Color(0xFF7A4300).withValues(alpha: 0.70),
+                  blurRadius: compact ? 0.8 : 1.7,
                   offset: const Offset(0, 1),
                 ),
               ],
@@ -542,13 +583,13 @@ class _GoldenVipText extends StatelessWidget {
               child: Align(
                 alignment: Alignment(-1.35 + shineValue * 2.7, 0),
                 child: Container(
-                  width: _tiny ? 8 : premiumShine ? 24 : 15,
+                  width: compact ? 6 : premiumShine ? 22 : 14,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
                         Colors.transparent,
                         Colors.white.withValues(
-                          alpha: _tiny ? 0.26 : premiumShine ? 0.70 : 0.36,
+                          alpha: compact ? 0.20 : premiumShine ? 0.68 : 0.34,
                         ),
                         Colors.transparent,
                       ],
@@ -593,12 +634,10 @@ class _FallbackShield extends StatelessWidget {
   const _FallbackShield({
     required this.size,
     required this.gradient,
-    required this.level,
   });
 
   final double size;
   final List<Color> gradient;
-  final int level;
 
   @override
   Widget build(BuildContext context) {
@@ -614,13 +653,13 @@ class _FallbackShield extends StatelessWidget {
         ),
         border: Border.all(
           color: const Color(0xFFFFD36A).withValues(alpha: 0.85),
-          width: size <= 34 ? 1.1 : 1.6,
+          width: size <= 22 ? 0.8 : 1.4,
         ),
         boxShadow: [
           BoxShadow(
-            color: gradient[2].withValues(alpha: 0.28),
-            blurRadius: size <= 34 ? 7 : 14,
-            offset: const Offset(0, 4),
+            color: gradient[2].withValues(alpha: 0.26),
+            blurRadius: size <= 22 ? 5 : 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
