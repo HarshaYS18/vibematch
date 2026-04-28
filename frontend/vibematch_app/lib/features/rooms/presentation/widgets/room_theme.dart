@@ -20,17 +20,31 @@ class RoomBackgroundTheme {
     required this.name,
     required this.colors,
     required this.accent,
+    this.assetPath,
+    this.overlayOpacity = 0.42,
   });
 
   final String id;
   final String name;
+
+  /// Fallback colors only. The actual room background should come from assets.
   final List<Color> colors;
   final Color accent;
+
+  /// Local packaged background asset.
+  ///
+  /// Later this can be replaced by approved backend/custom theme URLs, but the
+  /// base live room should never hardcode visual backgrounds inside LiveRoomPage.
+  final String? assetPath;
+  final double overlayOpacity;
 }
 
+const String roomBackgroundAssetBase = 'assets/images/rooms/backgrounds';
+
 const RoomBackgroundTheme defaultRoomBackgroundTheme = RoomBackgroundTheme(
-  id: 'nebula_glow',
-  name: 'Nebula Glow',
+  id: 'default_luxury',
+  name: 'Default Luxury',
+  assetPath: '$roomBackgroundAssetBase/default_luxury.png',
   colors: [Color(0xFF050716), Color(0xFF171034), Color(0xFF0B0613)],
   accent: RoomColors.violet,
 );
@@ -40,60 +54,138 @@ const List<RoomBackgroundTheme> mockRoomBackgroundThemes = [
   RoomBackgroundTheme(
     id: 'royal_night',
     name: 'Royal Night',
+    assetPath: '$roomBackgroundAssetBase/royal_night.png',
     colors: [Color(0xFF070414), Color(0xFF251538), Color(0xFF0A0710)],
     accent: RoomColors.gold,
   ),
   RoomBackgroundTheme(
-    id: 'ocean_mood',
-    name: 'Ocean Mood',
-    colors: [Color(0xFF021419), Color(0xFF08384A), Color(0xFF041018)],
+    id: 'neon_night',
+    name: 'Neon Night',
+    assetPath: '$roomBackgroundAssetBase/neon_night.png',
+    colors: [Color(0xFF071015), Color(0xFF10284A), Color(0xFF080611)],
     accent: RoomColors.aqua,
   ),
   RoomBackgroundTheme(
     id: 'rose_private',
     name: 'Rose Private',
+    assetPath: '$roomBackgroundAssetBase/rose_private.png',
     colors: [Color(0xFF120713), Color(0xFF3B102A), Color(0xFF08040A)],
     accent: RoomColors.coral,
+  ),
+  RoomBackgroundTheme(
+    id: 'cricket_mode',
+    name: 'Cricket Mode',
+    assetPath: '$roomBackgroundAssetBase/cricket_mode.png',
+    colors: [Color(0xFF04150B), Color(0xFF0F3B22), Color(0xFF050B08)],
+    accent: Color(0xFF4ADE80),
+  ),
+  RoomBackgroundTheme(
+    id: 'watch_party',
+    name: 'Watch Party',
+    assetPath: '$roomBackgroundAssetBase/watch_party.png',
+    colors: [Color(0xFF05050B), Color(0xFF111827), Color(0xFF020617)],
+    accent: Color(0xFF60A5FA),
   ),
 ];
 
 class RoomBackground extends StatelessWidget {
-  const RoomBackground({super.key, this.theme = defaultRoomBackgroundTheme});
+  const RoomBackground({
+    super.key,
+    this.theme = defaultRoomBackgroundTheme,
+    this.customAssetPath,
+    this.overlayOpacity,
+  });
+
+  final RoomBackgroundTheme theme;
+
+  /// Optional override used later for approved custom room backgrounds.
+  final String? customAssetPath;
+  final double? overlayOpacity;
+
+  @override
+  Widget build(BuildContext context) {
+    final assetPath = customAssetPath ?? theme.assetPath;
+    final effectiveOverlayOpacity = overlayOpacity ?? theme.overlayOpacity;
+
+    return RepaintBoundary(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _FallbackGradient(theme: theme),
+          if (assetPath != null)
+            Image.asset(
+              assetPath,
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: effectiveOverlayOpacity * 0.70),
+                  Colors.black.withValues(alpha: effectiveOverlayOpacity),
+                  Colors.black.withValues(alpha: (effectiveOverlayOpacity + 0.16).clamp(0.0, 0.82)),
+                ],
+              ),
+            ),
+          ),
+          _RoomAtmosphere(theme: theme),
+        ],
+      ),
+    );
+  }
+}
+
+class _FallbackGradient extends StatelessWidget {
+  const _FallbackGradient({required this.theme});
 
   final RoomBackgroundTheme theme;
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: theme.colors,
-          ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: theme.colors,
         ),
-        child: Stack(
-          children: [
-            Positioned(right: -150, top: 90, child: _GlowCircle(size: 315, color: theme.accent.withValues(alpha: 0.18))),
-            Positioned(left: -115, bottom: 130, child: _GlowCircle(size: 230, color: RoomColors.aqua.withValues(alpha: 0.12))),
-            Positioned(right: 52, bottom: -120, child: _GlowCircle(size: 235, color: RoomColors.coral.withValues(alpha: 0.10))),
-            ...List.generate(26, (index) {
-              final left = ((index * 47) % 360).toDouble();
-              final top = (58 + ((index * 71) % 700)).toDouble();
-              final size = 1.8 + (index % 3);
-              return Positioned(
-                left: left,
-                top: top,
-                child: Container(
-                  width: size,
-                  height: size,
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
-                ),
-              );
-            }),
-          ],
-        ),
+      ),
+    );
+  }
+}
+
+class _RoomAtmosphere extends StatelessWidget {
+  const _RoomAtmosphere({required this.theme});
+
+  final RoomBackgroundTheme theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned(right: -150, top: 90, child: _GlowCircle(size: 315, color: theme.accent.withValues(alpha: 0.16))),
+          Positioned(left: -115, bottom: 130, child: _GlowCircle(size: 230, color: RoomColors.aqua.withValues(alpha: 0.10))),
+          Positioned(right: 52, bottom: -120, child: _GlowCircle(size: 235, color: RoomColors.coral.withValues(alpha: 0.08))),
+          ...List.generate(22, (index) {
+            final left = ((index * 47) % 360).toDouble();
+            final top = (58 + ((index * 71) % 700)).toDouble();
+            final size = 1.6 + (index % 3);
+            return Positioned(
+              left: left,
+              top: top,
+              child: Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), shape: BoxShape.circle),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
