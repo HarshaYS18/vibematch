@@ -130,7 +130,7 @@ class _RoomContributionRankingsSheetState extends State<RoomContributionRankings
               shrinkWrap: true,
               physics: const BouncingScrollPhysics(),
               itemCount: rankedUsers.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (context, index) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final user = rankedUsers[index];
                 final score = _scoreFor(user);
