@@ -142,6 +142,7 @@ class _CompactChatLine extends StatelessWidget {
               fit: FlexFit.loose,
               child: _TransparentUserMessageFlexBox(
                 messageText: message.message,
+                enableMessageActions: false,
                 child: Text(
                   message.message,
                   maxLines: 2,
@@ -169,6 +170,7 @@ class _CompactChatLine extends StatelessWidget {
             fit: FlexFit.loose,
             child: _TransparentUserMessageFlexBox(
               messageText: message.message,
+              enableMessageActions: !message.isGift,
               onTap: onSenderTap,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -358,13 +360,16 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
     required this.child,
     required this.messageText,
     this.onTap,
+    this.enableMessageActions = true,
   });
 
   final Widget child;
   final String messageText;
   final VoidCallback? onTap;
+  final bool enableMessageActions;
 
   Future<void> _showMessageActionPill(BuildContext context, Offset globalPosition) async {
+    if (!enableMessageActions) return;
     FocusManager.instance.primaryFocus?.unfocus();
 
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
@@ -439,10 +444,12 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: onTap,
-      onLongPressStart: (details) {
-        FocusManager.instance.primaryFocus?.unfocus();
-        _showMessageActionPill(context, details.globalPosition);
-      },
+      onLongPressStart: enableMessageActions
+          ? (details) {
+              FocusManager.instance.primaryFocus?.unfocus();
+              _showMessageActionPill(context, details.globalPosition);
+            }
+          : null,
       child: Container(
         // Dynamic user-message flex box with a very light foggy white fill.
         // It improves message readability while keeping the chat background visible.
