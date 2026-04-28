@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
 
-enum GiftCategory { classic, lucky, event, svip, premium }
+enum GiftCategory { classic, lucky, event, svip, premium, baggage }
 
 enum RoomUserGender { male, female, undisclosed }
 
@@ -60,6 +60,8 @@ extension GiftCategoryX on GiftCategory {
         return 'SVIP';
       case GiftCategory.premium:
         return 'Premium';
+      case GiftCategory.baggage:
+        return 'Baggage';
     }
   }
 }
@@ -266,6 +268,7 @@ class GiftSlide {
     required this.giftIcon,
     required this.colors,
     required this.combo,
+    this.baseCombo = 1,
     required this.remainingSeconds,
   });
 
@@ -276,9 +279,10 @@ class GiftSlide {
   final IconData giftIcon;
   final List<Color> colors;
   final int combo;
+  final int baseCombo;
   final int remainingSeconds;
 
-  GiftSlide copyWith({int? combo, int? remainingSeconds}) {
+  GiftSlide copyWith({int? combo, int? baseCombo, int? remainingSeconds}) {
     return GiftSlide(
       id: id,
       senderName: senderName,
@@ -287,6 +291,7 @@ class GiftSlide {
       giftIcon: giftIcon,
       colors: colors,
       combo: combo ?? this.combo,
+      baseCombo: baseCombo ?? this.baseCombo,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
     );
   }
@@ -534,5 +539,23 @@ const List<GiftItem> mockGiftItems = [
     icon: Icons.workspace_premium_rounded,
     chatSymbol: '👑',
     colors: [Color(0xFFFFD166), Color(0xFF111827)],
+  ),
+  GiftItem(
+    id: 'owned_rose_pack',
+    name: 'Rose Pack',
+    category: GiftCategory.baggage,
+    coins: 0,
+    icon: Icons.inventory_2_rounded,
+    chatSymbol: '🎒',
+    colors: [Color(0xFFFF6B9A), Color(0xFFFFC2D8)],
+  ),
+  GiftItem(
+    id: 'owned_lucky_box',
+    name: 'Lucky Box',
+    category: GiftCategory.baggage,
+    coins: 0,
+    icon: Icons.card_giftcard_rounded,
+    chatSymbol: '🎁',
+    colors: [Color(0xFFFFD166), Color(0xFFFF7A45)],
   ),
 ];
