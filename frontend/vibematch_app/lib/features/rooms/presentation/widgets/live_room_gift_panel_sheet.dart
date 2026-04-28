@@ -60,6 +60,10 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
     return null;
   }
 
+  int _defaultComboFor(GiftCategory category) {
+    return category == GiftCategory.lucky ? 9 : 1;
+  }
+
   @override
   Widget build(BuildContext context) {
     return GiftPanel(
@@ -75,16 +79,19 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
         setState(() {
           _selectedCategory = category;
           _selectedGift = _firstGiftForCategory(category) ?? _selectedGift;
+          _selectedCombo = _defaultComboFor(category);
           if (_selectedGift != null) widget.onGiftSelected(_selectedGift!);
-          if (category == GiftCategory.lucky && _selectedCombo < 9) {
-            _selectedCombo = 9;
-            widget.onComboChanged(_selectedCombo);
-          }
+          widget.onComboChanged(_selectedCombo);
         });
       },
       onGiftSelected: (gift) {
         widget.onGiftSelected(gift);
-        setState(() => _selectedGift = gift);
+        setState(() {
+          _selectedGift = gift;
+          _selectedCategory = gift.category;
+          _selectedCombo = _defaultComboFor(gift.category);
+        });
+        widget.onComboChanged(_selectedCombo);
       },
       onReceiverToggle: (id) {
         widget.onReceiverToggle(id);
