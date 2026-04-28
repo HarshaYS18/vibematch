@@ -29,37 +29,32 @@ class _VipBadgeState extends State<VipBadge>
 
   int get _safeLevel => widget.level.clamp(0, 50);
   bool get _visible => widget.level > 0 || widget.showWhenZero;
-  bool get _shineEnabled => _safeLevel >= 30;
+  bool get _premiumShine => _safeLevel >= 30;
 
   @override
   void initState() {
     super.initState();
     _shineController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    );
-    _syncShine();
+      duration: Duration(milliseconds: _premiumShine ? 1500 : 3200),
+    )..repeat();
   }
 
   @override
   void didUpdateWidget(covariant VipBadge oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _syncShine();
+    if ((oldWidget.level >= 30) != _premiumShine) {
+      _shineController.duration = Duration(
+        milliseconds: _premiumShine ? 1500 : 3200,
+      );
+      _shineController.repeat();
+    }
   }
 
   @override
   void dispose() {
     _shineController.dispose();
     super.dispose();
-  }
-
-  void _syncShine() {
-    if (_shineEnabled) {
-      if (!_shineController.isAnimating) _shineController.repeat();
-    } else {
-      _shineController.stop();
-      _shineController.value = 0;
-    }
   }
 
   String get _assetPath {
@@ -136,9 +131,15 @@ class _VipBadgeState extends State<VipBadge>
               end: _fallbackEnd,
             ),
           ),
-          _StaticGlass(width: _width, height: _height),
-          if (_shineEnabled)
-            _MovingGlassShine(
+          _StaticGlass(width: _width, height: _height, premium: _premiumShine),
+          _MovingGlassShine(
+            animation: _shineController,
+            width: _width,
+            height: _height,
+            premium: _premiumShine,
+          ),
+          if (_premiumShine)
+            _SecondMovingGlassShine(
               animation: _shineController,
               width: _width,
               height: _height,
@@ -151,6 +152,7 @@ class _VipBadgeState extends State<VipBadge>
                 child: _GoldVipText(
                   label: 'VIP $_safeLevel',
                   fontSize: _fontSize,
+                  premium: _premiumShine,
                 ),
               ),
             ),
@@ -174,10 +176,15 @@ class _VipBadgeState extends State<VipBadge>
 }
 
 class _GoldVipText extends StatelessWidget {
-  const _GoldVipText({required this.label, required this.fontSize});
+  const _GoldVipText({
+    required this.label,
+    required this.fontSize,
+    required this.premium,
+  });
 
   final String label;
   final double fontSize;
+  final bool premium;
 
   @override
   Widget build(BuildContext context) {
@@ -192,8 +199,8 @@ class _GoldVipText extends StatelessWidget {
             letterSpacing: -0.05,
             foreground: Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = 2.1
-              ..color = const Color(0xFF6B3A00),
+              ..strokeWidth = premium ? 2.45 : 2.05
+              ..color = const Color(0xFF5F3300),
           ),
         ),
         Text(
@@ -203,16 +210,16 @@ class _GoldVipText extends StatelessWidget {
             fontSize: fontSize,
             fontWeight: FontWeight.w900,
             letterSpacing: -0.05,
-            shadows: const [
+            shadows: [
               Shadow(
-                color: Color(0xFFFFC857),
-                blurRadius: 8,
-                offset: Offset(0, 0.8),
+                color: const Color(0xFFFFD56A),
+                blurRadius: premium ? 14 : 8,
+                offset: const Offset(0, 0.8),
               ),
               Shadow(
-                color: Color(0xFF8A5200),
-                blurRadius: 2,
-                offset: Offset(0, 1.1),
+                color: const Color(0xFF8A5200),
+                blurRadius: premium ? 4 : 2,
+                offset: const Offset(0, 1.1),
               ),
             ],
           ),
@@ -223,31 +230,114 @@ class _GoldVipText extends StatelessWidget {
 }
 
 class _StaticGlass extends StatelessWidget {
-  const _StaticGlass({required this.width, required this.height});
+  const _StaticGlass({
+    required this.width,
+    required this.height,
+    required this.premium,
+  });
 
   final double width;
   final double height;
+  final bool premium;
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: height * 0.15,
-      left: width * 0.18,
-      right: width * 0.18,
-      child: IgnorePointer(
-        child: Container(
-          height: height * 0.18,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.white.withValues(alpha: 0.28),
-                Colors.white.withValues(alpha: 0.10),
-                Colors.white.withValues(alpha: 0.0),
-              ],
+    return Stack(
+      children: [
+        Positioned(
+          top: height * 0.11,
+          left: width * 0.14,
+          right: width * 0.14,
+          child: IgnorePointer(
+            child: Container(
+              height: height * (premium ? 0.24 : 0.18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: premium ? 0.42 : 0.26),
+                    Colors.white.withValues(alpha: premium ? 0.18 : 0.10),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
             ),
+          ),
+        ),
+        Positioned(
+          left: width * 0.18,
+          top: height * 0.20,
+          child: IgnorePointer(
+            child: Container(
+              width: width * (premium ? 0.20 : 0.13),
+              height: height * (premium ? 0.22 : 0.14),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: premium ? 0.22 : 0.10),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MovingGlassShine extends StatelessWidget {
+  const _MovingGlassShine({
+    required this.animation,
+    required this.width,
+    required this.height,
+    required this.premium,
+  });
+
+  final Animation<double> animation;
+  final double width;
+  final double height;
+  final bool premium;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: AnimatedBuilder(
+            animation: animation,
+            builder: (context, child) {
+              final travel = width * (premium ? 1.95 : 1.62) * animation.value;
+              return Stack(
+                children: [
+                  Transform.translate(
+                    offset: Offset(-width * 0.78 + travel, -height * 0.70),
+                    child: Transform.rotate(
+                      angle: -0.34,
+                      child: Container(
+                        width: width * (premium ? 0.34 : 0.18),
+                        height: height * 2.7,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.white.withValues(alpha: 0.0),
+                              Colors.white.withValues(alpha: premium ? 0.12 : 0.04),
+                              Colors.white.withValues(alpha: premium ? 0.34 : 0.12),
+                              Colors.white.withValues(alpha: premium ? 0.62 : 0.24),
+                              Colors.white.withValues(alpha: premium ? 0.34 : 0.12),
+                              Colors.white.withValues(alpha: premium ? 0.12 : 0.04),
+                              Colors.white.withValues(alpha: 0.0),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -255,8 +345,8 @@ class _StaticGlass extends StatelessWidget {
   }
 }
 
-class _MovingGlassShine extends StatelessWidget {
-  const _MovingGlassShine({
+class _SecondMovingGlassShine extends StatelessWidget {
+  const _SecondMovingGlassShine({
     required this.animation,
     required this.width,
     required this.height,
@@ -275,35 +365,30 @@ class _MovingGlassShine extends StatelessWidget {
           child: AnimatedBuilder(
             animation: animation,
             builder: (context, child) {
-              final travel = width * 1.75 * animation.value;
-              return Stack(
-                children: [
-                  Transform.translate(
-                    offset: Offset(-width * 0.72 + travel, -height * 0.66),
-                    child: Transform.rotate(
-                      angle: -0.34,
-                      child: Container(
-                        width: width * 0.26,
-                        height: height * 2.5,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.0),
-                              Colors.white.withValues(alpha: 0.08),
-                              Colors.white.withValues(alpha: 0.22),
-                              Colors.white.withValues(alpha: 0.42),
-                              Colors.white.withValues(alpha: 0.22),
-                              Colors.white.withValues(alpha: 0.08),
-                              Colors.white.withValues(alpha: 0.0),
-                            ],
-                          ),
-                        ),
+              final shiftedValue = (animation.value + 0.42) % 1.0;
+              final travel = width * 1.75 * shiftedValue;
+              return Transform.translate(
+                offset: Offset(-width * 0.84 + travel, -height * 0.55),
+                child: Transform.rotate(
+                  angle: -0.34,
+                  child: Container(
+                    width: width * 0.14,
+                    height: height * 2.25,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.0),
+                          Colors.white.withValues(alpha: 0.16),
+                          Colors.white.withValues(alpha: 0.38),
+                          Colors.white.withValues(alpha: 0.16),
+                          Colors.white.withValues(alpha: 0.0),
+                        ],
                       ),
                     ),
                   ),
-                ],
+                ),
               );
             },
           ),
