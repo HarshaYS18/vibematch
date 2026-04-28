@@ -5,6 +5,8 @@ import '../features/create/presentation/create_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/inbox/presentation/inbox_page.dart';
 import '../features/profile/presentation/me_page.dart';
+import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
+import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page.dart';
 
 enum _DevUserMode {
@@ -97,20 +99,25 @@ class _AppShellState extends State<AppShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
-      body: Column(
+      body: Stack(
         children: [
-          _DevUserSwitcher(
-            activeUser: activeUser,
-            selectedMode: _devUserMode,
-            onFounderTap: () => _switchDevUser(_DevUserMode.founder),
-            onUserTap: () => _switchDevUser(_DevUserMode.normalUser),
+          Column(
+            children: [
+              _DevUserSwitcher(
+                activeUser: activeUser,
+                selectedMode: _devUserMode,
+                onFounderTap: () => _switchDevUser(_DevUserMode.founder),
+                onUserTap: () => _switchDevUser(_DevUserMode.normalUser),
+              ),
+              Expanded(
+                child: IndexedStack(
+                  index: _selectedIndex,
+                  children: _pages,
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: _pages,
-            ),
-          ),
+          const _LiveRoomMiniBubbleLayer(),
         ],
       ),
       bottomNavigationBar: _VibeBottomNav(
@@ -118,6 +125,57 @@ class _AppShellState extends State<AppShell> {
         isTestingAsFounder: _isTestingAsFounder,
         onTap: _selectPage,
       ),
+    );
+  }
+}
+
+class _LiveRoomMiniBubbleLayer extends StatefulWidget {
+  const _LiveRoomMiniBubbleLayer();
+
+  @override
+  State<_LiveRoomMiniBubbleLayer> createState() => _LiveRoomMiniBubbleLayerState();
+}
+
+class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
+  final LiveRoomMinimizedOverlayService _service =
+      LiveRoomMinimizedOverlayService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _service.addListener(_onServiceChanged);
+  }
+
+  @override
+  void dispose() {
+    _service.removeListener(_onServiceChanged);
+    super.dispose();
+  }
+
+  void _onServiceChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_service.isShowing) return const SizedBox.shrink();
+
+    final size = MediaQuery.sizeOf(context);
+    final bottomSafeArea = MediaQuery.paddingOf(context).bottom;
+    final maxX = size.width - 86;
+    final maxY = size.height - bottomSafeArea - 96;
+
+    return LiveRoomMinimizedBubble(
+      offset: _service.offset,
+      onRestore: _service.restore,
+      onDrag: (details) {
+        final nextOffset = Offset(
+          (_service.offset.dx + details.delta.dx).clamp(8.0, maxX),
+          (_service.offset.dy + details.delta.dy).clamp(40.0, maxY),
+        );
+
+        _service.updateOffset(nextOffset);
+      },
     );
   }
 }
