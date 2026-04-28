@@ -209,16 +209,13 @@ class _GiftPanelState extends State<GiftPanel> {
   @override
   void initState() {
     super.initState();
-    _categoryPageController = PageController(
-      initialPage: GiftCategory.values.indexOf(widget.selectedCategory),
-    );
+    _categoryPageController = PageController(initialPage: GiftCategory.values.indexOf(widget.selectedCategory));
   }
 
   @override
   void didUpdateWidget(covariant GiftPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedCategory != widget.selectedCategory &&
-        _categoryPageController.hasClients) {
+    if (oldWidget.selectedCategory != widget.selectedCategory && _categoryPageController.hasClients) {
       _categoryPageController.animateToPage(
         GiftCategory.values.indexOf(widget.selectedCategory),
         duration: const Duration(milliseconds: 180),
@@ -236,24 +233,14 @@ class _GiftPanelState extends State<GiftPanel> {
   @override
   Widget build(BuildContext context) {
     final allGifts = GiftPanel.withMockExtras(widget.gifts);
-    final allSelected = widget.users.isNotEmpty &&
-        widget.selectedReceiverIds.length == widget.users.length;
-    final comboOptions = widget.selectedCategory == GiftCategory.lucky
-        ? GiftPanel.luckyCombos
-        : GiftPanel.combos;
-    final comboValue = comboOptions.contains(widget.selectedCombo)
-        ? widget.selectedCombo
-        : comboOptions.first;
+    final allSelected = widget.users.isNotEmpty && widget.selectedReceiverIds.length == widget.users.length;
+    final comboOptions = widget.selectedCategory == GiftCategory.lucky ? GiftPanel.luckyCombos : GiftPanel.combos;
+    final comboValue = comboOptions.contains(widget.selectedCombo) ? widget.selectedCombo : comboOptions.first;
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.345,
       child: Container(
-        padding: EdgeInsets.fromLTRB(
-          10,
-          7,
-          10,
-          MediaQuery.paddingOf(context).bottom + 8,
-        ),
+        padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
         decoration: const BoxDecoration(
           color: Color(0xFF12101D),
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -282,10 +269,7 @@ class _GiftPanelState extends State<GiftPanel> {
                     },
                   ),
                 ),
-                _TinyIconButton(
-                  icon: Icons.apps_rounded,
-                  onTap: () => RoomToast.show(context, 'Store / inventory opened'),
-                ),
+                _TinyIconButton(icon: Icons.apps_rounded, onTap: () => RoomToast.show(context, 'Store / inventory opened')),
               ],
             ),
             const SizedBox(height: 7),
@@ -362,9 +346,7 @@ class _GiftPanelState extends State<GiftPanel> {
                       borderRadius: BorderRadius.circular(15),
                       gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
                     ),
-                    child: const Center(
-                      child: Text('Send', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)),
-                    ),
+                    child: const Center(child: Text('Send', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900))),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -579,9 +561,7 @@ class CompactGiftCard extends StatelessWidget {
           color: Colors.white.withValues(alpha: selected ? 0.15 : 0.07),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: selected ? gift.colors.first : Colors.white12, width: selected ? 1.6 : 1),
-          boxShadow: selected
-              ? [BoxShadow(color: gift.colors.first.withValues(alpha: 0.20), blurRadius: 10, offset: const Offset(0, 4))]
-              : null,
+          boxShadow: selected ? [BoxShadow(color: gift.colors.first.withValues(alpha: 0.20), blurRadius: 10, offset: const Offset(0, 4))] : null,
         ),
         child: Column(
           children: [
@@ -612,9 +592,14 @@ class GiftSlideStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleSlides = slides.where((slide) {
+      final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15);
+      return ageSeconds <= 4;
+    }).take(2).toList(growable: false);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: slides.take(2).map((slide) {
+      children: visibleSlides.map((slide) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 7),
           child: GiftSlideCard(slide: slide, onComboTap: () => onComboTap(slide)),
@@ -632,20 +617,18 @@ class GiftSlideCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dismissProgress = slide.remainingSeconds <= 2 ? (2 - slide.remainingSeconds) / 2 : 0.0;
+    final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15);
+    final dismissProgress = ageSeconds <= 2 ? 0.0 : ((ageSeconds - 2) / 2).clamp(0.0, 1.0).toDouble();
 
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: dismissProgress, end: dismissProgress),
-      duration: const Duration(seconds: 2),
+      tween: Tween(end: dismissProgress),
+      duration: const Duration(milliseconds: 900),
       curve: Curves.easeInOutCubic,
       builder: (context, value, child) {
         final opacity = (1 - value).clamp(0.0, 1.0);
         return Opacity(
           opacity: opacity,
-          child: Transform.translate(
-            offset: Offset(value * 130, 0),
-            child: child,
-          ),
+          child: Transform.translate(offset: Offset(value * 130, 0), child: child),
         );
       },
       child: GestureDetector(
