@@ -79,10 +79,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final users = <SeatUser>[];
     final ids = <String>{};
 
-    for (final user in mockRoomUsers) {
+    // Use live seated users first so admin/member changes made through the
+    // room info pill or mini profile immediately override the static mock data.
+    for (final user in _roomUsers) {
       if (ids.add(user.id)) users.add(user);
     }
-    for (final user in _roomUsers) {
+    for (final user in mockRoomUsers) {
       if (ids.add(user.id)) users.add(user);
     }
     for (final user in mockInviteUsers) {
