@@ -57,8 +57,10 @@ class UserMiniProfileSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MiniProfileDecoration(
-      maxHeightFactor: 0.80,
-      backgroundColor: const Color(0xFFFCFAF7),
+      maxHeightFactor: 0.64,
+      topRadius: 26,
+      backgroundColor: const Color(0xFFFDFBF7),
+      showTopGlow: false,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.topCenter,
@@ -66,7 +68,7 @@ class UserMiniProfileSheet extends StatelessWidget {
           SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               14,
-              58,
+              48,
               14,
               MediaQuery.paddingOf(context).bottom + 12,
             ),
@@ -76,7 +78,7 @@ class UserMiniProfileSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  height: 38,
+                  height: 32,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -93,7 +95,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                       ),
                       Center(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 46),
                           child: Text(
                             user.name,
                             textAlign: TextAlign.center,
@@ -101,7 +103,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: RoomColors.plum,
-                              fontSize: 20,
+                              fontSize: 18,
                               fontWeight: FontWeight.w900,
                               letterSpacing: -0.3,
                             ),
@@ -113,55 +115,48 @@ class UserMiniProfileSheet extends StatelessWidget {
                         child: MiniProfileCornerButton(
                           icon: Icons.alternate_email_rounded,
                           color: RoomColors.aqua,
+                          size: 32,
+                          iconSize: 17,
                           onTap: onMentionTap,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 7),
+                const SizedBox(height: 6),
                 Wrap(
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    VipBadge(level: user.vipLevel, size: VipBadgeSize.medium, onTap: onVipTap),
+                    VipBadge(level: user.vipLevel, size: VipBadgeSize.small, onTap: onVipTap),
                     if (user.svipLevel > 0)
-                      _GlassyLevelPill(
+                      _CleanLevelPill(
                         label: 'SVIP ${user.svipLevel}',
                         icon: Icons.diamond_rounded,
-                        width: 78,
-                        gradient: const [
-                          Color(0xFFFFF3BA),
-                          Color(0xFFFFD35A),
-                          Color(0xFF9E6D00),
-                        ],
-                        textColor: const Color(0xFF3E2700),
+                        width: 76,
+                        background: const Color(0xFF30220B),
+                        border: const Color(0xFFD7AA45),
+                        textColor: const Color(0xFFFFE2A1),
                         onTap: onVipTap,
                       ),
-                    _GlassyLevelPill(
+                    _CleanLevelPill(
                       label: 'Lv ${user.sendingLevel}',
                       icon: Icons.north_east_rounded,
-                      width: 70,
-                      gradient: const [
-                        Color(0xFFEFEAFF),
-                        Color(0xFF8C5CF6),
-                        Color(0xFF12C7B7),
-                      ],
-                      textColor: Colors.white,
+                      width: 68,
+                      background: const Color(0xFF241E45),
+                      border: const Color(0xFF7364D9),
+                      textColor: const Color(0xFFEDEAFF),
                       onTap: onSendingLevelTap,
                     ),
-                    _GlassyLevelPill(
+                    _CleanLevelPill(
                       label: 'Lv ${user.receivingLevel}',
                       icon: Icons.favorite_rounded,
-                      width: 70,
-                      gradient: const [
-                        Color(0xFFFFEAF3),
-                        Color(0xFFFF6B9A),
-                        Color(0xFFE84C72),
-                      ],
-                      textColor: Colors.white,
+                      width: 68,
+                      background: const Color(0xFF411B2C),
+                      border: const Color(0xFFD95E8E),
+                      textColor: const Color(0xFFFFE8F1),
                       onTap: onReceivingLevelTap,
                     ),
                   ],
@@ -172,14 +167,13 @@ class UserMiniProfileSheet extends StatelessWidget {
                   const SizedBox(height: 7),
                   _LocationPill(location: user.locationLabel!),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: _MonthStatCard(
                         title: 'Sent',
                         value: compactNumber(user.sentExp),
-                        color: const Color(0xFFEDEBFF),
                         onTap: onSentRankingTap,
                       ),
                     ),
@@ -188,24 +182,23 @@ class UserMiniProfileSheet extends StatelessWidget {
                       child: _MonthStatCard(
                         title: 'Received',
                         value: compactNumber(user.receivedExp),
-                        color: const Color(0xFFFFEEF6),
                         onTap: onReceivedRankingTap,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 9),
-                _FamilyInfoCard(user: user, onTap: onFamilyTap),
                 const SizedBox(height: 8),
+                _FamilyInfoCard(user: user, onTap: onFamilyTap),
+                const SizedBox(height: 7),
                 _InfoCard(
+                  icon: Icons.favorite_rounded,
                   title: 'Love & Bonds',
                   value: user.relationshipText.trim().isEmpty ? 'No active bonds yet' : user.relationshipText,
-                  color: const Color(0xFFFFEAF4),
                   onTap: onRelationshipTap,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 7),
                 _BadgesInfoCard(user: user, onTap: onMedalsTap),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 _ActionRow(
                   isSelf: _isSelf,
                   canModerate: canModerate,
@@ -221,8 +214,14 @@ class UserMiniProfileSheet extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: -40,
-            child: MiniProfileAvatarDecoration(user: user, onTap: onAvatarTap),
+            top: -32,
+            child: MiniProfileAvatarDecoration(
+              user: user,
+              onTap: onAvatarTap,
+              size: 66,
+              showHeartBadge: false,
+              showOnlineRing: true,
+            ),
           ),
         ],
       ),
@@ -244,7 +243,7 @@ class _MetaRow extends StatelessWidget {
             fit: FlexFit.tight,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: _RolePill(label: user.roleLabel),
+              child: _MetaPill(icon: Icons.shield_rounded, label: user.roleLabel),
             ),
           )
         else
@@ -271,6 +270,8 @@ class _ReportIconButton extends StatelessWidget {
     return MiniProfileCornerButton(
       icon: Icons.report_gmailerrorred_rounded,
       color: RoomColors.coral,
+      size: 32,
+      iconSize: 17,
       onTap: onTap,
     );
   }
@@ -295,7 +296,7 @@ class _MoreMenuButton extends StatelessWidget {
 
     return PopupMenuButton<String>(
       tooltip: 'More',
-      offset: const Offset(0, 38),
+      offset: const Offset(0, 34),
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       onSelected: (value) {
@@ -320,10 +321,10 @@ class _MoreMenuButton extends StatelessWidget {
         ),
       ],
       child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(color: RoomColors.plum.withValues(alpha: 0.08), shape: BoxShape.circle),
-        child: const Icon(Icons.more_horiz_rounded, color: RoomColors.plum, size: 22),
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(color: RoomColors.plum.withValues(alpha: 0.07), shape: BoxShape.circle),
+        child: const Icon(Icons.more_horiz_rounded, color: RoomColors.plum, size: 20),
       ),
     );
   }
@@ -348,12 +349,13 @@ class _MenuRow extends StatelessWidget {
   }
 }
 
-class _GlassyLevelPill extends StatelessWidget {
-  const _GlassyLevelPill({
+class _CleanLevelPill extends StatelessWidget {
+  const _CleanLevelPill({
     required this.label,
     required this.icon,
     required this.width,
-    required this.gradient,
+    required this.background,
+    required this.border,
     required this.textColor,
     required this.onTap,
   });
@@ -361,7 +363,8 @@ class _GlassyLevelPill extends StatelessWidget {
   final String label;
   final IconData icon;
   final double width;
-  final List<Color> gradient;
+  final Color background;
+  final Color border;
   final Color textColor;
   final VoidCallback onTap;
 
@@ -372,20 +375,16 @@ class _GlassyLevelPill extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: width,
-        height: 28,
+        height: 26,
         decoration: BoxDecoration(
+          color: background,
           borderRadius: BorderRadius.circular(999),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradient,
-          ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.42), width: 0.8),
+          border: Border.all(color: border.withValues(alpha: 0.72), width: 0.8),
           boxShadow: [
             BoxShadow(
-              color: gradient.last.withValues(alpha: 0.22),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
+              color: border.withValues(alpha: 0.13),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -395,20 +394,14 @@ class _GlassyLevelPill extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               Positioned(
-                left: 9,
-                right: 9,
+                left: 8,
+                right: 8,
                 top: 3,
                 child: Container(
-                  height: 8,
+                  height: 6,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withValues(alpha: 0.46),
-                        Colors.white.withValues(alpha: 0.12),
-                        Colors.white.withValues(alpha: 0.0),
-                      ],
-                    ),
+                    color: Colors.white.withValues(alpha: 0.16),
                   ),
                 ),
               ),
@@ -416,7 +409,7 @@ class _GlassyLevelPill extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, color: textColor, size: 12),
+                  Icon(icon, color: textColor, size: 11.5),
                   const SizedBox(width: 3),
                   Flexible(
                     child: Text(
@@ -425,15 +418,8 @@ class _GlassyLevelPill extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: textColor,
-                        fontSize: 10.5,
+                        fontSize: 10.2,
                         fontWeight: FontWeight.w900,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: textColor == Colors.white ? 0.24 : 0.08),
-                            blurRadius: 2,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
                       ),
                     ),
                   ),
@@ -455,22 +441,7 @@ class _GenderAgePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = user.age == null ? 'Age hidden' : '${user.age}';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: user.gender.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: user.gender.color.withValues(alpha: 0.20)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(user.gender.icon, color: user.gender.color, size: 13),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(color: user.gender.color, fontSize: 10.5, fontWeight: FontWeight.w900)),
-        ],
-      ),
-    );
+    return _MetaPill(icon: user.gender.icon, label: label, color: user.gender.color);
   }
 }
 
@@ -481,24 +452,62 @@ class _LocationPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: RoomColors.aqua.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: RoomColors.aqua.withValues(alpha: 0.14)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_on_rounded, color: RoomColors.aqua, size: 13),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                location,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: RoomColors.plum, fontSize: 10.5, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.icon, required this.label, this.color = RoomColors.plum});
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: RoomColors.aqua.withValues(alpha: 0.10),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: RoomColors.aqua.withValues(alpha: 0.16)),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.location_on_rounded, color: RoomColors.aqua, size: 13),
+          Icon(icon, color: color, size: 12.5),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
-              location,
+              label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: RoomColors.plum, fontSize: 10.5, fontWeight: FontWeight.w900),
+              style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
             ),
           ),
         ],
@@ -507,56 +516,31 @@ class _LocationPill extends StatelessWidget {
   }
 }
 
-class _RolePill extends StatelessWidget {
-  const _RolePill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: RoomColors.gold.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: RoomColors.gold.withValues(alpha: 0.20)),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: RoomColors.plum, fontSize: 10.5, fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
-
 class _MonthStatCard extends StatelessWidget {
-  const _MonthStatCard({required this.title, required this.value, required this.color, required this.onTap});
+  const _MonthStatCard({required this.title, required this.value, required this.onTap});
 
   final String title;
   final String value;
-  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: RoomColors.softLine),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 5),
-            Text(value, textAlign: TextAlign.center, style: const TextStyle(color: RoomColors.plum, fontSize: 16, fontWeight: FontWeight.w900)),
+            Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B7282), fontSize: 10.5, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(value, textAlign: TextAlign.center, style: const TextStyle(color: RoomColors.plum, fontSize: 15, fontWeight: FontWeight.w900)),
           ],
         ),
       ),
@@ -574,47 +558,20 @@ class _FamilyInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final familyName = user.familyName.trim().isEmpty ? 'Join or create a family' : user.familyName;
 
-    return MiniProfileSectionCard(
-      backgroundColor: const Color(0xFFFFF8EA),
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(13),
-              gradient: LinearGradient(colors: user.avatarColors),
-              boxShadow: [
-                BoxShadow(
-                  color: RoomColors.gold.withValues(alpha: 0.16),
-                  blurRadius: 12,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.groups_rounded, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Family', style: TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 3),
-                Text(
-                  familyName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF96899F), size: 20),
-        ],
+    return _CleanInfoCard(
+      iconWidget: Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(colors: user.avatarColors),
+        ),
+        child: const Icon(Icons.groups_rounded, color: Colors.white, size: 18),
       ),
+      title: 'Family',
+      value: familyName,
+      onTap: onTap,
     );
   }
 }
@@ -627,54 +584,94 @@ class _BadgesInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badges = user.medals.isEmpty ? 'No badges yet' : user.medals.join('  ');
+    final badges = user.medals.isEmpty ? '—' : user.medals.join('  ');
 
-    return MiniProfileSectionCard(
-      backgroundColor: const Color(0xFFF0EEFF),
-      onTap: onTap,
-      child: Row(
-        children: [
-          const Expanded(
-            child: Text('Badges', style: TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)),
-          ),
-          Flexible(
-            child: Text(
-              badges,
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 13, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(width: 5),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF96899F), size: 20),
-        ],
+    return _CleanInfoCard(
+      iconWidget: const Icon(Icons.military_tech_rounded, color: RoomColors.gold, size: 20),
+      title: 'Badges',
+      valueWidget: Text(
+        badges,
+        textAlign: TextAlign.right,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Color(0xFF675C70), fontSize: 13, fontWeight: FontWeight.w900),
       ),
+      onTap: onTap,
     );
   }
 }
 
 class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.title, required this.value, required this.color, required this.onTap});
+  const _InfoCard({required this.icon, required this.title, required this.value, required this.onTap});
 
+  final IconData icon;
   final String title;
   final String value;
-  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CleanInfoCard(
+      iconWidget: Icon(icon, color: RoomColors.coral, size: 19),
+      title: title,
+      value: value,
+      onTap: onTap,
+    );
+  }
+}
+
+class _CleanInfoCard extends StatelessWidget {
+  const _CleanInfoCard({
+    required this.iconWidget,
+    required this.title,
+    this.value,
+    this.valueWidget,
+    required this.onTap,
+  });
+
+  final Widget iconWidget;
+  final String title;
+  final String? value;
+  final Widget? valueWidget;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return MiniProfileSectionCard(
-      backgroundColor: color,
+      backgroundColor: Colors.white,
+      borderColor: RoomColors.softLine,
+      radius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       onTap: onTap,
-      child: Row(children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 3),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800)),
-        ])),
-        const Icon(Icons.chevron_right_rounded, color: Color(0xFF96899F), size: 20),
-      ]),
+      child: Row(
+        children: [
+          SizedBox(width: 36, child: Center(child: iconWidget)),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: RoomColors.plum, fontSize: 12.5, fontWeight: FontWeight.w900)),
+                if (value != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    value!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFF736878), fontSize: 11.2, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (valueWidget != null) ...[
+            const SizedBox(width: 8),
+            Flexible(child: valueWidget!),
+          ],
+          const SizedBox(width: 5),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFFB3A9B9), size: 19),
+        ],
+      ),
     );
   }
 }
@@ -722,7 +719,7 @@ class _ActionRow extends StatelessWidget {
       if (isSelf || canModerate)
         _IconActionChip(icon: Icons.lock_rounded, tooltip: 'Leave and lock', onTap: onLeaveAndLock),
     ];
-    return Wrap(spacing: 10, runSpacing: 10, alignment: WrapAlignment.center, children: actions);
+    return Wrap(spacing: 12, runSpacing: 10, alignment: WrapAlignment.center, children: actions);
   }
 }
 
@@ -741,21 +738,21 @@ class _IconActionChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          width: 42,
-          height: 42,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
-            color: RoomColors.plum.withValues(alpha: 0.07),
+            color: Colors.white,
             shape: BoxShape.circle,
             border: Border.all(color: RoomColors.softLine),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
+                color: Colors.black.withValues(alpha: 0.035),
+                blurRadius: 9,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Icon(icon, color: RoomColors.plum, size: 19),
+          child: Icon(icon, color: RoomColors.plum, size: 18),
         ),
       ),
     );
