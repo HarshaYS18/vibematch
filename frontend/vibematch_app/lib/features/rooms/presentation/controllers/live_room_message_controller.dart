@@ -6,6 +6,13 @@ class LiveRoomMessageController {
     required this.onChanged,
   }) {
     messages = List<ChatEntry>.from(mockChatEntries);
+    _activeController = this;
+  }
+
+  static LiveRoomMessageController? _activeController;
+
+  static void clearActiveRoomChatForEveryone() {
+    _activeController?.clearChatForEveryone();
   }
 
   final SeatUser currentUser;
@@ -55,6 +62,21 @@ class LiveRoomMessageController {
 
   void insertEntry(ChatEntry entry) {
     messages.insert(0, entry);
+    onChanged();
+  }
+
+  void clearChatForEveryone() {
+    messages
+      ..clear()
+      ..insert(
+        0,
+        ChatEntry(
+          senderName: 'System',
+          senderId: 'system',
+          message: 'Chat cleared for everyone by ${currentUser.name}',
+        ),
+      );
+
     onChanged();
   }
 
