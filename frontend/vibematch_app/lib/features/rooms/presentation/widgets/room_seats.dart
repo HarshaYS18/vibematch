@@ -42,11 +42,11 @@ class RoomSeatLayout extends StatefulWidget {
 }
 
 class _RoomSeatLayoutState extends State<RoomSeatLayout> {
-  static const double _seatWidth = 76;
-  static const double _seatHeight = 88;
-  static const double _rowHeight = 106;
-  static const double _hostRowHeight = 106;
-  static const double _avatarSize = 56;
+  static const double _seatWidth = 84;
+  static const double _seatHeight = 98;
+  static const double _rowHeight = 118;
+  static const double _hostRowHeight = 118;
+  static const double _avatarSize = 66;
   static const double _actionWidth = 108;
   static const double _actionItemHeight = 30;
   static const double _actionPaddingY = 7;
@@ -252,10 +252,10 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _SeatAvatar(seat: seat, selected: selected, size: _avatarSize),
-          const SizedBox(height: 6),
+          const SizedBox(height: 7),
           SizedBox(
             width: _seatWidth,
-            height: 18,
+            height: 20,
             child: user == null ? _EmptySeatLabel(index: seat.index) : _GenderNameLabel(user: user, index: seat.index),
           ),
         ],
@@ -277,8 +277,8 @@ class _EmptySeatLabel extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.center,
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.56),
-        fontSize: 10.4,
+        color: Colors.white.withValues(alpha: 0.58),
+        fontSize: 11.2,
         fontWeight: FontWeight.w900,
         height: 1,
         letterSpacing: -0.1,
@@ -302,16 +302,16 @@ class _GenderNameLabel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 14,
-          height: 14,
+          width: 16,
+          height: 16,
           alignment: Alignment.center,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           child: Text(
             '${index + 1}',
-            style: const TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.w900, height: 1),
+            style: const TextStyle(color: Colors.white, fontSize: 8.2, fontWeight: FontWeight.w900, height: 1),
           ),
         ),
-        const SizedBox(width: 3),
+        const SizedBox(width: 4),
         Flexible(
           child: Text(
             user.name,
@@ -320,7 +320,7 @@ class _GenderNameLabel extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 10.4,
+              fontSize: 12.2,
               fontWeight: FontWeight.w900,
               height: 1,
               letterSpacing: -0.1,
@@ -354,8 +354,8 @@ class _SeatAvatar extends StatelessWidget {
       children: [
         if (selected)
           Container(
-            width: size + 10,
-            height: size + 10,
+            width: size + 12,
+            height: size + 12,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: SweepGradient(
@@ -378,10 +378,10 @@ class _SeatAvatar extends StatelessWidget {
               shape: BoxShape.circle,
               color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.09 : 0.12) : null,
               gradient: user == null ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
-              border: Border.all(color: borderColor, width: selected ? 2 : 1),
+              border: Border.all(color: borderColor, width: selected ? 2.2 : 1.1),
               boxShadow: [
-                if (selected) BoxShadow(color: RoomColors.gold.withValues(alpha: 0.20), blurRadius: 14, offset: const Offset(0, 7)),
-                if (user != null) BoxShadow(color: user.avatarColors.first.withValues(alpha: 0.18), blurRadius: 12, offset: const Offset(0, 6)),
+                if (selected) BoxShadow(color: RoomColors.gold.withValues(alpha: 0.22), blurRadius: 16, offset: const Offset(0, 8)),
+                if (user != null) BoxShadow(color: user.avatarColors.first.withValues(alpha: 0.20), blurRadius: 14, offset: const Offset(0, 7)),
               ],
             ),
             child: Center(
@@ -389,11 +389,11 @@ class _SeatAvatar extends StatelessWidget {
                   ? Icon(
                       seat.locked ? Icons.lock_rounded : Icons.add_rounded,
                       color: Colors.white.withValues(alpha: seat.locked ? 0.50 : 0.70),
-                      size: seat.locked ? 22 : 25,
+                      size: seat.locked ? 24 : 29,
                     )
                   : Text(
                       avatarLetter(user.name),
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                      style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900),
                     ),
             ),
           ),
@@ -401,31 +401,31 @@ class _SeatAvatar extends StatelessWidget {
         if (user?.muted ?? false)
           Positioned(
             right: -2,
-            bottom: 2,
+            bottom: 3,
             child: Container(
-              width: 19,
-              height: 19,
+              width: 21,
+              height: 21,
               decoration: BoxDecoration(
                 color: user!.adminMuted ? RoomColors.adminMute : RoomColors.selfMute,
                 shape: BoxShape.circle,
-                border: Border.all(color: RoomColors.deep, width: 1.2),
+                border: Border.all(color: RoomColors.deep, width: 1.3),
               ),
-              child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 10),
+              child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 11),
             ),
           ),
         if (seat.locked && user == null)
           Positioned(
             right: -1,
-            top: 3,
+            top: 4,
             child: Container(
-              width: 17,
-              height: 17,
+              width: 18,
+              height: 18,
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.50),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               ),
-              child: const Icon(Icons.lock_rounded, color: Colors.white70, size: 9),
+              child: const Icon(Icons.lock_rounded, color: Colors.white70, size: 10),
             ),
           ),
       ],
