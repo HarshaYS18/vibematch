@@ -143,7 +143,7 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.42,
+        height: MediaQuery.sizeOf(context).height * 0.46,
         child: Container(
           padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 10),
           decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
@@ -153,6 +153,11 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
               const SheetHandle(width: 42),
               const SizedBox(height: 8),
               const Text('Password & Privacy', style: TextStyle(color: RoomColors.plum, fontSize: 17, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              const Text(
+                'Locked mode applies only after a password is saved.',
+                style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 8),
               Expanded(
                 child: ListView(
@@ -163,13 +168,16 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
                     ...RoomPrivacyMode.values.map((mode) {
                       return _PrivacyTile(mode: mode, selected: _mode == mode, onTap: () {
                         setState(() => _mode = mode);
-                        widget.onModeChanged(mode);
+                        if (mode != RoomPrivacyMode.locked) {
+                          widget.onModeChanged(mode);
+                        }
                       });
                     }),
                     if (_mode == RoomPrivacyMode.locked) ...[
                       const SizedBox(height: 6),
                       TextField(
                         controller: _passwordController,
+                        obscureText: true,
                         decoration: InputDecoration(
                           hintText: 'Set room lock password',
                           isDense: true,
@@ -183,7 +191,15 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () => RoomToast.show(context, _passwordController.text.trim().isEmpty ? 'Enter a lock password' : 'Room lock saved'),
+                          onPressed: () {
+                            if (_passwordController.text.trim().isEmpty) {
+                              RoomToast.show(context, 'Enter a lock password');
+                              return;
+                            }
+                            widget.onModeChanged(RoomPrivacyMode.locked);
+                            RoomToast.show(context, 'Room lock saved');
+                            Navigator.pop(context);
+                          },
                           style: ElevatedButton.styleFrom(backgroundColor: RoomColors.plum, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
                           child: const Text('Save lock', style: TextStyle(fontWeight: FontWeight.w900)),
                         ),
