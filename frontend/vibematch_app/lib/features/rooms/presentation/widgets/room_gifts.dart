@@ -36,6 +36,7 @@ class GiftPanel extends StatefulWidget {
   final VoidCallback onRecharge;
 
   static const List<int> combos = [1, 9, 69, 99, 999];
+  static const List<int> luckyCombos = [9, 69, 99, 999];
 
   static List<GiftItem> withMockExtras(List<GiftItem> gifts) {
     const extras = <GiftItem>[
@@ -147,6 +148,33 @@ class GiftPanel extends StatefulWidget {
         chatSymbol: '🏰',
         colors: [Color(0xFFC99A3B), Color(0xFF251538)],
       ),
+      GiftItem(
+        id: 'owned_love_bomb_3',
+        name: 'Love x3',
+        category: GiftCategory.baggage,
+        coins: 0,
+        icon: Icons.favorite_rounded,
+        chatSymbol: '❤️',
+        colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)],
+      ),
+      GiftItem(
+        id: 'owned_rocket_1',
+        name: 'Rocket x1',
+        category: GiftCategory.baggage,
+        coins: 0,
+        icon: Icons.rocket_launch_rounded,
+        chatSymbol: '🚀',
+        colors: [Color(0xFF18C7B7), Color(0xFF6C63FF)],
+      ),
+      GiftItem(
+        id: 'owned_event_crown_2',
+        name: 'Crown x2',
+        category: GiftCategory.baggage,
+        coins: 0,
+        icon: Icons.workspace_premium_rounded,
+        chatSymbol: '👑',
+        colors: [Color(0xFFFFD166), Color(0xFF111827)],
+      ),
     ];
 
     final seen = gifts.map((gift) => gift.id).toSet();
@@ -195,6 +223,12 @@ class _GiftPanelState extends State<GiftPanel> {
     final allGifts = GiftPanel.withMockExtras(widget.gifts);
     final allSelected = widget.users.isNotEmpty &&
         widget.selectedReceiverIds.length == widget.users.length;
+    final comboOptions = widget.selectedCategory == GiftCategory.lucky
+        ? GiftPanel.luckyCombos
+        : GiftPanel.combos;
+    final comboValue = comboOptions.contains(widget.selectedCombo)
+        ? widget.selectedCombo
+        : comboOptions.first;
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.345,
@@ -246,7 +280,7 @@ class _GiftPanelState extends State<GiftPanel> {
                 ),
                 _TinyIconButton(
                   icon: Icons.apps_rounded,
-                  onTap: () => RoomToast.show(context, 'Bag / inventory opened'),
+                  onTap: () => RoomToast.show(context, 'Store / inventory opened'),
                 ),
               ],
             ),
@@ -300,9 +334,9 @@ class _GiftPanelState extends State<GiftPanel> {
                     itemCount: filtered.length,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 4,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 0.78,
+                      mainAxisSpacing: 7,
+                      crossAxisSpacing: 7,
+                      childAspectRatio: 1,
                     ),
                     itemBuilder: (context, giftIndex) {
                       final gift = filtered[giftIndex];
@@ -353,7 +387,7 @@ class _GiftPanelState extends State<GiftPanel> {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<int>(
-                      value: widget.selectedCombo,
+                      value: comboValue,
                       dropdownColor: const Color(0xFF201A2C),
                       iconEnabledColor: Colors.white,
                       style: const TextStyle(
@@ -361,7 +395,7 @@ class _GiftPanelState extends State<GiftPanel> {
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
                       ),
-                      items: GiftPanel.combos
+                      items: comboOptions
                           .map(
                             (combo) => DropdownMenuItem(
                               value: combo,
@@ -536,14 +570,16 @@ class CompactGiftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isOwned = gift.category == GiftCategory.baggage;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.all(7),
+        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: selected ? 0.15 : 0.07),
-          borderRadius: BorderRadius.circular(17),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: selected ? gift.colors.first : Colors.white12,
             width: selected ? 1.6 : 1,
@@ -552,16 +588,16 @@ class CompactGiftCard extends StatelessWidget {
               ? [
                   BoxShadow(
                     color: gift.colors.first.withValues(alpha: 0.20),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ]
               : null,
         ),
         child: Column(
           children: [
-            GradientIconBox(icon: gift.icon, colors: gift.colors, size: 34),
-            const SizedBox(height: 5),
+            GradientIconBox(icon: gift.icon, colors: gift.colors, size: 28),
+            const SizedBox(height: 3),
             Text(
               gift.name,
               maxLines: 1,
@@ -569,7 +605,7 @@ class CompactGiftCard extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 10.5,
+                fontSize: 9.7,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -577,17 +613,17 @@ class CompactGiftCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.toll_rounded,
-                  color: RoomColors.gold,
-                  size: 11,
+                Icon(
+                  isOwned ? Icons.inventory_2_rounded : Icons.toll_rounded,
+                  color: isOwned ? RoomColors.aqua : RoomColors.gold,
+                  size: 10,
                 ),
                 const SizedBox(width: 2),
                 Text(
-                  '${gift.coins}',
-                  style: const TextStyle(
-                    color: RoomColors.gold,
-                    fontSize: 10,
+                  isOwned ? 'Owned' : '${gift.coins}',
+                  style: TextStyle(
+                    color: isOwned ? RoomColors.aqua : RoomColors.gold,
+                    fontSize: 9.4,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
