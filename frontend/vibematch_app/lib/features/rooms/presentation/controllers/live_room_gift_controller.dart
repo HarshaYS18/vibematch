@@ -46,9 +46,7 @@ class LiveRoomGiftController {
       selectedGift = categoryGifts.first;
     }
 
-    if (category == GiftCategory.lucky && selectedCombo < 9) {
-      selectedCombo = 9;
-    }
+    selectedCombo = category == GiftCategory.lucky ? 9 : 1;
 
     onChanged();
   }
@@ -56,10 +54,7 @@ class LiveRoomGiftController {
   void selectGift(GiftItem gift) {
     selectedGift = gift;
     selectedCategory = gift.category;
-
-    if (gift.category == GiftCategory.lucky && selectedCombo < 9) {
-      selectedCombo = 9;
-    }
+    selectedCombo = gift.category == GiftCategory.lucky ? 9 : 1;
 
     onChanged();
   }
@@ -116,9 +111,6 @@ class LiveRoomGiftController {
     final sentToAll = receivers.length == roomUsers.length && roomUsers.isNotEmpty;
     final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
 
-    // If a gift is sent to All, the visible combo should represent the total
-    // number of gifts delivered: selected combo x number of receivers.
-    // Example: x9 sent to 3 people shows x27, then each combo trigger adds x27.
     final deliveredCombo = sentToAll
         ? selectedCombo * receivers.length
         : selectedCombo;
@@ -130,6 +122,7 @@ class LiveRoomGiftController {
         receiverName: receiver?.name ?? 'all',
         giftName: gift.name,
         giftIcon: gift.icon,
+        giftAssetPath: gift.assetPath,
         colors: gift.colors,
         combo: deliveredCombo,
         baseCombo: deliveredCombo,
@@ -168,7 +161,7 @@ class LiveRoomGiftController {
 
       final active = giftSlides[index];
 
-      if (active.remainingSeconds <= 1) {
+      if (active.remainingSeconds <= 0) {
         timer.cancel();
         giftSlides.removeAt(index);
         _giftTimers.remove(slide.id);
@@ -191,11 +184,12 @@ class LiveRoomGiftController {
       ChatEntry(
         senderName: slide.senderName,
         senderId: currentUser.id,
-        message: 'sent to ${slide.receiverName} 🎁 x${slide.combo}',
+        message: 'sent to ${slide.receiverName} ${slide.giftName} x${slide.combo}',
         vipLevel: currentUser.vipLevel,
         sendingLevel: currentUser.sendingLevel,
         receivingLevel: currentUser.receivingLevel,
         isGift: true,
+        giftAssetPath: slide.giftAssetPath,
       ),
     );
   }
