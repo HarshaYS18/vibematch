@@ -56,106 +56,28 @@ class RoomSettingsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <Widget>[
-      _SettingsCard(
-        icon: Icons.wallpaper_rounded,
-        title: 'Background',
-        onTap: onBackgroundTap,
-      ),
-      _SettingsCard(
-        icon: privacyMode.icon,
-        title: 'Privacy',
-        badge: privacyMode.shortLabel,
-        onTap: onPrivacyTap,
-      ),
-      _SettingsCard(
-        icon: Icons.grid_view_rounded,
-        title: 'Seats',
-        onTap: onSeatLayoutTap,
-      ),
-      _SettingsCard(
-        icon: Icons.campaign_rounded,
-        title: 'Notice',
-        onTap: onAnnouncementTap,
-      ),
-      _SettingsCard(
-        icon: Icons.favorite_rounded,
-        title: 'VibeSync',
-        badge: isVibeSyncActive ? 'Live' : null,
-        iconColor: RoomColors.coral,
-        onTap: onVibeSyncTap,
-      ),
-      _SettingsCard(
-        icon: Icons.shield_rounded,
-        title: 'Admins',
-        onTap: onAdminsTap,
-      ),
-      _SettingsCard(
-        icon: Icons.how_to_reg_rounded,
-        title: 'Requests',
-        badge: joinRequestCount > 0 ? '$joinRequestCount' : null,
-        onTap: onJoinRequestsTap,
-      ),
-      _SettingsCard(
-        icon: Icons.inbox_rounded,
-        title: 'Inbox',
-        onTap: onInboxTap,
-      ),
-      _SettingsCard(
-        icon: Icons.auto_awesome_rounded,
-        title: 'Effects',
-        onTap: onEffectsTap,
-      ),
-      _SettingsCard(
-        icon: Icons.music_note_rounded,
-        title: 'Music',
-        onTap: onMusicTap,
-      ),
-      _ToggleCard(
-        title: 'Images',
-        value: roomImagesEnabled,
-        onChanged: onToggleRoomImages,
-      ),
-      _ToggleCard(
-        title: 'Guests',
-        value: guestMessagesEnabled,
-        onChanged: onToggleGuestMessages,
-      ),
-      _ToggleCard(
-        title: 'Apply only',
-        value: applyOnlyModeEnabled,
-        onChanged: onToggleApplyOnlyMode,
-      ),
-      _SettingsCard(
-        icon: Icons.block_rounded,
-        title: 'Blocked',
-        onTap: onBlockedTap,
-      ),
-      _SettingsCard(
-        icon: Icons.report_gmailerrorred_rounded,
-        title: 'Reports',
-        onTap: onReportsTap,
-      ),
-      _SettingsCard(
-        icon: Icons.power_settings_new_rounded,
-        title: 'Close',
-        iconColor: RoomColors.coral,
-        onTap: onCloseRoom,
-      ),
+      _SettingsCard(icon: Icons.wallpaper_rounded, title: 'Background', onTap: onBackgroundTap),
+      _SettingsCard(icon: privacyMode.icon, title: 'Privacy', badge: privacyMode.shortLabel, onTap: onPrivacyTap),
+      _SettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
+      _SettingsCard(icon: Icons.campaign_rounded, title: 'Notice', onTap: onAnnouncementTap),
+      _SettingsCard(icon: Icons.favorite_rounded, title: 'VibeSync', badge: isVibeSyncActive ? 'Live' : null, iconColor: RoomColors.coral, onTap: onVibeSyncTap),
+      _SettingsCard(icon: Icons.shield_rounded, title: 'Admins', onTap: onAdminsTap),
+      _SettingsCard(icon: Icons.how_to_reg_rounded, title: 'Requests', badge: joinRequestCount > 0 ? '$joinRequestCount' : null, onTap: onJoinRequestsTap),
+      _SettingsCard(icon: Icons.auto_awesome_rounded, title: 'Effects', onTap: onEffectsTap),
+      _SettingsCard(icon: Icons.music_note_rounded, title: 'Music', onTap: onMusicTap),
+      _ToggleCard(title: 'Images', value: roomImagesEnabled, onChanged: onToggleRoomImages),
+      _ToggleCard(title: 'Guests', value: guestMessagesEnabled, onChanged: onToggleGuestMessages),
+      _ToggleCard(title: 'Apply only', value: applyOnlyModeEnabled, onChanged: onToggleApplyOnlyMode),
+      _SettingsCard(icon: Icons.block_rounded, title: 'Blocked', onTap: onBlockedTap),
+      _SettingsCard(icon: Icons.report_gmailerrorred_rounded, title: 'Reports', onTap: onReportsTap),
+      _SettingsCard(icon: Icons.power_settings_new_rounded, title: 'Close', iconColor: RoomColors.coral, onTap: onCloseRoom),
     ];
 
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.34,
+      height: MediaQuery.sizeOf(context).height * 0.36,
       child: Container(
-        padding: EdgeInsets.fromLTRB(
-          10,
-          7,
-          10,
-          MediaQuery.paddingOf(context).bottom + 8,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+        padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -165,14 +87,7 @@ class RoomSettingsSheet extends StatelessWidget {
               children: [
                 Icon(Icons.settings_rounded, color: RoomColors.aqua, size: 18),
                 SizedBox(width: 6),
-                Text(
-                  'Room Settings',
-                  style: TextStyle(
-                    color: RoomColors.plum,
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+                Text('Room Settings', style: TextStyle(color: RoomColors.plum, fontSize: 15.5, fontWeight: FontWeight.w900)),
               ],
             ),
             const SizedBox(height: 7),
@@ -198,11 +113,7 @@ class RoomSettingsSheet extends StatelessWidget {
 }
 
 class PrivacySettingsSheet extends StatefulWidget {
-  const PrivacySettingsSheet({
-    super.key,
-    required this.currentMode,
-    required this.onModeChanged,
-  });
+  const PrivacySettingsSheet({super.key, required this.currentMode, required this.onModeChanged});
 
   final RoomPrivacyMode currentMode;
   final ValueChanged<RoomPrivacyMode> onModeChanged;
@@ -234,46 +145,26 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
       child: SizedBox(
         height: MediaQuery.sizeOf(context).height * 0.42,
         child: Container(
-          padding: EdgeInsets.fromLTRB(
-            12,
-            8,
-            12,
-            MediaQuery.paddingOf(context).bottom + 10,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-          ),
+          padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 10),
+          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SheetHandle(width: 42),
               const SizedBox(height: 8),
-              const Text(
-                'Password & Privacy',
-                style: TextStyle(
-                  color: RoomColors.plum,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+              const Text('Password & Privacy', style: TextStyle(color: RoomColors.plum, fontSize: 17, fontWeight: FontWeight.w900)),
               const SizedBox(height: 8),
               Expanded(
                 child: ListView(
                   padding: EdgeInsets.zero,
                   physics: const BouncingScrollPhysics(),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   children: [
                     ...RoomPrivacyMode.values.map((mode) {
-                      return _PrivacyTile(
-                        mode: mode,
-                        selected: _mode == mode,
-                        onTap: () {
-                          setState(() => _mode = mode);
-                          widget.onModeChanged(mode);
-                        },
-                      );
+                      return _PrivacyTile(mode: mode, selected: _mode == mode, onTap: () {
+                        setState(() => _mode = mode);
+                        widget.onModeChanged(mode);
+                      });
                     }),
                     if (_mode == RoomPrivacyMode.locked) ...[
                       const SizedBox(height: 6),
@@ -284,38 +175,17 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
                           isDense: true,
                           filled: true,
                           fillColor: const Color(0xFFFAF7F1),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 10,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(13),
-                            borderSide: BorderSide.none,
-                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(13), borderSide: BorderSide.none),
                         ),
                       ),
                       const SizedBox(height: 7),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () => RoomToast.show(
-                            context,
-                            _passwordController.text.trim().isEmpty
-                                ? 'Enter a lock password'
-                                : 'Room lock saved',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: RoomColors.plum,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(13),
-                            ),
-                          ),
-                          child: const Text(
-                            'Save lock',
-                            style: TextStyle(fontWeight: FontWeight.w900),
-                          ),
+                          onPressed: () => RoomToast.show(context, _passwordController.text.trim().isEmpty ? 'Enter a lock password' : 'Room lock saved'),
+                          style: ElevatedButton.styleFrom(backgroundColor: RoomColors.plum, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
+                          child: const Text('Save lock', style: TextStyle(fontWeight: FontWeight.w900)),
                         ),
                       ),
                     ],
@@ -331,11 +201,7 @@ class _PrivacySettingsSheetState extends State<PrivacySettingsSheet> {
 }
 
 class _PrivacyTile extends StatelessWidget {
-  const _PrivacyTile({
-    required this.mode,
-    required this.selected,
-    required this.onTap,
-  });
+  const _PrivacyTile({required this.mode, required this.selected, required this.onTap});
 
   final RoomPrivacyMode mode;
   final bool selected;
@@ -349,41 +215,13 @@ class _PrivacyTile extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? RoomColors.aqua.withValues(alpha: 0.12)
-              : const Color(0xFFFCFAF6),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected
-                ? RoomColors.aqua.withValues(alpha: 0.30)
-                : const Color(0xFFE8DDCF),
-          ),
-        ),
+        decoration: BoxDecoration(color: selected ? RoomColors.aqua.withValues(alpha: 0.12) : const Color(0xFFFCFAF6), borderRadius: BorderRadius.circular(14), border: Border.all(color: selected ? RoomColors.aqua.withValues(alpha: 0.30) : const Color(0xFFE8DDCF))),
         child: Row(
           children: [
-            Icon(
-              mode.icon,
-              color: selected ? RoomColors.aqua : RoomColors.plum,
-              size: 18,
-            ),
+            Icon(mode.icon, color: selected ? RoomColors.aqua : RoomColors.plum, size: 18),
             const SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                mode.label,
-                style: TextStyle(
-                  color: selected ? RoomColors.aqua : RoomColors.plum,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            if (selected)
-              const Icon(
-                Icons.check_circle_rounded,
-                color: RoomColors.aqua,
-                size: 18,
-              ),
+            Expanded(child: Text(mode.label, style: TextStyle(color: selected ? RoomColors.aqua : RoomColors.plum, fontSize: 12.5, fontWeight: FontWeight.w900))),
+            if (selected) const Icon(Icons.check_circle_rounded, color: RoomColors.aqua, size: 18),
           ],
         ),
       ),
@@ -392,46 +230,24 @@ class _PrivacyTile extends StatelessWidget {
 }
 
 class SeatLayoutSheet extends StatelessWidget {
-  const SeatLayoutSheet({
-    super.key,
-    required this.selectedLayout,
-    required this.onSelected,
-  });
+  const SeatLayoutSheet({super.key, required this.selectedLayout, required this.onSelected});
 
   final String selectedLayout;
   final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final layouts = [
-      ...SeatLayoutSpec.withoutHostLayouts,
-      ...SeatLayoutSpec.withHostLayouts,
-    ];
+    final layouts = [...SeatLayoutSpec.withoutHostLayouts, ...SeatLayoutSpec.withHostLayouts];
     return Container(
-      padding: EdgeInsets.fromLTRB(
-        12,
-        8,
-        12,
-        MediaQuery.paddingOf(context).bottom + 10,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 10),
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SheetHandle(width: 42),
           const SizedBox(height: 8),
-          const Text(
-            'Seat Layout',
-            style: TextStyle(
-              color: RoomColors.plum,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          const Text('Seat Layout', style: TextStyle(color: RoomColors.plum, fontSize: 17, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 7,
@@ -443,23 +259,9 @@ class SeatLayoutSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(15),
                 onTap: () => onSelected(layout),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected ? RoomColors.plum : const Color(0xFFFCFAF6),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: const Color(0xFFE8DDCF)),
-                  ),
-                  child: Text(
-                    spec.label,
-                    style: TextStyle(
-                      color: selected ? Colors.white : RoomColors.plum,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(color: selected ? RoomColors.plum : const Color(0xFFFCFAF6), borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE8DDCF))),
+                  child: Text(spec.label, style: TextStyle(color: selected ? Colors.white : RoomColors.plum, fontSize: 12, fontWeight: FontWeight.w900)),
                 ),
               );
             }).toList(),
@@ -471,13 +273,7 @@ class SeatLayoutSheet extends StatelessWidget {
 }
 
 class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-    this.badge,
-    this.iconColor = RoomColors.aqua,
-  });
+  const _SettingsCard({required this.icon, required this.title, required this.onTap, this.badge, this.iconColor = RoomColors.aqua});
 
   final IconData icon;
   final String title;
@@ -492,50 +288,17 @@ class _SettingsCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFCFAF6),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: const Color(0xFFE8DDCF)),
-        ),
+        decoration: BoxDecoration(color: const Color(0xFFFCFAF6), borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE8DDCF))),
         child: Row(
           children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.13),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(icon, color: iconColor, size: 17),
-            ),
+            Container(width: 30, height: 30, decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: iconColor, size: 17)),
             const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: RoomColors.plum,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
+            Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: RoomColors.plum, fontSize: 12, fontWeight: FontWeight.w900))),
             if (badge != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: RoomColors.gold.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  badge!,
-                  style: const TextStyle(
-                    color: RoomColors.gold,
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+                decoration: BoxDecoration(color: RoomColors.gold.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
+                child: Text(badge!, style: const TextStyle(color: RoomColors.gold, fontSize: 8.5, fontWeight: FontWeight.w900)),
               ),
           ],
         ),
@@ -545,11 +308,7 @@ class _SettingsCard extends StatelessWidget {
 }
 
 class _ToggleCard extends StatelessWidget {
-  const _ToggleCard({
-    required this.title,
-    required this.value,
-    required this.onChanged,
-  });
+  const _ToggleCard({required this.title, required this.value, required this.onChanged});
 
   final String title;
   final bool value;
@@ -559,25 +318,10 @@ class _ToggleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFCFAF6),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color(0xFFE8DDCF)),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFFFCFAF6), borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE8DDCF))),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: RoomColors.plum,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
+          Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: RoomColors.plum, fontSize: 12, fontWeight: FontWeight.w900))),
           GestureDetector(
             onTap: () => onChanged(!value),
             child: AnimatedContainer(
@@ -586,22 +330,12 @@ class _ToggleCard extends StatelessWidget {
               width: 36,
               height: 20,
               padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: value ? RoomColors.aqua : const Color(0xFFD8D0CA),
-                borderRadius: BorderRadius.circular(999),
-              ),
+              decoration: BoxDecoration(color: value ? RoomColors.aqua : const Color(0xFFD8D0CA), borderRadius: BorderRadius.circular(999)),
               child: AnimatedAlign(
                 duration: const Duration(milliseconds: 160),
                 curve: Curves.easeOut,
                 alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+                child: Container(width: 16, height: 16, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
               ),
             ),
           ),
