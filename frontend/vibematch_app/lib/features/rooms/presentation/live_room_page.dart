@@ -270,6 +270,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               activeComboSlide: _giftController.activeComboSlide,
               bottomPadding: MediaQuery.paddingOf(context).bottom,
               onComboTap: _giftController.tapGiftCombo,
+              onVideoGiftFinished: _giftController.finishVideoGift,
               onComboButtonTap: () {
                 dismissRoomSeatActionPill();
                 final slide = _giftController.activeComboSlide;
