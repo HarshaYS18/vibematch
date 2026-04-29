@@ -16,6 +16,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     required this.bottomPadding,
     required this.onComboTap,
     required this.onComboButtonTap,
+    required this.onVideoGiftFinished,
   });
 
   final List<GiftSlide> slides;
@@ -23,6 +24,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
   final double bottomPadding;
   final ValueChanged<GiftSlide> onComboTap;
   final VoidCallback onComboButtonTap;
+  final ValueChanged<GiftSlide> onVideoGiftFinished;
 
   @override
   State<LiveRoomGiftOverlay> createState() => _LiveRoomGiftOverlayState();
@@ -41,7 +43,10 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
           slides: normalSlides,
           onComboTap: widget.onComboTap,
         ),
-        VideoGiftOverlay(slides: widget.slides),
+        VideoGiftOverlay(
+          slides: widget.slides,
+          onVideoFinished: widget.onVideoGiftFinished,
+        ),
         RibbonMessageOverlay(messages: _ribbonMessages),
         Positioned(
           right: 27,
