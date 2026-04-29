@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../data/home_repository.dart';
 import '../models/home_banner.dart';
 import '../models/home_room.dart';
 
 class HomeController extends ChangeNotifier {
+  HomeController({HomeRepository? repository})
+      : _repository = repository ?? HomeRepository();
+
+  final HomeRepository _repository;
+
   int selectedBannerIndex = 0;
   int visibleRoomCount = 6;
   String selectedCategory = 'Trending';
   String selectedLanguage = 'All';
+  bool isLoadingRooms = false;
+  String? loadErrorMessage;
+
+  List<HomeRoom> _backendRooms = const [];
 
   final List<String> categories = const [
     'Trending',
@@ -62,7 +72,7 @@ class HomeController extends ChangeNotifier {
     ),
   ];
 
-  final List<HomeRoom> rooms = const [
+  final List<HomeRoom> mockRooms = const [
     HomeRoom(id: 'VM120451', name: 'Late Night Chill', subtitle: 'Soft talks, music and Telugu vibes', language: 'Telugu', mode: 'Open', type: 'Music', onlineCount: 248, trendingScore: 9820, followedFriendsInside: ['Riya', 'Aman']),
     HomeRoom(id: 'VM881029', name: 'Hyderabad Friends Adda', subtitle: 'Casual chat room for Telugu friends', language: 'Telugu', mode: 'Locked', type: 'Chat', onlineCount: 186, trendingScore: 8740, followedFriendsInside: ['Meera']),
     HomeRoom(id: 'VM772190', name: 'Secret Star Vibe', subtitle: 'Private hidden room', language: 'Hindi', mode: 'Secret Vibe', type: 'Chat', onlineCount: 91, trendingScore: 8321, followedFriendsInside: ['Kiran']),
@@ -76,6 +86,12 @@ class HomeController extends ChangeNotifier {
     HomeRoom(id: 'VM771541', name: 'Bengali Music Night', subtitle: 'Songs, poems and friendly voices', language: 'Bengali', mode: 'Vibe Sync', type: 'Music', onlineCount: 176, trendingScore: 6891, followedFriendsInside: ['Kiran']),
     HomeRoom(id: 'VM445129', name: 'Friends Only Lounge', subtitle: 'Private member-based talk room', language: 'English', mode: 'Members Only', type: 'Chat', onlineCount: 67, trendingScore: 2870, followedFriendsInside: ['Meera']),
   ];
+
+  List<HomeRoom> get rooms {
+    return _backendRooms.isEmpty ? mockRooms : _backendRooms;
+  }
+
+  bool get usingBackendRooms => _backendRooms.isNotEmpty;
 
   List<HomeRoom> get publicOpenRooms {
     return rooms.where((room) => room.isPublicOpen || room.isLocked).toList();
@@ -102,6 +118,34 @@ class HomeController extends ChangeNotifier {
     return rooms.take(visibleRoomCount.clamp(0, rooms.length)).toList();
   }
 
+  Future<void> loadTrendingRooms({bool silent = false}) async {
+    if (isLoadingRooms) return;
+
+    isLoadingRooms = true;
+    if (!silent) loadErrorMessage = null;
+    notifyListeners();
+
+    try {
+      final fetchedRooms = await _repository.fetchTrendingRooms(
+        language: selectedLanguage == 'All' ? null : selectedLanguage,
+        category: selectedCategory == 'Trending' || selectedCategory == 'Following'
+            ? null
+            : selectedCategory,
+        limit: 50,
+      );
+
+      _backendRooms = fetchedRooms;
+      loadErrorMessage = null;
+    } catch (_) {
+      _backendRooms = const [];
+      loadErrorMessage = 'Backend unavailable. Showing local demo rooms.';
+    } finally {
+      isLoadingRooms = false;
+      visibleRoomCount = 6;
+      notifyListeners();
+    }
+  }
+
   void onScrollNearBottom(ScrollController scrollController) {
     if (!scrollController.hasClients) return;
     final nearBottom = scrollController.position.pixels > scrollController.position.maxScrollExtent - 420;
@@ -120,16 +164,24 @@ class HomeController extends ChangeNotifier {
     selectedCategory = category;
     visibleRoomCount = 6;
     notifyListeners();
+    loadTrendingRooms(silent: true);
   }
 
   void selectLanguage(String language) {
     selectedLanguage = language;
     visibleRoomCount = 6;
     notifyListeners();
+    loadTrendingRooms(silent: true);
   }
 
   void seeAllRooms() {
     visibleRoomCount = filteredRooms.length;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _repository.close();
+    super.dispose();
   }
 }
