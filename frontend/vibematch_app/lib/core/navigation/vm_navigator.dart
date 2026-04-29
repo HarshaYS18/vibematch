@@ -88,6 +88,10 @@ class VmNavigator {
     return Navigator.pushNamed<T>(context, VmRoutes.family);
   }
 
+  static Future<T?> openLoveBond<T>(BuildContext context) {
+    return Navigator.pushNamed<T>(context, VmRoutes.loveBond);
+  }
+
   static Future<T?> openVip<T>(BuildContext context) {
     return Navigator.pushNamed<T>(context, VmRoutes.vip);
   }
