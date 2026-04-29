@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -26,11 +28,9 @@ class VideoGiftOverlay extends StatelessWidget {
     return Positioned.fill(
       child: IgnorePointer(
         ignoring: true,
-        child: Center(
-          child: VideoGiftCard(
-            slide: activeVideoSlides.first,
-            onVideoFinished: onVideoFinished,
-          ),
+        child: VideoGiftCard(
+          slide: activeVideoSlides.first,
+          onVideoFinished: onVideoFinished,
         ),
       ),
     );
@@ -53,26 +53,43 @@ class VideoGiftCard extends StatefulWidget {
 
 class _VideoGiftCardState extends State<VideoGiftCard> {
   VideoPlayerController? _controller;
+  Timer? _imageGiftTimer;
   bool _ready = false;
   bool _failed = false;
   bool _finishNotified = false;
 
+  bool get _isAnimatedImageGift {
+    final path = widget.slide.videoAssetPath?.toLowerCase().trim() ?? '';
+    return path.endsWith('.webp') || path.endsWith('.gif') || path.endsWith('.png') || path.endsWith('.apng');
+  }
+
   @override
   void initState() {
     super.initState();
-    _loadVideo();
+    _loadGiftEffect();
   }
 
   @override
   void didUpdateWidget(covariant VideoGiftCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.slide.id != widget.slide.id) {
+    if (oldWidget.slide.id != widget.slide.id || oldWidget.slide.videoAssetPath != widget.slide.videoAssetPath) {
       _disposeController();
+      _imageGiftTimer?.cancel();
+      _imageGiftTimer = null;
       _ready = false;
       _failed = false;
       _finishNotified = false;
-      _loadVideo();
+      _loadGiftEffect();
     }
+  }
+
+  void _loadGiftEffect() {
+    if (_isAnimatedImageGift) {
+      setState(() => _ready = true);
+      _imageGiftTimer = Timer(const Duration(seconds: 8), _notifyFinished);
+      return;
+    }
+    unawaited(_loadVideo());
   }
 
   Future<void> _loadVideo() async {
@@ -138,142 +155,253 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
 
   @override
   void dispose() {
+    _imageGiftTimer?.cancel();
     _disposeController();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final cardWidth = (size.width * 0.82).clamp(280.0, 390.0);
-    final cardHeight = (size.height * 0.40).clamp(250.0, 360.0);
+    final screen = MediaQuery.sizeOf(context);
+    final effectWidth = screen.width * 0.90;
+    final effectHeight = screen.height * 0.90;
 
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.88, end: 1.0),
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutBack,
+      tween: Tween(begin: 0.94, end: 1.0),
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         return Opacity(
           opacity: value.clamp(0.0, 1.0),
           child: Transform.scale(scale: value, child: child),
         );
       },
-      child: Container(
-        width: cardWidth,
-        height: cardHeight,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-          boxShadow: [
-            BoxShadow(
-              color: RoomColors.coral.withValues(alpha: 0.32),
-              blurRadius: 34,
-              offset: const Offset(0, 14),
-            ),
-            BoxShadow(
-              color: RoomColors.gold.withValues(alpha: 0.20),
-              blurRadius: 44,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(27),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (_ready && _controller != null)
-                FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: _controller!.value.size.width,
-                    height: _controller!.value.size.height,
-                    child: VideoPlayer(_controller!),
-                  ),
-                )
-              else
-                _VideoGiftFallback(
-                  failed: _failed,
-                  colors: widget.slide.colors,
-                  icon: widget.slide.giftIcon,
-                ),
-              Positioned(
-                left: 12,
-                right: 12,
-                top: 12,
-                child: _VideoGiftTitle(slide: widget.slide),
+      child: Stack(
+        fit: StackFit.expand,
+        alignment: Alignment.center,
+        children: [
+          Center(
+            child: SizedBox(
+              width: effectWidth,
+              height: effectHeight,
+              child: _GiftEffectVisual(
+                slide: widget.slide,
+                ready: _ready,
+                failed: _failed,
+                controller: _controller,
+                isAnimatedImageGift: _isAnimatedImageGift,
               ),
-            ],
+            ),
           ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 14,
+            left: 18,
+            right: 18,
+            child: Center(child: _GoldenGiftRoutePill(slide: widget.slide)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GiftEffectVisual extends StatelessWidget {
+  const _GiftEffectVisual({
+    required this.slide,
+    required this.ready,
+    required this.failed,
+    required this.controller,
+    required this.isAnimatedImageGift,
+  });
+
+  final GiftSlide slide;
+  final bool ready;
+  final bool failed;
+  final VideoPlayerController? controller;
+  final bool isAnimatedImageGift;
+
+  @override
+  Widget build(BuildContext context) {
+    if (ready && isAnimatedImageGift) {
+      return Image.asset(
+        slide.videoAssetPath!,
+        fit: BoxFit.contain,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (context, error, stackTrace) => _VideoGiftFallback(
+          failed: true,
+          colors: slide.colors,
+          icon: slide.giftIcon,
+        ),
+      );
+    }
+
+    final videoController = controller;
+    if (ready && videoController != null) {
+      return FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: videoController.value.size.width,
+          height: videoController.value.size.height,
+          child: VideoPlayer(videoController),
+        ),
+      );
+    }
+
+    return Center(
+      child: SizedBox(
+        width: 220,
+        height: 220,
+        child: _VideoGiftFallback(
+          failed: failed,
+          colors: slide.colors,
+          icon: slide.giftIcon,
         ),
       ),
     );
   }
 }
 
-class _VideoGiftTitle extends StatelessWidget {
-  const _VideoGiftTitle({required this.slide});
+class _GoldenGiftRoutePill extends StatelessWidget {
+  const _GoldenGiftRoutePill({required this.slide});
 
   final GiftSlide slide;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.92),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.42),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFF2A8),
+            Color(0xFFFFD166),
+            Color(0xFFC88922),
+            Color(0xFFFFE08A),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.66), width: 1.3),
+        boxShadow: [
+          BoxShadow(
+            color: RoomColors.gold.withValues(alpha: 0.52),
+            blurRadius: 26,
+            spreadRadius: 1.4,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.28),
+            blurRadius: 18,
+            spreadRadius: 0.6,
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              slide.senderName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.54),
+                      Colors.white.withValues(alpha: 0.06),
+                      Colors.black.withValues(alpha: 0.08),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 7),
-            child: Text(
-              '➜',
-              style: TextStyle(
-                color: RoomColors.gold,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
+            Positioned(
+              left: -28,
+              top: -22,
+              child: Transform.rotate(
+                angle: -0.44,
+                child: Container(
+                  width: 42,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.0),
+                        Colors.white.withValues(alpha: 0.70),
+                        Colors.white.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-          Flexible(
-            child: Text(
-              slide.receiverName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(child: _PillText(slide.senderName)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    '➜',
+                    style: TextStyle(
+                      color: Color(0xFF4B2800),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      shadows: [
+                        Shadow(color: Colors.white, blurRadius: 8),
+                        Shadow(color: Color(0xFFFFF1B8), blurRadius: 14),
+                      ],
+                    ),
+                  ),
+                ),
+                Flexible(child: _PillText(slide.receiverName)),
+                const SizedBox(width: 9),
+                Text(
+                  'x${slide.combo}',
+                  maxLines: 1,
+                  style: const TextStyle(
+                    color: Color(0xFF4B2800),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                    shadows: [
+                      Shadow(color: Colors.white, blurRadius: 8),
+                      Shadow(color: Color(0xFFFFF1B8), blurRadius: 15),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(width: 7),
-          Text(
-            'x${slide.combo}',
-            style: const TextStyle(
-              color: RoomColors.gold,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PillText extends StatelessWidget {
+  const _PillText(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        color: Color(0xFF4B2800),
+        fontSize: 15,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.1,
+        shadows: [
+          Shadow(color: Colors.white, blurRadius: 8),
+          Shadow(color: Color(0xFFFFF1B8), blurRadius: 14),
         ],
       ),
     );
@@ -295,11 +423,16 @@ class _VideoGiftFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: colors,
         ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+        boxShadow: [
+          BoxShadow(color: colors.first.withValues(alpha: 0.30), blurRadius: 28),
+        ],
       ),
       child: Center(
         child: Column(
@@ -308,7 +441,7 @@ class _VideoGiftFallback extends StatelessWidget {
             Icon(icon, color: Colors.white, size: 58),
             const SizedBox(height: 12),
             Text(
-              failed ? 'Video file missing' : 'Loading effect...',
+              failed ? 'Gift effect missing' : 'Loading effect...',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 14,

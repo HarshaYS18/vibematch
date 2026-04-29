@@ -371,7 +371,7 @@ const List<ChatEntry> mockChatEntries = [];
 
 const List<GiftItem> mockGiftItems = [
   GiftItem(id: 'love_bomb', name: 'Love Bomb', category: GiftCategory.classic, coins: 1, icon: Icons.favorite_rounded, chatSymbol: '❤️', assetPath: 'assets/images/gifts/love_bomb.png', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
-  GiftItem(id: 'love_rocket', name: 'Love Rocket', category: GiftCategory.premium, coins: 999, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/images/gifts/rocket.png', videoAssetPath: 'assets/videos/gifts/love_rocket.mp4', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
+  GiftItem(id: 'love_rocket', name: 'Love Rocket', category: GiftCategory.premium, coins: 999, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/gifts/love_rocket/icon/love_rocket_icon.webp', videoAssetPath: 'assets/gifts/love_rocket/effect/love_rocket_effect.webp', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
   GiftItem(id: 'rocket', name: 'Rocket', category: GiftCategory.classic, coins: 99, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/images/gifts/rocket.png', colors: [Color(0xFF18C7B7), Color(0xFF6C63FF)]),
   GiftItem(id: 'lucky_star', name: 'Lucky Star', category: GiftCategory.lucky, coins: 19, icon: Icons.auto_awesome_rounded, chatSymbol: '✨', assetPath: 'assets/images/gifts/lucky_star.png', colors: [Color(0xFFFFD166), Color(0xFFFF7A45)]),
   GiftItem(id: 'event_crown', name: 'Event Crown', category: GiftCategory.event, coins: 199, icon: Icons.emoji_events_rounded, chatSymbol: '🏆', assetPath: 'assets/images/gifts/event_crown.png', colors: [Color(0xFFC99A3B), Color(0xFFE84C72)]),
