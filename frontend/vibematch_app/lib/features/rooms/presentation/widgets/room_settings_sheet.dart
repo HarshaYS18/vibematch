@@ -53,34 +53,13 @@ class RoomSettingsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <Widget>[
-      _SectionLabel(label: 'Modes'),
-      _SettingsCard(icon: Icons.favorite_rounded, title: 'VibeSync', iconColor: RoomColors.coral, onTap: onVibeSyncTap),
-      _SettingsCard(icon: Icons.smart_display_rounded, title: 'Watch Party', iconColor: RoomColors.aqua, onTap: onWatchPartyTap),
-      _SectionLabel(label: 'Room'),
-      _SettingsCard(icon: Icons.wallpaper_rounded, title: 'Background', onTap: onBackgroundTap),
-      _SettingsCard(icon: privacyMode.icon, title: 'Privacy', badge: privacyMode.shortLabel, onTap: onPrivacyTap),
-      _SettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
-      _SettingsCard(icon: Icons.campaign_rounded, title: 'Notice', onTap: onAnnouncementTap),
-      _SettingsCard(icon: Icons.how_to_reg_rounded, title: 'Requests', badge: joinRequestCount > 0 ? '$joinRequestCount' : null, onTap: onJoinRequestsTap),
-      _SettingsCard(icon: Icons.auto_awesome_rounded, title: 'Effects', onTap: onEffectsTap),
-      _SettingsCard(icon: Icons.music_note_rounded, title: 'Music', onTap: onMusicTap),
-      _SettingsCard(icon: Icons.block_rounded, title: 'Blocked', onTap: onBlockedTap),
-      _SettingsCard(icon: Icons.report_gmailerrorred_rounded, title: 'Reports', onTap: onReportsTap),
-      _SectionLabel(label: 'Permissions'),
-      _ToggleCard(title: 'Images', value: roomImagesEnabled, onChanged: onToggleRoomImages),
-      _ToggleCard(title: 'Guests', value: guestMessagesEnabled, onChanged: onToggleGuestMessages),
-      _ToggleCard(title: 'Apply only', value: applyOnlyModeEnabled, onChanged: onToggleApplyOnlyMode),
-      _SettingsCard(icon: Icons.power_settings_new_rounded, title: 'Close', iconColor: RoomColors.coral, onTap: onCloseRoom),
-    ];
-
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.42,
+      height: MediaQuery.sizeOf(context).height * 0.52,
       child: Container(
-        padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
+        padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 10),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,19 +80,55 @@ class RoomSettingsSheet extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 8),
             Expanded(
-              child: GridView.builder(
+              child: ListView(
                 padding: EdgeInsets.zero,
                 physics: const BouncingScrollPhysics(),
-                itemCount: items.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisExtent: 48,
-                  crossAxisSpacing: 7,
-                  mainAxisSpacing: 7,
-                ),
-                itemBuilder: (context, index) => items[index],
+                children: [
+                  _SettingsSection(
+                    title: 'Modes',
+                    children: [
+                      _SettingsCard(
+                        icon: Icons.favorite_rounded,
+                        title: 'VibeSync',
+                        iconColor: RoomColors.coral,
+                        onTap: onVibeSyncTap,
+                      ),
+                      _SettingsCard(
+                        icon: Icons.smart_display_rounded,
+                        title: 'Watch Party',
+                        iconColor: RoomColors.aqua,
+                        onTap: onWatchPartyTap,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 11),
+                  _SettingsSection(
+                    title: 'Room Settings',
+                    children: [
+                      _SettingsCard(icon: Icons.wallpaper_rounded, title: 'Background', onTap: onBackgroundTap),
+                      _SettingsCard(icon: privacyMode.icon, title: 'Privacy', badge: privacyMode.shortLabel, onTap: onPrivacyTap),
+                      _SettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
+                      _SettingsCard(icon: Icons.campaign_rounded, title: 'Notice', onTap: onAnnouncementTap),
+                      _SettingsCard(icon: Icons.how_to_reg_rounded, title: 'Requests', badge: joinRequestCount > 0 ? '$joinRequestCount' : null, onTap: onJoinRequestsTap),
+                      _SettingsCard(icon: Icons.auto_awesome_rounded, title: 'Effects', onTap: onEffectsTap),
+                      _SettingsCard(icon: Icons.music_note_rounded, title: 'Music', onTap: onMusicTap),
+                      _SettingsCard(icon: Icons.block_rounded, title: 'Blocked', onTap: onBlockedTap),
+                      _SettingsCard(icon: Icons.report_gmailerrorred_rounded, title: 'Reports', onTap: onReportsTap),
+                    ],
+                  ),
+                  const SizedBox(height: 11),
+                  _SettingsSection(
+                    title: 'Permissions',
+                    children: [
+                      _ToggleCard(title: 'Images', value: roomImagesEnabled, onChanged: onToggleRoomImages),
+                      _ToggleCard(title: 'Guests', value: guestMessagesEnabled, onChanged: onToggleGuestMessages),
+                      _ToggleCard(title: 'Apply only', value: applyOnlyModeEnabled, onChanged: onToggleApplyOnlyMode),
+                      _SettingsCard(icon: Icons.power_settings_new_rounded, title: 'Close', iconColor: RoomColors.coral, onTap: onCloseRoom),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -123,28 +138,43 @@ class RoomSettingsSheet extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({required this.title, required this.children});
 
-  final String label;
+  final String title;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 4),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color(0xFF8B7D92),
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: RoomColors.plum,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.2,
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 7),
+        GridView.builder(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: children.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisExtent: 48,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+          ),
+          itemBuilder: (context, index) => children[index],
+        ),
+      ],
     );
   }
 }
