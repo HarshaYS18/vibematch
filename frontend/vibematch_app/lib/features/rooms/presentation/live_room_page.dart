@@ -273,9 +273,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             ),
             VibeSyncRoomOverlay(
               state: _vibeSyncState,
-              users: _roomUsers,
-              onPulseTap: _tapVibePulse,
-              onReactionTap: _reactMicChemistry,
+              onDismiss: _clearVibeSyncOverlay,
             ),
             LiveRoomGiftOverlay(
               slides: _giftController.giftSlides,
@@ -627,48 +625,53 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       backgroundColor: Colors.transparent,
       builder: (_) => VibeSyncControlSheet(
         state: _vibeSyncState,
+        users: _roomUsers,
         canManage: _viewerCanManageRoom,
-        onStartPulse: () {
-          Navigator.pop(context);
+        onPickFirst: (user) {
           setState(() {
-            _vibeSyncState = const VibeSyncRoomState(active: true, mode: VibeSyncMode.pulseMatch, pulseCount: 0, chemistryScore: 0, statusText: 'Pulse Match is live — tap when you feel the vibe');
+            _vibeSyncState = _vibeSyncState.copyWith(
+              active: false,
+              announced: false,
+              firstUser: user,
+              statusText: 'First user picked: ${user.name}',
+            );
           });
-          _insertSystemMessage('VibeSync Pulse Match started');
         },
-        onStartChemistry: () {
-          Navigator.pop(context);
+        onPickSecond: (user) {
           setState(() {
-            _vibeSyncState = const VibeSyncRoomState(active: true, mode: VibeSyncMode.micChemistry, pulseCount: 0, chemistryScore: 62, statusText: 'Mic Chemistry is live — react to boost the score');
+            _vibeSyncState = _vibeSyncState.copyWith(
+              active: false,
+              announced: false,
+              secondUser: user,
+              statusText: 'Second user picked: ${user.name}',
+            );
           });
-          _insertSystemMessage('VibeSync Mic Chemistry started');
+        },
+        onAnnounce: () {
+          Navigator.pop(context);
+          final first = _vibeSyncState.firstUser;
+          final second = _vibeSyncState.secondUser;
+          if (first == null || second == null) return;
+          setState(() {
+            _vibeSyncState = _vibeSyncState.copyWith(
+              active: true,
+              announced: true,
+              statusText: '${first.name} and ${second.name} are matched by VibeSync',
+            );
+          });
+          _insertSystemMessage('VibeSync announced ${first.name} × ${second.name}');
         },
         onEnd: () {
           Navigator.pop(context);
           setState(() => _vibeSyncState = VibeSyncRoomState.inactive);
-          _insertSystemMessage('VibeSync ended');
+          _insertSystemMessage('VibeSync match cleared');
         },
       ),
     );
   }
 
-  void _tapVibePulse() {
-    setState(() {
-      final next = _vibeSyncState.pulseCount + 1;
-      _vibeSyncState = _vibeSyncState.copyWith(
-        pulseCount: next,
-        statusText: next % 2 == 0 ? 'Pulse synced — match wave created 💗' : 'Pulse sent — waiting for another vibe',
-      );
-    });
-  }
-
-  void _reactMicChemistry() {
-    setState(() {
-      final nextScore = (_vibeSyncState.chemistryScore + 7).clamp(0, 100);
-      _vibeSyncState = _vibeSyncState.copyWith(
-        chemistryScore: nextScore,
-        statusText: nextScore >= 90 ? 'Chemistry is fire — ${nextScore}% match' : 'Audience reaction boosted chemistry to $nextScore%',
-      );
-    });
+  void _clearVibeSyncOverlay() {
+    setState(() => _vibeSyncState = _vibeSyncState.copyWith(active: false));
   }
 
   void _openJoinRequestsSheet() {
