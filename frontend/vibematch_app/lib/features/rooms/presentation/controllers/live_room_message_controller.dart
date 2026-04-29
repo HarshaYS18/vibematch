@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../live_room_models.dart';
 
 class LiveRoomMessageController {
@@ -48,16 +50,7 @@ class LiveRoomMessageController {
     final trimmed = message.trim();
     if (trimmed.isEmpty) return;
 
-    messages.insert(
-      0,
-      ChatEntry(
-        senderName: 'System',
-        senderId: 'system',
-        message: trimmed,
-      ),
-    );
-
-    onChanged();
+    _insertAutoClearSystemMessage(trimmed);
   }
 
   void insertEntry(ChatEntry entry) {
@@ -66,18 +59,8 @@ class LiveRoomMessageController {
   }
 
   void clearChatForEveryone() {
-    messages
-      ..clear()
-      ..insert(
-        0,
-        ChatEntry(
-          senderName: 'System',
-          senderId: 'system',
-          message: 'Chat cleared for everyone by ${currentUser.name}',
-        ),
-      );
-
-    onChanged();
+    messages.clear();
+    _insertAutoClearSystemMessage('Chat cleared for everyone by ${currentUser.name}');
   }
 
   void requestJoin() {
@@ -114,6 +97,23 @@ class LiveRoomMessageController {
 
     onChanged();
   }
+
+  void _insertAutoClearSystemMessage(String message) {
+    final entry = ChatEntry(
+      senderName: 'System',
+      senderId: 'system',
+      message: message,
+    );
+
+    messages.insert(0, entry);
+    onChanged();
+
+    Timer(const Duration(seconds: 5), () {
+      final removed = messages.remove(entry);
+      if (removed) onChanged();
+    });
+  }
 }
 
 typedef VoidCallbackLike = void Function();
+typedef ValueChangedLike<T> = void Function(T value);
