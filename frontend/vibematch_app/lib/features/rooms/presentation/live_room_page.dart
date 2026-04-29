@@ -658,6 +658,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) {
           return LiveRoomSettingsSheetModule(
+            roomId: _roomId,
             privacyMode: _privacyMode,
             roomImagesEnabled: _roomImagesEnabled,
             guestMessagesEnabled: _guestMessagesEnabled,
@@ -948,5 +949,3 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 }
-
-
