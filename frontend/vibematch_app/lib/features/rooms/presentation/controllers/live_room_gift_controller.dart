@@ -26,7 +26,8 @@ class LiveRoomGiftController {
   final Set<String> _finishedGiftMessageIds = <String>{};
 
   GiftSlide? get activeComboSlide {
-    return giftSlides.isEmpty ? null : giftSlides.first;
+    final normalSlides = giftSlides.where((slide) => !slide.isVideoGift).toList(growable: false);
+    return normalSlides.isEmpty ? null : normalSlides.first;
   }
 
   void ensureDefaultReceiver(List<SeatUser> roomUsers) {
@@ -37,17 +38,9 @@ class LiveRoomGiftController {
 
   void selectCategory(GiftCategory category) {
     selectedCategory = category;
-
-    final categoryGifts = mockGiftItems
-        .where((gift) => gift.category == category)
-        .toList();
-
-    if (categoryGifts.isNotEmpty) {
-      selectedGift = categoryGifts.first;
-    }
-
+    final categoryGifts = mockGiftItems.where((gift) => gift.category == category).toList();
+    if (categoryGifts.isNotEmpty) selectedGift = categoryGifts.first;
     selectedCombo = category == GiftCategory.lucky ? 9 : 1;
-
     onChanged();
   }
 
@@ -55,7 +48,6 @@ class LiveRoomGiftController {
     selectedGift = gift;
     selectedCategory = gift.category;
     selectedCombo = gift.category == GiftCategory.lucky ? 9 : 1;
-
     onChanged();
   }
 
@@ -89,16 +81,14 @@ class LiveRoomGiftController {
     final gift = selectedGift;
     if (gift == null) return;
 
-    final receivers = roomUsers
-        .where((user) => selectedReceiverIds.contains(user.id))
-        .toList();
-
+    final receivers = roomUsers.where((user) => selectedReceiverIds.contains(user.id)).toList();
     if (receivers.isEmpty) {
       onToast('Select a receiver');
       return;
     }
 
-    final totalCost = gift.coins * selectedCombo * receivers.length;
+    final effectiveCombo = gift.isVideoGift ? 1 : selectedCombo;
+    final totalCost = gift.coins * effectiveCombo * receivers.length;
 
     if (coinBalance < totalCost) {
       onToast('Not enough coins');
@@ -108,12 +98,9 @@ class LiveRoomGiftController {
     coinBalance -= totalCost;
     onChanged();
 
-    final sentToAll = receivers.length == roomUsers.length && roomUsers.isNotEmpty;
+    final sentToAll = !gift.isVideoGift && receivers.length == roomUsers.length && roomUsers.isNotEmpty;
     final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
-
-    final deliveredCombo = sentToAll
-        ? selectedCombo * receivers.length
-        : selectedCombo;
+    final deliveredCombo = sentToAll ? effectiveCombo * receivers.length : effectiveCombo;
 
     for (final receiver in targets) {
       final slide = GiftSlide(
@@ -123,26 +110,24 @@ class LiveRoomGiftController {
         giftName: gift.name,
         giftIcon: gift.icon,
         giftAssetPath: gift.assetPath,
+        videoAssetPath: gift.videoAssetPath,
         colors: gift.colors,
         combo: deliveredCombo,
         baseCombo: deliveredCombo,
-        remainingSeconds: 15,
+        remainingSeconds: gift.isVideoGift ? 7 : 15,
       );
       _startGiftSlide(slide);
     }
   }
 
   void tapGiftCombo(GiftSlide slide) {
+    if (slide.isVideoGift) return;
     final index = giftSlides.indexWhere((item) => item.id == slide.id);
     if (index < 0) return;
 
     final active = giftSlides[index];
     final nextCombo = active.combo + active.baseCombo;
-
-    giftSlides[index] = active.copyWith(
-      combo: nextCombo,
-      remainingSeconds: 15,
-    );
+    giftSlides[index] = active.copyWith(combo: nextCombo, remainingSeconds: 15);
     onChanged();
   }
 
@@ -150,36 +135,35 @@ class LiveRoomGiftController {
     giftSlides.insert(0, slide);
     onChanged();
 
+    if (slide.isVideoGift) {
+      _insertFinalGiftMessage(slide);
+    }
+
     _giftTimers[slide.id]?.cancel();
     _giftTimers[slide.id] = Timer.periodic(const Duration(seconds: 1), (timer) {
       final index = giftSlides.indexWhere((item) => item.id == slide.id);
-
       if (index < 0) {
         timer.cancel();
         return;
       }
 
       final active = giftSlides[index];
-
       if (active.remainingSeconds <= 0) {
         timer.cancel();
         giftSlides.removeAt(index);
         _giftTimers.remove(slide.id);
-        _insertFinalGiftMessage(active);
+        if (!active.isVideoGift) _insertFinalGiftMessage(active);
         onChanged();
         return;
       }
 
-      giftSlides[index] = active.copyWith(
-        remainingSeconds: active.remainingSeconds - 1,
-      );
+      giftSlides[index] = active.copyWith(remainingSeconds: active.remainingSeconds - 1);
       onChanged();
     });
   }
 
   void _insertFinalGiftMessage(GiftSlide slide) {
     if (!_finishedGiftMessageIds.add(slide.id)) return;
-
     onFinalGiftMessage(
       ChatEntry(
         senderName: slide.senderName,

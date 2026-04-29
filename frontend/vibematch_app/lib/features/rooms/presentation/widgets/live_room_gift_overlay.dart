@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../modules/gift_slide/presentation/gift_slide_overlay.dart';
 import '../../modules/ribbon_chat/models/ribbon_message.dart';
 import '../../modules/ribbon_chat/presentation/ribbon_message_overlay.dart';
+import '../../modules/video_gift/presentation/video_gift_overlay.dart';
 import '../live_room_models.dart';
 import 'live_room_event_carousel.dart';
 import 'room_gifts.dart';
@@ -32,12 +33,15 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final normalSlides = widget.slides.where((slide) => !slide.isVideoGift).toList(growable: false);
+
     return Stack(
       children: [
         GiftSlideOverlay(
-          slides: widget.slides,
+          slides: normalSlides,
           onComboTap: widget.onComboTap,
         ),
+        VideoGiftOverlay(slides: widget.slides),
         RibbonMessageOverlay(messages: _ribbonMessages),
         Positioned(
           right: 27,
