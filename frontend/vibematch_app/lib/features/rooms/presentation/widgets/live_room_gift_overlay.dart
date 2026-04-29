@@ -36,6 +36,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   @override
   Widget build(BuildContext context) {
     final normalSlides = widget.slides.where((slide) => !slide.isVideoGift).toList(growable: false);
+    final hasActiveVideoGift = widget.slides.any((slide) => slide.videoAssetPath?.trim().isNotEmpty ?? false);
 
     return SizedBox.expand(
       child: Stack(
@@ -51,11 +52,12 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             onVideoFinished: widget.onVideoGiftFinished,
           ),
           RibbonMessageOverlay(messages: _ribbonMessages),
-          Positioned(
-            right: 27,
-            bottom: 140 + widget.bottomPadding,
-            child: const LiveRoomEventCarousel(),
-          ),
+          if (!hasActiveVideoGift)
+            Positioned(
+              right: 27,
+              bottom: 140 + widget.bottomPadding,
+              child: const LiveRoomEventCarousel(),
+            ),
           Positioned(
             right: 18,
             bottom: 52 + widget.bottomPadding,
