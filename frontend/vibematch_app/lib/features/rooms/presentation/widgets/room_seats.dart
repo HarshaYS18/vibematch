@@ -241,14 +241,40 @@ class _SeatAvatar extends StatelessWidget {
               ),
             ),
           ),
-          if (user?.muted ?? false)
+          if (user?.selfMuted ?? false)
             Positioned(
               right: 0,
               bottom: 5,
               child: Container(
                 width: 21,
                 height: 21,
-                decoration: BoxDecoration(color: RoomColors.selfMute, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.3)),
+                decoration: BoxDecoration(
+                  color: RoomColors.selfMute,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: RoomColors.deep, width: 1.3),
+                ),
+                child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 11),
+              ),
+            ),
+          if (user?.adminMuted ?? false)
+            Positioned(
+              right: 0,
+              bottom: 5,
+              child: Container(
+                width: 21,
+                height: 21,
+                decoration: BoxDecoration(
+                  color: RoomColors.coral,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: RoomColors.deep, width: 1.3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: RoomColors.coral.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 11),
               ),
             ),

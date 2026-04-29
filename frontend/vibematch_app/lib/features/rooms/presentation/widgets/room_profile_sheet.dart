@@ -27,6 +27,7 @@ class UserMiniProfileSheet extends StatelessWidget {
     required this.onSelfMuteToggle,
     required this.onAdminMuteToggle,
     required this.onGiftTap,
+    this.onKickOutTap,
   });
 
   final SeatUser user;
@@ -49,6 +50,7 @@ class UserMiniProfileSheet extends StatelessWidget {
   final VoidCallback onSelfMuteToggle;
   final VoidCallback onAdminMuteToggle;
   final VoidCallback onGiftTap;
+  final VoidCallback? onKickOutTap;
 
   bool get _isSelf => user.id == currentUser.id;
   bool get _showAdminMenu => canModerate && !_isSelf;
@@ -151,6 +153,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                   onSelfMuteToggle: onSelfMuteToggle,
                   onAdminMuteToggle: onAdminMuteToggle,
                   onGiftTap: onGiftTap,
+                  onKickOutTap: onKickOutTap,
                 ),
               ],
             ),
@@ -1042,6 +1045,7 @@ class _ActionRow extends StatelessWidget {
     required this.onSelfMuteToggle,
     required this.onAdminMuteToggle,
     required this.onGiftTap,
+    this.onKickOutTap,
   });
 
   final bool isSelf;
@@ -1052,63 +1056,102 @@ class _ActionRow extends StatelessWidget {
   final VoidCallback onSelfMuteToggle;
   final VoidCallback onAdminMuteToggle;
   final VoidCallback onGiftTap;
+  final VoidCallback? onKickOutTap;
 
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
-      _IconActionChip(icon: Icons.card_giftcard_rounded, tooltip: 'Gift', onTap: onGiftTap),
-      if (isSelf)
-        _IconActionChip(
-          icon: selfMuted ? Icons.mic_rounded : Icons.mic_off_rounded,
-          tooltip: selfMuted ? 'Turn on mic' : 'Turn off mic',
-          onTap: onSelfMuteToggle,
+      _MiniProfileActionCircle(
+        icon: Icons.card_giftcard_rounded,
+        color: RoomColors.gold,
+        onTap: onGiftTap,
+      ),
+      if (!isSelf && onKickOutTap != null)
+        _MiniProfileActionCircle(
+          icon: Icons.person_remove_alt_1_rounded,
+          color: RoomColors.coral,
+          isPrimary: true,
+          onTap: onKickOutTap!,
         ),
-      if (canModerate && !isSelf)
-        _IconActionChip(
-          icon: adminMuted ? Icons.mic_rounded : Icons.admin_panel_settings_rounded,
-          tooltip: adminMuted ? 'Unmute' : 'Admin mute',
+      if (isSelf)
+        _MiniProfileActionCircle(
+          icon: selfMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+          color: selfMuted ? RoomColors.selfMute : RoomColors.aqua,
+          onTap: onSelfMuteToggle,
+        )
+      else if (canModerate)
+        _MiniProfileActionCircle(
+          icon: adminMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+          color: adminMuted ? RoomColors.coral : RoomColors.violet,
           onTap: onAdminMuteToggle,
         ),
-      if (isSelf || canModerate)
-        _IconActionChip(icon: Icons.lock_rounded, tooltip: 'Leave and lock', onTap: onLeaveAndLock),
+      if (canModerate && !isSelf)
+        _MiniProfileActionCircle(
+          icon: Icons.lock_rounded,
+          color: RoomColors.plum,
+          onTap: onLeaveAndLock,
+        ),
     ];
 
-    return Wrap(spacing: 12, runSpacing: 10, alignment: WrapAlignment.center, children: actions);
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < actions.length; i++) ...[
+            if (i != 0) const SizedBox(width: 16),
+            actions[i],
+          ],
+        ],
+      ),
+    );
   }
 }
 
-class _IconActionChip extends StatelessWidget {
-  const _IconActionChip({required this.icon, required this.tooltip, required this.onTap});
+class _MiniProfileActionCircle extends StatelessWidget {
+  const _MiniProfileActionCircle({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.isPrimary = false,
+  });
 
   final IconData icon;
-  final String tooltip;
+  final Color color;
   final VoidCallback onTap;
+  final bool isPrimary;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
+    final background = isPrimary ? color : Colors.white;
+    final foreground = isPrimary ? Colors.white : color;
+
+    return Material(
+      color: background,
+      shape: const CircleBorder(),
+      elevation: isPrimary ? 8 : 2,
+      shadowColor: color.withValues(alpha: isPrimary ? 0.30 : 0.12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        customBorder: const CircleBorder(),
         onTap: onTap,
         child: Container(
-          width: 38,
-          height: 38,
+          width: isPrimary ? 54 : 48,
+          height: isPrimary ? 54 : 48,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: Colors.white,
             shape: BoxShape.circle,
-            border: Border.all(color: RoomColors.softLine),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.035),
-                blurRadius: 9,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            border: Border.all(
+              color: isPrimary
+                  ? Colors.white.withValues(alpha: 0.38)
+                  : RoomColors.softLine,
+              width: 1,
+            ),
           ),
-          child: Icon(icon, color: RoomColors.plum, size: 18),
+          child: Icon(icon, color: foreground, size: isPrimary ? 25 : 22),
         ),
       ),
     );
   }
 }
+
+

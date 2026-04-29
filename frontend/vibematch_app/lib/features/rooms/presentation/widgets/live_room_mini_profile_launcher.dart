@@ -36,9 +36,7 @@ class LiveRoomMiniProfileLauncher {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => Stack(
-        children: [
-          LiveRoomMiniProfileSheet(
+      builder: (_) => LiveRoomMiniProfileSheet(
             user: user,
             currentUser: currentUser,
             canModerate: canModerate,
@@ -108,24 +106,14 @@ class LiveRoomMiniProfileLauncher {
             onSelfMuteToggle: () => onSelfMuteToggle(user.id),
             onAdminMuteToggle: () => onAdminMuteToggle(user.id),
             onGiftTap: () => onGiftTap(user.id),
+            onKickOutTap: canShowKickOut && onKickOutDurationSelected != null
+                ? () => _openKickOutDurationSheet(
+                      context: context,
+                      user: user,
+                      onDurationSelected: onKickOutDurationSelected,
+                    )
+                : null,
           ),
-          if (canShowKickOut && onKickOutDurationSelected != null)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: MediaQuery.paddingOf(context).bottom + 16,
-              child: Center(
-                child: _MiniProfileKickOutIconButton(
-                  onTap: () => _openKickOutDurationSheet(
-                    context: context,
-                    user: user,
-                    onDurationSelected: onKickOutDurationSelected,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -167,43 +155,6 @@ class LiveRoomMiniProfileLauncher {
         builder: (sheetContext) => _MiniProfileReportSheet(user: user),
       );
     });
-  }
-}
-
-class _MiniProfileKickOutIconButton extends StatelessWidget {
-  const _MiniProfileKickOutIconButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Material(
-        color: RoomColors.coral,
-        shape: const CircleBorder(),
-        elevation: 8,
-        shadowColor: RoomColors.coral.withValues(alpha: 0.30),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Container(
-            width: 52,
-            height: 52,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.38), width: 1.2),
-            ),
-            child: const Icon(
-              Icons.person_remove_alt_1_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

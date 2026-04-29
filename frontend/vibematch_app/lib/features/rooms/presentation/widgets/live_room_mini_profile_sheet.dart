@@ -26,6 +26,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
     required this.onSelfMuteToggle,
     required this.onAdminMuteToggle,
     required this.onGiftTap,
+    this.onKickOutTap,
   });
 
   final SeatUser user;
@@ -49,6 +50,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
   final VoidCallback onSelfMuteToggle;
   final VoidCallback onAdminMuteToggle;
   final VoidCallback onGiftTap;
+  final VoidCallback? onKickOutTap;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +75,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
       onSelfMuteToggle: onSelfMuteToggle,
       onAdminMuteToggle: onAdminMuteToggle,
       onGiftTap: onGiftTap,
+      onKickOutTap: onKickOutTap,
     );
   }
 }
