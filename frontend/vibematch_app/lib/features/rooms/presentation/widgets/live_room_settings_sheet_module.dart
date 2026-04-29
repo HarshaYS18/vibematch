@@ -8,6 +8,7 @@ import 'room_settings_sheet.dart';
 class LiveRoomSettingsSheetModule extends StatelessWidget {
   const LiveRoomSettingsSheetModule({
     super.key,
+    required this.roomId,
     required this.privacyMode,
     required this.roomImagesEnabled,
     required this.guestMessagesEnabled,
@@ -26,6 +27,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
     required this.onVibeSyncTap,
   });
 
+  final String roomId;
   final RoomPrivacyMode privacyMode;
   final bool roomImagesEnabled;
   final bool guestMessagesEnabled;
@@ -49,7 +51,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const LiveRoomBlockedListSheet(),
+      builder: (_) => LiveRoomBlockedListSheet(roomId: roomId),
     );
   }
 
