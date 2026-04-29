@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../../data/room_moderation_repository.dart';
 import 'room_theme.dart';
 
 class LiveRoomBlockedListSheet extends StatefulWidget {
   const LiveRoomBlockedListSheet({
     super.key,
-    this.initialUsers = mockBlockedRoomUsers,
+    required this.roomId,
+    this.repository,
+    this.initialUsers = const <BlockedRoomUser>[],
   });
 
+  final String roomId;
+  final RoomModerationRepository? repository;
   final List<BlockedRoomUser> initialUsers;
 
   @override
@@ -15,19 +20,91 @@ class LiveRoomBlockedListSheet extends StatefulWidget {
 }
 
 class _LiveRoomBlockedListSheetState extends State<LiveRoomBlockedListSheet> {
+  late final RoomModerationRepository _repository = widget.repository ?? RoomModerationRepository();
+  late final bool _ownsRepository = widget.repository == null;
   late final List<BlockedRoomUser> _blockedUsers = List<BlockedRoomUser>.of(widget.initialUsers);
+
+  bool _loading = true;
+  bool _usingLocalFallback = false;
+  bool _unblockInProgress = false;
 
   int get _foreverCount => _blockedUsers.where((user) => user.isForever).length;
 
-  void _unblockUser(BlockedRoomUser user) {
+  @override
+  void initState() {
+    super.initState();
+    _loadBlockedUsers();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsRepository) _repository.close();
+    super.dispose();
+  }
+
+  Future<void> _loadBlockedUsers() async {
+    setState(() {
+      _loading = true;
+      _usingLocalFallback = false;
+    });
+
+    try {
+      final blockedUsers = await _repository.listBlockedUsers(roomId: widget.roomId);
+      if (!mounted) return;
+
+      setState(() {
+        _blockedUsers
+          ..clear()
+          ..addAll(blockedUsers.map(BlockedRoomUser.fromDto));
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _blockedUsers
+          ..clear()
+          ..addAll(widget.initialUsers.isNotEmpty ? widget.initialUsers : mockBlockedRoomUsers);
+        _loading = false;
+        _usingLocalFallback = true;
+      });
+
+      RoomToast.show(context, 'Blocked list loaded locally. Backend connection failed.');
+    }
+  }
+
+  Future<void> _unblockUser(BlockedRoomUser user) async {
+    if (_unblockInProgress) return;
+
+    if (user.kickoutId == null || _usingLocalFallback) {
+      _removeUserLocally(user);
+      RoomToast.show(context, '${user.displayName} removed locally from blocked list.');
+      return;
+    }
+
+    setState(() => _unblockInProgress = true);
+
+    try {
+      await _repository.unblockUser(
+        roomId: widget.roomId,
+        kickoutId: user.kickoutId!,
+      );
+
+      if (!mounted) return;
+      _removeUserLocally(user);
+      RoomToast.show(context, '${user.displayName} removed from this room blocked list.');
+    } catch (_) {
+      if (!mounted) return;
+      RoomToast.show(context, 'Unblock failed. Check backend connection and permissions.');
+    } finally {
+      if (mounted) setState(() => _unblockInProgress = false);
+    }
+  }
+
+  void _removeUserLocally(BlockedRoomUser user) {
     setState(() {
       _blockedUsers.removeWhere((blockedUser) => blockedUser.id == user.id);
     });
-
-    RoomToast.show(
-      context,
-      '${user.displayName} removed from this room blocked list.',
-    );
   }
 
   void _restoreMockUsers() {
@@ -35,6 +112,7 @@ class _LiveRoomBlockedListSheetState extends State<LiveRoomBlockedListSheet> {
       _blockedUsers
         ..clear()
         ..addAll(mockBlockedRoomUsers);
+      _usingLocalFallback = true;
     });
 
     RoomToast.show(context, 'Sample blocked users restored for UI testing.');
@@ -117,50 +195,35 @@ class _LiveRoomBlockedListSheetState extends State<LiveRoomBlockedListSheet> {
             ],
           ),
           const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: RoomColors.gold.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: RoomColors.gold.withValues(alpha: 0.26)),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_rounded, color: RoomColors.gold, size: 18),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Backend unblock route will connect here next. For now, Unblock removes the user locally so this action is testable.',
-                    style: TextStyle(
-                      color: RoomColors.plum,
-                      fontSize: 11.2,
-                      height: 1.25,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          _BlockedNotice(
+            usingLocalFallback: _usingLocalFallback,
+            onRetry: _loadBlockedUsers,
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: _blockedUsers.isEmpty
-                ? _BlockedEmptyState(onRestoreTap: _restoreMockUsers)
-                : ListView.separated(
-                    padding: EdgeInsets.zero,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: _blockedUsers.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 9),
-                    itemBuilder: (context, index) {
-                      final user = _blockedUsers[index];
-                      return _BlockedUserTile(
-                        user: user,
-                        onUnblockTap: () => _unblockUser(user),
-                      );
-                    },
-                  ),
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: RoomColors.aqua),
+                  )
+                : _blockedUsers.isEmpty
+                    ? _BlockedEmptyState(
+                        usingLocalFallback: _usingLocalFallback,
+                        onRestoreTap: _restoreMockUsers,
+                      )
+                    : ListView.separated(
+                        padding: EdgeInsets.zero,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: _blockedUsers.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 9),
+                        itemBuilder: (context, index) {
+                          final user = _blockedUsers[index];
+                          return _BlockedUserTile(
+                            user: user,
+                            busy: _unblockInProgress,
+                            onUnblockTap: () => _unblockUser(user),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -177,6 +240,7 @@ class BlockedRoomUser {
     required this.blockedBy,
     required this.blockedAtLabel,
     required this.avatarColors,
+    this.kickoutId,
     this.isForever = false,
   });
 
@@ -187,7 +251,22 @@ class BlockedRoomUser {
   final String blockedBy;
   final String blockedAtLabel;
   final List<Color> avatarColors;
+  final int? kickoutId;
   final bool isForever;
+
+  factory BlockedRoomUser.fromDto(RoomBlockedUserDto dto) {
+    return BlockedRoomUser(
+      id: 'kickout_${dto.id}',
+      kickoutId: dto.id,
+      displayName: dto.displayName,
+      publicUserId: dto.publicUserIdLabel,
+      durationLabel: dto.durationLabel,
+      blockedBy: dto.blockedByLabel,
+      blockedAtLabel: dto.blockedAtLabel,
+      isForever: dto.isForever,
+      avatarColors: _avatarColorsForSeed(dto.id),
+    );
+  }
 
   String get avatarLetter {
     final trimmed = displayName.trim();
@@ -227,13 +306,25 @@ const List<BlockedRoomUser> mockBlockedRoomUsers = [
   ),
 ];
 
+List<Color> _avatarColorsForSeed(int seed) {
+  const colorSets = <List<Color>>[
+    [Color(0xFFE84C72), Color(0xFFFFC857)],
+    [Color(0xFF12C7B7), Color(0xFF7A5CFF)],
+    [Color(0xFF251538), Color(0xFFE84C72)],
+    [Color(0xFFFF7A45), Color(0xFF12C7B7)],
+  ];
+  return colorSets[seed.abs() % colorSets.length];
+}
+
 class _BlockedUserTile extends StatelessWidget {
   const _BlockedUserTile({
     required this.user,
+    required this.busy,
     required this.onUnblockTap,
   });
 
   final BlockedRoomUser user;
+  final bool busy;
   final VoidCallback onUnblockTap;
 
   @override
@@ -309,13 +400,73 @@ class _BlockedUserTile extends StatelessWidget {
                 const SizedBox(height: 9),
                 _MiniActionPill(
                   icon: Icons.remove_circle_outline_rounded,
-                  label: 'Unblock',
+                  label: busy ? 'Unblocking...' : 'Unblock',
                   color: RoomColors.aqua,
-                  onTap: onUnblockTap,
+                  onTap: busy ? null : onUnblockTap,
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BlockedNotice extends StatelessWidget {
+  const _BlockedNotice({
+    required this.usingLocalFallback,
+    required this.onRetry,
+  });
+
+  final bool usingLocalFallback;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = usingLocalFallback ? RoomColors.coral : RoomColors.gold;
+    final message = usingLocalFallback
+        ? 'Backend unavailable. Showing local sample blocked list for UI testing.'
+        : 'Blocked users load from the backend. Unblock removes the active kickout entry.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(usingLocalFallback ? Icons.cloud_off_rounded : Icons.info_rounded, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: RoomColors.plum,
+                fontSize: 11.2,
+                height: 1.25,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          if (usingLocalFallback) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onRetry,
+              child: const Text(
+                'Retry',
+                style: TextStyle(
+                  color: RoomColors.coral,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -360,12 +511,12 @@ class _MiniActionPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: color.withValues(alpha: 0.11),
+      color: color.withValues(alpha: onTap == null ? 0.06 : 0.11),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
@@ -375,12 +526,12 @@ class _MiniActionPill extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 14),
+              Icon(icon, color: color.withValues(alpha: onTap == null ? 0.55 : 1), size: 14),
               const SizedBox(width: 5),
               Text(
                 label,
                 style: TextStyle(
-                  color: color,
+                  color: color.withValues(alpha: onTap == null ? 0.55 : 1),
                   fontSize: 10.5,
                   fontWeight: FontWeight.w900,
                 ),
@@ -463,8 +614,12 @@ class _ClosePill extends StatelessWidget {
 }
 
 class _BlockedEmptyState extends StatelessWidget {
-  const _BlockedEmptyState({required this.onRestoreTap});
+  const _BlockedEmptyState({
+    required this.usingLocalFallback,
+    required this.onRestoreTap,
+  });
 
+  final bool usingLocalFallback;
   final VoidCallback onRestoreTap;
 
   @override
@@ -496,10 +651,12 @@ class _BlockedEmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'This room has no local blocked users right now.',
+          Text(
+            usingLocalFallback
+                ? 'This local sample list is empty right now.'
+                : 'This room has no active backend blocked users right now.',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: Color(0xFF82758E),
               fontSize: 11.5,
               fontWeight: FontWeight.w800,
