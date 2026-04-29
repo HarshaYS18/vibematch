@@ -60,7 +60,10 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
 
   bool get _isAnimatedImageGift {
     final path = widget.slide.videoAssetPath?.toLowerCase().trim() ?? '';
-    return path.endsWith('.webp') || path.endsWith('.gif') || path.endsWith('.png') || path.endsWith('.apng');
+    return path.endsWith('.webp') ||
+        path.endsWith('.gif') ||
+        path.endsWith('.png') ||
+        path.endsWith('.apng');
   }
 
   @override
@@ -72,7 +75,8 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
   @override
   void didUpdateWidget(covariant VideoGiftCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.slide.id != widget.slide.id || oldWidget.slide.videoAssetPath != widget.slide.videoAssetPath) {
+    if (oldWidget.slide.id != widget.slide.id ||
+        oldWidget.slide.videoAssetPath != widget.slide.videoAssetPath) {
       _disposeController();
       _imageGiftTimer?.cancel();
       _imageGiftTimer = null;
@@ -163,12 +167,13 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
-    final effectWidth = screen.width * 0.90;
-    final effectHeight = screen.height * 0.90;
+    final safeTop = MediaQuery.paddingOf(context).top;
+    final effectWidth = screen.width;
+    final effectHeight = screen.height * 0.62;
 
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.94, end: 1.0),
-      duration: const Duration(milliseconds: 280),
+      tween: Tween(begin: 0.96, end: 1.0),
+      duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         return Opacity(
@@ -184,20 +189,22 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
             child: SizedBox(
               width: effectWidth,
               height: effectHeight,
-              child: _GiftEffectVisual(
-                slide: widget.slide,
-                ready: _ready,
-                failed: _failed,
-                controller: _controller,
-                isAnimatedImageGift: _isAnimatedImageGift,
+              child: ClipRect(
+                child: _GiftEffectVisual(
+                  slide: widget.slide,
+                  ready: _ready,
+                  failed: _failed,
+                  controller: _controller,
+                  isAnimatedImageGift: _isAnimatedImageGift,
+                ),
               ),
             ),
           ),
           Positioned(
-            top: MediaQuery.paddingOf(context).top + 14,
-            left: 18,
-            right: 18,
-            child: Center(child: _GoldenGiftRoutePill(slide: widget.slide)),
+            top: safeTop + 92,
+            left: 14,
+            right: 14,
+            child: Center(child: _GoldenGiftAnnouncementPill(slide: widget.slide)),
           ),
         ],
       ),
@@ -225,7 +232,7 @@ class _GiftEffectVisual extends StatelessWidget {
     if (ready && isAnimatedImageGift) {
       return Image.asset(
         slide.videoAssetPath!,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
         gaplessPlayback: true,
         filterQuality: FilterQuality.high,
         errorBuilder: (context, error, stackTrace) => _VideoGiftFallback(
@@ -239,7 +246,8 @@ class _GiftEffectVisual extends StatelessWidget {
     final videoController = controller;
     if (ready && videoController != null) {
       return FittedBox(
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
+        clipBehavior: Clip.hardEdge,
         child: SizedBox(
           width: videoController.value.size.width,
           height: videoController.value.size.height,
@@ -262,15 +270,22 @@ class _GiftEffectVisual extends StatelessWidget {
   }
 }
 
-class _GoldenGiftRoutePill extends StatelessWidget {
-  const _GoldenGiftRoutePill({required this.slide});
+class _GoldenGiftAnnouncementPill extends StatelessWidget {
+  const _GoldenGiftAnnouncementPill({required this.slide});
 
   final GiftSlide slide;
 
   @override
   Widget build(BuildContext context) {
+    final receiver = slide.receiverName.trim();
+    final giftName = slide.giftName.trim();
+    final comboText = slide.combo > 1 ? '  x${slide.combo}' : '';
+    final announcement = receiver.isEmpty || receiver.toLowerCase() == 'all'
+        ? '${slide.senderName} sent $giftName to everyone$comboText'
+        : '${slide.senderName} sent $giftName to $receiver$comboText';
+
     return Container(
-      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.92),
+      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.94),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
@@ -278,24 +293,29 @@ class _GoldenGiftRoutePill extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFFFFF2A8),
-            Color(0xFFFFD166),
+            Color(0xFFFFF7C7),
+            Color(0xFFFFD66B),
             Color(0xFFC88922),
-            Color(0xFFFFE08A),
+            Color(0xFFFFE49A),
           ],
         ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.66), width: 1.3),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.72), width: 1.35),
         boxShadow: [
           BoxShadow(
-            color: RoomColors.gold.withValues(alpha: 0.52),
-            blurRadius: 26,
-            spreadRadius: 1.4,
+            color: RoomColors.gold.withValues(alpha: 0.58),
+            blurRadius: 28,
+            spreadRadius: 1.5,
+            offset: const Offset(0, 9),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 20,
             offset: const Offset(0, 8),
           ),
           BoxShadow(
-            color: Colors.white.withValues(alpha: 0.28),
+            color: Colors.white.withValues(alpha: 0.30),
             blurRadius: 18,
-            spreadRadius: 0.6,
+            spreadRadius: 0.8,
           ),
         ],
       ),
@@ -311,27 +331,27 @@ class _GoldenGiftRoutePill extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Colors.white.withValues(alpha: 0.54),
-                      Colors.white.withValues(alpha: 0.06),
-                      Colors.black.withValues(alpha: 0.08),
+                      Colors.white.withValues(alpha: 0.58),
+                      Colors.white.withValues(alpha: 0.05),
+                      Colors.black.withValues(alpha: 0.09),
                     ],
                   ),
                 ),
               ),
             ),
             Positioned(
-              left: -28,
-              top: -22,
+              left: -34,
+              top: -26,
               child: Transform.rotate(
                 angle: -0.44,
                 child: Container(
-                  width: 42,
-                  height: 88,
+                  width: 48,
+                  height: 96,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
                         Colors.white.withValues(alpha: 0.0),
-                        Colors.white.withValues(alpha: 0.70),
+                        Colors.white.withValues(alpha: 0.72),
                         Colors.white.withValues(alpha: 0.0),
                       ],
                     ),
@@ -342,67 +362,59 @@ class _GoldenGiftRoutePill extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(child: _PillText(slide.senderName)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    '➜',
-                    style: TextStyle(
-                      color: Color(0xFF4B2800),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      shadows: [
-                        Shadow(color: Colors.white, blurRadius: 8),
-                        Shadow(color: Color(0xFFFFF1B8), blurRadius: 14),
+                Container(
+                  width: 27,
+                  height: 27,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFFFFBE3),
+                        Color(0xFFFFCD3A),
+                        Color(0xFFB36B0D),
                       ],
                     ),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.78), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.card_giftcard_rounded,
+                    size: 15,
+                    color: Color(0xFF4B2800),
                   ),
                 ),
-                Flexible(child: _PillText(slide.receiverName)),
                 const SizedBox(width: 9),
-                Text(
-                  'x${slide.combo}',
-                  maxLines: 1,
-                  style: const TextStyle(
-                    color: Color(0xFF4B2800),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.2,
-                    shadows: [
-                      Shadow(color: Colors.white, blurRadius: 8),
-                      Shadow(color: Color(0xFFFFF1B8), blurRadius: 15),
-                    ],
+                Flexible(
+                  child: Text(
+                    announcement,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF4B2800),
+                      fontSize: 14.6,
+                      height: 1.05,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.05,
+                      shadows: [
+                        Shadow(color: Colors.white, blurRadius: 8),
+                        Shadow(color: Color(0xFFFFF1B8), blurRadius: 15),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _PillText extends StatelessWidget {
-  const _PillText(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        color: Color(0xFF4B2800),
-        fontSize: 15,
-        fontWeight: FontWeight.w900,
-        letterSpacing: 0.1,
-        shadows: [
-          Shadow(color: Colors.white, blurRadius: 8),
-          Shadow(color: Color(0xFFFFF1B8), blurRadius: 14),
-        ],
       ),
     );
   }
