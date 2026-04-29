@@ -2,136 +2,160 @@ import 'package:flutter/material.dart';
 
 import 'room_theme.dart';
 
-class LiveRoomEventCarousel extends StatelessWidget {
+class LiveRoomEventCarousel extends StatefulWidget {
   const LiveRoomEventCarousel({super.key});
+
+  @override
+  State<LiveRoomEventCarousel> createState() => _LiveRoomEventCarouselState();
+}
+
+class _LiveRoomEventCarouselState extends State<LiveRoomEventCarousel> {
+  late final PageController _pageController;
+  int _page = 0;
 
   static const List<_RoomEventItem> _events = [
     _RoomEventItem(
       title: 'Love Rocket Week',
-      subtitle: 'Send gifts • win badge rewards',
+      assetPath: 'assets/images/events/love_rocket_week.png',
       icon: Icons.rocket_launch_rounded,
       colors: [Color(0xFFE84C72), Color(0xFFFFC857)],
     ),
     _RoomEventItem(
       title: 'VIP Recharge Bonus',
-      subtitle: 'Extra sparkle rewards live now',
+      assetPath: 'assets/images/events/vip_recharge_bonus.png',
       icon: Icons.workspace_premium_rounded,
       colors: [Color(0xFFFFD166), Color(0xFF7A5CFF)],
     ),
     _RoomEventItem(
       title: 'Room Star Race',
-      subtitle: 'Top rooms unlock frames',
+      assetPath: 'assets/images/events/room_star_race.png',
       icon: Icons.emoji_events_rounded,
       colors: [Color(0xFF18C7B7), Color(0xFF5E6DFF)],
     ),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 46,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        itemCount: _events.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final event = _events[index];
-          return _MiniEventCard(
-            event: event,
-            onTap: () => _openEventMock(context, event),
-          );
-        },
+      width: 64,
+      height: 64,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            physics: const BouncingScrollPhysics(),
+            onPageChanged: (value) => setState(() => _page = value),
+            itemCount: _events.length,
+            itemBuilder: (context, index) {
+              final event = _events[index];
+              return _MiniEventPng(
+                event: event,
+                onTap: () => RoomToast.show(context, '${event.title} event page will open here'),
+              );
+            },
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: -5,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                _events.length,
+                (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: _page == index ? 9 : 4,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: _page == index ? 0.95 : 0.42),
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: _page == index
+                        ? [BoxShadow(color: Colors.white.withValues(alpha: 0.34), blurRadius: 6)]
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-
-  void _openEventMock(BuildContext context, _RoomEventItem event) {
-    RoomToast.show(context, '${event.title} event page will open here');
-  }
 }
 
-class _MiniEventCard extends StatelessWidget {
-  const _MiniEventCard({required this.event, required this.onTap});
+class _MiniEventPng extends StatelessWidget {
+  const _MiniEventPng({required this.event, required this.onTap});
 
   final _RoomEventItem event;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          width: 176,
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              colors: [
-                event.colors.first.withValues(alpha: 0.72),
-                event.colors.last.withValues(alpha: 0.54),
-                Colors.white.withValues(alpha: 0.10),
-              ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 60,
+        height: 60,
+        margin: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(colors: event.colors),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.34), width: 1.1),
+          boxShadow: [
+            BoxShadow(
+              color: event.colors.first.withValues(alpha: 0.34),
+              blurRadius: 16,
+              offset: const Offset(0, 7),
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
-            boxShadow: [
-              BoxShadow(
-                color: event.colors.first.withValues(alpha: 0.18),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.16),
+              blurRadius: 10,
+              spreadRadius: 0.8,
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.18),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-                ),
-                child: Icon(event.icon, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11.3,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
-                      ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.24),
+                        Colors.white.withValues(alpha: 0.04),
+                        Colors.black.withValues(alpha: 0.10),
+                      ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      event.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.78),
-                        fontSize: 9.2,
-                        fontWeight: FontWeight.w800,
-                        height: 1,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 16),
+              Image.asset(
+                event.assetPath,
+                width: 54,
+                height: 54,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (context, error, stackTrace) => Icon(event.icon, color: Colors.white, size: 28),
+              ),
             ],
           ),
         ),
@@ -143,13 +167,13 @@ class _MiniEventCard extends StatelessWidget {
 class _RoomEventItem {
   const _RoomEventItem({
     required this.title,
-    required this.subtitle,
+    required this.assetPath,
     required this.icon,
     required this.colors,
   });
 
   final String title;
-  final String subtitle;
+  final String assetPath;
   final IconData icon;
   final List<Color> colors;
 }
