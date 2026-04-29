@@ -25,6 +25,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
     required this.onToggleApplyOnlyMode,
     required this.onCloseRoom,
     required this.onVibeSyncTap,
+    required this.onWatchPartyTap,
   });
 
   final String roomId;
@@ -45,6 +46,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   final ValueChanged<bool> onToggleApplyOnlyMode;
   final VoidCallback onCloseRoom;
   final VoidCallback onVibeSyncTap;
+  final VoidCallback onWatchPartyTap;
 
   void _openBlockedList(BuildContext context) {
     showModalBottomSheet<void>(
@@ -70,6 +72,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onInboxTap: onInboxTap,
       onJoinRequestsTap: onJoinRequestsTap,
       onVibeSyncTap: onVibeSyncTap,
+      onWatchPartyTap: onWatchPartyTap,
       onReportsTap: () => LiveRoomProfileNavigator.openModulePage(
         context: context,
         title: 'Reports',
