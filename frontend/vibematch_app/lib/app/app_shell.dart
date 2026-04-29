@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../features/auth/models/current_user.dart';
@@ -111,13 +110,12 @@ class _AppShellState extends State<AppShell> {
         children: [
           Column(
             children: [
-              if (kDebugMode)
-                _DevUserSwitcher(
-                  activeUser: activeUser,
-                  selectedMode: _devUserMode,
-                  onFounderTap: () => _switchDevUser(_DevUserMode.founder),
-                  onUserTap: () => _switchDevUser(_DevUserMode.normalUser),
-                ),
+              _DevUserSwitcher(
+                activeUser: activeUser,
+                selectedMode: _devUserMode,
+                onFounderTap: () => _switchDevUser(_DevUserMode.founder),
+                onUserTap: () => _switchDevUser(_DevUserMode.normalUser),
+              ),
               Expanded(
                 child: IndexedStack(
                   index: _selectedTab.index,
