@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../live_room_models.dart';
 import '../modules/live_room_games_module.dart';
+import '../modules/live_room_gift_module.dart';
 import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
@@ -535,7 +536,14 @@ class RoomInputDock extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: gap),
-                _DockButton(icon: Icons.card_giftcard_rounded, onTap: () => _runAndHideSeatActions(onGiftTap), gift: true, size: dockButtonSize, iconSize: dockIconSize),
+                SizedBox(
+                  width: dockButtonSize,
+                  height: dockButtonSize,
+                  child: LiveRoomGiftModule(
+                    onOpenGiftPanel: () => _runAndHideSeatActions(onGiftTap),
+                    comboActive: false,
+                  ),
+                ),
               ],
             ),
           );
