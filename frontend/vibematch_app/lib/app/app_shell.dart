@@ -73,10 +73,6 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  void _selectPage(int index) {
-    _selectTab(VmMainTab.fromIndex(index));
-  }
-
   void _switchDevUser(_DevUserMode mode) {
     setState(() {
       _devUserMode = mode;
@@ -118,7 +114,7 @@ class _AppShellState extends State<AppShell> {
               ),
               Expanded(
                 child: IndexedStack(
-                  index: _selectedTab.index,
+                  index: _selectedTab.tabIndex,
                   children: _pages,
                 ),
               ),
