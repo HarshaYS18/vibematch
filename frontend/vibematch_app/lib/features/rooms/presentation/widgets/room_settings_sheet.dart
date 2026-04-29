@@ -26,6 +26,7 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.onEffectsTap,
     required this.onMusicTap,
     required this.onVibeSyncTap,
+    required this.onWatchPartyTap,
   });
 
   final RoomPrivacyMode privacyMode;
@@ -48,28 +49,33 @@ class RoomSettingsSheet extends StatelessWidget {
   final VoidCallback onEffectsTap;
   final VoidCallback onMusicTap;
   final VoidCallback onVibeSyncTap;
+  final VoidCallback onWatchPartyTap;
 
   @override
   Widget build(BuildContext context) {
     final items = <Widget>[
+      _SectionLabel(label: 'Modes'),
+      _SettingsCard(icon: Icons.favorite_rounded, title: 'VibeSync', iconColor: RoomColors.coral, onTap: onVibeSyncTap),
+      _SettingsCard(icon: Icons.smart_display_rounded, title: 'Watch Party', iconColor: RoomColors.aqua, onTap: onWatchPartyTap),
+      _SectionLabel(label: 'Room'),
       _SettingsCard(icon: Icons.wallpaper_rounded, title: 'Background', onTap: onBackgroundTap),
       _SettingsCard(icon: privacyMode.icon, title: 'Privacy', badge: privacyMode.shortLabel, onTap: onPrivacyTap),
       _SettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
       _SettingsCard(icon: Icons.campaign_rounded, title: 'Notice', onTap: onAnnouncementTap),
-      _SettingsCard(icon: Icons.favorite_rounded, title: 'VibeSync', iconColor: RoomColors.coral, onTap: onVibeSyncTap),
       _SettingsCard(icon: Icons.how_to_reg_rounded, title: 'Requests', badge: joinRequestCount > 0 ? '$joinRequestCount' : null, onTap: onJoinRequestsTap),
       _SettingsCard(icon: Icons.auto_awesome_rounded, title: 'Effects', onTap: onEffectsTap),
       _SettingsCard(icon: Icons.music_note_rounded, title: 'Music', onTap: onMusicTap),
+      _SettingsCard(icon: Icons.block_rounded, title: 'Blocked', onTap: onBlockedTap),
+      _SettingsCard(icon: Icons.report_gmailerrorred_rounded, title: 'Reports', onTap: onReportsTap),
+      _SectionLabel(label: 'Permissions'),
       _ToggleCard(title: 'Images', value: roomImagesEnabled, onChanged: onToggleRoomImages),
       _ToggleCard(title: 'Guests', value: guestMessagesEnabled, onChanged: onToggleGuestMessages),
       _ToggleCard(title: 'Apply only', value: applyOnlyModeEnabled, onChanged: onToggleApplyOnlyMode),
-      _SettingsCard(icon: Icons.block_rounded, title: 'Blocked', onTap: onBlockedTap),
-      _SettingsCard(icon: Icons.report_gmailerrorred_rounded, title: 'Reports', onTap: onReportsTap),
       _SettingsCard(icon: Icons.power_settings_new_rounded, title: 'Close', iconColor: RoomColors.coral, onTap: onCloseRoom),
     ];
 
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.36,
+      height: MediaQuery.sizeOf(context).height * 0.42,
       child: Container(
         padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
         decoration: const BoxDecoration(
@@ -111,6 +117,32 @@ class RoomSettingsSheet extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF8B7D92),
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );
