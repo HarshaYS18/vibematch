@@ -543,11 +543,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         reason: 'Room kickout from mini profile',
       );
 
+      if (!mounted) return;
+
       _locallyKickedOutUserIds.add(user.id);
       _seatController.removeUserFromRoom(user.id);
       _insertSystemMessage('${_currentUser.name} removed ${user.name} from the room for ${duration.label}');
     } catch (_) {
-      RoomToast.show(context, 'Kick out failed. Check backend connection and permissions.');
+      if (!mounted) return;
+
+      RoomToast.show(
+        context,
+        'Kick out failed. Check backend connection and permissions.',
+      );
     }
   }
 
@@ -941,3 +948,5 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 }
+
+
