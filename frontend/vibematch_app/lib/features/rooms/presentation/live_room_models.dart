@@ -252,6 +252,7 @@ class GiftItem {
     required this.chatSymbol,
     required this.colors,
     this.assetPath,
+    this.videoAssetPath,
   });
 
   final String id;
@@ -262,6 +263,9 @@ class GiftItem {
   final String chatSymbol;
   final List<Color> colors;
   final String? assetPath;
+  final String? videoAssetPath;
+
+  bool get isVideoGift => videoAssetPath?.trim().isNotEmpty ?? false;
 }
 
 class GiftSlide {
@@ -272,6 +276,7 @@ class GiftSlide {
     required this.giftName,
     required this.giftIcon,
     this.giftAssetPath,
+    this.videoAssetPath,
     required this.colors,
     required this.combo,
     this.baseCombo = 1,
@@ -284,10 +289,13 @@ class GiftSlide {
   final String giftName;
   final IconData giftIcon;
   final String? giftAssetPath;
+  final String? videoAssetPath;
   final List<Color> colors;
   final int combo;
   final int baseCombo;
   final int remainingSeconds;
+
+  bool get isVideoGift => videoAssetPath?.trim().isNotEmpty ?? false;
 
   GiftSlide copyWith({int? combo, int? baseCombo, int? remainingSeconds}) {
     return GiftSlide(
@@ -297,6 +305,7 @@ class GiftSlide {
       giftName: giftName,
       giftIcon: giftIcon,
       giftAssetPath: giftAssetPath,
+      videoAssetPath: videoAssetPath,
       colors: colors,
       combo: combo ?? this.combo,
       baseCombo: baseCombo ?? this.baseCombo,
@@ -306,43 +315,23 @@ class GiftSlide {
 }
 
 class SeatLayoutSpec {
-  const SeatLayoutSpec({
-    required this.id,
-    required this.columns,
-    required this.rows,
-    required this.hasHostSeats,
-  });
-
+  const SeatLayoutSpec({required this.id, required this.columns, required this.rows, required this.hasHostSeats});
   final String id;
   final int columns;
   final int rows;
   final bool hasHostSeats;
-
   int get topSeatCount => hasHostSeats ? 2 : 0;
   int get totalSeats => topSeatCount + (columns * rows);
-
   String get label => hasHostSeats ? 'Host + ${columns}x$rows' : '${columns}x$rows';
-
   static const List<String> withoutHostLayouts = ['4x2', '5x2', '4x3', '5x3'];
-  static const List<String> withHostLayouts = [
-    'host_4x2',
-    'host_5x2',
-    'host_4x3',
-    'host_5x3',
-  ];
-
+  static const List<String> withHostLayouts = ['host_4x2', 'host_5x2', 'host_4x3', 'host_5x3'];
   static SeatLayoutSpec parse(String id) {
     final hasHost = id.startsWith('host_');
     final raw = id.replaceFirst('host_', '');
     final parts = raw.split('x');
     final columns = int.tryParse(parts.first) ?? 4;
     final rows = int.tryParse(parts.length > 1 ? parts.last : '2') ?? 2;
-    return SeatLayoutSpec(
-      id: id,
-      columns: columns,
-      rows: rows,
-      hasHostSeats: hasHost,
-    );
+    return SeatLayoutSpec(id: id, columns: columns, rows: rows, hasHostSeats: hasHost);
   }
 }
 
@@ -353,12 +342,8 @@ String avatarLetter(String input) {
 }
 
 String compactNumber(int value) {
-  if (value >= 1000000) {
-    return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-  }
-  if (value >= 1000) {
-    return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
-  }
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
   return '$value';
 }
 
@@ -366,212 +351,32 @@ RoomPrivacyMode privacyModeFromTitle(String title) {
   final value = title.toLowerCase();
   if (value.contains('lock')) return RoomPrivacyMode.locked;
   if (value.contains('member')) return RoomPrivacyMode.membersOnly;
-  if (value.contains('private') || value.contains('secret')) {
-    return RoomPrivacyMode.privateVibe;
-  }
+  if (value.contains('private') || value.contains('secret')) return RoomPrivacyMode.privateVibe;
   return RoomPrivacyMode.open;
 }
 
 const List<SeatUser> mockRoomUsers = [
-  SeatUser(
-    id: 'founder_owner',
-    name: 'Harsha',
-    roleLabel: 'Channel Host',
-    familyName: 'Moon Fam',
-    relationshipText: 'Love: Riya • Bonds: Arjun, Kiran',
-    vipLevel: 32,
-    svipLevel: 3,
-    sendingLevel: 52,
-    receivingLevel: 44,
-    sentExp: 98200,
-    receivedExp: 124500,
-    medals: ['🏆', '💎', '🔥'],
-    avatarColors: [Color(0xFFFFC857), Color(0xFFFF5F7E)],
-    gender: RoomUserGender.male,
-    age: 27,
-    locationLabel: 'Vijayawada, India',
-    isCurrentUser: true,
-    isHost: true,
-    isRoomAdmin: true,
-  ),
-  SeatUser(
-    id: 'riya',
-    name: 'Riya',
-    roleLabel: 'Administrator',
-    familyName: 'Moon Fam',
-    relationshipText: 'Love: Harsha • Bonds: Meera',
-    vipLevel: 28,
-    svipLevel: 1,
-    sendingLevel: 41,
-    receivingLevel: 38,
-    sentExp: 65400,
-    receivedExp: 90500,
-    medals: ['🌙', '🎖️'],
-    avatarColors: [Color(0xFF18C7B7), Color(0xFF5E6DFF)],
-    gender: RoomUserGender.female,
-    age: 24,
-    locationLabel: 'Hyderabad, India',
-    isRoomAdmin: true,
-  ),
-  SeatUser(
-    id: 'arjun',
-    name: 'Arjun',
-    roleLabel: 'Member',
-    familyName: 'Moon Fam',
-    relationshipText: 'Bond: Harsha',
-    vipLevel: 18,
-    svipLevel: 0,
-    sendingLevel: 22,
-    receivingLevel: 17,
-    sentExp: 22500,
-    receivedExp: 34100,
-    medals: ['⭐'],
-    avatarColors: [Color(0xFFE84C72), Color(0xFFB13C77)],
-    gender: RoomUserGender.male,
-    age: 25,
-    locationLabel: 'Bengaluru, India',
-  ),
+  SeatUser(id: 'founder_owner', name: 'Harsha', roleLabel: 'Channel Host', familyName: 'Moon Fam', relationshipText: 'Love: Riya • Bonds: Arjun, Kiran', vipLevel: 32, svipLevel: 3, sendingLevel: 52, receivingLevel: 44, sentExp: 98200, receivedExp: 124500, medals: ['🏆', '💎', '🔥'], avatarColors: [Color(0xFFFFC857), Color(0xFFFF5F7E)], gender: RoomUserGender.male, age: 27, locationLabel: 'Vijayawada, India', isCurrentUser: true, isHost: true, isRoomAdmin: true),
+  SeatUser(id: 'riya', name: 'Riya', roleLabel: 'Administrator', familyName: 'Moon Fam', relationshipText: 'Love: Harsha • Bonds: Meera', vipLevel: 28, svipLevel: 1, sendingLevel: 41, receivingLevel: 38, sentExp: 65400, receivedExp: 90500, medals: ['🌙', '🎖️'], avatarColors: [Color(0xFF18C7B7), Color(0xFF5E6DFF)], gender: RoomUserGender.female, age: 24, locationLabel: 'Hyderabad, India', isRoomAdmin: true),
+  SeatUser(id: 'arjun', name: 'Arjun', roleLabel: 'Member', familyName: 'Moon Fam', relationshipText: 'Bond: Harsha', vipLevel: 18, svipLevel: 0, sendingLevel: 22, receivingLevel: 17, sentExp: 22500, receivedExp: 34100, medals: ['⭐'], avatarColors: [Color(0xFFE84C72), Color(0xFFB13C77)], gender: RoomUserGender.male, age: 25, locationLabel: 'Bengaluru, India'),
 ];
 
 const List<SeatUser> mockInviteUsers = [
-  SeatUser(
-    id: 'meera',
-    name: 'Meera',
-    roleLabel: 'Member',
-    familyName: 'Star House',
-    relationshipText: 'Bond: Riya',
-    vipLevel: 9,
-    svipLevel: 0,
-    sendingLevel: 14,
-    receivingLevel: 11,
-    sentExp: 8800,
-    receivedExp: 12300,
-    medals: ['🌟'],
-    avatarColors: [Color(0xFF7A5CFF), Color(0xFF12C7B7)],
-    gender: RoomUserGender.female,
-    age: 23,
-    locationLabel: 'Chennai, India',
-  ),
-  SeatUser(
-    id: 'nikhil',
-    name: 'Nikhil',
-    roleLabel: 'Guest',
-    familyName: '',
-    relationshipText: '',
-    vipLevel: 4,
-    svipLevel: 0,
-    sendingLevel: 7,
-    receivingLevel: 5,
-    sentExp: 2100,
-    receivedExp: 1700,
-    medals: [],
-    avatarColors: [Color(0xFFFF7A45), Color(0xFFE84C72)],
-    gender: RoomUserGender.male,
-    age: 22,
-    locationLabel: 'Nandyal, India',
-  ),
-  SeatUser(
-    id: 'kiran',
-    name: 'Kiran',
-    roleLabel: 'Member',
-    familyName: 'Moon Fam',
-    relationshipText: 'Bond: Harsha',
-    vipLevel: 13,
-    svipLevel: 0,
-    sendingLevel: 20,
-    receivingLevel: 16,
-    sentExp: 14800,
-    receivedExp: 11600,
-    medals: ['🔥'],
-    avatarColors: [Color(0xFFFFC857), Color(0xFF7A5CFF)],
-    gender: RoomUserGender.male,
-    age: 26,
-    locationLabel: 'Vizag, India',
-    locationVisible: false,
-  ),
+  SeatUser(id: 'meera', name: 'Meera', roleLabel: 'Member', familyName: 'Star House', relationshipText: 'Bond: Riya', vipLevel: 9, svipLevel: 0, sendingLevel: 14, receivingLevel: 11, sentExp: 8800, receivedExp: 12300, medals: ['🌟'], avatarColors: [Color(0xFF7A5CFF), Color(0xFF12C7B7)], gender: RoomUserGender.female, age: 23, locationLabel: 'Chennai, India'),
+  SeatUser(id: 'nikhil', name: 'Nikhil', roleLabel: 'Guest', familyName: '', relationshipText: '', vipLevel: 4, svipLevel: 0, sendingLevel: 7, receivingLevel: 5, sentExp: 2100, receivedExp: 1700, medals: [], avatarColors: [Color(0xFFFF7A45), Color(0xFFE84C72)], gender: RoomUserGender.male, age: 22, locationLabel: 'Nandyal, India'),
+  SeatUser(id: 'kiran', name: 'Kiran', roleLabel: 'Member', familyName: 'Moon Fam', relationshipText: 'Bond: Harsha', vipLevel: 13, svipLevel: 0, sendingLevel: 20, receivingLevel: 16, sentExp: 14800, receivedExp: 11600, medals: ['🔥'], avatarColors: [Color(0xFFFFC857), Color(0xFF7A5CFF)], gender: RoomUserGender.male, age: 26, locationLabel: 'Vizag, India', locationVisible: false),
 ];
 
 const List<ChatEntry> mockChatEntries = [];
 
 const List<GiftItem> mockGiftItems = [
-  GiftItem(
-    id: 'love_bomb',
-    name: 'Love Bomb',
-    category: GiftCategory.classic,
-    coins: 1,
-    icon: Icons.favorite_rounded,
-    chatSymbol: '❤️',
-    assetPath: 'assets/images/gifts/love_bomb.png',
-    colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)],
-  ),
-  GiftItem(
-    id: 'rocket',
-    name: 'Rocket',
-    category: GiftCategory.classic,
-    coins: 99,
-    icon: Icons.rocket_launch_rounded,
-    chatSymbol: '🚀',
-    assetPath: 'assets/images/gifts/rocket.png',
-    colors: [Color(0xFF18C7B7), Color(0xFF6C63FF)],
-  ),
-  GiftItem(
-    id: 'lucky_star',
-    name: 'Lucky Star',
-    category: GiftCategory.lucky,
-    coins: 19,
-    icon: Icons.auto_awesome_rounded,
-    chatSymbol: '✨',
-    assetPath: 'assets/images/gifts/lucky_star.png',
-    colors: [Color(0xFFFFD166), Color(0xFFFF7A45)],
-  ),
-  GiftItem(
-    id: 'event_crown',
-    name: 'Event Crown',
-    category: GiftCategory.event,
-    coins: 199,
-    icon: Icons.emoji_events_rounded,
-    chatSymbol: '🏆',
-    assetPath: 'assets/images/gifts/event_crown.png',
-    colors: [Color(0xFFC99A3B), Color(0xFFE84C72)],
-  ),
-  GiftItem(
-    id: 'svip_aura',
-    name: 'SVIP Aura',
-    category: GiftCategory.svip,
-    coins: 399,
-    icon: Icons.diamond_rounded,
-    chatSymbol: '💎',
-    assetPath: 'assets/images/gifts/svip_aura.png',
-    colors: [Color(0xFF8C5CF6), Color(0xFF12C7B7)],
-  ),
-  GiftItem(
-    id: 'royal_crown',
-    name: 'Royal Crown',
-    category: GiftCategory.premium,
-    coins: 999,
-    icon: Icons.workspace_premium_rounded,
-    chatSymbol: '👑',
-    assetPath: 'assets/images/gifts/royal_crown.png',
-    colors: [Color(0xFFFFD166), Color(0xFF111827)],
-  ),
-  GiftItem(
-    id: 'owned_rose_pack',
-    name: 'Rose Pack',
-    category: GiftCategory.baggage,
-    coins: 0,
-    icon: Icons.inventory_2_rounded,
-    chatSymbol: '🎒',
-    assetPath: 'assets/images/gifts/rose_pack.png',
-    colors: [Color(0xFFFF6B9A), Color(0xFFFFC2D8)],
-  ),
-  GiftItem(
-    id: 'owned_lucky_box',
-    name: 'Lucky Box',
-    category: GiftCategory.baggage,
-    coins: 0,
-    icon: Icons.card_giftcard_rounded,
-    chatSymbol: '🎁',
-    assetPath: 'assets/images/gifts/lucky_box.png',
-    colors: [Color(0xFFFFD166), Color(0xFFFF7A45)],
-  ),
+  GiftItem(id: 'love_bomb', name: 'Love Bomb', category: GiftCategory.classic, coins: 1, icon: Icons.favorite_rounded, chatSymbol: '❤️', assetPath: 'assets/images/gifts/love_bomb.png', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
+  GiftItem(id: 'love_rocket', name: 'Love Rocket', category: GiftCategory.premium, coins: 999, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/images/gifts/rocket.png', videoAssetPath: 'assets/videos/gifts/love_rocket.mp4', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
+  GiftItem(id: 'rocket', name: 'Rocket', category: GiftCategory.classic, coins: 99, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/images/gifts/rocket.png', colors: [Color(0xFF18C7B7), Color(0xFF6C63FF)]),
+  GiftItem(id: 'lucky_star', name: 'Lucky Star', category: GiftCategory.lucky, coins: 19, icon: Icons.auto_awesome_rounded, chatSymbol: '✨', assetPath: 'assets/images/gifts/lucky_star.png', colors: [Color(0xFFFFD166), Color(0xFFFF7A45)]),
+  GiftItem(id: 'event_crown', name: 'Event Crown', category: GiftCategory.event, coins: 199, icon: Icons.emoji_events_rounded, chatSymbol: '🏆', assetPath: 'assets/images/gifts/event_crown.png', colors: [Color(0xFFC99A3B), Color(0xFFE84C72)]),
+  GiftItem(id: 'svip_aura', name: 'SVIP Aura', category: GiftCategory.svip, coins: 399, icon: Icons.diamond_rounded, chatSymbol: '💎', assetPath: 'assets/images/gifts/svip_aura.png', colors: [Color(0xFF8C5CF6), Color(0xFF12C7B7)]),
+  GiftItem(id: 'royal_crown', name: 'Royal Crown', category: GiftCategory.premium, coins: 999, icon: Icons.workspace_premium_rounded, chatSymbol: '👑', assetPath: 'assets/images/gifts/royal_crown.png', colors: [Color(0xFFFFD166), Color(0xFF111827)]),
+  GiftItem(id: 'owned_rose_pack', name: 'Rose Pack', category: GiftCategory.baggage, coins: 0, icon: Icons.inventory_2_rounded, chatSymbol: '🎒', assetPath: 'assets/images/gifts/rose_pack.png', colors: [Color(0xFFFF6B9A), Color(0xFFFFC2D8)]),
+  GiftItem(id: 'owned_lucky_box', name: 'Lucky Box', category: GiftCategory.baggage, coins: 0, icon: Icons.card_giftcard_rounded, chatSymbol: '🎁', assetPath: 'assets/images/gifts/lucky_box.png', colors: [Color(0xFFFFD166), Color(0xFFFF7A45)]),
 ];
