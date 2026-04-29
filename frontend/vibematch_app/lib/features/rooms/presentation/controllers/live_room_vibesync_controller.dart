@@ -1,4 +1,5 @@
 import '../live_room_models.dart';
+import '../widgets/vibesync_room_module.dart';
 
 class LiveRoomVibeSyncController {
   const LiveRoomVibeSyncController();
