@@ -37,31 +37,35 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   Widget build(BuildContext context) {
     final normalSlides = widget.slides.where((slide) => !slide.isVideoGift).toList(growable: false);
 
-    return Stack(
-      children: [
-        GiftSlideOverlay(
-          slides: normalSlides,
-          onComboTap: widget.onComboTap,
-        ),
-        VideoGiftOverlay(
-          slides: widget.slides,
-          onVideoFinished: widget.onVideoGiftFinished,
-        ),
-        RibbonMessageOverlay(messages: _ribbonMessages),
-        Positioned(
-          right: 27,
-          bottom: 140 + widget.bottomPadding,
-          child: const LiveRoomEventCarousel(),
-        ),
-        Positioned(
-          right: 18,
-          bottom: 52 + widget.bottomPadding,
-          child: ComboBuzzer(
-            slide: widget.activeComboSlide,
-            onTap: widget.onComboButtonTap,
+    return SizedBox.expand(
+      child: Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.none,
+        children: [
+          GiftSlideOverlay(
+            slides: normalSlides,
+            onComboTap: widget.onComboTap,
           ),
-        ),
-      ],
+          VideoGiftOverlay(
+            slides: widget.slides,
+            onVideoFinished: widget.onVideoGiftFinished,
+          ),
+          RibbonMessageOverlay(messages: _ribbonMessages),
+          Positioned(
+            right: 27,
+            bottom: 140 + widget.bottomPadding,
+            child: const LiveRoomEventCarousel(),
+          ),
+          Positioned(
+            right: 18,
+            bottom: 52 + widget.bottomPadding,
+            child: ComboBuzzer(
+              slide: widget.activeComboSlide,
+              onTap: widget.onComboButtonTap,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
