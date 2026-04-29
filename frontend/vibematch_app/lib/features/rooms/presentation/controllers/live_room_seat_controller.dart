@@ -179,6 +179,23 @@ class LiveRoomSeatController {
     onToast('Seat ${index + 1} unlocked');
   }
 
+  void removeUserFromRoom(String userId) {
+    var removed = false;
+
+    for (var i = 0; i < seats.length; i++) {
+      final user = seats[i].user;
+      if (user?.id == userId) {
+        seats[i] = seats[i].copyWith(clearUser: true);
+        removed = true;
+      }
+    }
+
+    if (removed) {
+      selectedSeatIndex = null;
+      onChanged();
+    }
+  }
+
   void toggleMic() {
     micMuted = !micMuted;
 
