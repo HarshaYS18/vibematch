@@ -9,6 +9,7 @@ import 'controllers/live_room_navigation_controller.dart';
 import 'controllers/live_room_seat_controller.dart';
 import 'controllers/live_room_sheet_controller.dart';
 import 'controllers/live_room_settings_controller.dart';
+import 'controllers/live_room_state_controller.dart';
 import 'controllers/live_room_users_controller.dart';
 import 'controllers/live_room_vibesync_controller.dart';
 import 'live_room_models.dart';
@@ -59,34 +60,33 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final TextEditingController _messageController;
   late final TextEditingController _announcementController;
   late final FocusNode _messageFocusNode;
+  late final LiveRoomStateController _roomStateController;
   late final LiveRoomGiftController _giftController;
   late final LiveRoomSeatController _seatController;
   late final LiveRoomMessageController _roomMessageController;
   late final LiveRoomModerationController _moderationController;
 
-  final LiveRoomNavigationController _navigationController = const LiveRoomNavigationController();
   final LiveRoomUsersController _usersController = const LiveRoomUsersController();
   final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
   final LiveRoomVibeSyncController _vibeSyncController = const LiveRoomVibeSyncController();
-
-  late String _roomName;
-  late String _roomId;
-  late RoomPrivacyMode _privacyMode;
-
-  bool _roomImagesEnabled = true;
-  bool _guestMessagesEnabled = true;
-  bool _minimized = false;
-  bool _allowRoomPop = false;
-  bool _leaveSheetOpen = false;
-  bool _exitingRoom = false;
-  bool _applyOnlyModeEnabled = false;
-  int _inboxUnreadCount = 4;
-  VibeSyncRoomState _vibeSyncState = VibeSyncRoomState.inactive;
-
-  Offset _bubbleOffset = const Offset(24, 120);
-  RoomBackgroundTheme _selectedBackgroundTheme = defaultRoomBackgroundTheme;
+  final LiveRoomNavigationController _navigationController = const LiveRoomNavigationController();
 
   final SeatUser _currentUser = mockRoomUsers.first;
+
+  String get _roomName => _roomStateController.roomName;
+  String get _roomId => _roomStateController.roomId;
+  RoomPrivacyMode get _privacyMode => _roomStateController.privacyMode;
+  bool get _roomImagesEnabled => _roomStateController.roomImagesEnabled;
+  bool get _guestMessagesEnabled => _roomStateController.guestMessagesEnabled;
+  bool get _minimized => _roomStateController.minimized;
+  bool get _allowRoomPop => _roomStateController.allowRoomPop;
+  bool get _leaveSheetOpen => _roomStateController.leaveSheetOpen;
+  bool get _exitingRoom => _roomStateController.exitingRoom;
+  bool get _applyOnlyModeEnabled => _roomStateController.applyOnlyModeEnabled;
+  int get _inboxUnreadCount => _roomStateController.inboxUnreadCount;
+  VibeSyncRoomState get _vibeSyncState => _roomStateController.vibeSyncState;
+  Offset get _bubbleOffset => _roomStateController.bubbleOffset;
+  RoomBackgroundTheme get _selectedBackgroundTheme => _roomStateController.selectedBackgroundTheme;
 
   List<SeatUser> get _roomUsers => _seatController.roomUsers;
 
@@ -123,11 +123,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _messageController = TextEditingController();
     _announcementController = TextEditingController();
     _messageFocusNode = FocusNode();
-    _moderationController = LiveRoomModerationController(currentUser: _currentUser);
 
-    _roomName = widget.roomName;
-    _roomId = widget.roomId;
-    _privacyMode = privacyModeFromTitle(widget.modeTitle);
+    _roomStateController = LiveRoomStateController(
+      initialRoomName: widget.roomName,
+      initialRoomId: widget.roomId,
+      initialModeTitle: widget.modeTitle,
+    )..addListener(_onRoomStateChanged);
+
+    _moderationController = LiveRoomModerationController(currentUser: _currentUser);
 
     _roomMessageController = LiveRoomMessageController(
       currentUser: _currentUser,
@@ -169,12 +172,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   @override
   void dispose() {
+    _roomStateController.removeListener(_onRoomStateChanged);
     _messageController.dispose();
     _announcementController.dispose();
     _messageFocusNode.dispose();
     _giftController.dispose();
     _moderationController.dispose();
+    _roomStateController.dispose();
     super.dispose();
+  }
+
+  void _onRoomStateChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -200,17 +209,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 offset: _bubbleOffset,
                 onRestore: () {
                   dismissRoomSeatActionPill();
-                  setState(() => _minimized = false);
+                  _roomStateController.setMinimized(false);
                 },
                 onDrag: (details) {
                   dismissRoomSeatActionPill();
-                  setState(() {
-                    _bubbleOffset = _navigationController.nextBubbleOffset(
-                      currentOffset: _bubbleOffset,
-                      dragDelta: details.delta,
-                      screenSize: MediaQuery.sizeOf(context),
-                    );
-                  });
+                  final nextOffset = _navigationController.nextBubbleOffset(
+                    currentOffset: _bubbleOffset,
+                    dragDelta: details.delta,
+                    screenSize: MediaQuery.sizeOf(context),
+                  );
+                  _roomStateController.setBubbleOffset(nextOffset);
                 },
               ),
             ],
@@ -222,7 +230,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     return PopScope<void>(
       canPop: _allowRoomPop,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
+        if (_navigationController.shouldBlockBackAction(
+          allowRoomPop: _allowRoomPop,
+          didPop: didPop,
+        )) {
           dismissRoomSeatActionPill();
           _openLeaveSheet();
         }
@@ -573,7 +584,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openInboxPage() {
     _clearRoomFocus();
-    setState(() => _inboxUnreadCount = 0);
+    _roomStateController.clearInboxUnreadCount();
     Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxPage()));
   }
 
@@ -599,44 +610,42 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openSettingsSheet() {
     _clearRoomFocus();
-    LiveRoomSheetController.showTransparentSheet<void>(
+    LiveRoomSheetController.showTransparentStatefulSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          return LiveRoomSettingsSheetModule(
-            roomId: _roomId,
-            privacyMode: _privacyMode,
-            roomImagesEnabled: _roomImagesEnabled,
-            guestMessagesEnabled: _guestMessagesEnabled,
-            applyOnlyModeEnabled: _applyOnlyModeEnabled,
-            joinRequestCount: _roomMessageController.joinRequestUsers.length,
-            onBackgroundTap: _openBackgroundSheet,
-            onPrivacyTap: _openPrivacySheet,
-            onSeatLayoutTap: _openSeatLayoutSheet,
-            onAnnouncementTap: _openAnnouncementSheet,
-            onInboxTap: () => _openInboxPageFromSheet(sheetContext),
-            onJoinRequestsTap: _openJoinRequestsSheet,
-            onVibeSyncTap: () => _openVibeSyncSheetFromSettings(sheetContext),
-            onToggleRoomImages: (value) {
-              setState(() => _roomImagesEnabled = value);
-              setSheetState(() {});
-              _insertSystemMessage(_settingsController.roomImagesSystemMessage(value));
-            },
-            onToggleGuestMessages: (value) {
-              setState(() => _guestMessagesEnabled = value);
-              setSheetState(() {});
-              _insertSystemMessage(_settingsController.guestMessagesSystemMessage(value));
-            },
-            onToggleApplyOnlyMode: (value) {
-              setState(() => _applyOnlyModeEnabled = value);
-              setSheetState(() {});
-              _insertSystemMessage(_settingsController.applyOnlyModeSystemMessage(value));
-            },
-            onCloseRoom: () => _leaveRoomFromSheet(context),
-          );
-        },
-      ),
+      builder: (sheetContext, setSheetState) {
+        return LiveRoomSettingsSheetModule(
+          roomId: _roomId,
+          privacyMode: _privacyMode,
+          roomImagesEnabled: _roomImagesEnabled,
+          guestMessagesEnabled: _guestMessagesEnabled,
+          applyOnlyModeEnabled: _applyOnlyModeEnabled,
+          joinRequestCount: _roomMessageController.joinRequestUsers.length,
+          onBackgroundTap: _openBackgroundSheet,
+          onPrivacyTap: _openPrivacySheet,
+          onSeatLayoutTap: _openSeatLayoutSheet,
+          onAnnouncementTap: _openAnnouncementSheet,
+          onInboxTap: () => _openInboxPageFromSheet(sheetContext),
+          onJoinRequestsTap: _openJoinRequestsSheet,
+          onVibeSyncTap: () => _openVibeSyncSheetFromSettings(sheetContext),
+          onToggleRoomImages: (value) {
+            _roomStateController.setRoomImagesEnabled(value);
+            setSheetState(() {});
+            _insertSystemMessage(_settingsController.roomImagesSystemMessage(value));
+          },
+          onToggleGuestMessages: (value) {
+            _roomStateController.setGuestMessagesEnabled(value);
+            setSheetState(() {});
+            _insertSystemMessage(_settingsController.guestMessagesSystemMessage(value));
+          },
+          onToggleApplyOnlyMode: (value) {
+            _roomStateController.setApplyOnlyModeEnabled(value);
+            setSheetState(() {});
+            _insertSystemMessage(_settingsController.applyOnlyModeSystemMessage(value));
+          },
+          onCloseRoom: () => _leaveRoomFromSheet(context),
+        );
+      },
     );
   }
 
@@ -657,31 +666,31 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         users: _roomUsers,
         canManage: _viewerCanManageRoom,
         onPickFirst: (user) {
-          setState(() {
-            _vibeSyncState = _vibeSyncController.pickFirstUser(
+          _roomStateController.setVibeSyncState(
+            _vibeSyncController.pickFirstUser(
               state: _vibeSyncState,
               user: user,
-            );
-          });
+            ),
+          );
         },
         onPickSecond: (user) {
-          setState(() {
-            _vibeSyncState = _vibeSyncController.pickSecondUser(
+          _roomStateController.setVibeSyncState(
+            _vibeSyncController.pickSecondUser(
               state: _vibeSyncState,
               user: user,
-            );
-          });
+            ),
+          );
         },
         onAnnounce: () {
           Navigator.pop(context);
           final announcement = _vibeSyncController.announce(_vibeSyncState);
           if (announcement == null) return;
-          setState(() => _vibeSyncState = announcement.state);
+          _roomStateController.setVibeSyncState(announcement.state);
           _insertSystemMessage(announcement.systemMessage);
         },
         onEnd: () {
           Navigator.pop(context);
-          setState(() => _vibeSyncState = _vibeSyncController.end());
+          _roomStateController.setVibeSyncState(_vibeSyncController.end());
           _insertSystemMessage(_vibeSyncController.endSystemMessage());
         },
       ),
@@ -689,7 +698,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _clearVibeSyncOverlay() {
-    setState(() => _vibeSyncState = _vibeSyncController.clearOverlay(_vibeSyncState));
+    _roomStateController.setVibeSyncState(_vibeSyncController.clearOverlay(_vibeSyncState));
   }
 
   void _openJoinRequestsSheet() {
@@ -727,7 +736,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       builder: (_) => LiveRoomPrivacySheet(
         currentMode: _privacyMode,
         onModeChanged: (mode) {
-          setState(() => _privacyMode = mode);
+          _roomStateController.setPrivacyMode(mode);
           _insertSystemMessage(_settingsController.privacyModeSystemMessage(mode));
         },
       ),
@@ -781,7 +790,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       builder: (_) => LiveRoomBackgroundSheet(
         currentTheme: _selectedBackgroundTheme,
         onThemeSelected: (theme) {
-          setState(() => _selectedBackgroundTheme = theme);
+          _roomStateController.setSelectedBackgroundTheme(theme);
           RoomToast.show(context, _settingsController.backgroundAppliedToast(theme));
         },
         onStoreTap: () => RoomToast.show(context, 'Theme store opened'),
@@ -816,7 +825,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     )) {
       return;
     }
-    _leaveSheetOpen = true;
+    _roomStateController.setLeaveSheetOpen(true);
     _clearRoomFocus();
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
@@ -830,7 +839,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           _leaveRoomFromSheet(sheetContext);
         },
       ),
-    ).whenComplete(() => _leaveSheetOpen = false);
+    ).whenComplete(() {
+      if (mounted) _roomStateController.setLeaveSheetOpen(false);
+    });
   }
 
   void _stayAndMinimize(BuildContext sheetContext) {
@@ -852,23 +863,23 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     Navigator.pop(sheetContext);
     if (!mounted) return;
-    setState(() => _allowRoomPop = true);
+    _roomStateController.setAllowRoomPop(true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (roomNavigator.canPop()) {
         roomNavigator.pop();
       } else {
-        setState(() => _minimized = true);
+        _roomStateController.setMinimized(true);
       }
     });
   }
 
   void _leaveRoomFromSheet(BuildContext sheetContext) {
     if (!_navigationController.canExitRoom(exitingRoom: _exitingRoom)) return;
-    _exitingRoom = true;
+    _roomStateController.setExitingRoom(true);
     Navigator.pop(sheetContext);
     if (!mounted) return;
-    setState(() => _allowRoomPop = true);
+    _roomStateController.setAllowRoomPop(true);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (mounted) Navigator.maybePop(context);
     });
