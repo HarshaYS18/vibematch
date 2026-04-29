@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
 import '../widgets/room_theme.dart';
+import '../widgets/vibesync_room_module.dart';
 
 class LiveRoomStateController extends ChangeNotifier {
   LiveRoomStateController({
