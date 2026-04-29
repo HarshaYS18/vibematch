@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'live_room_event_carousel.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
 import 'room_top_bar.dart';
@@ -126,7 +127,9 @@ class LiveRoomBody extends StatelessWidget {
               onRoomRankingsTap: onRoomRankingsTap,
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 10),
+          const LiveRoomEventCarousel(),
+          const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: RoomSeatLayout(
