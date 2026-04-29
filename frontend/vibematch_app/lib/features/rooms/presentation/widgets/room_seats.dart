@@ -42,9 +42,9 @@ class RoomSeatLayout extends StatefulWidget {
 
 class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   static const double seatWidth = 92;
-  static const double seatHeight = 118;
-  static const double rowHeight = 140;
-  static const double avatarSize = 66;
+  static const double seatHeight = 106;
+  static const double rowHeight = 116;
+  static const double avatarSize = 62;
   static const double menuWidth = 110;
   static const double menuItemHeight = 32;
 
@@ -186,9 +186,9 @@ class _SeatTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _SeatAvatar(seat: seat, selected: selected),
-          const SizedBox(height: 8),
+          const SizedBox(height: 5),
           SizedBox(
-            height: 26,
+            height: 24,
             child: user == null ? _EmptySeatLabel(index: seat.index) : _UserSeatLabel(user: user, index: seat.index),
           ),
         ],
@@ -236,8 +236,8 @@ class _SeatAvatar extends StatelessWidget {
               ),
               child: Center(
                 child: user == null
-                    ? Icon(seat.locked ? Icons.lock_rounded : Icons.add_rounded, color: Colors.white70, size: seat.locked ? 24 : 30)
-                    : Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900)),
+                    ? Icon(seat.locked ? Icons.lock_rounded : Icons.add_rounded, color: Colors.white70, size: seat.locked ? 22 : 28)
+                    : Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
               ),
             ),
           ),
