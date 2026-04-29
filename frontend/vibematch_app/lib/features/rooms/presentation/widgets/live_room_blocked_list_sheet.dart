@@ -158,10 +158,6 @@ class _LiveRoomBlockedListSheetState extends State<LiveRoomBlockedListSheet> {
                       return _BlockedUserTile(
                         user: user,
                         onUnblockTap: () => _unblockUser(user),
-                        onDetailsTap: () => RoomToast.show(
-                          context,
-                          '${user.displayName} block details opened locally.',
-                        ),
                       );
                     },
                   ),
@@ -177,7 +173,6 @@ class BlockedRoomUser {
     required this.id,
     required this.displayName,
     required this.publicUserId,
-    required this.reason,
     required this.durationLabel,
     required this.blockedBy,
     required this.blockedAtLabel,
@@ -188,7 +183,6 @@ class BlockedRoomUser {
   final String id;
   final String displayName;
   final String publicUserId;
-  final String reason;
   final String durationLabel;
   final String blockedBy;
   final String blockedAtLabel;
@@ -207,7 +201,6 @@ const List<BlockedRoomUser> mockBlockedRoomUsers = [
     id: 'blocked_riyan',
     displayName: 'Riyan',
     publicUserId: '6418002191',
-    reason: 'Spam messages in room chat',
     durationLabel: '1 Hour',
     blockedBy: 'Harsha',
     blockedAtLabel: '12 min ago',
@@ -217,7 +210,6 @@ const List<BlockedRoomUser> mockBlockedRoomUsers = [
     id: 'blocked_akash',
     displayName: 'Akash',
     publicUserId: '6418003314',
-    reason: 'Repeated seat disturbance',
     durationLabel: '1 Day',
     blockedBy: 'Riya',
     blockedAtLabel: '1 hr ago',
@@ -227,7 +219,6 @@ const List<BlockedRoomUser> mockBlockedRoomUsers = [
     id: 'blocked_guest_77',
     displayName: 'Guest 77',
     publicUserId: '6418007788',
-    reason: 'Unsafe behavior after warning',
     durationLabel: 'Forever',
     blockedBy: 'Harsha',
     blockedAtLabel: 'Yesterday',
@@ -240,125 +231,92 @@ class _BlockedUserTile extends StatelessWidget {
   const _BlockedUserTile({
     required this.user,
     required this.onUnblockTap,
-    required this.onDetailsTap,
   });
 
   final BlockedRoomUser user;
   final VoidCallback onUnblockTap;
-  final VoidCallback onDetailsTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCFAF6),
         borderRadius: BorderRadius.circular(20),
-        onTap: onDetailsTap,
-        child: Container(
-          padding: const EdgeInsets.all(11),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFCFAF6),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE8DDCF)),
+        border: Border.all(color: const Color(0xFFE8DDCF)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: user.avatarColors),
+              boxShadow: [
+                BoxShadow(
+                  color: user.avatarColors.last.withValues(alpha: 0.22),
+                  blurRadius: 14,
+                  offset: const Offset(0, 7),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                user.avatarLetter,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(colors: user.avatarColors),
-                  boxShadow: [
-                    BoxShadow(
-                      color: user.avatarColors.last.withValues(alpha: 0.22),
-                      blurRadius: 14,
-                      offset: const Offset(0, 7),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        user.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: RoomColors.plum,
+                          fontSize: 13.2,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ),
+                    _DurationBadge(user: user),
                   ],
                 ),
-                child: Center(
-                  child: Text(
-                    user.avatarLetter,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
+                const SizedBox(height: 3),
+                Text(
+                  'ID ${user.publicUserId} • by ${user.blockedBy} • ${user.blockedAtLabel}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF82758E),
+                    fontSize: 10.7,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            user.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: RoomColors.plum,
-                              fontSize: 13.2,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        _DurationBadge(user: user),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'ID ${user.publicUserId} • by ${user.blockedBy} • ${user.blockedAtLabel}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF82758E),
-                        fontSize: 10.7,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      user.reason,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: RoomColors.plum,
-                        fontSize: 11.3,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 9),
-                    Row(
-                      children: [
-                        _MiniActionPill(
-                          icon: Icons.remove_circle_outline_rounded,
-                          label: 'Unblock',
-                          color: RoomColors.aqua,
-                          onTap: onUnblockTap,
-                        ),
-                        const SizedBox(width: 8),
-                        _MiniActionPill(
-                          icon: Icons.history_rounded,
-                          label: 'Details',
-                          color: RoomColors.plum,
-                          onTap: onDetailsTap,
-                        ),
-                      ],
-                    ),
-                  ],
+                const SizedBox(height: 9),
+                _MiniActionPill(
+                  icon: Icons.remove_circle_outline_rounded,
+                  label: 'Unblock',
+                  color: RoomColors.aqua,
+                  onTap: onUnblockTap,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
