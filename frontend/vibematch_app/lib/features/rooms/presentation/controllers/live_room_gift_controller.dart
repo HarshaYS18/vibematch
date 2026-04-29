@@ -87,7 +87,7 @@ class LiveRoomGiftController {
       return;
     }
 
-    final effectiveCombo = gift.isVideoGift ? 1 : selectedCombo;
+    final effectiveCombo = selectedCombo;
     final totalCost = gift.coins * effectiveCombo * receivers.length;
 
     if (coinBalance < totalCost) {
