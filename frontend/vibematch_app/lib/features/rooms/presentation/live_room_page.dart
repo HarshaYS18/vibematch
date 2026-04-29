@@ -6,6 +6,7 @@ import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
 import 'controllers/live_room_moderation_controller.dart';
 import 'controllers/live_room_seat_controller.dart';
+import 'controllers/live_room_sheet_controller.dart';
 import 'controllers/live_room_users_controller.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
@@ -336,9 +337,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       allRoomUsers: _allRoomUsers,
       seatedUsers: _roomUsers,
     );
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomInviteSheet(
         seatIndex: seatIndex,
         users: inviteUsers,
@@ -374,10 +374,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openRoomUsersSheet() {
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomUsersSheet(
         users: _roomUsers,
         onUserTap: (user) {
@@ -391,10 +390,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openRoomRankingsSheet() {
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => RoomContributionRankingsSheet(
         roomName: _roomName,
         users: _allRoomUsers,
@@ -540,10 +538,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _openGiftPanel() {
     _clearRoomFocus();
     _giftController.ensureDefaultReceiver(_roomUsers);
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomGiftPanelSheet(
         gifts: mockGiftItems,
         users: _roomUsers,
@@ -580,9 +577,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openEmojiTray() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomEmojiSheet(
         onEmojiTap: (emoji) {
           Navigator.pop(context);
@@ -594,10 +590,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openSettingsSheet() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) {
           return LiveRoomSettingsSheetModule(
@@ -645,10 +640,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openVibeSyncSheet() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => VibeSyncControlSheet(
         state: _vibeSyncState,
         users: _roomUsers,
@@ -702,9 +696,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openJoinRequestsSheet() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
         builder: (context, setSheetState) {
           return LiveRoomJoinRequestsSheet(
@@ -730,10 +723,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openPrivacySheet() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomPrivacySheet(
         currentMode: _privacyMode,
         onModeChanged: (mode) {
@@ -746,9 +738,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openGamesSheet() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomGamesSheet(
         onCrystalHuntTap: () {
           Navigator.pop(context);
@@ -772,9 +763,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openSeatLayoutSheet() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomSeatLayoutPickerSheet(
         selectedLayout: _seatController.layoutId,
         onSelected: (layout) {
@@ -787,10 +777,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openBackgroundSheet() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomBackgroundSheet(
         currentTheme: _selectedBackgroundTheme,
         onThemeSelected: (theme) {
@@ -804,10 +793,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openAnnouncementSheet() {
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomAnnouncementSheet(
         controller: _announcementController,
         onSubmit: (message) {
@@ -827,9 +815,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     if (_leaveSheetOpen || _exitingRoom) return;
     _leaveSheetOpen = true;
     _clearRoomFocus();
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (sheetContext) => LiveRoomLeaveSheet(
         onStay: () {
           dismissRoomSeatActionPill();
@@ -885,9 +872,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openInfoSheet(String title, String body) {
-    showModalBottomSheet<void>(
+    LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomInfoSheet(title: title, body: body),
     );
   }
