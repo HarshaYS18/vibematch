@@ -21,11 +21,20 @@ class HomeRoom {
     required this.followedFriendsInside,
   });
 
-  bool get isSecretVibe => mode.toLowerCase().contains('secret');
-  bool get isLocked => mode.toLowerCase().contains('lock');
-  bool get isMembersOnly => mode.toLowerCase().contains('member');
-
   bool get isPublicOpen {
-    return !isSecretVibe && !isMembersOnly;
+    return mode.trim().toLowerCase() == 'open' ||
+        mode.trim().toLowerCase().contains('sync');
+  }
+
+  bool get isSecretVibe {
+    return mode.trim().toLowerCase().contains('secret');
+  }
+
+  bool get isLocked {
+    return mode.trim().toLowerCase().contains('lock');
+  }
+
+  bool get isMembersOnly {
+    return mode.trim().toLowerCase().contains('member');
   }
 }
