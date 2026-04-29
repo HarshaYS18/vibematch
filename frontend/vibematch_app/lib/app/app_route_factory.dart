@@ -4,6 +4,7 @@ import '../features/auth/presentation/auth_gate.dart';
 import '../features/control_center/presentation/control_center_page.dart';
 import '../features/events/presentation/events_page.dart';
 import '../features/family/presentation/family_page.dart';
+import '../features/love_bond/presentation/love_bond_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/public_profile_page.dart';
 import '../features/rankings/presentation/rankings_page.dart';
@@ -82,6 +83,8 @@ class AppRouteFactory {
         return _buildRoute(settings, const SettingsPage());
       case VmRoutes.family:
         return _buildRoute(settings, const FamilyPage());
+      case VmRoutes.loveBond:
+        return _buildRoute(settings, const LoveBondPage());
       case VmRoutes.vip:
         return _buildRoute(settings, const VipPage());
       case VmRoutes.notifications:
