@@ -5,6 +5,7 @@ import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
 import 'controllers/live_room_seat_controller.dart';
+import 'controllers/live_room_users_controller.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_background_sheet.dart';
@@ -58,6 +59,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final LiveRoomMessageController _roomMessageController;
   late final RoomModerationRepository _moderationRepository;
 
+  final LiveRoomUsersController _usersController = const LiveRoomUsersController();
+
   final Set<String> _locallyKickedOutUserIds = <String>{};
 
   late String _roomName;
@@ -82,31 +85,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   List<SeatUser> get _roomUsers => _seatController.roomUsers;
 
   List<SeatUser> get _allRoomUsers {
-    final users = <SeatUser>[];
-    final ids = <String>{};
-
-    for (final user in _roomUsers) {
-      if (_locallyKickedOutUserIds.contains(user.id)) continue;
-      if (ids.add(user.id)) users.add(user);
-    }
-    for (final user in mockRoomUsers) {
-      if (_locallyKickedOutUserIds.contains(user.id)) continue;
-      if (ids.add(user.id)) users.add(user);
-    }
-    for (final user in mockInviteUsers) {
-      if (_locallyKickedOutUserIds.contains(user.id)) continue;
-      if (ids.add(user.id)) users.add(user);
-    }
-
-    return users;
+    return _usersController.buildAllRoomUsers(
+      seatedUsers: _roomUsers,
+      fallbackRoomUsers: mockRoomUsers,
+      inviteUsers: mockInviteUsers,
+      isUserRemoved: _locallyKickedOutUserIds.contains,
+    );
   }
 
   List<SeatUser> get _roomAdmins {
-    return _allRoomUsers.where((user) => user.isHost || user.isRoomAdmin).toList();
+    return _usersController.buildRoomAdmins(_allRoomUsers);
   }
 
   List<SeatUser> get _availableAdminUsers {
-    return _allRoomUsers.where((user) => !user.isHost && !user.isRoomAdmin).toList();
+    return _usersController.buildAvailableAdminUsers(_allRoomUsers);
   }
 
   bool get _viewerCanManageRoom => _currentUser.isHost || _currentUser.isRoomAdmin;
@@ -339,8 +331,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openSeatInviteSheet(int seatIndex) {
     _clearRoomFocus();
-    final seatedIds = _roomUsers.map((user) => user.id).toSet();
-    final inviteUsers = _allRoomUsers.where((user) => !seatedIds.contains(user.id)).toList();
+    final inviteUsers = _usersController.buildSeatInviteUsers(
+      allRoomUsers: _allRoomUsers,
+      seatedUsers: _roomUsers,
+    );
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -422,22 +416,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openMiniProfileFromChat(ChatEntry entry) {
     if (entry.senderId == null || entry.senderId == 'system') return;
-    final user = _allRoomUsers.firstWhere(
-      (item) => item.id == entry.senderId,
-      orElse: () => SeatUser(
-        id: entry.senderId!,
-        name: entry.senderName,
-        roleLabel: 'Member',
-        familyName: '',
-        relationshipText: '',
-        vipLevel: entry.vipLevel,
-        sendingLevel: entry.sendingLevel,
-        receivingLevel: entry.receivingLevel,
-        sentExp: 0,
-        receivedExp: 0,
-        medals: const [],
-        avatarColors: const [RoomColors.violet, RoomColors.aqua],
-      ),
+    final user = _usersController.resolveUserFromChatEntry(
+      entry: entry,
+      allRoomUsers: _allRoomUsers,
     );
     _openMiniProfileForUser(user);
   }
