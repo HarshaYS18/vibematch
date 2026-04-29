@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
-import '../modules/live_room_watch_party_module.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
 import 'room_top_bar.dart';
@@ -56,7 +55,6 @@ class LiveRoomBody extends StatelessWidget {
   final String roomId;
   final RoomPrivacyMode privacyMode;
   final int onlineCount;
-
   final List<RoomSeat> seats;
   final String layoutId;
   final int? selectedSeatIndex;
@@ -65,16 +63,13 @@ class LiveRoomBody extends StatelessWidget {
   final List<SeatUser> availableAdminUsers;
   final ValueChanged<SeatUser> onAddAdmin;
   final ValueChanged<SeatUser> onRemoveAdmin;
-
   final List<ChatEntry> messages;
   final bool canManageSeatApplications;
-
   final TextEditingController messageController;
   final FocusNode messageFocusNode;
   final bool micMuted;
   final int inboxUnreadCount;
   final bool imagesEnabled;
-
   final VoidCallback onBack;
   final VoidCallback onJoinTap;
   final VoidCallback onShare;
@@ -82,18 +77,15 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onSettings;
   final VoidCallback onUsersTap;
   final VoidCallback onRoomRankingsTap;
-
   final ValueChanged<int> onSeatTap;
   final ValueChanged<int> onUserTap;
   final ValueChanged<int> onInvite;
   final ValueChanged<int> onSwitch;
   final ValueChanged<int> onLock;
   final ValueChanged<int> onUnlock;
-
   final ValueChanged<ChatEntry> onApproveSeatApplication;
   final ValueChanged<ChatEntry> onSenderTap;
   final VoidCallback onDismissOverlays;
-
   final VoidCallback onInboxTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onSendTap;
@@ -127,16 +119,7 @@ class LiveRoomBody extends StatelessWidget {
               onRoomRankingsTap: onRoomRankingsTap,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-            child: LiveRoomWatchPartyModule(
-              active: false,
-              canManage: canManageSeats,
-              onOpenSettings: onSettings,
-              onEndWatchParty: onSettings,
-            ),
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 22),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: RoomSeatLayout(
