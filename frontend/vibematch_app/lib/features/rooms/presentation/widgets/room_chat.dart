@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../live_room_models.dart';
-import 'room_action_pages.dart';
-import 'room_gifts.dart';
+import '../modules/live_room_games_module.dart';
 import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
@@ -94,7 +93,6 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
 
     return ListView.builder(
       controller: _scrollController,
-      reverse: false,
       padding: const EdgeInsets.only(top: 8, bottom: 10),
       physics: const BouncingScrollPhysics(),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -136,33 +134,25 @@ class _CompactChatLine extends StatelessWidget {
     if (isSystem) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Flexible(
-              fit: FlexFit.loose,
-              child: _TransparentUserMessageFlexBox(
-                messageText: message.message,
-                enableMessageActions: false,
-                child: Text(
-                  message.message,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: RoomColors.gold,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w900,
-                    height: 1.15,
-                  ),
-                ),
-              ),
+        child: _TransparentUserMessageFlexBox(
+          messageText: message.message,
+          enableMessageActions: false,
+          child: Text(
+            message.message,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: RoomColors.gold,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w900,
+              height: 1.15,
             ),
-          ],
+          ),
         ),
       );
     }
 
-    final row = Padding(
+    return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -180,26 +170,18 @@ class _CompactChatLine extends StatelessWidget {
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: onSenderTap,
-                    child: message.isGift
-                        ? GiftVisual(
-                            icon: Icons.card_giftcard_rounded,
-                            colors: const [RoomColors.gold, RoomColors.coral],
-                            assetPath: message.giftAssetPath,
-                            size: 28,
-                            padding: 2,
-                          )
-                        : CircleAvatar(
-                            radius: 13.5,
-                            backgroundColor: message.isSeatApplication ? RoomColors.aqua : RoomColors.violet,
-                            child: Text(
-                              avatarLetter(message.senderName),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
+                    child: CircleAvatar(
+                      radius: 13.5,
+                      backgroundColor: message.isSeatApplication ? RoomColors.aqua : RoomColors.violet,
+                      child: Text(
+                        avatarLetter(message.senderName),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Flexible(
@@ -211,14 +193,10 @@ class _CompactChatLine extends StatelessWidget {
                         children: [
                           WidgetSpan(
                             alignment: PlaceholderAlignment.middle,
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () => _openVipSvipCenter(context),
-                              child: VipBadge(
-                                level: message.vipLevel,
-                                size: VipBadgeSize.tiny,
-                                showWhenZero: true,
-                              ),
+                            child: VipBadge(
+                              level: message.vipLevel,
+                              size: VipBadgeSize.tiny,
+                              showWhenZero: true,
                             ),
                           ),
                           const TextSpan(text: '  '),
@@ -253,13 +231,6 @@ class _CompactChatLine extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: RoomColors.aqua,
                   borderRadius: BorderRadius.circular(999),
-                  boxShadow: [
-                    BoxShadow(
-                      color: RoomColors.aqua.withValues(alpha: 0.24),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: const Text(
                   'Agree',
@@ -275,46 +246,10 @@ class _CompactChatLine extends StatelessWidget {
         ],
       ),
     );
-
-    return row;
-  }
-
-  void _openVipSvipCenter(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RoomActionPage(
-          title: 'VIP & SVIP Centre',
-          subtitle:
-              '${message.senderName} is VIP ${message.vipLevel}. VIP benefits, SVIP rules, badge upgrades, recharge progress and frozen VIP status will connect here.',
-          icon: Icons.workspace_premium_rounded,
-          cards: [
-            RoomActionCard(
-              title: 'Current VIP',
-              value: 'VIP ${message.vipLevel}',
-              icon: Icons.workspace_premium_rounded,
-              color: RoomColors.gold,
-            ),
-            RoomActionCard(
-              title: 'Monthly SVIP',
-              value: 'SVIP status connects from backend',
-              icon: Icons.auto_awesome_rounded,
-              color: RoomColors.violet,
-            ),
-            const RoomActionCard(
-              title: 'VIP 30+ shine',
-              value: 'Premium badge shine and extra glow unlock at VIP 30+',
-              icon: Icons.auto_awesome_rounded,
-              color: RoomColors.aqua,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   List<TextSpan> _messageSpans(ChatEntry message) {
-    final text = message.message;
+    final text = message.isGift ? '${message.message} ${message.giftAssetPath == null ? '' : ''}' : message.message;
     final mentionRegex = RegExp(r'@\w+');
     final spans = <TextSpan>[];
     var cursor = 0;
@@ -411,9 +346,7 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
     if (!context.mounted || selected == null) return;
 
     if (selected == _ChatMessageAction.copy) {
-      FocusManager.instance.primaryFocus?.unfocus();
       await Clipboard.setData(ClipboardData(text: messageText));
-      FocusManager.instance.primaryFocus?.unfocus();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -427,7 +360,6 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
       return;
     }
 
-    FocusManager.instance.primaryFocus?.unfocus();
     RoomToast.show(context, 'Report message will connect here');
   }
 
@@ -446,7 +378,6 @@ class _TransparentUserMessageFlexBox extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.105),
-          shape: BoxShape.rectangle,
           borderRadius: BorderRadius.circular(7),
           border: Border.all(color: Colors.white.withValues(alpha: 0.34), width: 0.9),
           boxShadow: [
@@ -595,7 +526,14 @@ class RoomInputDock extends StatelessWidget {
                 SizedBox(width: gap),
                 _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(onMicTap), active: !micMuted, muted: micMuted, size: dockButtonSize, iconSize: dockIconSize),
                 SizedBox(width: gap),
-                _DockButton(icon: Icons.sports_esports_rounded, onTap: () => _runAndHideSeatActions(onGamesTap), size: dockButtonSize, iconSize: dockIconSize),
+                SizedBox(
+                  width: dockButtonSize,
+                  height: dockButtonSize,
+                  child: LiveRoomGamesModule(
+                    onOpenGames: () => _runAndHideSeatActions(onGamesTap),
+                    compact: true,
+                  ),
+                ),
                 SizedBox(width: gap),
                 _DockButton(icon: Icons.card_giftcard_rounded, onTap: () => _runAndHideSeatActions(onGiftTap), gift: true, size: dockButtonSize, iconSize: dockIconSize),
               ],
