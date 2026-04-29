@@ -68,3 +68,38 @@ def list_active_room_kickouts(
         .order_by(RoomKickout.created_at.desc())
         .all()
     )
+
+
+def remove_room_kickout(
+    db: Session,
+    room_public_id: str,
+    kickout_id: int,
+    actor_user_id: int | None = None,
+    actor_public_user_id: str | None = None,
+) -> RoomKickout | None:
+    """
+    Soft-remove a room kickout/blocked-list entry.
+
+    Temporary dev contract: actor identity is accepted for the future auth/audit
+    connection. Permission checks and audit logs will be added when room roles
+    are fully backend-enforced.
+    """
+
+    kickout = (
+        db.query(RoomKickout)
+        .filter(RoomKickout.id == kickout_id)
+        .filter(RoomKickout.room_public_id == room_public_id)
+        .filter(RoomKickout.is_active.is_(True))
+        .first()
+    )
+
+    if kickout is None:
+        return None
+
+    kickout.is_active = False
+    kickout.updated_at = datetime.utcnow()
+
+    db.add(kickout)
+    db.commit()
+    db.refresh(kickout)
+    return kickout
