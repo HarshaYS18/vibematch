@@ -36,6 +36,9 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _scrollController.addListener(_handleScroll);
     _controller.addListener(_handleControllerChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.loadTrendingRooms(silent: true);
+    });
   }
 
   @override
@@ -185,61 +188,156 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
-        child: CustomScrollView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: HomeHeaderSection(
-                onSearchTap: () => VmNavigator.openSearch(context),
-                onNotificationsTap: () => VmNavigator.openNotifications(context),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: HomeBannerSection(
-                banners: _controller.banners,
-                selectedIndex: _controller.selectedBannerIndex,
-                canManageHomeBanners: _canManageHomeBanners,
-                onBannerChanged: _controller.selectBanner,
-                onBannerTap: _handleBannerTap,
-                onManageTap: () => _toast('Banner management opened for official account'),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: HomeFiltersSection(
-                categories: _controller.categories,
-                selectedCategory: _controller.selectedCategory,
-                selectedLanguage: _controller.selectedLanguage,
-                onCategorySelected: _controller.selectCategory,
-                onLanguageTap: _openLanguageSheet,
-                onSeeAllTap: _seeAllRooms,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: HomeRoomSectionHeader(
-                selectedCategory: _controller.selectedCategory,
-                totalRooms: _controller.filteredRooms.length,
-              ),
-            ),
-            if (visibleRooms.isEmpty)
+        child: RefreshIndicator(
+          onRefresh: () => _controller.loadTrendingRooms(),
+          child: CustomScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            slivers: [
               SliverToBoxAdapter(
-                child: HomeEmptyState(selectedCategory: _controller.selectedCategory),
-              )
-            else
-              SliverList.builder(
-                itemCount: visibleRooms.length,
-                itemBuilder: (context, index) {
-                  final room = visibleRooms[index];
-                  return HomeRoomCard(
-                    room: room,
-                    rank: index + 1,
-                    onTap: () => _openRoom(room),
-                  );
-                },
+                child: HomeHeaderSection(
+                  onSearchTap: () => VmNavigator.openSearch(context),
+                  onNotificationsTap: () => VmNavigator.openNotifications(context),
+                ),
               ),
-            const SliverToBoxAdapter(child: SizedBox(height: 110)),
-          ],
+              SliverToBoxAdapter(
+                child: HomeBannerSection(
+                  banners: _controller.banners,
+                  selectedIndex: _controller.selectedBannerIndex,
+                  canManageHomeBanners: _canManageHomeBanners,
+                  onBannerChanged: _controller.selectBanner,
+                  onBannerTap: _handleBannerTap,
+                  onManageTap: () => _toast('Banner management opened for official account'),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: HomeFiltersSection(
+                  categories: _controller.categories,
+                  selectedCategory: _controller.selectedCategory,
+                  selectedLanguage: _controller.selectedLanguage,
+                  onCategorySelected: _controller.selectCategory,
+                  onLanguageTap: _openLanguageSheet,
+                  onSeeAllTap: _seeAllRooms,
+                ),
+              ),
+              if (_controller.isLoadingRooms)
+                const SliverToBoxAdapter(child: _HomeLoadingStrip())
+              else if (_controller.loadErrorMessage != null)
+                SliverToBoxAdapter(
+                  child: _HomeBackendFallbackStrip(message: _controller.loadErrorMessage!),
+                )
+              else if (_controller.usingBackendRooms)
+                const SliverToBoxAdapter(child: _HomeBackendConnectedStrip()),
+              SliverToBoxAdapter(
+                child: HomeRoomSectionHeader(
+                  selectedCategory: _controller.selectedCategory,
+                  totalRooms: _controller.filteredRooms.length,
+                ),
+              ),
+              if (visibleRooms.isEmpty)
+                SliverToBoxAdapter(
+                  child: HomeEmptyState(selectedCategory: _controller.selectedCategory),
+                )
+              else
+                SliverList.builder(
+                  itemCount: visibleRooms.length,
+                  itemBuilder: (context, index) {
+                    final room = visibleRooms[index];
+                    return HomeRoomCard(
+                      room: room,
+                      rank: index + 1,
+                      onTap: () => _openRoom(room),
+                    );
+                  },
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 110)),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _HomeLoadingStrip extends StatelessWidget {
+  const _HomeLoadingStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(18, 0, 18, 12),
+      child: LinearProgressIndicator(
+        minHeight: 3,
+        color: Color(0xFF12C7B7),
+        backgroundColor: Color(0xFFECE2D8),
+      ),
+    );
+  }
+}
+
+class _HomeBackendFallbackStrip extends StatelessWidget {
+  const _HomeBackendFallbackStrip({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7E8),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8C77C)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_rounded, color: Color(0xFFC99A3B), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xFF4A2A63),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeBackendConnectedStrip extends StatelessWidget {
+  const _HomeBackendConnectedStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8FAF7),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFB7EFE6)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.cloud_done_rounded, color: Color(0xFF12C7B7), size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Live room list loaded from backend.',
+              style: TextStyle(
+                color: Color(0xFF4A2A63),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
