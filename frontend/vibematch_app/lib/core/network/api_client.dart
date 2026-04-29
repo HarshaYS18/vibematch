@@ -92,6 +92,35 @@ class ApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> postMap(
+    String path, {
+    Map<String, String?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    Object? body,
+  }) async {
+    final response = await _httpClient
+        .post(
+          _buildUri(path, queryParameters: queryParameters),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            ...headers,
+          },
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(AppConstants.receiveTimeout);
+
+    final decodedBody = _decodeResponseBody(response);
+
+    if (decodedBody is Map<String, dynamic>) return decodedBody;
+
+    throw ApiException(
+      message: 'Expected a JSON object response',
+      statusCode: response.statusCode,
+      body: decodedBody,
+    );
+  }
+
   Future<Map<String, dynamic>> getHealthStatus() {
     return getMap('/health');
   }
