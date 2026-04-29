@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -10,6 +10,7 @@ from app.schemas.rooms.room_kickout import (
 from app.services.rooms.room_kickout_service import (
     create_room_kickout,
     list_active_room_kickouts,
+    remove_room_kickout,
 )
 from app.services.rooms.room_service import list_trending_rooms
 
@@ -74,3 +75,34 @@ def get_room_blocked_users(
         db=db,
         room_public_id=room_public_id,
     )
+
+
+@router.delete(
+    "/{room_public_id}/kickouts/{kickout_id}",
+    response_model=RoomKickoutResponse,
+)
+def unblock_room_user(
+    room_public_id: str,
+    kickout_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Remove a user from this room's blocked list.
+
+    Temporary dev contract: permission checks and audit logs will be connected
+    after backend room roles are fully wired.
+    """
+
+    removed = remove_room_kickout(
+        db=db,
+        room_public_id=room_public_id,
+        kickout_id=kickout_id,
+    )
+
+    if removed is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active room blocked-list entry not found.",
+        )
+
+    return removed
