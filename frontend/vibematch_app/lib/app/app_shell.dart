@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../features/auth/models/current_user.dart';
 import '../features/create/presentation/create_page.dart';
-import '../features/home/presentation/home_page.dart';
+import '../features/home/presentation/home_page_modular.dart';
 import '../features/inbox/presentation/inbox_page.dart';
 import '../features/profile/presentation/me_page.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
