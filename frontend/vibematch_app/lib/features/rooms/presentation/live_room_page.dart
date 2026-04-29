@@ -9,6 +9,7 @@ import 'controllers/live_room_seat_controller.dart';
 import 'controllers/live_room_sheet_controller.dart';
 import 'controllers/live_room_settings_controller.dart';
 import 'controllers/live_room_users_controller.dart';
+import 'controllers/live_room_vibesync_controller.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_background_sheet.dart';
@@ -64,6 +65,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   final LiveRoomUsersController _usersController = const LiveRoomUsersController();
   final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
+  final LiveRoomVibeSyncController _vibeSyncController = const LiveRoomVibeSyncController();
 
   late String _roomName;
   late String _roomId;
@@ -651,49 +653,38 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         canManage: _viewerCanManageRoom,
         onPickFirst: (user) {
           setState(() {
-            _vibeSyncState = _vibeSyncState.copyWith(
-              active: false,
-              announced: false,
-              firstUser: user,
-              statusText: 'First user picked: ${user.name}',
+            _vibeSyncState = _vibeSyncController.pickFirstUser(
+              state: _vibeSyncState,
+              user: user,
             );
           });
         },
         onPickSecond: (user) {
           setState(() {
-            _vibeSyncState = _vibeSyncState.copyWith(
-              active: false,
-              announced: false,
-              secondUser: user,
-              statusText: 'Second user picked: ${user.name}',
+            _vibeSyncState = _vibeSyncController.pickSecondUser(
+              state: _vibeSyncState,
+              user: user,
             );
           });
         },
         onAnnounce: () {
           Navigator.pop(context);
-          final first = _vibeSyncState.firstUser;
-          final second = _vibeSyncState.secondUser;
-          if (first == null || second == null) return;
-          setState(() {
-            _vibeSyncState = _vibeSyncState.copyWith(
-              active: true,
-              announced: true,
-              statusText: '${first.name} and ${second.name} are matched by VibeSync',
-            );
-          });
-          _insertSystemMessage('VibeSync announced ${first.name} × ${second.name}');
+          final announcement = _vibeSyncController.announce(_vibeSyncState);
+          if (announcement == null) return;
+          setState(() => _vibeSyncState = announcement.state);
+          _insertSystemMessage(announcement.systemMessage);
         },
         onEnd: () {
           Navigator.pop(context);
-          setState(() => _vibeSyncState = VibeSyncRoomState.inactive);
-          _insertSystemMessage('VibeSync match cleared');
+          setState(() => _vibeSyncState = _vibeSyncController.end());
+          _insertSystemMessage(_vibeSyncController.endSystemMessage());
         },
       ),
     );
   }
 
   void _clearVibeSyncOverlay() {
-    setState(() => _vibeSyncState = _vibeSyncState.copyWith(active: false));
+    setState(() => _vibeSyncState = _vibeSyncController.clearOverlay(_vibeSyncState));
   }
 
   void _openJoinRequestsSheet() {
