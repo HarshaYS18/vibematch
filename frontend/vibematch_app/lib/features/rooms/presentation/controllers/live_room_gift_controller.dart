@@ -114,7 +114,7 @@ class LiveRoomGiftController {
         colors: gift.colors,
         combo: deliveredCombo,
         baseCombo: deliveredCombo,
-        remainingSeconds: gift.isVideoGift ? 7 : 15,
+        remainingSeconds: gift.isVideoGift ? 10 : 15,
       );
       _startGiftSlide(slide);
     }
@@ -131,6 +131,15 @@ class LiveRoomGiftController {
     onChanged();
   }
 
+  void finishVideoGift(GiftSlide slide) {
+    final index = giftSlides.indexWhere((item) => item.id == slide.id);
+    if (index < 0) return;
+
+    _giftTimers.remove(slide.id)?.cancel();
+    giftSlides.removeAt(index);
+    onChanged();
+  }
+
   void _startGiftSlide(GiftSlide slide) {
     giftSlides.insert(0, slide);
     onChanged();
@@ -144,6 +153,7 @@ class LiveRoomGiftController {
       final index = giftSlides.indexWhere((item) => item.id == slide.id);
       if (index < 0) {
         timer.cancel();
+        _giftTimers.remove(slide.id);
         return;
       }
 
@@ -182,6 +192,7 @@ class LiveRoomGiftController {
     for (final timer in _giftTimers.values) {
       timer.cancel();
     }
+    _giftTimers.clear();
   }
 }
 
