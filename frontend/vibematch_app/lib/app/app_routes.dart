@@ -78,6 +78,30 @@ class VmRoutes {
   static const String search = '/search';
   static const String controlCenter = '/control-center';
 
+  static const String agency = '/agency';
+  static const String gifts = '/gifts';
+  static const String inventory = '/inventory';
+  static const String recharge = '/recharge';
+  static const String transactions = '/transactions';
+  static const String earnings = '/earnings';
+  static const String payouts = '/payouts';
+
+  static const String admin = '/admin';
+  static const String reports = '/reports';
+  static const String privacy = '/privacy';
+  static const String blockList = '/block-list';
+  static const String security = '/security';
+  static const String language = '/language';
+
+  static const String games = '/games';
+  static const String watchParty = '/watch-party';
+  static const String cricketMode = '/cricket-mode';
+  static const String vibeSync = '/vibesync';
+
+  static const String vibeDetail = '/vibes/detail';
+  static const String vibeComposer = '/vibes/composer';
+  static const String vibeComments = '/vibes/comments';
+
   static bool isMainTabRoute(String? route) {
     if (route == null) return false;
     return VmMainTab.values.any((tab) => tab.route == route);
