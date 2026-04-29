@@ -72,6 +72,7 @@ class VmRoutes {
   static const String settings = '/settings';
 
   static const String family = '/family';
+  static const String loveBond = '/love-bond';
   static const String vip = '/vip';
   static const String notifications = '/notifications';
   static const String search = '/search';
