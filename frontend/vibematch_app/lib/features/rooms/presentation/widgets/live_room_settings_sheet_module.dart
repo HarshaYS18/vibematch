@@ -8,7 +8,7 @@ import 'room_settings_sheet.dart';
 class LiveRoomSettingsSheetModule extends StatelessWidget {
   const LiveRoomSettingsSheetModule({
     super.key,
-    required this.roomId,
+    this.roomId = 'VM257808',
     required this.privacyMode,
     required this.roomImagesEnabled,
     required this.guestMessagesEnabled,
