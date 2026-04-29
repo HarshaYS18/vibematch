@@ -25,6 +25,7 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.onBlockedTap,
     required this.onEffectsTap,
     required this.onMusicTap,
+    required this.onVibeSyncTap,
   });
 
   final RoomPrivacyMode privacyMode;
@@ -46,6 +47,7 @@ class RoomSettingsSheet extends StatelessWidget {
   final VoidCallback onBlockedTap;
   final VoidCallback onEffectsTap;
   final VoidCallback onMusicTap;
+  final VoidCallback onVibeSyncTap;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +56,7 @@ class RoomSettingsSheet extends StatelessWidget {
       _SettingsCard(icon: privacyMode.icon, title: 'Privacy', badge: privacyMode.shortLabel, onTap: onPrivacyTap),
       _SettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
       _SettingsCard(icon: Icons.campaign_rounded, title: 'Notice', onTap: onAnnouncementTap),
+      _SettingsCard(icon: Icons.favorite_rounded, title: 'VibeSync', iconColor: RoomColors.coral, onTap: onVibeSyncTap),
       _SettingsCard(icon: Icons.how_to_reg_rounded, title: 'Requests', badge: joinRequestCount > 0 ? '$joinRequestCount' : null, onTap: onJoinRequestsTap),
       _SettingsCard(icon: Icons.auto_awesome_rounded, title: 'Effects', onTap: onEffectsTap),
       _SettingsCard(icon: Icons.music_note_rounded, title: 'Music', onTap: onMusicTap),
