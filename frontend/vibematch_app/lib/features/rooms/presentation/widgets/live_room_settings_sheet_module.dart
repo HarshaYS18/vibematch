@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
+import 'live_room_blocked_list_sheet.dart';
 import 'room_settings_sheet.dart';
 
 class LiveRoomSettingsSheetModule extends StatelessWidget {
@@ -43,6 +44,15 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   final VoidCallback onCloseRoom;
   final VoidCallback onVibeSyncTap;
 
+  void _openBlockedList(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const LiveRoomBlockedListSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return RoomSettingsSheet(
@@ -64,12 +74,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
         subtitle: 'Room safety, reports, and moderation queue will connect here.',
         icon: Icons.report_gmailerrorred_rounded,
       ),
-      onBlockedTap: () => LiveRoomProfileNavigator.openModulePage(
-        context: context,
-        title: 'Blocked users',
-        subtitle: 'Blocked and restricted room users will connect here.',
-        icon: Icons.block_rounded,
-      ),
+      onBlockedTap: () => _openBlockedList(context),
       onEffectsTap: () => LiveRoomProfileNavigator.openModulePage(
         context: context,
         title: 'Room effects',
