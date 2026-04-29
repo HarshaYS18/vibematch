@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'live_room_event_carousel.dart';
 import 'room_gifts.dart';
 
 class LiveRoomGiftOverlay extends StatelessWidget {
@@ -32,6 +33,11 @@ class LiveRoomGiftOverlay extends StatelessWidget {
             slides: slides,
             onComboTap: onComboTap,
           ),
+        ),
+        Positioned(
+          right: 27,
+          bottom: 140 + bottomPadding,
+          child: const LiveRoomEventCarousel(),
         ),
         Positioned(
           right: 18,
