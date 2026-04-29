@@ -72,26 +72,11 @@ class HomeController extends ChangeNotifier {
     ),
   ];
 
-  final List<HomeRoom> mockRooms = const [
-    HomeRoom(id: 'VM120451', name: 'Late Night Chill', subtitle: 'Soft talks, music and Telugu vibes', language: 'Telugu', mode: 'Open', type: 'Music', onlineCount: 248, trendingScore: 9820, followedFriendsInside: ['Riya', 'Aman']),
-    HomeRoom(id: 'VM881029', name: 'Hyderabad Friends Adda', subtitle: 'Casual chat room for Telugu friends', language: 'Telugu', mode: 'Locked', type: 'Chat', onlineCount: 186, trendingScore: 8740, followedFriendsInside: ['Meera']),
-    HomeRoom(id: 'VM772190', name: 'Secret Star Vibe', subtitle: 'Private hidden room', language: 'Hindi', mode: 'Secret Vibe', type: 'Chat', onlineCount: 91, trendingScore: 8321, followedFriendsInside: ['Kiran']),
-    HomeRoom(id: 'VM551482', name: 'Bollywood Vibe Sync', subtitle: 'Hindi songs, live energy and gifts', language: 'Hindi', mode: 'Vibe Sync', type: 'Music', onlineCount: 452, trendingScore: 12940, followedFriendsInside: ['Riya', 'Kiran', 'Aman']),
-    HomeRoom(id: 'VM660410', name: 'English Talk Lounge', subtitle: 'Practice English and meet new friends', language: 'English', mode: 'Open', type: 'Chat', onlineCount: 129, trendingScore: 6540, followedFriendsInside: []),
-    HomeRoom(id: 'VM330821', name: 'Tamil Melody Room', subtitle: 'Tamil songs and friendly talks', language: 'Tamil', mode: 'Open', type: 'Music', onlineCount: 214, trendingScore: 7360, followedFriendsInside: ['Meera']),
-    HomeRoom(id: 'VM909112', name: 'Gaming Voice Squad', subtitle: 'Find teammates and game friends', language: 'English', mode: 'Open', type: 'Gaming', onlineCount: 318, trendingScore: 9102, followedFriendsInside: ['Aman']),
-    HomeRoom(id: 'VM741902', name: 'Malayalam Friends Cafe', subtitle: 'Friendly Malayalam room', language: 'Malayalam', mode: 'Members Only', type: 'Chat', onlineCount: 104, trendingScore: 5121, followedFriendsInside: ['Nivin']),
-    HomeRoom(id: 'VM624812', name: 'PK Battle Arena', subtitle: 'Voice room with PK-style energy', language: 'Hindi', mode: 'Open', type: 'PK', onlineCount: 502, trendingScore: 15420, followedFriendsInside: ['Riya']),
-    HomeRoom(id: 'VM882761', name: 'Kannada Chill House', subtitle: 'Late night Kannada live room', language: 'Kannada', mode: 'Locked', type: 'Chat', onlineCount: 88, trendingScore: 3980, followedFriendsInside: ['Kavya']),
-    HomeRoom(id: 'VM771541', name: 'Bengali Music Night', subtitle: 'Songs, poems and friendly voices', language: 'Bengali', mode: 'Vibe Sync', type: 'Music', onlineCount: 176, trendingScore: 6891, followedFriendsInside: ['Kiran']),
-    HomeRoom(id: 'VM445129', name: 'Friends Only Lounge', subtitle: 'Private member-based talk room', language: 'English', mode: 'Members Only', type: 'Chat', onlineCount: 67, trendingScore: 2870, followedFriendsInside: ['Meera']),
-  ];
+  List<HomeRoom> get rooms => _backendRooms;
 
-  List<HomeRoom> get rooms {
-    return _backendRooms.isEmpty ? mockRooms : _backendRooms;
-  }
+  bool get hasNetworkError => loadErrorMessage != null;
 
-  bool get usingBackendRooms => _backendRooms.isNotEmpty;
+  bool get usingBackendRooms => _backendRooms.isNotEmpty && !hasNetworkError;
 
   List<HomeRoom> get publicOpenRooms {
     return rooms.where((room) => room.isPublicOpen || room.isLocked).toList();
@@ -102,6 +87,8 @@ class HomeController extends ChangeNotifier {
   }
 
   List<HomeRoom> get filteredRooms {
+    if (hasNetworkError) return const [];
+
     final sourceRooms = selectedCategory == 'Following' ? followingExceptionRooms : publicOpenRooms;
     final filtered = sourceRooms.where((room) {
       final categoryMatch = selectedCategory == 'Trending' || selectedCategory == 'Following' || room.type == selectedCategory;
@@ -138,7 +125,7 @@ class HomeController extends ChangeNotifier {
       loadErrorMessage = null;
     } catch (_) {
       _backendRooms = const [];
-      loadErrorMessage = 'Backend unavailable. Showing local demo rooms.';
+      loadErrorMessage = 'Network error. Please check your connection and try again.';
     } finally {
       isLoadingRooms = false;
       visibleRoomCount = 6;
@@ -147,7 +134,7 @@ class HomeController extends ChangeNotifier {
   }
 
   void onScrollNearBottom(ScrollController scrollController) {
-    if (!scrollController.hasClients) return;
+    if (!scrollController.hasClients || hasNetworkError) return;
     final nearBottom = scrollController.position.pixels > scrollController.position.maxScrollExtent - 420;
     if (nearBottom && visibleRoomCount < filteredRooms.length) {
       visibleRoomCount = (visibleRoomCount + 4).clamp(0, filteredRooms.length);
@@ -177,6 +164,10 @@ class HomeController extends ChangeNotifier {
   void seeAllRooms() {
     visibleRoomCount = filteredRooms.length;
     notifyListeners();
+  }
+
+  Future<void> retryLoadingRooms() {
+    return loadTrendingRooms();
   }
 
   @override
