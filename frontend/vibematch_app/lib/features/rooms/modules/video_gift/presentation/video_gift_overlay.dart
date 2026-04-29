@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -10,9 +8,11 @@ class VideoGiftOverlay extends StatelessWidget {
   const VideoGiftOverlay({
     super.key,
     required this.slides,
+    required this.onVideoFinished,
   });
 
   final List<GiftSlide> slides;
+  final ValueChanged<GiftSlide> onVideoFinished;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +27,10 @@ class VideoGiftOverlay extends StatelessWidget {
       child: IgnorePointer(
         ignoring: true,
         child: Center(
-          child: VideoGiftCard(slide: activeVideoSlides.first),
+          child: VideoGiftCard(
+            slide: activeVideoSlides.first,
+            onVideoFinished: onVideoFinished,
+          ),
         ),
       ),
     );
@@ -35,9 +38,14 @@ class VideoGiftOverlay extends StatelessWidget {
 }
 
 class VideoGiftCard extends StatefulWidget {
-  const VideoGiftCard({super.key, required this.slide});
+  const VideoGiftCard({
+    super.key,
+    required this.slide,
+    required this.onVideoFinished,
+  });
 
   final GiftSlide slide;
+  final ValueChanged<GiftSlide> onVideoFinished;
 
   @override
   State<VideoGiftCard> createState() => _VideoGiftCardState();
@@ -47,6 +55,7 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
   VideoPlayerController? _controller;
   bool _ready = false;
   bool _failed = false;
+  bool _finishNotified = false;
 
   @override
   void initState() {
@@ -58,10 +67,10 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
   void didUpdateWidget(covariant VideoGiftCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.slide.id != widget.slide.id) {
-      _controller?.dispose();
-      _controller = null;
+      _disposeController();
       _ready = false;
       _failed = false;
+      _finishNotified = false;
       _loadVideo();
     }
   }
@@ -73,6 +82,7 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
     try {
       final controller = VideoPlayerController.asset(path);
       _controller = controller;
+      controller.addListener(_handlePlaybackState);
       await controller.initialize();
       await controller.setLooping(false);
       await controller.setVolume(1.0);
@@ -82,12 +92,53 @@ class _VideoGiftCardState extends State<VideoGiftCard> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _failed = true);
+      _notifyFinished();
     }
+  }
+
+  void _handlePlaybackState() {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    final value = controller.value;
+    final duration = value.duration;
+    final position = value.position;
+    if (duration == Duration.zero) return;
+
+    final nearEnd = position >= duration - const Duration(milliseconds: 120);
+    if (nearEnd && !value.isPlaying) {
+      _notifyFinished();
+      return;
+    }
+    if (nearEnd) {
+      Future<void>.delayed(const Duration(milliseconds: 160), () {
+        if (!mounted) return;
+        final latest = _controller;
+        if (latest == null || !latest.value.isInitialized) return;
+        if (latest.value.position >= latest.value.duration - const Duration(milliseconds: 80)) {
+          _notifyFinished();
+        }
+      });
+    }
+  }
+
+  void _notifyFinished() {
+    if (_finishNotified) return;
+    _finishNotified = true;
+    widget.onVideoFinished(widget.slide);
+  }
+
+  void _disposeController() {
+    final controller = _controller;
+    if (controller == null) return;
+    controller.removeListener(_handlePlaybackState);
+    controller.pause();
+    controller.dispose();
+    _controller = null;
   }
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _disposeController();
     super.dispose();
   }
 
