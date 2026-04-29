@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../data/room_moderation_repository.dart';
 import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
 import 'live_room_mini_profile_sheet.dart';
@@ -24,13 +23,13 @@ class LiveRoomMiniProfileLauncher {
     required ValueChanged<String> onSetAdminTap,
     ValueChanged<String>? onRemoveAdminTap,
     ValueChanged<SeatUser>? onReportTap,
+    ValueChanged<RoomKickoutDuration>? onKickOutDurationSelected,
     required ValueChanged<int> onLeaveAndLock,
     required ValueChanged<String> onSelfMuteToggle,
     required ValueChanged<String> onAdminMuteToggle,
     required ValueChanged<String> onGiftTap,
   }) {
-    final canKickOut = canModerate && user.id != currentUser.id;
-    final targetRoomId = (roomId == null || roomId.trim().isEmpty) ? roomName : roomId.trim();
+    final canShowKickOut = canModerate && user.id != currentUser.id;
 
     showModalBottomSheet<void>(
       context: context,
@@ -109,16 +108,18 @@ class LiveRoomMiniProfileLauncher {
             onAdminMuteToggle: () => onAdminMuteToggle(user.id),
             onGiftTap: () => onGiftTap(user.id),
           ),
-          if (canKickOut)
+          if (canShowKickOut && onKickOutDurationSelected != null)
             Positioned(
-              left: 16,
-              right: 16,
-              bottom: MediaQuery.paddingOf(context).bottom + 14,
-              child: _MiniProfileKickOutButton(
-                onTap: () => _openKickOutDurationSheet(
-                  context: context,
-                  user: user,
-                  roomId: targetRoomId,
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.paddingOf(context).bottom + 16,
+              child: Center(
+                child: _MiniProfileKickOutIconButton(
+                  onTap: () => _openKickOutDurationSheet(
+                    context: context,
+                    user: user,
+                    onDurationSelected: onKickOutDurationSelected,
+                  ),
                 ),
               ),
             ),
@@ -130,7 +131,7 @@ class LiveRoomMiniProfileLauncher {
   static void _openKickOutDurationSheet({
     required BuildContext context,
     required SeatUser user,
-    required String roomId,
+    required ValueChanged<RoomKickoutDuration> onDurationSelected,
   }) {
     Navigator.pop(context);
 
@@ -143,68 +144,10 @@ class LiveRoomMiniProfileLauncher {
         backgroundColor: Colors.transparent,
         builder: (_) => RoomKickoutDurationSheet(
           user: user,
-          onDurationSelected: (duration) async {
-            await _kickOutUser(
-              context: context,
-              user: user,
-              roomId: roomId,
-              duration: duration,
-            );
-          },
+          onDurationSelected: onDurationSelected,
         ),
       );
     });
-  }
-
-  static Future<void> _kickOutUser({
-    required BuildContext context,
-    required SeatUser user,
-    required String roomId,
-    required RoomKickoutDuration duration,
-  }) async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.clearSnackBars();
-    messenger.showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: RoomColors.plum,
-        content: Text('Kicking out ${user.name} for ${duration.label}...'),
-      ),
-    );
-
-    final repository = RoomModerationRepository();
-
-    try {
-      await repository.kickOutUser(
-        roomId: roomId,
-        targetUserId: user.id,
-        targetDisplayName: user.name,
-        duration: duration,
-        reason: 'Room kick out from mini profile',
-      );
-
-      messenger.clearSnackBars();
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: RoomColors.coral,
-          content: Text(
-            '${user.name} was kicked out for ${duration.label}. Blocked list updated.',
-          ),
-        ),
-      );
-    } catch (_) {
-      messenger.clearSnackBars();
-      messenger.showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: RoomColors.coral,
-          content: Text('Kick out failed. Check backend connection and permissions.'),
-        ),
-      );
-    } finally {
-      repository.close();
-    }
   }
 
   static void _openReportSheet({
@@ -226,8 +169,8 @@ class LiveRoomMiniProfileLauncher {
   }
 }
 
-class _MiniProfileKickOutButton extends StatelessWidget {
-  const _MiniProfileKickOutButton({required this.onTap});
+class _MiniProfileKickOutIconButton extends StatelessWidget {
+  const _MiniProfileKickOutIconButton({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -235,40 +178,26 @@ class _MiniProfileKickOutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      child: Align(
-        alignment: Alignment.bottomCenter,
+      child: Material(
+        color: RoomColors.coral,
+        shape: const CircleBorder(),
+        elevation: 8,
+        shadowColor: RoomColors.coral.withValues(alpha: 0.30),
         child: InkWell(
-          borderRadius: BorderRadius.circular(999),
+          customBorder: const CircleBorder(),
           onTap: onTap,
           child: Container(
-            height: 46,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: RoomColors.coral,
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: [
-                BoxShadow(
-                  color: RoomColors.coral.withValues(alpha: 0.25),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.38), width: 1.2),
             ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.logout_rounded, color: Colors.white, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'Kick Out',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+            child: const Icon(
+              Icons.person_remove_alt_1_rounded,
+              color: Colors.white,
+              size: 24,
             ),
           ),
         ),
