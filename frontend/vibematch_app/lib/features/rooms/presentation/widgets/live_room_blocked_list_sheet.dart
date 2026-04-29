@@ -152,7 +152,7 @@ class _LiveRoomBlockedListSheetState extends State<LiveRoomBlockedListSheet> {
                     padding: EdgeInsets.zero,
                     physics: const BouncingScrollPhysics(),
                     itemCount: _blockedUsers.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 9),
+                    separatorBuilder: (context, index) => const SizedBox(height: 9),
                     itemBuilder: (context, index) {
                       final user = _blockedUsers[index];
                       return _BlockedUserTile(
