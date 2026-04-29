@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../features/auth/models/current_user.dart';
@@ -8,6 +9,7 @@ import '../features/profile/presentation/me_page.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page.dart';
+import 'app_routes.dart';
 
 enum _DevUserMode {
   founder,
@@ -31,7 +33,7 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _selectedIndex = 0;
+  VmMainTab _selectedTab = VmMainTab.home;
   _DevUserMode _devUserMode = _DevUserMode.founder;
 
   CurrentUser get _activeUser {
@@ -64,16 +66,22 @@ class _AppShellState extends State<AppShell> {
     ];
   }
 
-  void _selectPage(int index) {
+  void _selectTab(VmMainTab tab) {
+    if (_selectedTab == tab) return;
+
     setState(() {
-      _selectedIndex = index;
+      _selectedTab = tab;
     });
+  }
+
+  void _selectPage(int index) {
+    _selectTab(VmMainTab.fromIndex(index));
   }
 
   void _switchDevUser(_DevUserMode mode) {
     setState(() {
       _devUserMode = mode;
-      _selectedIndex = 4;
+      _selectedTab = VmMainTab.me;
     });
 
     final userLabel =
@@ -103,15 +111,16 @@ class _AppShellState extends State<AppShell> {
         children: [
           Column(
             children: [
-              _DevUserSwitcher(
-                activeUser: activeUser,
-                selectedMode: _devUserMode,
-                onFounderTap: () => _switchDevUser(_DevUserMode.founder),
-                onUserTap: () => _switchDevUser(_DevUserMode.normalUser),
-              ),
+              if (kDebugMode)
+                _DevUserSwitcher(
+                  activeUser: activeUser,
+                  selectedMode: _devUserMode,
+                  onFounderTap: () => _switchDevUser(_DevUserMode.founder),
+                  onUserTap: () => _switchDevUser(_DevUserMode.normalUser),
+                ),
               Expanded(
                 child: IndexedStack(
-                  index: _selectedIndex,
+                  index: _selectedTab.index,
                   children: _pages,
                 ),
               ),
@@ -121,9 +130,9 @@ class _AppShellState extends State<AppShell> {
         ],
       ),
       bottomNavigationBar: _VibeBottomNav(
-        selectedIndex: _selectedIndex,
+        selectedTab: _selectedTab,
         isTestingAsFounder: _isTestingAsFounder,
-        onTap: _selectPage,
+        onTabSelected: _selectTab,
       ),
     );
   }
@@ -313,14 +322,14 @@ class _DevModeButton extends StatelessWidget {
 
 class _VibeBottomNav extends StatelessWidget {
   const _VibeBottomNav({
-    required this.selectedIndex,
+    required this.selectedTab,
     required this.isTestingAsFounder,
-    required this.onTap,
+    required this.onTabSelected,
   });
 
-  final int selectedIndex;
+  final VmMainTab selectedTab;
   final bool isTestingAsFounder;
-  final ValueChanged<int> onTap;
+  final ValueChanged<VmMainTab> onTabSelected;
 
   static const Color deepPlum = Color(0xFF251538);
   static const Color softBorder = Color(0xFFECE2D8);
@@ -352,18 +361,18 @@ class _VibeBottomNav extends StatelessWidget {
           children: [
             _NavItem(
               icon: Icons.home_rounded,
-              label: 'Home',
-              active: selectedIndex == 0,
-              onTap: () => onTap(0),
+              label: VmMainTab.home.label,
+              active: selectedTab == VmMainTab.home,
+              onTap: () => onTabSelected(VmMainTab.home),
             ),
             _NavItem(
               icon: Icons.auto_awesome_rounded,
-              label: 'Vibes',
-              active: selectedIndex == 1,
-              onTap: () => onTap(1),
+              label: VmMainTab.vibes.label,
+              active: selectedTab == VmMainTab.vibes,
+              onTap: () => onTabSelected(VmMainTab.vibes),
             ),
             GestureDetector(
-              onTap: () => onTap(2),
+              onTap: () => onTabSelected(VmMainTab.create),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 height: 48,
@@ -377,8 +386,8 @@ class _VibeBottomNav extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: violet.withValues(alpha: 0.34),
-                      blurRadius: 18,
+                      color: violet.withValues(alpha: selectedTab == VmMainTab.create ? 0.44 : 0.34),
+                      blurRadius: selectedTab == VmMainTab.create ? 23 : 18,
                       offset: const Offset(0, 7),
                     ),
                   ],
@@ -392,17 +401,17 @@ class _VibeBottomNav extends StatelessWidget {
             ),
             _NavItem(
               icon: Icons.mail_rounded,
-              label: 'Inbox',
-              active: selectedIndex == 3,
-              onTap: () => onTap(3),
+              label: VmMainTab.inbox.label,
+              active: selectedTab == VmMainTab.inbox,
+              onTap: () => onTabSelected(VmMainTab.inbox),
             ),
             _NavItem(
               icon: isTestingAsFounder
                   ? Icons.admin_panel_settings_rounded
                   : Icons.person_rounded,
-              label: 'Me',
-              active: selectedIndex == 4,
-              onTap: () => onTap(4),
+              label: VmMainTab.me.label,
+              active: selectedTab == VmMainTab.me,
+              onTap: () => onTabSelected(VmMainTab.me),
             ),
           ],
         ),
