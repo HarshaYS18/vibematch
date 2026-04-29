@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../inbox/presentation/inbox_page.dart';
+import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
-import 'controllers/live_room_profile_navigator.dart';
 import 'controllers/live_room_seat_controller.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
@@ -56,6 +56,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final LiveRoomGiftController _giftController;
   late final LiveRoomSeatController _seatController;
   late final LiveRoomMessageController _roomMessageController;
+  late final RoomModerationRepository _moderationRepository;
+
+  final Set<String> _locallyKickedOutUserIds = <String>{};
 
   late String _roomName;
   late String _roomId;
@@ -83,12 +86,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final ids = <String>{};
 
     for (final user in _roomUsers) {
+      if (_locallyKickedOutUserIds.contains(user.id)) continue;
       if (ids.add(user.id)) users.add(user);
     }
     for (final user in mockRoomUsers) {
+      if (_locallyKickedOutUserIds.contains(user.id)) continue;
       if (ids.add(user.id)) users.add(user);
     }
     for (final user in mockInviteUsers) {
+      if (_locallyKickedOutUserIds.contains(user.id)) continue;
       if (ids.add(user.id)) users.add(user);
     }
 
@@ -106,7 +112,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool get _viewerCanManageRoom => _currentUser.isHost || _currentUser.isRoomAdmin;
 
   int get _safeOnlineCount {
-    return widget.onlineCount > _allRoomUsers.length ? widget.onlineCount : _allRoomUsers.length;
+    final adjustedBackendCount = widget.onlineCount - _locallyKickedOutUserIds.length;
+    return adjustedBackendCount > _roomUsers.length ? adjustedBackendCount : _roomUsers.length;
   }
 
   @override
@@ -116,6 +123,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _messageController = TextEditingController();
     _announcementController = TextEditingController();
     _messageFocusNode = FocusNode();
+    _moderationRepository = RoomModerationRepository();
 
     _roomName = widget.roomName;
     _roomId = widget.roomId;
@@ -165,6 +173,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _announcementController.dispose();
     _messageFocusNode.dispose();
     _giftController.dispose();
+    _moderationRepository.close();
     super.dispose();
   }
 
@@ -450,10 +459,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       allRoomUsers: _allRoomUsers,
       privacyMode: _privacyMode,
       roomName: _roomName,
+      roomId: _roomId,
       onMentionTap: _mentionUser,
       onSetAdminTap: _setUserAsAdmin,
       onRemoveAdminTap: _removeUserAsAdmin,
       onReportTap: _openReportForUser,
+      onKickOutDurationSelected: _canKickOutUser(user)
+          ? (duration) => _kickOutUser(user: user, duration: duration)
+          : null,
       onLeaveAndLock: (targetSeatIndex) {
         Navigator.pop(context);
         _seatController.leaveAndLockSeat(targetSeatIndex);
@@ -474,6 +487,68 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         _openGiftPanel();
       },
     );
+  }
+
+  bool _canKickOutUser(SeatUser target) {
+    if (!_viewerCanManageRoom) return false;
+    if (target.id == _currentUser.id) return false;
+    if (_isFounderOwner(target)) return false;
+
+    if (_isOwnerLevel(target)) {
+      return _isFounderOwner(_currentUser) || _isOwnerLevel(_currentUser) || _isMonitorTeam(_currentUser);
+    }
+
+    if (_isMonitorTeam(target)) {
+      return _isFounderOwner(_currentUser) || _isOwnerLevel(_currentUser) || _isMonitorTeam(_currentUser);
+    }
+
+    if (target.isRoomAdmin || target.isHost) {
+      return _isFounderOwner(_currentUser) || _isOwnerLevel(_currentUser) || _isMonitorTeam(_currentUser);
+    }
+
+    return _currentUser.isHost || _currentUser.isRoomAdmin || _isMonitorTeam(_currentUser);
+  }
+
+  bool _isFounderOwner(SeatUser user) {
+    final id = user.id.toLowerCase();
+    final role = user.roleLabel.toLowerCase();
+    return id == 'founder_owner' || role.contains('founder owner') || role.contains('super owner');
+  }
+
+  bool _isOwnerLevel(SeatUser user) {
+    final role = user.roleLabel.toLowerCase();
+    return user.isHost || role.contains('owner') || role.contains('channel host');
+  }
+
+  bool _isMonitorTeam(SeatUser user) {
+    final role = user.roleLabel.toLowerCase();
+    return role.contains('monitor') || role.contains('moderator');
+  }
+
+  Future<void> _kickOutUser({
+    required SeatUser user,
+    required RoomKickoutDuration duration,
+  }) async {
+    if (!_canKickOutUser(user)) {
+      _insertSystemMessage('${_currentUser.name} cannot remove ${user.name} because this account is protected.');
+      return;
+    }
+
+    try {
+      await _moderationRepository.kickOutUser(
+        roomId: _roomId,
+        targetUserId: user.id,
+        targetDisplayName: user.name,
+        duration: duration,
+        reason: 'Room kickout from mini profile',
+      );
+
+      _locallyKickedOutUserIds.add(user.id);
+      _seatController.removeUserFromRoom(user.id);
+      _insertSystemMessage('${_currentUser.name} removed ${user.name} from the room for ${duration.label}');
+    } catch (_) {
+      RoomToast.show(context, 'Kick out failed. Check backend connection and permissions.');
+    }
   }
 
   void _mentionUser(SeatUser user) {
