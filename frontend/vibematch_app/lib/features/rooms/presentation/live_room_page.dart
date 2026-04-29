@@ -5,6 +5,7 @@ import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
 import 'controllers/live_room_moderation_controller.dart';
+import 'controllers/live_room_navigation_controller.dart';
 import 'controllers/live_room_seat_controller.dart';
 import 'controllers/live_room_sheet_controller.dart';
 import 'controllers/live_room_settings_controller.dart';
@@ -63,6 +64,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final LiveRoomMessageController _roomMessageController;
   late final LiveRoomModerationController _moderationController;
 
+  final LiveRoomNavigationController _navigationController = const LiveRoomNavigationController();
   final LiveRoomUsersController _usersController = const LiveRoomUsersController();
   final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
   final LiveRoomVibeSyncController _vibeSyncController = const LiveRoomVibeSyncController();
@@ -181,7 +183,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       return PopScope<void>(
         canPop: _allowRoomPop,
         onPopInvokedWithResult: (didPop, result) {
-          if (!didPop) {
+          if (_navigationController.shouldBlockBackAction(
+            allowRoomPop: _allowRoomPop,
+            didPop: didPop,
+          )) {
             dismissRoomSeatActionPill();
             _openLeaveSheet();
           }
@@ -199,11 +204,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 },
                 onDrag: (details) {
                   dismissRoomSeatActionPill();
-                  final size = MediaQuery.sizeOf(context);
                   setState(() {
-                    _bubbleOffset = Offset(
-                      (_bubbleOffset.dx + details.delta.dx).clamp(8.0, size.width - 86),
-                      (_bubbleOffset.dy + details.delta.dy).clamp(40.0, size.height - 120),
+                    _bubbleOffset = _navigationController.nextBubbleOffset(
+                      currentOffset: _bubbleOffset,
+                      dragDelta: details.delta,
+                      screenSize: MediaQuery.sizeOf(context),
                     );
                   });
                 },
@@ -805,7 +810,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openLeaveSheet() {
     dismissRoomSeatActionPill();
-    if (_leaveSheetOpen || _exitingRoom) return;
+    if (!_navigationController.canOpenLeaveSheet(
+      leaveSheetOpen: _leaveSheetOpen,
+      exitingRoom: _exitingRoom,
+    )) {
+      return;
+    }
     _leaveSheetOpen = true;
     _clearRoomFocus();
     LiveRoomSheetController.showTransparentSheet<void>(
@@ -854,7 +864,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _leaveRoomFromSheet(BuildContext sheetContext) {
-    if (_exitingRoom) return;
+    if (!_navigationController.canExitRoom(exitingRoom: _exitingRoom)) return;
     _exitingRoom = true;
     Navigator.pop(sheetContext);
     if (!mounted) return;
