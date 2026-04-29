@@ -7,6 +7,7 @@ import 'controllers/live_room_message_controller.dart';
 import 'controllers/live_room_moderation_controller.dart';
 import 'controllers/live_room_seat_controller.dart';
 import 'controllers/live_room_sheet_controller.dart';
+import 'controllers/live_room_settings_controller.dart';
 import 'controllers/live_room_users_controller.dart';
 import 'live_room_models.dart';
 import 'widgets/live_room_announcement_sheet.dart';
@@ -62,6 +63,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final LiveRoomModerationController _moderationController;
 
   final LiveRoomUsersController _usersController = const LiveRoomUsersController();
+  final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
 
   late String _roomName;
   late String _roomId;
@@ -612,17 +614,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             onToggleRoomImages: (value) {
               setState(() => _roomImagesEnabled = value);
               setSheetState(() {});
-              _insertSystemMessage(value ? 'Images enabled' : 'Images disabled');
+              _insertSystemMessage(_settingsController.roomImagesSystemMessage(value));
             },
             onToggleGuestMessages: (value) {
               setState(() => _guestMessagesEnabled = value);
               setSheetState(() {});
-              _insertSystemMessage(value ? 'Guest messages enabled' : 'Guest messages disabled');
+              _insertSystemMessage(_settingsController.guestMessagesSystemMessage(value));
             },
             onToggleApplyOnlyMode: (value) {
               setState(() => _applyOnlyModeEnabled = value);
               setSheetState(() {});
-              _insertSystemMessage(value ? 'Apply mode enabled' : 'Free mode enabled');
+              _insertSystemMessage(_settingsController.applyOnlyModeSystemMessage(value));
             },
             onCloseRoom: () => _leaveRoomFromSheet(context),
           );
@@ -730,7 +732,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         currentMode: _privacyMode,
         onModeChanged: (mode) {
           setState(() => _privacyMode = mode);
-          _insertSystemMessage('Room mode changed to ${mode.label}');
+          _insertSystemMessage(_settingsController.privacyModeSystemMessage(mode));
         },
       ),
     );
@@ -784,7 +786,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         currentTheme: _selectedBackgroundTheme,
         onThemeSelected: (theme) {
           setState(() => _selectedBackgroundTheme = theme);
-          RoomToast.show(context, '${theme.name} applied');
+          RoomToast.show(context, _settingsController.backgroundAppliedToast(theme));
         },
         onStoreTap: () => RoomToast.show(context, 'Theme store opened'),
       ),
