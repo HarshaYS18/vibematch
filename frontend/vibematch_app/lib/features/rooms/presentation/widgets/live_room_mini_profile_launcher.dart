@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../data/room_moderation_repository.dart';
 import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
 import 'live_room_mini_profile_sheet.dart';
+import 'room_kickout_duration_sheet.dart';
 import 'room_theme.dart';
 
 class LiveRoomMiniProfileLauncher {
@@ -17,6 +19,7 @@ class LiveRoomMiniProfileLauncher {
     required List<SeatUser> allRoomUsers,
     required RoomPrivacyMode privacyMode,
     required String roomName,
+    String? roomId,
     required ValueChanged<SeatUser> onMentionTap,
     required ValueChanged<String> onSetAdminTap,
     ValueChanged<String>? onRemoveAdminTap,
@@ -26,82 +29,182 @@ class LiveRoomMiniProfileLauncher {
     required ValueChanged<String> onAdminMuteToggle,
     required ValueChanged<String> onGiftTap,
   }) {
+    final canKickOut = canModerate && user.id != currentUser.id;
+    final targetRoomId = (roomId == null || roomId.trim().isEmpty) ? roomName : roomId.trim();
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => LiveRoomMiniProfileSheet(
-        user: user,
-        currentUser: currentUser,
-        canModerate: canModerate,
-        onAvatarTap: () {
-          Navigator.pop(context);
-          LiveRoomProfileNavigator.openExistingPublicProfile(
-            context: context,
+      builder: (_) => Stack(
+        children: [
+          LiveRoomMiniProfileSheet(
             user: user,
-            privacyMode: privacyMode,
-            roomName: roomName,
-          );
-        },
-        onVipTap: () => LiveRoomProfileNavigator.openVipCentrePage(
-          context: context,
-          user: user,
-        ),
-        onSendingLevelTap:
-            () => LiveRoomProfileNavigator.openSendingExperiencePage(
+            currentUser: currentUser,
+            canModerate: canModerate,
+            onAvatarTap: () {
+              Navigator.pop(context);
+              LiveRoomProfileNavigator.openExistingPublicProfile(
+                context: context,
+                user: user,
+                privacyMode: privacyMode,
+                roomName: roomName,
+              );
+            },
+            onVipTap: () => LiveRoomProfileNavigator.openVipCentrePage(
+              context: context,
+              user: user,
+            ),
+            onSendingLevelTap:
+                () => LiveRoomProfileNavigator.openSendingExperiencePage(
+                      context: context,
+                      user: user,
+                    ),
+            onReceivingLevelTap:
+                () => LiveRoomProfileNavigator.openReceivingExperiencePage(
+                      context: context,
+                      user: user,
+                    ),
+            onSentRankingTap: () => LiveRoomProfileNavigator.openFollowedPage(
+              context: context,
+              user: user,
+              users: allRoomUsers,
+            ),
+            onReceivedRankingTap:
+                () => LiveRoomProfileNavigator.openFollowersPage(
+                      context: context,
+                      user: user,
+                      users: allRoomUsers,
+                    ),
+            onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
+              context: context,
+              user: user,
+            ),
+            onRelationshipTap: () => LiveRoomProfileNavigator.openLoveAndBondCentre(
+              context: context,
+              user: user,
+            ),
+            onMedalsTap: () => LiveRoomProfileNavigator.openMedalsPage(
+              context: context,
+              user: user,
+            ),
+            onMentionTap: () => onMentionTap(user),
+            onSetAdminTap: () => onSetAdminTap(user.id),
+            onRemoveAdminTap: () {
+              if (onRemoveAdminTap != null) {
+                onRemoveAdminTap(user.id);
+              } else {
+                Navigator.pop(context);
+              }
+            },
+            onReportTap: () {
+              if (onReportTap != null) {
+                onReportTap(user);
+              } else {
+                _openReportSheet(context: context, user: user);
+              }
+            },
+            onLeaveAndLock: () => onLeaveAndLock(seatIndex),
+            onSelfMuteToggle: () => onSelfMuteToggle(user.id),
+            onAdminMuteToggle: () => onAdminMuteToggle(user.id),
+            onGiftTap: () => onGiftTap(user.id),
+          ),
+          if (canKickOut)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.paddingOf(context).bottom + 14,
+              child: _MiniProfileKickOutButton(
+                onTap: () => _openKickOutDurationSheet(
                   context: context,
                   user: user,
+                  roomId: targetRoomId,
                 ),
-        onReceivingLevelTap:
-            () => LiveRoomProfileNavigator.openReceivingExperiencePage(
-                  context: context,
-                  user: user,
-                ),
-        onSentRankingTap: () => LiveRoomProfileNavigator.openFollowedPage(
-          context: context,
-          user: user,
-          users: allRoomUsers,
-        ),
-        onReceivedRankingTap:
-            () => LiveRoomProfileNavigator.openFollowersPage(
-                  context: context,
-                  user: user,
-                  users: allRoomUsers,
-                ),
-        onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
-          context: context,
-          user: user,
-        ),
-        onRelationshipTap: () => LiveRoomProfileNavigator.openLoveAndBondCentre(
-          context: context,
-          user: user,
-        ),
-        onMedalsTap: () => LiveRoomProfileNavigator.openMedalsPage(
-          context: context,
-          user: user,
-        ),
-        onMentionTap: () => onMentionTap(user),
-        onSetAdminTap: () => onSetAdminTap(user.id),
-        onRemoveAdminTap: () {
-          if (onRemoveAdminTap != null) {
-            onRemoveAdminTap(user.id);
-          } else {
-            Navigator.pop(context);
-          }
-        },
-        onReportTap: () {
-          if (onReportTap != null) {
-            onReportTap(user);
-          } else {
-            _openReportSheet(context: context, user: user);
-          }
-        },
-        onLeaveAndLock: () => onLeaveAndLock(seatIndex),
-        onSelfMuteToggle: () => onSelfMuteToggle(user.id),
-        onAdminMuteToggle: () => onAdminMuteToggle(user.id),
-        onGiftTap: () => onGiftTap(user.id),
+              ),
+            ),
+        ],
       ),
     );
+  }
+
+  static void _openKickOutDurationSheet({
+    required BuildContext context,
+    required SeatUser user,
+    required String roomId,
+  }) {
+    Navigator.pop(context);
+
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!context.mounted) return;
+
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => RoomKickoutDurationSheet(
+          user: user,
+          onDurationSelected: (duration) async {
+            await _kickOutUser(
+              context: context,
+              user: user,
+              roomId: roomId,
+              duration: duration,
+            );
+          },
+        ),
+      );
+    });
+  }
+
+  static Future<void> _kickOutUser({
+    required BuildContext context,
+    required SeatUser user,
+    required String roomId,
+    required RoomKickoutDuration duration,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: RoomColors.plum,
+        content: Text('Kicking out ${user.name} for ${duration.label}...'),
+      ),
+    );
+
+    final repository = RoomModerationRepository();
+
+    try {
+      await repository.kickOutUser(
+        roomId: roomId,
+        targetUserId: user.id,
+        targetDisplayName: user.name,
+        duration: duration,
+        reason: 'Room kick out from mini profile',
+      );
+
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: RoomColors.coral,
+          content: Text(
+            '${user.name} was kicked out for ${duration.label}. Blocked list updated.',
+          ),
+        ),
+      );
+    } catch (_) {
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: RoomColors.coral,
+          content: Text('Kick out failed. Check backend connection and permissions.'),
+        ),
+      );
+    } finally {
+      repository.close();
+    }
   }
 
   static void _openReportSheet({
@@ -120,6 +223,57 @@ class LiveRoomMiniProfileLauncher {
         builder: (sheetContext) => _MiniProfileReportSheet(user: user),
       );
     });
+  }
+}
+
+class _MiniProfileKickOutButton extends StatelessWidget {
+  const _MiniProfileKickOutButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: Container(
+            height: 46,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: RoomColors.coral,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: RoomColors.coral.withValues(alpha: 0.25),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.logout_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Kick Out',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
