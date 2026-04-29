@@ -1,43 +1,43 @@
 enum VmMainTab {
   home(
-    index: 0,
+    tabIndex: 0,
     route: VmRoutes.home,
     label: 'Home',
   ),
   vibes(
-    index: 1,
+    tabIndex: 1,
     route: VmRoutes.vibes,
     label: 'Vibes',
   ),
   create(
-    index: 2,
+    tabIndex: 2,
     route: VmRoutes.create,
     label: 'Create',
   ),
   inbox(
-    index: 3,
+    tabIndex: 3,
     route: VmRoutes.inbox,
     label: 'Inbox',
   ),
   me(
-    index: 4,
+    tabIndex: 4,
     route: VmRoutes.me,
     label: 'Me',
   );
 
   const VmMainTab({
-    required this.index,
+    required this.tabIndex,
     required this.route,
     required this.label,
   });
 
-  final int index;
+  final int tabIndex;
   final String route;
   final String label;
 
   static VmMainTab fromIndex(int index) {
     return VmMainTab.values.firstWhere(
-      (tab) => tab.index == index,
+      (tab) => tab.tabIndex == index,
       orElse: () => VmMainTab.home,
     );
   }
