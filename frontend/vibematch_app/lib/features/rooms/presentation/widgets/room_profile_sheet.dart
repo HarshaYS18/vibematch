@@ -1078,6 +1078,13 @@ class _ActionRow extends StatelessWidget {
           icon: selfMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
           color: selfMuted ? RoomColors.selfMute : RoomColors.aqua,
           onTap: onSelfMuteToggle,
+        ),
+      if (isSelf)
+        _MiniProfileActionCircle(
+          icon: Icons.logout_rounded,
+          color: RoomColors.coral,
+          isPrimary: true,
+          onTap: onLeaveAndLock,
         )
       else if (canModerate)
         _MiniProfileActionCircle(
