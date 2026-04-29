@@ -22,6 +22,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
     required this.onToggleGuestMessages,
     required this.onToggleApplyOnlyMode,
     required this.onCloseRoom,
+    required this.onVibeSyncTap,
   });
 
   final RoomPrivacyMode privacyMode;
@@ -40,6 +41,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   final ValueChanged<bool> onToggleGuestMessages;
   final ValueChanged<bool> onToggleApplyOnlyMode;
   final VoidCallback onCloseRoom;
+  final VoidCallback onVibeSyncTap;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +57,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onAnnouncementTap: onAnnouncementTap,
       onInboxTap: onInboxTap,
       onJoinRequestsTap: onJoinRequestsTap,
+      onVibeSyncTap: onVibeSyncTap,
       onReportsTap: () => LiveRoomProfileNavigator.openModulePage(
         context: context,
         title: 'Reports',
