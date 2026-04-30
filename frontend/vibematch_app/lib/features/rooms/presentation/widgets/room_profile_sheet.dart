@@ -1061,12 +1061,20 @@ class _ActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
-      _MiniProfileActionCircle(
-        icon: Icons.card_giftcard_rounded,
-        color: RoomColors.gold,
-        onTap: onGiftTap,
-      ),
-      if (!isSelf && onKickOutTap != null)
+      if (isSelf)
+        _MiniProfileActionCircle(
+          iconWidget: const _LeaveSeatIcon(),
+          color: RoomColors.coral,
+          isPrimary: true,
+          onTap: onLeaveAndLock,
+        ),
+      if (canModerate && !isSelf)
+        _MiniProfileActionCircle(
+          icon: Icons.lock_rounded,
+          color: RoomColors.plum,
+          onTap: onLeaveAndLock,
+        ),
+      if (canModerate && !isSelf && onKickOutTap != null)
         _MiniProfileActionCircle(
           icon: Icons.person_remove_alt_1_rounded,
           color: RoomColors.coral,
@@ -1078,13 +1086,6 @@ class _ActionRow extends StatelessWidget {
           icon: selfMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
           color: selfMuted ? RoomColors.selfMute : RoomColors.aqua,
           onTap: onSelfMuteToggle,
-        ),
-      if (isSelf)
-        _MiniProfileActionCircle(
-          icon: Icons.logout_rounded,
-          color: RoomColors.coral,
-          isPrimary: true,
-          onTap: onLeaveAndLock,
         )
       else if (canModerate)
         _MiniProfileActionCircle(
@@ -1092,13 +1093,9 @@ class _ActionRow extends StatelessWidget {
           color: adminMuted ? RoomColors.coral : RoomColors.violet,
           onTap: onAdminMuteToggle,
         ),
-      if (canModerate && !isSelf)
-        _MiniProfileActionCircle(
-          icon: Icons.lock_rounded,
-          color: RoomColors.plum,
-          onTap: onLeaveAndLock,
-        ),
     ];
+
+    if (actions.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.only(top: 2, bottom: 2),
@@ -1117,13 +1114,15 @@ class _ActionRow extends StatelessWidget {
 
 class _MiniProfileActionCircle extends StatelessWidget {
   const _MiniProfileActionCircle({
-    required this.icon,
     required this.color,
     required this.onTap,
+    this.icon,
+    this.iconWidget,
     this.isPrimary = false,
-  });
+  }) : assert(icon != null || iconWidget != null, 'Provide either icon or iconWidget.');
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final Color color;
   final VoidCallback onTap;
   final bool isPrimary;
@@ -1154,11 +1153,41 @@ class _MiniProfileActionCircle extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Icon(icon, color: foreground, size: isPrimary ? 25 : 22),
+          child: iconWidget ?? Icon(icon, color: foreground, size: isPrimary ? 25 : 22),
         ),
       ),
     );
   }
 }
 
+class _LeaveSeatIcon extends StatelessWidget {
+  const _LeaveSeatIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: const [
+          Positioned(
+            top: 2,
+            child: Icon(Icons.mic_rounded, color: Colors.white, size: 22),
+          ),
+          Positioned(
+            right: -2,
+            bottom: -3,
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white,
+              size: 19,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
