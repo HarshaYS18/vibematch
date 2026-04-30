@@ -90,17 +90,10 @@ class MiniProfileAvatarDecoration extends StatelessWidget {
               decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
               child: Container(
                 alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(colors: user.avatarColors),
-                ),
+                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
                 child: Text(
                   avatarLetter(user.name),
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: size * 0.35,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: size * 0.35, fontWeight: FontWeight.w900),
                 ),
               ),
             ),
@@ -116,9 +109,7 @@ class MiniProfileAvatarDecoration extends StatelessWidget {
                   color: const Color(0xFF21D07A),
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(color: const Color(0xFF21D07A).withValues(alpha: 0.50), blurRadius: 8),
-                  ],
+                  boxShadow: [BoxShadow(color: const Color(0xFF21D07A).withValues(alpha: 0.50), blurRadius: 8)],
                 ),
               ),
             ),
@@ -133,9 +124,7 @@ class MiniProfileAvatarDecoration extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(colors: [Color(0xFFFFC857), Color(0xFFFF5F7E)]),
                   border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(color: RoomColors.coral.withValues(alpha: 0.28), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
+                  boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.28), blurRadius: 10, offset: const Offset(0, 4))],
                 ),
                 child: Icon(Icons.favorite_rounded, color: Colors.white, size: badgeSize * 0.56),
               ),
@@ -179,7 +168,6 @@ class MiniProfileSectionCard extends StatelessWidget {
     );
 
     if (onTap == null) return card;
-
     return InkWell(borderRadius: BorderRadius.circular(radius), onTap: onTap, child: card);
   }
 }
@@ -215,18 +203,12 @@ class MiniProfilePill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, color: foreground, size: 13), const SizedBox(width: 4)],
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: foreground, fontSize: 10.5, fontWeight: FontWeight.w900),
-          ),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: foreground, fontSize: 10.5, fontWeight: FontWeight.w900)),
         ],
       ),
     );
 
     if (onTap == null) return pill;
-
     return InkWell(borderRadius: BorderRadius.circular(999), onTap: onTap, child: pill);
   }
 }
@@ -290,10 +272,7 @@ class MiniProfileGradientGiftButton extends StatelessWidget {
               children: [
                 const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 19),
                 const SizedBox(width: 7),
-                Text(
-                  label,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.2),
-                ),
+                Text(label, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.2)),
               ],
             ),
           ),
@@ -331,65 +310,158 @@ class _MiniProfileCardSkin extends StatelessWidget {
 class MiniProfileHeaderDecoration extends StatelessWidget {
   const MiniProfileHeaderDecoration({super.key});
 
+  static const String _bannerAsset = 'assets/images/mini_profile_decorations/purple_gold_banner.png';
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
     return IgnorePointer(
       child: SizedBox(
-        height: 88,
+        height: 58,
         child: Stack(
           alignment: Alignment.topCenter,
           clipBehavior: Clip.none,
           children: [
             Positioned(
-              top: 17,
-              left: 34,
-              right: 34,
-              child: Container(
-                height: 2,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      RoomColors.gold.withValues(alpha: 0.24),
-                      RoomColors.coral.withValues(alpha: 0.12),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 10,
-              child: Container(
-                width: 98,
-                height: 28,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [RoomColors.gold.withValues(alpha: 0.23), RoomColors.gold.withValues(alpha: 0.02)],
-                  ),
-                ),
-              ),
-            ),
-            const Positioned(top: 16, left: 42, child: _MiniProfileWing(isLeft: true)),
-            const Positioned(top: 16, right: 42, child: _MiniProfileWing(isLeft: false)),
-            Positioned(
-              top: 13,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: RoomColors.gold.withValues(alpha: 0.78),
-                  boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.35), blurRadius: 10)],
+              top: -10,
+              child: SizedBox(
+                width: screenWidth + 96,
+                height: 66,
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    Image.asset(
+                      _bannerAsset,
+                      width: screenWidth + 96,
+                      height: 66,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => const _FallbackMiniProfileHeaderDecoration(),
+                    ),
+                    Positioned(
+                      left: 42,
+                      right: 42,
+                      top: 12,
+                      child: _MiniProfileBannerShine(width: screenWidth + 12),
+                    ),
+                    const Positioned(left: 72, top: 19, child: _MiniProfileSparkle(size: 7)),
+                    const Positioned(right: 76, top: 16, child: _MiniProfileSparkle(size: 8)),
+                    const Positioned(top: 20, child: _MiniProfileSparkle(size: 6)),
+                  ],
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MiniProfileBannerShine extends StatefulWidget {
+  const _MiniProfileBannerShine({required this.width});
+
+  final double width;
+
+  @override
+  State<_MiniProfileBannerShine> createState() => _MiniProfileBannerShineState();
+}
+
+class _MiniProfileBannerShineState extends State<_MiniProfileBannerShine> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final dx = -widget.width * 0.72 + (_controller.value * widget.width * 1.44);
+        return Transform.translate(
+          offset: Offset(dx, 0),
+          child: Transform.rotate(
+            angle: -0.17,
+            child: Container(
+              width: 24,
+              height: 46,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.0),
+                    Colors.white.withValues(alpha: 0.18),
+                    Colors.white.withValues(alpha: 0.58),
+                    Colors.white.withValues(alpha: 0.14),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FallbackMiniProfileHeaderDecoration extends StatelessWidget {
+  const _FallbackMiniProfileHeaderDecoration();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 58,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: 17,
+            left: 34,
+            right: 34,
+            child: Container(
+              height: 2,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(
+                  colors: [Colors.transparent, RoomColors.gold.withValues(alpha: 0.24), RoomColors.coral.withValues(alpha: 0.12), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
+          const Positioned(top: 16, left: 42, child: _MiniProfileWing(isLeft: true)),
+          const Positioned(top: 16, right: 42, child: _MiniProfileWing(isLeft: false)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniProfileSparkle extends StatelessWidget {
+  const _MiniProfileSparkle({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: [Colors.white, Colors.white.withValues(alpha: 0.86), Colors.white.withValues(alpha: 0.0)]),
+        boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: 0.70), blurRadius: size * 1.3)],
       ),
     );
   }
@@ -485,9 +557,7 @@ class _MiniProfileTopGlow extends StatelessWidget {
       child: Container(
         height: 180,
         decoration: BoxDecoration(
-          gradient: RadialGradient(
-            colors: [RoomColors.aqua.withValues(alpha: 0.14), RoomColors.violet.withValues(alpha: 0.07), Colors.transparent],
-          ),
+          gradient: RadialGradient(colors: [RoomColors.aqua.withValues(alpha: 0.14), RoomColors.violet.withValues(alpha: 0.07), Colors.transparent]),
         ),
       ),
     );
