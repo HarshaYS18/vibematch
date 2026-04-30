@@ -21,13 +21,15 @@ class MiniProfileDecoration extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.vertical(top: Radius.circular(topRadius));
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * maxHeightFactor,
       ),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(topRadius)),
+        borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -36,28 +38,30 @@ class MiniProfileDecoration extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(topRadius)),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const Positioned.fill(child: _MiniProfileCardSkin()),
-            if (showTopGlow)
-              const Positioned(
-                top: -86,
-                left: -60,
-                right: -60,
-                child: _MiniProfileTopGlow(),
-              ),
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: _MiniProfileOrnamentHeader(),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: borderRadius,
+              child: const _MiniProfileCardSkin(),
             ),
-            child,
-          ],
-        ),
+          ),
+          if (showTopGlow)
+            const Positioned(
+              top: -86,
+              left: -60,
+              right: -60,
+              child: _MiniProfileTopGlow(),
+            ),
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: MiniProfileHeaderDecoration(),
+          ),
+          child,
+        ],
       ),
     );
   }
@@ -431,8 +435,8 @@ class _MiniProfileCardSkin extends StatelessWidget {
   }
 }
 
-class _MiniProfileOrnamentHeader extends StatelessWidget {
-  const _MiniProfileOrnamentHeader();
+class MiniProfileHeaderDecoration extends StatelessWidget {
+  const MiniProfileHeaderDecoration({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -441,6 +445,7 @@ class _MiniProfileOrnamentHeader extends StatelessWidget {
         height: 88,
         child: Stack(
           alignment: Alignment.topCenter,
+          clipBehavior: Clip.none,
           children: [
             Positioned(
               top: 17,
