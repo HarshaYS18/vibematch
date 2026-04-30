@@ -275,15 +275,22 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  /// Current-user action: leave the mic seat only.
+  /// Moderator action on another seated user: clear that user and lock that seat.
   void leaveAndLockSeat(int seatIndex) {
     if (seatIndex < 0 || seatIndex >= seats.length) return;
 
+    final seatedUser = seats[seatIndex].user;
+    final isCurrentUserSeat = seatedUser?.id == currentUser.id;
+
     seats[seatIndex] = RoomSeat(
       index: seatIndex,
-      locked: true,
+      locked: !isCurrentUserSeat,
     );
 
+    selectedSeatIndex = null;
     onChanged();
+    onToast(isCurrentUserSeat ? 'You left the seat' : 'User locked off seat ${seatIndex + 1}');
   }
 }
 
