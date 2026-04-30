@@ -292,6 +292,19 @@ class LiveRoomSeatController {
     onChanged();
     onToast(isCurrentUserSeat ? 'You left the seat' : 'User locked off seat ${seatIndex + 1}');
   }
+
+  /// Moderator action: remove another user from the mic seat without locking it.
+  void leaveSeatOnly(int seatIndex) {
+    if (seatIndex < 0 || seatIndex >= seats.length) return;
+
+    final seatedUser = seats[seatIndex].user;
+    if (seatedUser == null) return;
+
+    seats[seatIndex] = RoomSeat(index: seatIndex);
+    selectedSeatIndex = null;
+    onChanged();
+    onToast('${seatedUser.name} left seat ${seatIndex + 1}');
+  }
 }
 
 typedef VoidCallbackLike = void Function();
