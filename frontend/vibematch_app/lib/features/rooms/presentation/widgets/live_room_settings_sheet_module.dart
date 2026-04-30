@@ -26,6 +26,9 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
     required this.onCloseRoom,
     required this.onVibeSyncTap,
     required this.onWatchPartyTap,
+    required this.onClearChatTap,
+    required this.onCricketModeTap,
+    required this.canCloseRoom,
   });
 
   final String roomId;
@@ -47,6 +50,9 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   final VoidCallback onCloseRoom;
   final VoidCallback onVibeSyncTap;
   final VoidCallback onWatchPartyTap;
+  final VoidCallback onClearChatTap;
+  final VoidCallback onCricketModeTap;
+  final bool canCloseRoom;
 
   void _openBlockedList(BuildContext context) {
     showModalBottomSheet<void>(
@@ -73,6 +79,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onJoinRequestsTap: onJoinRequestsTap,
       onVibeSyncTap: onVibeSyncTap,
       onWatchPartyTap: onWatchPartyTap,
+      onCricketModeTap: onCricketModeTap,
       onReportsTap: () => LiveRoomProfileNavigator.openModulePage(
         context: context,
         title: 'Reports',
@@ -96,7 +103,9 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onToggleRoomImages: onToggleRoomImages,
       onToggleGuestMessages: onToggleGuestMessages,
       onToggleApplyOnlyMode: onToggleApplyOnlyMode,
+      onClearChatTap: onClearChatTap,
       onCloseRoom: onCloseRoom,
+      canCloseRoom: canCloseRoom,
     );
   }
 }

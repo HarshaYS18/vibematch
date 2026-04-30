@@ -27,6 +27,9 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.onMusicTap,
     required this.onVibeSyncTap,
     required this.onWatchPartyTap,
+    required this.onCricketModeTap,
+    required this.onClearChatTap,
+    required this.canCloseRoom,
   });
 
   final RoomPrivacyMode privacyMode;
@@ -50,6 +53,9 @@ class RoomSettingsSheet extends StatelessWidget {
   final VoidCallback onMusicTap;
   final VoidCallback onVibeSyncTap;
   final VoidCallback onWatchPartyTap;
+  final VoidCallback onCricketModeTap;
+  final VoidCallback onClearChatTap;
+  final bool canCloseRoom;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +107,12 @@ class RoomSettingsSheet extends StatelessWidget {
                         iconColor: RoomColors.aqua,
                         onTap: onWatchPartyTap,
                       ),
+                      _SettingsCard(
+                        icon: Icons.sports_cricket_rounded,
+                        title: 'Cricket Mode',
+                        iconColor: const Color(0xFF139A5C),
+                        onTap: onCricketModeTap,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 11),
@@ -116,6 +128,7 @@ class RoomSettingsSheet extends StatelessWidget {
                       _SettingsCard(icon: Icons.music_note_rounded, title: 'Music', onTap: onMusicTap),
                       _SettingsCard(icon: Icons.block_rounded, title: 'Blocked', onTap: onBlockedTap),
                       _SettingsCard(icon: Icons.report_gmailerrorred_rounded, title: 'Reports', onTap: onReportsTap),
+                      _SettingsCard(icon: Icons.cleaning_services_rounded, title: 'Clear Chat', iconColor: RoomColors.coral, onTap: onClearChatTap),
                     ],
                   ),
                   const SizedBox(height: 11),
@@ -125,7 +138,8 @@ class RoomSettingsSheet extends StatelessWidget {
                       _ToggleCard(title: 'Images', value: roomImagesEnabled, onChanged: onToggleRoomImages),
                       _ToggleCard(title: 'Guests', value: guestMessagesEnabled, onChanged: onToggleGuestMessages),
                       _ToggleCard(title: 'Apply only', value: applyOnlyModeEnabled, onChanged: onToggleApplyOnlyMode),
-                      _SettingsCard(icon: Icons.power_settings_new_rounded, title: 'Close', iconColor: RoomColors.coral, onTap: onCloseRoom),
+                      if (canCloseRoom)
+                        _SettingsCard(icon: Icons.power_settings_new_rounded, title: 'Close', iconColor: RoomColors.coral, onTap: onCloseRoom),
                     ],
                   ),
                 ],

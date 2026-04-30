@@ -32,6 +32,7 @@ import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
 import 'widgets/live_room_users_sheet.dart';
 import 'widgets/room_contribution_rankings_sheet.dart';
+import 'widgets/room_seat_invite_request_sheet.dart';
 import 'widgets/room_seats.dart';
 import 'widgets/room_theme.dart';
 import 'widgets/vibesync_room_module.dart';
@@ -316,7 +317,44 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _openSeatInviteSheet(int seatIndex) {
     _clearRoomFocus();
     final inviteUsers = _usersController.buildSeatInviteUsers(allRoomUsers: _allRoomUsers, seatedUsers: _roomUsers);
-    LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomInviteSheet(seatIndex: seatIndex, users: inviteUsers, onInvite: (user) { Navigator.pop(context); RoomToast.show(context, 'Invite sent to ${user.name} for seat ${seatIndex + 1}'); }));
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (_) => LiveRoomInviteSheet(
+        seatIndex: seatIndex,
+        users: inviteUsers,
+        onInvite: (user) {
+          Navigator.pop(context);
+          RoomToast.show(context, 'Seat invite sent to ${user.name}');
+          Future<void>.delayed(const Duration(milliseconds: 100), () {
+            if (!mounted) return;
+            showDialog<void>(
+              context: context,
+              barrierDismissible: true,
+              barrierColor: Colors.black.withValues(alpha: 0.36),
+              builder: (dialogContext) => RoomSeatInviteRequestSheet(
+                onDecline: () {
+                  Navigator.pop(dialogContext);
+                  RoomToast.show(context, 'Seat invite declined');
+                },
+                onAccept: () {
+                  Navigator.pop(dialogContext);
+                  final seatAvailable = seatIndex >= 0 &&
+                      seatIndex < _seatController.seats.length &&
+                      !_seatController.seats[seatIndex].locked &&
+                      _seatController.seats[seatIndex].user == null;
+                  if (seatAvailable) {
+                    _seatController.occupySeat(seatIndex);
+                    RoomToast.show(context, 'Seat accepted');
+                  } else {
+                    RoomToast.show(context, 'Seat unavailable');
+                  }
+                },
+              ),
+            );
+          });
+        },
+      ),
+    );
   }
 
   void _dismissRoomOverlays() { dismissRoomSeatActionPill(); _clearRoomFocus(); }
@@ -423,6 +461,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onJoinRequestsTap: _openJoinRequestsSheet,
         onVibeSyncTap: () => _openVibeSyncSheetFromSettings(sheetContext),
         onWatchPartyTap: () => _openWatchPartyFromSettings(sheetContext),
+        onCricketModeTap: () => _openCricketModeFromSettings(sheetContext),
+        onClearChatTap: () {
+          LiveRoomMessageController.clearActiveRoomChatForEveryone();
+          RoomToast.show(context, 'Chat cleared for everyone');
+        },
+        canCloseRoom: _currentUser.isHost,
         onToggleRoomImages: (value) { _roomStateController.setRoomImagesEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.roomImagesSystemMessage(value)); },
         onToggleGuestMessages: (value) { _roomStateController.setGuestMessagesEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.guestMessagesSystemMessage(value)); },
         onToggleApplyOnlyMode: (value) { _roomStateController.setApplyOnlyModeEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.applyOnlyModeSystemMessage(value)); },
@@ -431,6 +475,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 
+  void _openCricketModeFromSettings(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openInfoSheet('Cricket Mode', 'Cricket Mode rules, score controls, start/end match controls, and owner/admin permissions will connect here.'); }); }
   void _openWatchPartyFromSettings(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openInfoSheet('Watch Party', 'Watch Party settings will open here. YouTube link, play/pause/seek sync, and 10-seat watch layout will connect next.'); }); }
   void _openVibeSyncSheetFromSettings(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openVibeSyncSheet(); }); }
 
