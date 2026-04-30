@@ -45,7 +45,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   static const double seatHeight = 106;
   static const double rowHeight = 116;
   static const double avatarSize = 62;
-  static const double menuWidth = 116;
+  static const double menuWidth = 82;
   static const double menuItemHeight = 34;
   static const double menuArrowHeight = 9;
 
@@ -439,14 +439,14 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
               const _SeatMenuPointer(),
               Material(
                 color: Colors.transparent,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 elevation: 10,
                 shadowColor: Colors.black.withValues(alpha: 0.16),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFF5F6470).withValues(alpha: 0.76),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
                     boxShadow: [
                       BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 14, offset: const Offset(0, 8)),
@@ -458,7 +458,7 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
                       for (var i = 0; i < actions.length; i++) ...[
                         _MenuButton(action: actions[i]),
                         if (i != actions.length - 1)
-                          Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 2.5), color: Colors.white.withValues(alpha: 0.11)),
+                          Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 4), color: Colors.white.withValues(alpha: 0.11)),
                       ],
                     ],
                   ),
