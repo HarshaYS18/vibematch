@@ -178,7 +178,12 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
                 selected: widget.selectedSeatIndex == index && _hiddenMenuSeat != index,
                 onTap: () {
                   final user = widget.seats[index].user;
-                  user == null ? widget.onSeatTap(index) : widget.onUserTap(index);
+                  if (user == null) {
+                    widget.onSeatTap(index);
+                  } else {
+                    dismissRoomSeatActionPill();
+                    widget.onUserTap(index);
+                  }
                 },
               ),
             ),
