@@ -30,24 +30,34 @@ class MiniProfileDecoration extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(topRadius)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 28,
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 30,
             offset: const Offset(0, -8),
           ),
         ],
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          if (showTopGlow)
+      child: ClipRRect(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(topRadius)),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Positioned.fill(child: _MiniProfileCardSkin()),
+            if (showTopGlow)
+              const Positioned(
+                top: -86,
+                left: -60,
+                right: -60,
+                child: _MiniProfileTopGlow(),
+              ),
             const Positioned(
-              top: -90,
-              left: -60,
-              right: -60,
-              child: _MiniProfileTopGlow(),
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _MiniProfileOrnamentHeader(),
             ),
-          child,
-        ],
+            child,
+          ],
+        ),
       ),
     );
   }
@@ -104,7 +114,6 @@ class MiniProfileAvatarDecoration extends StatelessWidget {
                 BoxShadow(
                   color: RoomColors.gold.withValues(alpha: 0.18),
                   blurRadius: 34,
-                  offset: const Offset(0, 0),
                 ),
               ],
             ),
@@ -393,6 +402,205 @@ class MiniProfileGradientGiftButton extends StatelessWidget {
   }
 }
 
+class _MiniProfileCardSkin extends StatelessWidget {
+  const _MiniProfileCardSkin();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFFFFF7EC),
+            const Color(0xFFFDFBF7),
+            const Color(0xFFFFFFFF),
+          ],
+          stops: const [0, 0.38, 1],
+        ),
+      ),
+      child: Stack(
+        children: const [
+          Positioned(top: 12, left: -44, child: _MiniProfileSoftOrb(color: Color(0xFFFFC857))),
+          Positioned(top: 38, right: -52, child: _MiniProfileSoftOrb(color: Color(0xFF18C7B7))),
+          Positioned(top: 0, left: 0, right: 0, child: _MiniProfileTopSheen()),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniProfileOrnamentHeader extends StatelessWidget {
+  const _MiniProfileOrnamentHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: SizedBox(
+        height: 88,
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            Positioned(
+              top: 17,
+              left: 34,
+              right: 34,
+              child: Container(
+                height: 2,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      RoomColors.gold.withValues(alpha: 0.24),
+                      RoomColors.coral.withValues(alpha: 0.12),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              child: Container(
+                width: 98,
+                height: 28,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      RoomColors.gold.withValues(alpha: 0.23),
+                      RoomColors.gold.withValues(alpha: 0.02),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const Positioned(top: 16, left: 42, child: _MiniProfileWing(isLeft: true)),
+            const Positioned(top: 16, right: 42, child: _MiniProfileWing(isLeft: false)),
+            Positioned(
+              top: 13,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: RoomColors.gold.withValues(alpha: 0.78),
+                  boxShadow: [
+                    BoxShadow(
+                      color: RoomColors.gold.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniProfileWing extends StatelessWidget {
+  const _MiniProfileWing({required this.isLeft});
+
+  final bool isLeft;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.scale(
+      scaleX: isLeft ? 1 : -1,
+      child: CustomPaint(
+        size: const Size(64, 24),
+        painter: _MiniProfileWingPainter(),
+      ),
+    );
+  }
+}
+
+class _MiniProfileWingPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.15
+      ..strokeCap = StrokeCap.round
+      ..shader = const LinearGradient(
+        colors: [Color(0x00FFC857), Color(0x99FFC857), Color(0x33FF5F7E)],
+      ).createShader(Offset.zero & size);
+
+    final path = Path()
+      ..moveTo(size.width, size.height * 0.52)
+      ..cubicTo(size.width * 0.72, size.height * 0.05, size.width * 0.34, size.height * 0.22, 0, size.height * 0.60);
+    canvas.drawPath(path, paint);
+
+    for (var i = 0; i < 3; i++) {
+      final y = size.height * (0.44 + (i * 0.18));
+      final p = Path()
+        ..moveTo(size.width * (0.88 - i * 0.10), y)
+        ..cubicTo(size.width * 0.62, y - 8, size.width * 0.36, y - 2, size.width * 0.12, y + 5);
+      canvas.drawPath(p, paint..strokeWidth = 0.85);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _MiniProfileSoftOrb extends StatelessWidget {
+  const _MiniProfileSoftOrb({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: 130,
+        height: 130,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              color.withValues(alpha: 0.10),
+              color.withValues(alpha: 0.035),
+              Colors.transparent,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniProfileTopSheen extends StatelessWidget {
+  const _MiniProfileTopSheen();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        height: 86,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.white.withValues(alpha: 0.36),
+              Colors.white.withValues(alpha: 0.10),
+              Colors.white.withValues(alpha: 0.0),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MiniProfileTopGlow extends StatelessWidget {
   const _MiniProfileTopGlow();
 
@@ -404,8 +612,8 @@ class _MiniProfileTopGlow extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: RadialGradient(
             colors: [
-              RoomColors.aqua.withValues(alpha: 0.16),
-              RoomColors.violet.withValues(alpha: 0.08),
+              RoomColors.aqua.withValues(alpha: 0.14),
+              RoomColors.violet.withValues(alpha: 0.07),
               Colors.transparent,
             ],
           ),
