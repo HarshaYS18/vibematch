@@ -625,14 +625,14 @@ class _FamilyTagPill extends StatelessWidget {
       case 'platinum':
         return const _FamilyTagStyle(
           assetPath: 'assets/images/family_badges/platinum.png',
-          top: Color(0xFF768292),
-          bottom: Color(0xFF485260),
-          border: Color(0xFFE8EEF6),
-          text: Color(0xFFFDFEFF),
+          top: Color(0xFF7B8594),
+          bottom: Color(0xFF4A5463),
+          border: Color(0xFFEAF0F8),
+          text: Color(0xFFFFFFFF),
           shine: Color(0xFFFFFFFF),
           glow: Color(0xFFDDE6F3),
           shineAlpha: 0.56,
-          glowAlpha: 0.26,
+          glowAlpha: 0.24,
           durationMs: 1050,
         );
       case 'gold':
@@ -651,7 +651,7 @@ class _FamilyTagPill extends StatelessWidget {
       case 'silver':
         return const _FamilyTagStyle(
           assetPath: 'assets/images/family_badges/silver.png',
-          top: Color(0xFFD4D9DF),
+          top: Color(0xFFD5DAE1),
           bottom: Color(0xFF87919C),
           border: Color(0xFFF0F4F8),
           text: Color(0xFFFBFDFF),
@@ -681,41 +681,37 @@ class _FamilyTagPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = _style;
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 150),
-      child: IntrinsicWidth(
-        child: SizedBox(
-          height: 22,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: 13,
-                top: 1,
-                bottom: 1,
+    return IntrinsicWidth(
+      child: SizedBox(
+        height: 24,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: ClipPath(
+                clipper: const _FamilyTagClipper(),
                 child: Container(
-                  constraints: const BoxConstraints(minWidth: 74, maxWidth: 137),
-                                  decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [style.top, style.bottom],
-                  ),
-                  border: Border.all(
-                    color: style.border.withValues(alpha: 0.82),
-                    width: 0.85,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: style.glow.withValues(alpha: style.glowAlpha),
-                      blurRadius: _level == 'platinum' ? 12 : 7,
-                      offset: const Offset(0, 3),
+                  constraints: const BoxConstraints(minWidth: 66, maxWidth: 132),
+                  height: 20,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [style.top, style.bottom],
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: style.border.withValues(alpha: 0.86),
+                      width: 0.8,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: style.glow.withValues(alpha: style.glowAlpha),
+                        blurRadius: _level == 'platinum' ? 12 : 7,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
                   child: Stack(
                     children: [
                       Positioned(
@@ -734,17 +730,16 @@ class _FamilyTagPill extends StatelessWidget {
                       ),
                       _FamilyTagShine(style: style),
                       Padding(
-                        padding: const EdgeInsets.only(left: 20, right: 10),
+                        padding: const EdgeInsets.only(left: 24, right: 13),
                         child: Align(
                           alignment: Alignment.centerLeft,
-                          widthFactor: 1,
                           child: Text(
                             _familyName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: style.text,
-                              fontSize: 9.0,
+                              fontSize: 9,
                               fontWeight: FontWeight.w900,
                               height: 1,
                               letterSpacing: -0.08,
@@ -759,16 +754,16 @@ class _FamilyTagPill extends StatelessWidget {
             ),
             Positioned(
               left: 0,
-              top: -3,
+              top: -3.5,
               child: Image.asset(
                 style.assetPath,
-                width: 28,
-                height: 28,
+                width: 26,
+                height: 26,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    width: 28,
-                    height: 28,
+                    width: 26,
+                    height: 26,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -779,16 +774,15 @@ class _FamilyTagPill extends StatelessWidget {
                       _familyName.characters.first.toUpperCase(),
                       style: TextStyle(
                         color: style.text,
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   );
                 },
-                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -880,15 +874,9 @@ class _FamilyTagShineState extends State<_FamilyTagShine>
                       gradient: LinearGradient(
                         colors: [
                           widget.style.shine.withValues(alpha: 0.0),
-                          widget.style.shine.withValues(
-                            alpha: widget.style.shineAlpha * 0.45,
-                          ),
-                          widget.style.shine.withValues(
-                            alpha: widget.style.shineAlpha,
-                          ),
-                          widget.style.shine.withValues(
-                            alpha: widget.style.shineAlpha * 0.45,
-                          ),
+                          widget.style.shine.withValues(alpha: widget.style.shineAlpha * 0.45),
+                          widget.style.shine.withValues(alpha: widget.style.shineAlpha),
+                          widget.style.shine.withValues(alpha: widget.style.shineAlpha * 0.45),
                           widget.style.shine.withValues(alpha: 0.0),
                         ],
                       ),
@@ -902,6 +890,34 @@ class _FamilyTagShineState extends State<_FamilyTagShine>
       },
     );
   }
+}
+
+class _FamilyTagClipper extends CustomClipper<Path> {
+  const _FamilyTagClipper();
+
+  @override
+  Path getClip(Size size) {
+    const rightCut = 9.0;
+
+    final radius = size.height / 2;
+    final path = Path()
+      ..moveTo(radius, 0)
+      ..lineTo(size.width - rightCut, 0)
+      ..lineTo(size.width, size.height / 2)
+      ..lineTo(size.width - rightCut, size.height)
+      ..lineTo(radius, size.height)
+      ..arcToPoint(
+        Offset(radius, 0),
+        radius: Radius.circular(radius),
+        clockwise: true,
+      )
+      ..close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 class _MetaPill extends StatelessWidget {
