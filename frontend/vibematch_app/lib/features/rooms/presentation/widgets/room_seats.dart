@@ -113,7 +113,6 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
           final seatTopLeft = _seatOffset(selectedSeat.index, spec, width);
           final seatCenterX = seatTopLeft.dx;
           final labelBottomY = seatTopLeft.dy + seatHeight;
-          final menuHeight = _SeatMenu.menuHeight(locked: selectedSeat.locked);
           final left = (seatCenterX - (menuWidth / 2)).clamp(
             0.0,
             (width - menuWidth).clamp(0.0, width),
@@ -216,17 +215,13 @@ class _SeatAvatar extends StatelessWidget {
         children: [
           if (selected)
             Container(
-              width: _RoomSeatLayoutState.avatarSize + 12,
-              height: _RoomSeatLayoutState.avatarSize + 12,
+              width: _RoomSeatLayoutState.avatarSize + 8,
+              height: _RoomSeatLayoutState.avatarSize + 8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: SweepGradient(
-                  colors: [
-                    RoomColors.gold.withValues(alpha: 0.08),
-                    RoomColors.gold,
-                    RoomColors.aqua.withValues(alpha: 0.35),
-                    RoomColors.gold.withValues(alpha: 0.08),
-                  ],
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  width: 1.4,
                 ),
               ),
             ),
@@ -240,7 +235,7 @@ class _SeatAvatar extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.08 : 0.12) : null,
                 gradient: user == null ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
-                border: Border.all(color: selected ? RoomColors.gold : Colors.white.withValues(alpha: 0.18), width: selected ? 2.2 : 1.1),
+                border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.86) : Colors.white.withValues(alpha: 0.18), width: selected ? 1.4 : 1.1),
               ),
               child: Center(
                 child: user == null
@@ -356,12 +351,6 @@ class _SeatMenu extends StatefulWidget {
   final VoidCallback onLock;
   final VoidCallback onUnlock;
 
-  static double menuHeight({required bool locked}) {
-    final itemCount = locked ? 1 : 3;
-    final dividers = itemCount - 1;
-    return _RoomSeatLayoutState.menuArrowHeight + 12 + (itemCount * _RoomSeatLayoutState.menuItemHeight) + (dividers * 5) + 12;
-  }
-
   @override
   State<_SeatMenu> createState() => _SeatMenuState();
 }
@@ -393,14 +382,19 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
     super.dispose();
   }
 
+  void _runAction(VoidCallback action) {
+    dismissRoomSeatActionPill();
+    action();
+  }
+
   @override
   Widget build(BuildContext context) {
     final actions = widget.locked
-        ? [_MenuAction(Icons.lock_open_rounded, 'Unlock', widget.onUnlock)]
+        ? [_MenuAction(Icons.lock_open_rounded, 'Unlock', () => _runAction(widget.onUnlock))]
         : [
-            _MenuAction(Icons.person_add_alt_1_rounded, 'Invite', widget.onInvite),
-            _MenuAction(Icons.swap_horiz_rounded, 'Switch', widget.onSwitch),
-            _MenuAction(Icons.lock_outline_rounded, 'Lock', widget.onLock),
+            _MenuAction(Icons.person_add_alt_1_rounded, 'Invite', () => _runAction(widget.onInvite)),
+            _MenuAction(Icons.swap_horiz_rounded, 'Switch', () => _runAction(widget.onSwitch)),
+            _MenuAction(Icons.lock_outline_rounded, 'Lock', () => _runAction(widget.onLock)),
           ];
 
     return FadeTransition(
