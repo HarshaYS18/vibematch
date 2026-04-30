@@ -166,12 +166,12 @@ class _LeaveSeatIcon extends StatelessWidget {
           Positioned(
             left: 3,
             top: 1,
-            child: Icon(Icons.meeting_room_rounded, color: color, size: 20),
+            child: Icon(Icons.mic_external_on_rounded, color: color, size: 20),
           ),
           Positioned(
             right: 1,
-            top: 5,
-            child: Icon(Icons.arrow_forward_rounded, color: color, size: 17),
+            bottom: 1,
+            child: Icon(Icons.keyboard_arrow_down_rounded, color: color, size: 18),
           ),
         ],
       ),

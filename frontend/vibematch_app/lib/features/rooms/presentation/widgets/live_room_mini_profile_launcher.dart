@@ -26,6 +26,7 @@ class LiveRoomMiniProfileLauncher {
     ValueChanged<SeatUser>? onReportTap,
     ValueChanged<RoomKickoutDuration>? onKickOutDurationSelected,
     required ValueChanged<int> onLeaveAndLock,
+    required ValueChanged<int> onLeaveSeatOnly,
     required ValueChanged<String> onSelfMuteToggle,
     required ValueChanged<String> onAdminMuteToggle,
     required ValueChanged<String> onGiftTap,
@@ -103,6 +104,7 @@ class LiveRoomMiniProfileLauncher {
               }
             },
             onLeaveAndLock: () => onLeaveAndLock(seatIndex),
+            onLeaveSeatOnly: () => onLeaveSeatOnly(seatIndex),
             onSelfMuteToggle: () => onSelfMuteToggle(user.id),
             onAdminMuteToggle: () => onAdminMuteToggle(user.id),
             onGiftTap: () => onGiftTap(user.id),

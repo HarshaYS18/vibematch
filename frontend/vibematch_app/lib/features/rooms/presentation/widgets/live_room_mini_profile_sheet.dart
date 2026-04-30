@@ -23,6 +23,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
     required this.onRemoveAdminTap,
     required this.onReportTap,
     required this.onLeaveAndLock,
+    required this.onLeaveSeatOnly,
     required this.onSelfMuteToggle,
     required this.onAdminMuteToggle,
     required this.onGiftTap,
@@ -47,6 +48,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
   final VoidCallback onRemoveAdminTap;
   final VoidCallback onReportTap;
   final VoidCallback onLeaveAndLock;
+  final VoidCallback onLeaveSeatOnly;
   final VoidCallback onSelfMuteToggle;
   final VoidCallback onAdminMuteToggle;
   final VoidCallback onGiftTap;
@@ -72,6 +74,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
       onRemoveAdminTap: onRemoveAdminTap,
       onReportTap: onReportTap,
       onLeaveAndLock: onLeaveAndLock,
+      onLeaveSeatOnly: onLeaveSeatOnly,
       onSelfMuteToggle: onSelfMuteToggle,
       onAdminMuteToggle: onAdminMuteToggle,
       onGiftTap: onGiftTap,

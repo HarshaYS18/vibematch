@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
 import 'mini_profile_decoration.dart';
+import 'room_profile_action_row.dart';
 import 'room_theme.dart';
 
 class UserMiniProfileSheet extends StatelessWidget {
@@ -24,6 +25,7 @@ class UserMiniProfileSheet extends StatelessWidget {
     required this.onRemoveAdminTap,
     required this.onReportTap,
     required this.onLeaveAndLock,
+    required this.onLeaveSeatOnly,
     required this.onSelfMuteToggle,
     required this.onAdminMuteToggle,
     required this.onGiftTap,
@@ -47,6 +49,7 @@ class UserMiniProfileSheet extends StatelessWidget {
   final VoidCallback onRemoveAdminTap;
   final VoidCallback onReportTap;
   final VoidCallback onLeaveAndLock;
+  final VoidCallback onLeaveSeatOnly;
   final VoidCallback onSelfMuteToggle;
   final VoidCallback onAdminMuteToggle;
   final VoidCallback onGiftTap;
@@ -150,6 +153,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                   selfMuted: user.selfMuted,
                   adminMuted: user.adminMuted,
                   onLeaveAndLock: onLeaveAndLock,
+                  onLeaveSeatOnly: onLeaveSeatOnly,
                   onSelfMuteToggle: onSelfMuteToggle,
                   onAdminMuteToggle: onAdminMuteToggle,
                   onGiftTap: onGiftTap,
@@ -1042,6 +1046,7 @@ class _ActionRow extends StatelessWidget {
     required this.selfMuted,
     required this.adminMuted,
     required this.onLeaveAndLock,
+    required this.onLeaveSeatOnly,
     required this.onSelfMuteToggle,
     required this.onAdminMuteToggle,
     required this.onGiftTap,
@@ -1053,6 +1058,7 @@ class _ActionRow extends StatelessWidget {
   final bool selfMuted;
   final bool adminMuted;
   final VoidCallback onLeaveAndLock;
+  final VoidCallback onLeaveSeatOnly;
   final VoidCallback onSelfMuteToggle;
   final VoidCallback onAdminMuteToggle;
   final VoidCallback onGiftTap;
@@ -1060,134 +1066,16 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actions = <Widget>[
-      if (isSelf)
-        _MiniProfileActionCircle(
-          iconWidget: const _LeaveSeatIcon(),
-          color: RoomColors.coral,
-          isPrimary: true,
-          onTap: onLeaveAndLock,
-        ),
-      if (canModerate && !isSelf)
-        _MiniProfileActionCircle(
-          icon: Icons.lock_rounded,
-          color: RoomColors.plum,
-          onTap: onLeaveAndLock,
-        ),
-      if (canModerate && !isSelf && onKickOutTap != null)
-        _MiniProfileActionCircle(
-          icon: Icons.person_remove_alt_1_rounded,
-          color: RoomColors.coral,
-          isPrimary: true,
-          onTap: onKickOutTap!,
-        ),
-      if (isSelf)
-        _MiniProfileActionCircle(
-          icon: selfMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-          color: selfMuted ? RoomColors.selfMute : RoomColors.aqua,
-          onTap: onSelfMuteToggle,
-        )
-      else if (canModerate)
-        _MiniProfileActionCircle(
-          icon: adminMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-          color: adminMuted ? RoomColors.coral : RoomColors.violet,
-          onTap: onAdminMuteToggle,
-        ),
-    ];
-
-    if (actions.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (var i = 0; i < actions.length; i++) ...[
-            if (i != 0) const SizedBox(width: 16),
-            actions[i],
-          ],
-        ],
-      ),
+    return RoomProfileActionRow(
+      isSelf: isSelf,
+      canModerate: canModerate,
+      selfMuted: selfMuted,
+      adminMuted: adminMuted,
+      onLeaveAndLock: onLeaveAndLock,
+      onLeaveSeatOnly: onLeaveSeatOnly,
+      onSelfMuteToggle: onSelfMuteToggle,
+      onAdminMuteToggle: onAdminMuteToggle,
+      onKickOutTap: onKickOutTap,
     );
   }
 }
-
-class _MiniProfileActionCircle extends StatelessWidget {
-  const _MiniProfileActionCircle({
-    required this.color,
-    required this.onTap,
-    this.icon,
-    this.iconWidget,
-    this.isPrimary = false,
-  }) : assert(icon != null || iconWidget != null, 'Provide either icon or iconWidget.');
-
-  final IconData? icon;
-  final Widget? iconWidget;
-  final Color color;
-  final VoidCallback onTap;
-  final bool isPrimary;
-
-  @override
-  Widget build(BuildContext context) {
-    final background = isPrimary ? color : Colors.white;
-    final foreground = isPrimary ? Colors.white : color;
-
-    return Material(
-      color: background,
-      shape: const CircleBorder(),
-      elevation: isPrimary ? 8 : 2,
-      shadowColor: color.withValues(alpha: isPrimary ? 0.30 : 0.12),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Container(
-          width: isPrimary ? 54 : 48,
-          height: isPrimary ? 54 : 48,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isPrimary
-                  ? Colors.white.withValues(alpha: 0.38)
-                  : RoomColors.softLine,
-              width: 1,
-            ),
-          ),
-          child: iconWidget ?? Icon(icon, color: foreground, size: isPrimary ? 25 : 22),
-        ),
-      ),
-    );
-  }
-}
-
-class _LeaveSeatIcon extends StatelessWidget {
-  const _LeaveSeatIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 28,
-      height: 28,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: const [
-          Positioned(
-            top: 2,
-            child: Icon(Icons.mic_rounded, color: Colors.white, size: 22),
-          ),
-          Positioned(
-            right: -2,
-            bottom: -3,
-            child: Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Colors.white,
-              size: 19,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-

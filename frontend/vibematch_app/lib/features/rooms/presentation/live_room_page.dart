@@ -356,6 +356,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       onReportTap: _openReportForUser,
       onKickOutDurationSelected: _canKickOutUser(user) ? (duration) => _kickOutUser(user: user, duration: duration) : null,
       onLeaveAndLock: (targetSeatIndex) { Navigator.pop(context); _seatController.leaveAndLockSeat(targetSeatIndex); },
+      onLeaveSeatOnly: (targetSeatIndex) {
+        Navigator.pop(context);
+        final seatedUser = targetSeatIndex >= 0 && targetSeatIndex < _seatController.seats.length
+            ? _seatController.seats[targetSeatIndex].user
+            : null;
+        if (seatedUser?.id == _currentUser.id) {
+          _seatController.leaveAndLockSeat(targetSeatIndex);
+        } else {
+          _seatController.leaveSeatOnly(targetSeatIndex);
+        }
+      },
       onSelfMuteToggle: (userId) { Navigator.pop(context); _seatController.toggleSelfMute(userId); },
       onAdminMuteToggle: (userId) { Navigator.pop(context); _seatController.toggleAdminMute(userId); },
       onGiftTap: (userId) { Navigator.pop(context); setState(() { _giftController.selectedReceiverIds..clear()..add(userId); }); _openGiftPanel(); },
