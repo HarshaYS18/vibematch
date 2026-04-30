@@ -11,7 +11,8 @@ class MiniProfileDecoration extends StatelessWidget {
     this.maxHeightFactor = 0.80,
     this.topRadius = 30,
     this.backgroundColor = Colors.white,
-    this.showTopGlow = true,
+    this.showTopGlow = false,
+    this.showHeaderDecoration = true,
   });
 
   final Widget child;
@@ -19,6 +20,7 @@ class MiniProfileDecoration extends StatelessWidget {
   final double topRadius;
   final Color backgroundColor;
   final bool showTopGlow;
+  final bool showHeaderDecoration;
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +45,57 @@ class MiniProfileDecoration extends StatelessWidget {
           Positioned.fill(
             child: ClipRRect(borderRadius: borderRadius, child: const _MiniProfileCardSkin()),
           ),
-
-          const Positioned(top: 0, left: 0, right: 0, child: MiniProfileHeaderDecoration()),
+          if (showHeaderDecoration)
+            const Positioned(
+              top: -61,
+              left: -36,
+              right: -36,
+              child: MiniProfileHeaderDecoration(),
+            ),
           child,
         ],
+      ),
+    );
+  }
+}
+
+class MiniProfileHeaderCard extends StatelessWidget {
+  const MiniProfileHeaderCard({
+    super.key,
+    required this.avatar,
+    this.decorationTop = -61,
+    this.avatarTop = -32,
+    this.left = -36,
+    this.right = -36,
+  });
+
+  final Widget avatar;
+  final double decorationTop;
+  final double avatarTop;
+  final double left;
+  final double right;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: false,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            Positioned(
+              top: decorationTop,
+              left: left,
+              right: right,
+              child: const MiniProfileHeaderDecoration(),
+            ),
+            Positioned(
+              top: avatarTop,
+              child: avatar,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -309,8 +358,7 @@ class _MiniProfileCardSkin extends StatelessWidget {
 class MiniProfileHeaderDecoration extends StatelessWidget {
   const MiniProfileHeaderDecoration({super.key});
 
-  static const String _bannerAsset =
-      'assets/images/mini_profile_decorations/purple_gold_banner.png';
+  static const String _bannerAsset = 'assets/images/mini_profile_decorations/purple_gold_banner.png';
 
   @override
   Widget build(BuildContext context) {
@@ -333,8 +381,7 @@ class MiniProfileHeaderDecoration extends StatelessWidget {
                   width: screenWidth + 112,
                   height: 90,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const _FallbackMiniProfileHeaderDecoration(),
+                  errorBuilder: (context, error, stackTrace) => const _FallbackMiniProfileHeaderDecoration(),
                 ),
               ),
             ),
@@ -377,7 +424,6 @@ class _FallbackMiniProfileHeaderDecoration extends StatelessWidget {
     );
   }
 }
-
 
 class _MiniProfileWing extends StatelessWidget {
   const _MiniProfileWing({required this.isLeft});
@@ -459,4 +505,3 @@ class _MiniProfileTopSheen extends StatelessWidget {
     );
   }
 }
-
