@@ -133,19 +133,6 @@ class UserMiniProfileSheet extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                _FamilyInfoCard(user: user, onTap: onFamilyTap),
-                const SizedBox(height: 7),
-                _InfoCard(
-                  icon: Icons.favorite_rounded,
-                  title: 'Love & Bonds',
-                  value: user.relationshipText.trim().isEmpty
-                      ? 'No active bonds yet'
-                      : user.relationshipText,
-                  onTap: onRelationshipTap,
-                ),
-                const SizedBox(height: 7),
-                _BadgesInfoCard(user: user, onTap: onMedalsTap),
                 const SizedBox(height: 10),
                 _ActionRow(
                   isSelf: _isSelf,
@@ -321,12 +308,12 @@ class _MetaRow extends StatelessWidget {
     return Wrap(
       alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 6,
-      runSpacing: 5,
+      spacing: 4,
+      runSpacing: 4,
       children: [
         if (user.roleLabel.isNotEmpty)
           _MetaPill(icon: Icons.shield_rounded, label: user.roleLabel),
-        if (user.showLocation) _LocationPill(location: user.locationLabel!),
+        if (user.familyName.trim().isNotEmpty) _FamilyTagPill(user: user),
         _GenderAgePill(user: user),
       ],
     );
@@ -606,52 +593,323 @@ class _GenderAgePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = user.age == null ? 'Age hidden' : '${user.age}';
-    return _MetaPill(icon: user.gender.icon, label: label, color: user.gender.color);
+    return _MetaPill(
+      icon: user.gender.icon,
+      label: label,
+      color: user.gender.color,
+    );
   }
 }
 
-class _LocationPill extends StatelessWidget {
-  const _LocationPill({required this.location});
+class _FamilyTagPill extends StatelessWidget {
+  const _FamilyTagPill({required this.user});
 
-  final String location;
+  final SeatUser user;
+
+  String get _familyName {
+    final clean = user.familyName.trim();
+    if (clean.isEmpty) return 'Family';
+    return clean;
+  }
+
+  String get _level {
+    final raw = user.familyLevel.trim().toLowerCase();
+    if (raw.contains('platinum')) return 'platinum';
+    if (raw.contains('gold')) return 'gold';
+    if (raw.contains('silver')) return 'silver';
+    return 'bronze';
+  }
+
+  _FamilyTagStyle get _style {
+    switch (_level) {
+      case 'platinum':
+        return const _FamilyTagStyle(
+          assetPath: 'assets/images/family_badges/platinum.png',
+          top: Color(0xFF768292),
+          bottom: Color(0xFF485260),
+          border: Color(0xFFE8EEF6),
+          text: Color(0xFFFDFEFF),
+          shine: Color(0xFFFFFFFF),
+          glow: Color(0xFFDDE6F3),
+          shineAlpha: 0.56,
+          glowAlpha: 0.26,
+          durationMs: 1050,
+        );
+      case 'gold':
+        return const _FamilyTagStyle(
+          assetPath: 'assets/images/family_badges/gold.png',
+          top: Color(0xFFE0B12F),
+          bottom: Color(0xFF8D6508),
+          border: Color(0xFFFFE28A),
+          text: Color(0xFFFFF8DB),
+          shine: Color(0xFFFFF2B0),
+          glow: Color(0xFFFFD96A),
+          shineAlpha: 0.40,
+          glowAlpha: 0.18,
+          durationMs: 1380,
+        );
+      case 'silver':
+        return const _FamilyTagStyle(
+          assetPath: 'assets/images/family_badges/silver.png',
+          top: Color(0xFFD4D9DF),
+          bottom: Color(0xFF87919C),
+          border: Color(0xFFF0F4F8),
+          text: Color(0xFFFBFDFF),
+          shine: Color(0xFFFFFFFF),
+          glow: Color(0xFFD6DDE5),
+          shineAlpha: 0.28,
+          glowAlpha: 0.12,
+          durationMs: 1720,
+        );
+      default:
+        return const _FamilyTagStyle(
+          assetPath: 'assets/images/family_badges/bronze.png',
+          top: Color(0xFFC08A5A),
+          bottom: Color(0xFF7A4E2D),
+          border: Color(0xFFDCA477),
+          text: Color(0xFFFFE8D5),
+          shine: Color(0xFFFFD8BA),
+          glow: Color(0xFFC68E61),
+          shineAlpha: 0.16,
+          glowAlpha: 0.08,
+          durationMs: 2100,
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final style = _style;
+
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 150),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(
-          color: RoomColors.aqua.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: RoomColors.aqua.withValues(alpha: 0.14)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.location_on_rounded, color: RoomColors.aqua, size: 13),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                location,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: RoomColors.plum,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
+      child: IntrinsicWidth(
+        child: SizedBox(
+          height: 22,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 13,
+                top: 1,
+                bottom: 1,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 74, maxWidth: 137),
+                                  decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [style.top, style.bottom],
+                  ),
+                  border: Border.all(
+                    color: style.border.withValues(alpha: 0.82),
+                    width: 0.85,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: style.glow.withValues(alpha: style.glowAlpha),
+                      blurRadius: _level == 'platinum' ? 12 : 7,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 16,
+                        right: 8,
+                        top: 2,
+                        child: Container(
+                          height: 3,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            color: Colors.white.withValues(
+                              alpha: _level == 'platinum' ? 0.22 : 0.12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      _FamilyTagShine(style: style),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 20, right: 10),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: 1,
+                          child: Text(
+                            _familyName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: style.text,
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                              letterSpacing: -0.08,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ],
+            Positioned(
+              left: 0,
+              top: -3,
+              child: Image.asset(
+                style.assetPath,
+                width: 28,
+                height: 28,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: style.top,
+                      border: Border.all(color: style.border, width: 0.8),
+                    ),
+                    child: Text(
+                      _familyName.characters.first.toUpperCase(),
+                      style: TextStyle(
+                        color: style.text,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  );
+                },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+class _FamilyTagStyle {
+  const _FamilyTagStyle({
+    required this.assetPath,
+    required this.top,
+    required this.bottom,
+    required this.border,
+    required this.text,
+    required this.shine,
+    required this.glow,
+    required this.shineAlpha,
+    required this.glowAlpha,
+    required this.durationMs,
+  });
+
+  final String assetPath;
+  final Color top;
+  final Color bottom;
+  final Color border;
+  final Color text;
+  final Color shine;
+  final Color glow;
+  final double shineAlpha;
+  final double glowAlpha;
+  final int durationMs;
+}
+
+class _FamilyTagShine extends StatefulWidget {
+  const _FamilyTagShine({required this.style});
+
+  final _FamilyTagStyle style;
+
+  @override
+  State<_FamilyTagShine> createState() => _FamilyTagShineState();
+}
+
+class _FamilyTagShineState extends State<_FamilyTagShine>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: widget.style.durationMs),
+    )..repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FamilyTagShine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.style.durationMs != widget.style.durationMs) {
+      _controller.duration = Duration(milliseconds: widget.style.durationMs);
+      _controller
+        ..reset()
+        ..repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final x = -0.85 + (_controller.value * 2.0);
+        return Positioned.fill(
+          child: IgnorePointer(
+            child: Transform.translate(
+              offset: Offset(x * 105, 0),
+              child: Transform.rotate(
+                angle: -0.45,
+                child: Center(
+                  child: Container(
+                    width: 14,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          widget.style.shine.withValues(alpha: 0.0),
+                          widget.style.shine.withValues(
+                            alpha: widget.style.shineAlpha * 0.45,
+                          ),
+                          widget.style.shine.withValues(
+                            alpha: widget.style.shineAlpha,
+                          ),
+                          widget.style.shine.withValues(
+                            alpha: widget.style.shineAlpha * 0.45,
+                          ),
+                          widget.style.shine.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _MetaPill extends StatelessWidget {
-  const _MetaPill({required this.icon, required this.label, this.color = RoomColors.plum});
+  const _MetaPill({
+    required this.icon,
+    required this.label,
+    this.color = RoomColors.plum,
+  });
 
   final IconData icon;
   final String label;
@@ -660,9 +918,10 @@ class _MetaPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 130),
+      constraints: const BoxConstraints(maxWidth: 104),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        height: 21,
+        padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 0),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(999),
@@ -671,14 +930,19 @@ class _MetaPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 12.5),
-            const SizedBox(width: 4),
+            Icon(icon, color: color, size: 10.5),
+            const SizedBox(width: 3),
             Flexible(
               child: Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: color,
+                  fontSize: 9.0,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
               ),
             ),
           ],
@@ -907,137 +1171,9 @@ class _MiniStatCardShine extends StatelessWidget {
   }
 }
 
-class _FamilyInfoCard extends StatelessWidget {
-  const _FamilyInfoCard({required this.user, required this.onTap});
 
-  final SeatUser user;
-  final VoidCallback onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    final familyName = user.familyName.trim().isEmpty ? 'Join or create a family' : user.familyName;
 
-    return _CleanInfoCard(
-      iconWidget: Container(
-        width: 34,
-        height: 34,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(colors: user.avatarColors),
-        ),
-        child: const Icon(Icons.groups_rounded, color: Colors.white, size: 18),
-      ),
-      title: 'Family',
-      value: familyName,
-      onTap: onTap,
-    );
-  }
-}
-
-class _BadgesInfoCard extends StatelessWidget {
-  const _BadgesInfoCard({required this.user, required this.onTap});
-
-  final SeatUser user;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final badges = user.medals.isEmpty ? '—' : user.medals.join('   ');
-
-    return _CleanInfoCard(
-      iconWidget: const Icon(Icons.military_tech_rounded, color: RoomColors.gold, size: 20),
-      title: 'Badges',
-      valueWidget: Align(
-        alignment: Alignment.centerRight,
-        child: Text(
-          badges,
-          textAlign: TextAlign.right,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Color(0xFF675C70), fontSize: 13, fontWeight: FontWeight.w900),
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.icon, required this.title, required this.value, required this.onTap});
-
-  final IconData icon;
-  final String title;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _CleanInfoCard(
-      iconWidget: Icon(icon, color: RoomColors.coral, size: 19),
-      title: title,
-      value: value,
-      onTap: onTap,
-    );
-  }
-}
-
-class _CleanInfoCard extends StatelessWidget {
-  const _CleanInfoCard({
-    required this.iconWidget,
-    required this.title,
-    this.value,
-    this.valueWidget,
-    required this.onTap,
-  });
-
-  final Widget iconWidget;
-  final String title;
-  final String? value;
-  final Widget? valueWidget;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return MiniProfileSectionCard(
-      backgroundColor: Colors.white,
-      borderColor: RoomColors.softLine,
-      radius: 16,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      onTap: onTap,
-      child: Row(
-        children: [
-          SizedBox(width: 36, child: Center(child: iconWidget)),
-          const SizedBox(width: 9),
-          Expanded(
-            flex: valueWidget == null ? 1 : 0,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: RoomColors.plum, fontSize: 12.5, fontWeight: FontWeight.w900)),
-                if (value != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    value!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Color(0xFF736878), fontSize: 11.2, fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (valueWidget != null) ...[
-            const Spacer(),
-            SizedBox(width: 92, child: valueWidget!),
-          ],
-          const SizedBox(width: 5),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFFB3A9B9), size: 19),
-        ],
-      ),
-    );
-  }
-}
 
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
