@@ -50,6 +50,11 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   static const double menuArrowHeight = 9;
 
   int? _hiddenMenuSeat;
+  OverlayEntry? _menuEntry;
+  int? _overlaySeatIndex;
+  bool? _overlaySeatLocked;
+  Size? _lastLayoutSize;
+  SeatLayoutSpec? _lastSpec;
 
   @override
   void initState() {
@@ -63,23 +68,90 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     if (oldWidget.selectedSeatIndex != widget.selectedSeatIndex) {
       _hiddenMenuSeat = null;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncOverlayMenu());
   }
 
   @override
   void dispose() {
     roomSeatActionDismissSignal.removeListener(_hideMenu);
+    _removeOverlayMenu();
     super.dispose();
   }
 
   void _hideMenu() {
     if (!mounted || widget.selectedSeatIndex == null) return;
     setState(() => _hiddenMenuSeat = widget.selectedSeatIndex);
+    _removeOverlayMenu();
+  }
+
+  void _removeOverlayMenu() {
+    _menuEntry?.remove();
+    _menuEntry = null;
+    _overlaySeatIndex = null;
+    _overlaySeatLocked = null;
+  }
+
+  void _syncOverlayMenu() {
+    if (!mounted) return;
+
+    final selectedSeat = _selectedSeat;
+    final layoutSize = _lastLayoutSize;
+    final spec = _lastSpec;
+
+    if (selectedSeat == null || layoutSize == null || spec == null) {
+      _removeOverlayMenu();
+      return;
+    }
+
+    if (_overlaySeatIndex == selectedSeat.index && _overlaySeatLocked == selectedSeat.locked && _menuEntry != null) {
+      _menuEntry!.markNeedsBuild();
+      return;
+    }
+
+    _removeOverlayMenu();
+
+    final overlay = Overlay.of(context);
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null || !renderBox.hasSize) return;
+
+    final seatTopLeft = _seatOffset(selectedSeat.index, spec, layoutSize.width);
+    final localLeft = seatTopLeft.dx - (menuWidth / 2);
+    final localTop = seatTopLeft.dy + seatHeight + 3;
+    final globalPosition = renderBox.localToGlobal(Offset(localLeft, localTop));
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final left = globalPosition.dx.clamp(6.0, screenWidth - menuWidth - 6);
+    final top = globalPosition.dy;
+
+    _overlaySeatIndex = selectedSeat.index;
+    _overlaySeatLocked = selectedSeat.locked;
+
+    _menuEntry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: left,
+        top: top,
+        width: menuWidth,
+        child: _SeatMenu(
+          key: ValueKey('seat-menu-${selectedSeat.index}-${selectedSeat.locked}'),
+          locked: selectedSeat.locked,
+          onInvite: () => _runMenuAction(() => widget.onInvite(selectedSeat.index)),
+          onSwitch: () => _runMenuAction(() => widget.onSwitch(selectedSeat.index)),
+          onLock: () => _runMenuAction(() => widget.onLock(selectedSeat.index)),
+          onUnlock: () => _runMenuAction(() => widget.onUnlock(selectedSeat.index)),
+        ),
+      ),
+    );
+
+    overlay.insert(_menuEntry!);
+  }
+
+  void _runMenuAction(VoidCallback action) {
+    dismissRoomSeatActionPill();
+    action();
   }
 
   @override
   Widget build(BuildContext context) {
     final spec = SeatLayoutSpec.parse(widget.layoutId);
-    final selectedSeat = _selectedSeat;
     final topRows = spec.hasHostSeats ? 1 : 0;
     final totalRows = topRows + spec.rows;
     final layoutHeight = totalRows * rowHeight;
@@ -87,6 +159,10 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
+        _lastLayoutSize = Size(width, layoutHeight);
+        _lastSpec = spec;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _syncOverlayMenu());
+
         final children = <Widget>[];
 
         for (var index = 0; index < widget.seats.length; index++) {
@@ -104,33 +180,6 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
                   final user = widget.seats[index].user;
                   user == null ? widget.onSeatTap(index) : widget.onUserTap(index);
                 },
-              ),
-            ),
-          );
-        }
-
-        if (selectedSeat != null) {
-          final seatTopLeft = _seatOffset(selectedSeat.index, spec, width);
-          final seatCenterX = seatTopLeft.dx;
-          final labelBottomY = seatTopLeft.dy + seatHeight;
-          final left = (seatCenterX - (menuWidth / 2)).clamp(
-            0.0,
-            (width - menuWidth).clamp(0.0, width),
-          );
-          final top = labelBottomY + 3;
-
-          children.add(
-            Positioned(
-              left: left,
-              top: top,
-              width: menuWidth,
-              child: _SeatMenu(
-                key: ValueKey('seat-menu-${selectedSeat.index}-${selectedSeat.locked}'),
-                locked: selectedSeat.locked,
-                onInvite: () => widget.onInvite(selectedSeat.index),
-                onSwitch: () => widget.onSwitch(selectedSeat.index),
-                onLock: () => widget.onLock(selectedSeat.index),
-                onUnlock: () => widget.onUnlock(selectedSeat.index),
               ),
             ),
           );
@@ -219,10 +268,7 @@ class _SeatAvatar extends StatelessWidget {
               height: _RoomSeatLayoutState.avatarSize + 8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.92),
-                  width: 1.4,
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.92), width: 1.4),
               ),
             ),
           RoomAvatarFrameHost(
@@ -271,11 +317,7 @@ class _SeatAvatar extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: RoomColors.deep, width: 1.3),
                   boxShadow: [
-                    BoxShadow(
-                      color: RoomColors.coral.withValues(alpha: 0.35),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
+                    BoxShadow(color: RoomColors.coral.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 2)),
                   ],
                 ),
                 child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 11),
@@ -364,11 +406,7 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 210),
-      reverseDuration: const Duration(milliseconds: 140),
-    );
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 210), reverseDuration: const Duration(milliseconds: 140));
     final curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack, reverseCurve: Curves.easeInBack);
     _opacity = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic));
     _scale = Tween<double>(begin: 0.88, end: 1).animate(curve);
@@ -382,20 +420,11 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
     super.dispose();
   }
 
-  void _runAction(VoidCallback action) {
-    dismissRoomSeatActionPill();
-    action();
-  }
-
   @override
   Widget build(BuildContext context) {
     final actions = widget.locked
-        ? [_MenuAction(Icons.lock_open_rounded, 'Unlock', () => _runAction(widget.onUnlock))]
-        : [
-            _MenuAction(Icons.person_add_alt_1_rounded, 'Invite', () => _runAction(widget.onInvite)),
-            _MenuAction(Icons.swap_horiz_rounded, 'Switch', () => _runAction(widget.onSwitch)),
-            _MenuAction(Icons.lock_outline_rounded, 'Lock', () => _runAction(widget.onLock)),
-          ];
+        ? [_MenuAction('Unlock', widget.onUnlock)]
+        : [_MenuAction('Invite', widget.onInvite), _MenuAction('Switch', widget.onSwitch), _MenuAction('Lock', widget.onLock)];
 
     return FadeTransition(
       opacity: _opacity,
@@ -420,11 +449,7 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
                     boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.16),
-                        blurRadius: 14,
-                        offset: const Offset(0, 8),
-                      ),
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 14, offset: const Offset(0, 8)),
                     ],
                   ),
                   child: Column(
@@ -433,11 +458,7 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
                       for (var i = 0; i < actions.length; i++) ...[
                         _MenuButton(action: actions[i]),
                         if (i != actions.length - 1)
-                          Container(
-                            height: 1,
-                            margin: const EdgeInsets.symmetric(vertical: 2.5),
-                            color: Colors.white.withValues(alpha: 0.11),
-                          ),
+                          Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 2.5), color: Colors.white.withValues(alpha: 0.11)),
                       ],
                     ],
                   ),
@@ -456,10 +477,7 @@ class _SeatMenuPointer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(18, _RoomSeatLayoutState.menuArrowHeight),
-      painter: _SeatMenuPointerPainter(),
-    );
+    return CustomPaint(size: const Size(18, _RoomSeatLayoutState.menuArrowHeight), painter: _SeatMenuPointerPainter());
   }
 }
 
@@ -469,13 +487,11 @@ class _SeatMenuPointerPainter extends CustomPainter {
     final paint = Paint()
       ..color = const Color(0xFF5F6470).withValues(alpha: 0.76)
       ..style = PaintingStyle.fill;
-
     final path = Path()
       ..moveTo(size.width / 2, 0)
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
-
     canvas.drawPath(path, paint);
   }
 
@@ -484,9 +500,8 @@ class _SeatMenuPointerPainter extends CustomPainter {
 }
 
 class _MenuAction {
-  const _MenuAction(this.icon, this.label, this.onTap);
+  const _MenuAction(this.label, this.onTap);
 
-  final IconData icon;
   final String label;
   final VoidCallback onTap;
 }
@@ -503,33 +518,13 @@ class _MenuButton extends StatelessWidget {
       onTap: action.onTap,
       child: SizedBox(
         height: _RoomSeatLayoutState.menuItemHeight,
-        child: Row(
-          children: [
-            Container(
-              width: 22,
-              height: 22,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.13),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(action.icon, color: Colors.white, size: 13),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                action.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.4,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
-              ),
-            ),
-          ],
+        child: Center(
+          child: Text(
+            action.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 12.8, fontWeight: FontWeight.w900, height: 1),
+          ),
         ),
       ),
     );
