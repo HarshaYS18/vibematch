@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/media/image_picker_service.dart';
+import '../../../../core/media/image_source_sheet.dart';
 import '../widgets/room_seats.dart';
 import '../widgets/room_theme.dart';
 
@@ -31,6 +33,8 @@ class LiveRoomMessageComposerModule extends StatefulWidget {
 
 class _LiveRoomMessageComposerModuleState
     extends State<LiveRoomMessageComposerModule> {
+  final VibeImagePickerService _imagePickerService = VibeImagePickerService();
+
   bool _floatingMode = false;
 
   bool get _hasText => widget.controller.text.trim().isNotEmpty;
@@ -105,13 +109,50 @@ class _LiveRoomMessageComposerModuleState
     Navigator.maybePop(context);
   }
 
-  void _handleImageTap() {
+  Future<void> _handleImageTap() async {
     dismissRoomSeatActionPill();
 
     if (!widget.imagesEnabled) {
       RoomToast.show(context, 'Image messages are disabled in this room');
       return;
     }
+
+    widget.focusNode?.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    final action = await VibeImageSourceSheet.show(
+      context: context,
+      title: 'Send image',
+      subtitle:
+          'Choose an image for room chat. For now this is a local picker preview step; backend chat-image upload is next.',
+    );
+
+    if (!mounted || action == null || action.remove) return;
+
+    final source = action.source;
+    if (source == null) return;
+
+    final result = await _imagePickerService.pickImage(
+      source: source,
+      maxBytes: VibeImagePickerService.roomImageMaxBytes,
+    );
+
+    if (!mounted) return;
+
+    if (result.cancelled) return;
+
+    if (result.hasError) {
+      RoomToast.show(context, result.errorMessage!);
+      return;
+    }
+
+    final image = result.image;
+    if (image == null) return;
+
+    RoomToast.show(
+      context,
+      'Image selected · ${image.displayName} · ${image.sizeMb.toStringAsFixed(1)} MB',
+    );
 
     widget.onImageTap();
   }
