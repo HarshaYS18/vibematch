@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import admin, auth, media, moderation, users
+from app.api.routes import admin, auth, media, moderation, users, ws
 from app.api.routes.rooms import rooms
 from app.core.config import settings
 from app.database import Base, engine
@@ -65,3 +65,4 @@ app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(rooms.router)
 app.include_router(media.router)
+app.include_router(ws.router)
