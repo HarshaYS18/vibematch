@@ -83,6 +83,7 @@ class UserMiniProfileSheet extends StatelessWidget {
               children: [
                 _HeaderRow(
                   user: user,
+                  isSelf: _isSelf,
                   showAdminMenu: _showAdminMenu,
                   onMentionTap: onMentionTap,
                   onReportTap: onReportTap,
@@ -97,7 +98,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                   onReceivingLevelTap: onReceivingLevelTap,
                 ),
                 const SizedBox(height: 8),
-                _MetaRow(user: user),
+                _MetaRow(user: user, onFamilyTap: onFamilyTap),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -168,6 +169,7 @@ class UserMiniProfileSheet extends StatelessWidget {
 class _HeaderRow extends StatelessWidget {
   const _HeaderRow({
     required this.user,
+    required this.isSelf,
     required this.showAdminMenu,
     required this.onMentionTap,
     required this.onReportTap,
@@ -176,6 +178,7 @@ class _HeaderRow extends StatelessWidget {
   });
 
   final SeatUser user;
+  final bool isSelf;
   final bool showAdminMenu;
   final VoidCallback onMentionTap;
   final VoidCallback onReportTap;
@@ -217,16 +220,17 @@ class _HeaderRow extends StatelessWidget {
               ),
             ),
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: MiniProfileCornerButton(
-              icon: Icons.alternate_email_rounded,
-              color: RoomColors.aqua,
-              size: 32,
-              iconSize: 17,
-              onTap: onMentionTap,
+          if (!isSelf)
+            Align(
+              alignment: Alignment.centerRight,
+              child: MiniProfileCornerButton(
+                icon: Icons.alternate_email_rounded,
+                color: RoomColors.aqua,
+                size: 32,
+                iconSize: 17,
+                onTap: onMentionTap,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -299,9 +303,13 @@ class _LevelRow extends StatelessWidget {
 }
 
 class _MetaRow extends StatelessWidget {
-  const _MetaRow({required this.user});
+  const _MetaRow({
+    required this.user,
+    required this.onFamilyTap,
+  });
 
   final SeatUser user;
+  final VoidCallback onFamilyTap;
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +321,7 @@ class _MetaRow extends StatelessWidget {
       children: [
         if (user.roleLabel.isNotEmpty)
           _MetaPill(icon: Icons.shield_rounded, label: user.roleLabel),
-        if (user.familyName.trim().isNotEmpty) _FamilyTagPill(user: user),
+        if (user.familyName.trim().isNotEmpty) _FamilyTagPill(user: user, onTap: onFamilyTap),
         _GenderAgePill(user: user),
       ],
     );
@@ -602,9 +610,13 @@ class _GenderAgePill extends StatelessWidget {
 }
 
 class _FamilyTagPill extends StatelessWidget {
-  const _FamilyTagPill({required this.user});
+  const _FamilyTagPill({
+    required this.user,
+    required this.onTap,
+  });
 
   final SeatUser user;
+  final VoidCallback onTap;
 
   String get _familyName {
     final clean = user.familyName.trim();
@@ -681,12 +693,17 @@ class _FamilyTagPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = _style;
 
-    return IntrinsicWidth(
-      child: SizedBox(
-        height: 24,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: IntrinsicWidth(
+          child: SizedBox(
+            height: 24,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
             Padding(
               padding: const EdgeInsets.only(left: 10),
               child: ClipPath(
@@ -782,7 +799,9 @@ class _FamilyTagPill extends StatelessWidget {
                 },
               ),
             ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );

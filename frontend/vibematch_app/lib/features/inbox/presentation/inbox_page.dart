@@ -460,15 +460,13 @@ class _InboxPageState extends State<InboxPage> {
 
   void _openConversation(_InboxConversation conversation) {
     if (conversation.type == _InboxType.strangerGroup) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => _StrangerMessagesPage(
-            conversations: _strangerConversations,
-            isLocked: _isLocked,
-            isBlocked: _isBlocked,
-            onOpenConversation: _openConversation,
-            onShowOptions: _showConversationOptions,
-          ),
+      _openOverlayPage(
+        _StrangerMessagesPage(
+          conversations: _strangerConversations,
+          isLocked: _isLocked,
+          isBlocked: _isBlocked,
+          onOpenConversation: _openConversation,
+          onShowOptions: _showConversationOptions,
         ),
       );
       return;
@@ -506,18 +504,42 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _pushChat(_InboxConversation conversation) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _InboxChatPage(
-          conversation: conversation,
-          isLocked: _isLocked(conversation),
-          isBlocked: _isBlocked(conversation),
-          onMoreTap: () => _showConversationOptions(conversation),
-          onToggleLock: () => _toggleLock(conversation),
-          onToggleBlock: () => _toggleBlock(conversation),
-          onReport: () => _reportProfile(conversation),
-        ),
+    _openOverlayPage(
+      _InboxChatPage(
+        conversation: conversation,
+        isLocked: _isLocked(conversation),
+        isBlocked: _isBlocked(conversation),
+        onMoreTap: () => _showConversationOptions(conversation),
+        onToggleLock: () => _toggleLock(conversation),
+        onToggleBlock: () => _toggleBlock(conversation),
+        onReport: () => _reportProfile(conversation),
       ),
+    );
+  }
+
+  void _openOverlayPage(Widget child) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      builder: (sheetContext) {
+        final height = MediaQuery.sizeOf(sheetContext).height * 0.50;
+
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            height: height,
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAF7F1),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            ),
+            child: child,
+          ),
+        );
+      },
     );
   }
 

@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import '../live_room_models.dart';
 import '../modules/live_room_games_module.dart';
 import '../modules/live_room_gift_module.dart';
-import '../modules/live_room_ribbon_chat_module.dart';
+import '../modules/live_room_message_composer_module.dart';
 import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
@@ -24,12 +24,14 @@ class RoomChatFeed extends StatefulWidget {
     required this.canManageSeatApplications,
     required this.onApproveSeatApplication,
     this.onSenderTap,
+    this.onMentionTap,
   });
 
   final List<ChatEntry> messages;
   final bool canManageSeatApplications;
   final ValueChanged<ChatEntry> onApproveSeatApplication;
   final ValueChanged<ChatEntry>? onSenderTap;
+  final ValueChanged<String>? onMentionTap;
 
   @override
   State<RoomChatFeed> createState() => _RoomChatFeedState();
@@ -107,6 +109,7 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
             message: message,
             canManageSeatApplications: widget.canManageSeatApplications,
             onSenderTap: widget.onSenderTap == null ? null : () => widget.onSenderTap!(message),
+            onMentionTap: widget.onMentionTap,
             onApproveSeatApplication: () => widget.onApproveSeatApplication(message),
           ),
         );
@@ -121,12 +124,14 @@ class _CompactChatLine extends StatelessWidget {
     required this.canManageSeatApplications,
     required this.onApproveSeatApplication,
     this.onSenderTap,
+    this.onMentionTap,
   });
 
   final ChatEntry message;
   final bool canManageSeatApplications;
   final VoidCallback onApproveSeatApplication;
   final VoidCallback? onSenderTap;
+  final ValueChanged<String>? onMentionTap;
 
   @override
   Widget build(BuildContext context) {
@@ -184,8 +189,8 @@ class _CompactChatLine extends StatelessWidget {
                           WidgetSpan(alignment: PlaceholderAlignment.middle, child: VipBadge(level: message.vipLevel, size: VipBadgeSize.tiny, showWhenZero: true)),
                           const TextSpan(text: '  '),
                           TextSpan(text: message.senderName, recognizer: TapGestureRecognizer()..onTap = onSenderTap, style: const TextStyle(color: Colors.white, fontSize: 14.8, fontWeight: FontWeight.w900, height: 1.15)),
-                          const TextSpan(text: '  '),
-                          ..._messageSpans(message),
+                          const TextSpan(text: '\n '),
+                          ..._messageSpans(message, onMentionTap),
                         ],
                       ),
                     ),
@@ -212,19 +217,44 @@ class _CompactChatLine extends StatelessWidget {
     );
   }
 
-  List<TextSpan> _messageSpans(ChatEntry message) {
+  List<TextSpan> _messageSpans(
+    ChatEntry message,
+    ValueChanged<String>? onMentionTap,
+  ) {
     final text = message.message;
-    final mentionRegex = RegExp(r'@\w+');
+    final mentionRegex = RegExp(r'@[\w\u00C0-\uFFFF]+');
     final spans = <TextSpan>[];
     var cursor = 0;
 
     for (final match in mentionRegex.allMatches(text)) {
-      if (match.start > cursor) spans.add(_normalSpan(text.substring(cursor, match.start), message));
-      spans.add(TextSpan(text: text.substring(match.start, match.end), style: const TextStyle(color: RoomColors.aqua, fontSize: 14.2, fontWeight: FontWeight.w900, height: 1.15)));
+      if (match.start > cursor) {
+        spans.add(_normalSpan(text.substring(cursor, match.start), message));
+      }
+
+      final mentionText = text.substring(match.start, match.end);
+      final mentionName = mentionText.substring(1);
+
+      spans.add(
+        TextSpan(
+          text: mentionText,
+          recognizer: TapGestureRecognizer()
+            ..onTap = onMentionTap == null ? null : () => onMentionTap(mentionName),
+          style: const TextStyle(
+            color: RoomColors.aqua,
+            fontSize: 14.2,
+            fontWeight: FontWeight.w900,
+            height: 1.15,
+          ),
+        ),
+      );
+
       cursor = match.end;
     }
 
-    if (cursor < text.length) spans.add(_normalSpan(text.substring(cursor), message));
+    if (cursor < text.length) {
+      spans.add(_normalSpan(text.substring(cursor), message));
+    }
+
     return spans;
   }
 
@@ -312,7 +342,7 @@ class _MessageActionPillItem extends StatelessWidget {
   }
 }
 
-class RoomInputDock extends StatefulWidget {
+class RoomInputDock extends StatelessWidget {
   const RoomInputDock({
     super.key,
     required this.controller,
@@ -340,25 +370,30 @@ class RoomInputDock extends StatefulWidget {
   final VoidCallback onGiftTap;
   final bool imagesEnabled;
 
-  @override
-  State<RoomInputDock> createState() => _RoomInputDockState();
-}
-
-class _RoomInputDockState extends State<RoomInputDock> {
-  static const int _ribbonCoinCost = 1000;
-  static const int _ribbonCharacterLimit = 50;
-  bool _ribbonModeEnabled = false;
-
-  void _runAndHideSeatActions(VoidCallback action) { dismissRoomSeatActionPill(); action(); }
-  void _toggleRibbonMode() { dismissRoomSeatActionPill(); setState(() => _ribbonModeEnabled = !_ribbonModeEnabled); }
-
-  void _sendRibbonMessage() {
+  void _runAndHideSeatActions(VoidCallback action) {
     dismissRoomSeatActionPill();
-    final text = widget.controller.text.trim();
-    if (text.isEmpty) { RoomToast.show(context, 'Enter floating text first'); return; }
-    if (text.length > _ribbonCharacterLimit) { RoomToast.show(context, 'Floating Text limit is $_ribbonCharacterLimit characters'); return; }
-    RoomToast.show(context, 'Floating Text queued • $_ribbonCoinCost coins');
-    widget.onSendTap();
+    action();
+  }
+
+  void _openMessageComposer(BuildContext context) {
+    dismissRoomSeatActionPill();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) => LiveRoomMessageComposerModule(
+        controller: controller,
+        focusNode: focusNode,
+        imagesEnabled: imagesEnabled,
+        onSendText: onSendTap,
+        onImageTap: () {
+          RoomToast.show(context, 'Image message picker will connect here');
+        },
+        onSendFloatingText: onSendTap,
+      ),
+    );
   }
 
   @override
@@ -369,67 +404,72 @@ class _RoomInputDockState extends State<RoomInputDock> {
         builder: (context, constraints) {
           final tiny = constraints.maxWidth < 340;
           final compact = constraints.maxWidth < 380;
-          final gap = tiny ? 3.0 : compact ? 4.0 : 5.0;
-          final horizontalPadding = tiny ? 6.0 : 8.0;
-          final dockButtonSize = tiny ? 31.0 : compact ? 33.0 : 36.0;
-          final dockIconSize = tiny ? 17.0 : compact ? 18.0 : 19.0;
-          final inputHeight = tiny ? 36.0 : 38.0;
-          final inputIconMin = tiny ? 26.0 : 30.0;
-          final inputIconSize = tiny ? 18.0 : 20.0;
-          final showImageButton = constraints.maxWidth >= 330 && !_ribbonModeEnabled;
+          final buttonSize = tiny ? 36.0 : compact ? 38.0 : 40.0;
+          final iconSize = tiny ? 18.0 : compact ? 19.0 : 20.0;
+          final gap = tiny ? 6.0 : 8.0;
+          final horizontalPadding = tiny ? 10.0 : 12.0;
 
           return Container(
-            padding: EdgeInsets.fromLTRB(horizontalPadding, 5, horizontalPadding, 6),
-            decoration: BoxDecoration(color: RoomColors.deep.withValues(alpha: 0.94), border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05)))),
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              7,
+              horizontalPadding,
+              8,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
+            ),
             child: Row(
               children: [
-                _DockButton(icon: Icons.mail_outline_rounded, onTap: () => _runAndHideSeatActions(widget.onInboxTap), badgeCount: widget.inboxUnreadCount, size: dockButtonSize, iconSize: dockIconSize),
-                SizedBox(width: gap),
-                SizedBox(
-                  width: dockButtonSize,
-                  height: dockButtonSize,
-                  child: LiveRoomRibbonChatModule(enabled: _ribbonModeEnabled, coinCost: _ribbonCoinCost, onToggleMode: _toggleRibbonMode, onSendRibbon: _sendRibbonMessage, compact: true),
+                _DockButton(
+                  icon: Icons.emoji_emotions_rounded,
+                  onTap: () => _runAndHideSeatActions(onEmojiTap),
+                  active: true,
+                  size: buttonSize,
+                  iconSize: iconSize,
                 ),
                 SizedBox(width: gap),
-                Expanded(
-                  child: Container(
-                    height: inputHeight,
-                    padding: EdgeInsets.only(left: tiny ? 8 : 10),
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(19), border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: widget.controller,
-                            focusNode: widget.focusNode,
-                            maxLength: _ribbonModeEnabled ? _ribbonCharacterLimit : null,
-                            buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: tiny ? 12.8 : 13.5),
-                            decoration: InputDecoration(hintText: _ribbonModeEnabled ? 'Floating Text...' : 'Message...', hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.36), fontWeight: FontWeight.w800), border: InputBorder.none, isDense: true),
-                            onTap: dismissRoomSeatActionPill,
-                            onSubmitted: (_) => _ribbonModeEnabled ? _sendRibbonMessage() : _runAndHideSeatActions(widget.onSendTap),
-                          ),
-                        ),
-                        if (_ribbonModeEnabled)
-                          Padding(
-                            padding: EdgeInsets.only(right: tiny ? 4 : 6),
-                            child: Text('$_ribbonCoinCost', style: const TextStyle(color: RoomColors.gold, fontSize: 10.5, fontWeight: FontWeight.w900)),
-                          ),
-                        if (showImageButton)
-                          IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: BoxConstraints(minWidth: inputIconMin, minHeight: inputIconMin), onPressed: widget.imagesEnabled ? () => _runAndHideSeatActions(() => RoomToast.show(context, 'Image message picker will connect here')) : null, icon: Icon(Icons.image_rounded, color: Colors.white.withValues(alpha: widget.imagesEnabled ? 0.78 : 0.22), size: inputIconSize)),
-                        if (!_ribbonModeEnabled)
-                          IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: BoxConstraints(minWidth: inputIconMin, minHeight: inputIconMin), onPressed: () => _runAndHideSeatActions(widget.onEmojiTap), icon: Icon(Icons.emoji_emotions_rounded, color: RoomColors.gold, size: inputIconSize)),
-                        IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: BoxConstraints(minWidth: inputIconMin, minHeight: inputIconMin), onPressed: _ribbonModeEnabled ? _sendRibbonMessage : () => _runAndHideSeatActions(widget.onSendTap), icon: Icon(Icons.send_rounded, color: _ribbonModeEnabled ? RoomColors.gold : RoomColors.aqua, size: inputIconSize + 1)),
-                      ],
-                    ),
+                _DockButton(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  onTap: () => _openMessageComposer(context),
+                  size: buttonSize,
+                  iconSize: iconSize,
+                ),
+                SizedBox(width: gap),
+                _DockButton(
+                  icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                  onTap: () => _runAndHideSeatActions(onMicTap),
+                  active: !micMuted,
+                  muted: micMuted,
+                  size: buttonSize,
+                  iconSize: iconSize,
+                ),
+                const Spacer(),
+                _DockButton(
+                  icon: Icons.mail_outline_rounded,
+                  onTap: () => _runAndHideSeatActions(onInboxTap),
+                  badgeCount: inboxUnreadCount,
+                  size: buttonSize,
+                  iconSize: iconSize,
+                ),
+                SizedBox(width: gap),
+                SizedBox(
+                  width: buttonSize,
+                  height: buttonSize,
+                  child: LiveRoomGamesModule(
+                    onOpenGames: () => _runAndHideSeatActions(onGamesTap),
+                    compact: true,
                   ),
                 ),
                 SizedBox(width: gap),
-                _DockButton(icon: widget.micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(widget.onMicTap), active: !widget.micMuted, muted: widget.micMuted, size: dockButtonSize, iconSize: dockIconSize),
-                SizedBox(width: gap),
-                SizedBox(width: dockButtonSize, height: dockButtonSize, child: LiveRoomGamesModule(onOpenGames: () => _runAndHideSeatActions(widget.onGamesTap), compact: true)),
-                SizedBox(width: gap),
-                SizedBox(width: dockButtonSize, height: dockButtonSize, child: LiveRoomGiftModule(onOpenGiftPanel: () => _runAndHideSeatActions(widget.onGiftTap), comboActive: false)),
+                SizedBox(
+                  width: buttonSize,
+                  height: buttonSize,
+                  child: LiveRoomGiftModule(
+                    onOpenGiftPanel: () => _runAndHideSeatActions(onGiftTap),
+                    comboActive: false,
+                  ),
+                ),
               ],
             ),
           );
@@ -453,7 +493,6 @@ class _DockButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = muted ? RoomColors.coral.withValues(alpha: 0.22) : active ? RoomColors.aqua.withValues(alpha: 0.24) : Colors.white.withValues(alpha: 0.055);
     final iconColor = muted ? RoomColors.coral : active ? RoomColors.aqua : Colors.white;
     return Material(
       color: Colors.transparent,
@@ -464,7 +503,15 @@ class _DockButton extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: gift ? const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]) : null, color: gift ? null : bg, border: Border.all(color: Colors.white.withValues(alpha: 0.09))), child: Icon(icon, color: gift ? Colors.white : iconColor, size: iconSize)),
+            Container(
+              width: size,
+              height: size,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.transparent,
+              ),
+              child: Icon(icon, color: iconColor, size: iconSize),
+            ),
             if (badgeCount > 0)
               Positioned(right: -2, top: -3, child: Container(constraints: const BoxConstraints(minWidth: 16, minHeight: 16), padding: const EdgeInsets.symmetric(horizontal: 4), alignment: Alignment.center, decoration: BoxDecoration(color: RoomColors.coral, borderRadius: BorderRadius.circular(999), border: Border.all(color: RoomColors.deep, width: 1)), child: Text(badgeCount > 99 ? '99+' : '$badgeCount', style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900)))),
           ],

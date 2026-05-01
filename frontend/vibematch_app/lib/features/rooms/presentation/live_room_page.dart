@@ -4,8 +4,10 @@ import '../../inbox/presentation/inbox_page.dart';
 import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
+import 'controllers/live_room_mention_text_controller.dart';
 import 'controllers/live_room_moderation_controller.dart';
 import 'controllers/live_room_navigation_controller.dart';
+import 'controllers/live_room_profile_navigator.dart';
 import 'controllers/live_room_seat_controller.dart';
 import 'controllers/live_room_sheet_controller.dart';
 import 'controllers/live_room_settings_controller.dart';
@@ -13,6 +15,7 @@ import 'controllers/live_room_state_controller.dart';
 import 'controllers/live_room_users_controller.dart';
 import 'controllers/live_room_vibesync_controller.dart';
 import 'live_room_models.dart';
+import 'modules/live_room_message_composer_module.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_background_sheet.dart';
 import 'widgets/live_room_body.dart';
@@ -58,7 +61,7 @@ class LiveRoomPage extends StatefulWidget {
 }
 
 class _LiveRoomPageState extends State<LiveRoomPage> {
-  late final TextEditingController _messageController;
+  late final LiveRoomMentionTextController _messageController;
   late final TextEditingController _announcementController;
   late final FocusNode _messageFocusNode;
   late final LiveRoomStateController _roomStateController;
@@ -114,7 +117,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   @override
   void initState() {
     super.initState();
-    _messageController = TextEditingController();
+    _messageController = LiveRoomMentionTextController();
     _announcementController = TextEditingController();
     _messageFocusNode = FocusNode();
     _roomStateController = LiveRoomStateController(
@@ -257,6 +260,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onUnlock: _seatController.unlockSeat,
               onApproveSeatApplication: _approveSeatApplication,
               onSenderTap: _openMiniProfileFromChat,
+              onMentionTap: _openMentionedUserProfile,
               onDismissOverlays: _dismissRoomOverlays,
               onInboxTap: _openInboxPage,
               onEmojiTap: _openEmojiTray,
@@ -424,7 +428,62 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     if (toastMessage != null) RoomToast.show(context, toastMessage);
   }
 
-  void _mentionUser(SeatUser user) { Navigator.pop(context); final mention = '@${user.name} '; final current = _messageController.text; _messageController.text = current.endsWith(' ') || current.isEmpty ? '$current$mention' : '$current $mention'; _messageController.selection = TextSelection.collapsed(offset: _messageController.text.length); _messageFocusNode.requestFocus(); }
+  void _mentionUser(SeatUser user) {
+    Navigator.pop(context);
+
+    _messageController.insertMention(user.name);
+
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
+      if (!mounted) return;
+      _openMessageComposerWithMention();
+    });
+  }
+
+  void _openMentionedUserProfile(String mentionName) {
+    final cleanMention = mentionName.trim().toLowerCase();
+    if (cleanMention.isEmpty) return;
+
+    final user = _allRoomUsers.where((item) {
+      final cleanName = item.name.trim().toLowerCase();
+      final cleanUsername = cleanName.replaceAll(' ', '_');
+      return cleanName == cleanMention ||
+          cleanUsername == cleanMention ||
+          cleanName.replaceAll(' ', '') == cleanMention.replaceAll('_', '');
+    }).firstOrNull;
+
+    if (user == null) {
+      RoomToast.show(context, '@$mentionName profile not found in this room');
+      return;
+    }
+
+    LiveRoomProfileNavigator.openExistingPublicProfile(
+      context: context,
+      user: user,
+      privacyMode: _privacyMode,
+      roomName: _roomName,
+    );
+  }
+  void _openMessageComposerWithMention() {
+    _clearRoomFocus();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) => LiveRoomMessageComposerModule(
+        controller: _messageController,
+        focusNode: _messageFocusNode,
+        imagesEnabled: _roomImagesEnabled,
+        onSendText: _sendMessage,
+        onImageTap: () {
+          RoomToast.show(context, 'Image message picker will connect here');
+        },
+        onSendFloatingText: _sendMessage,
+      ),
+    );
+  }
+
   void _setUserAsAdmin(String userId) { Navigator.pop(context); _seatController.setUserAsAdmin(userId); _clearRoomFocus(); }
   void _removeUserAsAdmin(String userId) { Navigator.pop(context); _seatController.removeUserAsAdmin(userId); _clearRoomFocus(); }
   void _addRoomAdminFromInfo(SeatUser user) { _seatController.setUserAsAdmin(user.id); _clearRoomFocus(); }
@@ -437,7 +496,34 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomGiftPanelSheet(gifts: mockGiftItems, users: _roomUsers, selectedCategory: _giftController.selectedCategory, selectedGift: _giftController.selectedGift, selectedReceiverIds: _giftController.selectedReceiverIds, selectedCombo: _giftController.selectedCombo, coinBalance: _giftController.coinBalance, onCategoryChanged: _giftController.selectCategory, onGiftSelected: _giftController.selectGift, onReceiverToggle: (id) => _giftController.toggleReceiver(id, _roomUsers), onComboChanged: _giftController.setCombo, onSend: () { Navigator.pop(context); _giftController.sendGift(_roomUsers); }, onRecharge: () => RoomToast.show(context, 'Wallet / coin recharge opened')));
   }
 
-  void _openInboxPage() { _clearRoomFocus(); _roomStateController.clearInboxUnreadCount(); Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxPage())); }
+  void _openInboxPage() {
+    _clearRoomFocus();
+    _roomStateController.clearInboxUnreadCount();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      builder: (sheetContext) {
+        final height = MediaQuery.sizeOf(sheetContext).height * 0.50;
+
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            height: height,
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            ),
+            child: const InboxPage(),
+          ),
+        );
+      },
+    );
+  }
   void _openInboxPageFromSheet(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openInboxPage(); }); }
   void _openEmojiTray() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomEmojiSheet(onEmojiTap: (emoji) { Navigator.pop(context); RoomToast.show(context, '$emoji reaction will animate over avatar'); })); }
 

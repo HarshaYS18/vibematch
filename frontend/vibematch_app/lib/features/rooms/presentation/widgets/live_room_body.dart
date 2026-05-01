@@ -42,6 +42,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.onUnlock,
     required this.onApproveSeatApplication,
     required this.onSenderTap,
+    required this.onMentionTap,
     required this.onDismissOverlays,
     required this.onInboxTap,
     required this.onEmojiTap,
@@ -85,6 +86,7 @@ class LiveRoomBody extends StatelessWidget {
   final ValueChanged<int> onUnlock;
   final ValueChanged<ChatEntry> onApproveSeatApplication;
   final ValueChanged<ChatEntry> onSenderTap;
+  final ValueChanged<String> onMentionTap;
   final VoidCallback onDismissOverlays;
   final VoidCallback onInboxTap;
   final VoidCallback onEmojiTap;
@@ -147,6 +149,7 @@ class LiveRoomBody extends StatelessWidget {
                   canManageSeatApplications: canManageSeatApplications,
                   onApproveSeatApplication: onApproveSeatApplication,
                   onSenderTap: onSenderTap,
+                  onMentionTap: onMentionTap,
                 ),
               ),
             ),

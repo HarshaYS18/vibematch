@@ -45,6 +45,7 @@ class RoomInfoSheet extends StatefulWidget {
 class _RoomInfoSheetState extends State<RoomInfoSheet> {
   late List<SeatUser> _admins;
   late List<SeatUser> _availableAdminUsers;
+  late List<SeatUser> _members;
   late final PageController _pageController;
   _RoomInfoTab _selectedTab = _RoomInfoTab.roomInfo;
 
@@ -73,9 +74,10 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
   void _syncFromWidget() {
     _admins = List<SeatUser>.from(widget.admins);
     _availableAdminUsers = List<SeatUser>.from(widget.availableAdminUsers);
+    _members = _buildInitialMembers();
   }
 
-  List<SeatUser> get _members {
+  List<SeatUser> _buildInitialMembers() {
     final users = <SeatUser>[];
     final ids = <String>{};
 
@@ -135,6 +137,21 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
     });
 
     widget.onRemoveAdmin(user);
+  }
+
+  void _removeMember(SeatUser user) {
+    if (user.isHost) {
+      RoomToast.show(context, 'Room owner cannot be removed');
+      return;
+    }
+
+    setState(() {
+      _members.removeWhere((item) => item.id == user.id);
+      _admins.removeWhere((item) => item.id == user.id);
+      _availableAdminUsers.removeWhere((item) => item.id == user.id);
+    });
+
+    RoomToast.show(context, '${user.name} removed from room members');
   }
 
   @override
@@ -204,7 +221,11 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
                   onOpenAddAdminSheet: _openAddAdminSheet,
                   onRemoveAdmin: _removeAdmin,
                 ),
-                _MembersPage(members: _members),
+                _MembersPage(
+                  members: _members,
+                  canManageMembers: widget.canManageAdmins,
+                  onRemoveMember: _removeMember,
+                ),
               ],
             ),
           ),
@@ -520,17 +541,50 @@ class _AdminsPage extends StatelessWidget {
 }
 
 class _MembersPage extends StatelessWidget {
-  const _MembersPage({required this.members});
+  const _MembersPage({
+    required this.members,
+    required this.canManageMembers,
+    required this.onRemoveMember,
+  });
 
   final List<SeatUser> members;
+  final bool canManageMembers;
+  final ValueChanged<SeatUser> onRemoveMember;
 
   @override
   Widget build(BuildContext context) {
+    if (members.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: RoomColors.pearl,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: RoomColors.softLine),
+        ),
+        child: const Text(
+          'No members found.',
+          style: TextStyle(
+            color: Color(0xFF82758E),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+    }
+
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
       itemCount: members.length,
       separatorBuilder: (context, index) => const SizedBox(height: 7),
-      itemBuilder: (context, index) => _MemberTile(user: members[index]),
+      itemBuilder: (context, index) {
+        final member = members[index];
+        return _MemberTile(
+          user: member,
+          canManage: canManageMembers && !member.isHost,
+          onRemove: () => onRemoveMember(member),
+        );
+      },
     );
   }
 }
@@ -730,9 +784,15 @@ class _AdminTile extends StatelessWidget {
 }
 
 class _MemberTile extends StatelessWidget {
-  const _MemberTile({required this.user});
+  const _MemberTile({
+    required this.user,
+    required this.canManage,
+    required this.onRemove,
+  });
 
   final SeatUser user;
+  final bool canManage;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -743,6 +803,18 @@ class _MemberTile extends StatelessWidget {
           : user.isRoomAdmin
               ? 'Room Admin'
               : 'Member',
+      trailing: canManage
+          ? IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Remove member',
+              onPressed: onRemove,
+              icon: const Icon(
+                Icons.remove_circle_rounded,
+                color: RoomColors.coral,
+                size: 20,
+              ),
+            )
+          : null,
     );
   }
 }
