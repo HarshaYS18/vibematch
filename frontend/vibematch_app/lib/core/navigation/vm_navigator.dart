@@ -34,16 +34,13 @@ class VmNavigator {
     required String modeTitle,
     required int onlineCount,
   }) {
-    return Navigator.pushNamed<T>(
+    return openLiveRoom<T>(
       context,
-      VmRoutes.roomPreview,
-      arguments: RoomPreviewRouteArgs(
-        roomName: roomName,
-        roomId: roomId,
-        language: language,
-        modeTitle: modeTitle,
-        onlineCount: onlineCount,
-      ),
+      roomName: roomName,
+      roomId: roomId,
+      language: language,
+      modeTitle: modeTitle,
+      onlineCount: onlineCount,
     );
   }
 
