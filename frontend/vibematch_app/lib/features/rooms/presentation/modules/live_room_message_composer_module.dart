@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/media/image_picker_service.dart';
 import '../../../../core/media/image_source_sheet.dart';
+import '../../../../core/media/media_upload_service.dart';
 import '../widgets/room_seats.dart';
 import '../widgets/room_theme.dart';
 
@@ -34,8 +35,10 @@ class LiveRoomMessageComposerModule extends StatefulWidget {
 class _LiveRoomMessageComposerModuleState
     extends State<LiveRoomMessageComposerModule> {
   final VibeImagePickerService _imagePickerService = VibeImagePickerService();
+  final MediaUploadService _mediaUploadService = const MediaUploadService();
 
   bool _floatingMode = false;
+  bool _sendingImage = false;
 
   bool get _hasText => widget.controller.text.trim().isNotEmpty;
 
@@ -112,6 +115,8 @@ class _LiveRoomMessageComposerModuleState
   Future<void> _handleImageTap() async {
     dismissRoomSeatActionPill();
 
+    if (_sendingImage) return;
+
     if (!widget.imagesEnabled) {
       RoomToast.show(context, 'Image messages are disabled in this room');
       return;
@@ -123,8 +128,7 @@ class _LiveRoomMessageComposerModuleState
     final action = await VibeImageSourceSheet.show(
       context: context,
       title: 'Send image',
-      subtitle:
-          'Choose an image for room chat. Local image bubbles work now; backend CDN upload is next.',
+      subtitle: 'Choose an image for room chat.',
     );
 
     if (!mounted || action == null || action.remove) return;
@@ -149,17 +153,34 @@ class _LiveRoomMessageComposerModuleState
     final image = result.image;
     if (image == null) return;
 
-    widget.controller.text = _localImageMessagePayload(image);
+    setState(() => _sendingImage = true);
+    final uploaded = await _mediaUploadService.uploadChatImage(image);
+    if (!mounted) return;
+    setState(() => _sendingImage = false);
+
+    if (uploaded.hasError) {
+      RoomToast.show(context, uploaded.errorMessage!);
+      return;
+    }
+
+    final media = uploaded.media;
+    if (media == null) {
+      RoomToast.show(context, 'Image send failed.');
+      return;
+    }
+
+    widget.controller.text = _imageMessagePayload(media);
     widget.onSendText();
     widget.controller.clear();
 
     Navigator.maybePop(context);
   }
 
-  String _localImageMessagePayload(PickedVibeImage image) {
-    return 'vm-local-image://${Uri.encodeComponent(image.file.path)}'
-        '?name=${Uri.encodeComponent(image.displayName)}'
-        '&size=${image.sizeBytes}';
+  String _imageMessagePayload(MediaUploadResponse media) {
+    return 'vm-cdn-image://${Uri.encodeComponent(media.publicUrl)}'
+        '?storage_key=${Uri.encodeComponent(media.storageKey)}'
+        '&name=${Uri.encodeComponent(media.filename)}'
+        '&size=${media.sizeBytes}';
   }
 
   @override
@@ -216,10 +237,12 @@ class _LiveRoomMessageComposerModuleState
             Row(
               children: [
                 _ComposerRoundButton(
-                  icon: Icons.image_rounded,
-                  enabled: widget.imagesEnabled,
+                  icon: _sendingImage
+                      ? Icons.hourglass_top_rounded
+                      : Icons.image_rounded,
+                  enabled: widget.imagesEnabled && !_sendingImage,
                   active: widget.imagesEnabled,
-                  disabledTooltip: 'Images disabled',
+                  disabledTooltip: _sendingImage ? 'Sending image' : 'Images disabled',
                   onTap: _handleImageTap,
                 ),
                 const SizedBox(width: 9),
@@ -269,9 +292,11 @@ class _LiveRoomMessageComposerModuleState
                               fontWeight: FontWeight.w800,
                             ),
                             decoration: InputDecoration(
-                              hintText: _floatingMode
-                                  ? 'Floating message...'
-                                  : 'Send a message...',
+                              hintText: _sendingImage
+                                  ? 'Sending image...'
+                                  : _floatingMode
+                                      ? 'Floating message...'
+                                      : 'Send a message...',
                               hintStyle: const TextStyle(
                                 color: Color(0xFFB0A8B7),
                                 fontSize: 14,
@@ -302,7 +327,7 @@ class _LiveRoomMessageComposerModuleState
                 ),
                 const SizedBox(width: 9),
                 _ComposerSendButton(
-                  enabled: _hasText && !overLimit,
+                  enabled: _hasText && !overLimit && !_sendingImage,
                   floatingMode: _floatingMode,
                   onTap: _send,
                 ),
@@ -427,7 +452,7 @@ class _ComposerRoundButton extends StatelessWidget {
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
-          onTap: onTap,
+          onTap: enabled ? onTap : null,
           child: SizedBox(
             width: 44,
             height: 44,
@@ -519,7 +544,7 @@ class _ComposerSendButton extends StatelessWidget {
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         child: SizedBox(
           width: 48,
           height: 48,
