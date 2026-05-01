@@ -36,3 +36,22 @@ class LoginHistoryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RoomRealtimeAuditLogResponse(BaseModel):
+    id: int
+    room_id: str
+    event_type: str
+    actor_user_id: str | None = None
+    actor_name: str | None = None
+    target_user_id: str | None = None
+    seat_index: int | None = None
+    from_seat_index: int | None = None
+    to_seat_index: int | None = None
+    request_id: str | None = None
+    reason: str | None = None
+    metadata_json: dict | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
