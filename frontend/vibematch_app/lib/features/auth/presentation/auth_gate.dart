@@ -62,7 +62,7 @@ class _AuthGateState extends State<AuthGate> {
 
     try {
       await _authApiService.devLogin(
-        email: 'founder@vibematch.com',
+        email: 'sreeharshareddyyeddula@gmail.com',
         username: 'founder',
         displayName: 'Founder Owner',
       );
