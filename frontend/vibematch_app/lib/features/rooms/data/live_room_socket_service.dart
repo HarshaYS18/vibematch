@@ -112,6 +112,109 @@ class LiveRoomSocketService {
     );
   }
 
+  void sendSeatOccupy({
+    required String roomId,
+    required String userId,
+    required int seatIndex,
+  }) {
+    sendEvent(
+      type: 'room.seat.occupy',
+      roomId: roomId,
+      userId: userId,
+      requestId: 'seat-occupy-${DateTime.now().millisecondsSinceEpoch}',
+      payload: {'seat_index': seatIndex},
+    );
+  }
+
+  void sendSeatLeave({
+    required String roomId,
+    required String userId,
+    required int seatIndex,
+  }) {
+    sendEvent(
+      type: 'room.seat.leave',
+      roomId: roomId,
+      userId: userId,
+      requestId: 'seat-leave-${DateTime.now().millisecondsSinceEpoch}',
+      payload: {'seat_index': seatIndex},
+    );
+  }
+
+  void sendSeatSwitch({
+    required String roomId,
+    required String userId,
+    required int fromSeatIndex,
+    required int toSeatIndex,
+  }) {
+    sendEvent(
+      type: 'room.seat.switch',
+      roomId: roomId,
+      userId: userId,
+      requestId: 'seat-switch-${DateTime.now().millisecondsSinceEpoch}',
+      payload: {
+        'from_seat_index': fromSeatIndex,
+        'to_seat_index': toSeatIndex,
+      },
+    );
+  }
+
+  void sendSeatLock({
+    required String roomId,
+    required String userId,
+    required int seatIndex,
+  }) {
+    sendEvent(
+      type: 'room.seat.lock',
+      roomId: roomId,
+      userId: userId,
+      requestId: 'seat-lock-${DateTime.now().millisecondsSinceEpoch}',
+      payload: {'seat_index': seatIndex},
+    );
+  }
+
+  void sendSeatUnlock({
+    required String roomId,
+    required String userId,
+    required int seatIndex,
+  }) {
+    sendEvent(
+      type: 'room.seat.unlock',
+      roomId: roomId,
+      userId: userId,
+      requestId: 'seat-unlock-${DateTime.now().millisecondsSinceEpoch}',
+      payload: {'seat_index': seatIndex},
+    );
+  }
+
+  void sendSelfMute({
+    required String roomId,
+    required String userId,
+    required bool muted,
+  }) {
+    sendEvent(
+      type: muted ? 'room.mic.self_mute' : 'room.mic.self_unmute',
+      roomId: roomId,
+      userId: userId,
+      requestId: 'self-mute-${DateTime.now().millisecondsSinceEpoch}',
+      payload: {'target_user_id': userId, 'muted': muted},
+    );
+  }
+
+  void sendAdminMute({
+    required String roomId,
+    required String userId,
+    required String targetUserId,
+    required bool muted,
+  }) {
+    sendEvent(
+      type: muted ? 'room.mic.admin_mute' : 'room.mic.admin_unmute',
+      roomId: roomId,
+      userId: userId,
+      requestId: 'admin-mute-${DateTime.now().millisecondsSinceEpoch}',
+      payload: {'target_user_id': targetUserId, 'muted': muted},
+    );
+  }
+
   void sendEvent({
     required String type,
     String? roomId,
