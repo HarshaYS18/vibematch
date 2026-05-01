@@ -33,6 +33,10 @@ logs/
 # Database / local data
 *.sqlite3
 *.db
+backend/storage/media/**
+!backend/storage/
+!backend/storage/media/
+!backend/storage/media/.gitkeep
 
 # Flutter / Dart
 .dart_tool/
