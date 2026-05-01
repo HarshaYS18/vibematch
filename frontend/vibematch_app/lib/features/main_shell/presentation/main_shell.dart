@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
-import '../../create/presentation/create_page.dart';
+import '../../create/presentation/create_modular_page.dart';
 import '../../home/presentation/home_page.dart';
 import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/me_page.dart';
@@ -80,7 +80,7 @@ class _MainShellState extends State<MainShell> {
         user: activeUser,
       ),
       const VibesPage(),
-      const CreatePage(),
+      const CreateModularPage(),
       const InboxPage(),
       MePage(
         user: activeUser,
