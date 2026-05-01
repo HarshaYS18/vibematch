@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../constants/app_constants.dart';
 import 'image_picker_service.dart';
@@ -99,6 +100,7 @@ class MediaUploadService {
           'file',
           image.file.path,
           filename: image.displayName,
+          contentType: _contentTypeForExtension(image.extension),
         ),
       );
 
@@ -136,6 +138,20 @@ class MediaUploadService {
   Uri _buildUri(String endpointPath) {
     final base = Uri.parse(_baseUrl);
     return base.replace(path: endpointPath);
+  }
+
+  MediaType _contentTypeForExtension(String extension) {
+    final clean = extension.toLowerCase().replaceAll('.', '').trim();
+    return switch (clean) {
+      'jpg' || 'jpeg' => MediaType('image', 'jpeg'),
+      'png' => MediaType('image', 'png'),
+      'webp' => MediaType('image', 'webp'),
+      'gif' => MediaType('image', 'gif'),
+      'heic' => MediaType('image', 'heic'),
+      'heif' => MediaType('image', 'heif'),
+      'apng' => MediaType('image', 'apng'),
+      _ => MediaType('image', 'jpeg'),
+    };
   }
 
   String _absolutePublicUrl(String publicUrl) {
