@@ -6,6 +6,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from app.schemas.websocket import WebSocketEnvelope
+from app.services.room_realtime_audit_service import room_realtime_audit_service
 from app.services.room_realtime_state_service import room_realtime_state_service
 from app.services.websocket_connection_manager import websocket_manager
 
@@ -214,6 +215,16 @@ async def _handle_room_state_event(
 ) -> None:
     event_type = ROOM_STATE_EVENT_TYPES[envelope.type]
     payload = dict(envelope.payload)
+
+    room_realtime_audit_service.log_event(
+        room_id=room_id,
+        event_type=envelope.type,
+        actor_user_id=user_id,
+        actor_name=display_name,
+        request_id=envelope.request_id,
+        payload=payload,
+    )
+
     room_state = room_realtime_state_service.apply_event(
         room_id=room_id,
         event_type=envelope.type,
