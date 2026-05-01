@@ -60,19 +60,7 @@ class LiveRoomSeatController {
   }
 
   void occupySeat(int index) {
-    final oldIndex = seats.indexWhere(
-      (seat) => seat.user?.id == currentUser.id,
-    );
-
-    if (oldIndex >= 0) {
-      seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
-    }
-
-    seats[index] = seats[index].copyWith(
-      user: currentUser,
-      locked: false,
-    );
-
+    _placeUserOnSeat(user: currentUser, seatIndex: index);
     selectedSeatIndex = null;
     onChanged();
   }
@@ -305,6 +293,131 @@ class LiveRoomSeatController {
     onChanged();
     onToast('${seatedUser.name} left seat ${seatIndex + 1}');
   }
+
+  void applyRemoteSeatOccupy({
+    required int seatIndex,
+    required String userId,
+    required String displayName,
+  }) {
+    if (!_isValidSeatIndex(seatIndex)) return;
+    final user = _resolveRemoteUser(userId: userId, displayName: displayName);
+    _placeUserOnSeat(user: user, seatIndex: seatIndex);
+    selectedSeatIndex = null;
+    onChanged();
+  }
+
+  void applyRemoteSeatLeave({required int seatIndex}) {
+    if (!_isValidSeatIndex(seatIndex)) return;
+    seats[seatIndex] = seats[seatIndex].copyWith(clearUser: true);
+    selectedSeatIndex = null;
+    onChanged();
+  }
+
+  void applyRemoteSeatSwitch({
+    required int fromSeatIndex,
+    required int toSeatIndex,
+    required String userId,
+    required String displayName,
+  }) {
+    if (!_isValidSeatIndex(toSeatIndex)) return;
+    if (_isValidSeatIndex(fromSeatIndex)) {
+      seats[fromSeatIndex] = seats[fromSeatIndex].copyWith(clearUser: true);
+    }
+    final user = _resolveRemoteUser(userId: userId, displayName: displayName);
+    seats[toSeatIndex] = seats[toSeatIndex].copyWith(user: user, locked: false);
+    selectedSeatIndex = null;
+    onChanged();
+  }
+
+  void applyRemoteSeatLock({required int seatIndex}) {
+    if (!_isValidSeatIndex(seatIndex)) return;
+    seats[seatIndex] = seats[seatIndex].copyWith(locked: true, clearUser: true);
+    selectedSeatIndex = null;
+    onChanged();
+  }
+
+  void applyRemoteSeatUnlock({required int seatIndex}) {
+    if (!_isValidSeatIndex(seatIndex)) return;
+    seats[seatIndex] = seats[seatIndex].copyWith(locked: false);
+    selectedSeatIndex = null;
+    onChanged();
+  }
+
+  void applyRemoteSelfMute({
+    required String userId,
+    required bool muted,
+  }) {
+    final index = seats.indexWhere((seat) => seat.user?.id == userId);
+    if (index < 0) return;
+    final user = seats[index].user!;
+    seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: muted));
+    if (userId == currentUser.id) micMuted = muted;
+    onChanged();
+  }
+
+  void applyRemoteAdminMute({
+    required String userId,
+    required bool muted,
+  }) {
+    final index = seats.indexWhere((seat) => seat.user?.id == userId);
+    if (index < 0) return;
+    final user = seats[index].user!;
+    seats[index] = seats[index].copyWith(user: user.copyWith(adminMuted: muted));
+    onChanged();
+  }
+
+  void _placeUserOnSeat({
+    required SeatUser user,
+    required int seatIndex,
+  }) {
+    if (!_isValidSeatIndex(seatIndex)) return;
+
+    final oldIndex = seats.indexWhere((seat) => seat.user?.id == user.id);
+    if (oldIndex >= 0) {
+      seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
+    }
+
+    seats[seatIndex] = seats[seatIndex].copyWith(user: user, locked: false);
+  }
+
+  SeatUser _resolveRemoteUser({
+    required String userId,
+    required String displayName,
+  }) {
+    for (final seat in seats) {
+      final user = seat.user;
+      if (user?.id == userId) return user!;
+    }
+
+    for (final user in mockRoomUsers) {
+      if (user.id == userId) return user;
+    }
+
+    for (final user in mockInviteUsers) {
+      if (user.id == userId) return user;
+    }
+
+    return SeatUser(
+      id: userId,
+      name: displayName.trim().isEmpty ? 'Guest' : displayName,
+      roleLabel: 'Member',
+      familyName: '',
+      relationshipText: '',
+      vipLevel: 0,
+      sendingLevel: 0,
+      receivingLevel: 0,
+      sentExp: 0,
+      receivedExp: 0,
+      medals: const [],
+      avatarColors: const [
+        Color(0xFF18C7B7),
+        Color(0xFF6C63FF),
+      ],
+      isCurrentUser: userId == currentUser.id,
+    );
+  }
+
+  bool _isValidSeatIndex(int index) => index >= 0 && index < seats.length;
 }
 
 typedef VoidCallbackLike = void Function();
