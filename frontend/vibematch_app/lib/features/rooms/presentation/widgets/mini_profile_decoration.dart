@@ -47,7 +47,7 @@ class MiniProfileDecoration extends StatelessWidget {
           ),
           if (showHeaderDecoration)
             const Positioned(
-              top: -61,
+              top: -4.25,
               left: -36,
               right: -36,
               child: MiniProfileHeaderDecoration(),
