@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -133,6 +135,8 @@ class _CompactChatLine extends StatelessWidget {
   final VoidCallback? onSenderTap;
   final ValueChanged<String>? onMentionTap;
 
+  bool get _isLocalImageMessage => message.message.startsWith('vm-local-image://');
+
   @override
   Widget build(BuildContext context) {
     final showAgree = message.isSeatApplication && canManageSeatApplications && !message.applicationApproved;
@@ -151,6 +155,13 @@ class _CompactChatLine extends StatelessWidget {
             style: const TextStyle(color: RoomColors.gold, fontSize: 14.5, fontWeight: FontWeight.w900, height: 1.15),
           ),
         ),
+      );
+    }
+
+    if (_isLocalImageMessage) {
+      return _LocalImageChatLine(
+        message: message,
+        onSenderTap: onSenderTap,
       );
     }
 
@@ -275,6 +286,130 @@ class _CompactChatLine extends StatelessWidget {
   }
 }
 
+class _LocalImageChatLine extends StatelessWidget {
+  const _LocalImageChatLine({
+    required this.message,
+    this.onSenderTap,
+  });
+
+  final ChatEntry message;
+  final VoidCallback? onSenderTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = _LocalImagePayload.parse(message.message);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onSenderTap,
+            child: CircleAvatar(
+              radius: 13.5,
+              backgroundColor: RoomColors.violet,
+              child: Text(
+                avatarLetter(message.senderName),
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: _TransparentUserMessageFlexBox(
+              messageText: '${message.senderName} sent an image',
+              enableMessageActions: false,
+              onTap: onSenderTap,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      VipBadge(level: message.vipLevel, size: VipBadgeSize.tiny, showWhenZero: true),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          message.senderName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14.8,
+                            fontWeight: FontWeight.w900,
+                            height: 1.15,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 180,
+                      height: 128,
+                      child: Image.file(
+                        File(image.path),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.broken_image_rounded,
+                            color: RoomColors.gold,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    image.name.isEmpty ? 'Image message' : image.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocalImagePayload {
+  const _LocalImagePayload({
+    required this.path,
+    required this.name,
+    required this.sizeBytes,
+  });
+
+  final String path;
+  final String name;
+  final int sizeBytes;
+
+  static _LocalImagePayload parse(String raw) {
+    final uri = Uri.parse(raw);
+    final encodedPath = uri.host + uri.path;
+    return _LocalImagePayload(
+      path: Uri.decodeComponent(encodedPath),
+      name: uri.queryParameters['name'] ?? '',
+      sizeBytes: int.tryParse(uri.queryParameters['size'] ?? '') ?? 0,
+    );
+  }
+}
+
 enum _ChatMessageAction { copy, report }
 
 class _TransparentUserMessageFlexBox extends StatelessWidget {
@@ -388,9 +523,7 @@ class RoomInputDock extends StatelessWidget {
         focusNode: focusNode,
         imagesEnabled: imagesEnabled,
         onSendText: onSendTap,
-        onImageTap: () {
-          RoomToast.show(context, 'Image message picker will connect here');
-        },
+        onImageTap: () {},
         onSendFloatingText: onSendTap,
       ),
     );
