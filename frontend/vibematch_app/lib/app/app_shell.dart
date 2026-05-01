@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/admin/presentation/founder_control_center_page.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/create/presentation/create_page.dart';
 import '../features/home/presentation/home_page_modular.dart';
@@ -45,6 +46,11 @@ class _AppShellState extends State<AppShell> {
   }
 
   bool get _isTestingAsFounder => _devUserMode == _DevUserMode.founder;
+
+  bool get _canOpenFounderControlCenter {
+    final role = _activeUser.primaryRole.toLowerCase().trim();
+    return role == 'founder_owner' || role == 'super_owner' || role == 'owner';
+  }
 
   List<Widget> get _pages {
     final activeUser = _activeUser;
@@ -96,6 +102,14 @@ class _AppShellState extends State<AppShell> {
       );
   }
 
+  void _openFounderControlCenter() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const FounderControlCenterPage(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeUser = _activeUser;
@@ -120,6 +134,10 @@ class _AppShellState extends State<AppShell> {
               ),
             ],
           ),
+          if (_canOpenFounderControlCenter)
+            _ControlCenterQuickButton(
+              onTap: _openFounderControlCenter,
+            ),
           const _LiveRoomMiniBubbleLayer(),
         ],
       ),
@@ -127,6 +145,54 @@ class _AppShellState extends State<AppShell> {
         selectedTab: _selectedTab,
         isTestingAsFounder: _isTestingAsFounder,
         onTabSelected: _selectTab,
+      ),
+    );
+  }
+}
+
+class _ControlCenterQuickButton extends StatelessWidget {
+  const _ControlCenterQuickButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top + 58;
+
+    return Positioned(
+      right: 14,
+      top: top,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFD36A), Color(0xFFE84C72), Color(0xFF6D5DF6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.82), width: 1.4),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6D5DF6).withValues(alpha: 0.26),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.admin_panel_settings_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+        ),
       ),
     );
   }
