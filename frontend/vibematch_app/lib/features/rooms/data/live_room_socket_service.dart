@@ -90,6 +90,28 @@ class LiveRoomSocketService {
     );
   }
 
+  void sendRoomImageMessage({
+    required String imageUrl,
+    required String storageKey,
+    required String filename,
+    required int sizeBytes,
+    required String roomId,
+    required String userId,
+    String? requestId,
+  }) {
+    sendRoomMessage(
+      text: _cdnImageMessagePayload(
+        imageUrl: imageUrl,
+        storageKey: storageKey,
+        filename: filename,
+        sizeBytes: sizeBytes,
+      ),
+      roomId: roomId,
+      userId: userId,
+      requestId: requestId ?? 'img-${DateTime.now().millisecondsSinceEpoch}',
+    );
+  }
+
   void sendEvent({
     required String type,
     String? roomId,
@@ -140,6 +162,18 @@ class LiveRoomSocketService {
         'display_name': displayName,
       },
     );
+  }
+
+  String _cdnImageMessagePayload({
+    required String imageUrl,
+    required String storageKey,
+    required String filename,
+    required int sizeBytes,
+  }) {
+    return 'vm-cdn-image://${Uri.encodeComponent(imageUrl)}'
+        '?storage_key=${Uri.encodeComponent(storageKey)}'
+        '&name=${Uri.encodeComponent(filename)}'
+        '&size=$sizeBytes';
   }
 
   void _handleRawEvent(dynamic rawEvent) {
