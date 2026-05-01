@@ -10,6 +10,18 @@ from app.services.websocket_connection_manager import websocket_manager
 
 router = APIRouter(tags=["WebSocket"])
 
+ROOM_STATE_EVENT_TYPES = {
+    "room.seat.occupy": "room.seat.occupied",
+    "room.seat.leave": "room.seat.left",
+    "room.seat.switch": "room.seat.switched",
+    "room.seat.lock": "room.seat.locked",
+    "room.seat.unlock": "room.seat.unlocked",
+    "room.mic.self_mute": "room.mic.self_muted",
+    "room.mic.self_unmute": "room.mic.self_unmuted",
+    "room.mic.admin_mute": "room.mic.admin_muted",
+    "room.mic.admin_unmute": "room.mic.admin_unmuted",
+}
+
 
 @router.websocket("/ws/rooms/{room_id}")
 async def room_websocket(
@@ -106,7 +118,15 @@ async def _handle_room_event(
 
     if envelope.type == "room.message.send":
         await _handle_send_room_message(
-            websocket=websocket,
+            room_id=room_id,
+            user_id=user_id,
+            display_name=display_name,
+            envelope=envelope,
+        )
+        return
+
+    if envelope.type in ROOM_STATE_EVENT_TYPES:
+        await _handle_room_state_event(
             room_id=room_id,
             user_id=user_id,
             display_name=display_name,
@@ -128,7 +148,6 @@ async def _handle_room_event(
 
 async def _handle_send_room_message(
     *,
-    websocket: WebSocket,
     room_id: str,
     user_id: str,
     display_name: str,
@@ -137,9 +156,9 @@ async def _handle_send_room_message(
     text = str(envelope.payload.get("text", "")).strip()
 
     if not text:
-        await websocket_manager.send_json(
-            websocket,
-            {
+        await websocket_manager.broadcast_to_room(
+            room_id=room_id,
+            data={
                 "type": "system.error",
                 "request_id": envelope.request_id,
                 "ok": False,
@@ -150,9 +169,9 @@ async def _handle_send_room_message(
         return
 
     if len(text) > 500:
-        await websocket_manager.send_json(
-            websocket,
-            {
+        await websocket_manager.broadcast_to_room(
+            room_id=room_id,
+            data={
                 "type": "system.error",
                 "request_id": envelope.request_id,
                 "ok": False,
@@ -174,6 +193,34 @@ async def _handle_send_room_message(
                 "text": text,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             },
+        },
+    )
+
+
+async def _handle_room_state_event(
+    *,
+    room_id: str,
+    user_id: str,
+    display_name: str,
+    envelope: WebSocketEnvelope,
+) -> None:
+    event_type = ROOM_STATE_EVENT_TYPES[envelope.type]
+    payload = dict(envelope.payload)
+    payload.update(
+        {
+            "room_id": room_id,
+            "actor_user_id": user_id,
+            "actor_name": display_name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+    await websocket_manager.broadcast_to_room(
+        room_id=room_id,
+        data={
+            "type": event_type,
+            "request_id": envelope.request_id,
+            "payload": payload,
         },
     )
 
