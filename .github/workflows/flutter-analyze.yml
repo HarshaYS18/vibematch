@@ -1,0 +1,35 @@
+name: Flutter Analyze
+
+on:
+  push:
+    branches:
+      - home-modular-performance-v1
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  analyze:
+    name: Analyze Flutter app
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install Flutter dependencies
+        working-directory: frontend/vibematch_app
+        run: flutter pub get
+
+      - name: Run Flutter analyze
+        working-directory: frontend/vibematch_app
+        run: flutter analyze
