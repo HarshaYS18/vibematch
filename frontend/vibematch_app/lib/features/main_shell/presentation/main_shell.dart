@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
 import '../../create/presentation/create_page.dart';
-import '../../home/presentation/home_page.dart';
+import '../../home/presentation/home_modular_page.dart';
 import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/me_page.dart';
 import '../../vibes/presentation/vibes_page.dart';
@@ -76,7 +76,7 @@ class _MainShellState extends State<MainShell> {
     final activeUser = _activeUser;
 
     return [
-      HomePage(
+      HomeModularPage(
         user: activeUser,
       ),
       const VibesPage(),
