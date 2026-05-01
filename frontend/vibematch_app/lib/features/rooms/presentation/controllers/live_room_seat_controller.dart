@@ -414,6 +414,47 @@ class LiveRoomSeatController implements LiveRoomRealtimeSeatApplier {
     onChanged();
   }
 
+  @override
+  void applyRemoteRoomStateSnapshot(Map<String, dynamic> payload) {
+    final remoteSeats = payload['seats'];
+    if (remoteSeats is! List || remoteSeats.isEmpty) return;
+
+    for (final item in remoteSeats) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final seatIndex = _intValue(item['seat_index']);
+      if (!_isValidSeatIndex(seatIndex)) continue;
+
+      final locked = _boolValue(item['locked']);
+      final userPayload = item['user'];
+      SeatUser? user;
+
+      if (userPayload is Map<String, dynamic>) {
+        final userId = userPayload['user_id']?.toString() ?? '';
+        final displayName = userPayload['display_name']?.toString() ?? '';
+        if (userId.trim().isNotEmpty) {
+          user = _resolveRemoteUser(userId: userId, displayName: displayName)
+              .copyWith(
+            selfMuted: _boolValue(userPayload['self_muted']),
+            adminMuted: _boolValue(userPayload['admin_muted']),
+          );
+        }
+      }
+
+      seats[seatIndex] = RoomSeat(
+        index: seatIndex,
+        locked: locked,
+        user: user,
+      );
+    }
+
+    micMuted = seats.any(
+      (seat) => seat.user?.id == currentUser.id && seat.user!.selfMuted,
+    );
+    selectedSeatIndex = null;
+    onChanged();
+  }
+
   void _placeUserOnSeat({
     required SeatUser user,
     required int seatIndex,
@@ -463,6 +504,17 @@ class LiveRoomSeatController implements LiveRoomRealtimeSeatApplier {
       ],
       isCurrentUser: userId == currentUser.id,
     );
+  }
+
+  int _intValue(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? -1;
+  }
+
+  bool _boolValue(Object? value) {
+    if (value is bool) return value;
+    return value?.toString().toLowerCase() == 'true';
   }
 
   bool _isValidSeatIndex(int index) => index >= 0 && index < seats.length;
