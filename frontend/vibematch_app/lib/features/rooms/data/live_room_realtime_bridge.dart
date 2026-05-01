@@ -27,6 +27,8 @@ abstract class LiveRoomRealtimeSeatApplier {
     required String userId,
     required bool muted,
   });
+
+  void applyRemoteRoomStateSnapshot(Map<String, dynamic> payload);
 }
 
 class LiveRoomRealtimeBridge {
@@ -129,6 +131,10 @@ class LiveRoomRealtimeBridge {
     if (applier == null) return;
 
     switch (type) {
+      case 'room.state.snapshot':
+      case 'room.state.updated':
+        applier.applyRemoteRoomStateSnapshot(payload);
+        return;
       case 'room.seat.occupied':
         applier.applyRemoteSeatOccupy(
           seatIndex: _intPayload(payload, 'seat_index'),
