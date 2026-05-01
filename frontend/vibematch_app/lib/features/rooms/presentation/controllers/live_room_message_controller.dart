@@ -28,18 +28,36 @@ class LiveRoomMessageController {
   ];
 
   void sendMessage(String text) {
+    insertRoomMessage(
+      text: text,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      vipLevel: currentUser.vipLevel,
+      sendingLevel: currentUser.sendingLevel,
+      receivingLevel: currentUser.receivingLevel,
+    );
+  }
+
+  void insertRoomMessage({
+    required String text,
+    required String senderId,
+    required String senderName,
+    int? vipLevel,
+    int? sendingLevel,
+    int? receivingLevel,
+  }) {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
 
     messages.insert(
       0,
       ChatEntry(
-        senderName: currentUser.name,
-        senderId: currentUser.id,
+        senderName: senderName,
+        senderId: senderId,
         message: trimmed,
-        vipLevel: currentUser.vipLevel,
-        sendingLevel: currentUser.sendingLevel,
-        receivingLevel: currentUser.receivingLevel,
+        vipLevel: vipLevel,
+        sendingLevel: sendingLevel,
+        receivingLevel: receivingLevel,
       ),
     );
 
