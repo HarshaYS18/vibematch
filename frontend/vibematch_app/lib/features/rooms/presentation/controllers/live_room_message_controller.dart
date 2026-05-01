@@ -55,9 +55,9 @@ class LiveRoomMessageController {
         senderName: senderName,
         senderId: senderId,
         message: trimmed,
-        vipLevel: vipLevel,
-        sendingLevel: sendingLevel,
-        receivingLevel: receivingLevel,
+        vipLevel: vipLevel ?? 0,
+        sendingLevel: sendingLevel ?? 0,
+        receivingLevel: receivingLevel ?? 0,
       ),
     );
 
