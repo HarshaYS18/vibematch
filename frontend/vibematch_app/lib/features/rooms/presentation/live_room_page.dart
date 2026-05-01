@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../inbox/presentation/inbox_page.dart';
+import '../data/live_room_socket_service.dart';
 import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
@@ -69,6 +72,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final LiveRoomSeatController _seatController;
   late final LiveRoomMessageController _roomMessageController;
   late final LiveRoomModerationController _moderationController;
+  late final LiveRoomSocketService _roomSocketService;
+  StreamSubscription<LiveRoomSocketEvent>? _roomSocketSubscription;
+  int? _socketOnlineCount;
 
   final LiveRoomUsersController _usersController = const LiveRoomUsersController();
   final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
@@ -109,7 +115,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   int get _safeOnlineCount {
     return _moderationController.safeOnlineCount(
-      backendOnlineCount: widget.onlineCount,
+      backendOnlineCount: _socketOnlineCount ?? widget.onlineCount,
       visibleRoomUsersCount: _roomUsers.length,
     );
   }
@@ -120,6 +126,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _messageController = LiveRoomMentionTextController();
     _announcementController = TextEditingController();
     _messageFocusNode = FocusNode();
+    _roomSocketService = LiveRoomSocketService();
     _roomStateController = LiveRoomStateController(
       initialRoomName: widget.roomName,
       initialRoomId: widget.roomId,
@@ -159,11 +166,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     if (_roomUsers.isNotEmpty) {
       _giftController.selectedReceiverIds.add(_roomUsers.first.id);
     }
+    _connectRoomSocket();
   }
 
   @override
   void dispose() {
     _roomStateController.removeListener(_onRoomStateChanged);
+    unawaited(_roomSocketSubscription?.cancel());
+    unawaited(_roomSocketService.dispose());
     _messageController.dispose();
     _announcementController.dispose();
     _messageFocusNode.dispose();
@@ -175,6 +185,62 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _onRoomStateChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _connectRoomSocket() async {
+    _roomSocketSubscription = _roomSocketService.events.listen(_handleRoomSocketEvent);
+
+    try {
+      await _roomSocketService.connect(
+        roomId: _roomId,
+        userId: _currentUser.id,
+        displayName: _currentUser.name,
+      );
+      _roomSocketService.sendPing(requestId: 'live-room-open-${DateTime.now().millisecondsSinceEpoch}');
+    } catch (error) {
+      if (!mounted) return;
+      _insertSystemMessage('Realtime connection failed. Local chat fallback is active.');
+    }
+  }
+
+  void _handleRoomSocketEvent(LiveRoomSocketEvent event) {
+    if (!mounted) return;
+
+    switch (event.type) {
+      case 'system.connected':
+        _insertSystemMessage('Realtime connected');
+        return;
+      case 'system.disconnected':
+        _insertSystemMessage('Realtime disconnected');
+        return;
+      case 'system.client_error':
+        final message = event.payload['message']?.toString() ?? 'Realtime client error';
+        RoomToast.show(context, message);
+        return;
+      case 'system.error':
+        RoomToast.show(context, event.message ?? 'Realtime event failed');
+        return;
+      case 'room.presence.updated':
+        final onlineCount = event.payload['online_count'];
+        if (onlineCount is int) {
+          setState(() => _socketOnlineCount = onlineCount);
+        }
+        return;
+      case 'room.message.created':
+        final text = event.payload['text']?.toString().trim() ?? '';
+        if (text.isEmpty) return;
+
+        _roomMessageController.insertRoomMessage(
+          text: text,
+          senderId: event.payload['sender_user_id']?.toString() ?? 'unknown',
+          senderName: event.payload['sender_name']?.toString() ?? 'Guest',
+        );
+        return;
+      case 'pong':
+        return;
+      default:
+        return;
+    }
   }
 
   @override
@@ -375,7 +441,22 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => RoomContributionRankingsSheet(roomName: _roomName, users: _allRoomUsers, onUserTap: (user) { Navigator.pop(context); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openMiniProfileForUser(user); }); }));
   }
 
-  void _sendMessage() { final text = _messageController.text.trim(); if (text.isEmpty) return; _roomMessageController.sendMessage(text); _messageController.clear(); }
+  void _sendMessage() {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    if (_roomSocketService.isConnected) {
+      _roomSocketService.sendRoomMessage(
+        text: text,
+        roomId: _roomId,
+        userId: _currentUser.id,
+      );
+    } else {
+      _roomMessageController.sendMessage(text);
+    }
+
+    _messageController.clear();
+  }
 
   void _openMiniProfileFromChat(ChatEntry entry) { if (entry.senderId == null || entry.senderId == 'system') return; _openMiniProfileForUser(_usersController.resolveUserFromChatEntry(entry: entry, allRoomUsers: _allRoomUsers)); }
   void _openMiniProfileForUser(SeatUser user) { final liveUser = _allRoomUsers.firstWhere((item) => item.id == user.id, orElse: () => user); final seatIndex = _seatController.seats.indexWhere((seat) => seat.user?.id == liveUser.id); _openMiniProfile(liveUser, seatIndex); }
