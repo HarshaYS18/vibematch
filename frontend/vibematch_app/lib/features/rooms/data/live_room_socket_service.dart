@@ -133,9 +133,9 @@ class LiveRoomSocketService {
     channel.sink.add(
       jsonEncode({
         'type': type,
-        ?roomId: 'room_id',
-        ?userId: 'user_id',
-        ?requestId: 'request_id',
+        if (roomId != null) 'room_id': roomId,
+        if (userId != null) 'user_id': userId,
+        if (requestId != null) 'request_id': requestId,
         'payload': payload,
       }),
     );
