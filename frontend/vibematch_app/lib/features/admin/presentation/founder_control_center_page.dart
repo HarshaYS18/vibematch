@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'modules/control_panel_module.dart';
 import 'modules/room_realtime_audit_logs_module.dart';
+import 'modules/room_state_monitor_module.dart';
 
 class FounderControlCenterPage extends StatelessWidget {
   const FounderControlCenterPage({super.key});
@@ -18,11 +19,10 @@ class FounderControlCenterPage extends StatelessWidget {
         ControlPanelModule(
           id: 'room_state_monitor',
           title: 'Room State Monitor',
-          subtitle: 'Coming next: active Redis room-state snapshots and live room status',
+          subtitle: 'Active Redis room-state snapshots, occupied seats, locks, and mutes',
           icon: Icons.radar_rounded,
           color: const Color(0xFF12C7B7),
-          enabled: false,
-          builder: (_) => const _ComingSoonModule(title: 'Room State Monitor'),
+          builder: (_) => const RoomStateMonitorModule(),
         ),
         ControlPanelModule(
           id: 'moderation_actions',
