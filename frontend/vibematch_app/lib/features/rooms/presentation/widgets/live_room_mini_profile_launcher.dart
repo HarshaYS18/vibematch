@@ -64,17 +64,14 @@ class LiveRoomMiniProfileLauncher {
                       context: context,
                       user: user,
                     ),
-            onSentRankingTap: () => LiveRoomProfileNavigator.openFollowedPage(
+            onSentRankingTap: () => LiveRoomProfileNavigator.openSentRankingsPage(
               context: context,
-              user: user,
               users: allRoomUsers,
             ),
-            onReceivedRankingTap:
-                () => LiveRoomProfileNavigator.openFollowersPage(
-                      context: context,
-                      user: user,
-                      users: allRoomUsers,
-                    ),
+            onReceivedRankingTap: () => LiveRoomProfileNavigator.openReceivedRankingsPage(
+              context: context,
+              users: allRoomUsers,
+            ),
             onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
               context: context,
               user: user,
