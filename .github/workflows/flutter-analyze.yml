@@ -18,14 +18,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: false
+      - name: Install Flutter SDK
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
 
       - name: Flutter version
         run: flutter --version
+
+      - name: Disable Flutter analytics
+        run: flutter config --no-analytics
 
       - name: Install Flutter dependencies
         working-directory: frontend/vibematch_app
