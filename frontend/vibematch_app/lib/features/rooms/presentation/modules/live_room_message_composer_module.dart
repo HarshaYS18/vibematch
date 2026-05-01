@@ -153,11 +153,6 @@ class _LiveRoomMessageComposerModuleState
     widget.onSendText();
     widget.controller.clear();
 
-    RoomToast.show(
-      context,
-      'Image sent · ${image.displayName} · ${image.sizeMb.toStringAsFixed(1)} MB',
-    );
-
     Navigator.maybePop(context);
   }
 
