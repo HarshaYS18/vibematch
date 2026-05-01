@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.admin_log import AdminLog
 from app.models.login_history import LoginHistory
 from app.models.role import RoleName
+from app.models.room_realtime_audit_log import RoomRealtimeAuditLog
 from app.models.special_permission import SpecialPermission
 from app.models.user import User
 from app.schemas.admin import (
@@ -13,7 +14,11 @@ from app.schemas.admin import (
     AssignRoleRequest,
     AssignRoleResponse,
 )
-from app.schemas.audit_log import AdminLogResponse, LoginHistoryResponse
+from app.schemas.audit_log import (
+    AdminLogResponse,
+    LoginHistoryResponse,
+    RoomRealtimeAuditLogResponse,
+)
 from app.schemas.special_permission import (
     GrantSpecialPermissionRequest,
     RevokeSpecialPermissionRequest,
@@ -110,6 +115,75 @@ def list_audit_logs(
     require_founder_owner(current_user)
 
     logs = db.query(AdminLog).order_by(AdminLog.id.desc()).limit(100).all()
+
+    return logs
+
+
+@router.get(
+    "/room-realtime-audit-logs",
+    response_model=list[RoomRealtimeAuditLogResponse],
+)
+def list_room_realtime_audit_logs(
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_founder_owner(current_user)
+
+    logs = (
+        db.query(RoomRealtimeAuditLog)
+        .order_by(RoomRealtimeAuditLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return logs
+
+
+@router.get(
+    "/room-realtime-audit-logs/room/{room_id}",
+    response_model=list[RoomRealtimeAuditLogResponse],
+)
+def list_room_realtime_audit_logs_for_room(
+    room_id: str,
+    event_type: str | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_founder_owner(current_user)
+
+    query = db.query(RoomRealtimeAuditLog).filter(
+        RoomRealtimeAuditLog.room_id == room_id,
+    )
+
+    if event_type:
+        query = query.filter(RoomRealtimeAuditLog.event_type == event_type)
+
+    logs = query.order_by(RoomRealtimeAuditLog.id.desc()).limit(limit).all()
+
+    return logs
+
+
+@router.get(
+    "/room-realtime-audit-logs/actor/{actor_user_id}",
+    response_model=list[RoomRealtimeAuditLogResponse],
+)
+def list_room_realtime_audit_logs_for_actor(
+    actor_user_id: str,
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_founder_owner(current_user)
+
+    logs = (
+        db.query(RoomRealtimeAuditLog)
+        .filter(RoomRealtimeAuditLog.actor_user_id == actor_user_id)
+        .order_by(RoomRealtimeAuditLog.id.desc())
+        .limit(limit)
+        .all()
+    )
 
     return logs
 
