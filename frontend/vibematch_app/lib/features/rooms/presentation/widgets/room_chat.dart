@@ -321,61 +321,60 @@ class _LocalImageChatLine extends StatelessWidget {
             child: _TransparentUserMessageFlexBox(
               messageText: '${message.senderName} sent an image',
               enableMessageActions: false,
-              onTap: onSenderTap,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      VipBadge(level: message.vipLevel, size: VipBadgeSize.tiny, showWhenZero: true),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          message.senderName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14.8,
-                            fontWeight: FontWeight.w900,
-                            height: 1.15,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onSenderTap,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        VipBadge(level: message.vipLevel, size: VipBadgeSize.tiny, showWhenZero: true),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            message.senderName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14.8,
+                              fontWeight: FontWeight.w900,
+                              height: 1.15,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: 180,
-                      height: 128,
-                      child: Image.file(
-                        File(image.path),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.broken_image_rounded,
-                            color: RoomColors.gold,
-                            size: 28,
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    image.name.isEmpty ? 'Image message' : image.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                  const SizedBox(height: 7),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _openFullScreenImage(context, image),
+                    child: Hero(
+                      tag: 'room-chat-image-${image.path.hashCode}-${message.senderName}',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 180,
+                          height: 128,
+                          child: Image.file(
+                            File(image.path),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.broken_image_rounded,
+                                color: RoomColors.gold,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -383,6 +382,76 @@ class _LocalImageChatLine extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openFullScreenImage(BuildContext context, _LocalImagePayload image) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FullScreenLocalImageViewer(
+          image: image,
+          heroTag: 'room-chat-image-${image.path.hashCode}-${message.senderName}',
+        ),
+      ),
+    );
+  }
+}
+
+class _FullScreenLocalImageViewer extends StatelessWidget {
+  const _FullScreenLocalImageViewer({
+    required this.image,
+    required this.heroTag,
+  });
+
+  final _LocalImagePayload image;
+  final String heroTag;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.maybePop(context),
+                child: Center(
+                  child: Hero(
+                    tag: heroTag,
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: Image.file(
+                        File(image.path),
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.broken_image_rounded,
+                          color: Colors.white,
+                          size: 48,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              top: 10,
+              child: Material(
+                color: Colors.black.withValues(alpha: 0.35),
+                shape: const CircleBorder(),
+                child: IconButton(
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
