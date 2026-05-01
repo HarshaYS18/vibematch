@@ -1,11 +1,16 @@
+import 'package:flutter/material.dart';
+
+import '../../data/live_room_realtime_bridge.dart';
 import '../live_room_models.dart';
 
-class LiveRoomSeatController {
+class LiveRoomSeatController implements LiveRoomRealtimeSeatApplier {
   LiveRoomSeatController({
     required this.currentUser,
     required this.onChanged,
     required this.onToast,
-  });
+  }) {
+    LiveRoomRealtimeBridge.registerSeatApplier(this);
+  }
 
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
@@ -21,6 +26,10 @@ class LiveRoomSeatController {
         .where((seat) => seat.user != null)
         .map((seat) => seat.user!)
         .toList();
+  }
+
+  void dispose() {
+    LiveRoomRealtimeBridge.unregisterSeatApplier(this);
   }
 
   void initialize(String initialLayoutId) {
@@ -63,6 +72,7 @@ class LiveRoomSeatController {
     _placeUserOnSeat(user: currentUser, seatIndex: index);
     selectedSeatIndex = null;
     onChanged();
+    LiveRoomRealtimeBridge.sendSeatOccupy(index);
   }
 
   void applyForSeat({
@@ -142,12 +152,25 @@ class LiveRoomSeatController {
       );
     }
 
+    LiveRoomRealtimeBridge.sendSeatOccupy(seatIndex);
     onChanged();
   }
 
   void switchSeat(int index) {
-    occupySeat(index);
+    final oldIndex = seats.indexWhere((seat) => seat.user?.id == currentUser.id);
+    _placeUserOnSeat(user: currentUser, seatIndex: index);
+    selectedSeatIndex = null;
+    onChanged();
     onToast('Switched to seat ${index + 1}');
+
+    if (oldIndex >= 0 && oldIndex != index) {
+      LiveRoomRealtimeBridge.sendSeatSwitch(
+        fromSeatIndex: oldIndex,
+        toSeatIndex: index,
+      );
+    } else {
+      LiveRoomRealtimeBridge.sendSeatOccupy(index);
+    }
   }
 
   void lockSeat(int index) {
@@ -158,6 +181,7 @@ class LiveRoomSeatController {
     selectedSeatIndex = null;
     onChanged();
     onToast('Seat ${index + 1} locked');
+    LiveRoomRealtimeBridge.sendSeatLock(index);
   }
 
   void unlockSeat(int index) {
@@ -165,6 +189,7 @@ class LiveRoomSeatController {
     selectedSeatIndex = null;
     onChanged();
     onToast('Seat ${index + 1} unlocked');
+    LiveRoomRealtimeBridge.sendSeatUnlock(index);
   }
 
   void removeUserFromRoom(String userId) {
@@ -199,6 +224,7 @@ class LiveRoomSeatController {
     }
 
     onChanged();
+    LiveRoomRealtimeBridge.sendSelfMute(micMuted);
   }
 
   void toggleSelfMute(String userId) {
@@ -206,9 +232,15 @@ class LiveRoomSeatController {
     if (index < 0) return;
 
     final user = seats[index].user!;
+    final muted = !user.selfMuted;
     seats[index] = seats[index].copyWith(
-      user: user.copyWith(selfMuted: !user.selfMuted),
+      user: user.copyWith(selfMuted: muted),
     );
+
+    if (userId == currentUser.id) {
+      micMuted = muted;
+      LiveRoomRealtimeBridge.sendSelfMute(muted);
+    }
 
     onChanged();
   }
@@ -224,11 +256,13 @@ class LiveRoomSeatController {
       return;
     }
 
+    final muted = !user.adminMuted;
     seats[index] = seats[index].copyWith(
-      user: user.copyWith(adminMuted: !user.adminMuted),
+      user: user.copyWith(adminMuted: muted),
     );
 
     onChanged();
+    LiveRoomRealtimeBridge.sendAdminMute(targetUserId: userId, muted: muted);
   }
 
   void setUserAsAdmin(String userId) {
@@ -279,6 +313,12 @@ class LiveRoomSeatController {
     selectedSeatIndex = null;
     onChanged();
     onToast(isCurrentUserSeat ? 'You left the seat' : 'User locked off seat ${seatIndex + 1}');
+
+    if (isCurrentUserSeat) {
+      LiveRoomRealtimeBridge.sendSeatLeave(seatIndex);
+    } else {
+      LiveRoomRealtimeBridge.sendSeatLock(seatIndex);
+    }
   }
 
   /// Moderator action: remove another user from the mic seat without locking it.
@@ -292,8 +332,10 @@ class LiveRoomSeatController {
     selectedSeatIndex = null;
     onChanged();
     onToast('${seatedUser.name} left seat ${seatIndex + 1}');
+    LiveRoomRealtimeBridge.sendSeatLeave(seatIndex);
   }
 
+  @override
   void applyRemoteSeatOccupy({
     required int seatIndex,
     required String userId,
@@ -306,6 +348,7 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  @override
   void applyRemoteSeatLeave({required int seatIndex}) {
     if (!_isValidSeatIndex(seatIndex)) return;
     seats[seatIndex] = seats[seatIndex].copyWith(clearUser: true);
@@ -313,6 +356,7 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  @override
   void applyRemoteSeatSwitch({
     required int fromSeatIndex,
     required int toSeatIndex,
@@ -329,6 +373,7 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  @override
   void applyRemoteSeatLock({required int seatIndex}) {
     if (!_isValidSeatIndex(seatIndex)) return;
     seats[seatIndex] = seats[seatIndex].copyWith(locked: true, clearUser: true);
@@ -336,6 +381,7 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  @override
   void applyRemoteSeatUnlock({required int seatIndex}) {
     if (!_isValidSeatIndex(seatIndex)) return;
     seats[seatIndex] = seats[seatIndex].copyWith(locked: false);
@@ -343,6 +389,7 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  @override
   void applyRemoteSelfMute({
     required String userId,
     required bool muted,
@@ -355,6 +402,7 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  @override
   void applyRemoteAdminMute({
     required String userId,
     required bool muted,
