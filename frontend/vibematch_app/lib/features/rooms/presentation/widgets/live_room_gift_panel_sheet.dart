@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../controllers/live_room_gift_panel_state_controller.dart';
 import '../live_room_models.dart';
 import 'room_gifts.dart';
 import 'room_theme.dart';
@@ -43,61 +44,34 @@ class LiveRoomGiftPanelSheet extends StatefulWidget {
 }
 
 class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
+  late final LiveRoomGiftPanelStateController _stateController;
   late final PageController _pageController;
-  late final List<GiftItem> _allGifts;
-
-  late final ValueNotifier<GiftCategory> _categoryNotifier;
-  late final ValueNotifier<GiftItem?> _giftNotifier;
-  late final ValueNotifier<int> _comboNotifier;
-  late final ValueNotifier<Set<String>> _receiversNotifier;
 
   @override
   void initState() {
     super.initState();
-    _allGifts = GiftPanel.withMockExtras(widget.gifts);
-    _categoryNotifier = ValueNotifier<GiftCategory>(widget.selectedCategory);
-    _giftNotifier = ValueNotifier<GiftItem?>(widget.selectedGift ?? _firstGiftForCategory(widget.selectedCategory));
-    _comboNotifier = ValueNotifier<int>(widget.selectedCombo);
-    _receiversNotifier = ValueNotifier<Set<String>>(Set<String>.from(widget.selectedReceiverIds));
-    _pageController = PageController(
-      initialPage: GiftCategory.values.indexOf(widget.selectedCategory),
+    _stateController = LiveRoomGiftPanelStateController(
+      gifts: widget.gifts,
+      initialCategory: widget.selectedCategory,
+      initialGift: widget.selectedGift,
+      initialReceiverIds: widget.selectedReceiverIds,
+      initialCombo: widget.selectedCombo,
     );
+    _pageController = _stateController.createPageController();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _categoryNotifier.dispose();
-    _giftNotifier.dispose();
-    _comboNotifier.dispose();
-    _receiversNotifier.dispose();
+    _stateController.dispose();
     super.dispose();
   }
 
-  GiftItem? _firstGiftForCategory(GiftCategory category) {
-    for (final gift in _allGifts) {
-      if (gift.category == category) return gift;
-    }
-    return null;
-  }
-
-  int _defaultComboFor(GiftCategory category) {
-    return category == GiftCategory.lucky ? 9 : 1;
-  }
-
-  List<int> _comboOptionsFor(GiftCategory category) {
-    return category == GiftCategory.lucky ? GiftPanel.luckyCombos : GiftPanel.combos;
-  }
-
   void _selectCategory(GiftCategory category, {bool animatePage = true}) {
-    if (_categoryNotifier.value == category) return;
+    if (_stateController.categoryNotifier.value == category) return;
 
-    final gift = _firstGiftForCategory(category);
-    final combo = _defaultComboFor(category);
-
-    _categoryNotifier.value = category;
-    _giftNotifier.value = gift;
-    _comboNotifier.value = combo;
+    final gift = _stateController.selectCategory(category);
+    final combo = _stateController.comboNotifier.value;
 
     widget.onCategoryChanged(category);
     if (gift != null) widget.onGiftSelected(gift);
@@ -113,37 +87,18 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
   }
 
   void _selectGift(GiftItem gift) {
-    final combo = gift.isVideoGift ? 1 : _defaultComboFor(gift.category);
-
-    _giftNotifier.value = gift;
-    _categoryNotifier.value = gift.category;
-    _comboNotifier.value = combo;
-
+    final combo = _stateController.selectGift(gift);
     widget.onGiftSelected(gift);
     widget.onComboChanged(combo);
   }
 
   void _toggleReceiver(String id) {
     widget.onReceiverToggle(id);
-
-    final current = Set<String>.from(_receiversNotifier.value);
-    if (id == '__all__') {
-      final allSelected = widget.users.isNotEmpty && current.length == widget.users.length;
-      current
-        ..clear()
-        ..addAll(allSelected ? const <String>[] : widget.users.map((user) => user.id));
-    } else if (current.contains(id)) {
-      current.remove(id);
-    } else {
-      current.add(id);
-    }
-    _receiversNotifier.value = current;
+    _stateController.toggleReceiver(id: id, users: widget.users);
   }
 
   void _changeCombo(int combo) {
-    final selectedGift = _giftNotifier.value;
-    final safeCombo = selectedGift?.isVideoGift ?? false ? 1 : combo;
-    _comboNotifier.value = safeCombo;
+    final safeCombo = _stateController.setCombo(combo);
     widget.onComboChanged(safeCombo);
   }
 
@@ -166,14 +121,14 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
               const SheetHandle(width: 42),
               const SizedBox(height: 6),
               _GiftPanelHeader(
-                selectedCategoryListenable: _categoryNotifier,
+                selectedCategoryListenable: _stateController.categoryNotifier,
                 onCategoryChanged: _selectCategory,
                 onStoreTap: () => RoomToast.show(context, 'Store / inventory opened'),
               ),
               const SizedBox(height: 7),
               _GiftReceiverStrip(
                 users: widget.users,
-                selectedReceiverIdsListenable: _receiversNotifier,
+                selectedReceiverIdsListenable: _stateController.receiversNotifier,
                 onReceiverToggle: _toggleReceiver,
               ),
               const SizedBox(height: 7),
@@ -181,9 +136,9 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
                 child: RepaintBoundary(
                   child: _GiftCategoryPager(
                     pageController: _pageController,
-                    allGifts: _allGifts,
-                    selectedCategoryListenable: _categoryNotifier,
-                    selectedGiftListenable: _giftNotifier,
+                    allGifts: _stateController.allGifts,
+                    selectedCategoryListenable: _stateController.categoryNotifier,
+                    selectedGiftListenable: _stateController.giftNotifier,
                     onPageChanged: (category) => _selectCategory(category, animatePage: false),
                     onGiftSelected: _selectGift,
                   ),
@@ -191,11 +146,11 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
               ),
               const SizedBox(height: 7),
               _GiftPanelFooter(
-                selectedCategoryListenable: _categoryNotifier,
-                selectedGiftListenable: _giftNotifier,
-                comboListenable: _comboNotifier,
+                selectedCategoryListenable: _stateController.categoryNotifier,
+                selectedGiftListenable: _stateController.giftNotifier,
+                comboListenable: _stateController.comboNotifier,
                 coinBalance: widget.coinBalance,
-                comboOptionsFor: _comboOptionsFor,
+                comboOptionsFor: _stateController.comboOptionsFor,
                 onComboChanged: _changeCombo,
                 onSend: widget.onSend,
                 onRecharge: widget.onRecharge,
