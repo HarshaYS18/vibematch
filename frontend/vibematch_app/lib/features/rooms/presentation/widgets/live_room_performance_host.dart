@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../controllers/live_room_controller_bundle.dart';
 import '../live_room_models.dart';
 import '../live_room_route_args.dart';
-import 'room_seats.dart';
 
 class LiveRoomPerformanceHost extends StatefulWidget {
   const LiveRoomPerformanceHost({
