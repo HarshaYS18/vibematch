@@ -135,7 +135,9 @@ class _CompactChatLine extends StatelessWidget {
   final VoidCallback? onSenderTap;
   final ValueChanged<String>? onMentionTap;
 
-  bool get _isLocalImageMessage => message.message.startsWith('vm-local-image://');
+  bool get _isImageMessage =>
+      message.message.startsWith('vm-local-image://') ||
+      message.message.startsWith('vm-cdn-image://');
 
   @override
   Widget build(BuildContext context) {
@@ -158,8 +160,8 @@ class _CompactChatLine extends StatelessWidget {
       );
     }
 
-    if (_isLocalImageMessage) {
-      return _LocalImageChatLine(
+    if (_isImageMessage) {
+      return _ImageChatLine(
         message: message,
         onSenderTap: onSenderTap,
       );
@@ -286,8 +288,8 @@ class _CompactChatLine extends StatelessWidget {
   }
 }
 
-class _LocalImageChatLine extends StatelessWidget {
-  const _LocalImageChatLine({
+class _ImageChatLine extends StatelessWidget {
+  const _ImageChatLine({
     required this.message,
     this.onSenderTap,
   });
@@ -297,7 +299,8 @@ class _LocalImageChatLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = _LocalImagePayload.parse(message.message);
+    final image = _RoomImagePayload.parse(message.message);
+    final heroTag = 'room-chat-image-${image.source.hashCode}-${message.senderName}';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -352,27 +355,25 @@ class _LocalImageChatLine extends StatelessWidget {
                   const SizedBox(height: 7),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => _openFullScreenImage(context, image),
+                    onTap: () => _openFullScreenImage(context, image, heroTag),
                     child: Hero(
-                      tag: 'room-chat-image-${image.path.hashCode}-${message.senderName}',
+                      tag: heroTag,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: SizedBox(
                           width: 180,
                           height: 128,
-                          child: Image.file(
-                            File(image.path),
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.broken_image_rounded,
-                                color: RoomColors.gold,
-                                size: 28,
-                              ),
-                            ),
-                          ),
+                          child: image.isNetwork
+                              ? Image.network(
+                                  image.source,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: _brokenImageBuilder,
+                                )
+                              : Image.file(
+                                  File(image.source),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: _brokenImageBuilder,
+                                ),
                         ),
                       ),
                     ),
@@ -386,25 +387,37 @@ class _LocalImageChatLine extends StatelessWidget {
     );
   }
 
-  void _openFullScreenImage(BuildContext context, _LocalImagePayload image) {
+  Widget _brokenImageBuilder(BuildContext context, Object error, StackTrace? stackTrace) {
+    return Container(
+      color: Colors.white.withValues(alpha: 0.12),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.broken_image_rounded,
+        color: RoomColors.gold,
+        size: 28,
+      ),
+    );
+  }
+
+  void _openFullScreenImage(BuildContext context, _RoomImagePayload image, String heroTag) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => _FullScreenLocalImageViewer(
+        builder: (_) => _FullScreenRoomImageViewer(
           image: image,
-          heroTag: 'room-chat-image-${image.path.hashCode}-${message.senderName}',
+          heroTag: heroTag,
         ),
       ),
     );
   }
 }
 
-class _FullScreenLocalImageViewer extends StatelessWidget {
-  const _FullScreenLocalImageViewer({
+class _FullScreenRoomImageViewer extends StatelessWidget {
+  const _FullScreenRoomImageViewer({
     required this.image,
     required this.heroTag,
   });
 
-  final _LocalImagePayload image;
+  final _RoomImagePayload image;
   final String heroTag;
 
   @override
@@ -424,15 +437,17 @@ class _FullScreenLocalImageViewer extends StatelessWidget {
                     child: InteractiveViewer(
                       minScale: 1,
                       maxScale: 4,
-                      child: Image.file(
-                        File(image.path),
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => const Icon(
-                          Icons.broken_image_rounded,
-                          color: Colors.white,
-                          size: 48,
-                        ),
-                      ),
+                      child: image.isNetwork
+                          ? Image.network(
+                              image.source,
+                              fit: BoxFit.contain,
+                              errorBuilder: _fullScreenBrokenImageBuilder,
+                            )
+                          : Image.file(
+                              File(image.source),
+                              fit: BoxFit.contain,
+                              errorBuilder: _fullScreenBrokenImageBuilder,
+                            ),
                     ),
                   ),
                 ),
@@ -455,26 +470,39 @@ class _FullScreenLocalImageViewer extends StatelessWidget {
       ),
     );
   }
+
+  Widget _fullScreenBrokenImageBuilder(BuildContext context, Object error, StackTrace? stackTrace) {
+    return const Icon(
+      Icons.broken_image_rounded,
+      color: Colors.white,
+      size: 48,
+    );
+  }
 }
 
-class _LocalImagePayload {
-  const _LocalImagePayload({
-    required this.path,
+class _RoomImagePayload {
+  const _RoomImagePayload({
+    required this.source,
     required this.name,
     required this.sizeBytes,
+    required this.isNetwork,
   });
 
-  final String path;
+  final String source;
   final String name;
   final int sizeBytes;
+  final bool isNetwork;
 
-  static _LocalImagePayload parse(String raw) {
+  static _RoomImagePayload parse(String raw) {
     final uri = Uri.parse(raw);
-    final encodedPath = uri.host + uri.path;
-    return _LocalImagePayload(
-      path: Uri.decodeComponent(encodedPath),
+    final encodedSource = uri.host + uri.path;
+    final source = Uri.decodeComponent(encodedSource);
+
+    return _RoomImagePayload(
+      source: source,
       name: uri.queryParameters['name'] ?? '',
       sizeBytes: int.tryParse(uri.queryParameters['size'] ?? '') ?? 0,
+      isNetwork: raw.startsWith('vm-cdn-image://'),
     );
   }
 }
