@@ -130,15 +130,16 @@ class LiveRoomSocketService {
       return;
     }
 
-    channel.sink.add(
-      jsonEncode({
-        'type': type,
-        if (roomId != null) 'room_id': roomId,
-        if (userId != null) 'user_id': userId,
-        if (requestId != null) 'request_id': requestId,
-        'payload': payload,
-      }),
-    );
+    final envelope = <String, dynamic>{
+      'type': type,
+      'payload': payload,
+    };
+
+    if (roomId != null) envelope['room_id'] = roomId;
+    if (userId != null) envelope['user_id'] = userId;
+    if (requestId != null) envelope['request_id'] = requestId;
+
+    channel.sink.add(jsonEncode(envelope));
   }
 
   Future<void> dispose() async {
