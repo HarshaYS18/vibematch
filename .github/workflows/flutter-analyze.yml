@@ -1,0 +1,38 @@
+name: Flutter Analyze
+
+on:
+  push:
+    branches:
+      - live-room-modular-performance-v1
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  analyze:
+    name: Analyze Flutter app
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Flutter SDK
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Disable Flutter analytics
+        run: flutter config --no-analytics
+
+      - name: Install Flutter dependencies
+        working-directory: frontend/vibematch_app
+        run: flutter pub get
+
+      - name: Run Flutter analyze
+        working-directory: frontend/vibematch_app
+        run: flutter analyze
