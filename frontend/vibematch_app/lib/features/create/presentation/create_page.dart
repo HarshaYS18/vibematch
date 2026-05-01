@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/media/image_picker_service.dart';
+import '../../../../core/media/image_source_sheet.dart';
 import '../../rooms/presentation/live_room_page.dart';
 
 class CreatePage extends StatefulWidget {
@@ -13,10 +17,12 @@ class _CreatePageState extends State<CreatePage> {
   final TextEditingController _roomNameController = TextEditingController(
     text: 'Late Night Chill',
   );
+  final VibeImagePickerService _imagePickerService = VibeImagePickerService();
 
   String _selectedLanguage = 'Telugu';
   _RoomMode _selectedMode = _RoomMode.open;
-  bool _roomImageSelected = false;
+  PickedVibeImage? _selectedRoomImage;
+  Uint8List? _selectedRoomImageBytes;
 
   final List<String> _languages = const [
     'Telugu',
@@ -37,6 +43,8 @@ class _CreatePageState extends State<CreatePage> {
     'Other',
   ];
 
+  bool get _roomImageSelected => _selectedRoomImage != null;
+
   @override
   void dispose() {
     _roomNameController.dispose();
@@ -49,7 +57,10 @@ class _CreatePageState extends State<CreatePage> {
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xFF251538),
-        content: Text(message),
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
       ),
     );
   }
@@ -57,6 +68,60 @@ class _CreatePageState extends State<CreatePage> {
   String _generateRoomId() {
     final now = DateTime.now().millisecondsSinceEpoch.toString();
     return 'VM${now.substring(now.length - 6)}';
+  }
+
+  Future<void> _openRoomImagePicker() async {
+    final action = await VibeImageSourceSheet.show(
+      context: context,
+      title: 'Room image',
+      subtitle:
+          'Choose a premium room display image. Room images are locally previewed now and will upload to backend moderation later.',
+      showRemove: _roomImageSelected,
+      removeLabel: 'Remove room image',
+    );
+
+    if (!mounted || action == null) return;
+
+    if (action.remove) {
+      setState(() {
+        _selectedRoomImage = null;
+        _selectedRoomImageBytes = null;
+      });
+      _toast('Room image removed');
+      return;
+    }
+
+    final source = action.source;
+    if (source == null) return;
+
+    final result = await _imagePickerService.pickImage(
+      source: source,
+      maxBytes: VibeImagePickerService.roomImageMaxBytes,
+    );
+
+    if (!mounted) return;
+
+    if (result.cancelled) return;
+
+    if (result.hasError) {
+      _toast(result.errorMessage!);
+      return;
+    }
+
+    final image = result.image;
+    if (image == null) return;
+
+    final bytes = await image.file.readAsBytes();
+    if (!mounted) return;
+
+    setState(() {
+      _selectedRoomImage = image;
+      _selectedRoomImageBytes = bytes;
+    });
+
+    _toast(
+      'Room image ready · ${image.sizeMb.toStringAsFixed(1)} MB · backend upload later',
+    );
   }
 
   void _openLanguageSheet() {
@@ -163,11 +228,17 @@ class _CreatePageState extends State<CreatePage> {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.graphic_eq_rounded,
-                  color: Colors.white,
-                  size: 34,
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: _selectedRoomImageBytes == null
+                    ? const Icon(
+                        Icons.graphic_eq_rounded,
+                        color: Colors.white,
+                        size: 34,
+                      )
+                    : Image.memory(
+                        _selectedRoomImageBytes!,
+                        fit: BoxFit.cover,
+                      ),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -192,6 +263,10 @@ class _CreatePageState extends State<CreatePage> {
               _ReadyInfoRow(label: 'Room ID', value: roomId),
               _ReadyInfoRow(label: 'Mode', value: _selectedMode.title),
               _ReadyInfoRow(label: 'Language', value: _selectedLanguage),
+              _ReadyInfoRow(
+                label: 'Room image',
+                value: _roomImageSelected ? 'Selected' : 'Default',
+              ),
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -343,14 +418,7 @@ class _CreatePageState extends State<CreatePage> {
       child: Column(
         children: [
           GestureDetector(
-            onTap: () {
-              setState(() => _roomImageSelected = !_roomImageSelected);
-              _toast(
-                _roomImageSelected
-                    ? 'Mock room image selected'
-                    : 'Room image removed',
-              );
-            },
+            onTap: _openRoomImagePicker,
             child: Container(
               width: 108,
               height: 108,
@@ -368,20 +436,51 @@ class _CreatePageState extends State<CreatePage> {
                 color: _roomImageSelected ? null : const Color(0xFFF4EEE7),
                 border: Border.all(color: const Color(0xFFEDE3D7)),
               ),
-              child: Icon(
-                _roomImageSelected
-                    ? Icons.image_rounded
-                    : Icons.add_photo_alternate_rounded,
-                color: _roomImageSelected
-                    ? Colors.white
-                    : const Color(0xFF7B6A86),
-                size: 38,
-              ),
+              clipBehavior: Clip.antiAlias,
+              child: _selectedRoomImageBytes == null
+                  ? Icon(
+                      _roomImageSelected
+                          ? Icons.image_rounded
+                          : Icons.add_photo_alternate_rounded,
+                      color: _roomImageSelected
+                          ? Colors.white
+                          : const Color(0xFF7B6A86),
+                      size: 38,
+                    )
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.memory(
+                          _selectedRoomImageBytes!,
+                          fit: BoxFit.cover,
+                        ),
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: Container(
+                            margin: const EdgeInsets.all(8),
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.52),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.edit_rounded,
+                              color: Colors.white,
+                              size: 17,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           const SizedBox(height: 10),
           Text(
-            _roomImageSelected ? 'Room image ready' : 'Tap to add room image',
+            _roomImageSelected
+                ? '${_selectedRoomImage!.displayName} · ${_selectedRoomImage!.sizeMb.toStringAsFixed(1)} MB'
+                : 'Tap to add room image',
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: Color(0xFF7B6A86),
               fontSize: 12,
@@ -521,7 +620,7 @@ class _CreatePageState extends State<CreatePage> {
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Backend later controls locked access, Secret Vibe privacy, member approval, image chat, guest messages, audit logs, and room moderation hierarchy.',
+              'Selected room images are local previews now. Backend later uploads them, runs AI/moderation review, controls locked access, Secret Vibe privacy, member approval, image chat, guest messages, audit logs, and room moderation hierarchy.',
               style: TextStyle(
                 color: Color(0xFF6A4E18),
                 fontSize: 12.5,
