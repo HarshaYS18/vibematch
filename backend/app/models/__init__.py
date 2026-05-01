@@ -7,6 +7,7 @@ from app.models.user_ban import UserBan, BanType, BanSource
 from app.models.device_ban import DeviceBan
 from app.models.room import Room, RoomMode, RoomType
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
+from app.models.room_realtime_audit_log import RoomRealtimeAuditLog
 from app.models.login_history import (
     LoginHistory,
     LoginHistoryStatus,
