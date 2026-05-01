@@ -109,7 +109,8 @@ def dev_login(
     if identity:
         user = identity.user
     else:
-        is_founder_email = email == "founder@vibematch.com"
+        founder_email = settings.FOUNDER_OWNER_EMAIL.lower().strip()
+        is_founder_email = email == founder_email
 
         public_user_id = (
             settings.FOUNDER_OWNER_PUBLIC_ID
