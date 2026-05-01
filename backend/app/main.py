@@ -1,8 +1,12 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import admin, auth, moderation, users
+from app.api.routes import admin, auth, media, moderation, users
 from app.api.routes.rooms import rooms
+from app.core.config import settings
 from app.database import Base, engine
 from app.models import (
     AdminLog,
@@ -30,6 +34,15 @@ app.add_middleware(
 )
 
 
+media_root = Path(settings.MEDIA_ROOT_DIR).resolve()
+media_root.mkdir(parents=True, exist_ok=True)
+app.mount(
+    settings.MEDIA_PUBLIC_PATH,
+    StaticFiles(directory=str(media_root)),
+    name="media",
+)
+
+
 @app.get("/")
 def root():
     return {
@@ -51,3 +64,4 @@ app.include_router(users.router)
 app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(rooms.router)
+app.include_router(media.router)
