@@ -124,7 +124,7 @@ class _LiveRoomMessageComposerModuleState
       context: context,
       title: 'Send image',
       subtitle:
-          'Choose an image for room chat. For now this is a local picker preview step; backend chat-image upload is next.',
+          'Choose an image for room chat. Local image bubbles work now; backend CDN upload is next.',
     );
 
     if (!mounted || action == null || action.remove) return;
@@ -149,12 +149,22 @@ class _LiveRoomMessageComposerModuleState
     final image = result.image;
     if (image == null) return;
 
+    widget.controller.text = _localImageMessagePayload(image);
+    widget.onSendText();
+    widget.controller.clear();
+
     RoomToast.show(
       context,
-      'Image selected · ${image.displayName} · ${image.sizeMb.toStringAsFixed(1)} MB',
+      'Image sent · ${image.displayName} · ${image.sizeMb.toStringAsFixed(1)} MB',
     );
 
-    widget.onImageTap();
+    Navigator.maybePop(context);
+  }
+
+  String _localImageMessagePayload(PickedVibeImage image) {
+    return 'vm-local-image://${Uri.encodeComponent(image.file.path)}'
+        '?name=${Uri.encodeComponent(image.displayName)}'
+        '&size=${image.sizeBytes}';
   }
 
   @override
