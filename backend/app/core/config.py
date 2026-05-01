@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     # Founder Owner
     FOUNDER_OWNER_PUBLIC_ID: int = 6922022
 
+    # Local laptop CDN / media settings.
+    # Keep MEDIA_PUBLIC_BASE_URL empty for same-host URLs like /media/avatars/...
+    # Set it later to a LAN, tunnel, or cloud CDN URL without changing stored keys.
+    MEDIA_STORAGE_BACKEND: str = "local"
+    MEDIA_ROOT_DIR: str = "storage/media"
+    MEDIA_PUBLIC_PATH: str = "/media"
+    MEDIA_PUBLIC_BASE_URL: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
