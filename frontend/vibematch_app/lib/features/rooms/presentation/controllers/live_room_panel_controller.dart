@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
 import '../widgets/live_room_gift_panel_sheet.dart';
-import '../widgets/room_gifts.dart';
-import '../widgets/room_seats.dart';
 import 'live_room_gift_controller.dart';
 import 'live_room_sheet_controller.dart';
 
