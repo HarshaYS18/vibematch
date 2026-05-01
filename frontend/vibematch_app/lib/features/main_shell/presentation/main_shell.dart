@@ -5,7 +5,7 @@ import '../../create/presentation/create_page.dart';
 import '../../home/presentation/home_page.dart';
 import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/me_page.dart';
-import '../../vibes/presentation/vibes_page.dart';
+import '../../vibes/presentation/vibes_modular_page.dart';
 
 enum _DevUserMode {
   founder,
@@ -79,7 +79,7 @@ class _MainShellState extends State<MainShell> {
       HomePage(
         user: activeUser,
       ),
-      const VibesPage(),
+      const VibesModularPage(),
       const CreatePage(),
       const InboxPage(),
       MePage(
