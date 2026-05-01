@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     # Founder Owner
     FOUNDER_OWNER_PUBLIC_ID: int = 6922022
+    FOUNDER_OWNER_EMAIL: str = "founder@vibematch.com"
 
     # Local laptop CDN / media settings.
     # Keep MEDIA_PUBLIC_BASE_URL empty for same-host URLs like /media/avatars/...
