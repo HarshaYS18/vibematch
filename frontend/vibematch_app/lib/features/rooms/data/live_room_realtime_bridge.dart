@@ -1,5 +1,3 @@
-import 'live_room_socket_service.dart';
-
 abstract class LiveRoomRealtimeSeatApplier {
   void applyRemoteSeatOccupy({
     required int seatIndex,
@@ -123,53 +121,56 @@ class LiveRoomRealtimeBridge {
     );
   }
 
-  static void applyIncomingEvent(LiveRoomSocketEvent event) {
+  static void applyIncomingEvent({
+    required String type,
+    required Map<String, dynamic> payload,
+  }) {
     final applier = _seatApplier;
     if (applier == null) return;
 
-    switch (event.type) {
+    switch (type) {
       case 'room.seat.occupied':
         applier.applyRemoteSeatOccupy(
-          seatIndex: _intPayload(event, 'seat_index'),
-          userId: _stringPayload(event, 'actor_user_id'),
-          displayName: _stringPayload(event, 'actor_name'),
+          seatIndex: _intPayload(payload, 'seat_index'),
+          userId: _stringPayload(payload, 'actor_user_id'),
+          displayName: _stringPayload(payload, 'actor_name'),
         );
         return;
       case 'room.seat.left':
         applier.applyRemoteSeatLeave(
-          seatIndex: _intPayload(event, 'seat_index'),
+          seatIndex: _intPayload(payload, 'seat_index'),
         );
         return;
       case 'room.seat.switched':
         applier.applyRemoteSeatSwitch(
-          fromSeatIndex: _intPayload(event, 'from_seat_index'),
-          toSeatIndex: _intPayload(event, 'to_seat_index'),
-          userId: _stringPayload(event, 'actor_user_id'),
-          displayName: _stringPayload(event, 'actor_name'),
+          fromSeatIndex: _intPayload(payload, 'from_seat_index'),
+          toSeatIndex: _intPayload(payload, 'to_seat_index'),
+          userId: _stringPayload(payload, 'actor_user_id'),
+          displayName: _stringPayload(payload, 'actor_name'),
         );
         return;
       case 'room.seat.locked':
         applier.applyRemoteSeatLock(
-          seatIndex: _intPayload(event, 'seat_index'),
+          seatIndex: _intPayload(payload, 'seat_index'),
         );
         return;
       case 'room.seat.unlocked':
         applier.applyRemoteSeatUnlock(
-          seatIndex: _intPayload(event, 'seat_index'),
+          seatIndex: _intPayload(payload, 'seat_index'),
         );
         return;
       case 'room.mic.self_muted':
       case 'room.mic.self_unmuted':
         applier.applyRemoteSelfMute(
-          userId: _stringPayload(event, 'target_user_id'),
-          muted: _boolPayload(event, 'muted'),
+          userId: _stringPayload(payload, 'target_user_id'),
+          muted: _boolPayload(payload, 'muted'),
         );
         return;
       case 'room.mic.admin_muted':
       case 'room.mic.admin_unmuted':
         applier.applyRemoteAdminMute(
-          userId: _stringPayload(event, 'target_user_id'),
-          muted: _boolPayload(event, 'muted'),
+          userId: _stringPayload(payload, 'target_user_id'),
+          muted: _boolPayload(payload, 'muted'),
         );
         return;
       default:
@@ -192,19 +193,19 @@ class LiveRoomRealtimeBridge {
     );
   }
 
-  static int _intPayload(LiveRoomSocketEvent event, String key) {
-    final value = event.payload[key];
+  static int _intPayload(Map<String, dynamic> payload, String key) {
+    final value = payload[key];
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? -1;
   }
 
-  static String _stringPayload(LiveRoomSocketEvent event, String key) {
-    return event.payload[key]?.toString() ?? '';
+  static String _stringPayload(Map<String, dynamic> payload, String key) {
+    return payload[key]?.toString() ?? '';
   }
 
-  static bool _boolPayload(LiveRoomSocketEvent event, String key) {
-    final value = event.payload[key];
+  static bool _boolPayload(Map<String, dynamic> payload, String key) {
+    final value = payload[key];
     if (value is bool) return value;
     return value?.toString().toLowerCase() == 'true';
   }
