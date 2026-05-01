@@ -338,7 +338,7 @@ class _FilterPanel extends StatelessWidget {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: selectedEventType,
+                  initialValue: selectedEventType,
                   items: eventTypes
                       .map((type) => DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis)))
                       .toList(),
