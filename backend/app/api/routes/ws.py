@@ -6,6 +6,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from app.schemas.websocket import WebSocketEnvelope
+from app.services.room_realtime_state_service import room_realtime_state_service
 from app.services.websocket_connection_manager import websocket_manager
 
 router = APIRouter(tags=["WebSocket"])
@@ -48,6 +49,13 @@ async def room_websocket(
                 "display_name": display_name,
                 "connected_at": connection.connected_at.isoformat(),
             },
+        },
+    )
+    await websocket_manager.send_json(
+        websocket,
+        {
+            "type": "room.state.snapshot",
+            "payload": room_realtime_state_service.snapshot(room_id),
         },
     )
     await _broadcast_presence(room_id)
@@ -206,11 +214,19 @@ async def _handle_room_state_event(
 ) -> None:
     event_type = ROOM_STATE_EVENT_TYPES[envelope.type]
     payload = dict(envelope.payload)
+    room_state = room_realtime_state_service.apply_event(
+        room_id=room_id,
+        event_type=envelope.type,
+        actor_user_id=user_id,
+        actor_name=display_name,
+        payload=payload,
+    )
     payload.update(
         {
             "room_id": room_id,
             "actor_user_id": user_id,
             "actor_name": display_name,
+            "room_state": room_state,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
     )
@@ -221,6 +237,14 @@ async def _handle_room_state_event(
             "type": event_type,
             "request_id": envelope.request_id,
             "payload": payload,
+        },
+    )
+    await websocket_manager.broadcast_to_room(
+        room_id=room_id,
+        data={
+            "type": "room.state.updated",
+            "request_id": envelope.request_id,
+            "payload": room_state,
         },
     )
 
