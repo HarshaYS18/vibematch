@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+
+from redis.exceptions import RedisError
+
+from app.services.redis_client import redis_client
 
 
 @dataclass
@@ -52,14 +57,56 @@ class RealtimeRoomState:
             "updated_at": self.updated_at.isoformat(),
         }
 
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> RealtimeRoomState:
+        room = cls(room_id=str(payload.get("room_id") or ""))
+        updated_at = payload.get("updated_at")
+        if isinstance(updated_at, str):
+            try:
+                room.updated_at = datetime.fromisoformat(updated_at)
+            except ValueError:
+                room.updated_at = datetime.now(timezone.utc)
+
+        seats = payload.get("seats")
+        if isinstance(seats, list):
+            for item in seats:
+                if not isinstance(item, dict):
+                    continue
+                seat_index = _safe_int(item.get("seat_index"), default=-1)
+                if seat_index < 0:
+                    continue
+
+                user = None
+                user_payload = item.get("user")
+                if isinstance(user_payload, dict):
+                    user_id = str(user_payload.get("user_id") or "")
+                    if user_id:
+                        user = RealtimeSeatUserState(
+                            user_id=user_id,
+                            display_name=str(user_payload.get("display_name") or "Guest"),
+                            self_muted=bool(user_payload.get("self_muted", False)),
+                            admin_muted=bool(user_payload.get("admin_muted", False)),
+                        )
+
+                room.seats[seat_index] = RealtimeSeatState(
+                    seat_index=seat_index,
+                    locked=bool(item.get("locked", False)),
+                    user=user,
+                )
+
+        return room
+
 
 class RoomRealtimeStateService:
-    """In-memory room state snapshot store for local/dev realtime.
+    """Redis-backed active room state snapshot store with memory fallback.
 
-    This keeps room seat/mic state consistent for late joiners while running a
-    single backend process. Later this should move to Redis/PostgreSQL and be
-    permission-checked through room services.
+    Redis keeps live room seat/mic state available after a backend reload and
+    across future backend workers. In-memory cache keeps dev usage working even
+    when Redis is temporarily unavailable.
     """
+
+    REDIS_KEY_PREFIX = "vm:room_state:"
+    REDIS_TTL_SECONDS = 60 * 60 * 24
 
     def __init__(self) -> None:
         self._rooms: dict[str, RealtimeRoomState] = {}
@@ -126,12 +173,48 @@ class RoomRealtimeStateService:
             )
 
         room.touch()
+        self._save_room(room)
         return self.snapshot(room_id)
 
     def _room(self, room_id: str) -> RealtimeRoomState:
-        if room_id not in self._rooms:
-            self._rooms[room_id] = RealtimeRoomState(room_id=room_id)
+        if room_id in self._rooms:
+            return self._rooms[room_id]
+
+        restored = self._load_room(room_id)
+        if restored is not None:
+            self._rooms[room_id] = restored
+            return restored
+
+        self._rooms[room_id] = RealtimeRoomState(room_id=room_id)
         return self._rooms[room_id]
+
+    def _load_room(self, room_id: str) -> RealtimeRoomState | None:
+        try:
+            raw = redis_client.client.get(self._redis_key(room_id))
+            if not raw:
+                return None
+            decoded = json.loads(raw)
+            if not isinstance(decoded, dict):
+                return None
+            room = RealtimeRoomState.from_payload(decoded)
+            if not room.room_id:
+                room.room_id = room_id
+            return room
+        except (RedisError, json.JSONDecodeError, TypeError, ValueError):
+            return None
+
+    def _save_room(self, room: RealtimeRoomState) -> None:
+        try:
+            redis_client.client.setex(
+                self._redis_key(room.room_id),
+                self.REDIS_TTL_SECONDS,
+                json.dumps(room.to_payload(), default=str),
+            )
+        except RedisError:
+            return
+
+    def _redis_key(self, room_id: str) -> str:
+        return f"{self.REDIS_KEY_PREFIX}{room_id}"
 
     def _seat(self, room: RealtimeRoomState, seat_index: int) -> RealtimeSeatState:
         if seat_index < 0:
@@ -210,13 +293,16 @@ class RoomRealtimeStateService:
         return seat.user
 
     def _int_payload(self, payload: dict[str, Any], key: str) -> int:
-        value = payload.get(key)
-        if isinstance(value, int):
-            return value
-        try:
-            return int(str(value))
-        except (TypeError, ValueError):
-            return -1
+        return _safe_int(payload.get(key), default=-1)
+
+
+def _safe_int(value: Any, *, default: int) -> int:
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return default
 
 
 room_realtime_state_service = RoomRealtimeStateService()
