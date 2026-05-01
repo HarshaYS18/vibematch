@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../../core/constants/app_constants.dart';
+import 'live_room_realtime_bridge.dart';
 
 class LiveRoomSocketService {
   LiveRoomSocketService({String? httpBaseUrl})
@@ -35,6 +36,11 @@ class LiveRoomSocketService {
 
     final channel = WebSocketChannel.connect(uri);
     _channel = channel;
+    LiveRoomRealtimeBridge.attachSocket(
+      roomId: roomId,
+      userId: userId,
+      sendEvent: sendEvent,
+    );
 
     _subscription = channel.stream.listen(
       _handleRawEvent,
@@ -47,6 +53,7 @@ class LiveRoomSocketService {
         );
       },
       onDone: () {
+        LiveRoomRealtimeBridge.detachSocket();
         _eventsController.add(
           const LiveRoomSocketEvent(
             type: 'system.disconnected',
@@ -65,6 +72,7 @@ class LiveRoomSocketService {
     _subscription = null;
     await _channel?.sink.close();
     _channel = null;
+    LiveRoomRealtimeBridge.detachSocket();
   }
 
   void sendPing({String? requestId}) {
@@ -286,7 +294,12 @@ class LiveRoomSocketService {
       if (decoded is! Map<String, dynamic>) {
         throw const FormatException('WebSocket event must be a JSON object.');
       }
-      _eventsController.add(LiveRoomSocketEvent.fromJson(decoded));
+      final event = LiveRoomSocketEvent.fromJson(decoded);
+      LiveRoomRealtimeBridge.applyIncomingEvent(
+        type: event.type,
+        payload: event.payload,
+      );
+      _eventsController.add(event);
     } catch (error) {
       _eventsController.add(
         LiveRoomSocketEvent(
