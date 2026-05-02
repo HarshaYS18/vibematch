@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../inbox/presentation/inbox_page.dart';
+import '../../../inbox/presentation/inbox_page.dart';
 import '../live_room_models.dart';
 import '../widgets/live_room_emoji_sheet.dart';
 import '../widgets/live_room_games_sheet.dart';
