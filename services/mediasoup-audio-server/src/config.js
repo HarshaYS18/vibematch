@@ -1,4 +1,5 @@
 require('dotenv').config();
+const os = require('os');
 
 const announcedIp = process.env.ANNOUNCED_IP || '127.0.0.1';
 const turnHost = process.env.TURN_HOST || announcedIp;
@@ -7,10 +8,14 @@ const turnUsername = process.env.TURN_USERNAME || 'vibematch-local';
 const turnPassword = process.env.TURN_PASSWORD || 'vibematch-local-password';
 
 const maxSpeakersPerRoom = Number(process.env.MAX_SPEAKERS_PER_ROOM || 17);
+const cpuCount = Math.max(1, os.cpus().length || 1);
+const defaultWorkerCount = Math.min(cpuCount, 4);
 
 module.exports = {
   port: Number(process.env.PORT || 4000),
   announcedIp,
+  workerCount: Number(process.env.MEDIASOUP_WORKER_COUNT || defaultWorkerCount),
+  maxRooms: Number(process.env.MAX_ROOMS || 500),
   maxSpeakersPerRoom,
   maxRoomPeers: Number(process.env.MAX_ROOM_PEERS || 250),
 
