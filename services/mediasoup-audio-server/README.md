@@ -5,13 +5,15 @@ Standalone WebRTC audio SFU service for testing VibeMatch audio rooms without to
 ## Scope
 
 - Audio-only WebRTC using mediasoup.
-- SFU architecture, not peer-to-peer mesh.
+- Multi-room SFU architecture, not peer-to-peer mesh.
+- Every `roomId` gets its own mediasoup router.
+- New rooms are distributed across a mediasoup worker pool.
 - 17 speaker seats per room.
 - Audience users can join and consume audio without publishing.
 - Seated users can publish mic audio.
 - Local self-mute and admin-mute state are represented in room state.
 - Local coturn config is included for open-source TURN/STUN testing.
-- Designed as a standalone module that can later move to a cloud server.
+- Designed as a standalone module that can later move to cloud servers.
 
 ## Folder
 
@@ -40,16 +42,51 @@ Health check:
 curl http://127.0.0.1:4000/health
 ```
 
-Expected response:
+Expected response includes:
 
 ```json
 {
   "ok": true,
   "service": "vibematch-mediasoup-audio-server",
-  "mode": "standalone-poc",
+  "mode": "standalone-multi-room-poc",
+  "workerCount": 4,
+  "maxRooms": 500,
   "maxSpeakersPerRoom": 17
 }
 ```
+
+Stats check:
+
+```bash
+curl http://127.0.0.1:4000/stats
+```
+
+`/stats` shows worker load, room count, room IDs, peer count, speaker count, producer count, and consumer count.
+
+## Multi-room behavior
+
+The server is not limited to one room.
+
+Each unique `roomId` creates or reuses an independent room:
+
+```txt
+roomId = VM1001 -> mediasoup router A
+roomId = VM1002 -> mediasoup router B
+roomId = VM1003 -> mediasoup router C
+```
+
+Rooms are allocated across the worker pool using least-loaded/round-robin selection. Empty rooms are closed automatically and release their worker room count.
+
+Local POC limits are controlled by `.env`:
+
+```env
+MEDIASOUP_WORKER_COUNT=4
+MAX_ROOMS=500
+MAX_SPEAKERS_PER_ROOM=17
+MAX_ROOM_PEERS=250
+```
+
+These are not final production limits. Production limits must be decided after load testing on the actual server type.
 
 ## Phone testing on same Wi-Fi
 
@@ -80,12 +117,12 @@ Client sends:
 
 ```json
 {
-  "roomId": "test-room",
+  "roomId": "VM1001",
   "peerId": "6418123456"
 }
 ```
 
-Server returns router RTP capabilities, ICE servers, seats, and existing producers.
+Server returns router RTP capabilities, ICE servers, seats, and existing producers for that room only.
 
 ### takeSeat
 
@@ -93,7 +130,7 @@ A user must take one of the 17 seats before producing audio.
 
 ```json
 {
-  "roomId": "test-room",
+  "roomId": "VM1001",
   "peerId": "6418123456",
   "seatNo": 1
 }
@@ -105,7 +142,7 @@ Use direction `send` only for seated users. Use direction `recv` for listeners.
 
 ```json
 {
-  "roomId": "test-room",
+  "roomId": "VM1001",
   "peerId": "6418123456",
   "direction": "send"
 }
@@ -121,7 +158,7 @@ Publishes audio to the SFU. Only seated users can produce.
 
 ### consume
 
-Consumes another seated user's producer.
+Consumes another seated user's producer from the same room.
 
 ### setSelfMuted
 
@@ -137,9 +174,11 @@ POC-level admin mute event. Later this must be authorized by FastAPI role and ro
 - This module avoids paid RTC services for testing.
 - SFU avoids the heavy peer-to-peer mesh problem.
 - Only 17 users can publish audio per room.
+- Audience users should consume only the room producers they need.
 - Receive transports should be reused by clients.
 - Audio is Opus-only.
 - No recording, transcription, video, or paid services are included.
+- The first production cost drivers will be server CPU and bandwidth, not license fees.
 
 ## Later production migration
 
@@ -150,7 +189,8 @@ Before public launch, add:
 - Short-lived TURN credentials.
 - Linux deployment.
 - Public IP/domain and firewall rules.
-- Multi-worker room allocation.
+- Multi-server room allocation.
+- Redis or database-backed audio session registry.
 - Metrics and monitoring.
 - Reconnect recovery.
 - Load testing.
@@ -158,4 +198,4 @@ Before public launch, add:
 
 ## Current status
 
-This branch only adds the standalone SFU service. It does not wire Flutter yet.
+This branch adds the standalone multi-room SFU service. It does not wire Flutter yet.
