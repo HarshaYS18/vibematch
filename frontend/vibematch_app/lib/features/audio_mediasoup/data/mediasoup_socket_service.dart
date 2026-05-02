@@ -34,6 +34,7 @@ class MediasoupSocketService {
     required String serverUrl,
     required String roomId,
     required String peerId,
+    String? audioToken,
   }) async {
     await disconnect();
 
@@ -74,6 +75,7 @@ class MediasoupSocketService {
     final response = await _emitAck('joinRoom', <String, dynamic>{
       'roomId': roomId,
       'peerId': peerId,
+      if (audioToken != null && audioToken.isNotEmpty) 'audioToken': audioToken,
     });
 
     _ensureOk(response, 'joinRoom');
