@@ -45,6 +45,33 @@ function getProducerSnapshot(room, requestingPeerId) {
     );
 }
 
+function closePeerProducers(room, peer, io) {
+  const closedProducerIds = [];
+
+  for (const producer of peer.producers.values()) {
+    closedProducerIds.push(producer.id);
+    producer.close();
+  }
+
+  peer.producers.clear();
+
+  for (const producerId of closedProducerIds) {
+    io.to(room.id).emit('producerClosed', { producerId, peerId: peer.id });
+  }
+
+  return closedProducerIds;
+}
+
+function pausePeerProducers(peer, paused) {
+  for (const producer of peer.producers.values()) {
+    if (paused) {
+      producer.pause();
+    } else {
+      producer.resume();
+    }
+  }
+}
+
 function registerSocketHandlers(io) {
   io.on('connection', (socket) => {
     console.log(`[socket] connected socket=${socket.id}`);
@@ -114,6 +141,11 @@ function registerSocketHandlers(io) {
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
+        const peer = room.peers.get(String(peerId));
+        if (peer) {
+          closePeerProducers(room, peer, io);
+        }
+
         const seat = leaveSeat(room, String(peerId));
         const payload = { seat, seats: getSeatSnapshot(room) };
 
@@ -179,12 +211,15 @@ function registerSocketHandlers(io) {
         const transport = peer.transports.get(transportId);
         if (!transport) throw new Error('transport not found');
 
+        closePeerProducers(room, peer, io);
+
         const producer = await transport.produce({ kind, rtpParameters });
         peer.producers.set(producer.id, producer);
         setSeatProducer(room, peer.id, producer.id);
 
         producer.on('transportclose', () => {
           peer.producers.delete(producer.id);
+          io.to(roomId).emit('producerClosed', { producerId: producer.id, peerId: peer.id });
         });
 
         producer.on('close', () => {
@@ -261,6 +296,11 @@ function registerSocketHandlers(io) {
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
+        const peer = room.peers.get(String(peerId));
+        if (peer) {
+          pausePeerProducers(peer, Boolean(muted));
+        }
+
         const seat = setSelfMuted(room, String(peerId), Boolean(muted));
         const payload = { seat, seats: getSeatSnapshot(room) };
 
@@ -276,6 +316,11 @@ function registerSocketHandlers(io) {
       try {
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
+
+        const peer = room.peers.get(String(targetPeerId));
+        if (peer) {
+          pausePeerProducers(peer, Boolean(muted));
+        }
 
         const seat = setAdminMuted(room, String(targetPeerId), Boolean(muted));
         const payload = { seat, seats: getSeatSnapshot(room) };
