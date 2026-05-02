@@ -31,7 +31,6 @@ import 'widgets/live_room_minimized_overlay_service.dart';
 import 'widgets/live_room_privacy_sheet.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
-import 'widgets/live_room_users_sheet.dart';
 import 'widgets/room_contribution_rankings_sheet.dart';
 import 'widgets/room_seat_invite_request_sheet.dart';
 import 'widgets/room_seats.dart';
@@ -367,7 +366,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _handleJoinRoom() { _clearRoomFocus(); _roomMessageController.requestJoin(); _openInfoSheet('Join request sent', 'Your request to become a member of $_roomName has been sent to the room owner/admins.'); }
 
   void _openRoomUsersSheet() {
-    LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomUsersSheet(users: _roomUsers, onUserTap: (user) { Navigator.pop(context); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openMiniProfileForUser(user); }); }));
+    _panelController.openRoomUsersSheet(
+      context: context,
+      users: _roomUsers,
+      onUserTap: (user) {
+        Navigator.pop(context);
+        Future<void>.delayed(const Duration(milliseconds: 80), () {
+          if (mounted) _openMiniProfileForUser(user);
+        });
+      },
+    );
   }
 
   void _openRoomRankingsSheet() {
