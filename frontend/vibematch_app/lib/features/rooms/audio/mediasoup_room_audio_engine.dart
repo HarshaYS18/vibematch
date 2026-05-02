@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../audio_mediasoup/data/mediasoup_audio_engine.dart';
 import '../../audio_mediasoup/data/mediasoup_local_mic_service.dart';
 import '../../audio_mediasoup/data/mediasoup_socket_service.dart';
@@ -16,22 +18,25 @@ class MediasoupRoomAudioEngine extends RoomAudioEngine {
       socketService: _socketService,
       micService: _micService,
     );
-    _socketService.seatEvents.listen(_handleSeatEvent);
-    _socketService.newProducers.listen(_handleNewProducer);
-    _socketService.producerClosedEvents.listen(_handleProducerClosed);
-    _socketService.logs.listen((message) => _setStatus(message));
-    _audioEngine.logs.listen((message) => _setStatus(message));
+    _subscriptions.add(_socketService.seatEvents.listen(_handleSeatEvent));
+    _subscriptions.add(_socketService.newProducers.listen(_handleNewProducer));
+    _subscriptions.add(_socketService.producerClosedEvents.listen(_handleProducerClosed));
+    _subscriptions.add(_socketService.logs.listen((message) => _setStatus(message)));
+    _subscriptions.add(_audioEngine.logs.listen((message) => _setStatus(message)));
   }
 
   final String _serverUrl;
   final MediasoupSocketService _socketService = MediasoupSocketService();
   final MediasoupLocalMicService _micService = MediasoupLocalMicService();
+  final List<StreamSubscription<dynamic>> _subscriptions = <StreamSubscription<dynamic>>[];
   late final MediasoupAudioEngine _audioEngine;
 
   String? _roomId;
   String? _peerId;
+  String? _audioToken;
   MediasoupRoomState? _roomState;
   RoomAudioState _state = const RoomAudioState();
+  bool _disposed = false;
 
   @override
   RoomAudioState get state => _state;
@@ -46,28 +51,71 @@ class MediasoupRoomAudioEngine extends RoomAudioEngine {
 
     _roomId = roomId;
     _peerId = peerId;
-
-    final joinedState = await _socketService.connectAndJoin(
-      serverUrl: _serverUrl,
-      roomId: roomId,
-      peerId: peerId,
-      audioToken: audioToken,
-    );
-
-    await _audioEngine.loadRoom(joinedState);
-    await _audioEngine.consumeExistingProducers(joinedState.producers);
-
-    _roomState = joinedState;
+    _audioToken = audioToken;
     _state = _state.copyWith(
-      connected: true,
-      engineLoaded: true,
+      connecting: true,
+      connected: false,
+      reconnecting: false,
+      engineLoaded: false,
       publishing: false,
-      selfMuted: false,
       clearMySeatNo: true,
-      remoteConsumerCount: _audioEngine.remoteConsumerCount,
-      status: 'Connected to room audio',
+      clearLastError: true,
+      status: 'Connecting room audio',
     );
     notifyListeners();
+
+    try {
+      final joinedState = await _socketService.connectAndJoin(
+        serverUrl: _serverUrl,
+        roomId: roomId,
+        peerId: peerId,
+        audioToken: audioToken,
+      );
+
+      await _audioEngine.loadRoom(joinedState);
+      await _audioEngine.consumeExistingProducers(joinedState.producers);
+
+      _roomState = joinedState;
+      _state = _state.copyWith(
+        connected: true,
+        connecting: false,
+        reconnecting: false,
+        engineLoaded: true,
+        publishing: false,
+        selfMuted: false,
+        clearMySeatNo: true,
+        remoteConsumerCount: _audioEngine.remoteConsumerCount,
+        clearLastError: true,
+        status: 'Connected to room audio',
+      );
+      notifyListeners();
+    } catch (error) {
+      _state = _state.copyWith(
+        connected: false,
+        connecting: false,
+        reconnecting: false,
+        engineLoaded: false,
+        lastError: error.toString(),
+        status: 'Room audio failed',
+      );
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> reconnect() async {
+    final roomId = _roomId;
+    final peerId = _peerId;
+    final audioToken = _audioToken;
+    if (roomId == null || peerId == null || audioToken == null) return;
+
+    _state = _state.copyWith(
+      reconnecting: true,
+      status: 'Reconnecting room audio',
+    );
+    notifyListeners();
+
+    await joinAsAudience(roomId: roomId, peerId: peerId, audioToken: audioToken);
   }
 
   @override
@@ -78,6 +126,7 @@ class MediasoupRoomAudioEngine extends RoomAudioEngine {
 
     _state = _state.copyWith(
       mySeatNo: seatNo,
+      clearLastError: true,
       status: 'Audio seat $seatNo joined',
     );
     notifyListeners();
@@ -95,6 +144,7 @@ class MediasoupRoomAudioEngine extends RoomAudioEngine {
       clearMySeatNo: true,
       publishing: false,
       selfMuted: false,
+      clearLastError: true,
       status: 'Left audio seat',
     );
     notifyListeners();
@@ -107,13 +157,24 @@ class MediasoupRoomAudioEngine extends RoomAudioEngine {
       throw StateError('Take an audio seat before publishing mic');
     }
 
-    await _audioEngine.publishMic();
-    _state = _state.copyWith(
-      publishing: true,
-      remoteConsumerCount: _audioEngine.remoteConsumerCount,
-      status: 'Mic publishing',
-    );
-    notifyListeners();
+    try {
+      await _audioEngine.publishMic();
+      _state = _state.copyWith(
+        publishing: true,
+        remoteConsumerCount: _audioEngine.remoteConsumerCount,
+        clearLastError: true,
+        status: 'Mic publishing',
+      );
+      notifyListeners();
+    } catch (error) {
+      _state = _state.copyWith(
+        publishing: false,
+        lastError: error.toString(),
+        status: 'Mic publish failed',
+      );
+      notifyListeners();
+      rethrow;
+    }
   }
 
   @override
@@ -141,6 +202,7 @@ class MediasoupRoomAudioEngine extends RoomAudioEngine {
 
     _state = _state.copyWith(
       selfMuted: muted,
+      clearLastError: true,
       status: muted ? 'Mic muted' : 'Mic unmuted',
     );
     notifyListeners();
@@ -154,13 +216,18 @@ class MediasoupRoomAudioEngine extends RoomAudioEngine {
 
     _roomId = null;
     _peerId = null;
+    _audioToken = null;
     _roomState = null;
     _state = const RoomAudioState(status: 'Audio disconnected');
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
     _audioEngine.dispose();
     _socketService.dispose();
     _micService.dispose();
@@ -172,11 +239,16 @@ class MediasoupRoomAudioEngine extends RoomAudioEngine {
       await _audioEngine.consumeProducer(producer);
       _state = _state.copyWith(
         remoteConsumerCount: _audioEngine.remoteConsumerCount,
+        clearLastError: true,
         status: 'Consuming ${producer.peerId}',
       );
       notifyListeners();
     } catch (error) {
-      _setStatus('Consume failed: $error');
+      _state = _state.copyWith(
+        lastError: error.toString(),
+        status: 'Consume failed',
+      );
+      notifyListeners();
     }
   }
 
