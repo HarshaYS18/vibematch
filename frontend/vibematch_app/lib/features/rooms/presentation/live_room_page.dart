@@ -31,7 +31,6 @@ import 'widgets/live_room_minimized_overlay_service.dart';
 import 'widgets/live_room_privacy_sheet.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
-import 'widgets/room_contribution_rankings_sheet.dart';
 import 'widgets/room_seat_invite_request_sheet.dart';
 import 'widgets/room_seats.dart';
 import 'widgets/room_theme.dart';
@@ -379,7 +378,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openRoomRankingsSheet() {
-    LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => RoomContributionRankingsSheet(roomName: _roomName, users: _allRoomUsers, onUserTap: (user) { Navigator.pop(context); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openMiniProfileForUser(user); }); }));
+    _panelController.openRoomRankingsSheet(
+      context: context,
+      roomName: _roomName,
+      users: _allRoomUsers,
+      onUserTap: (user) {
+        Navigator.pop(context);
+        Future<void>.delayed(const Duration(milliseconds: 80), () {
+          if (mounted) _openMiniProfileForUser(user);
+        });
+      },
+    );
   }
 
   void _sendMessage() { final text = _messageController.text.trim(); if (text.isEmpty) return; _roomMessageController.sendMessage(text); _messageController.clear(); }
