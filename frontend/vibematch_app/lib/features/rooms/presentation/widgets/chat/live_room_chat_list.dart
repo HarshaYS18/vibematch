@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../live_room_models.dart';
+import '../badges/live_room_vip_level_badge.dart';
 import '../room_theme.dart';
 
 class LiveRoomChatList extends StatelessWidget {
@@ -82,15 +83,10 @@ class _LiveRoomChatEntryBubble extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (!_isSystem)
-                      Text(
-                        entry.senderName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isGift ? RoomColors.gold : Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      _ChatSenderLine(
+                        senderName: entry.senderName,
+                        vipLevel: entry.vipLevel,
+                        isGift: isGift,
                       ),
                     Text(
                       entry.message,
@@ -134,6 +130,46 @@ class _LiveRoomChatEntryBubble extends StatelessWidget {
     if (isGift) return RoomColors.gold.withValues(alpha: 0.26);
     if (isApplication) return RoomColors.aqua.withValues(alpha: 0.24);
     return Colors.white.withValues(alpha: 0.08);
+  }
+}
+
+class _ChatSenderLine extends StatelessWidget {
+  const _ChatSenderLine({
+    required this.senderName,
+    required this.vipLevel,
+    required this.isGift,
+  });
+
+  final String senderName;
+  final int vipLevel;
+  final bool isGift;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 1.5),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              senderName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isGift ? RoomColors.gold : Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          if (vipLevel > 0) ...[
+            const SizedBox(width: 5),
+            LiveRoomVipLevelBadge(vipLevel: vipLevel, compact: true),
+          ],
+        ],
+      ),
+    );
   }
 }
 
