@@ -20,7 +20,6 @@ import 'modules/live_room_message_composer_module.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_background_sheet.dart';
 import 'widgets/live_room_body.dart';
-import 'widgets/live_room_emoji_sheet.dart';
 import 'widgets/live_room_gift_overlay.dart';
 import 'widgets/live_room_info_sheet.dart';
 import 'widgets/live_room_invite_sheet.dart';
@@ -529,7 +528,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
   void _openInboxPageFromSheet(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openInboxPage(); }); }
-  void _openEmojiTray() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomEmojiSheet(onEmojiTap: (emoji) { Navigator.pop(context); RoomToast.show(context, '$emoji reaction will animate over avatar'); })); }
+  void _openEmojiTray() {
+    _clearRoomFocus();
+    _panelController.openEmojiSheet(
+      context: context,
+      onEmojiTap: (emoji) {
+        Navigator.pop(context);
+        RoomToast.show(context, '$emoji reaction will animate over avatar');
+      },
+    );
+  }
 
   void _openSettingsSheet() {
     _clearRoomFocus();
