@@ -17,27 +17,54 @@ class LiveRoomAudioController extends ChangeNotifier {
   final AudioSessionApiService _sessionApi;
   final RoomAudioEngine _engine;
 
+  String? _lastRoomId;
+  int? _lastSeatIndex;
+  bool _wantedPublishing = false;
+  bool _operationInFlight = false;
+
   RoomAudioState get state => _engine.state;
   bool get connected => state.connected;
+  bool get connecting => state.connecting;
   bool get publishing => state.publishing;
   bool get selfMuted => state.selfMuted;
+  bool get canRetry => _lastRoomId != null && !_operationInFlight;
 
   Future<void> joinRoomAudio(String roomId) async {
-    final session = await _sessionApi.createRoomAudioSession(roomId);
-    await _engine.joinAsAudience(
-      roomId: session.roomId,
-      peerId: session.peerId,
-      audioToken: session.audioToken,
-    );
+    if (_operationInFlight) return;
+    _operationInFlight = true;
+    try {
+      _lastRoomId = roomId;
+      final session = await _sessionApi.createRoomAudioSession(roomId);
+      await _engine.joinAsAudience(
+        roomId: session.roomId,
+        peerId: session.peerId,
+        audioToken: session.audioToken,
+      );
+    } finally {
+      _operationInFlight = false;
+    }
+  }
+
+  Future<void> retryLastRoomAudio() async {
+    final roomId = _lastRoomId;
+    if (roomId == null) return;
+    await joinRoomAudio(roomId);
+    if (_wantedPublishing && _lastSeatIndex != null) {
+      await takeSeatAndPublish(_lastSeatIndex!);
+    }
   }
 
   Future<void> takeSeatAndPublish(int seatIndex) async {
+    _lastSeatIndex = seatIndex;
+    _wantedPublishing = true;
     final seatNo = seatIndex + 1;
     await _engine.takeSpeakerSeat(seatNo);
     await _engine.publishMic();
   }
 
   Future<void> leaveSeat() async {
+    _lastSeatIndex = null;
+    _wantedPublishing = false;
     await _engine.leaveSpeakerSeat();
   }
 
@@ -46,10 +73,14 @@ class LiveRoomAudioController extends ChangeNotifier {
   }
 
   Future<void> stopPublishing() async {
+    _wantedPublishing = false;
     await _engine.stopPublishing();
   }
 
   Future<void> leaveRoomAudio() async {
+    _lastRoomId = null;
+    _lastSeatIndex = null;
+    _wantedPublishing = false;
     await _engine.leaveRoomAudio();
   }
 
