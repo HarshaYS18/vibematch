@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../data/mediasoup_audio_engine.dart';
 import '../data/mediasoup_local_mic_service.dart';
 import '../data/mediasoup_socket_service.dart';
 import '../models/mediasoup_producer_state.dart';
@@ -24,6 +25,10 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
 
   final MediasoupSocketService _socketService = MediasoupSocketService();
   final MediasoupLocalMicService _micService = MediasoupLocalMicService();
+  late final MediasoupAudioEngine _audioEngine = MediasoupAudioEngine(
+    socketService: _socketService,
+    micService: _micService,
+  );
 
   final TextEditingController _serverController = TextEditingController(text: 'http://10.0.2.2:4000');
   final TextEditingController _roomController = TextEditingController(text: 'VM1001');
@@ -37,14 +42,17 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
   bool _joined = false;
   bool _micStarted = false;
   bool _selfMuted = false;
+  bool _audioEngineLoaded = false;
   int? _mySeatNo;
 
   @override
   void initState() {
     super.initState();
     _subscriptions.add(_socketService.logs.listen(_addLog));
+    _subscriptions.add(_audioEngine.logs.listen(_addLog));
     _subscriptions.add(_socketService.seatEvents.listen(_handleSeatEvent));
     _subscriptions.add(_socketService.newProducers.listen(_handleNewProducer));
+    _subscriptions.add(_socketService.producerClosedEvents.listen(_handleProducerClosed));
     _subscriptions.add(_socketService.peerLeftEvents.listen((peerId) {
       _addLog('peer left event received: $peerId');
     }));
@@ -55,6 +63,7 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
+    _audioEngine.dispose();
     _socketService.dispose();
     _micService.dispose();
     _serverController.dispose();
@@ -74,29 +83,39 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
         return;
       }
 
+      await _audioEngine.close();
+
       final state = await _socketService.connectAndJoin(
         serverUrl: serverUrl,
         roomId: roomId,
         peerId: peerId,
       );
 
+      await _audioEngine.loadRoom(state);
+      await _audioEngine.consumeExistingProducers(state.producers);
+
       setState(() {
         _roomState = state;
         _joined = true;
+        _audioEngineLoaded = true;
+        _micStarted = false;
+        _selfMuted = false;
         _mySeatNo = _findMySeatNo(state.seats);
       });
 
-      _addLog('room joined with ${state.seats.length} seats and ${state.producers.length} producers');
+      _addLog('room joined with ${state.seats.length} seats and ${state.producers.length} remote producers');
     });
   }
 
   Future<void> _disconnect() async {
     await _runBusy(() async {
+      await _audioEngine.close();
       await _micService.stopMic();
       await _socketService.disconnect();
 
       setState(() {
         _joined = false;
+        _audioEngineLoaded = false;
         _micStarted = false;
         _selfMuted = false;
         _mySeatNo = null;
@@ -125,11 +144,17 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
     if (!_joined) return;
 
     await _runBusy(() async {
+      await _audioEngine.stopPublishing();
+      await _micService.stopMic();
       final response = await _socketService.leaveSeat();
       final seats = MediasoupRoomState.seatsFromEvent(response);
       _applySeats(seats);
-      setState(() => _mySeatNo = null);
-      _addLog('seat left');
+      setState(() {
+        _mySeatNo = null;
+        _micStarted = false;
+        _selfMuted = false;
+      });
+      _addLog('seat left and local producer closed');
     });
   }
 
@@ -144,16 +169,22 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
       return;
     }
 
+    if (!_audioEngineLoaded) {
+      _showSnack('Audio engine is not loaded yet. Rejoin the room.');
+      return;
+    }
+
     await _runBusy(() async {
-      await _micService.startMic();
-      _micService.setMuted(_selfMuted);
+      await _audioEngine.publishMic();
+      await _audioEngine.setMuted(_selfMuted);
       setState(() => _micStarted = true);
-      _addLog('local mic started. SFU publish wiring is next step.');
+      _addLog('mic published to SFU');
     });
   }
 
   Future<void> _stopMic() async {
     await _runBusy(() async {
+      await _audioEngine.stopPublishing();
       await _micService.stopMic();
       setState(() {
         _micStarted = false;
@@ -173,7 +204,7 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
       final nextMuted = !_selfMuted;
       final response = await _socketService.setSelfMuted(nextMuted);
       final seats = MediasoupRoomState.seatsFromEvent(response);
-      _micService.setMuted(nextMuted);
+      await _audioEngine.setMuted(nextMuted);
       setState(() => _selfMuted = nextMuted);
       _applySeats(seats);
       _addLog('self mute changed to $nextMuted');
@@ -188,16 +219,35 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
     _applySeats(seats);
   }
 
-  void _handleNewProducer(MediasoupProducerState producer) {
+  Future<void> _handleNewProducer(MediasoupProducerState producer) async {
     final exists = _roomState.producers.any((item) => item.producerId == producer.producerId);
-    if (exists) return;
+    if (!exists) {
+      setState(() {
+        _roomState = _roomState.copyWith(
+          producers: <MediasoupProducerState>[
+            ..._roomState.producers,
+            producer,
+          ],
+        );
+      });
+    }
 
+    try {
+      await _audioEngine.consumeProducer(producer);
+      if (mounted) setState(() {});
+    } catch (error) {
+      _addLog('consume error: $error');
+    }
+  }
+
+  Future<void> _handleProducerClosed(String producerId) async {
+    await _audioEngine.closeConsumer(producerId);
+    if (!mounted) return;
     setState(() {
       _roomState = _roomState.copyWith(
-        producers: <MediasoupProducerState>[
-          ..._roomState.producers,
-          producer,
-        ],
+        producers: _roomState.producers
+            .where((producer) => producer.producerId != producerId)
+            .toList(growable: false),
       );
     });
   }
@@ -236,8 +286,8 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
     if (!mounted) return;
     setState(() {
       _logs.insert(0, message);
-      if (_logs.length > 80) {
-        _logs.removeRange(80, _logs.length);
+      if (_logs.length > 100) {
+        _logs.removeRange(100, _logs.length);
       }
     });
   }
@@ -338,11 +388,13 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
         runSpacing: 8,
         children: [
           _StatusPill(label: _joined ? 'Connected' : 'Disconnected', color: _joined ? _aqua : Colors.white54),
+          _StatusPill(label: _audioEngineLoaded ? 'Device loaded' : 'Device off', color: _audioEngineLoaded ? _aqua : Colors.white54),
           _StatusPill(label: 'Room ${_roomState.roomId}', color: _gold),
           _StatusPill(label: '${_roomState.occupiedSeatCount}/17 seats', color: _aqua),
           _StatusPill(label: '${_roomState.activeProducerCount} producers', color: _pink),
+          _StatusPill(label: '${_audioEngine.remoteConsumerCount} consuming', color: _aqua),
           _StatusPill(label: _mySeatNo == null ? 'Audience' : 'Seat $_mySeatNo', color: _mySeatNo == null ? Colors.white54 : _gold),
-          _StatusPill(label: _micStarted ? 'Mic ready' : 'Mic off', color: _micStarted ? _aqua : Colors.white54),
+          _StatusPill(label: _micStarted ? 'Publishing mic' : 'Mic off', color: _micStarted ? _aqua : Colors.white54),
           _StatusPill(label: _selfMuted ? 'Muted' : 'Unmuted', color: _selfMuted ? _pink : _aqua),
         ],
       ),
@@ -355,18 +407,18 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionTitle(
-            title: 'Seat and mic controls',
-            subtitle: 'This test keeps audio isolated from the production Live Room.',
+            title: 'Real SFU audio controls',
+            subtitle: 'Seated users publish mic audio. Audience users consume room producers.',
           ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _busy || !_joined || _mySeatNo == null ? null : _startMic,
+                  onPressed: _busy || !_joined || _mySeatNo == null || _micStarted ? null : _startMic,
                   style: FilledButton.styleFrom(backgroundColor: _aqua, foregroundColor: _bg),
                   icon: const Icon(Icons.mic_rounded),
-                  label: const Text('Start local mic'),
+                  label: const Text('Publish mic'),
                 ),
               ),
               const SizedBox(width: 10),
@@ -375,7 +427,7 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
                   onPressed: _busy || !_micStarted ? null : _stopMic,
                   style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
                   icon: const Icon(Icons.mic_off_rounded),
-                  label: const Text('Stop mic'),
+                  label: const Text('Stop publish'),
                 ),
               ),
             ],
@@ -388,7 +440,7 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
                   onPressed: _busy || !_joined || _mySeatNo == null ? null : _toggleSelfMute,
                   style: OutlinedButton.styleFrom(foregroundColor: _selfMuted ? _pink : _aqua),
                   icon: Icon(_selfMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
-                  label: Text(_selfMuted ? 'Unmute state' : 'Mute state'),
+                  label: Text(_selfMuted ? 'Unmute' : 'Mute'),
                 ),
               ),
               const SizedBox(width: 10),
@@ -404,7 +456,7 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Next patch will connect mediasoup send/receive transports to this page. This patch validates multi-room signaling, 17-seat state, and local mic capture safely first.',
+            'Production path: this standalone page validates publish/consume before we create RoomAudioEngine abstraction and wire Live Room seats.',
             style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.35),
           ),
         ],
@@ -460,13 +512,13 @@ class _MediasoupAudioTestPageState extends State<MediasoupAudioTestPage> {
         children: [
           const _SectionTitle(
             title: 'Test logs',
-            subtitle: 'Use this to verify multi-room socket events during local testing.',
+            subtitle: 'Use this to verify multi-room publish/consume during local testing.',
           ),
           const SizedBox(height: 10),
           if (_logs.isEmpty)
             const Text('No logs yet.', style: TextStyle(color: Colors.white54))
           else
-            for (final log in _logs.take(30))
+            for (final log in _logs.take(34))
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
