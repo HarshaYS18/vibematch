@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../inbox/presentation/inbox_page.dart';
 import '../live_room_models.dart';
 import '../widgets/live_room_emoji_sheet.dart';
 import '../widgets/live_room_games_sheet.dart';
@@ -101,6 +102,32 @@ class LiveRoomPanelController {
         users: users,
         onUserTap: onUserTap,
       ),
+    );
+  }
+
+  void openInboxMiniPanel({required BuildContext context}) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      builder: (sheetContext) {
+        final height = MediaQuery.sizeOf(sheetContext).height * 0.50;
+
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            height: height,
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            ),
+            child: const InboxPage(),
+          ),
+        );
+      },
     );
   }
 }
