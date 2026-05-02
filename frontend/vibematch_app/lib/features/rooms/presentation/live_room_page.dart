@@ -28,7 +28,6 @@ import 'widgets/live_room_mini_profile_launcher.dart';
 import 'widgets/live_room_minimized_bubble.dart';
 import 'widgets/live_room_minimized_overlay_service.dart';
 import 'widgets/live_room_privacy_sheet.dart';
-import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
 import 'widgets/room_seat_invite_request_sheet.dart';
 import 'widgets/room_seats.dart';
@@ -601,7 +600,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       },
     );
   }
-  void _openSeatLayoutSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomSeatLayoutPickerSheet(selectedLayout: _seatController.layoutId, onSelected: (layout) { _seatController.changeLayout(layout); Navigator.pop(context); })); }
+  void _openSeatLayoutSheet() {
+    _clearRoomFocus();
+    _panelController.openSeatLayoutSheet(
+      context: context,
+      selectedLayout: _seatController.layoutId,
+      onSelected: (layout) {
+        _seatController.changeLayout(layout);
+        Navigator.pop(context);
+      },
+    );
+  }
   void _openBackgroundSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomBackgroundSheet(currentTheme: _selectedBackgroundTheme, onThemeSelected: (theme) { _roomStateController.setSelectedBackgroundTheme(theme); RoomToast.show(context, _settingsController.backgroundAppliedToast(theme)); }, onStoreTap: () => RoomToast.show(context, 'Theme store opened'))); }
   void _openAnnouncementSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomAnnouncementSheet(controller: _announcementController, onSubmit: (message) { Navigator.pop(context); if (message.isNotEmpty) { _insertSystemMessage(message); _announcementController.clear(); } RoomToast.show(context, 'Announcement saved'); })); }
 
