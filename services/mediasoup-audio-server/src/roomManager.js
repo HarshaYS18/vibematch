@@ -1,5 +1,10 @@
 const config = require('./config');
-const { getWorker } = require('./mediasoupServer');
+const {
+  assignWorkerForRoom,
+  decrementWorkerRoomCount,
+  getWorkerStats,
+  incrementWorkerRoomCount,
+} = require('./mediasoupServer');
 
 const rooms = new Map();
 
@@ -19,6 +24,27 @@ function createSeatMap() {
   return seats;
 }
 
+function getRoomStats() {
+  const roomStats = Array.from(rooms.values()).map((room) => ({
+    id: room.id,
+    workerIndex: room.worker.appData.index,
+    peerCount: room.peers.size,
+    speakerCount: Array.from(room.seats.values()).filter((seat) => Boolean(seat.peerId)).length,
+    producerCount: Array.from(room.peers.values()).reduce((count, peer) => count + peer.producers.size, 0),
+    consumerCount: Array.from(room.peers.values()).reduce((count, peer) => count + peer.consumers.size, 0),
+    createdAt: room.createdAt.toISOString(),
+  }));
+
+  return {
+    roomCount: rooms.size,
+    maxRooms: config.maxRooms,
+    maxSpeakersPerRoom: config.maxSpeakersPerRoom,
+    maxRoomPeers: config.maxRoomPeers,
+    workers: getWorkerStats(),
+    rooms: roomStats,
+  };
+}
+
 async function getOrCreateRoom(roomId) {
   let room = rooms.get(roomId);
 
@@ -26,13 +52,18 @@ async function getOrCreateRoom(roomId) {
     return room;
   }
 
-  const worker = getWorker();
+  if (rooms.size >= config.maxRooms) {
+    throw new Error(`server room limit reached: ${config.maxRooms}`);
+  }
+
+  const worker = assignWorkerForRoom();
   const router = await worker.createRouter({
     mediaCodecs: config.mediasoup.router.mediaCodecs,
   });
 
   room = {
     id: roomId,
+    worker,
     router,
     peers: new Map(),
     seats: createSeatMap(),
@@ -40,7 +71,9 @@ async function getOrCreateRoom(roomId) {
   };
 
   rooms.set(roomId, room);
-  console.log(`[room] created room=${roomId}`);
+  incrementWorkerRoomCount(worker);
+
+  console.log(`[room] created room=${roomId} worker=${worker.appData.index}`);
 
   return room;
 }
@@ -156,6 +189,19 @@ function setAdminMuted(room, targetPeerId, muted) {
   return seat;
 }
 
+function closeRoomIfEmpty(roomId, room) {
+  if (!room || room.peers.size !== 0) {
+    return room;
+  }
+
+  room.router.close();
+  rooms.delete(roomId);
+  decrementWorkerRoomCount(room.worker);
+  console.log(`[room] closed empty room=${roomId} worker=${room.worker.appData.index}`);
+
+  return null;
+}
+
 function removePeer(roomId, peerId) {
   const room = rooms.get(roomId);
   if (!room) return null;
@@ -180,19 +226,13 @@ function removePeer(roomId, peerId) {
   room.peers.delete(peerId);
   console.log(`[peer] removed peer=${peerId} room=${roomId}`);
 
-  if (room.peers.size === 0) {
-    room.router.close();
-    rooms.delete(roomId);
-    console.log(`[room] closed empty room=${roomId}`);
-    return null;
-  }
-
-  return room;
+  return closeRoomIfEmpty(roomId, room);
 }
 
 module.exports = {
   getOrCreateRoom,
   getRoom,
+  getRoomStats,
   createPeer,
   removePeer,
   getSeatSnapshot,
