@@ -19,6 +19,12 @@ module.exports = {
   maxSpeakersPerRoom,
   maxRoomPeers: Number(process.env.MAX_ROOM_PEERS || 250),
 
+  auth: {
+    requireAudioToken: process.env.REQUIRE_AUDIO_TOKEN !== 'false',
+    jwtSecret: process.env.JWT_SECRET_KEY || 'change-this-secret-key-in-production',
+    jwtAlgorithm: process.env.JWT_ALGORITHM || 'HS256',
+  },
+
   iceServers: [
     {
       urls: [`stun:${turnHost}:${turnPort}`],
