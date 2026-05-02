@@ -5,6 +5,7 @@ import '../live_room_models.dart';
 import '../widgets/live_room_emoji_sheet.dart';
 import '../widgets/live_room_games_sheet.dart';
 import '../widgets/live_room_gift_panel_sheet.dart';
+import '../widgets/live_room_seat_layout_picker_sheet.dart';
 import '../widgets/live_room_users_sheet.dart';
 import '../widgets/room_contribution_rankings_sheet.dart';
 import 'live_room_gift_controller.dart';
@@ -128,6 +129,20 @@ class LiveRoomPanelController {
           ),
         );
       },
+    );
+  }
+
+  void openSeatLayoutSheet({
+    required BuildContext context,
+    required String selectedLayout,
+    required ValueChanged<String> onSelected,
+  }) {
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (_) => LiveRoomSeatLayoutPickerSheet(
+        selectedLayout: selectedLayout,
+        onSelected: onSelected,
+      ),
     );
   }
 }
