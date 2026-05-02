@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import '../widgets/live_room_games_sheet.dart';
 import '../widgets/live_room_gift_panel_sheet.dart';
 import 'live_room_gift_controller.dart';
 import 'live_room_sheet_controller.dart';
@@ -36,6 +37,24 @@ class LiveRoomPanelController {
           giftController.sendGift(roomUsers);
         },
         onRecharge: onRecharge,
+      ),
+    );
+  }
+
+  void openGamesSheet({
+    required BuildContext context,
+    required VoidCallback onCrystalHuntTap,
+    required VoidCallback onLudoTap,
+    required VoidCallback onCarromTap,
+    required VoidCallback onPkTap,
+  }) {
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (_) => LiveRoomGamesSheet(
+        onCrystalHuntTap: onCrystalHuntTap,
+        onLudoTap: onLudoTap,
+        onCarromTap: onCarromTap,
+        onPkTap: onPkTap,
       ),
     );
   }
