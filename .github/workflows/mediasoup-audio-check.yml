@@ -1,0 +1,34 @@
+name: Mediasoup Audio Server Check
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - mediasoup-audio-sfu-poc
+      - live-room-modular-performance-v1
+
+jobs:
+  node-check:
+    name: Check mediasoup audio server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: services/mediasoup-audio-server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: services/mediasoup-audio-server
+        run: npm install
+
+      - name: Check server JavaScript
+        working-directory: services/mediasoup-audio-server
+        run: npm run check
