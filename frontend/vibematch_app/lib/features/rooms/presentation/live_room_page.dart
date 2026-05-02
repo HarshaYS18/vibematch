@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../inbox/presentation/inbox_page.dart';
+import '../audio/live_room_audio_controller.dart';
 import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
@@ -69,6 +71,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final LiveRoomSeatController _seatController;
   late final LiveRoomMessageController _roomMessageController;
   late final LiveRoomModerationController _moderationController;
+  late final LiveRoomAudioController _audioController;
 
   final LiveRoomUsersController _usersController = const LiveRoomUsersController();
   final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
@@ -156,14 +159,22 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         RoomToast.show(context, message);
       },
     );
+    _audioController = LiveRoomAudioController()
+      ..addListener(_onRoomAudioChanged);
     if (_roomUsers.isNotEmpty) {
       _giftController.selectedReceiverIds.add(_roomUsers.first.id);
+    }
+    if (AppConstants.useMediasoupAudioInLiveRoom) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _joinRoomAudioForTesting());
     }
   }
 
   @override
   void dispose() {
     _roomStateController.removeListener(_onRoomStateChanged);
+    _audioController.removeListener(_onRoomAudioChanged);
+    _audioController.leaveRoomAudio();
+    _audioController.dispose();
     _messageController.dispose();
     _announcementController.dispose();
     _messageFocusNode.dispose();
@@ -175,6 +186,47 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _onRoomStateChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _onRoomAudioChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _joinRoomAudioForTesting() async {
+    if (!mounted || _audioController.connected) return;
+    try {
+      await _audioController.joinRoomAudio(_roomId);
+      if (!mounted) return;
+      _insertSystemMessage('WebRTC audio connected: ${_audioController.state.status}');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, 'WebRTC audio not connected: $error');
+    }
+  }
+
+  Future<void> _publishCurrentUserSeatAudio(int seatIndex) async {
+    if (!AppConstants.useMediasoupAudioInLiveRoom) return;
+    try {
+      if (!_audioController.connected) {
+        await _audioController.joinRoomAudio(_roomId);
+      }
+      await _audioController.takeSeatAndPublish(seatIndex);
+      if (!mounted) return;
+      RoomToast.show(context, 'WebRTC mic live on seat ${seatIndex + 1}');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, 'WebRTC mic failed: $error');
+    }
+  }
+
+  Future<void> _leaveCurrentUserSeatAudio() async {
+    if (!AppConstants.useMediasoupAudioInLiveRoom) return;
+    try {
+      await _audioController.leaveSeat();
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, 'WebRTC leave seat failed: $error');
+    }
   }
 
   @override
@@ -242,7 +294,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               canManageSeatApplications: _viewerCanManageRoom,
               messageController: _messageController,
               messageFocusNode: _messageFocusNode,
-              micMuted: _seatController.micMuted,
+              micMuted: _audioController.connected ? _audioController.selfMuted : _seatController.micMuted,
               inboxUnreadCount: _inboxUnreadCount,
               imagesEnabled: _roomImagesEnabled,
               onBack: _openLeaveSheet,
@@ -255,7 +307,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onSeatTap: _onSeatTap,
               onUserTap: _onUserTap,
               onInvite: _inviteSeat,
-              onSwitch: _seatController.switchSeat,
+              onSwitch: _switchSeatWithAudio,
               onLock: _seatController.lockSeat,
               onUnlock: _seatController.unlockSeat,
               onApproveSeatApplication: _approveSeatApplication,
@@ -303,6 +355,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         _seatController.applyForSeat(index: index, messages: _roomMessageController.messages);
       } else {
         _seatController.occupySeat(index);
+        _publishCurrentUserSeatAudio(index);
       }
       return;
     }
@@ -317,6 +370,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _approveSeatApplication(ChatEntry entry) => _seatController.approveSeatApplication(entry: entry, messages: _roomMessageController.messages, allRoomUsers: _allRoomUsers);
   void _inviteSeat(int index) { _seatController.clearSelectedSeat(); _openSeatInviteSheet(index); }
+
+  void _switchSeatWithAudio(int index) {
+    _seatController.switchSeat(index);
+    _publishCurrentUserSeatAudio(index);
+  }
 
   void _openSeatInviteSheet(int seatIndex) {
     _clearRoomFocus();
@@ -348,6 +406,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       _seatController.seats[seatIndex].user == null;
                   if (seatAvailable) {
                     _seatController.occupySeat(seatIndex);
+                    _publishCurrentUserSeatAudio(seatIndex);
                     RoomToast.show(context, 'Seat accepted');
                   } else {
                     RoomToast.show(context, 'Seat unavailable');
@@ -364,7 +423,29 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _dismissRoomOverlays() { dismissRoomSeatActionPill(); _clearRoomFocus(); }
   void _insertSystemMessage(String message) => _roomMessageController.insertSystemMessage(message);
   void _clearRoomFocus() { _messageFocusNode.unfocus(); FocusManager.instance.primaryFocus?.unfocus(); }
-  void _toggleMic() { _clearRoomFocus(); _seatController.toggleMic(); }
+  void _toggleMic() {
+    _clearRoomFocus();
+    final currentSeatIndex = _seatController.seats.indexWhere((seat) => seat.user?.id == _currentUser.id);
+    if (!AppConstants.useMediasoupAudioInLiveRoom) {
+      _seatController.toggleMic();
+      return;
+    }
+    if (currentSeatIndex < 0) {
+      RoomToast.show(context, 'Take a seat before using mic');
+      return;
+    }
+    if (!_audioController.publishing) {
+      _publishCurrentUserSeatAudio(currentSeatIndex);
+      return;
+    }
+    _audioController.toggleSelfMute().then((_) {
+      if (!mounted) return;
+      _seatController.toggleMic();
+    }).catchError((Object error) {
+      if (!mounted) return;
+      RoomToast.show(context, 'WebRTC mute failed: $error');
+    });
+  }
   void _handleJoinRoom() { _clearRoomFocus(); _roomMessageController.requestJoin(); _openInfoSheet('Join request sent', 'Your request to become a member of $_roomName has been sent to the room owner/admins.'); }
 
   void _openRoomUsersSheet() {
@@ -397,7 +478,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       onRemoveAdminTap: _removeUserAsAdmin,
       onReportTap: _openReportForUser,
       onKickOutDurationSelected: _canKickOutUser(user) ? (duration) => _kickOutUser(user: user, duration: duration) : null,
-      onLeaveAndLock: (targetSeatIndex) { Navigator.pop(context); _seatController.leaveAndLockSeat(targetSeatIndex); },
+      onLeaveAndLock: (targetSeatIndex) { Navigator.pop(context); _seatController.leaveAndLockSeat(targetSeatIndex); if (_seatController.seats[targetSeatIndex].user?.id == _currentUser.id) _leaveCurrentUserSeatAudio(); },
       onLeaveSeatOnly: (targetSeatIndex) {
         Navigator.pop(context);
         final seatedUser = targetSeatIndex >= 0 && targetSeatIndex < _seatController.seats.length
@@ -405,11 +486,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             : null;
         if (seatedUser?.id == _currentUser.id) {
           _seatController.leaveAndLockSeat(targetSeatIndex);
+          _leaveCurrentUserSeatAudio();
         } else {
           _seatController.leaveSeatOnly(targetSeatIndex);
         }
       },
-      onSelfMuteToggle: (userId) { Navigator.pop(context); _seatController.toggleSelfMute(userId); },
+      onSelfMuteToggle: (userId) { Navigator.pop(context); _seatController.toggleSelfMute(userId); if (userId == _currentUser.id) _audioController.toggleSelfMute(); },
       onAdminMuteToggle: (userId) { Navigator.pop(context); _seatController.toggleAdminMute(userId); },
       onGiftTap: (userId) { Navigator.pop(context); setState(() { _giftController.selectedReceiverIds..clear()..add(userId); }); _openGiftPanel(); },
     );
@@ -581,6 +663,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openLeaveSheet() { dismissRoomSeatActionPill(); if (!_navigationController.canOpenLeaveSheet(leaveSheetOpen: _leaveSheetOpen, exitingRoom: _exitingRoom)) return; _roomStateController.setLeaveSheetOpen(true); _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (sheetContext) => LiveRoomLeaveSheet(onStay: () { dismissRoomSeatActionPill(); _stayAndMinimize(sheetContext); }, onLeave: () { dismissRoomSeatActionPill(); _leaveRoomFromSheet(sheetContext); })).whenComplete(() { if (mounted) _roomStateController.setLeaveSheetOpen(false); }); }
   void _stayAndMinimize(BuildContext sheetContext) { dismissRoomSeatActionPill(); final roomNavigator = Navigator.of(context); final rootNavigator = Navigator.of(context, rootNavigator: true); final roomName = _roomName; final roomId = _roomId; final language = widget.language; final modeTitle = widget.modeTitle; final onlineCount = widget.onlineCount; LiveRoomMinimizedOverlayService.show(context: rootNavigator.context, onRestore: () { rootNavigator.push(MaterialPageRoute(builder: (_) => LiveRoomPage(roomName: roomName, roomId: roomId, language: language, modeTitle: modeTitle, onlineCount: onlineCount))); }); Navigator.pop(sheetContext); if (!mounted) return; _roomStateController.setAllowRoomPop(true); WidgetsBinding.instance.addPostFrameCallback((_) { if (!mounted) return; if (roomNavigator.canPop()) { roomNavigator.pop(); } else { _roomStateController.setMinimized(true); } }); }
-  void _leaveRoomFromSheet(BuildContext sheetContext) { if (!_navigationController.canExitRoom(exitingRoom: _exitingRoom)) return; _roomStateController.setExitingRoom(true); Navigator.pop(sheetContext); if (!mounted) return; _roomStateController.setAllowRoomPop(true); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) Navigator.maybePop(context); }); }
+  void _leaveRoomFromSheet(BuildContext sheetContext) { if (!_navigationController.canExitRoom(exitingRoom: _exitingRoom)) return; _roomStateController.setExitingRoom(true); _audioController.leaveRoomAudio(); Navigator.pop(sheetContext); if (!mounted) return; _roomStateController.setAllowRoomPop(true); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) Navigator.maybePop(context); }); }
   void _openInfoSheet(String title, String body) { LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomInfoSheet(title: title, body: body)); }
 }
