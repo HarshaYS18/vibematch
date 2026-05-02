@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../inbox/presentation/inbox_page.dart';
 import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
@@ -519,30 +518,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _openInboxPage() {
     _clearRoomFocus();
     _roomStateController.clearInboxUnreadCount();
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: false,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.18),
-      builder: (sheetContext) {
-        final height = MediaQuery.sizeOf(sheetContext).height * 0.50;
-
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            height: height,
-            clipBehavior: Clip.antiAlias,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-            ),
-            child: const InboxPage(),
-          ),
-        );
-      },
-    );
+    _panelController.openInboxMiniPanel(context: context);
   }
   void _openInboxPageFromSheet(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openInboxPage(); }); }
   void _openEmojiTray() {
