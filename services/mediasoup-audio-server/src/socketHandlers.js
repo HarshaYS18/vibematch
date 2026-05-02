@@ -1,4 +1,5 @@
 const config = require('./config');
+const { validateAudioToken } = require('./auth');
 const {
   getOrCreateRoom,
   getRoom,
@@ -72,6 +73,12 @@ function pausePeerProducers(peer, paused) {
   }
 }
 
+function requireJoinedPeer(roomId, peerId, expectedRoomId, expectedPeerId) {
+  if (String(roomId) !== String(expectedRoomId) || String(peerId) !== String(expectedPeerId)) {
+    throw new Error('peer session mismatch');
+  }
+}
+
 function registerSocketHandlers(io) {
   io.on('connection', (socket) => {
     console.log(`[socket] connected socket=${socket.id}`);
@@ -79,11 +86,13 @@ function registerSocketHandlers(io) {
     let joinedRoomId = null;
     let joinedPeerId = null;
 
-    socket.on('joinRoom', async ({ roomId, peerId }, callback) => {
+    socket.on('joinRoom', async ({ roomId, peerId, audioToken }, callback) => {
       try {
         if (!roomId || !peerId) {
           throw new Error('roomId and peerId are required');
         }
+
+        validateAudioToken({ audioToken, roomId, peerId });
 
         joinedRoomId = String(roomId);
         joinedPeerId = String(peerId);
@@ -122,6 +131,7 @@ function registerSocketHandlers(io) {
 
     socket.on('takeSeat', ({ roomId, peerId, seatNo }, callback) => {
       try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
@@ -138,6 +148,7 @@ function registerSocketHandlers(io) {
 
     socket.on('leaveSeat', ({ roomId, peerId }, callback) => {
       try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
@@ -159,6 +170,7 @@ function registerSocketHandlers(io) {
 
     socket.on('createWebRtcTransport', async ({ roomId, peerId, direction }, callback) => {
       try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
@@ -181,6 +193,7 @@ function registerSocketHandlers(io) {
 
     socket.on('connectTransport', async ({ roomId, peerId, transportId, dtlsParameters }, callback) => {
       try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
@@ -200,6 +213,7 @@ function registerSocketHandlers(io) {
 
     socket.on('produce', async ({ roomId, peerId, transportId, kind, rtpParameters }, callback) => {
       try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
@@ -246,6 +260,7 @@ function registerSocketHandlers(io) {
 
     socket.on('consume', async ({ roomId, peerId, producerId, transportId, rtpCapabilities }, callback) => {
       try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
@@ -293,6 +308,7 @@ function registerSocketHandlers(io) {
 
     socket.on('setSelfMuted', ({ roomId, peerId, muted }, callback) => {
       try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
@@ -314,6 +330,9 @@ function registerSocketHandlers(io) {
 
     socket.on('setAdminMuted', ({ roomId, targetPeerId, muted }, callback) => {
       try {
+        if (String(roomId) !== String(joinedRoomId)) {
+          throw new Error('room session mismatch');
+        }
         const room = getRoom(roomId);
         if (!room) throw new Error('room not found');
 
