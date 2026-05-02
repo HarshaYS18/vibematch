@@ -21,7 +21,6 @@ import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_background_sheet.dart';
 import 'widgets/live_room_body.dart';
 import 'widgets/live_room_emoji_sheet.dart';
-import 'widgets/live_room_games_sheet.dart';
 import 'widgets/live_room_gift_overlay.dart';
 import 'widgets/live_room_info_sheet.dart';
 import 'widgets/live_room_invite_sheet.dart';
@@ -579,7 +578,28 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _openJoinRequestsSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => StatefulBuilder(builder: (context, setSheetState) => LiveRoomJoinRequestsSheet(users: _roomMessageController.joinRequestUsers, onApprove: (user) { _resolveJoinRequest(user, approved: true); setSheetState(() {}); }, onReject: (user) { _resolveJoinRequest(user, approved: false); setSheetState(() {}); }))); }
   void _resolveJoinRequest(SeatUser user, {required bool approved}) { _roomMessageController.resolveJoinRequest(user: user, approved: approved, roomName: _roomName); RoomToast.show(context, approved ? '${user.name} approved' : '${user.name} rejected'); }
   void _openPrivacySheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomPrivacySheet(currentMode: _privacyMode, onModeChanged: (mode) { _roomStateController.setPrivacyMode(mode); _insertSystemMessage(_settingsController.privacyModeSystemMessage(mode)); })); }
-  void _openGamesSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomGamesSheet(onCrystalHuntTap: () { Navigator.pop(context); RoomToast.show(context, 'Crystal Hunt opens here'); }, onLudoTap: () { Navigator.pop(context); RoomToast.show(context, 'Ludo opens here'); }, onCarromTap: () { Navigator.pop(context); RoomToast.show(context, 'Carrom opens here'); }, onPkTap: () { Navigator.pop(context); RoomToast.show(context, 'PK game opens here'); })); }
+  void _openGamesSheet() {
+    _clearRoomFocus();
+    _panelController.openGamesSheet(
+      context: context,
+      onCrystalHuntTap: () {
+        Navigator.pop(context);
+        RoomToast.show(context, 'Crystal Hunt opens here');
+      },
+      onLudoTap: () {
+        Navigator.pop(context);
+        RoomToast.show(context, 'Ludo opens here');
+      },
+      onCarromTap: () {
+        Navigator.pop(context);
+        RoomToast.show(context, 'Carrom opens here');
+      },
+      onPkTap: () {
+        Navigator.pop(context);
+        RoomToast.show(context, 'PK game opens here');
+      },
+    );
+  }
   void _openSeatLayoutSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomSeatLayoutPickerSheet(selectedLayout: _seatController.layoutId, onSelected: (layout) { _seatController.changeLayout(layout); Navigator.pop(context); })); }
   void _openBackgroundSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomBackgroundSheet(currentTheme: _selectedBackgroundTheme, onThemeSelected: (theme) { _roomStateController.setSelectedBackgroundTheme(theme); RoomToast.show(context, _settingsController.backgroundAppliedToast(theme)); }, onStoreTap: () => RoomToast.show(context, 'Theme store opened'))); }
   void _openAnnouncementSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomAnnouncementSheet(controller: _announcementController, onSubmit: (message) { Navigator.pop(context); if (message.isNotEmpty) { _insertSystemMessage(message); _announcementController.clear(); } RoomToast.show(context, 'Announcement saved'); })); }
