@@ -7,6 +7,7 @@ import 'controllers/live_room_message_controller.dart';
 import 'controllers/live_room_mention_text_controller.dart';
 import 'controllers/live_room_moderation_controller.dart';
 import 'controllers/live_room_navigation_controller.dart';
+import 'controllers/live_room_panel_controller.dart';
 import 'controllers/live_room_profile_navigator.dart';
 import 'controllers/live_room_seat_controller.dart';
 import 'controllers/live_room_sheet_controller.dart';
@@ -22,7 +23,6 @@ import 'widgets/live_room_body.dart';
 import 'widgets/live_room_emoji_sheet.dart';
 import 'widgets/live_room_games_sheet.dart';
 import 'widgets/live_room_gift_overlay.dart';
-import 'widgets/live_room_gift_panel_sheet.dart';
 import 'widgets/live_room_info_sheet.dart';
 import 'widgets/live_room_invite_sheet.dart';
 import 'widgets/live_room_join_requests_sheet.dart';
@@ -74,6 +74,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
   final LiveRoomVibeSyncController _vibeSyncController = const LiveRoomVibeSyncController();
   final LiveRoomNavigationController _navigationController = const LiveRoomNavigationController();
+  final LiveRoomPanelController _panelController = const LiveRoomPanelController();
 
   final SeatUser _currentUser = mockRoomUsers.first;
 
@@ -492,8 +493,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openGiftPanel() {
     _clearRoomFocus();
-    _giftController.ensureDefaultReceiver(_roomUsers);
-    LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomGiftPanelSheet(gifts: mockGiftItems, users: _roomUsers, selectedCategory: _giftController.selectedCategory, selectedGift: _giftController.selectedGift, selectedReceiverIds: _giftController.selectedReceiverIds, selectedCombo: _giftController.selectedCombo, coinBalance: _giftController.coinBalance, onCategoryChanged: _giftController.selectCategory, onGiftSelected: _giftController.selectGift, onReceiverToggle: (id) => _giftController.toggleReceiver(id, _roomUsers), onComboChanged: _giftController.setCombo, onSend: () { Navigator.pop(context); _giftController.sendGift(_roomUsers); }, onRecharge: () => RoomToast.show(context, 'Wallet / coin recharge opened')));
+    _panelController.openGiftPanel(
+      context: context,
+      giftController: _giftController,
+      roomUsers: _roomUsers,
+      onRecharge: () => RoomToast.show(context, 'Wallet / coin recharge opened'),
+    );
   }
 
   void _openInboxPage() {
