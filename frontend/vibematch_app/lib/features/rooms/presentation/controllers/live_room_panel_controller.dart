@@ -4,6 +4,7 @@ import '../live_room_models.dart';
 import '../widgets/live_room_emoji_sheet.dart';
 import '../widgets/live_room_games_sheet.dart';
 import '../widgets/live_room_gift_panel_sheet.dart';
+import '../widgets/live_room_users_sheet.dart';
 import 'live_room_gift_controller.dart';
 import 'live_room_sheet_controller.dart';
 
@@ -67,6 +68,21 @@ class LiveRoomPanelController {
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       builder: (_) => LiveRoomEmojiSheet(onEmojiTap: onEmojiTap),
+    );
+  }
+
+  void openRoomUsersSheet({
+    required BuildContext context,
+    required List<SeatUser> users,
+    required ValueChanged<SeatUser> onUserTap,
+  }) {
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => LiveRoomUsersSheet(
+        users: users,
+        onUserTap: onUserTap,
+      ),
     );
   }
 }
