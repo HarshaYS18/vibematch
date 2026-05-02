@@ -16,14 +16,17 @@ class MediasoupSocketService {
   final StreamController<String> _logController = StreamController<String>.broadcast();
   final StreamController<List<dynamic>> _seatEventController = StreamController<List<dynamic>>.broadcast();
   final StreamController<MediasoupProducerState> _producerController = StreamController<MediasoupProducerState>.broadcast();
+  final StreamController<String> _producerClosedController = StreamController<String>.broadcast();
   final StreamController<String> _peerLeftController = StreamController<String>.broadcast();
 
   Stream<String> get logs => _logController.stream;
   Stream<List<dynamic>> get seatEvents => _seatEventController.stream;
   Stream<MediasoupProducerState> get newProducers => _producerController.stream;
+  Stream<String> get producerClosedEvents => _producerClosedController.stream;
   Stream<String> get peerLeftEvents => _peerLeftController.stream;
 
   bool get connected => _socket?.connected ?? false;
+  String? get serverUrl => _serverUrl;
   String? get roomId => _roomId;
   String? get peerId => _peerId;
 
@@ -196,6 +199,7 @@ class MediasoupSocketService {
     _logController.close();
     _seatEventController.close();
     _producerController.close();
+    _producerClosedController.close();
     _peerLeftController.close();
   }
 
@@ -238,6 +242,7 @@ class MediasoupSocketService {
 
     socket.on('producerClosed', (dynamic data) {
       final producerId = _asMap(data)['producerId']?.toString() ?? 'unknown';
+      _producerClosedController.add(producerId);
       _log('producer closed: $producerId');
     });
   }
