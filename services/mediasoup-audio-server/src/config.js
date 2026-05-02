@@ -18,6 +18,8 @@ module.exports = {
   maxRooms: Number(process.env.MAX_ROOMS || 500),
   maxSpeakersPerRoom,
   maxRoomPeers: Number(process.env.MAX_ROOM_PEERS || 250),
+  roomIdleCleanupMs: Number(process.env.ROOM_IDLE_CLEANUP_MS || 600000),
+  roomCleanupIntervalMs: Number(process.env.ROOM_CLEANUP_INTERVAL_MS || 60000),
 
   auth: {
     requireAudioToken: process.env.REQUIRE_AUDIO_TOKEN !== 'false',
