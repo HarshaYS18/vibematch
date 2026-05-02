@@ -63,6 +63,7 @@ class VmRoutes {
 
   static const String liveRoom = '/rooms/live';
   static const String roomPreview = '/rooms/preview';
+  static const String mediasoupAudioTest = '/debug/mediasoup-audio-test';
 
   static const String profile = '/profile';
   static const String events = '/events';
