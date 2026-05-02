@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import '../widgets/live_room_emoji_sheet.dart';
 import '../widgets/live_room_games_sheet.dart';
 import '../widgets/live_room_gift_panel_sheet.dart';
 import 'live_room_gift_controller.dart';
@@ -56,6 +57,16 @@ class LiveRoomPanelController {
         onCarromTap: onCarromTap,
         onPkTap: onPkTap,
       ),
+    );
+  }
+
+  void openEmojiSheet({
+    required BuildContext context,
+    required ValueChanged<String> onEmojiTap,
+  }) {
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (_) => LiveRoomEmojiSheet(onEmojiTap: onEmojiTap),
     );
   }
 }
