@@ -5,7 +5,7 @@ const { Server } = require('socket.io');
 
 const config = require('./config');
 const { createWorkers } = require('./mediasoupServer');
-const { getRoomStats } = require('./roomManager');
+const { cleanupStaleRooms, getRoomStats } = require('./roomManager');
 const { registerSocketHandlers } = require('./socketHandlers');
 
 async function main() {
@@ -21,13 +21,30 @@ async function main() {
     res.json({
       ok: true,
       service: 'vibematch-mediasoup-audio-server',
-      mode: 'standalone-multi-room-poc',
+      mode: 'small-beta-multi-room',
       announcedIp: config.announcedIp,
       workerCount: config.workerCount,
       maxRooms: config.maxRooms,
       maxSpeakersPerRoom: config.maxSpeakersPerRoom,
       maxRoomPeers: config.maxRoomPeers,
       roomCount: stats.roomCount,
+      uptimeSeconds: stats.uptimeSeconds,
+    });
+  });
+
+  app.get('/ready', (req, res) => {
+    const stats = getRoomStats();
+    const roomCapacityOk = stats.roomCount < config.maxRooms;
+    const workersOk = stats.workers.length === config.workerCount && stats.workers.every((worker) => worker.closed === false);
+    const ok = roomCapacityOk && workersOk;
+
+    res.status(ok ? 200 : 503).json({
+      ok,
+      roomCapacityOk,
+      workersOk,
+      workerCount: config.workerCount,
+      roomCount: stats.roomCount,
+      maxRooms: config.maxRooms,
     });
   });
 
@@ -49,8 +66,15 @@ async function main() {
 
   registerSocketHandlers(io);
 
+  setInterval(() => {
+    const closedCount = cleanupStaleRooms();
+    if (closedCount > 0) {
+      console.log(`[cleanup] closed stale rooms count=${closedCount}`);
+    }
+  }, config.roomCleanupIntervalMs).unref();
+
   server.listen(config.port, '0.0.0.0', () => {
-    console.log(`[server] VibeMatch mediasoup multi-room audio SFU listening on 0.0.0.0:${config.port}`);
+    console.log(`[server] VibeMatch mediasoup small-beta audio SFU listening on 0.0.0.0:${config.port}`);
     console.log(`[server] workerCount=${config.workerCount}`);
     console.log(`[server] maxRooms=${config.maxRooms}`);
     console.log(`[server] maxSpeakersPerRoom=${config.maxSpeakersPerRoom}`);
