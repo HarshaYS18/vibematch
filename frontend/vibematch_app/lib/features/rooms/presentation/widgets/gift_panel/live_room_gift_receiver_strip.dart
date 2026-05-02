@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../live_room_models.dart';
-import '../room_seats.dart';
 import '../room_theme.dart';
 
 class LiveRoomGiftReceiverStrip extends StatelessWidget {
