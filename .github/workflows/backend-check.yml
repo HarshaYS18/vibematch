@@ -1,0 +1,28 @@
+name: Backend Check
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - mediasoup-audio-sfu-poc
+      - live-room-modular-performance-v1
+
+jobs:
+  python-check:
+    name: Check FastAPI backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile backend Python files
+        working-directory: backend
+        run: python -m compileall app
