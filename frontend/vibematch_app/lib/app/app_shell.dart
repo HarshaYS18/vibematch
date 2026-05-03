@@ -56,6 +56,25 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
+  Future<void> _refreshActiveAccount() async {
+    final messenger = ScaffoldMessenger.of(context);
+    await widget.onRefreshPressed();
+    if (!mounted) return;
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFF251538),
+          content: Text(
+            'Account refreshed',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeUser = widget.currentUser;
@@ -68,22 +87,7 @@ class _AppShellState extends State<AppShell> {
             children: [
               _ActiveAccountStrip(
                 activeUser: activeUser,
-                onRefreshTap: () async {
-                  await widget.onRefreshPressed();
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(
-                      const SnackBar(
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: Color(0xFF251538),
-                        content: Text(
-                          'Account refreshed',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    );
-                },
+                onRefreshTap: _refreshActiveAccount,
                 onLogoutTap: widget.onLogoutPressed,
               ),
               Expanded(
