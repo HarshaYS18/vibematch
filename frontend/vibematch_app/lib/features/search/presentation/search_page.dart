@@ -244,7 +244,7 @@ class _SearchBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
       physics: const BouncingScrollPhysics(),
       itemCount: results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final user = results[index];
         return _UserResultCard(user: user, onTap: () => onUserTap(user));
