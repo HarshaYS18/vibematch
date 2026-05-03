@@ -14,6 +14,7 @@ from app.models import (
     UserBan,
     UserRole,
 )
+from app.websocket import live_room
 
 
 Base.metadata.create_all(bind=engine)
@@ -52,3 +53,4 @@ app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(audio.router)
 app.include_router(rooms.router)
+app.include_router(live_room.router)
