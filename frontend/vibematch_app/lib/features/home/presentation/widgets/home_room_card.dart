@@ -34,10 +34,6 @@ class HomeRoomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final friendsText = room.followedFriendsInside.isEmpty
-        ? 'No followed friends inside'
-        : '${room.followedFriendsInside.join(', ')} inside';
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -126,17 +122,6 @@ class HomeRoomCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    room.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF7B6A86),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
                   const SizedBox(height: 9),
                   Wrap(
                     spacing: 7,
@@ -149,22 +134,22 @@ class HomeRoomCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 9),
-                  Row(
+                  const Row(
                     children: [
                       Expanded(
                         child: Text(
-                          friendsText,
+                          'Tap to enter room',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Color(0xFF4A2A63),
                             fontSize: 11.5,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF7B6A86)),
+                      SizedBox(width: 8),
+                      Icon(Icons.chevron_right_rounded, color: Color(0xFF7B6A86)),
                     ],
                   ),
                 ],
