@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -60,6 +61,30 @@ class CreateRoomApiService {
   final AuthLocalStorage _localStorage;
   final http.Client _client;
 
+  Future<String?> uploadRoomCover(File imageFile) async {
+    final token = await _requireToken();
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/uploads/room-cover');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Room cover upload failed (${response.statusCode}): ${response.body}');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('Room cover upload failed: invalid backend response.');
+    }
+
+    final url = decoded['url']?.toString().trim();
+    if (url == null || url.isEmpty) return null;
+    return url;
+  }
+
   Future<CreatedRoomResult> createRoom({
     required String name,
     required String language,
@@ -67,11 +92,7 @@ class CreateRoomApiService {
     required String type,
     String? coverImageUrl,
   }) async {
-    final token = await _localStorage.getAccessToken();
-    if (token == null || token.trim().isEmpty) {
-      throw Exception('Login required before creating a room.');
-    }
-
+    final token = await _requireToken();
     final uri = Uri.parse('${AppConstants.apiBaseUrl}/rooms');
     final response = await _client.post(
       uri,
@@ -98,5 +119,13 @@ class CreateRoomApiService {
     }
 
     return CreatedRoomResult.fromJson(decoded.cast<String, dynamic>());
+  }
+
+  Future<String> _requireToken() async {
+    final token = await _localStorage.getAccessToken();
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Login required before creating a room.');
+    }
+    return token;
   }
 }
