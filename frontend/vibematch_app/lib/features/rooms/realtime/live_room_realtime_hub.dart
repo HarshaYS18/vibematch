@@ -3,6 +3,20 @@ import 'dart:async';
 import 'live_room_realtime_event.dart';
 import 'live_room_realtime_service.dart';
 
+class LiveRoomRealtimeActionResult {
+  const LiveRoomRealtimeActionResult({
+    required this.ok,
+    required this.action,
+    required this.payload,
+    this.message,
+  });
+
+  final bool ok;
+  final String action;
+  final Map<String, dynamic> payload;
+  final String? message;
+}
+
 class LiveRoomRealtimeHub {
   LiveRoomRealtimeHub._();
 
@@ -13,9 +27,13 @@ class LiveRoomRealtimeHub {
   static bool _connecting = false;
   static bool _connected = false;
   static int _onlineCount = 0;
+  static int _requestCounter = 0;
+  static final Map<String, Completer<LiveRoomRealtimeActionResult>> _pendingActions =
+      <String, Completer<LiveRoomRealtimeActionResult>>{};
 
   static bool get connected => _connected;
   static int get onlineCount => _onlineCount;
+  static Stream<LiveRoomRealtimeEvent> get events => _service.events;
 
   static Future<void> connect(String roomId) async {
     if (_connected && _roomId == roomId) return;
@@ -36,6 +54,12 @@ class LiveRoomRealtimeHub {
   }
 
   static Future<void> disconnect() async {
+    for (final completer in _pendingActions.values) {
+      if (!completer.isCompleted) {
+        completer.completeError(StateError('Live room realtime disconnected'));
+      }
+    }
+    _pendingActions.clear();
     await _eventSubscription?.cancel();
     await _logSubscription?.cancel();
     _eventSubscription = null;
@@ -52,18 +76,39 @@ class LiveRoomRealtimeHub {
     _service.send('room/chat/message', <String, dynamic>{'message': trimmed});
   }
 
-  static void sendSeatTake(int seatIndex) {
-    _service.send('room/seat/take', <String, dynamic>{
+  static Future<LiveRoomRealtimeActionResult> requestSeatTake(int seatIndex) {
+    return _sendAction('room/seat/take', <String, dynamic>{
       'seat_index': seatIndex,
       'seat_no': seatIndex + 1,
     });
   }
 
-  static void sendSeatLeave(int seatIndex) {
-    _service.send('room/seat/leave', <String, dynamic>{
+  static Future<LiveRoomRealtimeActionResult> requestSeatLeave(int seatIndex) {
+    return _sendAction('room/seat/leave', <String, dynamic>{
       'seat_index': seatIndex,
       'seat_no': seatIndex + 1,
     });
+  }
+
+  static Future<LiveRoomRealtimeActionResult> requestMuteState({
+    required int seatIndex,
+    required bool muted,
+    required bool adminMuted,
+  }) {
+    return _sendAction('room/seat/mute_state', <String, dynamic>{
+      'seat_index': seatIndex,
+      'seat_no': seatIndex + 1,
+      'muted': muted,
+      'admin_muted': adminMuted,
+    });
+  }
+
+  static void sendSeatTake(int seatIndex) {
+    requestSeatTake(seatIndex);
+  }
+
+  static void sendSeatLeave(int seatIndex) {
+    requestSeatLeave(seatIndex);
   }
 
   static void sendSeatApplication(int seatIndex) {
@@ -78,12 +123,7 @@ class LiveRoomRealtimeHub {
     required bool muted,
     required bool adminMuted,
   }) {
-    _service.send('room/seat/mute_state', <String, dynamic>{
-      'seat_index': seatIndex,
-      'seat_no': seatIndex + 1,
-      'muted': muted,
-      'admin_muted': adminMuted,
-    });
+    requestMuteState(seatIndex: seatIndex, muted: muted, adminMuted: adminMuted);
   }
 
   static void sendJoinRequest() {
@@ -128,6 +168,34 @@ class LiveRoomRealtimeHub {
     _service.send('room/ping');
   }
 
+  static Future<LiveRoomRealtimeActionResult> _sendAction(
+    String action,
+    Map<String, dynamic> payload,
+  ) async {
+    if (!_connected) {
+      final roomId = _roomId;
+      if (roomId == null) throw StateError('Live room realtime is not connected');
+      await connect(roomId);
+    }
+
+    final requestId = '${DateTime.now().microsecondsSinceEpoch}-${_requestCounter++}';
+    final completer = Completer<LiveRoomRealtimeActionResult>();
+    _pendingActions[requestId] = completer;
+
+    _service.send(action, <String, dynamic>{
+      ...payload,
+      'request_id': requestId,
+    });
+
+    return completer.future.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        _pendingActions.remove(requestId);
+        throw TimeoutException('Timed out waiting for $action confirmation');
+      },
+    );
+  }
+
   static void _handleEvent(LiveRoomRealtimeEvent event) {
     if (event.type == 'room/snapshot' || event.type == 'room/presence') {
       final value = event.payload['online_count'];
@@ -137,6 +205,33 @@ class LiveRoomRealtimeHub {
         _onlineCount = value.toInt();
       } else {
         _onlineCount = int.tryParse(value?.toString() ?? '') ?? _onlineCount;
+      }
+    }
+
+    if (event.type == 'room/action_result') {
+      final requestId = event.payload['request_id']?.toString();
+      if (requestId == null) return;
+      final completer = _pendingActions.remove(requestId);
+      if (completer == null || completer.isCompleted) return;
+
+      final rawPayload = event.payload['payload'];
+      final payload = rawPayload is Map<String, dynamic>
+          ? rawPayload
+          : rawPayload is Map
+              ? rawPayload.cast<String, dynamic>()
+              : <String, dynamic>{};
+
+      final result = LiveRoomRealtimeActionResult(
+        ok: event.payload['ok'] == true,
+        action: event.payload['action']?.toString() ?? '',
+        payload: payload,
+        message: event.payload['message']?.toString(),
+      );
+
+      if (result.ok) {
+        completer.complete(result);
+      } else {
+        completer.completeError(StateError(result.message ?? 'Live room action rejected'));
       }
     }
   }
