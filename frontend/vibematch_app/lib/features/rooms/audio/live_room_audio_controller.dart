@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../realtime/live_room_realtime_hub.dart';
@@ -21,6 +23,7 @@ class LiveRoomAudioController extends ChangeNotifier {
   String? _lastRoomId;
   int? _lastSeatIndex;
   bool _wantedPublishing = false;
+  Future<void>? _joinFuture;
   bool _operationInFlight = false;
 
   RoomAudioState get state => _engine.state;
@@ -30,8 +33,24 @@ class LiveRoomAudioController extends ChangeNotifier {
   bool get selfMuted => state.selfMuted;
   bool get canRetry => _lastRoomId != null && !_operationInFlight;
 
-  Future<void> joinRoomAudio(String roomId) async {
-    if (_operationInFlight) return;
+  Future<void> joinRoomAudio(String roomId) {
+    final existingJoin = _joinFuture;
+    if (existingJoin != null) {
+      return existingJoin;
+    }
+
+    final joinFuture = _joinRoomAudioInternal(roomId);
+    _joinFuture = joinFuture;
+    return joinFuture.whenComplete(() {
+      if (identical(_joinFuture, joinFuture)) {
+        _joinFuture = null;
+      }
+    });
+  }
+
+  Future<void> _joinRoomAudioInternal(String roomId) async {
+    if (connected && _lastRoomId == roomId) return;
+
     _operationInFlight = true;
     try {
       _lastRoomId = roomId;
@@ -57,6 +76,19 @@ class LiveRoomAudioController extends ChangeNotifier {
   }
 
   Future<void> takeSeatAndPublish(int seatIndex) async {
+    final roomId = _lastRoomId;
+    if (!connected) {
+      if (roomId == null) {
+        throw StateError('Join room audio before taking an audio seat');
+      }
+      await joinRoomAudio(roomId);
+    } else {
+      final existingJoin = _joinFuture;
+      if (existingJoin != null) {
+        await existingJoin;
+      }
+    }
+
     _lastSeatIndex = seatIndex;
     _wantedPublishing = true;
     final seatNo = seatIndex + 1;
@@ -96,6 +128,7 @@ class LiveRoomAudioController extends ChangeNotifier {
     _lastRoomId = null;
     _lastSeatIndex = null;
     _wantedPublishing = false;
+    _joinFuture = null;
     await _engine.leaveRoomAudio();
     await LiveRoomRealtimeHub.disconnect();
   }
