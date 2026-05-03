@@ -1,3 +1,4 @@
+import '../../realtime/live_room_realtime_hub.dart';
 import '../live_room_models.dart';
 
 class LiveRoomSeatController {
@@ -46,6 +47,10 @@ class LiveRoomSeatController {
     layoutId = nextLayoutId;
     seats = buildSeatsForLayout(nextLayoutId);
     selectedSeatIndex = null;
+    LiveRoomRealtimeHub.sendSettingsUpdate(<String, dynamic>{
+      'action': 'seat_layout_changed',
+      'layout_id': nextLayoutId,
+    });
     onChanged();
   }
 
@@ -66,6 +71,7 @@ class LiveRoomSeatController {
 
     if (oldIndex >= 0) {
       seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
+      LiveRoomRealtimeHub.sendSeatLeave(oldIndex);
     }
 
     seats[index] = seats[index].copyWith(
@@ -74,6 +80,7 @@ class LiveRoomSeatController {
     );
 
     selectedSeatIndex = null;
+    LiveRoomRealtimeHub.sendSeatTake(index);
     onChanged();
   }
 
@@ -110,6 +117,7 @@ class LiveRoomSeatController {
       ),
     );
 
+    LiveRoomRealtimeHub.sendSeatApplication(index);
     onChanged();
     onToast('Seat application sent');
   }
@@ -154,6 +162,11 @@ class LiveRoomSeatController {
       );
     }
 
+    LiveRoomRealtimeHub.sendJoinRequestResolution(
+      targetUserId: applicant.id,
+      approved: true,
+    );
+    LiveRoomRealtimeHub.sendSeatTake(seatIndex);
     onChanged();
   }
 
@@ -168,6 +181,11 @@ class LiveRoomSeatController {
       clearUser: true,
     );
     selectedSeatIndex = null;
+    LiveRoomRealtimeHub.sendSettingsUpdate(<String, dynamic>{
+      'action': 'seat_locked',
+      'seat_index': index,
+      'seat_no': index + 1,
+    });
     onChanged();
     onToast('Seat ${index + 1} locked');
   }
@@ -175,6 +193,11 @@ class LiveRoomSeatController {
   void unlockSeat(int index) {
     seats[index] = seats[index].copyWith(locked: false);
     selectedSeatIndex = null;
+    LiveRoomRealtimeHub.sendSettingsUpdate(<String, dynamic>{
+      'action': 'seat_unlocked',
+      'seat_index': index,
+      'seat_no': index + 1,
+    });
     onChanged();
     onToast('Seat ${index + 1} unlocked');
   }
@@ -186,6 +209,7 @@ class LiveRoomSeatController {
       final user = seats[i].user;
       if (user?.id == userId) {
         seats[i] = seats[i].copyWith(clearUser: true);
+        LiveRoomRealtimeHub.sendSeatLeave(i);
         removed = true;
       }
     }
@@ -208,6 +232,11 @@ class LiveRoomSeatController {
       seats[index] = seats[index].copyWith(
         user: user.copyWith(selfMuted: micMuted),
       );
+      LiveRoomRealtimeHub.sendMuteState(
+        seatIndex: index,
+        muted: micMuted,
+        adminMuted: user.adminMuted,
+      );
     }
 
     onChanged();
@@ -218,10 +247,16 @@ class LiveRoomSeatController {
     if (index < 0) return;
 
     final user = seats[index].user!;
+    final nextMuted = !user.selfMuted;
     seats[index] = seats[index].copyWith(
-      user: user.copyWith(selfMuted: !user.selfMuted),
+      user: user.copyWith(selfMuted: nextMuted),
     );
 
+    LiveRoomRealtimeHub.sendMuteState(
+      seatIndex: index,
+      muted: nextMuted,
+      adminMuted: user.adminMuted,
+    );
     onChanged();
   }
 
@@ -236,10 +271,16 @@ class LiveRoomSeatController {
       return;
     }
 
+    final nextAdminMuted = !user.adminMuted;
     seats[index] = seats[index].copyWith(
-      user: user.copyWith(adminMuted: !user.adminMuted),
+      user: user.copyWith(adminMuted: nextAdminMuted),
     );
 
+    LiveRoomRealtimeHub.sendMuteState(
+      seatIndex: index,
+      muted: user.selfMuted,
+      adminMuted: nextAdminMuted,
+    );
     onChanged();
   }
 
@@ -256,6 +297,10 @@ class LiveRoomSeatController {
       }
     }
 
+    LiveRoomRealtimeHub.sendSettingsUpdate(<String, dynamic>{
+      'action': 'room_admin_added',
+      'user_id': userId,
+    });
     onChanged();
   }
 
@@ -272,6 +317,10 @@ class LiveRoomSeatController {
       }
     }
 
+    LiveRoomRealtimeHub.sendSettingsUpdate(<String, dynamic>{
+      'action': 'room_admin_removed',
+      'user_id': userId,
+    });
     onChanged();
   }
 
@@ -289,6 +338,14 @@ class LiveRoomSeatController {
     );
 
     selectedSeatIndex = null;
+    LiveRoomRealtimeHub.sendSeatLeave(seatIndex);
+    if (!isCurrentUserSeat) {
+      LiveRoomRealtimeHub.sendSettingsUpdate(<String, dynamic>{
+        'action': 'seat_locked_after_leave',
+        'seat_index': seatIndex,
+        'seat_no': seatIndex + 1,
+      });
+    }
     onChanged();
     onToast(isCurrentUserSeat ? 'You left the seat' : 'User locked off seat ${seatIndex + 1}');
   }
@@ -302,6 +359,7 @@ class LiveRoomSeatController {
 
     seats[seatIndex] = RoomSeat(index: seatIndex);
     selectedSeatIndex = null;
+    LiveRoomRealtimeHub.sendSeatLeave(seatIndex);
     onChanged();
     onToast('${seatedUser.name} left seat ${seatIndex + 1}');
   }
