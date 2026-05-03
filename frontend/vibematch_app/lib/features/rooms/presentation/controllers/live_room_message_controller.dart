@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../realtime/live_room_realtime_hub.dart';
 import '../live_room_models.dart';
 
 class LiveRoomMessageController {
@@ -43,6 +44,7 @@ class LiveRoomMessageController {
       ),
     );
 
+    LiveRoomRealtimeHub.sendChatMessage(trimmed);
     onChanged();
   }
 
@@ -61,6 +63,7 @@ class LiveRoomMessageController {
   void clearChatForEveryone() {
     messages.clear();
     _insertAutoClearSystemMessage('Chat cleared for everyone by ${currentUser.name}');
+    LiveRoomRealtimeHub.sendSettingsUpdate(<String, dynamic>{'action': 'clear_chat'});
   }
 
   void requestJoin() {
@@ -70,6 +73,7 @@ class LiveRoomMessageController {
 
     if (!alreadyRequested) {
       joinRequestUsers.add(currentUser);
+      LiveRoomRealtimeHub.sendJoinRequest();
       onChanged();
     }
   }
@@ -95,6 +99,10 @@ class LiveRoomMessageController {
       ),
     );
 
+    LiveRoomRealtimeHub.sendJoinRequestResolution(
+      targetUserId: user.id,
+      approved: approved,
+    );
     onChanged();
   }
 
