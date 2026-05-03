@@ -31,16 +31,10 @@ class LiveRoomSeatController {
 
   List<RoomSeat> buildSeatsForLayout(String targetLayoutId) {
     final spec = SeatLayoutSpec.parse(targetLayoutId);
-    final builtSeats = List<RoomSeat>.generate(
+    return List<RoomSeat>.generate(
       spec.totalSeats,
       (index) => RoomSeat(index: index),
     );
-
-    for (var i = 0; i < mockRoomUsers.length && i < builtSeats.length; i++) {
-      builtSeats[i] = RoomSeat(index: i, user: mockRoomUsers[i]);
-    }
-
-    return builtSeats;
   }
 
   void changeLayout(String nextLayoutId) {
@@ -324,8 +318,6 @@ class LiveRoomSeatController {
     onChanged();
   }
 
-  /// Current-user action: leave the mic seat only.
-  /// Moderator action on another seated user: clear that user and lock that seat.
   void leaveAndLockSeat(int seatIndex) {
     if (seatIndex < 0 || seatIndex >= seats.length) return;
 
@@ -350,7 +342,6 @@ class LiveRoomSeatController {
     onToast(isCurrentUserSeat ? 'You left the seat' : 'User locked off seat ${seatIndex + 1}');
   }
 
-  /// Moderator action: remove another user from the mic seat without locking it.
   void leaveSeatOnly(int seatIndex) {
     if (seatIndex < 0 || seatIndex >= seats.length) return;
 
