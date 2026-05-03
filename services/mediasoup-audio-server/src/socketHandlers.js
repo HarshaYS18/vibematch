@@ -122,7 +122,7 @@ function registerSocketHandlers(io) {
         });
 
         socket.to(joinedRoomId).emit('peerJoined', { peerId: joinedPeerId });
-        console.log(`[joinRoom] room=${joinedRoomId} peer=${joinedPeerId}`);
+        console.log(`[joinRoom] room=${joinedRoomId} peer=${joinedPeerId} socket=${socket.id}`);
       } catch (error) {
         console.error('[joinRoom] error', error);
         callback({ ok: false, error: error.message });
@@ -355,13 +355,25 @@ function registerSocketHandlers(io) {
     socket.on('disconnect', () => {
       console.log(`[socket] disconnected socket=${socket.id}`);
 
-      if (joinedRoomId && joinedPeerId) {
-        const room = removePeer(joinedRoomId, joinedPeerId);
-        socket.to(joinedRoomId).emit('peerLeft', { peerId: joinedPeerId });
+      if (!joinedRoomId || !joinedPeerId) {
+        return;
+      }
 
-        if (room) {
-          socket.to(joinedRoomId).emit('seatsUpdated', { seats: getSeatSnapshot(room) });
-        }
+      const existingRoom = getRoom(joinedRoomId);
+      const existingPeer = existingRoom?.peers.get(String(joinedPeerId));
+
+      if (existingPeer && existingPeer.socketId !== socket.id) {
+        console.log(
+          `[socket] stale disconnect ignored socket=${socket.id} activeSocket=${existingPeer.socketId} room=${joinedRoomId} peer=${joinedPeerId}`,
+        );
+        return;
+      }
+
+      const room = removePeer(joinedRoomId, joinedPeerId);
+      socket.to(joinedRoomId).emit('peerLeft', { peerId: joinedPeerId });
+
+      if (room) {
+        socket.to(joinedRoomId).emit('seatsUpdated', { seats: getSeatSnapshot(room) });
       }
     });
   });
