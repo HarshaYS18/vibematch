@@ -4,15 +4,20 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/constants/app_constants.dart';
 import '../models/current_user.dart';
+import 'auth_local_storage.dart';
 
 class AuthApiService {
-  const AuthApiService();
+  AuthApiService({
+    AuthLocalStorage? localStorage,
+  }) : _localStorage = localStorage ?? AuthLocalStorage();
 
   static const String baseUrl = AppConstants.apiBaseUrl;
 
   static String? _cachedAccessToken;
   static CurrentUser? _cachedUser;
   static String? _cachedDeviceId;
+
+  final AuthLocalStorage _localStorage;
 
   Future<String> getCurrentDeviceId() async {
     final existingDeviceId = _cachedDeviceId;
@@ -76,6 +81,7 @@ class AuthApiService {
 
     _cachedAccessToken = accessToken;
     _cachedDeviceId = resolvedDeviceId;
+    await _localStorage.saveAccessToken(accessToken);
 
     CurrentUser user;
 
@@ -98,9 +104,10 @@ class AuthApiService {
   Future<CurrentUser> getCurrentUser({
     String? accessToken,
   }) async {
-    final token = accessToken ?? _cachedAccessToken;
+    final savedToken = accessToken ?? _cachedAccessToken ?? await _localStorage.getAccessToken();
+    final token = savedToken?.trim();
 
-    if (token == null || token.trim().isEmpty) {
+    if (token == null || token.isEmpty) {
       if (_cachedUser != null) {
         return _cachedUser!;
       }
@@ -128,6 +135,7 @@ class AuthApiService {
 
     _cachedAccessToken = token;
     _cachedUser = user;
+    await _localStorage.saveAccessToken(token);
 
     return user;
   }
@@ -135,6 +143,7 @@ class AuthApiService {
   Future<void> logout() async {
     _cachedAccessToken = null;
     _cachedUser = null;
+    await _localStorage.clear();
   }
 
   String? get cachedAccessToken => _cachedAccessToken;
