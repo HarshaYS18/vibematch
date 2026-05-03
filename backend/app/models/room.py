@@ -29,6 +29,7 @@ class Room(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     # Human-readable room ID shown in the UI, for example VM120451.
+    # This ID is generated once during room creation and must never change.
     room_public_id: Mapped[str] = mapped_column(
         String(32),
         unique=True,
@@ -40,6 +41,8 @@ class Room(Base):
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     subtitle: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    cover_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     language: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
     mode: Mapped[str] = mapped_column(
         String(40),
