@@ -29,6 +29,12 @@ ALLOWED_CLIENT_EVENT_TYPES = {
     "room/typing",
 }
 
+AUTHORITATIVE_ACTION_TYPES = {
+    "room/seat/take",
+    "room/seat/leave",
+    "room/seat/mute_state",
+}
+
 MAX_TEXT_LENGTH = 600
 MAX_EVENT_KEYS = 24
 
@@ -39,7 +45,7 @@ def _get_user_from_token(db: Session, token: str | None) -> User | None:
 
     payload = decode_access_token(token)
     if not payload:
-        return None
+ return None
 
     subject = payload.get("sub")
     if subject is None:
@@ -53,6 +59,27 @@ def _get_user_from_token(db: Session, token: str | None) -> User | None:
     return db.query(User).filter(User.id == user_id).first()
 
 
+def _int_from_event(event: dict[str, Any], key: str, fallback: int | None = None) -> int | None:
+    value = event.get(key)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return fallback
+    return fallback
+
+
+def _request_id(event: dict[str, Any]) -> str | None:
+    value = event.get("request_id")
+    if value is None:
+        return None
+    return str(value)[:80]
+
+
 def _sanitize_event(event: dict[str, Any], user: User) -> dict[str, Any]:
     event_type = str(event.get("type") or "")
     if event_type not in ALLOWED_CLIENT_EVENT_TYPES:
@@ -63,6 +90,7 @@ def _sanitize_event(event: dict[str, Any], user: User) -> dict[str, Any]:
 
     sanitized: dict[str, Any] = {
         "type": event_type,
+        "request_id": _request_id(event),
         "sender": {
             "user_id": user.id,
             "public_user_id": user.public_user_id,
@@ -83,6 +111,104 @@ def _sanitize_event(event: dict[str, Any], user: User) -> dict[str, Any]:
             sanitized[key] = {str(k): v for k, v in list(value.items())[:20]}
 
     return sanitized
+
+
+async def _handle_authoritative_action(
+    *,
+    websocket: WebSocket,
+    room_id: str,
+    user: User,
+    event: dict[str, Any],
+) -> bool:
+    event_type = event["type"]
+    request_id = _request_id(event)
+
+    if event_type not in AUTHORITATIVE_ACTION_TYPES:
+        return False
+
+    try:
+        if event_type == "room/seat/take":
+            seat_no = _int_from_event(event, "seat_no")
+            if seat_no is None:
+                seat_index = _int_from_event(event, "seat_index")
+                seat_no = None if seat_index is None else seat_index + 1
+            if seat_no is None:
+                raise ValueError("seat number is required")
+
+            seat = live_room_manager.take_seat(room_id=room_id, user=user, seat_no=seat_no)
+            seats = live_room_manager.seat_snapshot(room_id)
+            await live_room_manager.accept_action(
+                websocket=websocket,
+                room_id=room_id,
+                request_id=request_id,
+                action=event_type,
+                payload={"seat": seat, "seats": seats},
+            )
+            await live_room_manager.broadcast(
+                room_id=room_id,
+                event={"type": "room/seats_updated", "seats": seats, "changed_seat": seat},
+            )
+            return True
+
+        if event_type == "room/seat/leave":
+            seat_no = _int_from_event(event, "seat_no")
+            if seat_no is None:
+                seat_index = _int_from_event(event, "seat_index")
+                seat_no = None if seat_index is None else seat_index + 1
+
+            removed = live_room_manager.leave_seat(room_id=room_id, user_id=user.id, seat_no=seat_no)
+            seats = live_room_manager.seat_snapshot(room_id)
+            await live_room_manager.accept_action(
+                websocket=websocket,
+                room_id=room_id,
+                request_id=request_id,
+                action=event_type,
+                payload={"seat": removed, "seats": seats},
+            )
+            await live_room_manager.broadcast(
+                room_id=room_id,
+                event={"type": "room/seats_updated", "seats": seats, "changed_seat": removed},
+            )
+            return True
+
+        if event_type == "room/seat/mute_state":
+            seat_no = _int_from_event(event, "seat_no")
+            if seat_no is None:
+                seat_index = _int_from_event(event, "seat_index")
+                seat_no = None if seat_index is None else seat_index + 1
+            if seat_no is None:
+                raise ValueError("seat number is required")
+
+            seat = live_room_manager.set_mute_state(
+                room_id=room_id,
+                user_id=user.id,
+                seat_no=seat_no,
+                muted=bool(event.get("muted")),
+                admin_muted=bool(event.get("admin_muted")),
+            )
+            seats = live_room_manager.seat_snapshot(room_id)
+            await live_room_manager.accept_action(
+                websocket=websocket,
+                room_id=room_id,
+                request_id=request_id,
+                action=event_type,
+                payload={"seat": seat, "seats": seats},
+            )
+            await live_room_manager.broadcast(
+                room_id=room_id,
+                event={"type": "room/seats_updated", "seats": seats, "changed_seat": seat},
+            )
+            return True
+    except ValueError as error:
+        await live_room_manager.reject_action(
+            websocket=websocket,
+            request_id=request_id,
+            action=event_type,
+            message=str(error),
+        )
+        return True
+
+    return False
 
 
 @router.websocket("/ws/rooms/{room_id}")
@@ -134,6 +260,15 @@ async def live_room_websocket(websocket: WebSocket, room_id: str):
 
             if event["type"] == "room/ping":
                 await websocket.send_json({"type": "room/pong", "server_time": datetime.now(timezone.utc).isoformat()})
+                continue
+
+            handled = await _handle_authoritative_action(
+                websocket=websocket,
+                room_id=room_id,
+                user=user,
+                event=event,
+            )
+            if handled:
                 continue
 
             await live_room_manager.broadcast(room_id=room_id, event=event)
