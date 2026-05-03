@@ -62,7 +62,6 @@ class VmRoutes {
   static const String me = '/me';
 
   static const String liveRoom = '/rooms/live';
-  static const String roomPreview = '/rooms/preview';
   static const String mediasoupAudioTest = '/debug/mediasoup-audio-test';
 
   static const String profile = '/profile';
@@ -117,22 +116,6 @@ class LiveRoomRouteArgs {
   final int onlineCount;
 
   const LiveRoomRouteArgs({
-    required this.roomName,
-    required this.roomId,
-    required this.language,
-    required this.modeTitle,
-    required this.onlineCount,
-  });
-}
-
-class RoomPreviewRouteArgs {
-  final String roomName;
-  final String roomId;
-  final String language;
-  final String modeTitle;
-  final int onlineCount;
-
-  const RoomPreviewRouteArgs({
     required this.roomName,
     required this.roomId,
     required this.language,
