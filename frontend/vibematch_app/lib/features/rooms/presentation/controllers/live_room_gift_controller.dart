@@ -16,7 +16,7 @@ class LiveRoomGiftController {
   final ValueChangedLike<String> onToast;
 
   GiftCategory selectedCategory = GiftCategory.classic;
-  GiftItem? selectedGift = mockGiftItems.first;
+  GiftItem? selectedGift = mockGiftItems.isNotEmpty ? mockGiftItems.first : null;
   final Set<String> selectedReceiverIds = <String>{};
   int selectedCombo = 1;
   int coinBalance = 35494;
@@ -53,7 +53,8 @@ class LiveRoomGiftController {
 
   void toggleReceiver(String id, List<SeatUser> roomUsers) {
     if (id == '__all__') {
-      if (selectedReceiverIds.length == roomUsers.length) {
+      final allSelected = roomUsers.isNotEmpty && selectedReceiverIds.length == roomUsers.length;
+      if (allSelected) {
         selectedReceiverIds.clear();
       } else {
         selectedReceiverIds
@@ -79,7 +80,10 @@ class LiveRoomGiftController {
 
   void sendGift(List<SeatUser> roomUsers) {
     final gift = selectedGift;
-    if (gift == null) return;
+    if (gift == null) {
+      onToast('No gifts available');
+      return;
+    }
 
     final receivers = roomUsers.where((user) => selectedReceiverIds.contains(user.id)).toList();
     if (receivers.isEmpty) {
