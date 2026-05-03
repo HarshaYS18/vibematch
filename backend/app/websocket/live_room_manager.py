@@ -7,10 +7,22 @@ from typing import Any
 
 from fastapi import WebSocket
 
+from app.models.role import RoleName
+from app.models.room import Room
+from app.models.user import User
+from app.services.role_service import get_user_roles
+
 
 MAX_RECENT_EVENTS_PER_ROOM = 80
 MAX_CONNECTIONS_PER_ROOM = 2000
 MAX_SEATS_PER_ROOM = 30
+PROTECTED_HOST_SEAT_NO = 1
+HOST_SEAT_ROLES = {
+    RoleName.FOUNDER_OWNER,
+    RoleName.OWNER,
+    RoleName.SUPERADMIN,
+    RoleName.ADMIN,
+}
 
 
 @dataclass
@@ -211,18 +223,45 @@ class LiveRoomConnectionManager:
             },
         )
 
+    def can_use_host_seat(self, *, app_room: Room | None, user: User) -> bool:
+        if app_room is not None and app_room.owner_user_id == user.id:
+            return True
+
+        roles = set(get_user_roles(user))
+        if roles.intersection(HOST_SEAT_ROLES):
+            return True
+
+        # Future room-member table should be checked here. For now, normal
+        # users are blocked from protected seat 1 unless they own the room or
+        # have an official/admin role.
+        return False
+
+    def should_auto_take_host_seat(self, *, app_room: Room | None, user: User) -> bool:
+        if not self.can_use_host_seat(app_room=app_room, user=user):
+            return False
+        room = self._rooms.get(app_room.room_public_id if app_room is not None else "")
+        if room is None:
+            return True
+        existing = room.seats.get(PROTECTED_HOST_SEAT_NO)
+        return existing is None or existing.get("user_id") == user.id
+
     def take_seat(
         self,
         *,
         room_id: str,
-        user: Any,
+        user: User,
         seat_no: int,
+        app_room: Room | None = None,
+        auto_assigned: bool = False,
     ) -> dict[str, Any]:
         room = self._rooms.get(room_id)
         if room is None:
             raise ValueError("room not found")
         if seat_no < 1 or seat_no > MAX_SEATS_PER_ROOM:
             raise ValueError("invalid seat number")
+
+        if seat_no == PROTECTED_HOST_SEAT_NO and not self.can_use_host_seat(app_room=app_room, user=user):
+            raise ValueError("seat 1 is reserved for the room owner, room admins, or approved members")
 
         existing = room.seats.get(seat_no)
         if existing is not None and existing.get("user_id") != user.id:
@@ -243,6 +282,8 @@ class LiveRoomConnectionManager:
             "self_muted": False,
             "admin_muted": False,
             "locked": False,
+            "auto_assigned": auto_assigned,
+            "auto_start_mic": auto_assigned and seat_no == PROTECTED_HOST_SEAT_NO,
         }
         room.seats[seat_no] = seat
         room.updated_at = datetime.now(timezone.utc)
