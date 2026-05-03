@@ -1,4 +1,5 @@
 require('dotenv').config();
+const crypto = require('crypto');
 const os = require('os');
 
 const announcedIp = process.env.ANNOUNCED_IP || '127.0.0.1';
@@ -10,6 +11,12 @@ const turnPassword = process.env.TURN_PASSWORD || 'vibematch-local-password';
 const maxSpeakersPerRoom = Number(process.env.MAX_SPEAKERS_PER_ROOM || 17);
 const cpuCount = Math.max(1, os.cpus().length || 1);
 const defaultWorkerCount = Math.min(cpuCount, 4);
+const audioJwtSecret = process.env.AUDIO_JWT_SECRET_KEY || process.env.JWT_SECRET_KEY || 'change-this-secret-key-in-production';
+const audioJwtAlgorithm = process.env.AUDIO_JWT_ALGORITHM || process.env.JWT_ALGORITHM || 'HS256';
+
+function secretFingerprint(secret) {
+  return crypto.createHash('sha256').update(secret).digest('hex').slice(0, 12);
+}
 
 module.exports = {
   port: Number(process.env.PORT || 4000),
@@ -23,8 +30,9 @@ module.exports = {
 
   auth: {
     requireAudioToken: process.env.REQUIRE_AUDIO_TOKEN !== 'false',
-    jwtSecret: process.env.JWT_SECRET_KEY || 'change-this-secret-key-in-production',
-    jwtAlgorithm: process.env.JWT_ALGORITHM || 'HS256',
+    jwtSecret: audioJwtSecret,
+    jwtAlgorithm: audioJwtAlgorithm,
+    secretFingerprint: secretFingerprint(audioJwtSecret),
   },
 
   iceServers: [
