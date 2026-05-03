@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.routes.users import get_current_user
 from app.database import get_db
-from app.schemas.rooms.room import RoomTrendingResponse
+from app.models.user import User
+from app.schemas.rooms.room import RoomCreateRequest, RoomCreateResponse, RoomTrendingResponse
 from app.schemas.rooms.room_kickout import (
     RoomKickoutCreateRequest,
     RoomKickoutResponse,
@@ -12,10 +14,19 @@ from app.services.rooms.room_kickout_service import (
     list_active_room_kickouts,
     remove_room_kickout,
 )
-from app.services.rooms.room_service import list_trending_rooms
+from app.services.rooms.room_service import create_room, list_trending_rooms
 
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
+
+
+@router.post("", response_model=RoomCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_live_room(
+    payload: RoomCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return create_room(db=db, owner=current_user, payload=payload)
 
 
 @router.get("/trending", response_model=list[RoomTrendingResponse])
