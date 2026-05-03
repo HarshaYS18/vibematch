@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.admin_log import AdminLog
 from app.models.login_history import LoginHistory
 from app.models.role import RoleName
+from app.models.room import Room
 from app.models.special_permission import SpecialPermission
 from app.models.user import User
 from app.schemas.admin import (
@@ -50,6 +51,18 @@ ADMIN_CONTROL_ROLES = {
 PROTECTED_SPECIAL_PERMISSION_TARGET_ROLES = {
     RoleName.FOUNDER_OWNER,
     RoleName.OWNER,
+}
+
+
+KNOWN_DEMO_ROOM_NAMES = {
+    "Bollywood Vibe Sync",
+    "Late Night Chill",
+    "Hyderabad Friends Adda",
+    "Coding Night Hangout",
+    "Gaming Squad",
+    "PK Arena",
+    "Telugu Music Night",
+    "Friends Adda",
 }
 
 
@@ -100,6 +113,55 @@ def list_users(
     users = db.query(User).order_by(User.id.asc()).limit(100).all()
 
     return [build_admin_user_response(user) for user in users]
+
+
+@router.delete("/dev/rooms/cleanup")
+def cleanup_demo_rooms(
+    clear_all: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Founder-only local/dev cleanup for seeded room rows.
+
+    Use clear_all=true only in local testing when you want Home to show no rooms
+    until real create-room APIs insert real rows.
+    """
+
+    require_founder_owner(current_user)
+
+    query = db.query(Room)
+    if not clear_all:
+        query = query.filter(Room.name.in_(KNOWN_DEMO_ROOM_NAMES))
+
+    rooms = query.all()
+    deleted_names = [room.name for room in rooms]
+    deleted_ids = [room.room_public_id for room in rooms]
+
+    for room in rooms:
+        db.delete(room)
+
+    db.commit()
+
+    create_admin_log(
+        db=db,
+        actor_user_id=current_user.id,
+        action="DEV_ROOMS_CLEANUP",
+        resource_type="room",
+        reason="Local/dev cleanup of seeded or mock room rows",
+        metadata_json={
+            "clear_all": clear_all,
+            "deleted_count": len(rooms),
+            "deleted_room_public_ids": deleted_ids,
+            "deleted_names": deleted_names,
+        },
+    )
+
+    return {
+        "ok": True,
+        "deleted_count": len(rooms),
+        "deleted_room_public_ids": deleted_ids,
+        "deleted_names": deleted_names,
+    }
 
 
 @router.get("/audit-logs", response_model=list[AdminLogResponse])
