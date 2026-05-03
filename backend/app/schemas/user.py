@@ -22,3 +22,18 @@ class UserMeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserSearchResult(BaseModel):
+    id: int
+    public_user_id: int
+    display_custom_id: int | None = None
+    username: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    primary_role: str
+    roles: list[str]
+    is_active: bool
+
+    class Config:
+        from_attributes = True
