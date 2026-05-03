@@ -10,11 +10,6 @@ import '../features/rooms/presentation/widgets/live_room_minimized_overlay_servi
 import '../features/vibes/presentation/vibes_page.dart';
 import 'app_routes.dart';
 
-enum _DevUserMode {
-  founder,
-  normalUser,
-}
-
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -33,21 +28,9 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   VmMainTab _selectedTab = VmMainTab.home;
-  _DevUserMode _devUserMode = _DevUserMode.founder;
-
-  CurrentUser get _activeUser {
-    switch (_devUserMode) {
-      case _DevUserMode.founder:
-        return CurrentUser.mockFounderOwner();
-      case _DevUserMode.normalUser:
-        return CurrentUser.mockNormalUser();
-    }
-  }
-
-  bool get _isTestingAsFounder => _devUserMode == _DevUserMode.founder;
 
   List<Widget> get _pages {
-    final activeUser = _activeUser;
+    final activeUser = widget.currentUser;
 
     return [
       HomePage(
@@ -73,32 +56,9 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  void _switchDevUser(_DevUserMode mode) {
-    setState(() {
-      _devUserMode = mode;
-      _selectedTab = VmMainTab.me;
-    });
-
-    final userLabel =
-        mode == _DevUserMode.founder ? 'Founder Owner' : 'Normal User';
-
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
-          content: Text(
-            'Testing as $userLabel',
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-        ),
-      );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final activeUser = _activeUser;
+    final activeUser = widget.currentUser;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
@@ -106,11 +66,25 @@ class _AppShellState extends State<AppShell> {
         children: [
           Column(
             children: [
-              _DevUserSwitcher(
+              _ActiveAccountStrip(
                 activeUser: activeUser,
-                selectedMode: _devUserMode,
-                onFounderTap: () => _switchDevUser(_DevUserMode.founder),
-                onUserTap: () => _switchDevUser(_DevUserMode.normalUser),
+                onRefreshTap: () async {
+                  await widget.onRefreshPressed();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context)
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      const SnackBar(
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Color(0xFF251538),
+                        content: Text(
+                          'Account refreshed',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    );
+                },
+                onLogoutTap: widget.onLogoutPressed,
               ),
               Expanded(
                 child: IndexedStack(
@@ -125,7 +99,7 @@ class _AppShellState extends State<AppShell> {
       ),
       bottomNavigationBar: _VibeBottomNav(
         selectedTab: _selectedTab,
-        isTestingAsFounder: _isTestingAsFounder,
+        isFounderOwner: activeUser.isFounderOwner,
         onTabSelected: _selectTab,
       ),
     );
@@ -183,25 +157,24 @@ class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
   }
 }
 
-class _DevUserSwitcher extends StatelessWidget {
-  const _DevUserSwitcher({
+class _ActiveAccountStrip extends StatelessWidget {
+  const _ActiveAccountStrip({
     required this.activeUser,
-    required this.selectedMode,
-    required this.onFounderTap,
-    required this.onUserTap,
+    required this.onRefreshTap,
+    required this.onLogoutTap,
   });
 
   final CurrentUser activeUser;
-  final _DevUserMode selectedMode;
-  final VoidCallback onFounderTap;
-  final VoidCallback onUserTap;
+  final VoidCallback onRefreshTap;
+  final Future<void> Function() onLogoutTap;
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
+    final isFounder = activeUser.isFounderOwner;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(12, topPadding + 6, 12, 7),
+      padding: EdgeInsets.fromLTRB(12, topPadding + 6, 8, 7),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.98),
         border: const Border(
@@ -223,7 +196,7 @@ class _DevUserSwitcher extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
               gradient: LinearGradient(
-                colors: selectedMode == _DevUserMode.founder
+                colors: isFounder
                     ? const [
                         Color(0xFFFFC857),
                         Color(0xFFE84C72),
@@ -236,9 +209,7 @@ class _DevUserSwitcher extends StatelessWidget {
               ),
             ),
             child: Icon(
-              selectedMode == _DevUserMode.founder
-                  ? Icons.admin_panel_settings_rounded
-                  : Icons.person_rounded,
+              isFounder ? Icons.admin_panel_settings_rounded : Icons.person_rounded,
               color: Colors.white,
               size: 19,
             ),
@@ -246,7 +217,7 @@ class _DevUserSwitcher extends StatelessWidget {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} · ${activeUser.primaryRole} · ID ${activeUser.visibleId}',
+              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} · ${activeUser.roleDisplayLabel} · ID ${activeUser.visibleId}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -256,59 +227,17 @@ class _DevUserSwitcher extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          _DevModeButton(
-            text: 'Founder',
-            selected: selectedMode == _DevUserMode.founder,
-            onTap: onFounderTap,
+          IconButton(
+            tooltip: 'Refresh account',
+            onPressed: onRefreshTap,
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF4A2A63), size: 20),
           ),
-          const SizedBox(width: 6),
-          _DevModeButton(
-            text: 'User',
-            selected: selectedMode == _DevUserMode.normalUser,
-            onTap: onUserTap,
+          IconButton(
+            tooltip: 'Switch login',
+            onPressed: () => onLogoutTap(),
+            icon: const Icon(Icons.switch_account_rounded, color: Color(0xFFE84C72), size: 20),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _DevModeButton extends StatelessWidget {
-  const _DevModeButton({
-    required this.text,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String text;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color:
-                selected ? const Color(0xFF251538) : const Color(0xFFECE2D8),
-          ),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF4A2A63),
-            fontSize: 10.5,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
       ),
     );
   }
@@ -317,12 +246,12 @@ class _DevModeButton extends StatelessWidget {
 class _VibeBottomNav extends StatelessWidget {
   const _VibeBottomNav({
     required this.selectedTab,
-    required this.isTestingAsFounder,
+    required this.isFounderOwner,
     required this.onTabSelected,
   });
 
   final VmMainTab selectedTab;
-  final bool isTestingAsFounder;
+  final bool isFounderOwner;
   final ValueChanged<VmMainTab> onTabSelected;
 
   static const Color deepPlum = Color(0xFF251538);
@@ -400,7 +329,7 @@ class _VibeBottomNav extends StatelessWidget {
               onTap: () => onTabSelected(VmMainTab.inbox),
             ),
             _NavItem(
-              icon: isTestingAsFounder
+              icon: isFounderOwner
                   ? Icons.admin_panel_settings_rounded
                   : Icons.person_rounded,
               label: VmMainTab.me.label,
