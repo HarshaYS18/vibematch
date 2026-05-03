@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../auth/models/current_user.dart';
+
 enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
 
 enum GiftCategory { classic, lucky, event, svip, premium, baggage }
@@ -338,6 +340,67 @@ class SeatLayoutSpec {
   }
 }
 
+class LiveRoomSessionUserStore {
+  const LiveRoomSessionUserStore._();
+
+  static CurrentUser? _currentUser;
+
+  static void setCurrentUser(CurrentUser? user) {
+    _currentUser = user;
+  }
+
+  static SeatUser get currentSeatUser {
+    final user = _currentUser;
+    if (user == null) return _fallbackSeatUser;
+
+    final officialManager = user.roles.any(
+      (role) => const {
+        'founder_owner',
+        'super_owner',
+        'owner',
+        'superadmin',
+        'admin',
+      }.contains(role),
+    );
+
+    return SeatUser(
+      id: user.id.toString(),
+      name: user.displayName ?? user.username ?? 'User ${user.publicUserId}',
+      roleLabel: officialManager ? 'Room Host' : user.roleDisplayLabel,
+      familyName: '',
+      relationshipText: '',
+      vipLevel: 0,
+      sendingLevel: 0,
+      receivingLevel: 0,
+      sentExp: 0,
+      receivedExp: 0,
+      medals: const <String>[],
+      avatarColors: officialManager
+          ? const <Color>[Color(0xFFFFC857), Color(0xFFE84C72), Color(0xFF8C5CF6)]
+          : const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      isCurrentUser: true,
+      isHost: officialManager,
+      isRoomAdmin: officialManager,
+    );
+  }
+
+  static const SeatUser _fallbackSeatUser = SeatUser(
+    id: 'session_user',
+    name: 'Session User',
+    roleLabel: 'Member',
+    familyName: '',
+    relationshipText: '',
+    vipLevel: 0,
+    sendingLevel: 0,
+    receivingLevel: 0,
+    sentExp: 0,
+    receivedExp: 0,
+    medals: <String>[],
+    avatarColors: <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+    isCurrentUser: true,
+  );
+}
+
 String avatarLetter(String input) {
   final trimmed = input.trim();
   if (trimmed.isEmpty) return '?';
@@ -358,23 +421,7 @@ RoomPrivacyMode privacyModeFromTitle(String title) {
   return RoomPrivacyMode.open;
 }
 
-const List<SeatUser> mockRoomUsers = [
-  SeatUser(
-    id: 'active_user',
-    name: 'You',
-    roleLabel: 'Member',
-    familyName: '',
-    relationshipText: '',
-    vipLevel: 0,
-    sendingLevel: 0,
-    receivingLevel: 0,
-    sentExp: 0,
-    receivedExp: 0,
-    medals: [],
-    avatarColors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-    isCurrentUser: true,
-  ),
-];
+List<SeatUser> get mockRoomUsers => <SeatUser>[LiveRoomSessionUserStore.currentSeatUser];
 
 const List<SeatUser> mockInviteUsers = <SeatUser>[];
 
