@@ -358,7 +358,23 @@ RoomPrivacyMode privacyModeFromTitle(String title) {
   return RoomPrivacyMode.open;
 }
 
-const List<SeatUser> mockRoomUsers = <SeatUser>[];
+const List<SeatUser> mockRoomUsers = [
+  SeatUser(
+    id: 'active_user',
+    name: 'You',
+    roleLabel: 'Member',
+    familyName: '',
+    relationshipText: '',
+    vipLevel: 0,
+    sendingLevel: 0,
+    receivingLevel: 0,
+    sentExp: 0,
+    receivedExp: 0,
+    medals: [],
+    avatarColors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+    isCurrentUser: true,
+  ),
+];
 
 const List<SeatUser> mockInviteUsers = <SeatUser>[];
 
