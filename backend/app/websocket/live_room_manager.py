@@ -10,6 +10,7 @@ from fastapi import WebSocket
 
 MAX_RECENT_EVENTS_PER_ROOM = 80
 MAX_CONNECTIONS_PER_ROOM = 2000
+MAX_SEATS_PER_ROOM = 30
 
 
 @dataclass
@@ -29,6 +30,7 @@ class LiveRoomRuntimeState:
     recent_events: deque[dict[str, Any]] = field(
         default_factory=lambda: deque(maxlen=MAX_RECENT_EVENTS_PER_ROOM),
     )
+    seats: dict[int, dict[str, Any]] = field(default_factory=dict)
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -93,6 +95,10 @@ class LiveRoomConnectionManager:
         if not self._user_room_index[user_id]:
             self._user_room_index.pop(user_id, None)
 
+        for seat_no, seat in list(room.seats.items()):
+            if seat.get("user_id") == user_id:
+                room.seats.pop(seat_no, None)
+
         if not room.peers:
             self._rooms.pop(room_id, None)
         else:
@@ -103,7 +109,7 @@ class LiveRoomConnectionManager:
     async def send_snapshot(self, *, room_id: str, websocket: WebSocket) -> None:
         room = self._rooms.get(room_id)
         if room is None:
-            await websocket.send_json({"type": "room/snapshot", "room_id": room_id, "online_count": 0, "users": []})
+            await websocket.send_json({"type": "room/snapshot", "room_id": room_id, "online_count": 0, "users": [], "seats": []})
             return
 
         await websocket.send_json(
@@ -112,6 +118,7 @@ class LiveRoomConnectionManager:
                 "room_id": room_id,
                 "online_count": len(room.peers),
                 "users": [self._peer_payload(peer) for peer in room.peers.values()],
+                "seats": self.seat_snapshot(room_id),
                 "recent_events": list(room.recent_events),
                 "server_time": datetime.now(timezone.utc).isoformat(),
             },
@@ -160,9 +167,131 @@ class LiveRoomConnectionManager:
                 "type": "room/presence",
                 "online_count": len(room.peers),
                 "users": [self._peer_payload(peer) for peer in room.peers.values()],
+                "seats": self.seat_snapshot(room_id),
             },
             persist=False,
         )
+
+    async def accept_action(
+        self,
+        *,
+        websocket: WebSocket,
+        room_id: str,
+        request_id: str | None,
+        action: str,
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        await websocket.send_json(
+            {
+                "type": "room/action_result",
+                "ok": True,
+                "request_id": request_id,
+                "action": action,
+                "payload": payload or {},
+                "server_time": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    async def reject_action(
+        self,
+        *,
+        websocket: WebSocket,
+        request_id: str | None,
+        action: str,
+        message: str,
+    ) -> None:
+        await websocket.send_json(
+            {
+                "type": "room/action_result",
+                "ok": False,
+                "request_id": request_id,
+                "action": action,
+                "message": message,
+                "server_time": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    def take_seat(
+        self,
+        *,
+        room_id: str,
+        user: Any,
+        seat_no: int,
+    ) -> dict[str, Any]:
+        room = self._rooms.get(room_id)
+        if room is None:
+            raise ValueError("room not found")
+        if seat_no < 1 or seat_no > MAX_SEATS_PER_ROOM:
+            raise ValueError("invalid seat number")
+
+        existing = room.seats.get(seat_no)
+        if existing is not None and existing.get("user_id") != user.id:
+            raise ValueError("seat already occupied")
+        if existing is not None and existing.get("locked") is True:
+            raise ValueError("seat is locked")
+
+        for old_seat_no, old_seat in list(room.seats.items()):
+            if old_seat.get("user_id") == user.id and old_seat_no != seat_no:
+                room.seats.pop(old_seat_no, None)
+
+        seat = {
+            "seat_no": seat_no,
+            "seat_index": seat_no - 1,
+            "user_id": user.id,
+            "public_user_id": user.public_user_id,
+            "display_name": user.display_name or user.username or f"User {user.public_user_id}",
+            "self_muted": False,
+            "admin_muted": False,
+            "locked": False,
+        }
+        room.seats[seat_no] = seat
+        room.updated_at = datetime.now(timezone.utc)
+        return seat
+
+    def leave_seat(self, *, room_id: str, user_id: int, seat_no: int | None = None) -> dict[str, Any] | None:
+        room = self._rooms.get(room_id)
+        if room is None:
+            raise ValueError("room not found")
+
+        removed: dict[str, Any] | None = None
+        for existing_seat_no, seat in list(room.seats.items()):
+            if seat_no is not None and existing_seat_no != seat_no:
+                continue
+            if seat.get("user_id") == user_id:
+                removed = room.seats.pop(existing_seat_no, None)
+                break
+
+        room.updated_at = datetime.now(timezone.utc)
+        return removed
+
+    def set_mute_state(
+        self,
+        *,
+        room_id: str,
+        user_id: int,
+        seat_no: int,
+        muted: bool,
+        admin_muted: bool,
+    ) -> dict[str, Any]:
+        room = self._rooms.get(room_id)
+        if room is None:
+            raise ValueError("room not found")
+        seat = room.seats.get(seat_no)
+        if seat is None:
+            raise ValueError("seat not occupied")
+        if seat.get("user_id") != user_id:
+            raise ValueError("cannot update another user seat mute state")
+
+        seat["self_muted"] = bool(muted)
+        seat["admin_muted"] = bool(admin_muted)
+        room.updated_at = datetime.now(timezone.utc)
+        return seat
+
+    def seat_snapshot(self, room_id: str) -> list[dict[str, Any]]:
+        room = self._rooms.get(room_id)
+        if room is None:
+            return []
+        return [room.seats[key] for key in sorted(room.seats.keys())]
 
     def stats(self) -> dict[str, Any]:
         return {
@@ -172,6 +301,7 @@ class LiveRoomConnectionManager:
                 {
                     "room_id": room.room_id,
                     "online_count": len(room.peers),
+                    "seat_count": len(room.seats),
                     "recent_event_count": len(room.recent_events),
                     "updated_at": room.updated_at.isoformat(),
                 }
