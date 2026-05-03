@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import admin, audio, auth, moderation, users
+from app.api.routes import admin, audio, auth, moderation, uploads, users
 from app.api.routes.rooms import rooms
 from app.database import Base, engine
 from app.models import (
@@ -18,6 +21,7 @@ from app.websocket import live_room
 
 
 Base.metadata.create_all(bind=engine)
+Path("uploads").mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Vibe Match API")
 
@@ -29,6 +33,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/")
@@ -52,5 +58,6 @@ app.include_router(users.router)
 app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(audio.router)
+app.include_router(uploads.router)
 app.include_router(rooms.router)
 app.include_router(live_room.router)
