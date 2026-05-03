@@ -356,7 +356,7 @@ class _LiveRoomPageBackendSafeState extends State<LiveRoomPageBackendSafe> {
       backgroundColor: const Color(0xFF0D1020),
       body: Stack(
         children: [
-          const Positioned.fill(child: RoomBackground(theme: RoomBackgroundTheme.premiumDark)),
+          const Positioned.fill(child: RoomBackground(theme: defaultDarkRoomBackgroundTheme)),
           SafeArea(
             child: Column(
               children: [
