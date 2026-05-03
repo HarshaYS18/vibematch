@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../realtime/live_room_realtime_hub.dart';
 import 'audio_session_api_service.dart';
 import 'mediasoup_room_audio_engine.dart';
 import 'room_audio_engine.dart';
@@ -34,6 +35,7 @@ class LiveRoomAudioController extends ChangeNotifier {
     _operationInFlight = true;
     try {
       _lastRoomId = roomId;
+      await LiveRoomRealtimeHub.connect(roomId);
       final session = await _sessionApi.createRoomAudioSession(roomId);
       await _engine.joinAsAudience(
         roomId: session.roomId,
@@ -60,16 +62,29 @@ class LiveRoomAudioController extends ChangeNotifier {
     final seatNo = seatIndex + 1;
     await _engine.takeSpeakerSeat(seatNo);
     await _engine.publishMic();
+    LiveRoomRealtimeHub.sendSeatTake(seatIndex);
   }
 
   Future<void> leaveSeat() async {
+    final seatIndex = _lastSeatIndex;
     _lastSeatIndex = null;
     _wantedPublishing = false;
     await _engine.leaveSpeakerSeat();
+    if (seatIndex != null) {
+      LiveRoomRealtimeHub.sendSeatLeave(seatIndex);
+    }
   }
 
   Future<void> toggleSelfMute() async {
     await _engine.setSelfMuted(!state.selfMuted);
+    final seatIndex = _lastSeatIndex;
+    if (seatIndex != null) {
+      LiveRoomRealtimeHub.sendMuteState(
+        seatIndex: seatIndex,
+        muted: state.selfMuted,
+        adminMuted: false,
+      );
+    }
   }
 
   Future<void> stopPublishing() async {
@@ -82,6 +97,7 @@ class LiveRoomAudioController extends ChangeNotifier {
     _lastSeatIndex = null;
     _wantedPublishing = false;
     await _engine.leaveRoomAudio();
+    await LiveRoomRealtimeHub.disconnect();
   }
 
   @override
