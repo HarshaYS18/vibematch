@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
 import '../controllers/home_controller.dart';
-import '../models/home_banner.dart';
 import '../models/home_room.dart';
-import 'sections/home_banner_section.dart';
 import 'sections/home_empty_state.dart';
 import 'sections/home_filters_section.dart';
 import 'sections/home_header_section.dart';
@@ -58,30 +56,6 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() {});
   }
 
-  bool get _canManageHomeBanners {
-    final dynamic activeUser = widget.user ?? widget.currentUser;
-
-    try {
-      final primaryRole = activeUser?.primaryRole?.toString().toLowerCase();
-      final roles = activeUser?.roles;
-
-      if (primaryRole == 'founder_owner' || primaryRole == 'super_owner' || primaryRole == 'owner') {
-        return true;
-      }
-
-      if (roles is Iterable) {
-        return roles.any((role) {
-          final normalized = role.toString().toLowerCase();
-          return normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
-        });
-      }
-    } catch (_) {
-      return false;
-    }
-
-    return false;
-  }
-
   void _toast(String message) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -132,7 +106,7 @@ class _HomePageState extends State<HomePage> {
       isScrollControlled: true,
       builder: (_) => HomeLockedRoomSheet(
         room: room,
-        onWrongPassword: () => _toast('Wrong password. Use 1234 for mock room.'),
+        onWrongPassword: () => _toast('Wrong password. Use room password from backend when connected.'),
         onPasswordAccepted: () => _enterRoom(room),
       ),
     );
@@ -162,23 +136,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    _toast('Showing all public open rooms');
-  }
-
-  void _handleBannerTap(HomeBanner banner) {
-    switch (banner.action) {
-      case HomeBannerAction.openEvents:
-        VmNavigator.openEvents(context);
-        return;
-      case HomeBannerAction.openTrendingRooms:
-        _controller.selectCategory('Trending');
-        _toast('Trending rooms selected');
-        return;
-      case HomeBannerAction.openVibeSyncRooms:
-        _controller.selectCategory('Music');
-        _toast('Vibe Sync rooms highlighted');
-        return;
-    }
+    _toast('Showing all public rooms');
   }
 
   @override
@@ -197,17 +155,6 @@ class _HomePageState extends State<HomePage> {
               SliverToBoxAdapter(
                 child: HomeHeaderSection(
                   onSearchTap: () => VmNavigator.openSearch(context),
-                  onNotificationsTap: () => VmNavigator.openNotifications(context),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: HomeBannerSection(
-                  banners: _controller.banners,
-                  selectedIndex: _controller.selectedBannerIndex,
-                  canManageHomeBanners: _canManageHomeBanners,
-                  onBannerChanged: _controller.selectBanner,
-                  onBannerTap: _handleBannerTap,
-                  onManageTap: () => _toast('Banner management opened for official account'),
                 ),
               ),
               SliverToBoxAdapter(
@@ -385,7 +332,7 @@ class _HomeBackendConnectedStrip extends StatelessWidget {
           SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Live room list loaded from backend.',
+              'Rooms loaded from backend.',
               style: TextStyle(
                 color: Color(0xFF4A2A63),
                 fontSize: 11.5,
