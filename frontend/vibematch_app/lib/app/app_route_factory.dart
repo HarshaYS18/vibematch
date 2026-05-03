@@ -9,7 +9,7 @@ import '../features/love_bond/presentation/love_bond_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/public_profile_page.dart';
 import '../features/rankings/presentation/rankings_page.dart';
-import '../features/rooms/presentation/live_room_page_modular.dart';
+import '../features/rooms/presentation/live_room_page.dart';
 import '../features/search/presentation/search_page.dart';
 import '../features/settings/presentation/settings_page.dart';
 import '../features/store/presentation/store_page.dart';
@@ -29,14 +29,14 @@ class AppRouteFactory {
         return _buildRoute(
           settings,
           args is LiveRoomRouteArgs
-              ? LiveRoomPageModular(
+              ? LiveRoomPage(
                   roomName: args.roomName,
                   roomId: args.roomId,
                   language: args.language,
                   modeTitle: args.modeTitle,
                   onlineCount: args.onlineCount,
                 )
-              : const LiveRoomPageModular(),
+              : const LiveRoomPage(),
         );
       case VmRoutes.profile:
         final args = settings.arguments;
