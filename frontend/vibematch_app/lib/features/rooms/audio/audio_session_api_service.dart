@@ -53,6 +53,8 @@ class AudioSessionResponse {
     required this.peerId,
     required this.engine,
     required this.expiresAt,
+    required this.algorithm,
+    required this.secretFingerprint,
   });
 
   final String audioToken;
@@ -60,6 +62,8 @@ class AudioSessionResponse {
   final String peerId;
   final String engine;
   final String expiresAt;
+  final String algorithm;
+  final String secretFingerprint;
 
   factory AudioSessionResponse.fromJson(Map<String, dynamic> json) {
     return AudioSessionResponse(
@@ -68,6 +72,8 @@ class AudioSessionResponse {
       peerId: json['peer_id']?.toString() ?? '',
       engine: json['engine']?.toString() ?? 'mediasoup',
       expiresAt: json['expires_at']?.toString() ?? '',
+      algorithm: json['algorithm']?.toString() ?? 'HS256',
+      secretFingerprint: json['secret_fingerprint']?.toString() ?? '',
     );
   }
 }
