@@ -45,7 +45,7 @@ def _get_user_from_token(db: Session, token: str | None) -> User | None:
 
     payload = decode_access_token(token)
     if not payload:
- return None
+        return None
 
     subject = payload.get("sub")
     if subject is None:
