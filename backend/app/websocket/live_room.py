@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.database import SessionLocal
+from app.models.room import Room
 from app.models.user import User
-from app.websocket.live_room_manager import live_room_manager
+from app.websocket.live_room_manager import PROTECTED_HOST_SEAT_NO, live_room_manager
 
 
 router = APIRouter()
@@ -57,6 +58,10 @@ def _get_user_from_token(db: Session, token: str | None) -> User | None:
         return None
 
     return db.query(User).filter(User.id == user_id).first()
+
+
+def _get_app_room(db: Session, room_id: str) -> Room | None:
+    return db.query(Room).filter(Room.room_public_id == room_id).first()
 
 
 def _int_from_event(event: dict[str, Any], key: str, fallback: int | None = None) -> int | None:
@@ -113,11 +118,24 @@ def _sanitize_event(event: dict[str, Any], user: User) -> dict[str, Any]:
     return sanitized
 
 
+async def _broadcast_seats(room_id: str, changed_seat: dict[str, Any] | None) -> None:
+    seats = live_room_manager.seat_snapshot(room_id)
+    await live_room_manager.broadcast(
+        room_id=room_id,
+        event={
+            "type": "room/seats_updated",
+            "seats": seats,
+            "changed_seat": changed_seat,
+        },
+    )
+
+
 async def _handle_authoritative_action(
     *,
     websocket: WebSocket,
     room_id: str,
     user: User,
+    app_room: Room | None,
     event: dict[str, Any],
 ) -> bool:
     event_type = event["type"]
@@ -135,7 +153,12 @@ async def _handle_authoritative_action(
             if seat_no is None:
                 raise ValueError("seat number is required")
 
-            seat = live_room_manager.take_seat(room_id=room_id, user=user, seat_no=seat_no)
+            seat = live_room_manager.take_seat(
+                room_id=room_id,
+                user=user,
+                seat_no=seat_no,
+                app_room=app_room,
+            )
             seats = live_room_manager.seat_snapshot(room_id)
             await live_room_manager.accept_action(
                 websocket=websocket,
@@ -144,10 +167,7 @@ async def _handle_authoritative_action(
                 action=event_type,
                 payload={"seat": seat, "seats": seats},
             )
-            await live_room_manager.broadcast(
-                room_id=room_id,
-                event={"type": "room/seats_updated", "seats": seats, "changed_seat": seat},
-            )
+            await _broadcast_seats(room_id, seat)
             return True
 
         if event_type == "room/seat/leave":
@@ -165,10 +185,7 @@ async def _handle_authoritative_action(
                 action=event_type,
                 payload={"seat": removed, "seats": seats},
             )
-            await live_room_manager.broadcast(
-                room_id=room_id,
-                event={"type": "room/seats_updated", "seats": seats, "changed_seat": removed},
-            )
+            await _broadcast_seats(room_id, removed)
             return True
 
         if event_type == "room/seat/mute_state":
@@ -194,10 +211,7 @@ async def _handle_authoritative_action(
                 action=event_type,
                 payload={"seat": seat, "seats": seats},
             )
-            await live_room_manager.broadcast(
-                room_id=room_id,
-                event={"type": "room/seats_updated", "seats": seats, "changed_seat": seat},
-            )
+            await _broadcast_seats(room_id, seat)
             return True
     except ValueError as error:
         await live_room_manager.reject_action(
@@ -223,6 +237,8 @@ async def live_room_websocket(websocket: WebSocket, room_id: str):
             await websocket.close(code=4401, reason="unauthorized")
             return
 
+        app_room = _get_app_room(db, room_id)
+
         await live_room_manager.connect(
             websocket=websocket,
             room_id=room_id,
@@ -230,7 +246,25 @@ async def live_room_websocket(websocket: WebSocket, room_id: str):
             public_user_id=user.public_user_id,
             display_name=user.display_name,
         )
+
         await live_room_manager.send_snapshot(room_id=room_id, websocket=websocket)
+
+        auto_seat: dict[str, Any] | None = None
+        if live_room_manager.can_use_host_seat(app_room=app_room, user=user):
+            try:
+                auto_seat = live_room_manager.take_seat(
+                    room_id=room_id,
+                    user=user,
+                    seat_no=PROTECTED_HOST_SEAT_NO,
+                    app_room=app_room,
+                    auto_assigned=True,
+                )
+            except ValueError:
+                auto_seat = None
+
+        if auto_seat is not None:
+            await _broadcast_seats(room_id, auto_seat)
+
         await live_room_manager.broadcast(
             room_id=room_id,
             event={
@@ -266,6 +300,7 @@ async def live_room_websocket(websocket: WebSocket, room_id: str):
                 websocket=websocket,
                 room_id=room_id,
                 user=user,
+                app_room=app_room,
                 event=event,
             )
             if handled:
@@ -293,6 +328,7 @@ async def live_room_websocket(websocket: WebSocket, room_id: str):
                     exclude_user_id=user.id,
                 )
                 await live_room_manager.broadcast_presence(room_id=room_id)
+                await _broadcast_seats(room_id, None)
         db.close()
 
 
