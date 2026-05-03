@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
@@ -167,6 +169,8 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
 
         for (var index = 0; index < widget.seats.length; index++) {
           final offset = _seatOffset(index, spec, width);
+          final seat = widget.seats[index];
+          final visuallyProtectedSeatOne = index == 0 && seat.user == null && !widget.canManageSeats;
           children.add(
             Positioned(
               left: offset.dx - (seatWidth / 2),
@@ -174,8 +178,9 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
               width: seatWidth,
               height: seatHeight,
               child: _SeatTile(
-                seat: widget.seats[index],
+                seat: seat,
                 selected: widget.selectedSeatIndex == index && _hiddenMenuSeat != index,
+                visuallyProtected: visuallyProtectedSeatOne,
                 onTap: () {
                   final user = widget.seats[index].user;
                   if (user == null) {
@@ -224,10 +229,16 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
 }
 
 class _SeatTile extends StatelessWidget {
-  const _SeatTile({required this.seat, required this.selected, required this.onTap});
+  const _SeatTile({
+    required this.seat,
+    required this.selected,
+    required this.visuallyProtected,
+    required this.onTap,
+  });
 
   final RoomSeat seat;
   final bool selected;
+  final bool visuallyProtected;
   final VoidCallback onTap;
 
   @override
@@ -239,11 +250,17 @@ class _SeatTile extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _SeatAvatar(seat: seat, selected: selected),
+          _SeatAvatar(
+            seat: seat,
+            selected: selected,
+            visuallyProtected: visuallyProtected,
+          ),
           const SizedBox(height: 5),
           SizedBox(
             height: 24,
-            child: user == null ? _EmptySeatLabel(index: seat.index) : _UserSeatLabel(user: user, index: seat.index),
+            child: user == null
+                ? _EmptySeatLabel(index: seat.index, visuallyProtected: visuallyProtected)
+                : _UserSeatLabel(user: user, index: seat.index),
           ),
         ],
       ),
@@ -252,25 +269,73 @@ class _SeatTile extends StatelessWidget {
 }
 
 class _SeatAvatar extends StatelessWidget {
-  const _SeatAvatar({required this.seat, required this.selected});
+  const _SeatAvatar({
+    required this.seat,
+    required this.selected,
+    required this.visuallyProtected,
+  });
 
   final RoomSeat seat;
   final bool selected;
+  final bool visuallyProtected;
+
+  bool get _lockedVisual => seat.locked || visuallyProtected;
 
   @override
   Widget build(BuildContext context) {
     final user = seat.user;
+    final fogColor = _lockedVisual ? const Color(0xFFE7EDF7) : const Color(0xFFDFF9F7);
+    final glowColor = _lockedVisual ? const Color(0xFFC9D4E6) : const Color(0xFF12C7B7);
+
     return SizedBox(
-      width: _RoomSeatLayoutState.avatarSize + 14,
-      height: _RoomSeatLayoutState.avatarSize + 14,
+      width: _RoomSeatLayoutState.avatarSize + 18,
+      height: _RoomSeatLayoutState.avatarSize + 18,
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
+          if (_lockedVisual)
+            CustomPaint(
+              size: Size.square(_RoomSeatLayoutState.avatarSize + 14),
+              painter: _DottedSeatRingPainter(
+                color: Colors.white.withValues(alpha: 0.62),
+                strokeWidth: 1.7,
+                dashLength: 4.4,
+                gapLength: 4.6,
+              ),
+            ),
+          Container(
+            width: _RoomSeatLayoutState.avatarSize + 12,
+            height: _RoomSeatLayoutState.avatarSize + 12,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                center: const Alignment(-0.28, -0.34),
+                radius: 0.92,
+                colors: [
+                  fogColor.withValues(alpha: _lockedVisual ? 0.30 : 0.36),
+                  Colors.white.withValues(alpha: _lockedVisual ? 0.10 : 0.16),
+                  const Color(0xFF101522).withValues(alpha: _lockedVisual ? 0.54 : 0.44),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: _lockedVisual ? 0.14 : 0.20),
+                  blurRadius: 17,
+                  offset: const Offset(0, 7),
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(-2, -2),
+                ),
+              ],
+            ),
+          ),
           if (selected)
             Container(
-              width: _RoomSeatLayoutState.avatarSize + 8,
-              height: _RoomSeatLayoutState.avatarSize + 8,
+              width: _RoomSeatLayoutState.avatarSize + 9,
+              height: _RoomSeatLayoutState.avatarSize + 9,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white.withValues(alpha: 0.92), width: 1.4),
@@ -284,17 +349,56 @@ class _SeatAvatar extends StatelessWidget {
               height: _RoomSeatLayoutState.avatarSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.08 : 0.12) : null,
-                gradient: user == null ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
-                border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.86) : Colors.white.withValues(alpha: 0.18), width: selected ? 1.4 : 1.1),
+                color: user == null ? null : null,
+                gradient: user == null
+                    ? RadialGradient(
+                        center: const Alignment(-0.35, -0.42),
+                        radius: 0.92,
+                        colors: [
+                          Colors.white.withValues(alpha: _lockedVisual ? 0.30 : 0.24),
+                          fogColor.withValues(alpha: _lockedVisual ? 0.14 : 0.18),
+                          const Color(0xFF232633).withValues(alpha: _lockedVisual ? 0.68 : 0.54),
+                        ],
+                      )
+                    : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
+                border: Border.all(
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.86)
+                      : _lockedVisual
+                          ? Colors.white.withValues(alpha: 0.24)
+                          : Colors.white.withValues(alpha: 0.18),
+                  width: selected ? 1.4 : 1.1,
+                ),
               ),
               child: Center(
                 child: user == null
-                    ? Icon(seat.locked ? Icons.lock_rounded : Icons.add_rounded, color: Colors.white70, size: seat.locked ? 22 : 28)
-                    : Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
+                    ? Icon(
+                        _lockedVisual ? Icons.lock_rounded : Icons.add_rounded,
+                        color: Colors.white.withValues(alpha: _lockedVisual ? 0.82 : 0.76),
+                        size: _lockedVisual ? 22 : 28,
+                      )
+                    : Text(
+                        avatarLetter(user.name),
+                        style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900),
+                      ),
               ),
             ),
           ),
+          if (visuallyProtected)
+            Positioned(
+              right: 0,
+              top: 5,
+              child: Container(
+                width: 19,
+                height: 19,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC99A3B).withValues(alpha: 0.94),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: RoomColors.deep, width: 1.2),
+                ),
+                child: const Icon(Icons.shield_rounded, color: Colors.white, size: 10.5),
+              ),
+            ),
           if (user?.selfMuted ?? false)
             Positioned(
               right: 0,
@@ -334,19 +438,69 @@ class _SeatAvatar extends StatelessWidget {
   }
 }
 
+class _DottedSeatRingPainter extends CustomPainter {
+  const _DottedSeatRingPainter({
+    required this.color,
+    required this.strokeWidth,
+    required this.dashLength,
+    required this.gapLength,
+  });
+
+  final Color color;
+  final double strokeWidth;
+  final double dashLength;
+  final double gapLength;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
+    final center = Offset(size.width / 2, size.height / 2);
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final circumference = 2 * math.pi * radius;
+    final dashRadians = (dashLength / circumference) * 2 * math.pi;
+    final gapRadians = (gapLength / circumference) * 2 * math.pi;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    var start = -math.pi / 2;
+    while (start < math.pi * 1.5) {
+      canvas.drawArc(rect, start, dashRadians, false, paint);
+      start += dashRadians + gapRadians;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DottedSeatRingPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.dashLength != dashLength ||
+        oldDelegate.gapLength != gapLength;
+  }
+}
+
 class _EmptySeatLabel extends StatelessWidget {
-  const _EmptySeatLabel({required this.index});
+  const _EmptySeatLabel({required this.index, required this.visuallyProtected});
 
   final int index;
+  final bool visuallyProtected;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Text(
-        'NO.${index + 1}',
+        visuallyProtected ? 'HOST' : 'NO.${index + 1}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 11.2, fontWeight: FontWeight.w900, height: 1),
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: visuallyProtected ? 0.68 : 0.58),
+          fontSize: 11.2,
+          fontWeight: FontWeight.w900,
+          height: 1,
+          letterSpacing: visuallyProtected ? 0.4 : 0,
+        ),
       ),
     );
   }
