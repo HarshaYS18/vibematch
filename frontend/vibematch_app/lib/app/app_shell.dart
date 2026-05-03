@@ -5,6 +5,7 @@ import '../features/create/presentation/create_page.dart';
 import '../features/home/presentation/home_page_modular.dart';
 import '../features/inbox/presentation/inbox_page.dart';
 import '../features/profile/presentation/me_page.dart';
+import '../features/rooms/presentation/live_room_models.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page.dart';
@@ -28,6 +29,27 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   VmMainTab _selectedTab = VmMainTab.home;
+
+  @override
+  void initState() {
+    super.initState();
+    LiveRoomSessionUserStore.setCurrentUser(widget.currentUser);
+  }
+
+  @override
+  void didUpdateWidget(covariant AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentUser.id != widget.currentUser.id ||
+        oldWidget.currentUser.updatedAt != widget.currentUser.updatedAt) {
+      LiveRoomSessionUserStore.setCurrentUser(widget.currentUser);
+    }
+  }
+
+  @override
+  void dispose() {
+    LiveRoomSessionUserStore.setCurrentUser(null);
+    super.dispose();
+  }
 
   List<Widget> get _pages {
     final activeUser = widget.currentUser;
