@@ -148,8 +148,12 @@ class _InboxPageState extends State<InboxPage> {
         builder: (_) => InboxSettingsPage(
           backupEnabled: _controller.backupEnabled,
           frequency: _controller.backupFrequency,
+          strangersCanMessage: _controller.strangersCanMessage,
+          strangersCanMentionInVibes: _controller.strangersCanMentionInVibes,
           onBackupEnabledChanged: _controller.setBackupEnabled,
           onFrequencyChanged: _controller.setBackupFrequency,
+          onStrangersCanMessageChanged: _controller.setStrangersCanMessage,
+          onStrangersCanMentionInVibesChanged: _controller.setStrangersCanMentionInVibes,
           onBackupNow: () => _toast('Encrypted backup flow will connect to backend/Drive later.'),
           onRestoreTap: () => _toast('Restore from backup flow will connect later.'),
           onBackTap: () => Navigator.pop(context),
