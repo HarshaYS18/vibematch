@@ -63,9 +63,10 @@ class LiveRoomGiftActionsModule {
       isScrollControlled: true,
       builder: (_) => LuckyPacketSetupSheet(
         coinBalance: giftController.coinBalance,
-        onSend: (coinAmount, message) {
+        onSend: (coinAmount, peopleCount, message) {
           final sent = giftController.sendLuckyPacket(
             coinAmount: coinAmount,
+            winnerCount: peopleCount,
             message: message,
             roomUsers: roomUsers,
           );
