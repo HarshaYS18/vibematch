@@ -16,6 +16,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.layoutId,
     required this.selectedSeatIndex,
     required this.canManageSeats,
+    required this.applyOnlyModeEnabled,
     required this.admins,
     required this.availableAdminUsers,
     required this.onAddAdmin,
@@ -41,7 +42,9 @@ class LiveRoomBody extends StatelessWidget {
     required this.onSwitch,
     required this.onLock,
     required this.onUnlock,
+    required this.onApplySeat,
     required this.onApproveSeatApplication,
+    required this.onRejectSeatApplication,
     required this.onSenderTap,
     required this.onMentionTap,
     required this.onDismissOverlays,
@@ -61,6 +64,7 @@ class LiveRoomBody extends StatelessWidget {
   final String layoutId;
   final int? selectedSeatIndex;
   final bool canManageSeats;
+  final bool applyOnlyModeEnabled;
   final List<SeatUser> admins;
   final List<SeatUser> availableAdminUsers;
   final ValueChanged<SeatUser> onAddAdmin;
@@ -86,7 +90,9 @@ class LiveRoomBody extends StatelessWidget {
   final ValueChanged<int> onSwitch;
   final ValueChanged<int> onLock;
   final ValueChanged<int> onUnlock;
+  final ValueChanged<int> onApplySeat;
   final ValueChanged<ChatEntry> onApproveSeatApplication;
+  final ValueChanged<ChatEntry> onRejectSeatApplication;
   final ValueChanged<ChatEntry> onSenderTap;
   final ValueChanged<String> onMentionTap;
   final VoidCallback onDismissOverlays;
@@ -132,12 +138,14 @@ class LiveRoomBody extends StatelessWidget {
               layoutId: layoutId,
               selectedSeatIndex: selectedSeatIndex,
               canManageSeats: canManageSeats,
+              applyOnlyModeEnabled: applyOnlyModeEnabled,
               onSeatTap: onSeatTap,
               onUserTap: onUserTap,
               onInvite: onInvite,
               onSwitch: onSwitch,
               onLock: onLock,
               onUnlock: onUnlock,
+              onApply: onApplySeat,
             ),
           ),
           const SizedBox(height: 6),
@@ -151,6 +159,7 @@ class LiveRoomBody extends StatelessWidget {
                   messages: messages,
                   canManageSeatApplications: canManageSeatApplications,
                   onApproveSeatApplication: onApproveSeatApplication,
+                  onRejectSeatApplication: onRejectSeatApplication,
                   onSenderTap: onSenderTap,
                   onMentionTap: onMentionTap,
                 ),
