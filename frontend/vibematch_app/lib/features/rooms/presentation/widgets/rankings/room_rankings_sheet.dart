@@ -70,7 +70,7 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
                 const SizedBox(height: 12),
                 _RankingsHeader(
                   title: _category.title,
-                  roomName: widget.roomName,
+                  subtitle: '${_period.label} global ranking',
                   icon: _category.icon,
                   accentColor: accentColor,
                   onClose: () => Navigator.pop(context),
@@ -147,14 +147,14 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
 class _RankingsHeader extends StatelessWidget {
   const _RankingsHeader({
     required this.title,
-    required this.roomName,
+    required this.subtitle,
     required this.icon,
     required this.accentColor,
     required this.onClose,
   });
 
   final String title;
-  final String roomName;
+  final String subtitle;
   final IconData icon;
   final Color accentColor;
   final VoidCallback onClose;
@@ -187,7 +187,7 @@ class _RankingsHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                roomName,
+                subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 11.5, fontWeight: FontWeight.w800),
