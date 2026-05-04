@@ -77,4 +77,9 @@ class RoomRankingEntry {
   final int score;
   final String scoreLabel;
   final String subtitle;
+
+  String get displayRank {
+    if (rank > 99) return '99+';
+    return '$rank';
+  }
 }
