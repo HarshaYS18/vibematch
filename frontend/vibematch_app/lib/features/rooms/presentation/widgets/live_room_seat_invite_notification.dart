@@ -26,13 +26,15 @@ class LiveRoomSeatInviteNotification extends StatelessWidget {
         ignoring: false,
         child: Center(
           child: Container(
-            width: double.infinity,
-            margin: const EdgeInsets.symmetric(horizontal: 18),
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            width: 320,
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.96),
+              color: Colors.white.withValues(alpha: 0.97),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.86),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.20),
@@ -41,20 +43,22 @@ class LiveRoomSeatInviteNotification extends StatelessWidget {
                 ),
               ],
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(colors: invitedUser.avatarColors),
                     boxShadow: [
                       BoxShadow(
-                        color: invitedUser.avatarColors.first.withValues(alpha: 0.20),
-                        blurRadius: 12,
-                        offset: const Offset(0, 5),
+                        color: invitedUser.avatarColors.first.withValues(
+                          alpha: 0.22,
+                        ),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
@@ -63,55 +67,54 @@ class LiveRoomSeatInviteNotification extends StatelessWidget {
                     avatarLetter(invitedUser.name),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 17,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$inviterName invited you to take seat ${seatIndex + 1}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: RoomColors.plum,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          height: 1.18,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Seat invitation for ${invitedUser.name} • auto hides in 15s',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF7B6A86),
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 12),
+                Text(
+                  '$inviterName has invited you to take seat ${seatIndex + 1}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: RoomColors.plum,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    height: 1.25,
                   ),
                 ),
-                const SizedBox(width: 8),
-                _SeatInviteActionButton(
-                  label: 'Reject',
-                  color: const Color(0xFFE85D75),
-                  background: const Color(0xFFFFEDF1),
-                  onTap: onReject,
+                const SizedBox(height: 6),
+                const Text(
+                  'This invite will disappear automatically in 15 seconds.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF7B6A86),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                  ),
                 ),
-                const SizedBox(width: 6),
-                _SeatInviteActionButton(
-                  label: 'Accept',
-                  color: const Color(0xFF129A63),
-                  background: const Color(0xFFEAF9F1),
-                  onTap: onAccept,
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SeatInviteActionButton(
+                        label: 'Reject',
+                        color: const Color(0xFFE85D75),
+                        background: const Color(0xFFFFEDF1),
+                        onTap: onReject,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _SeatInviteActionButton(
+                        label: 'Accept',
+                        color: const Color(0xFF129A63),
+                        background: const Color(0xFFEAF9F1),
+                        onTap: onAccept,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -138,22 +141,23 @@ class _SeatInviteActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 11),
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withValues(alpha: 0.18)),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: color.withValues(alpha: 0.18),
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             color: color,
-            fontSize: 11.5,
+            fontSize: 12.5,
             fontWeight: FontWeight.w900,
           ),
         ),
