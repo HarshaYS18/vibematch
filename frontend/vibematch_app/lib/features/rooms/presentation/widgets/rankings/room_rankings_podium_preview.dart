@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../live_room_models.dart';
 import 'room_rankings_models.dart';
 
 class RoomRankingsPodiumPreview extends StatelessWidget {
@@ -19,15 +20,39 @@ class RoomRankingsPodiumPreview extends StatelessWidget {
     final third = entries.length > 2 ? entries[2] : null;
 
     return SizedBox(
-      height: 106,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      height: 130,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
         children: [
-          Expanded(child: _PodiumUser(entry: second, height: 72, rank: 2, accentColor: accentColor)),
-          const SizedBox(width: 8),
-          Expanded(child: _PodiumUser(entry: first, height: 96, rank: 1, accentColor: accentColor)),
-          const SizedBox(width: 8),
-          Expanded(child: _PodiumUser(entry: third, height: 62, rank: 3, accentColor: accentColor)),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              height: 34,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.06),
+                    accentColor.withValues(alpha: 0.20),
+                    Colors.white.withValues(alpha: 0.06),
+                  ],
+                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+              ),
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(child: _PodiumUser(entry: second, height: 86, rank: 2, accentColor: accentColor)),
+              const SizedBox(width: 8),
+              Expanded(child: _PodiumUser(entry: first, height: 112, rank: 1, accentColor: accentColor)),
+              const SizedBox(width: 8),
+              Expanded(child: _PodiumUser(entry: third, height: 80, rank: 3, accentColor: accentColor)),
+            ],
+          ),
         ],
       ),
     );
@@ -64,18 +89,28 @@ class _PodiumUser extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            rankColor.withValues(alpha: 0.18),
-            accentColor.withValues(alpha: 0.10),
+            rankColor.withValues(alpha: 0.22),
+            accentColor.withValues(alpha: 0.12),
+            Colors.black.withValues(alpha: 0.10),
           ],
         ),
-        border: Border.all(color: rankColor.withValues(alpha: 0.34)),
+        border: Border.all(color: rankColor.withValues(alpha: 0.42)),
+        boxShadow: [
+          BoxShadow(
+            color: rankColor.withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          _PodiumAvatar(entry: entry, rankColor: rankColor, size: rank == 1 ? 42 : 36),
+          const SizedBox(height: 5),
           Text(
             '$rank',
-            style: TextStyle(color: rankColor, fontSize: rank == 1 ? 24 : 20, fontWeight: FontWeight.w900, height: 1),
+            style: TextStyle(color: rankColor, fontSize: rank == 1 ? 23 : 19, fontWeight: FontWeight.w900, height: 1),
           ),
           const SizedBox(height: 4),
           Text(
@@ -87,13 +122,41 @@ class _PodiumUser extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            entry == null ? '' : '${entry!.score}',
+            entry == null ? '' : compactNumber(entry!.score),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 9, fontWeight: FontWeight.w800),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 9, fontWeight: FontWeight.w800),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PodiumAvatar extends StatelessWidget {
+  const _PodiumAvatar({required this.entry, required this.rankColor, required this.size});
+
+  final RoomRankingEntry? entry;
+  final Color rankColor;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = entry?.user;
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: user == null ? null : LinearGradient(colors: user.avatarColors),
+        color: user == null ? Colors.white.withValues(alpha: 0.08) : null,
+        border: Border.all(color: rankColor.withValues(alpha: 0.70), width: 1.4),
+      ),
+      child: Text(
+        user == null ? '?' : avatarLetter(user.name),
+        style: TextStyle(color: Colors.white, fontSize: size * 0.42, fontWeight: FontWeight.w900),
       ),
     );
   }
