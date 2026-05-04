@@ -6,10 +6,10 @@ import '../live_room_models.dart';
 import '../modules/live_room_games_module.dart';
 import '../modules/live_room_gift_module.dart';
 import '../modules/live_room_message_composer_module.dart';
+import 'chat_vip_badge.dart';
 import 'room_seats.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
-import 'vip_badge.dart';
 
 final ValueNotifier<int> roomChatClearSignal = ValueNotifier<int>(0);
 
@@ -186,7 +186,7 @@ class _CompactChatLine extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       text: TextSpan(
                         children: [
-                          WidgetSpan(alignment: PlaceholderAlignment.middle, child: VipBadge(level: message.vipLevel, size: VipBadgeSize.tiny, showWhenZero: true)),
+                          WidgetSpan(alignment: PlaceholderAlignment.middle, child: ChatVipBadge(level: message.vipLevel, showWhenZero: true)),
                           const TextSpan(text: '  '),
                           TextSpan(text: message.senderName, recognizer: TapGestureRecognizer()..onTap = onSenderTap, style: const TextStyle(color: Colors.white, fontSize: 14.8, fontWeight: FontWeight.w900, height: 1.15)),
                           const TextSpan(text: '\n '),
