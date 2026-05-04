@@ -17,6 +17,7 @@ class _CreatePageState extends State<CreatePage> {
   String _selectedLanguage = 'Telugu';
   _RoomMode _selectedMode = _RoomMode.open;
   bool _roomImageSelected = false;
+  bool _allowScreenshots = true;
 
   final List<String> _languages = const [
     'Telugu',
@@ -196,6 +197,10 @@ class _CreatePageState extends State<CreatePage> {
               _ReadyInfoRow(label: 'Room ID', value: roomId),
               _ReadyInfoRow(label: 'Mode', value: _selectedMode.title),
               _ReadyInfoRow(label: 'Language', value: _selectedLanguage),
+              _ReadyInfoRow(
+                label: 'Screenshots',
+                value: _allowScreenshots ? 'Allowed' : 'Denied',
+              ),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -225,6 +230,12 @@ class _CreatePageState extends State<CreatePage> {
                             ),
                           ),
                         );
+
+                        _toast(
+                          _allowScreenshots
+                              ? 'Screenshots allowed for this mock room'
+                              : 'Screenshots denied for this mock room',
+                        );
                       },
                     ),
                   ),
@@ -248,18 +259,31 @@ class _CreatePageState extends State<CreatePage> {
             SliverToBoxAdapter(child: _buildCreateCard()),
             SliverToBoxAdapter(child: _buildModeSection()),
             SliverToBoxAdapter(child: _buildRulesCard()),
-            const SliverToBoxAdapter(child: SizedBox(height: 92)),
+            const SliverToBoxAdapter(child: SizedBox(height: 128)),
           ],
         ),
       ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: _PrimaryButton(
-            text: 'Create Room',
-            icon: Icons.add_circle_rounded,
-            onTap: _createRoom,
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ScreenshotToggle(
+                allowScreenshots: _allowScreenshots,
+                onChanged: (value) {
+                  setState(() => _allowScreenshots = value);
+                  _toast(value ? 'Screenshots allowed' : 'Screenshots denied');
+                },
+              ),
+              const SizedBox(height: 8),
+              _PrimaryButton(
+                text: 'Create Room',
+                icon: Icons.add_circle_rounded,
+                onTap: _createRoom,
+              ),
+            ],
           ),
         ),
       ),
@@ -470,7 +494,7 @@ class _CreatePageState extends State<CreatePage> {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Backend later controls locked access, Secret Vibe privacy, member approval, image chat, guest messages, audit logs, and room moderation hierarchy.',
+              'Backend later controls locked access, Secret Vibe privacy, member approval, screenshot rules, image chat, guest messages, audit logs, and room moderation hierarchy.',
               style: TextStyle(
                 color: Color(0xFF6A4E18),
                 fontSize: 11.5,
@@ -504,12 +528,6 @@ enum _RoomMode {
     icon: Icons.visibility_off_rounded,
     color: Color(0xFF8C5CF6),
   ),
-  vibeSync(
-    title: 'Vibe Sync',
-    subtitle: 'Music-style room with animated mood',
-    icon: Icons.graphic_eq_rounded,
-    color: Color(0xFFE84C72),
-  ),
   membersOnly(
     title: 'Members Only',
     subtitle: 'Only approved room members can chat',
@@ -528,6 +546,81 @@ enum _RoomMode {
   final String subtitle;
   final IconData icon;
   final Color color;
+}
+
+class _ScreenshotToggle extends StatelessWidget {
+  const _ScreenshotToggle({
+    required this.allowScreenshots,
+    required this.onChanged,
+  });
+
+  final bool allowScreenshots;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEDE3D7)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF251538).withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(
+            allowScreenshots
+                ? Icons.screenshot_monitor_rounded
+                : Icons.no_photography_rounded,
+            color: allowScreenshots
+                ? const Color(0xFF12C7B7)
+                : const Color(0xFFE84C72),
+            size: 19,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Screenshots',
+                  style: TextStyle(
+                    color: Color(0xFF251538),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  allowScreenshots
+                      ? 'Allowed in this chatroom'
+                      : 'Denied in this chatroom',
+                  style: const TextStyle(
+                    color: Color(0xFF7B6A86),
+                    fontSize: 10.8,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: allowScreenshots,
+            onChanged: onChanged,
+            activeThumbColor: const Color(0xFF12C7B7),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ModeCard extends StatelessWidget {
