@@ -138,7 +138,7 @@ class _LuckyPacketDialog extends StatelessWidget {
           Text(packet.senderName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
           const SizedBox(height: 4),
           Text(
-            packet.message.trim().isEmpty ? 'sent a Lucky Packet' : packet.message.trim(),
+            packet.message.trim().isEmpty ? 'sent a Lucky Packet to ${packet.winnerCount} people' : packet.message.trim(),
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -193,11 +193,11 @@ class _LuckyPacketDialog extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
                 ),
-                child: Text('Get • ${packet.remainingSeconds}s', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+                child: const Text('Get', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
               ),
             )
           else if (isClaim)
-            Text('Claim closes in ${packet.remainingSeconds}s', style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800))
+            const Text('Reward opened. Total results reveal after 20 seconds.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800))
           else if (isResults) ...[
             _LuckyPacketResults(packet: packet),
             const SizedBox(height: 10),
@@ -233,20 +233,25 @@ class _LuckyPacketResults extends StatelessWidget {
       return const Text('No claims this round', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800));
     }
 
-    return Column(
-      children: entries.take(5).map((entry) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 5),
-          child: Row(
-            children: [
-              Expanded(child: Text(entry.key, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800))),
-              const GoldCoinIcon(size: 12),
-              const SizedBox(width: 4),
-              Text('${entry.value}', style: const TextStyle(color: RoomColors.gold, fontSize: 11, fontWeight: FontWeight.w900)),
-            ],
-          ),
-        );
-      }).toList(),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 154),
+      child: SingleChildScrollView(
+        child: Column(
+          children: entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Row(
+                children: [
+                  Expanded(child: Text(entry.key, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800))),
+                  const GoldCoinIcon(size: 12),
+                  const SizedBox(width: 4),
+                  Text('${entry.value}', style: const TextStyle(color: RoomColors.gold, fontSize: 11, fontWeight: FontWeight.w900)),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
     );
   }
 }
