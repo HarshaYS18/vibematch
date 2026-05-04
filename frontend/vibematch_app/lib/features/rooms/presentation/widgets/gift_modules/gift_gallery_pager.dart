@@ -40,10 +40,10 @@ class GiftGalleryPager extends StatelessWidget {
           physics: const BouncingScrollPhysics(),
           itemCount: filtered.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: 7,
-            crossAxisSpacing: 7,
-            childAspectRatio: 1,
+            crossAxisCount: 5,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: 0.92,
           ),
           itemBuilder: (context, giftIndex) {
             final gift = filtered[giftIndex];
