@@ -34,7 +34,6 @@ import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
 import 'widgets/live_room_users_sheet.dart';
 import 'widgets/room_contribution_rankings_sheet.dart';
-import 'widgets/room_seat_invite_request_sheet.dart';
 import 'widgets/room_seats.dart';
 import 'widgets/room_theme.dart';
 import 'widgets/vibesync_room_module.dart';
@@ -323,37 +322,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       builder: (_) => LiveRoomInviteSheet(
         seatIndex: seatIndex,
         users: inviteUsers,
-        onInvite: (user) {
-          Navigator.pop(context);
-          RoomToast.show(context, 'Seat invite sent to ${user.name}');
-          Future<void>.delayed(const Duration(milliseconds: 100), () {
-            if (!mounted) return;
-            showDialog<void>(
-              context: context,
-              barrierDismissible: true,
-              barrierColor: Colors.black.withValues(alpha: 0.36),
-              builder: (dialogContext) => RoomSeatInviteRequestSheet(
-                onDecline: () {
-                  Navigator.pop(dialogContext);
-                  RoomToast.show(context, 'Seat invite declined');
-                },
-                onAccept: () {
-                  Navigator.pop(dialogContext);
-                  final seatAvailable = seatIndex >= 0 &&
-                      seatIndex < _seatController.seats.length &&
-                      !_seatController.seats[seatIndex].locked &&
-                      _seatController.seats[seatIndex].user == null;
-                  if (seatAvailable) {
-                    _seatController.occupySeat(seatIndex);
-                    RoomToast.show(context, 'Seat accepted');
-                  } else {
-                    RoomToast.show(context, 'Seat unavailable');
-                  }
-                },
-              ),
-            );
-          });
-        },
+        onInvite: (_) {},
       ),
     );
   }
