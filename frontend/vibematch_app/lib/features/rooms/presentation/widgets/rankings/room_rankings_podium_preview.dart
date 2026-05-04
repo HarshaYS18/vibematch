@@ -19,41 +19,56 @@ class RoomRankingsPodiumPreview extends StatelessWidget {
     final second = entries.length > 1 ? entries[1] : null;
     final third = entries.length > 2 ? entries[2] : null;
 
-    return SizedBox(
-      height: 130,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              height: 34,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(999),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.06),
-                    accentColor.withValues(alpha: 0.20),
-                    Colors.white.withValues(alpha: 0.06),
-                  ],
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      child: SizedBox(
+        height: 178,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 0,
+              child: Container(
+                height: 30,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.05),
+                      accentColor.withValues(alpha: 0.22),
+                      Colors.white.withValues(alpha: 0.05),
+                    ],
+                  ),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
               ),
             ),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(child: _PodiumUser(entry: second, height: 86, rank: 2, accentColor: accentColor)),
-              const SizedBox(width: 8),
-              Expanded(child: _PodiumUser(entry: first, height: 112, rank: 1, accentColor: accentColor)),
-              const SizedBox(width: 8),
-              Expanded(child: _PodiumUser(entry: third, height: 80, rank: 3, accentColor: accentColor)),
-            ],
-          ),
-        ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 42),
+                    child: _PodiumUser(entry: second, height: 118, rank: 2, accentColor: accentColor),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: _PodiumUser(entry: first, height: 158, rank: 1, accentColor: accentColor),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 50),
+                    child: _PodiumUser(entry: third, height: 110, rank: 3, accentColor: accentColor),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -82,22 +97,22 @@ class _PodiumUser extends StatelessWidget {
 
     return Container(
       height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
             rankColor.withValues(alpha: 0.22),
             accentColor.withValues(alpha: 0.12),
-            Colors.black.withValues(alpha: 0.10),
+            Colors.black.withValues(alpha: 0.13),
           ],
         ),
         border: Border.all(color: rankColor.withValues(alpha: 0.42)),
         boxShadow: [
           BoxShadow(
-            color: rankColor.withValues(alpha: 0.12),
+            color: rankColor.withValues(alpha: 0.14),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -105,28 +120,29 @@ class _PodiumUser extends StatelessWidget {
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _PodiumAvatar(entry: entry, rankColor: rankColor, size: rank == 1 ? 42 : 36),
-          const SizedBox(height: 5),
+          _PodiumAvatar(entry: entry, rankColor: rankColor, size: rank == 1 ? 44 : 38),
+          const SizedBox(height: 6),
           Text(
             '$rank',
-            style: TextStyle(color: rankColor, fontSize: rank == 1 ? 23 : 19, fontWeight: FontWeight.w900, height: 1),
+            style: TextStyle(color: rankColor, fontSize: rank == 1 ? 24 : 20, fontWeight: FontWeight.w900, height: 1),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 5),
           Text(
             entry?.user.name ?? '—',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900),
+            style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900, height: 1.05),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             entry == null ? '' : compactNumber(entry!.score),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 9, fontWeight: FontWeight.w800),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 9, fontWeight: FontWeight.w800, height: 1),
           ),
         ],
       ),
