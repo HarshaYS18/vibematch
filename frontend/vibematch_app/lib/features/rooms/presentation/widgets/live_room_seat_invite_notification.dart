@@ -74,24 +74,13 @@ class LiveRoomSeatInviteNotification extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '$inviterName has invited you to take seat ${seatIndex + 1}',
+                  '$inviterName has invited you to take seat',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: RoomColors.plum,
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
                     height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'This invite will disappear automatically in 15 seconds.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF7B6A86),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
                   ),
                 ),
                 const SizedBox(height: 14),
