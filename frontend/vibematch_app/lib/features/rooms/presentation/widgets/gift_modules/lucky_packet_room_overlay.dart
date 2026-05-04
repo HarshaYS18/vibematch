@@ -121,104 +121,128 @@ class _LuckyPacketDialog extends StatelessWidget {
     final isClaim = packet.phase == LuckyPacketPhase.claim;
     final isResults = packet.phase == LuckyPacketPhase.results;
 
-    return Container(
-      width: MediaQuery.sizeOf(context).width * 0.82,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF35162B), Color(0xFF17111F), Color(0xFF2A1334)],
-        ),
-        border: Border.all(color: RoomColors.gold.withValues(alpha: 0.30)),
-        boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.36), blurRadius: 30, offset: const Offset(0, 16))],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(packet.senderName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 4),
-          Text(
-            packet.message.trim().isEmpty ? 'sent a Lucky Packet to ${packet.winnerCount} people' : packet.message.trim(),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.66), fontSize: 11.5, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 16),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            width: isResults || packet.claimedByCurrentUser ? 150 : 132,
-            height: isResults || packet.claimedByCurrentUser ? 126 : 150,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: packet.claimedByCurrentUser || isResults
-                    ? const [Color(0xFFFFE1A3), Color(0xFFFFA84D), Color(0xFFB34A28)]
-                    : const [Color(0xFFE84C72), Color(0xFF9A2248), Color(0xFF50192D)],
-              ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-              boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.26), blurRadius: 22, offset: const Offset(0, 10))],
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: MediaQuery.sizeOf(context).width * 0.82,
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF35162B), Color(0xFF17111F), Color(0xFF2A1334)],
             ),
-            child: packet.claimedByCurrentUser || isResults
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('OPEN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 2)),
-                      const SizedBox(height: 8),
-                      Row(
+            border: Border.all(color: RoomColors.gold.withValues(alpha: 0.30)),
+            boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.36), blurRadius: 30, offset: const Offset(0, 16))],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(packet.senderName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              Text(
+                packet.message.trim().isEmpty ? 'sent a Lucky Packet to ${packet.winnerCount} people' : packet.message.trim(),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.66), fontSize: 11.5, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 16),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                width: isResults || packet.claimedByCurrentUser ? 150 : 132,
+                height: isResults || packet.claimedByCurrentUser ? 126 : 150,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: packet.claimedByCurrentUser || isResults
+                        ? const [Color(0xFFFFE1A3), Color(0xFFFFA84D), Color(0xFFB34A28)]
+                        : const [Color(0xFFE84C72), Color(0xFF9A2248), Color(0xFF50192D)],
+                  ),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+                  boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.26), blurRadius: 22, offset: const Offset(0, 10))],
+                ),
+                child: packet.claimedByCurrentUser || isResults
+                    ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const GoldCoinIcon(size: 22),
-                          const SizedBox(width: 6),
-                          Text('${packet.currentUserReward ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                          const Text('OPEN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const GoldCoinIcon(size: 22),
+                              const SizedBox(width: 6),
+                              Text('${packet.currentUserReward ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text('received', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w800)),
                         ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text('received', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w800)),
-                    ],
-                  )
-                : const Text('🧧', style: TextStyle(fontSize: 58)),
+                      )
+                    : const Text('🧧', style: TextStyle(fontSize: 58)),
+              ),
+              const SizedBox(height: 14),
+              if (isClaim && !packet.claimedByCurrentUser)
+                GestureDetector(
+                  onTap: onGetTap,
+                  child: Container(
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
+                    ),
+                    child: const Text('Get', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+                  ),
+                )
+              else if (isClaim)
+                const Text('Reward opened. Total results reveal after 20 seconds.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800))
+              else if (isResults) ...[
+                _LuckyPacketResults(packet: packet),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: onDismissResults,
+                  child: Container(
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: Colors.white.withValues(alpha: 0.10),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: const Text('Close', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: 14),
-          if (isClaim && !packet.claimedByCurrentUser)
-            GestureDetector(
-              onTap: onGetTap,
-              child: Container(
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
-                ),
-                child: const Text('Get', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+        ),
+        Positioned(
+          top: -10,
+          right: -8,
+          child: GestureDetector(
+            onTap: onDismissResults,
+            child: Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF12101D),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
               ),
-            )
-          else if (isClaim)
-            const Text('Reward opened. Total results reveal after 20 seconds.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800))
-          else if (isResults) ...[
-            _LuckyPacketResults(packet: packet),
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: onDismissResults,
-              child: Container(
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: Colors.white.withValues(alpha: 0.10),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: const Text('Close', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
-              ),
+              child: const Icon(Icons.close_rounded, color: Colors.white, size: 17),
             ),
-          ],
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 }
