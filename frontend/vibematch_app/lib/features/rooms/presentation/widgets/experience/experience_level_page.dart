@@ -22,12 +22,12 @@ class ExperienceLevelPage extends StatelessWidget {
     const controller = ExperienceLevelController();
     final totalExp = type == ExperienceLevelType.sent ? user.sentExp : user.receivedExp;
     final level = type == ExperienceLevelType.sent ? user.sendingLevel : user.receivingLevel;
-    final progress = controller.progressForTotalExp(totalExp);
     final style = experiencePillStyleFor(type: type, level: level);
-    final mockTimeExp = type == ExperienceLevelType.sent ? controller.timeSpentExpForMinutes(120) : 0;
-    final mockCoinExp = type == ExperienceLevelType.sent
+    final todayTimeExp = type == ExperienceLevelType.sent ? controller.timeSpentExpForMinutes(120) : 0;
+    final todayCoinExp = type == ExperienceLevelType.sent
         ? controller.sentGiftExpForCoins(1200) + controller.storePurchaseExpForCoins(800)
         : controller.receivedGiftExpForCoins(1600);
+    final todayTotalExp = todayTimeExp + todayCoinExp;
     final backendPath = controller.backendPath(type: type, userId: user.id);
 
     return Scaffold(
@@ -38,101 +38,222 @@ class ExperienceLevelPage extends StatelessWidget {
         foregroundColor: RoomColors.plum,
         title: Text(type.title, style: const TextStyle(fontWeight: FontWeight.w900)),
       ),
-      body: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: style.gradient,
-              ),
-              boxShadow: [
-                BoxShadow(color: style.glowColor.withValues(alpha: 0.26), blurRadius: 24, offset: const Offset(0, 12)),
+      body: user.isCurrentUser
+          ? ListView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                _ExperienceHeroCard(
+                  user: user,
+                  type: type,
+                  level: level,
+                  totalExp: totalExp,
+                  todayTotalExp: todayTotalExp,
+                  style: style,
+                ),
+                const SizedBox(height: 14),
+                _ExperienceRulesCard(type: type),
+                const SizedBox(height: 12),
+                _ExperienceMetricGrid(
+                  type: type,
+                  totalExp: totalExp,
+                  level: level,
+                  timeExp: todayTimeExp,
+                  coinExp: todayCoinExp,
+                  todayTotalExp: todayTotalExp,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Backend later: GET $backendPath',
+                  style: const TextStyle(color: Color(0xFF8B7B98), fontSize: 11, fontWeight: FontWeight.w700),
+                ),
               ],
+            )
+          : _PrivateExperienceState(type: type),
+    );
+  }
+}
+
+class _ExperienceHeroCard extends StatelessWidget {
+  const _ExperienceHeroCard({
+    required this.user,
+    required this.type,
+    required this.level,
+    required this.totalExp,
+    required this.todayTotalExp,
+    required this.style,
+  });
+
+  final SeatUser user;
+  final ExperienceLevelType type;
+  final int level;
+  final int totalExp;
+  final int todayTotalExp;
+  final ExperiencePillStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: style.gradient,
+        ),
+        boxShadow: [
+          BoxShadow(color: style.glowColor.withValues(alpha: 0.26), blurRadius: 24, offset: const Offset(0, 12)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -34,
+              top: -34,
+              child: Icon(style.crownIcon, color: Colors.white.withValues(alpha: 0.10), size: 142),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Stack(
-                children: [
-                  Positioned(
-                    right: -34,
-                    top: -34,
-                    child: Icon(style.crownIcon, color: Colors.white.withValues(alpha: 0.10), size: 142),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 54,
+                      height: 54,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
+                      child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 54,
-                            height: 54,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
-                            child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-                                const SizedBox(height: 5),
-                                ExperienceLevelPill(type: type, level: level),
-                              ],
-                            ),
-                          ),
+                          Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 5),
+                          ExperienceLevelPill(type: type, level: level),
                         ],
                       ),
-                      const SizedBox(height: 18),
-                      Text(
-                        progress.isMaxLevel ? 'Max level reached' : '${compactNumber(progress.expIntoLevel)} / ${compactNumber(progress.expNeededForNextLevel)} EXP to next level',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.90), fontSize: 12.5, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          minHeight: 10,
-                          value: progress.progress.clamp(0, 1),
-                          backgroundColor: Colors.white.withValues(alpha: 0.20),
-                          valueColor: AlwaysStoppedAnimation<Color>(style.crownColor),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Tier: ${style.tier.label} · Max level 200',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
-                      ),
-                    ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Infinity EXP scale · ${compactNumber(totalExp)} lifetime EXP',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.90), fontSize: 12.5, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                _InfinityScaleProgress(style: style, value: _infinityProgressValue(totalExp)),
+                const SizedBox(height: 10),
+                Text(
+                  'Today +${compactNumber(todayTotalExp)} EXP · Tier ${style.tier.label}',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _infinityProgressValue(int exp) {
+    if (exp <= 0) return 0.08;
+    final loop = exp % 10000;
+    return (loop / 10000).clamp(0.08, 1.0);
+  }
+}
+
+class _InfinityScaleProgress extends StatelessWidget {
+  const _InfinityScaleProgress({required this.style, required this.value});
+
+  final ExperiencePillStyle style;
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 12,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.20),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: Stack(
+          children: [
+            FractionallySizedBox(
+              widthFactor: value,
+              alignment: Alignment.centerLeft,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [style.crownColor, style.glowColor, Colors.white.withValues(alpha: 0.92)],
                   ),
-                ],
+                ),
               ),
             ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.0),
+                      Colors.white.withValues(alpha: 0.34),
+                      Colors.white.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.18, 0.5, 0.82],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrivateExperienceState extends StatelessWidget {
+  const _PrivateExperienceState({required this.type});
+
+  final ExperienceLevelType type;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: RoomColors.softLine),
           ),
-          const SizedBox(height: 14),
-          _ExperienceRulesCard(type: type),
-          const SizedBox(height: 12),
-          _ExperienceMetricGrid(
-            type: type,
-            totalExp: totalExp,
-            level: level,
-            timeExp: mockTimeExp,
-            coinExp: mockCoinExp,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_rounded, color: type == ExperienceLevelType.sent ? const Color(0xFF0E6CFF) : const Color(0xFFFF4F93), size: 34),
+              const SizedBox(height: 10),
+              Text(
+                '${type.shortLabel} EXP details are private',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: RoomColors.plum, fontSize: 16, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Detailed Sent and Received EXP pages are shown only on your own profile.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.25),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          _LevelCurveCard(type: type),
-          const SizedBox(height: 12),
-          Text(
-            'Backend later: GET $backendPath',
-            style: const TextStyle(color: Color(0xFF8B7B98), fontSize: 11, fontWeight: FontWeight.w700),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -166,13 +287,14 @@ class _ExperienceRulesCard extends StatelessWidget {
 }
 
 class _ExperienceMetricGrid extends StatelessWidget {
-  const _ExperienceMetricGrid({required this.type, required this.totalExp, required this.level, required this.timeExp, required this.coinExp});
+  const _ExperienceMetricGrid({required this.type, required this.totalExp, required this.level, required this.timeExp, required this.coinExp, required this.todayTotalExp});
 
   final ExperienceLevelType type;
   final int totalExp;
   final int level;
   final int timeExp;
   final int coinExp;
+  final int todayTotalExp;
 
   @override
   Widget build(BuildContext context) {
@@ -186,29 +308,11 @@ class _ExperienceMetricGrid extends StatelessWidget {
       children: [
         _MetricTile(title: 'Current level', value: 'Lv $level', icon: type.baseIcon),
         _MetricTile(title: 'Total EXP', value: compactNumber(totalExp), icon: Icons.bolt_rounded),
+        _MetricTile(title: 'Today EXP', value: compactNumber(todayTotalExp), icon: Icons.today_rounded),
         if (type == ExperienceLevelType.sent)
-          _MetricTile(title: 'Today time EXP', value: '$timeExp / 800', icon: Icons.schedule_rounded),
-        _MetricTile(title: type == ExperienceLevelType.sent ? 'Coin EXP sample' : 'Receive EXP sample', value: compactNumber(coinExp), iconWidget: const GoldCoinIcon(size: 18)),
-      ],
-    );
-  }
-}
-
-class _LevelCurveCard extends StatelessWidget {
-  const _LevelCurveCard({required this.type});
-
-  final ExperienceLevelType type;
-
-  @override
-  Widget build(BuildContext context) {
-    return const _ExpCard(
-      title: 'Level curve',
-      icon: Icons.stacked_line_chart_rounded,
-      children: [
-        _RuleRow(icon: Icons.trending_up_rounded, text: 'Levels 1–49 are easier for new users'),
-        _RuleRow(icon: Icons.trending_up_rounded, text: 'After level 50, EXP requirements become harder'),
-        _RuleRow(icon: Icons.whatshot_rounded, text: 'After level 100, progress becomes very hard'),
-        _RuleRow(icon: Icons.auto_awesome_rounded, text: 'After level 150, progress becomes insane and royal shine unlocks'),
+          _MetricTile(title: 'Today time EXP', value: '$timeExp / 800', icon: Icons.schedule_rounded)
+        else
+          _MetricTile(title: 'Gift receive EXP', value: compactNumber(coinExp), iconWidget: const GoldCoinIcon(size: 18)),
       ],
     );
   }
