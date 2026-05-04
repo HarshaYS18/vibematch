@@ -24,6 +24,10 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
         final activePacket = packet ?? busPacket;
         if (activePacket == null) return const SizedBox.shrink();
 
+        final isUsingBusPacket = packet == null && busPacket != null;
+        final resolvedGetTap = isUsingBusPacket ? LuckyPacketRoomBus.claim : onGetTap;
+        final resolvedDismissResults = isUsingBusPacket ? LuckyPacketRoomBus.dismissResults : onDismissResults;
+
         return Positioned.fill(
           child: IgnorePointer(
             ignoring: activePacket.phase == LuckyPacketPhase.countdown,
@@ -43,8 +47,8 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
                   Center(
                     child: _LuckyPacketDialog(
                       packet: activePacket,
-                      onGetTap: onGetTap == _noop ? LuckyPacketRoomBus.claim : onGetTap,
-                      onDismissResults: onDismissResults == _noop ? LuckyPacketRoomBus.dismissResults : onDismissResults,
+                      onGetTap: resolvedGetTap,
+                      onDismissResults: resolvedDismissResults,
                     ),
                   ),
               ],
@@ -54,8 +58,6 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
       },
     );
   }
-
-  static void _noop() {}
 }
 
 class _LuckyPacketTimerPill extends StatelessWidget {
