@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../inbox/presentation/inbox_page.dart';
@@ -14,32 +16,65 @@ class LiveRoomInboxActionsModule {
     FocusManager.instance.primaryFocus?.unfocus();
     roomStateController.clearInboxUnreadCount();
 
-    return showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      useSafeArea: false,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.18),
-      builder: (sheetContext) {
-        final height = MediaQuery.sizeOf(sheetContext).height * heightFactor;
+    final overlayState = Overlay.of(context, rootOverlay: true);
+    final completer = Completer<void>();
+    OverlayEntry? entry;
 
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            height: height,
-            clipBehavior: Clip.antiAlias,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-            ),
-            child: const InboxPage(openPagesInOverlay: true),
+    void closeOverlay() {
+      if (entry?.mounted ?? false) {
+        entry?.remove();
+      }
+      entry = null;
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
+
+    entry = OverlayEntry(
+      builder: (overlayContext) {
+        final height = MediaQuery.sizeOf(overlayContext).height * heightFactor;
+
+        return Material(
+          color: Colors.transparent,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: closeOverlay,
+                  child: Container(color: Colors.black.withValues(alpha: 0.18)),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {},
+                  onVerticalDragEnd: (details) {
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (velocity > 320) closeOverlay();
+                  },
+                  child: Container(
+                    height: height,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+                    ),
+                    child: const InboxPage(openPagesInOverlay: true),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
     );
+
+    overlayState.insert(entry!);
+    return completer.future;
   }
 
   static void openInboxSheetAfterClosingCurrentSheet({
