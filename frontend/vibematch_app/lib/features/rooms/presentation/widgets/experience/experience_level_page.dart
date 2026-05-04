@@ -21,7 +21,8 @@ class ExperienceLevelPage extends StatelessWidget {
   Widget build(BuildContext context) {
     const controller = ExperienceLevelController();
     final totalExp = type == ExperienceLevelType.sent ? user.sentExp : user.receivedExp;
-    final level = type == ExperienceLevelType.sent ? user.sendingLevel : user.receivingLevel;
+    final progress = controller.progressForTotalExp(totalExp);
+    final level = progress.level;
     final style = experiencePillStyleFor(type: type, level: level);
     final todayTimeExp = type == ExperienceLevelType.sent ? controller.timeSpentExpForMinutes(120) : 0;
     final todayCoinExp = type == ExperienceLevelType.sent
@@ -46,8 +47,7 @@ class ExperienceLevelPage extends StatelessWidget {
                 _ExperienceHeroCard(
                   user: user,
                   type: type,
-                  level: level,
-                  totalExp: totalExp,
+                  progress: progress,
                   todayTotalExp: todayTotalExp,
                   style: style,
                 ),
@@ -61,6 +61,7 @@ class ExperienceLevelPage extends StatelessWidget {
                   timeExp: todayTimeExp,
                   coinExp: todayCoinExp,
                   todayTotalExp: todayTotalExp,
+                  expNeededForCurrentLevel: progress.expNeededForNextLevel,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -78,16 +79,14 @@ class _ExperienceHeroCard extends StatelessWidget {
   const _ExperienceHeroCard({
     required this.user,
     required this.type,
-    required this.level,
-    required this.totalExp,
+    required this.progress,
     required this.todayTotalExp,
     required this.style,
   });
 
   final SeatUser user;
   final ExperienceLevelType type;
-  final int level;
-  final int totalExp;
+  final ExperienceLevelProgress progress;
   final int todayTotalExp;
   final ExperiencePillStyle style;
 
@@ -134,7 +133,7 @@ class _ExperienceHeroCard extends StatelessWidget {
                         children: [
                           Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                           const SizedBox(height: 5),
-                          ExperienceLevelPill(type: type, level: level),
+                          ExperienceLevelPill(type: type, level: progress.level),
                         ],
                       ),
                     ),
@@ -142,11 +141,13 @@ class _ExperienceHeroCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Infinity EXP scale · ${compactNumber(totalExp)} lifetime EXP',
+                  progress.isMaxLevel
+                      ? 'Max level reached · ${compactNumber(progress.totalExp)} lifetime EXP'
+                      : '${compactNumber(progress.expIntoLevel)} / ${compactNumber(progress.expNeededForNextLevel)} EXP to finish Lv ${progress.level}',
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.90), fontSize: 12.5, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 8),
-                _InfinityScaleProgress(style: style, value: _infinityProgressValue(totalExp)),
+                _LevelProgressBar(style: style, value: progress.progress.clamp(0, 1)),
                 const SizedBox(height: 10),
                 Text(
                   'Today +${compactNumber(todayTotalExp)} EXP · Tier ${style.tier.label}',
@@ -159,16 +160,10 @@ class _ExperienceHeroCard extends StatelessWidget {
       ),
     );
   }
-
-  double _infinityProgressValue(int exp) {
-    if (exp <= 0) return 0.08;
-    final loop = exp % 10000;
-    return (loop / 10000).clamp(0.08, 1.0);
-  }
 }
 
-class _InfinityScaleProgress extends StatelessWidget {
-  const _InfinityScaleProgress({required this.style, required this.value});
+class _LevelProgressBar extends StatelessWidget {
+  const _LevelProgressBar({required this.style, required this.value});
 
   final ExperiencePillStyle style;
   final double value;
@@ -287,7 +282,15 @@ class _ExperienceRulesCard extends StatelessWidget {
 }
 
 class _ExperienceMetricGrid extends StatelessWidget {
-  const _ExperienceMetricGrid({required this.type, required this.totalExp, required this.level, required this.timeExp, required this.coinExp, required this.todayTotalExp});
+  const _ExperienceMetricGrid({
+    required this.type,
+    required this.totalExp,
+    required this.level,
+    required this.timeExp,
+    required this.coinExp,
+    required this.todayTotalExp,
+    required this.expNeededForCurrentLevel,
+  });
 
   final ExperienceLevelType type;
   final int totalExp;
@@ -295,6 +298,7 @@ class _ExperienceMetricGrid extends StatelessWidget {
   final int timeExp;
   final int coinExp;
   final int todayTotalExp;
+  final int expNeededForCurrentLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -307,7 +311,7 @@ class _ExperienceMetricGrid extends StatelessWidget {
       mainAxisSpacing: 10,
       children: [
         _MetricTile(title: 'Current level', value: 'Lv $level', icon: type.baseIcon),
-        _MetricTile(title: 'Total EXP', value: compactNumber(totalExp), icon: Icons.bolt_rounded),
+        _MetricTile(title: 'EXP for this level', value: compactNumber(expNeededForCurrentLevel), icon: Icons.flag_rounded),
         _MetricTile(title: 'Today EXP', value: compactNumber(todayTotalExp), icon: Icons.today_rounded),
         if (type == ExperienceLevelType.sent)
           _MetricTile(title: 'Today time EXP', value: '$timeExp / 800', icon: Icons.schedule_rounded)
