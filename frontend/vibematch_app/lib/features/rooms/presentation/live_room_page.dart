@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../app/app_routes.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
 import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
@@ -80,7 +81,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   final SeatUser _currentUser = mockRoomUsers.first;
   _PendingSeatInvite? _pendingSeatInvite;
   Timer? _seatInviteAutoHideTimer;
-
 
   String get _roomName => _roomStateController.roomName;
   String get _roomId => _roomStateController.roomId;
@@ -256,6 +256,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onSettings: _openSettingsSheet,
               onUsersTap: _openRoomUsersSheet,
               onRoomRankingsTap: _openRoomRankingsSheet,
+              onRoomLevelTap: _openRoomLevelPage,
               onSeatTap: _onSeatTap,
               onUserTap: _onUserTap,
               onInvite: _inviteSeat,
@@ -277,7 +278,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             LiveRoomGiftOverlay(
               slides: _giftController.giftSlides,
               activeComboSlide: _giftController.activeComboSlide,
-              bottomPadding: MediaQuery.paddingOf(context).bottom,
+              bottomPadding: MediaQuery.of(context).padding.bottom,
               onComboTap: _giftController.tapGiftCombo,
               onVideoGiftFinished: _giftController.finishVideoGift,
               onComboButtonTap: () {
@@ -416,10 +417,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       return;
     }
 
-    _insertSystemMessage(
-      '${invite.invitedUser.name} accepted ${invite.inviterName}\'s seat ${invite.seatIndex + 1} invite',
-    );
-
     _seatInviteAutoHideTimer?.cancel();
     _seatInviteAutoHideTimer = null;
 
@@ -458,6 +455,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openRoomRankingsSheet() {
     LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => RoomContributionRankingsSheet(roomName: _roomName, users: _allRoomUsers, onUserTap: (user) { Navigator.pop(context); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openMiniProfileForUser(user); }); }));
+  }
+
+  void _openRoomLevelPage() {
+    _clearRoomFocus();
+    Navigator.pushNamed(context, VmRoutes.roomLevel);
   }
 
   void _sendMessage() { final text = _messageController.text.trim(); if (text.isEmpty) return; _roomMessageController.sendMessage(text); _messageController.clear(); }
@@ -683,4 +685,3 @@ class _PendingSeatInvite {
   final SeatUser invitedUser;
   final int seatIndex;
 }
-
