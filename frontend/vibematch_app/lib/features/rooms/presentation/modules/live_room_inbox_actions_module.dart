@@ -16,6 +16,7 @@ class LiveRoomInboxActionsModule {
 
     return showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       isDismissible: true,
       enableDrag: true,
