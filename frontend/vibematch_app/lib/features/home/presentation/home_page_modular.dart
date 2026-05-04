@@ -188,19 +188,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _handleBannerTap(HomeBanner banner) {
-    switch (banner.action) {
-      case HomeBannerAction.openEvents:
-        VmNavigator.openEvents(context);
-        return;
-      case HomeBannerAction.openTrendingRooms:
-        _controller.selectCategory('Trending');
-        _toast('Trending rooms selected');
-        return;
-      case HomeBannerAction.openVibeSyncRooms:
-        _controller.selectCategory('Music');
-        _toast('Vibe Sync rooms highlighted');
-        return;
-    }
+    VmNavigator.openEvents(context);
   }
 
   @override
@@ -231,7 +219,7 @@ class _HomePageState extends State<HomePage> {
                   canManageHomeBanners: _canManageHomeBanners,
                   onBannerChanged: _controller.selectBanner,
                   onBannerTap: _handleBannerTap,
-                  onManageTap: () => _toast('Banner management opened for official account'),
+                  onManageTap: () => _toast('Event/promo banner upload manager opens here.'),
                 ),
               ),
               SliverToBoxAdapter(
