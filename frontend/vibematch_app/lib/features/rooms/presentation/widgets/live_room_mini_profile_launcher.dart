@@ -6,7 +6,6 @@ import '../live_room_models.dart';
 import 'live_room_mini_profile_sheet.dart';
 import 'mini_profile_report_sheet.dart';
 import 'room_kickout_duration_sheet.dart';
-import 'room_theme.dart';
 
 class LiveRoomMiniProfileLauncher {
   const LiveRoomMiniProfileLauncher._();
