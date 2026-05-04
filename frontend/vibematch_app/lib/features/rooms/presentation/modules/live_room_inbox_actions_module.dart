@@ -32,7 +32,7 @@ class LiveRoomInboxActionsModule {
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
             ),
-            child: const InboxPage(),
+            child: const InboxPage(openPagesInOverlay: true),
           ),
         );
       },
