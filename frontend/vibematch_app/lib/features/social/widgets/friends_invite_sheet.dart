@@ -8,17 +8,21 @@ class FriendsInviteSheet extends StatefulWidget {
     super.key,
     required this.title,
     required this.onInvite,
+    this.actionLabel = 'Invite',
+    this.completedLabel = 'Invited',
   });
 
   final String title;
   final ValueChanged<SocialUser> onInvite;
+  final String actionLabel;
+  final String completedLabel;
 
   @override
   State<FriendsInviteSheet> createState() => _FriendsInviteSheetState();
 }
 
 class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
-  final Set<String> _invitedIds = <String>{};
+  final Set<String> _completedIds = <String>{};
 
   List<SocialUser> get _friends {
     final friends = [...SocialMockData.friends];
@@ -31,8 +35,8 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
     return friends;
   }
 
-  void _invite(SocialUser user) {
-    setState(() => _invitedIds.add(user.id));
+  void _completeAction(SocialUser user) {
+    setState(() => _completedIds.add(user.id));
     widget.onInvite(user);
   }
 
@@ -64,13 +68,29 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            Text(
-              widget.title,
-              style: const TextStyle(
-                color: Color(0xFF251538),
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${_friends.length} friends',
+                  style: const TextStyle(
+                    color: Color(0xFF7B6A86),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             Expanded(
@@ -82,8 +102,23 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
                     ...online.map(_friendRow),
                     const SizedBox(height: 8),
                   ],
-                  const _SectionLabel('Friends'),
-                  ...offline.map(_friendRow),
+                  if (offline.isNotEmpty) ...[
+                    const _SectionLabel('Friends'),
+                    ...offline.map(_friendRow),
+                  ],
+                  if (_friends.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 22),
+                      child: Center(
+                        child: Text(
+                          'No friends available right now.',
+                          style: TextStyle(
+                            color: Color(0xFF7B6A86),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -94,7 +129,7 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
   }
 
   Widget _friendRow(SocialUser user) {
-    final invited = _invitedIds.contains(user.id);
+    final completed = _completedIds.contains(user.id);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -159,8 +194,8 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
             ),
           ),
           TextButton(
-            onPressed: invited ? null : () => _invite(user),
-            child: Text(invited ? 'Invited' : 'Invite'),
+            onPressed: completed ? null : () => _completeAction(user),
+            child: Text(completed ? widget.completedLabel : widget.actionLabel),
           ),
         ],
       ),
