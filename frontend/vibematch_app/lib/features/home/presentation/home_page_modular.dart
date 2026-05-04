@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
+import '../../create/presentation/create_page.dart';
 import '../controllers/home_controller.dart';
 import '../models/home_banner.dart';
 import '../models/home_room.dart';
@@ -91,6 +92,27 @@ class _HomePageState extends State<HomePage> {
         content: Text(message),
       ),
     );
+  }
+
+  Future<void> _openMyRoomOrCreate() async {
+    final existingRoom = _controller.myCreatedRoom;
+    if (existingRoom != null) {
+      _enterRoom(existingRoom);
+      return;
+    }
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const CreatePage()),
+    );
+
+    if (!mounted) return;
+    _controller.ensureMockCreatedRoom();
+
+    final createdRoom = _controller.myCreatedRoom;
+    if (createdRoom != null) {
+      _enterRoom(createdRoom);
+    }
   }
 
   void _openRoom(HomeRoom room) {
@@ -196,6 +218,8 @@ class _HomePageState extends State<HomePage> {
             slivers: [
               SliverToBoxAdapter(
                 child: HomeHeaderSection(
+                  myCreatedRoom: _controller.myCreatedRoom,
+                  onMyRoomTap: _openMyRoomOrCreate,
                   onSearchTap: () => VmNavigator.openSearch(context),
                   onNotificationsTap: () => VmNavigator.openNotifications(context),
                 ),
