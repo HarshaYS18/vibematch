@@ -123,7 +123,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 10),
-                _ActionRow(
+                RoomProfileActionRow(
                   isSelf: _isSelf,
                   canModerate: canModerate,
                   selfMuted: user.selfMuted,
@@ -132,7 +132,6 @@ class UserMiniProfileSheet extends StatelessWidget {
                   onLeaveSeatOnly: onLeaveSeatOnly,
                   onSelfMuteToggle: onSelfMuteToggle,
                   onAdminMuteToggle: onAdminMuteToggle,
-                  onGiftTap: onGiftTap,
                   onKickOutTap: onKickOutTap,
                 ),
               ],
@@ -150,47 +149,6 @@ class UserMiniProfileSheet extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({
-    required this.isSelf,
-    required this.canModerate,
-    required this.selfMuted,
-    required this.adminMuted,
-    required this.onLeaveAndLock,
-    required this.onLeaveSeatOnly,
-    required this.onSelfMuteToggle,
-    required this.onAdminMuteToggle,
-    required this.onGiftTap,
-    this.onKickOutTap,
-  });
-
-  final bool isSelf;
-  final bool canModerate;
-  final bool selfMuted;
-  final bool adminMuted;
-  final VoidCallback onLeaveAndLock;
-  final VoidCallback onLeaveSeatOnly;
-  final VoidCallback onSelfMuteToggle;
-  final VoidCallback onAdminMuteToggle;
-  final VoidCallback onGiftTap;
-  final VoidCallback? onKickOutTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return RoomProfileActionRow(
-      isSelf: isSelf,
-      canModerate: canModerate,
-      selfMuted: selfMuted,
-      adminMuted: adminMuted,
-      onLeaveAndLock: onLeaveAndLock,
-      onLeaveSeatOnly: onLeaveSeatOnly,
-      onSelfMuteToggle: onSelfMuteToggle,
-      onAdminMuteToggle: onAdminMuteToggle,
-      onKickOutTap: onKickOutTap,
     );
   }
 }
