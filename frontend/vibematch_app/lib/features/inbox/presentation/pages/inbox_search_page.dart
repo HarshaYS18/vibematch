@@ -40,7 +40,7 @@ class _InboxSearchPageState extends State<InboxSearchPage> {
   Widget build(BuildContext context) {
     final query = _searchController.text.trim();
     final chatResults = _results.where((item) => item.matchType == InboxSearchMatchType.chat).toList();
-    final mutualResults = _results.where((item) => item.matchType == InboxSearchMatchType.mutualFollow).toList();
+    final friendResults = _results.where((item) => item.matchType == InboxSearchMatchType.mutualFollow).toList();
     final messageResults = _results.where((item) => item.matchType == InboxSearchMatchType.message).toList();
 
     return Scaffold(
@@ -69,8 +69,8 @@ class _InboxSearchPageState extends State<InboxSearchPage> {
                               onOpenConversation: widget.onOpenConversation,
                             ),
                             _ResultSection(
-                              title: 'Mutual follows',
-                              results: mutualResults,
+                              title: 'Friends',
+                              results: friendResults,
                               query: query,
                               onOpenConversation: widget.onOpenConversation,
                             ),
@@ -349,7 +349,7 @@ class _SearchEmptyHint extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: Text(
-        'Search chats, mutual follows, and message text',
+        'Search chats, friends, and message text',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Color(0xFF7B6A86),
