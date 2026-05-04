@@ -35,8 +35,8 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
                   ),
                 if (activePacket.phase == LuckyPacketPhase.countdown)
                   Positioned(
-                    top: 118,
-                    right: 16,
+                    right: 24,
+                    bottom: 160 + MediaQuery.paddingOf(context).bottom,
                     child: _LuckyPacketTimerPill(packet: activePacket),
                   )
                 else
