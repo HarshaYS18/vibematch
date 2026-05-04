@@ -77,6 +77,7 @@ class VmRoutes {
   static const String notifications = '/notifications';
   static const String search = '/search';
   static const String controlCenter = '/control-center';
+  static const String bannerManager = '/banner-manager';
 
   static const String agency = '/agency';
   static const String gifts = '/gifts';
