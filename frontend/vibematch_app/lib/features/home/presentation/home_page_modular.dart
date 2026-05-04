@@ -67,14 +67,18 @@ class _HomePageState extends State<HomePage> {
       final primaryRole = activeUser?.primaryRole?.toString().toLowerCase();
       final roles = activeUser?.roles;
 
-      if (primaryRole == 'founder_owner' || primaryRole == 'super_owner' || primaryRole == 'owner') {
+      if (primaryRole == 'founder_owner' || primaryRole == 'super_owner') {
         return true;
       }
 
       if (roles is Iterable) {
         return roles.any((role) {
           final normalized = role.toString().toLowerCase();
-          return normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
+          return normalized == 'founder_owner' ||
+              normalized == 'super_owner' ||
+              normalized == 'banner_manager' ||
+              normalized == 'manage_home_banners' ||
+              normalized == 'permission_manage_home_banners';
         });
       }
     } catch (_) {
