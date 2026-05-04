@@ -5,6 +5,8 @@ import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
 import 'live_room_mini_profile_sheet.dart';
 import 'mini_profile_report_sheet.dart';
+import 'rankings/room_rankings_models.dart';
+import 'rankings/room_rankings_sheet.dart';
 import 'room_kickout_duration_sheet.dart';
 
 class LiveRoomMiniProfileLauncher {
@@ -62,13 +64,19 @@ class LiveRoomMiniProfileLauncher {
           context: context,
           user: user,
         ),
-        onSentRankingTap: () => LiveRoomProfileNavigator.openSentRankingsPage(
+        onSentRankingTap: () => _openRankingsSheet(
           context: context,
+          roomId: roomId,
+          roomName: roomName,
           users: allRoomUsers,
+          initialCategory: RoomRankingCategory.sent,
         ),
-        onReceivedRankingTap: () => LiveRoomProfileNavigator.openReceivedRankingsPage(
+        onReceivedRankingTap: () => _openRankingsSheet(
           context: context,
+          roomId: roomId,
+          roomName: roomName,
           users: allRoomUsers,
+          initialCategory: RoomRankingCategory.received,
         ),
         onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
           context: context,
@@ -114,6 +122,33 @@ class LiveRoomMiniProfileLauncher {
             : null,
       ),
     );
+  }
+
+  static void _openRankingsSheet({
+    required BuildContext context,
+    required String? roomId,
+    required String roomName,
+    required List<SeatUser> users,
+    required RoomRankingCategory initialCategory,
+  }) {
+    Navigator.pop(context);
+
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!context.mounted) return;
+
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => RoomRankingsSheet(
+          roomPublicId: roomId ?? 'unknown_room',
+          roomName: roomName,
+          users: users,
+          initialCategory: initialCategory,
+          initialPeriod: RoomRankingPeriod.monthly,
+        ),
+      );
+    });
   }
 
   static void _openKickOutDurationSheet({
