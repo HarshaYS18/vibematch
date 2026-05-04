@@ -26,18 +26,27 @@ class GiftBottomActionBar extends StatelessWidget {
     return Row(
       children: [
         GestureDetector(
-          onTap: onSend,
+          onTap: onRecharge,
           child: Container(
             height: 34,
-            padding: const EdgeInsets.symmetric(horizontal: 15),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(15),
-              gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
+              border: Border.all(color: Colors.white12),
             ),
-            child: const Center(child: Text('Send', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900))),
+            child: Row(
+              children: [
+                const Icon(Icons.add_circle_rounded, color: RoomColors.aqua, size: 17),
+                const SizedBox(width: 5),
+                const GoldCoinIcon(size: 15),
+                const SizedBox(width: 4),
+                Text('$coinBalance', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+              ],
+            ),
           ),
         ),
-        const SizedBox(width: 8),
+        const Spacer(),
         Container(
           height: 34,
           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -59,26 +68,17 @@ class GiftBottomActionBar extends StatelessWidget {
             ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 8),
         GestureDetector(
-          onTap: onRecharge,
+          onTap: onSend,
           child: Container(
             height: 34,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 15),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.white12),
+              gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.add_circle_rounded, color: RoomColors.aqua, size: 17),
-                const SizedBox(width: 5),
-                const GoldCoinIcon(size: 15),
-                const SizedBox(width: 4),
-                Text('$coinBalance', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
-              ],
-            ),
+            child: const Center(child: Text('Send', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900))),
           ),
         ),
       ],
