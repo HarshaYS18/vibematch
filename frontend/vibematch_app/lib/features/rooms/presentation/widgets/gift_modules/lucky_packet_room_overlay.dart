@@ -18,37 +18,44 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activePacket = packet;
-    if (activePacket == null) return const SizedBox.shrink();
+    return ValueListenableBuilder<LuckyPacketRoomEvent?>(
+      valueListenable: LuckyPacketRoomBus.packet,
+      builder: (context, busPacket, child) {
+        final activePacket = packet ?? busPacket;
+        if (activePacket == null) return const SizedBox.shrink();
 
-    return Positioned.fill(
-      child: IgnorePointer(
-        ignoring: activePacket.phase == LuckyPacketPhase.countdown,
-        child: Stack(
-          children: [
-            if (activePacket.phase != LuckyPacketPhase.countdown)
-              Positioned.fill(
-                child: Container(color: Colors.black.withValues(alpha: 0.34)),
-              ),
-            if (activePacket.phase == LuckyPacketPhase.countdown)
-              Positioned(
-                top: 118,
-                right: 16,
-                child: _LuckyPacketTimerPill(packet: activePacket),
-              )
-            else
-              Center(
-                child: _LuckyPacketDialog(
-                  packet: activePacket,
-                  onGetTap: onGetTap,
-                  onDismissResults: onDismissResults,
-                ),
-              ),
-          ],
-        ),
-      ),
+        return Positioned.fill(
+          child: IgnorePointer(
+            ignoring: activePacket.phase == LuckyPacketPhase.countdown,
+            child: Stack(
+              children: [
+                if (activePacket.phase != LuckyPacketPhase.countdown)
+                  Positioned.fill(
+                    child: Container(color: Colors.black.withValues(alpha: 0.34)),
+                  ),
+                if (activePacket.phase == LuckyPacketPhase.countdown)
+                  Positioned(
+                    top: 118,
+                    right: 16,
+                    child: _LuckyPacketTimerPill(packet: activePacket),
+                  )
+                else
+                  Center(
+                    child: _LuckyPacketDialog(
+                      packet: activePacket,
+                      onGetTap: onGetTap == _noop ? LuckyPacketRoomBus.claim : onGetTap,
+                      onDismissResults: onDismissResults == _noop ? LuckyPacketRoomBus.dismissResults : onDismissResults,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
+
+  static void _noop() {}
 }
 
 class _LuckyPacketTimerPill extends StatelessWidget {
