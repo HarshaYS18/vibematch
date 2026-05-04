@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
-import 'chat_vip_badge.dart';
+import 'live_room_invite_components.dart';
 
 class LiveRoomInviteSheet extends StatefulWidget {
   const LiveRoomInviteSheet({
@@ -62,61 +62,26 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0D5CB),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
+            const LiveRoomInviteHandle(),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Invite to seat ${widget.seatIndex + 1}',
-                    style: const TextStyle(
-                      color: Color(0xFF251538),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${users.length} users',
-                  style: const TextStyle(
-                    color: Color(0xFF7B6A86),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+            LiveRoomInviteHeader(
+              seatIndex: widget.seatIndex,
+              userCount: users.length,
             ),
             const SizedBox(height: 10),
             Expanded(
               child: users.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No users available to invite.',
-                        style: TextStyle(
-                          color: Color(0xFF7B6A86),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    )
+                  ? const LiveRoomInviteEmptyState()
                   : ListView(
                       physics: const BouncingScrollPhysics(),
                       children: [
                         if (onlineUsers.isNotEmpty) ...[
-                          const _SectionLabel('Online'),
+                          const LiveRoomInviteSectionLabel('Online'),
                           ...onlineUsers.map(_userRow),
                           const SizedBox(height: 8),
                         ],
                         if (otherUsers.isNotEmpty) ...[
-                          const _SectionLabel('Users'),
+                          const LiveRoomInviteSectionLabel('Users'),
                           ...otherUsers.map(_userRow),
                         ],
                       ],
@@ -131,103 +96,11 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
   Widget _userRow(SeatUser user) {
     final invited = _invitedIds.contains(user.id);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: user.avatarColors),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  user.name.isEmpty ? '?' : user.name.characters.first.toUpperCase(),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                ),
-              ),
-              if (_isOnline(user))
-                Positioned(
-                  right: -1,
-                  bottom: -1,
-                  child: Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF12C7B7),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        user.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF251538),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    ChatVipBadge(level: user.vipLevel, showWhenZero: true),
-                  ],
-                ),
-                Text(
-                  user.roleLabel.isEmpty ? 'Room user' : user.roleLabel,
-                  style: const TextStyle(
-                    color: Color(0xFF7B6A86),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: invited ? null : () => _invite(user),
-            child: Text(invited ? 'Invited' : 'Invite'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, top: 2),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Color(0xFF7B6A86),
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
+    return LiveRoomInviteUserRow(
+      user: user,
+      isOnline: _isOnline(user),
+      invited: invited,
+      onInvite: () => _invite(user),
     );
   }
 }
