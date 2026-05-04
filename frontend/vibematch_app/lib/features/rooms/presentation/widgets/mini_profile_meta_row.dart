@@ -23,8 +23,6 @@ class MiniProfileMetaRow extends StatelessWidget {
       runSpacing: 4,
       children: [
         if (user.roleLabel.isNotEmpty)
-          const SizedBox.shrink(),
-        if (user.roleLabel.isNotEmpty)
           MiniProfileMetaPill(icon: Icons.shield_rounded, label: user.roleLabel),
         if (user.familyName.trim().isNotEmpty)
           MiniProfileFamilyBadge(
