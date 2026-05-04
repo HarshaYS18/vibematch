@@ -176,7 +176,7 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
                   children: [
                     Flexible(
                       child: Text(
-                        '${user.id} · ${user.name}',
+                        user.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
