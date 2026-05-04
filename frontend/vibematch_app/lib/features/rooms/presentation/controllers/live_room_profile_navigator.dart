@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../auth/models/current_user.dart';
 import '../../../profile/presentation/public_profile_view_page.dart';
 import '../live_room_models.dart';
+import '../widgets/experience/experience_level_models.dart';
+import '../widgets/experience/experience_level_page.dart';
 import '../widgets/followers_followed_page.dart';
 import '../widgets/room_action_pages.dart';
 import '../widgets/room_theme.dart';
@@ -157,26 +159,7 @@ class LiveRoomProfileNavigator {
   }) {
     _pushRoomActionPageFromSheet(
       context,
-      RoomActionPage(
-        title: 'Sending Experience',
-        subtitle:
-            '${user.name}\'s total sending level progress and monthly coin-send history.',
-        icon: Icons.north_east_rounded,
-        cards: [
-          RoomActionCard(
-            title: 'Send level',
-            value: 'Lv ${user.sendingLevel}',
-            icon: Icons.north_east_rounded,
-            color: RoomColors.violet,
-          ),
-          RoomActionCard(
-            title: 'This month sent',
-            value: compactNumber(user.sentExp),
-            icon: Icons.toll_rounded,
-            color: RoomColors.gold,
-          ),
-        ],
-      ),
+      ExperienceLevelPage(user: user, type: ExperienceLevelType.sent),
     );
   }
 
@@ -186,26 +169,7 @@ class LiveRoomProfileNavigator {
   }) {
     _pushRoomActionPageFromSheet(
       context,
-      RoomActionPage(
-        title: 'Receiving Experience',
-        subtitle:
-            '${user.name}\'s receiving level progress and monthly received coin history.',
-        icon: Icons.favorite_rounded,
-        cards: [
-          RoomActionCard(
-            title: 'Receive level',
-            value: 'Lv ${user.receivingLevel}',
-            icon: Icons.favorite_rounded,
-            color: RoomColors.coral,
-          ),
-          RoomActionCard(
-            title: 'This month received',
-            value: compactNumber(user.receivedExp),
-            icon: Icons.toll_rounded,
-            color: RoomColors.gold,
-          ),
-        ],
-      ),
+      ExperienceLevelPage(user: user, type: ExperienceLevelType.received),
     );
   }
 
