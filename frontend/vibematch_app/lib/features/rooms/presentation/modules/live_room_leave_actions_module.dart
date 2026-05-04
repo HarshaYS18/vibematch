@@ -81,6 +81,8 @@ class LiveRoomLeaveActionsModule {
       return;
     }
 
+    final roomNavigator = Navigator.of(context);
+
     roomStateController.setExitingRoom(true);
     Navigator.pop(sheetContext);
 
@@ -89,7 +91,8 @@ class LiveRoomLeaveActionsModule {
     roomStateController.setAllowRoomPop(true);
 
     Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (mountedGetter()) Navigator.maybePop(context);
+      if (!mountedGetter()) return;
+      roomNavigator.maybePop();
     });
   }
 
