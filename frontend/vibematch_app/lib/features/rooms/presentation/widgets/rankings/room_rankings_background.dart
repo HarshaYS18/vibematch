@@ -17,24 +17,35 @@ class RoomRankingsBackground extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            RoomRankingsAssets.podiumBackground,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF070512),
-                      Color(0xFF10051E),
-                      Color(0xFF05030D),
-                    ],
-                  ),
-                ),
-              );
-            },
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF070512),
+                  Color(0xFF16052A),
+                  Color(0xFF0A0614),
+                  Color(0xFF04030A),
+                ],
+              ),
+            ),
+          ),
+          Positioned.fill(
+            top: -34,
+            bottom: 26,
+            child: Transform.scale(
+              scale: 0.92,
+              alignment: Alignment.topCenter,
+              child: Image.asset(
+                RoomRankingsAssets.podiumBackground,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                errorBuilder: (context, error, stackTrace) {
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
           ),
           DecoratedBox(
             decoration: BoxDecoration(
@@ -42,9 +53,10 @@ class RoomRankingsBackground extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withValues(alpha: 0.16),
-                  Colors.black.withValues(alpha: 0.42),
-                  Colors.black.withValues(alpha: 0.72),
+                  Colors.black.withValues(alpha: 0.08),
+                  const Color(0xFF10051E).withValues(alpha: 0.20),
+                  const Color(0xFF080612).withValues(alpha: 0.66),
+                  const Color(0xFF04030A).withValues(alpha: 0.90),
                 ],
               ),
             ),
