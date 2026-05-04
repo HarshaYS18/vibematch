@@ -20,9 +20,9 @@ class RoomRankingsPodiumPreview extends StatelessWidget {
     final third = entries.length > 2 ? entries[2] : null;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
       child: SizedBox(
-        height: 178,
+        height: 190,
         child: Stack(
           alignment: Alignment.bottomCenter,
           children: [
@@ -50,19 +50,19 @@ class RoomRankingsPodiumPreview extends StatelessWidget {
               children: [
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 42),
-                    child: _PodiumUser(entry: second, height: 118, rank: 2, accentColor: accentColor),
+                    padding: const EdgeInsets.only(top: 52),
+                    child: _PodiumUser(entry: second, height: 120, rank: 2, accentColor: accentColor),
                   ),
                 ),
                 const SizedBox(width: 9),
                 Expanded(
-                  child: _PodiumUser(entry: first, height: 158, rank: 1, accentColor: accentColor),
+                  child: _PodiumUser(entry: first, height: 162, rank: 1, accentColor: accentColor),
                 ),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 50),
-                    child: _PodiumUser(entry: third, height: 110, rank: 3, accentColor: accentColor),
+                    padding: const EdgeInsets.only(top: 58),
+                    child: _PodiumUser(entry: third, height: 118, rank: 3, accentColor: accentColor),
                   ),
                 ),
               ],
@@ -97,7 +97,7 @@ class _PodiumUser extends StatelessWidget {
 
     return Container(
       height: height,
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+      padding: const EdgeInsets.fromLTRB(8, 9, 8, 9),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         gradient: LinearGradient(
@@ -122,27 +122,27 @@ class _PodiumUser extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _PodiumAvatar(entry: entry, rankColor: rankColor, size: rank == 1 ? 44 : 38),
-          const SizedBox(height: 6),
+          _PodiumAvatar(entry: entry, rankColor: rankColor, size: rank == 1 ? 42 : 36),
+          const SizedBox(height: 5),
           Text(
             '$rank',
-            style: TextStyle(color: rankColor, fontSize: rank == 1 ? 24 : 20, fontWeight: FontWeight.w900, height: 1),
+            style: TextStyle(color: rankColor, fontSize: rank == 1 ? 23 : 19, fontWeight: FontWeight.w900, height: 1),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           Text(
             entry?.user.name ?? '—',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900, height: 1.05),
+            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, height: 1),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             entry == null ? '' : compactNumber(entry!.score),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 9, fontWeight: FontWeight.w800, height: 1),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 8.5, fontWeight: FontWeight.w800, height: 1),
           ),
         ],
       ),
