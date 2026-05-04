@@ -62,6 +62,54 @@ class InboxController extends ChangeNotifier {
     }
   }
 
+  List<InboxSearchResult> searchInbox(String query) {
+    final normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) return const [];
+
+    final results = <InboxSearchResult>[];
+
+    for (final conversation in unlockedConversations) {
+      final title = conversation.title.toLowerCase();
+      final subtitle = conversation.subtitle.toLowerCase();
+      final roomName = conversation.currentRoomName?.toLowerCase() ?? '';
+
+      final chatMatches = title.contains(normalizedQuery) ||
+          subtitle.contains(normalizedQuery) ||
+          roomName.contains(normalizedQuery);
+
+      if (chatMatches) {
+        results.add(
+          InboxSearchResult(
+            conversation: conversation,
+            matchType: conversation.isMutualFollowChat
+                ? InboxSearchMatchType.mutualFollow
+                : InboxSearchMatchType.chat,
+            title: conversation.title,
+            preview: conversation.subtitle,
+            matchedText: query.trim(),
+          ),
+        );
+      }
+
+      for (final message in conversation.messages) {
+        if (!message.text.toLowerCase().contains(normalizedQuery)) continue;
+
+        results.add(
+          InboxSearchResult(
+            conversation: conversation,
+            matchType: InboxSearchMatchType.message,
+            title: conversation.title,
+            preview: message.text,
+            matchedText: query.trim(),
+            message: message,
+          ),
+        );
+      }
+    }
+
+    return results;
+  }
+
   bool validatePasscode(String value) {
     return value.trim() == mockAccountPasscode;
   }
