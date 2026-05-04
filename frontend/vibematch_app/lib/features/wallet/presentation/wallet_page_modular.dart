@@ -6,14 +6,19 @@ import 'widgets/wallet_shared_widgets.dart';
 import 'widgets/wallet_sheets.dart';
 
 class WalletPageModular extends StatefulWidget {
-  const WalletPageModular({super.key});
+  const WalletPageModular({
+    super.key,
+    this.initialSection = WalletSection.coins,
+  });
+
+  final WalletSection initialSection;
 
   @override
   State<WalletPageModular> createState() => _WalletPageModularState();
 }
 
 class _WalletPageModularState extends State<WalletPageModular> {
-  WalletSection _selectedSection = WalletSection.coins;
+  late WalletSection _selectedSection = widget.initialSection;
 
   void _showToast(String message) {
     ScaffoldMessenger.of(context)
