@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/home_room_data.dart';
+import '../../models/home_room.dart';
 
 class HomeRoomCard extends StatelessWidget {
   const HomeRoomCard({
@@ -10,7 +10,7 @@ class HomeRoomCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final HomeRoomData room;
+  final HomeRoom room;
   final int rank;
   final VoidCallback onTap;
 
@@ -160,7 +160,7 @@ class HomeRoomCard extends StatelessWidget {
 class _HomeRoomAvatar extends StatelessWidget {
   const _HomeRoomAvatar({required this.room, required this.size});
 
-  final HomeRoomData room;
+  final HomeRoom room;
   final double size;
 
   @override
