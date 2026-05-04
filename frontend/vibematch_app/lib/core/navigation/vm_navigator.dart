@@ -107,4 +107,8 @@ class VmNavigator {
   static Future<T?> openControlCenter<T>(BuildContext context) {
     return Navigator.pushNamed<T>(context, VmRoutes.controlCenter);
   }
+
+  static Future<T?> openBannerManager<T>(BuildContext context) {
+    return Navigator.pushNamed<T>(context, VmRoutes.bannerManager);
+  }
 }
