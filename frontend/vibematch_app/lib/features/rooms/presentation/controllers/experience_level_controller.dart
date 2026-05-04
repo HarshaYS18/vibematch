@@ -43,14 +43,15 @@ class ExperienceLevelController {
     var currentStart = 0;
 
     while (level < maxLevel) {
-      final next = currentStart + expRequiredForLevel(level);
+      final requiredForThisLevel = expRequiredToFinishLevel(level);
+      final next = currentStart + requiredForThisLevel;
       if (safeExp < next) {
         return ExperienceLevelProgress(
           level: level,
           totalExp: safeExp,
           currentLevelStartExp: currentStart,
           nextLevelExp: next,
-          progress: (safeExp - currentStart) / (next - currentStart),
+          progress: (safeExp - currentStart) / requiredForThisLevel,
           tier: tierForLevel(level),
         );
       }
@@ -68,12 +69,26 @@ class ExperienceLevelController {
     );
   }
 
-  int expRequiredForLevel(int level) {
-    if (level < 1) return 100;
-    if (level < 50) return 100 + level * 22;
-    if (level < 100) return 1800 + (level - 50) * 88;
-    if (level < 150) return 7600 + (level - 100) * 260;
-    if (level < maxLevel) return 23600 + (level - 150) * 680;
+  int totalExpRequiredToReachLevel(int targetLevel) {
+    final safeLevel = targetLevel.clamp(1, maxLevel);
+    var total = 0;
+    for (var level = 1; level < safeLevel; level++) {
+      total += expRequiredToFinishLevel(level);
+    }
+    return total;
+  }
+
+  int expRequiredToFinishLevel(int level) {
+    if (level < 1) return 120;
+    if (level < 10) return 120 + (level - 1) * 35;
+    if (level < 25) return 460 + (level - 10) * 70;
+    if (level < 50) return 1550 + (level - 25) * 135;
+    if (level < 75) return 5200 + (level - 50) * 310;
+    if (level < 100) return 13500 + (level - 75) * 620;
+    if (level < 125) return 32000 + (level - 100) * 1250;
+    if (level < 150) return 72000 + (level - 125) * 2400;
+    if (level < 175) return 150000 + (level - 150) * 5200;
+    if (level < maxLevel) return 320000 + (level - 175) * 11000;
     return 0;
   }
 
