@@ -15,13 +15,13 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     super.key,
     required this.slides,
     required this.activeComboSlide,
-    required this.activeLuckyPacket,
+    this.activeLuckyPacket,
     required this.bottomPadding,
     required this.onComboTap,
     required this.onComboButtonTap,
     required this.onVideoGiftFinished,
-    required this.onLuckyPacketGetTap,
-    required this.onLuckyPacketResultsDismiss,
+    this.onLuckyPacketGetTap,
+    this.onLuckyPacketResultsDismiss,
   });
 
   final List<GiftSlide> slides;
@@ -31,8 +31,8 @@ class LiveRoomGiftOverlay extends StatefulWidget {
   final ValueChanged<GiftSlide> onComboTap;
   final VoidCallback onComboButtonTap;
   final ValueChanged<GiftSlide> onVideoGiftFinished;
-  final VoidCallback onLuckyPacketGetTap;
-  final VoidCallback onLuckyPacketResultsDismiss;
+  final VoidCallback? onLuckyPacketGetTap;
+  final VoidCallback? onLuckyPacketResultsDismiss;
 
   @override
   State<LiveRoomGiftOverlay> createState() => _LiveRoomGiftOverlayState();
@@ -77,8 +77,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
           ),
           LuckyPacketRoomOverlay(
             packet: widget.activeLuckyPacket,
-            onGetTap: widget.onLuckyPacketGetTap,
-            onDismissResults: widget.onLuckyPacketResultsDismiss,
+            onGetTap: widget.onLuckyPacketGetTap ?? () {},
+            onDismissResults: widget.onLuckyPacketResultsDismiss ?? () {},
           ),
         ],
       ),
