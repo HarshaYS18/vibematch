@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/presentation/vm_skeleton_page.dart';
 import '../features/auth/presentation/auth_gate.dart';
+import '../features/banner_manager/presentation/banner_manager_page.dart';
 import '../features/control_center/presentation/control_center_page.dart';
 import '../features/events/presentation/events_page.dart';
 import '../features/family/presentation/family_page.dart';
@@ -94,6 +95,8 @@ class AppRouteFactory {
         return _buildRoute(settings, const SearchPage());
       case VmRoutes.controlCenter:
         return _buildRoute(settings, const ControlCenterPage());
+      case VmRoutes.bannerManager:
+        return _buildRoute(settings, const BannerManagerPage());
 
       case VmRoutes.agency:
         return _buildRoute(settings, const VmSkeletonPage(title: 'Agency', subtitle: 'Agency Owner, Agency Admin, Hosts, BD hierarchy, commission, leave requests, and agency performance.', icon: Icons.groups_2_rounded, highlights: ['Agency Owner can invite, approve, remove hosts, and appoint up to 2 admins.', 'Agency Admin can invite and approve hosts but cannot remove hosts or manage admins.', 'Future backend: agency membership, host rewards, commissions, and audit logs.']));
