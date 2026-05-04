@@ -441,7 +441,6 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const _SeatMenuPointer(),
               Material(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
@@ -469,6 +468,7 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
                   ),
                 ),
               ),
+              const _SeatMenuPointer(),
             ],
           ),
         ),
@@ -493,9 +493,9 @@ class _SeatMenuPointerPainter extends CustomPainter {
       ..color = const Color(0xFF5F6470).withValues(alpha: 0.76)
       ..style = PaintingStyle.fill;
     final path = Path()
-      ..moveTo(size.width / 2, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
       ..close();
     canvas.drawPath(path, paint);
   }
