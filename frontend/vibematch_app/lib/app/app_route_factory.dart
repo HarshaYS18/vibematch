@@ -18,7 +18,7 @@ import '../features/search/presentation/search_page.dart';
 import '../features/settings/presentation/settings_page.dart';
 import '../features/store/presentation/store_page.dart';
 import '../features/vip/presentation/vip_page.dart';
-import '../features/wallet/presentation/wallet_page.dart';
+import '../features/wallet/presentation/wallet_page_modular.dart';
 import 'app_routes.dart';
 
 class AppRouteFactory {
@@ -66,7 +66,7 @@ class AppRouteFactory {
       case VmRoutes.rankings:
         return _buildRoute(settings, const RankingsPage());
       case VmRoutes.wallet:
-        return _buildRoute(settings, const WalletPage());
+        return _buildRoute(settings, const WalletPageModular());
       case VmRoutes.store:
         return _buildRoute(settings, const StorePage());
       case VmRoutes.settings:
