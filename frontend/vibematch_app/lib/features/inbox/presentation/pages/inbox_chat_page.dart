@@ -7,10 +7,12 @@ class InboxChatPage extends StatelessWidget {
     super.key,
     required this.conversation,
     required this.onMoreTap,
+    this.onBackTap,
   });
 
   final InboxConversation conversation;
   final VoidCallback onMoreTap;
+  final VoidCallback? onBackTap;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +23,7 @@ class InboxChatPage extends StatelessWidget {
           children: [
             _ChatHeader(
               conversation: conversation,
-              onBackTap: () => Navigator.pop(context),
+              onBackTap: onBackTap ?? () => Navigator.pop(context),
               onMoreTap: onMoreTap,
             ),
             Expanded(
