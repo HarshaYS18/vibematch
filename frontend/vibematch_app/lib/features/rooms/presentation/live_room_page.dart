@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../social/widgets/friends_invite_sheet.dart';
@@ -77,6 +79,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   final SeatUser _currentUser = mockRoomUsers.first;
   _PendingSeatInvite? _pendingSeatInvite;
+  Timer? _seatInviteAutoHideTimer;
 
 
   String get _roomName => _roomStateController.roomName;
@@ -163,6 +166,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   @override
   void dispose() {
+    _seatInviteAutoHideTimer?.cancel();
     _roomStateController.removeListener(_onRoomStateChanged);
     _messageController.dispose();
     _announcementController.dispose();
@@ -349,12 +353,28 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     Navigator.pop(context);
     _clearRoomFocus();
 
+    _seatInviteAutoHideTimer?.cancel();
+
     setState(() {
       _pendingSeatInvite = _PendingSeatInvite(
         inviterName: _currentUser.name,
         invitedUser: invitedUser,
         seatIndex: seatIndex,
       );
+    });
+
+    _seatInviteAutoHideTimer = Timer(const Duration(seconds: 15), () {
+      if (!mounted) return;
+      final activeInvite = _pendingSeatInvite;
+      if (activeInvite == null ||
+          activeInvite.invitedUser.id != invitedUser.id ||
+          activeInvite.seatIndex != seatIndex) {
+        return;
+      }
+
+      setState(() {
+        _pendingSeatInvite = null;
+      });
     });
 
     RoomToast.show(
@@ -366,6 +386,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _rejectSeatInvite() {
     final invite = _pendingSeatInvite;
     if (invite == null) return;
+
+    _seatInviteAutoHideTimer?.cancel();
+    _seatInviteAutoHideTimer = null;
 
     setState(() {
       _pendingSeatInvite = null;
@@ -384,6 +407,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
 
     if (!accepted) {
+      _seatInviteAutoHideTimer?.cancel();
+      _seatInviteAutoHideTimer = null;
+
       setState(() {
         _pendingSeatInvite = null;
       });
@@ -393,6 +419,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _insertSystemMessage(
       '${invite.invitedUser.name} accepted ${invite.inviterName}\'s seat ${invite.seatIndex + 1} invite',
     );
+
+    _seatInviteAutoHideTimer?.cancel();
+    _seatInviteAutoHideTimer = null;
 
     setState(() {
       _pendingSeatInvite = null;
