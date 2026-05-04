@@ -213,6 +213,7 @@ class ChatEntry {
     this.isSeatApplication = false,
     this.seatIndex,
     this.applicationApproved = false,
+    this.applicationRejected = false,
     this.giftAssetPath,
   });
 
@@ -226,9 +227,16 @@ class ChatEntry {
   final bool isSeatApplication;
   final int? seatIndex;
   final bool applicationApproved;
+  final bool applicationRejected;
   final String? giftAssetPath;
 
-  ChatEntry copyWith({String? message, bool? applicationApproved}) {
+  bool get applicationResolved => applicationApproved || applicationRejected;
+
+  ChatEntry copyWith({
+    String? message,
+    bool? applicationApproved,
+    bool? applicationRejected,
+  }) {
     return ChatEntry(
       senderName: senderName,
       message: message ?? this.message,
@@ -240,6 +248,7 @@ class ChatEntry {
       isSeatApplication: isSeatApplication,
       seatIndex: seatIndex,
       applicationApproved: applicationApproved ?? this.applicationApproved,
+      applicationRejected: applicationRejected ?? this.applicationRejected,
       giftAssetPath: giftAssetPath,
     );
   }
