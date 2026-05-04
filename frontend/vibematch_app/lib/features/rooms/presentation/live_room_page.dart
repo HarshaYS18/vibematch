@@ -83,8 +83,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool get _guestMessagesEnabled => _roomStateController.guestMessagesEnabled;
   bool get _minimized => _roomStateController.minimized;
   bool get _allowRoomPop => _roomStateController.allowRoomPop;
-  bool get _leaveSheetOpen => _roomStateController.leaveSheetOpen;
-  bool get _exitingRoom => _roomStateController.exitingRoom;
   bool get _applyOnlyModeEnabled => _roomStateController.applyOnlyModeEnabled;
   int get _inboxUnreadCount => _roomStateController.inboxUnreadCount;
   VibeSyncRoomState get _vibeSyncState => _roomStateController.vibeSyncState;
