@@ -22,6 +22,7 @@ class InboxPage extends StatefulWidget {
 
 class _InboxPageState extends State<InboxPage> {
   final InboxController _controller = InboxController();
+  Widget? _panelOverlay;
 
   @override
   void initState() {
@@ -38,6 +39,17 @@ class _InboxPageState extends State<InboxPage> {
 
   void _handleControllerChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _closePanelOverlay() {
+    if (!widget.openPagesInOverlay) {
+      Navigator.pop(context);
+      return;
+    }
+
+    setState(() {
+      _panelOverlay = null;
+    });
   }
 
   void _toast(String message) {
@@ -57,9 +69,25 @@ class _InboxPageState extends State<InboxPage> {
     required String subtitle,
     required VoidCallback onUnlocked,
   }) async {
+    if (widget.openPagesInOverlay) {
+      setState(() {
+        _panelOverlay = InboxPasscodeSheet(
+          title: title,
+          subtitle: subtitle,
+          onValidate: _controller.validatePasscode,
+          onUnlocked: () {
+            setState(() {
+              _panelOverlay = null;
+            });
+            onUnlocked();
+          },
+        );
+      });
+      return;
+    }
+
     await showModalBottomSheet<void>(
       context: context,
-      useRootNavigator: widget.openPagesInOverlay,
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
@@ -113,7 +141,7 @@ class _InboxPageState extends State<InboxPage> {
       conversations: _controller.lockedConversations,
       onOpenConversation: _openConversation,
       onShowOptions: _showChatOptions,
-      onBackTap: () => Navigator.pop(context),
+      onBackTap: _closePanelOverlay,
     );
 
     _openInboxSubPage(page);
@@ -150,7 +178,7 @@ class _InboxPageState extends State<InboxPage> {
         onStrangersCanMentionInVibesChanged: _controller.setStrangersCanMentionInVibes,
         onBackupNow: () => _toast('Encrypted backup flow will connect to backend/Drive later.'),
         onRestoreTap: () => _toast('Restore from backup flow will connect later.'),
-        onBackTap: () => Navigator.pop(context),
+        onBackTap: _closePanelOverlay,
       ),
     );
   }
@@ -161,30 +189,46 @@ class _InboxPageState extends State<InboxPage> {
       return;
     }
 
-    showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      useSafeArea: false,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.12),
-      builder: (sheetContext) => Container(
-        height: MediaQuery.sizeOf(sheetContext).height * 0.92,
-        clipBehavior: Clip.antiAlias,
-        decoration: const BoxDecoration(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-        ),
-        child: page,
-      ),
-    );
+    setState(() {
+      _panelOverlay = page;
+    });
   }
 
   void _showChatOptions(InboxConversation conversation) {
+    if (widget.openPagesInOverlay) {
+      setState(() {
+        _panelOverlay = Align(
+          alignment: Alignment.bottomCenter,
+          child: _InboxChatOptionsSheet(
+            conversation: conversation,
+            onToggleLock: () {
+              _controller.toggleBackendLock(conversation);
+              setState(() {
+                _panelOverlay = null;
+              });
+              _toast('Backend chat lock state updated locally for now.');
+            },
+            onToggleBlock: () {
+              _controller.toggleBlock(conversation);
+              setState(() {
+                _panelOverlay = null;
+              });
+              _toast('Block state updated locally. Backend will own this later.');
+            },
+            onReport: () {
+              setState(() {
+                _panelOverlay = null;
+              });
+              _toast('Report flow will connect to CS/Monitor workflow later.');
+            },
+          ),
+        );
+      });
+      return;
+    }
+
     showModalBottomSheet<void>(
       context: context,
-      useRootNavigator: widget.openPagesInOverlay,
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
@@ -212,51 +256,76 @@ class _InboxPageState extends State<InboxPage> {
   Widget build(BuildContext context) {
     final visibleConversations = _controller.visibleConversations;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F1),
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: InboxHeader(
-                lockedCount: _controller.lockedCount,
-                onLockTap: _openLockedVault,
-                onSettingsTap: _openSettings,
-                onSearchTap: _openSearch,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: InboxFilterBar(
-                filters: _controller.filters,
-                selectedFilter: _controller.selectedFilter,
-                onChanged: _controller.selectFilter,
-              ),
-            ),
-            if (visibleConversations.isEmpty)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _EmptyInboxState(),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 104),
-                sliver: SliverList.separated(
-                  itemCount: visibleConversations.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 6),
-                  itemBuilder: (context, index) {
-                    final conversation = visibleConversations[index];
-                    return InboxConversationCard(
-                      conversation: conversation,
-                      onTap: () => _openConversation(conversation),
-                      onLongPress: () => _showChatOptions(conversation),
-                    );
-                  },
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFFFAF7F1),
+          body: SafeArea(
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: InboxHeader(
+                    lockedCount: _controller.lockedCount,
+                    onLockTap: _openLockedVault,
+                    onSettingsTap: _openSettings,
+                    onSearchTap: _openSearch,
+                  ),
                 ),
-              ),
-          ],
+                SliverToBoxAdapter(
+                  child: InboxFilterBar(
+                    filters: _controller.filters,
+                    selectedFilter: _controller.selectedFilter,
+                    onChanged: _controller.selectFilter,
+                  ),
+                ),
+                if (visibleConversations.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyInboxState(),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 104),
+                    sliver: SliverList.separated(
+                      itemCount: visibleConversations.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
+                      itemBuilder: (context, index) {
+                        final conversation = visibleConversations[index];
+                        return InboxConversationCard(
+                          conversation: conversation,
+                          onTap: () => _openConversation(conversation),
+                          onLongPress: () => _showChatOptions(conversation),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
-      ),
+        if (_panelOverlay != null)
+          Positioned.fill(
+            child: Material(
+              color: const Color(0x66000000),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        setState(() {
+                          _panelOverlay = null;
+                        });
+                      },
+                    ),
+                  ),
+                  Positioned.fill(child: _panelOverlay!),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
