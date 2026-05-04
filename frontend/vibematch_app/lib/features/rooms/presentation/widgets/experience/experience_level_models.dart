@@ -132,44 +132,43 @@ ExperiencePillStyle experiencePillStyleFor({
   final tier = experienceTierForLevel(level);
   final band = experienceBandForLevel(level);
   final crownIcon = experienceCrownForBand(band);
-  final textColor = Colors.white;
 
   if (type == ExperienceLevelType.sent) {
     final sentGradients = <List<Color>>[
-      const [Color(0xFF2F80FF), Color(0xFF12C7B7), Color(0xFF5ED7FF)],
-      const [Color(0xFF155EEF), Color(0xFF0EA5E9), Color(0xFF12C7B7)],
-      const [Color(0xFF154DFF), Color(0xFF12C7B7), Color(0xFF7A5CFF)],
-      const [Color(0xFF0B4BD3), Color(0xFF0EA5E9), Color(0xFF7C3AED)],
-      const [Color(0xFF0B2D89), Color(0xFF38BDF8), Color(0xFF8C5CF6)],
-      const [Color(0xFF0B1E7A), Color(0xFF0EA5E9), RoomColors.gold],
-      const [Color(0xFF061A4A), Color(0xFF111827), Color(0xFF38BDF8), Color(0xFFC084FC)],
-      const [Color(0xFF06102E), Color(0xFF111827), Color(0xFF0EA5E9), Color(0xFFFFD166)],
-      const [Color(0xFF020617), Color(0xFF0F172A), Color(0xFF38BDF8), Color(0xFFE0F2FE), Color(0xFFFFD166)],
-      const [Color(0xFF020617), Color(0xFF08111F), Color(0xFF67E8F9), Color(0xFFFFFFFF), Color(0xFFFFD166)],
+      const [Color(0xFF15C7FF), Color(0xFF0B6BFF), Color(0xFF39FFCF)],
+      const [Color(0xFF0047FF), Color(0xFF00D4FF), Color(0xFF00A884)],
+      const [Color(0xFF2D00F7), Color(0xFF009DFF), Color(0xFF00FFC2)],
+      const [Color(0xFF0619A8), Color(0xFF19B7FF), Color(0xFF8A2BE2)],
+      const [Color(0xFF001D5C), Color(0xFF00B8FF), Color(0xFFC084FC)],
+      const [Color(0xFF03143F), Color(0xFF0066FF), Color(0xFFFFD166)],
+      const [Color(0xFF020617), Color(0xFF0047AB), Color(0xFF00E5FF), Color(0xFFFFC857)],
+      const [Color(0xFF020617), Color(0xFF111827), Color(0xFF2DD4BF), Color(0xFFFFD166)],
+      const [Color(0xFF000000), Color(0xFF0B1120), Color(0xFF67E8F9), Color(0xFFFFFFFF), Color(0xFFFFD166)],
+      const [Color(0xFF000000), Color(0xFF020617), Color(0xFFBDEBFF), Color(0xFFFFFFFF), Color(0xFFFFB703)],
     ];
     final crownColors = const [
-      Color(0xFFD9F4FF),
-      Color(0xFFE5F8FF),
-      Color(0xFFE5F2FF),
-      Color(0xFFE0E7FF),
-      Color(0xFFDDEBFF),
+      Color(0xFFE6FBFF),
+      Color(0xFFE0F7FF),
+      Color(0xFFE7E9FF),
+      Color(0xFFF1E8FF),
+      Color(0xFFE9D5FF),
       Color(0xFFFFE9A6),
-      Color(0xFFFFECB3),
-      Color(0xFFFFF1B8),
+      Color(0xFFFFF0B8),
+      Color(0xFFFFF4C7),
       Color(0xFFFFFFFF),
       Color(0xFFFFFFFF),
     ];
     final glowColors = const [
-      Color(0xFF12C7B7),
-      Color(0xFF0EA5E9),
-      Color(0xFF2CCBFF),
-      Color(0xFF60A5FA),
-      Color(0xFF8C5CF6),
-      RoomColors.gold,
+      Color(0xFF15C7FF),
+      Color(0xFF00D4FF),
+      Color(0xFF7A5CFF),
+      Color(0xFF8A2BE2),
       Color(0xFFC084FC),
       Color(0xFFFFD166),
-      Color(0xFFE0F2FE),
+      Color(0xFF00E5FF),
+      Color(0xFFFFD166),
       Color(0xFFFFFFFF),
+      Color(0xFFFFB703),
     ];
 
     return ExperiencePillStyle(
@@ -177,46 +176,46 @@ ExperiencePillStyle experiencePillStyleFor({
       crownIcon: crownIcon,
       crownColor: crownColors[band],
       glowColor: glowColors[band],
-      textColor: textColor,
+      textColor: Colors.white,
       tier: tier,
     );
   }
 
   final receivedGradients = <List<Color>>[
-    const [Color(0xFFFF4F93), Color(0xFFFF8FB3), Color(0xFFFFB4CF)],
-    const [Color(0xFFF43F7F), Color(0xFFFF8FB3), Color(0xFFFB7185)],
-    const [Color(0xFFE84C72), Color(0xFFFF8FB3), Color(0xFF8C5CF6)],
-    const [Color(0xFFBE185D), Color(0xFFFF4F93), Color(0xFF7C3AED)],
-    const [Color(0xFF9D174D), Color(0xFFFF4F93), Color(0xFFA855F7)],
-    const [Color(0xFF881337), Color(0xFFE84C72), RoomColors.gold],
-    const [Color(0xFF4A061D), Color(0xFF111827), Color(0xFFFF4F93), Color(0xFFC084FC)],
-    const [Color(0xFF2A0617), Color(0xFF111827), Color(0xFFFF4F93), Color(0xFFFFD166)],
-    const [Color(0xFF020617), Color(0xFF4A061D), Color(0xFFFF4F93), Color(0xFFFCE7F3), Color(0xFFFFD166)],
-    const [Color(0xFF020617), Color(0xFF3B071C), Color(0xFFFF8FB3), Color(0xFFFFFFFF), Color(0xFFFFD166)],
+    const [Color(0xFFFF5CA8), Color(0xFFFF2E75), Color(0xFFFFB3D1)],
+    const [Color(0xFFE6007E), Color(0xFFFF6FA7), Color(0xFFFF8A00)],
+    const [Color(0xFFC9184A), Color(0xFFFF4F93), Color(0xFF8C5CF6)],
+    const [Color(0xFF9D174D), Color(0xFFFF2E75), Color(0xFF7C3AED)],
+    const [Color(0xFF6D0028), Color(0xFFFF4F93), Color(0xFFA855F7)],
+    const [Color(0xFF4A061D), Color(0xFFE84C72), Color(0xFFFFD166)],
+    const [Color(0xFF2A0617), Color(0xFF7F1D1D), Color(0xFFFF4F93), Color(0xFFC084FC)],
+    const [Color(0xFF18020B), Color(0xFF111827), Color(0xFFFF2E75), Color(0xFFFFD166)],
+    const [Color(0xFF000000), Color(0xFF4A061D), Color(0xFFFF8FB3), Color(0xFFFFFFFF), Color(0xFFFFD166)],
+    const [Color(0xFF000000), Color(0xFF2A0617), Color(0xFFFFC7DF), Color(0xFFFFFFFF), Color(0xFFFFB703)],
   ];
   final crownColors = const [
     Color(0xFFFFECF5),
-    Color(0xFFFFF0F7),
-    Color(0xFFFFF0F7),
-    Color(0xFFFCE7F3),
+    Color(0xFFFFF0D8),
+    Color(0xFFFFECF5),
+    Color(0xFFF5E8FF),
     Color(0xFFFFD7EA),
     Color(0xFFFFE9A6),
-    Color(0xFFFFECB3),
+    Color(0xFFFFE0F1),
     Color(0xFFFFF1B8),
     Color(0xFFFFFFFF),
     Color(0xFFFFFFFF),
   ];
   final glowColors = const [
-    Color(0xFFFF6FA7),
-    Color(0xFFFF6FA7),
-    Color(0xFFFF6FA7),
-    Color(0xFFF472B6),
+    Color(0xFFFF5CA8),
+    Color(0xFFFF8A00),
+    Color(0xFF8C5CF6),
+    Color(0xFF7C3AED),
     Color(0xFFA855F7),
-    RoomColors.gold,
+    Color(0xFFFFD166),
     Color(0xFFC084FC),
     Color(0xFFFFD166),
-    Color(0xFFFCE7F3),
     Color(0xFFFFFFFF),
+    Color(0xFFFFB703),
   ];
 
   return ExperiencePillStyle(
@@ -224,7 +223,7 @@ ExperiencePillStyle experiencePillStyleFor({
     crownIcon: crownIcon,
     crownColor: crownColors[band],
     glowColor: glowColors[band],
-    textColor: textColor,
+    textColor: Colors.white,
     tier: tier,
   );
 }
