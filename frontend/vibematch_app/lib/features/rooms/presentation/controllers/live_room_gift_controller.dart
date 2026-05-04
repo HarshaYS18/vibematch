@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import '../live_room_models.dart';
 
 enum LuckyPacketPhase { countdown, claim, results }
@@ -46,6 +48,39 @@ class LuckyPacketRoomEvent {
       currentUserReward: currentUserReward ?? this.currentUserReward,
       distributions: distributions ?? this.distributions,
     );
+  }
+}
+
+class LuckyPacketRoomBus {
+  const LuckyPacketRoomBus._();
+
+  static final ValueNotifier<LuckyPacketRoomEvent?> packet = ValueNotifier<LuckyPacketRoomEvent?>(null);
+  static LiveRoomGiftController? _controller;
+  static List<SeatUser> _roomUsers = const <SeatUser>[];
+
+  static void bind({required LiveRoomGiftController controller, required List<SeatUser> roomUsers}) {
+    _controller = controller;
+    _roomUsers = roomUsers;
+    packet.value = controller.activeLuckyPacket;
+  }
+
+  static void publish(LuckyPacketRoomEvent? event) {
+    packet.value = event;
+  }
+
+  static void claim() {
+    _controller?.claimLuckyPacket(_roomUsers);
+  }
+
+  static void dismissResults() {
+    _controller?.dismissLuckyPacketResults();
+  }
+
+  static void clearController(LiveRoomGiftController controller) {
+    if (_controller != controller) return;
+    _controller = null;
+    _roomUsers = const <SeatUser>[];
+    packet.value = null;
   }
 }
 
@@ -191,19 +226,23 @@ class LiveRoomGiftController {
     required String message,
     required List<SeatUser> roomUsers,
   }) {
+    LuckyPacketRoomBus.bind(controller: this, roomUsers: roomUsers);
+
     if (coinBalance < coinAmount) {
       onToast('Not enough coins');
       return false;
     }
 
     coinBalance -= coinAmount;
-    activeLuckyPacket = LuckyPacketRoomEvent(
-      id: 'lucky-packet-${DateTime.now().microsecondsSinceEpoch}',
-      senderName: currentUser.name,
-      coinAmount: coinAmount,
-      message: message.trim(),
-      phase: LuckyPacketPhase.countdown,
-      remainingSeconds: 30,
+    _setLuckyPacket(
+      LuckyPacketRoomEvent(
+        id: 'lucky-packet-${DateTime.now().microsecondsSinceEpoch}',
+        senderName: currentUser.name,
+        coinAmount: coinAmount,
+        message: message.trim(),
+        phase: LuckyPacketPhase.countdown,
+        remainingSeconds: 30,
+      ),
     );
 
     _luckyPacketTimer?.cancel();
@@ -233,14 +272,16 @@ class LiveRoomGiftController {
     final nextDistributions = Map<String, int>.from(packet.distributions)
       ..[currentUser.name] = reward;
 
-    activeLuckyPacket = packet.copyWith(
-      claimedByCurrentUser: true,
-      currentUserReward: reward,
-      distributions: _mockDistributions(
-        roomUsers: roomUsers,
-        coinAmount: packet.coinAmount,
+    _setLuckyPacket(
+      packet.copyWith(
+        claimedByCurrentUser: true,
         currentUserReward: reward,
-        existing: nextDistributions,
+        distributions: _mockDistributions(
+          roomUsers: roomUsers,
+          coinAmount: packet.coinAmount,
+          currentUserReward: reward,
+          existing: nextDistributions,
+        ),
       ),
     );
     onChanged();
@@ -251,7 +292,7 @@ class LiveRoomGiftController {
     if (packet == null || packet.phase != LuckyPacketPhase.results) return;
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
-    activeLuckyPacket = null;
+    _setLuckyPacket(null);
     onChanged();
   }
 
@@ -275,37 +316,45 @@ class LiveRoomGiftController {
     onChanged();
   }
 
+  void _setLuckyPacket(LuckyPacketRoomEvent? packet) {
+    activeLuckyPacket = packet;
+    LuckyPacketRoomBus.publish(packet);
+  }
+
   void _tickLuckyPacket(List<SeatUser> roomUsers) {
     final packet = activeLuckyPacket;
     if (packet == null) {
       _luckyPacketTimer?.cancel();
       _luckyPacketTimer = null;
+      LuckyPacketRoomBus.publish(null);
       return;
     }
 
     if (packet.remainingSeconds > 0) {
-      activeLuckyPacket = packet.copyWith(remainingSeconds: packet.remainingSeconds - 1);
+      _setLuckyPacket(packet.copyWith(remainingSeconds: packet.remainingSeconds - 1));
       onChanged();
       return;
     }
 
     switch (packet.phase) {
       case LuckyPacketPhase.countdown:
-        activeLuckyPacket = packet.copyWith(phase: LuckyPacketPhase.claim, remainingSeconds: 20);
+        _setLuckyPacket(packet.copyWith(phase: LuckyPacketPhase.claim, remainingSeconds: 20));
         onChanged();
         return;
       case LuckyPacketPhase.claim:
-        activeLuckyPacket = packet.copyWith(
-          phase: LuckyPacketPhase.results,
-          remainingSeconds: 6,
-          distributions: packet.distributions.isEmpty
-              ? _mockDistributions(roomUsers: roomUsers, coinAmount: packet.coinAmount, currentUserReward: 0, existing: const <String, int>{})
-              : packet.distributions,
+        _setLuckyPacket(
+          packet.copyWith(
+            phase: LuckyPacketPhase.results,
+            remainingSeconds: 6,
+            distributions: packet.distributions.isEmpty
+                ? _mockDistributions(roomUsers: roomUsers, coinAmount: packet.coinAmount, currentUserReward: 0, existing: const <String, int>{})
+                : packet.distributions,
+          ),
         );
         onChanged();
         return;
       case LuckyPacketPhase.results:
-        activeLuckyPacket = null;
+        _setLuckyPacket(null);
         _luckyPacketTimer?.cancel();
         _luckyPacketTimer = null;
         onChanged();
@@ -395,6 +444,7 @@ class LiveRoomGiftController {
     _giftTimers.clear();
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
+    LuckyPacketRoomBus.clearController(this);
   }
 }
 
