@@ -41,13 +41,15 @@ class _ChatroomContributionRankingsSheetState extends State<ChatroomContribution
   Widget build(BuildContext context) {
     const category = RoomRankingCategory.sent;
     final accentColor = category.accentColor;
+    final roomScopedUsers = widget.users;
     final entries = _controller.buildMockEntries(
-      users: widget.users,
+      users: roomScopedUsers,
       category: category,
       period: _period,
     );
     final topEntries = entries.take(100).toList(growable: false);
     final currentEntry = _currentEntry(entries);
+    final backendPath = '/rooms/${widget.roomPublicId}/contributions?period=${_period.backendValue}';
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.78,
@@ -72,6 +74,12 @@ class _ChatroomContributionRankingsSheetState extends State<ChatroomContribution
                   selectedPeriod: _period,
                   accentColor: accentColor,
                   onChanged: (period) => setState(() => _period = period),
+                ),
+                const SizedBox(height: 12),
+                _RoomScopePill(
+                  roomName: widget.roomName,
+                  usersCount: roomScopedUsers.length,
+                  backendPath: backendPath,
                 ),
                 const SizedBox(height: 12),
                 Expanded(
@@ -158,7 +166,7 @@ class _ContributionHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                '${period.label} top contributors • $roomName',
+                '${period.label} top contributors in this room',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 11.5, fontWeight: FontWeight.w800),
@@ -185,6 +193,58 @@ class _ContributionHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _RoomScopePill extends StatelessWidget {
+  const _RoomScopePill({
+    required this.roomName,
+    required this.usersCount,
+    required this.backendPath,
+  });
+
+  final String roomName;
+  final int usersCount;
+  final String backendPath;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.meeting_room_rounded, color: RoomColors.gold, size: 15),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '$roomName only',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900),
+                ),
+              ),
+              Text('$usersCount users', style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 10.5, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Backend later: GET $backendPath',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.34), fontSize: 9.5, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
     );
   }
 }
