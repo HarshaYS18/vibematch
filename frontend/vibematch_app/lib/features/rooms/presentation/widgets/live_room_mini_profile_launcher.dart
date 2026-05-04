@@ -6,6 +6,7 @@ import '../live_room_models.dart';
 import 'live_room_mini_profile_sheet.dart';
 import 'mini_profile_report_sheet.dart';
 import 'room_kickout_duration_sheet.dart';
+import 'room_theme.dart';
 
 class LiveRoomMiniProfileLauncher {
   const LiveRoomMiniProfileLauncher._();
@@ -103,6 +104,8 @@ class LiveRoomMiniProfileLauncher {
         onSelfMuteToggle: () => onSelfMuteToggle(user.id),
         onAdminMuteToggle: () => onAdminMuteToggle(user.id),
         onGiftTap: () => onGiftTap(user.id),
+        onSocialRelationTap: () => _openSocialRelationInfo(context: context, user: user),
+        onMessageTap: () => _openMessageInfo(context: context, user: user),
         onKickOutTap: canShowKickOut && onKickOutDurationSelected != null
             ? () => _openKickOutDurationSheet(
                   context: context,
@@ -150,6 +153,42 @@ class LiveRoomMiniProfileLauncher {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => MiniProfileReportSheet(user: user),
+      );
+    });
+  }
+
+  static void _openSocialRelationInfo({
+    required BuildContext context,
+    required SeatUser user,
+  }) {
+    Navigator.pop(context);
+
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!context.mounted) return;
+      LiveRoomProfileNavigator.openModulePage(
+        context: context,
+        title: 'Follow',
+        subtitle:
+            'Follow, follow back, following, and friends state for ${user.name} will connect to backend social graph here.',
+        icon: Icons.person_add_alt_1_rounded,
+      );
+    });
+  }
+
+  static void _openMessageInfo({
+    required BuildContext context,
+    required SeatUser user,
+  }) {
+    Navigator.pop(context);
+
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!context.mounted) return;
+      LiveRoomProfileNavigator.openModulePage(
+        context: context,
+        title: 'Message ${user.name}',
+        subtitle:
+            'Direct message composer for ${user.name} will open here. Stranger-message and mutual-friend rules will connect to Inbox backend later.',
+        icon: Icons.chat_bubble_rounded,
       );
     });
   }
