@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
-import 'experience/experience_level_models.dart';
-import 'experience/experience_level_pill.dart';
 
 class MiniProfileStatsRow extends StatelessWidget {
   const MiniProfileStatsRow({
@@ -30,20 +28,26 @@ class MiniProfileStatsRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: MiniProfileExperienceStatCard(
-            type: ExperienceLevelType.sent,
-            level: user.sendingLevel,
+          child: MiniProfileMonthStatCard(
+            title: 'Sent',
             value: compactNumber(user.sentExp),
             onTap: onSentRankingTap,
+            tint: const Color(0xFFEFF7FF),
+            borderColor: const Color(0xFFC8DEF3),
+            titleColor: const Color(0xFF6B8198),
+            valueColor: const Color(0xFF326B9E),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: MiniProfileExperienceStatCard(
-            type: ExperienceLevelType.received,
-            level: user.receivingLevel,
+          child: MiniProfileMonthStatCard(
+            title: 'Received',
             value: compactNumber(user.receivedExp),
             onTap: onReceivedRankingTap,
+            tint: const Color(0xFFFFEEF5),
+            borderColor: const Color(0xFFF3D3DF),
+            titleColor: const Color(0xFF9A7483),
+            valueColor: const Color(0xFFC45A80),
           ),
         ),
       ],
@@ -177,76 +181,63 @@ class MiniProfileVipStatCard extends StatelessWidget {
   }
 }
 
-class MiniProfileExperienceStatCard extends StatelessWidget {
-  const MiniProfileExperienceStatCard({
+class MiniProfileMonthStatCard extends StatelessWidget {
+  const MiniProfileMonthStatCard({
     super.key,
-    required this.type,
-    required this.level,
+    required this.title,
     required this.value,
     required this.onTap,
+    required this.tint,
+    required this.borderColor,
+    required this.titleColor,
+    required this.valueColor,
   });
 
-  final ExperienceLevelType type;
-  final int level;
+  final String title;
   final String value;
   final VoidCallback onTap;
+  final Color tint;
+  final Color borderColor;
+  final Color titleColor;
+  final Color valueColor;
 
   @override
   Widget build(BuildContext context) {
-    final style = experiencePillStyleFor(type: type, level: level);
-
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
         height: 72,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
+          color: tint,
           borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              style.gradient.first.withValues(alpha: 0.18),
-              style.gradient.last.withValues(alpha: 0.14),
-              Colors.white.withValues(alpha: 0.84),
-            ],
-          ),
-          border: Border.all(color: style.glowColor.withValues(alpha: 0.26)),
-          boxShadow: [
-            BoxShadow(
-              color: style.glowColor.withValues(alpha: 0.07),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: titleColor,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: valueColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Stack(
-            children: [
-              const _MiniProfileStatCardShine(),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ExperienceLevelPill(type: type, level: level, compact: true),
-                  const SizedBox(height: 6),
-                  Text(
-                    value,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: style.gradient.first,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.15,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -271,8 +262,8 @@ class _MiniProfileStatCardShine extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.white.withValues(alpha: 0.32),
-                  Colors.white.withValues(alpha: 0.11),
+                  Colors.white.withValues(alpha: 0.28),
+                  Colors.white.withValues(alpha: 0.10),
                   Colors.white.withValues(alpha: 0.00),
                 ],
               ),
