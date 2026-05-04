@@ -93,7 +93,7 @@ class RoomRankingsController {
 
   String _scoreLabelFor(RoomRankingCategory category) {
     return switch (category) {
-      RoomRankingCategory.wealth => 'coins recharged',
+      RoomRankingCategory.wealth => 'coin',
       RoomRankingCategory.sent => 'sent',
       RoomRankingCategory.received => 'received',
       RoomRankingCategory.relation => 'Love & Bonds',
