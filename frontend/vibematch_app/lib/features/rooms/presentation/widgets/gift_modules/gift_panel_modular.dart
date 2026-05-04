@@ -78,7 +78,8 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
   Widget build(BuildContext context) {
     final allGifts = GiftPanelModular.withMockExtras(widget.gifts);
     final comboOptions = widget.selectedCategory == GiftCategory.lucky ? GiftPanelConstants.luckyCombos : GiftPanelConstants.combos;
-    final comboValue = comboOptions.contains(widget.selectedCombo) ? widget.selectedCombo : comboOptions.first;
+    final isLuckyPacket = widget.selectedGift?.id == 'lucky_packet';
+    final comboValue = isLuckyPacket ? 1 : (comboOptions.contains(widget.selectedCombo) ? widget.selectedCombo : comboOptions.first);
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.414,
@@ -126,8 +127,9 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
             const SizedBox(height: 7),
             GiftBottomActionBar(
               comboValue: comboValue,
-              comboOptions: comboOptions,
+              comboOptions: isLuckyPacket ? const [1] : comboOptions,
               coinBalance: widget.coinBalance,
+              comboEnabled: !isLuckyPacket,
               onSend: widget.onSend,
               onComboChanged: widget.onComboChanged,
               onRecharge: widget.onRecharge,
