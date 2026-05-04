@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/home_room.dart';
+import '../../models/home_room_data.dart';
 
 class HomeRoomCard extends StatelessWidget {
   const HomeRoomCard({
@@ -10,7 +10,7 @@ class HomeRoomCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final HomeRoom room;
+  final HomeRoomData room;
   final int rank;
   final VoidCallback onTap;
 
@@ -73,11 +73,7 @@ class HomeRoomCard extends StatelessWidget {
                     ),
                     child: Text(
                       '#$rank',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
@@ -95,11 +91,7 @@ class HomeRoomCard extends StatelessWidget {
                           room.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF251538),
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w900,
-                          ),
+                          style: const TextStyle(color: Color(0xFF251538), fontSize: 15.5, fontWeight: FontWeight.w900),
                         ),
                       ),
                       Container(
@@ -115,11 +107,7 @@ class HomeRoomCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Text(
                               room.mode,
-                              style: TextStyle(
-                                color: _modeColor,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                              ),
+                              style: TextStyle(color: _modeColor, fontSize: 10, fontWeight: FontWeight.w900),
                             ),
                           ],
                         ),
@@ -131,11 +119,7 @@ class HomeRoomCard extends StatelessWidget {
                     room.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF7B6A86),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 9),
                   Wrap(
@@ -156,11 +140,7 @@ class HomeRoomCard extends StatelessWidget {
                           friendsText,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF4A2A63),
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 11.5, fontWeight: FontWeight.w800),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -180,7 +160,7 @@ class HomeRoomCard extends StatelessWidget {
 class _HomeRoomAvatar extends StatelessWidget {
   const _HomeRoomAvatar({required this.room, required this.size});
 
-  final HomeRoom room;
+  final HomeRoomData room;
   final double size;
 
   @override
@@ -247,11 +227,7 @@ class _HomeRoomMiniPill extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             text,
-            style: const TextStyle(
-              color: Color(0xFF4A2A63),
-              fontSize: 10.5,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 10.5, fontWeight: FontWeight.w900),
           ),
         ],
       ),
