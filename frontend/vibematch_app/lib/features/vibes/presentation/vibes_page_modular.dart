@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../social/widgets/friends_invite_sheet.dart';
 import '../controllers/vibes_controller.dart';
 import '../models/vibe_models.dart';
 import 'pages/create_vibe_page_modular.dart';
@@ -55,11 +56,9 @@ class _VibesPageState extends State<VibesPage> {
           whoCanComment: _controller.whoCanComment,
           onMentionChanged: (value) {
             _controller.setWhoCanMention(value);
-            _showAction('Mention privacy set to ${value.label}');
           },
           onCommentChanged: (value) {
             _controller.setWhoCanComment(value);
-            _showAction('Comment privacy set to ${value.label}');
           },
         ),
       ),
@@ -87,6 +86,24 @@ class _VibesPageState extends State<VibesPage> {
           vibe: vibe,
           onCommentAdded: () => _controller.incrementCommentCount(vibe),
         ),
+      ),
+    );
+  }
+
+  void _openShareSheet(VibeItem vibe) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      builder: (_) => FriendsInviteSheet(
+        title: 'Share ${vibe.authorName}\'s Vibe',
+        actionLabel: 'Send',
+        completedLabel: 'Sent',
+        onInvite: (friend) {
+          _showAction('Vibe sent to ${friend.displayName}');
+        },
       ),
     );
   }
@@ -188,7 +205,7 @@ class _VibesPageState extends State<VibesPage> {
                       onProfileTap: () => _showAction('${vibe.authorName} profile will open.'),
                       onLikeTap: () => _controller.toggleLike(vibe),
                       onCommentTap: () => _openComments(vibe),
-                      onShareTap: () => _showAction('Share Vibe will open.'),
+                      onShareTap: () => _openShareSheet(vibe),
                       onMoreTap: () => _showAction('Vibe options will open.'),
                     );
                   },
