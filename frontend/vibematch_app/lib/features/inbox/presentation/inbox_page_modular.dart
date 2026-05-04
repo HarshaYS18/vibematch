@@ -59,6 +59,9 @@ class _InboxPageState extends State<InboxPage> {
   }) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: widget.openPagesInOverlay,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxPasscodeSheet(
@@ -160,17 +163,20 @@ class _InboxPageState extends State<InboxPage> {
 
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       useSafeArea: false,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.12),
-      builder: (_) => FractionallySizedBox(
-        heightFactor: 0.92,
-        alignment: Alignment.bottomCenter,
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
-          child: page,
+      builder: (sheetContext) => Container(
+        height: MediaQuery.sizeOf(sheetContext).height * 0.92,
+        clipBehavior: Clip.antiAlias,
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
         ),
+        child: page,
       ),
     );
   }
@@ -178,6 +184,9 @@ class _InboxPageState extends State<InboxPage> {
   void _showChatOptions(InboxConversation conversation) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: widget.openPagesInOverlay,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _InboxChatOptionsSheet(
         conversation: conversation,
