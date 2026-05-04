@@ -8,10 +8,12 @@ class InboxSearchPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onOpenConversation,
+    this.onBackTap,
   });
 
   final InboxController controller;
   final ValueChanged<InboxConversation> onOpenConversation;
+  final VoidCallback? onBackTap;
 
   @override
   State<InboxSearchPage> createState() => _InboxSearchPageState();
@@ -50,7 +52,7 @@ class _InboxSearchPageState extends State<InboxSearchPage> {
           children: [
             _SearchHeader(
               controller: _searchController,
-              onBackTap: () => Navigator.pop(context),
+              onBackTap: widget.onBackTap ?? () => Navigator.pop(context),
               onChanged: _onSearchChanged,
               onClearTap: _clearSearch,
             ),
