@@ -31,6 +31,7 @@ import 'widgets/live_room_join_requests_sheet.dart';
 import 'widgets/live_room_mini_profile_launcher.dart';
 import 'widgets/live_room_minimized_bubble.dart';
 import 'widgets/live_room_privacy_sheet.dart';
+import 'widgets/live_room_seat_invite_notification.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
 import 'widgets/live_room_users_sheet.dart';
@@ -75,6 +76,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   final LiveRoomNavigationController _navigationController = const LiveRoomNavigationController();
 
   final SeatUser _currentUser = mockRoomUsers.first;
+  _PendingSeatInvite? _pendingSeatInvite;
+
 
   String get _roomName => _roomStateController.roomName;
   String get _roomId => _roomStateController.roomId;
@@ -279,6 +282,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 if (slide != null) _giftController.tapGiftCombo(slide);
               },
             ),
+            if (_pendingSeatInvite != null)
+              LiveRoomSeatInviteNotification(
+                inviterName: _pendingSeatInvite!.inviterName,
+                invitedUser: _pendingSeatInvite!.invitedUser,
+                seatIndex: _pendingSeatInvite!.seatIndex,
+                onReject: _rejectSeatInvite,
+                onAccept: _acceptSeatInvite,
+              ),
           ],
         ),
       ),
@@ -323,9 +334,69 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       builder: (_) => LiveRoomInviteSheet(
         seatIndex: seatIndex,
         users: inviteUsers,
-        onInvite: (_) {},
+        onInvite: (user) => _sendSeatInvite(
+          seatIndex: seatIndex,
+          invitedUser: user,
+        ),
       ),
     );
+  }
+
+  void _sendSeatInvite({
+    required int seatIndex,
+    required SeatUser invitedUser,
+  }) {
+    Navigator.pop(context);
+    _clearRoomFocus();
+
+    setState(() {
+      _pendingSeatInvite = _PendingSeatInvite(
+        inviterName: _currentUser.name,
+        invitedUser: invitedUser,
+        seatIndex: seatIndex,
+      );
+    });
+
+    RoomToast.show(
+      context,
+      '${_currentUser.name} invited ${invitedUser.name} to seat ${seatIndex + 1}',
+    );
+  }
+
+  void _rejectSeatInvite() {
+    final invite = _pendingSeatInvite;
+    if (invite == null) return;
+
+    setState(() {
+      _pendingSeatInvite = null;
+    });
+
+    RoomToast.show(context, '${invite.invitedUser.name} rejected the seat invite');
+  }
+
+  void _acceptSeatInvite() {
+    final invite = _pendingSeatInvite;
+    if (invite == null) return;
+
+    final accepted = _seatController.inviteUserToSeat(
+      seatIndex: invite.seatIndex,
+      invitedUser: invite.invitedUser,
+    );
+
+    if (!accepted) {
+      setState(() {
+        _pendingSeatInvite = null;
+      });
+      return;
+    }
+
+    _insertSystemMessage(
+      '${invite.invitedUser.name} accepted ${invite.inviterName}\'s seat ${invite.seatIndex + 1} invite',
+    );
+
+    setState(() {
+      _pendingSeatInvite = null;
+    });
   }
 
   void _openRoomShareSheet() {
@@ -571,3 +642,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
   void _openInfoSheet(String title, String body) { LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomInfoSheet(title: title, body: body)); }
 }
+
+class _PendingSeatInvite {
+  const _PendingSeatInvite({
+    required this.inviterName,
+    required this.invitedUser,
+    required this.seatIndex,
+  });
+
+  final String inviterName;
+  final SeatUser invitedUser;
+  final int seatIndex;
+}
+
