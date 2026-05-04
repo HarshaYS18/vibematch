@@ -27,6 +27,8 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
     required this.onSelfMuteToggle,
     required this.onAdminMuteToggle,
     required this.onGiftTap,
+    required this.onSocialRelationTap,
+    required this.onMessageTap,
     this.onKickOutTap,
   });
 
@@ -52,6 +54,8 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
   final VoidCallback onSelfMuteToggle;
   final VoidCallback onAdminMuteToggle;
   final VoidCallback onGiftTap;
+  final VoidCallback onSocialRelationTap;
+  final VoidCallback onMessageTap;
   final VoidCallback? onKickOutTap;
 
   @override
@@ -78,6 +82,8 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
       onSelfMuteToggle: onSelfMuteToggle,
       onAdminMuteToggle: onAdminMuteToggle,
       onGiftTap: onGiftTap,
+      onSocialRelationTap: onSocialRelationTap,
+      onMessageTap: onMessageTap,
       onKickOutTap: onKickOutTap,
     );
   }
