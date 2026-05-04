@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
-import 'room_theme.dart';
 
 class MiniProfileLevelRow extends StatelessWidget {
   const MiniProfileLevelRow({
