@@ -105,16 +105,23 @@ ExperienceTier experienceTierForLevel(int level) {
   return ExperienceTier.starter;
 }
 
-IconData experienceCrownForTier(ExperienceTier tier) {
-  return switch (tier) {
-    ExperienceTier.starter => Icons.workspace_premium_rounded,
-    ExperienceTier.rising => Icons.emoji_events_rounded,
-    ExperienceTier.premium => Icons.military_tech_rounded,
-    ExperienceTier.elite => Icons.shield_rounded,
-    ExperienceTier.royal => Icons.diamond_rounded,
-    ExperienceTier.sovereign => Icons.local_fire_department_rounded,
-    ExperienceTier.mythic => Icons.auto_awesome_rounded,
-    ExperienceTier.immortal => Icons.stars_rounded,
+int experienceBandForLevel(int level) {
+  final safeLevel = level.clamp(1, 200);
+  return ((safeLevel - 1) ~/ 20).clamp(0, 9);
+}
+
+IconData experienceCrownForBand(int band) {
+  return switch (band) {
+    0 => Icons.workspace_premium_rounded,
+    1 => Icons.emoji_events_rounded,
+    2 => Icons.military_tech_rounded,
+    3 => Icons.shield_rounded,
+    4 => Icons.diamond_rounded,
+    5 => Icons.local_fire_department_rounded,
+    6 => Icons.auto_awesome_rounded,
+    7 => Icons.stars_rounded,
+    8 => Icons.flare_rounded,
+    _ => Icons.brightness_7_rounded,
   };
 }
 
@@ -123,141 +130,101 @@ ExperiencePillStyle experiencePillStyleFor({
   required int level,
 }) {
   final tier = experienceTierForLevel(level);
-  final crownIcon = experienceCrownForTier(tier);
+  final band = experienceBandForLevel(level);
+  final crownIcon = experienceCrownForBand(band);
+  final textColor = Colors.white;
 
   if (type == ExperienceLevelType.sent) {
-    return switch (tier) {
-      ExperienceTier.starter => const ExperiencePillStyle(
-          gradient: [Color(0xFF2F80FF), Color(0xFF12C7B7)],
-          crownIcon: Icons.workspace_premium_rounded,
-          crownColor: Color(0xFFD9F4FF),
-          glowColor: Color(0xFF12C7B7),
-          textColor: Colors.white,
-          tier: ExperienceTier.starter,
-        ),
-      ExperienceTier.rising => ExperiencePillStyle(
-          gradient: const [Color(0xFF155EEF), Color(0xFF0EA5E9), Color(0xFF12C7B7)],
-          crownIcon: crownIcon,
-          crownColor: const Color(0xFFE5F8FF),
-          glowColor: const Color(0xFF0EA5E9),
-          textColor: Colors.white,
-          tier: tier,
-        ),
-      ExperienceTier.premium => ExperiencePillStyle(
-          gradient: const [Color(0xFF154DFF), Color(0xFF12C7B7), Color(0xFF7A5CFF)],
-          crownIcon: crownIcon,
-          crownColor: const Color(0xFFE5F2FF),
-          glowColor: const Color(0xFF2CCBFF),
-          textColor: Colors.white,
-          tier: tier,
-        ),
-      ExperienceTier.elite => ExperiencePillStyle(
-          gradient: const [Color(0xFF0B2D89), Color(0xFF0EA5E9), Color(0xFF7C3AED)],
-          crownIcon: crownIcon,
-          crownColor: const Color(0xFFE0E7FF),
-          glowColor: const Color(0xFF60A5FA),
-          textColor: Colors.white,
-          tier: tier,
-        ),
-      ExperienceTier.royal => ExperiencePillStyle(
-          gradient: const [Color(0xFF0B1E7A), Color(0xFF0EA5E9), Color(0xFF8C5CF6), RoomColors.gold],
-          crownIcon: crownIcon,
-          crownColor: const Color(0xFFFFE9A6),
-          glowColor: RoomColors.gold,
-          textColor: Colors.white,
-          tier: tier,
-        ),
-      ExperienceTier.sovereign => ExperiencePillStyle(
-          gradient: const [Color(0xFF061A4A), Color(0xFF111827), Color(0xFF0EA5E9), Color(0xFFC084FC), Color(0xFFFFD166)],
-          crownIcon: crownIcon,
-          crownColor: const Color(0xFFFFECB3),
-          glowColor: const Color(0xFFFFD166),
-          textColor: Colors.white,
-          tier: tier,
-        ),
-      ExperienceTier.mythic => ExperiencePillStyle(
-          gradient: const [Color(0xFF06102E), Color(0xFF111827), Color(0xFF0EA5E9), Color(0xFFFFD166)],
-          crownIcon: crownIcon,
-          crownColor: const Color(0xFFFFF1B8),
-          glowColor: const Color(0xFFFFD166),
-          textColor: Colors.white,
-          tier: tier,
-        ),
-      ExperienceTier.immortal => ExperiencePillStyle(
-          gradient: const [Color(0xFF020617), Color(0xFF0F172A), Color(0xFF38BDF8), Color(0xFFE0F2FE), Color(0xFFFFD166)],
-          crownIcon: crownIcon,
-          crownColor: const Color(0xFFFFFFFF),
-          glowColor: const Color(0xFFE0F2FE),
-          textColor: Colors.white,
-          tier: tier,
-        ),
-    };
+    final sentGradients = <List<Color>>[
+      const [Color(0xFF2F80FF), Color(0xFF12C7B7), Color(0xFF5ED7FF)],
+      const [Color(0xFF155EEF), Color(0xFF0EA5E9), Color(0xFF12C7B7)],
+      const [Color(0xFF154DFF), Color(0xFF12C7B7), Color(0xFF7A5CFF)],
+      const [Color(0xFF0B4BD3), Color(0xFF0EA5E9), Color(0xFF7C3AED)],
+      const [Color(0xFF0B2D89), Color(0xFF38BDF8), Color(0xFF8C5CF6)],
+      const [Color(0xFF0B1E7A), Color(0xFF0EA5E9), RoomColors.gold],
+      const [Color(0xFF061A4A), Color(0xFF111827), Color(0xFF38BDF8), Color(0xFFC084FC)],
+      const [Color(0xFF06102E), Color(0xFF111827), Color(0xFF0EA5E9), Color(0xFFFFD166)],
+      const [Color(0xFF020617), Color(0xFF0F172A), Color(0xFF38BDF8), Color(0xFFE0F2FE), Color(0xFFFFD166)],
+      const [Color(0xFF020617), Color(0xFF08111F), Color(0xFF67E8F9), Color(0xFFFFFFFF), Color(0xFFFFD166)],
+    ];
+    final crownColors = const [
+      Color(0xFFD9F4FF),
+      Color(0xFFE5F8FF),
+      Color(0xFFE5F2FF),
+      Color(0xFFE0E7FF),
+      Color(0xFFDDEBFF),
+      Color(0xFFFFE9A6),
+      Color(0xFFFFECB3),
+      Color(0xFFFFF1B8),
+      Color(0xFFFFFFFF),
+      Color(0xFFFFFFFF),
+    ];
+    final glowColors = const [
+      Color(0xFF12C7B7),
+      Color(0xFF0EA5E9),
+      Color(0xFF2CCBFF),
+      Color(0xFF60A5FA),
+      Color(0xFF8C5CF6),
+      RoomColors.gold,
+      Color(0xFFC084FC),
+      Color(0xFFFFD166),
+      Color(0xFFE0F2FE),
+      Color(0xFFFFFFFF),
+    ];
+
+    return ExperiencePillStyle(
+      gradient: sentGradients[band],
+      crownIcon: crownIcon,
+      crownColor: crownColors[band],
+      glowColor: glowColors[band],
+      textColor: textColor,
+      tier: tier,
+    );
   }
 
-  return switch (tier) {
-    ExperienceTier.starter => const ExperiencePillStyle(
-        gradient: [Color(0xFFFF4F93), Color(0xFFFF8FB3)],
-        crownIcon: Icons.workspace_premium_rounded,
-        crownColor: Color(0xFFFFECF5),
-        glowColor: Color(0xFFFF6FA7),
-        textColor: Colors.white,
-        tier: ExperienceTier.starter,
-      ),
-    ExperienceTier.rising => ExperiencePillStyle(
-        gradient: const [Color(0xFFF43F7F), Color(0xFFFF8FB3), Color(0xFFFB7185)],
-        crownIcon: crownIcon,
-        crownColor: const Color(0xFFFFF0F7),
-        glowColor: const Color(0xFFFF6FA7),
-        textColor: Colors.white,
-        tier: tier,
-      ),
-    ExperienceTier.premium => ExperiencePillStyle(
-        gradient: const [Color(0xFFE84C72), Color(0xFFFF8FB3), Color(0xFF8C5CF6)],
-        crownIcon: crownIcon,
-        crownColor: const Color(0xFFFFF0F7),
-        glowColor: const Color(0xFFFF6FA7),
-        textColor: Colors.white,
-        tier: tier,
-      ),
-    ExperienceTier.elite => ExperiencePillStyle(
-        gradient: const [Color(0xFFBE185D), Color(0xFFFF4F93), Color(0xFF7C3AED)],
-        crownIcon: crownIcon,
-        crownColor: const Color(0xFFFCE7F3),
-        glowColor: const Color(0xFFF472B6),
-        textColor: Colors.white,
-        tier: tier,
-      ),
-    ExperienceTier.royal => ExperiencePillStyle(
-        gradient: const [Color(0xFF881337), Color(0xFFE84C72), Color(0xFF8C5CF6), RoomColors.gold],
-        crownIcon: crownIcon,
-        crownColor: const Color(0xFFFFE9A6),
-        glowColor: RoomColors.gold,
-        textColor: Colors.white,
-        tier: tier,
-      ),
-    ExperienceTier.sovereign => ExperiencePillStyle(
-        gradient: const [Color(0xFF4A061D), Color(0xFF111827), Color(0xFFE84C72), Color(0xFFC084FC), Color(0xFFFFD166)],
-        crownIcon: crownIcon,
-        crownColor: const Color(0xFFFFECB3),
-        glowColor: const Color(0xFFFFD166),
-        textColor: Colors.white,
-        tier: tier,
-      ),
-    ExperienceTier.mythic => ExperiencePillStyle(
-        gradient: const [Color(0xFF2A0617), Color(0xFF111827), Color(0xFFFF4F93), Color(0xFFFFD166)],
-        crownIcon: crownIcon,
-        crownColor: const Color(0xFFFFF1B8),
-        glowColor: const Color(0xFFFFD166),
-        textColor: Colors.white,
-        tier: tier,
-      ),
-    ExperienceTier.immortal => ExperiencePillStyle(
-        gradient: const [Color(0xFF020617), Color(0xFF4A061D), Color(0xFFFF4F93), Color(0xFFFCE7F3), Color(0xFFFFD166)],
-        crownIcon: crownIcon,
-        crownColor: const Color(0xFFFFFFFF),
-        glowColor: const Color(0xFFFCE7F3),
-        textColor: Colors.white,
-        tier: tier,
-      ),
-  };
+  final receivedGradients = <List<Color>>[
+    const [Color(0xFFFF4F93), Color(0xFFFF8FB3), Color(0xFFFFB4CF)],
+    const [Color(0xFFF43F7F), Color(0xFFFF8FB3), Color(0xFFFB7185)],
+    const [Color(0xFFE84C72), Color(0xFFFF8FB3), Color(0xFF8C5CF6)],
+    const [Color(0xFFBE185D), Color(0xFFFF4F93), Color(0xFF7C3AED)],
+    const [Color(0xFF9D174D), Color(0xFFFF4F93), Color(0xFFA855F7)],
+    const [Color(0xFF881337), Color(0xFFE84C72), RoomColors.gold],
+    const [Color(0xFF4A061D), Color(0xFF111827), Color(0xFFFF4F93), Color(0xFFC084FC)],
+    const [Color(0xFF2A0617), Color(0xFF111827), Color(0xFFFF4F93), Color(0xFFFFD166)],
+    const [Color(0xFF020617), Color(0xFF4A061D), Color(0xFFFF4F93), Color(0xFFFCE7F3), Color(0xFFFFD166)],
+    const [Color(0xFF020617), Color(0xFF3B071C), Color(0xFFFF8FB3), Color(0xFFFFFFFF), Color(0xFFFFD166)],
+  ];
+  final crownColors = const [
+    Color(0xFFFFECF5),
+    Color(0xFFFFF0F7),
+    Color(0xFFFFF0F7),
+    Color(0xFFFCE7F3),
+    Color(0xFFFFD7EA),
+    Color(0xFFFFE9A6),
+    Color(0xFFFFECB3),
+    Color(0xFFFFF1B8),
+    Color(0xFFFFFFFF),
+    Color(0xFFFFFFFF),
+  ];
+  final glowColors = const [
+    Color(0xFFFF6FA7),
+    Color(0xFFFF6FA7),
+    Color(0xFFFF6FA7),
+    Color(0xFFF472B6),
+    Color(0xFFA855F7),
+    RoomColors.gold,
+    Color(0xFFC084FC),
+    Color(0xFFFFD166),
+    Color(0xFFFCE7F3),
+    Color(0xFFFFFFFF),
+  ];
+
+  return ExperiencePillStyle(
+    gradient: receivedGradients[band],
+    crownIcon: crownIcon,
+    crownColor: crownColors[band],
+    glowColor: glowColors[band],
+    textColor: textColor,
+    tier: tier,
+  );
 }
