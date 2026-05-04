@@ -16,6 +16,7 @@ class HomeController extends ChangeNotifier {
   String selectedLanguage = 'All';
   bool isLoadingRooms = false;
   String? loadErrorMessage;
+  HomeRoom? myCreatedRoom;
 
   List<HomeRoom> _backendRooms = const [];
 
@@ -103,6 +104,21 @@ class HomeController extends ChangeNotifier {
   List<HomeRoom> get visibleRooms {
     final rooms = filteredRooms;
     return rooms.take(visibleRoomCount.clamp(0, rooms.length)).toList();
+  }
+
+  void ensureMockCreatedRoom() {
+    myCreatedRoom ??= HomeRoom(
+      id: 'VM${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      name: 'My Vibe Room',
+      subtitle: 'Your created live room',
+      language: selectedLanguage == 'All' ? 'Telugu' : selectedLanguage,
+      mode: 'Open',
+      type: 'Chat',
+      onlineCount: 1,
+      trendingScore: 0,
+      followedFriendsInside: const [],
+    );
+    notifyListeners();
   }
 
   Future<void> loadTrendingRooms({bool silent = false}) async {
