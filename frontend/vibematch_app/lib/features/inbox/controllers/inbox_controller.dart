@@ -10,6 +10,8 @@ class InboxController extends ChangeNotifier {
   bool lockedVaultUnlocked = false;
   ChatBackupFrequency backupFrequency = ChatBackupFrequency.weekly;
   bool backupEnabled = true;
+  bool strangersCanMessage = true;
+  bool strangersCanMentionInVibes = true;
 
   final List<String> filters = const [
     'All',
@@ -136,6 +138,16 @@ class InboxController extends ChangeNotifier {
 
   void setBackupFrequency(ChatBackupFrequency frequency) {
     backupFrequency = frequency;
+    notifyListeners();
+  }
+
+  void setStrangersCanMessage(bool value) {
+    strangersCanMessage = value;
+    notifyListeners();
+  }
+
+  void setStrangersCanMentionInVibes(bool value) {
+    strangersCanMentionInVibes = value;
     notifyListeners();
   }
 
