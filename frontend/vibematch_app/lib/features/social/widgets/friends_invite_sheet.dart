@@ -173,7 +173,7 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${user.id} · ${user.displayName}',
+                  user.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
