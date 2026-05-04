@@ -7,7 +7,7 @@ import '../features/inbox/presentation/inbox_page_modular.dart';
 import '../features/profile/presentation/me_page.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
-import '../features/vibes/presentation/vibes_page.dart';
+import '../features/vibes/presentation/vibes_page_modular.dart';
 import 'app_routes.dart';
 
 enum _DevUserMode {
