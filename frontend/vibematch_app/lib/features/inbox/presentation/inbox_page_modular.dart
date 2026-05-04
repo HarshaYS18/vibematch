@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controllers/inbox_controller.dart';
 import '../models/inbox_models.dart';
 import 'pages/inbox_chat_page.dart';
+import 'pages/inbox_search_page.dart';
 import 'pages/inbox_settings_page.dart';
 import 'pages/locked_chats_page.dart';
 import 'widgets/inbox_conversation_card.dart';
@@ -128,6 +129,18 @@ class _InboxPageState extends State<InboxPage> {
     );
   }
 
+  void _openSearch() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InboxSearchPage(
+          controller: _controller,
+          onOpenConversation: _openConversation,
+        ),
+      ),
+    );
+  }
+
   void _openSettings() {
     Navigator.push(
       context,
@@ -184,7 +197,7 @@ class _InboxPageState extends State<InboxPage> {
                 lockedCount: _controller.lockedCount,
                 onLockTap: _openLockedVault,
                 onSettingsTap: _openSettings,
-                onSearchTap: () => _toast('Inbox search will connect later.'),
+                onSearchTap: _openSearch,
               ),
             ),
             SliverToBoxAdapter(
