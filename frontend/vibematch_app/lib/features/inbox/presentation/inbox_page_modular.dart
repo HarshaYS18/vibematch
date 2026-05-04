@@ -52,6 +52,17 @@ class _InboxPageState extends State<InboxPage> {
     });
   }
 
+  void _handleBackInsideOverlay() {
+    if (_panelOverlay != null) {
+      setState(() {
+        _panelOverlay = null;
+      });
+      return;
+    }
+
+    Navigator.pop(context);
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -256,7 +267,7 @@ class _InboxPageState extends State<InboxPage> {
   Widget build(BuildContext context) {
     final visibleConversations = _controller.visibleConversations;
 
-    return Stack(
+    final page = Stack(
       children: [
         Scaffold(
           backgroundColor: const Color(0xFFFAF7F1),
@@ -326,6 +337,17 @@ class _InboxPageState extends State<InboxPage> {
             ),
           ),
       ],
+    );
+
+    if (!widget.openPagesInOverlay) return page;
+
+    return PopScope<void>(
+      canPop: _panelOverlay == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackInsideOverlay();
+      },
+      child: page,
     );
   }
 }
