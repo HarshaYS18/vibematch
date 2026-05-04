@@ -22,6 +22,16 @@ enum ChatBackupFrequency {
   final String label;
 }
 
+enum InboxSearchMatchType {
+  chat('Chats'),
+  mutualFollow('Mutual follows'),
+  message('Messages');
+
+  const InboxSearchMatchType(this.label);
+
+  final String label;
+}
+
 class InboxConversation {
   const InboxConversation({
     required this.id,
@@ -58,6 +68,7 @@ class InboxConversation {
   bool get isOfficial => type == InboxConversationType.official;
   bool get isStranger => type == InboxConversationType.stranger;
   bool get isRoomInvite => type == InboxConversationType.roomInvite;
+  bool get isMutualFollowChat => type == InboxConversationType.chat && !isStranger;
 
   InboxConversation copyWith({
     bool? isLockedByBackend,
@@ -96,4 +107,22 @@ class InboxMessage {
   final String time;
   final bool isMine;
   final String? inviteRoomName;
+}
+
+class InboxSearchResult {
+  const InboxSearchResult({
+    required this.conversation,
+    required this.matchType,
+    required this.title,
+    required this.preview,
+    required this.matchedText,
+    this.message,
+  });
+
+  final InboxConversation conversation;
+  final InboxSearchMatchType matchType;
+  final String title;
+  final String preview;
+  final String matchedText;
+  final InboxMessage? message;
 }
