@@ -11,7 +11,7 @@ class LuckyPacketSetupSheet extends StatefulWidget {
   });
 
   final int coinBalance;
-  final void Function(int coinAmount, String message) onSend;
+  final void Function(int coinAmount, int peopleCount, String message) onSend;
 
   @override
   State<LuckyPacketSetupSheet> createState() => _LuckyPacketSetupSheetState();
@@ -19,9 +19,11 @@ class LuckyPacketSetupSheet extends StatefulWidget {
 
 class _LuckyPacketSetupSheetState extends State<LuckyPacketSetupSheet> {
   static const List<int> _amounts = [500, 1000, 5000, 10000];
+  static const List<int> _peopleCounts = [5, 10, 20, 50, 100];
 
   final TextEditingController _messageController = TextEditingController();
   int _selectedAmount = 500;
+  int _selectedPeopleCount = 5;
 
   @override
   void dispose() {
@@ -63,7 +65,7 @@ class _LuckyPacketSetupSheetState extends State<LuckyPacketSetupSheet> {
                   children: [
                     Text('Lucky Packet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                     SizedBox(height: 2),
-                    Text('Choose amount and message', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)),
+                    Text('Choose amount, people and message', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -77,30 +79,39 @@ class _LuckyPacketSetupSheetState extends State<LuckyPacketSetupSheet> {
             ],
           ),
           const SizedBox(height: 16),
+          const Text('Coins', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: _amounts.map((amount) {
               final selected = amount == _selectedAmount;
-              return GestureDetector(
+              return _LuckyPacketChip(
+                selected: selected,
                 onTap: () => setState(() => _selectedAmount = amount),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 140),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selected ? RoomColors.gold : Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: selected ? Colors.white24 : Colors.white12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const GoldCoinIcon(size: 13),
-                      const SizedBox(width: 5),
-                      Text('$amount', style: TextStyle(color: selected ? RoomColors.deep : Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
-                    ],
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const GoldCoinIcon(size: 13),
+                    const SizedBox(width: 5),
+                    Text('$amount', style: TextStyle(color: selected ? RoomColors.deep : Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+                  ],
                 ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 14),
+          const Text('No. of people', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _peopleCounts.map((count) {
+              final selected = count == _selectedPeopleCount;
+              return _LuckyPacketChip(
+                selected: selected,
+                onTap: () => setState(() => _selectedPeopleCount = count),
+                child: Text('$count', style: TextStyle(color: selected ? RoomColors.deep : Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
               );
             }).toList(),
           ),
@@ -122,7 +133,7 @@ class _LuckyPacketSetupSheetState extends State<LuckyPacketSetupSheet> {
           ),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () => widget.onSend(_selectedAmount, _messageController.text),
+            onTap: () => widget.onSend(_selectedAmount, _selectedPeopleCount, _messageController.text),
             child: Container(
               height: 44,
               alignment: Alignment.center,
@@ -135,6 +146,31 @@ class _LuckyPacketSetupSheetState extends State<LuckyPacketSetupSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LuckyPacketChip extends StatelessWidget {
+  const _LuckyPacketChip({required this.selected, required this.onTap, required this.child});
+
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? RoomColors.gold : Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? Colors.white24 : Colors.white12),
+        ),
+        child: child,
       ),
     );
   }
