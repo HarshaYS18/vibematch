@@ -12,7 +12,9 @@ import 'widgets/inbox_header.dart';
 import 'widgets/inbox_passcode_sheet.dart';
 
 class InboxPage extends StatefulWidget {
-  const InboxPage({super.key});
+  const InboxPage({super.key, this.openPagesInOverlay = false});
+
+  final bool openPagesInOverlay;
 
   @override
   State<InboxPage> createState() => _InboxPageState();
@@ -78,18 +80,18 @@ class _InboxPageState extends State<InboxPage> {
         subtitle: 'This chat is backend-locked for your account. Enter passcode to open it on this device.',
         onUnlocked: () {
           _controller.unlockLockedVault();
-          _pushChat(conversation);
+          _openChat(conversation);
         },
       );
       return;
     }
 
-    _pushChat(conversation);
+    _openChat(conversation);
   }
 
   void _openLockedVault() {
     if (_controller.lockedVaultUnlocked) {
-      _pushLockedVault();
+      _openLockedVaultPage();
       return;
     }
 
@@ -98,65 +100,76 @@ class _InboxPageState extends State<InboxPage> {
       subtitle: 'Locked chats are hidden from Inbox and require account passcode before viewing.',
       onUnlocked: () {
         _controller.unlockLockedVault();
-        _pushLockedVault();
+        _openLockedVaultPage();
       },
     );
   }
 
-  void _pushLockedVault() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => LockedChatsPage(
-          conversations: _controller.lockedConversations,
-          onOpenConversation: _openConversation,
-          onShowOptions: _showChatOptions,
-          onBackTap: () => Navigator.pop(context),
-        ),
-      ),
+  void _openLockedVaultPage() {
+    final page = LockedChatsPage(
+      conversations: _controller.lockedConversations,
+      onOpenConversation: _openConversation,
+      onShowOptions: _showChatOptions,
+      onBackTap: () => Navigator.pop(context),
     );
+
+    _openInboxSubPage(page);
   }
 
-  void _pushChat(InboxConversation conversation) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => InboxChatPage(
-          conversation: conversation,
-          onMoreTap: () => _showChatOptions(conversation),
-        ),
+  void _openChat(InboxConversation conversation) {
+    _openInboxSubPage(
+      InboxChatPage(
+        conversation: conversation,
+        onMoreTap: () => _showChatOptions(conversation),
       ),
     );
   }
 
   void _openSearch() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => InboxSearchPage(
-          controller: _controller,
-          onOpenConversation: _openConversation,
-        ),
+    _openInboxSubPage(
+      InboxSearchPage(
+        controller: _controller,
+        onOpenConversation: _openConversation,
       ),
     );
   }
 
   void _openSettings() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => InboxSettingsPage(
-          backupEnabled: _controller.backupEnabled,
-          frequency: _controller.backupFrequency,
-          strangersCanMessage: _controller.strangersCanMessage,
-          strangersCanMentionInVibes: _controller.strangersCanMentionInVibes,
-          onBackupEnabledChanged: _controller.setBackupEnabled,
-          onFrequencyChanged: _controller.setBackupFrequency,
-          onStrangersCanMessageChanged: _controller.setStrangersCanMessage,
-          onStrangersCanMentionInVibesChanged: _controller.setStrangersCanMentionInVibes,
-          onBackupNow: () => _toast('Encrypted backup flow will connect to backend/Drive later.'),
-          onRestoreTap: () => _toast('Restore from backup flow will connect later.'),
-          onBackTap: () => Navigator.pop(context),
+    _openInboxSubPage(
+      InboxSettingsPage(
+        backupEnabled: _controller.backupEnabled,
+        frequency: _controller.backupFrequency,
+        strangersCanMessage: _controller.strangersCanMessage,
+        strangersCanMentionInVibes: _controller.strangersCanMentionInVibes,
+        onBackupEnabledChanged: _controller.setBackupEnabled,
+        onFrequencyChanged: _controller.setBackupFrequency,
+        onStrangersCanMessageChanged: _controller.setStrangersCanMessage,
+        onStrangersCanMentionInVibesChanged: _controller.setStrangersCanMentionInVibes,
+        onBackupNow: () => _toast('Encrypted backup flow will connect to backend/Drive later.'),
+        onRestoreTap: () => _toast('Restore from backup flow will connect later.'),
+        onBackTap: () => Navigator.pop(context),
+      ),
+    );
+  }
+
+  void _openInboxSubPage(Widget page) {
+    if (!widget.openPagesInOverlay) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.12),
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.92,
+        alignment: Alignment.bottomCenter,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+          child: page,
         ),
       ),
     );
