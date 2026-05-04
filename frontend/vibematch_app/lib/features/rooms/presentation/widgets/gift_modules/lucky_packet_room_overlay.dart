@@ -58,19 +58,38 @@ class _LuckyPacketTimerPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        gradient: const LinearGradient(colors: [Color(0xFFFFD166), Color(0xFFE84C72)]),
-        boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.36), blurRadius: 18, offset: const Offset(0, 8))],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return SizedBox(
+      width: 58,
+      height: 58,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          const Text('🧧', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 7),
-          Text('${packet.remainingSeconds}s', style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)),
+          Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(colors: [Color(0xFFFFD166), Color(0xFFE84C72)]),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.34)),
+              boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.36), blurRadius: 18, offset: const Offset(0, 8))],
+            ),
+            child: const Text('🧧', style: TextStyle(fontSize: 27)),
+          ),
+          Positioned(
+            right: -1,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                color: const Color(0xFF12101D),
+                border: Border.all(color: RoomColors.gold.withValues(alpha: 0.55)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.30), blurRadius: 8, offset: const Offset(0, 3))],
+              ),
+              child: Text('${packet.remainingSeconds}s', style: const TextStyle(color: RoomColors.gold, fontSize: 10.5, fontWeight: FontWeight.w900)),
+            ),
+          ),
         ],
       ),
     );
