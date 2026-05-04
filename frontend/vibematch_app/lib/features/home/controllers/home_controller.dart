@@ -11,6 +11,7 @@ class HomeController extends ChangeNotifier {
   final HomeRepository _repository;
 
   int selectedBannerIndex = 0;
+  int selectedPolicyBannerIndex = 0;
   int visibleRoomCount = 6;
   String selectedCategory = 'Trending';
   String selectedLanguage = 'All';
@@ -67,6 +68,21 @@ class HomeController extends ChangeNotifier {
       title: 'Vibes Event',
       fallbackIcon: Icons.auto_awesome_rounded,
       fallbackGradient: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+    ),
+  ];
+
+  final List<HomeBanner> policyBanners = const [
+    HomeBanner(
+      id: 'policy_rules_001',
+      title: 'Rules & Regulations',
+      fallbackIcon: Icons.rule_rounded,
+      fallbackGradient: [Color(0xFF251538), Color(0xFF4A2A63)],
+    ),
+    HomeBanner(
+      id: 'policy_safety_001',
+      title: 'Safety Policy',
+      fallbackIcon: Icons.verified_user_rounded,
+      fallbackGradient: [Color(0xFF4A2A63), Color(0xFF12C7B7)],
     ),
   ];
 
@@ -157,6 +173,11 @@ class HomeController extends ChangeNotifier {
 
   void selectBanner(int index) {
     selectedBannerIndex = index;
+    notifyListeners();
+  }
+
+  void selectPolicyBanner(int index) {
+    selectedPolicyBannerIndex = index;
     notifyListeners();
   }
 
