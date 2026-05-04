@@ -24,6 +24,7 @@ class RoomTopBar extends StatelessWidget {
     required this.onAddAdmin,
     required this.onRemoveAdmin,
     this.onRoomRankingsTap,
+    this.onRoomLevelTap,
     this.roomLevel = 12,
     this.language = 'Telugu',
     this.canManageAdmins = true,
@@ -44,6 +45,7 @@ class RoomTopBar extends StatelessWidget {
   final ValueChanged<SeatUser> onAddAdmin;
   final ValueChanged<SeatUser> onRemoveAdmin;
   final VoidCallback? onRoomRankingsTap;
+  final VoidCallback? onRoomLevelTap;
   final int roomLevel;
   final String language;
   final bool canManageAdmins;
@@ -108,7 +110,7 @@ class RoomTopBar extends StatelessWidget {
             const SizedBox(width: 2),
             _TrophyButton(onTap: openRankings),
             const SizedBox(width: 7),
-            _RoomLevelBadge(level: roomLevel),
+            _RoomLevelBadge(level: roomLevel, onTap: onRoomLevelTap),
             const SizedBox(width: 7),
             _OnlineButton(count: onlineCount, onTap: onUsersTap),
           ],
@@ -289,8 +291,9 @@ class _PrivacyIcon extends StatelessWidget {
 }
 
 class _RoomLevelBadge extends StatelessWidget {
-  const _RoomLevelBadge({required this.level});
+  const _RoomLevelBadge({required this.level, this.onTap});
   final int level;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +302,7 @@ class _RoomLevelBadge extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: () => RoomToast.show(context, 'Room level details will connect here'),
+        onTap: onTap,
         child: Container(
           height: 31,
           padding: const EdgeInsets.symmetric(horizontal: 8),
