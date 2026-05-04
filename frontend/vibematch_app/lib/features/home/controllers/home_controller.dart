@@ -51,25 +51,22 @@ class HomeController extends ChangeNotifier {
 
   final List<HomeBanner> banners = const [
     HomeBanner(
-      title: 'Tonight’s Premium Rooms',
-      subtitle: 'Join trending voice rooms with live seats and gifts.',
-      icon: Icons.graphic_eq_rounded,
-      gradient: [Color(0xFF12C7B7), Color(0xFF8C5CF6), Color(0xFFE84C72)],
-      action: HomeBannerAction.openTrendingRooms,
+      id: 'event_weekend_001',
+      title: 'Weekend Event',
+      fallbackIcon: Icons.celebration_rounded,
+      fallbackGradient: [Color(0xFFE84C72), Color(0xFF8C5CF6)],
     ),
     HomeBanner(
-      title: 'Vibe Sync Rooms',
-      subtitle: 'Music-style live rooms with animated mood and energy.',
-      icon: Icons.waves_rounded,
-      gradient: [Color(0xFF251538), Color(0xFF4A2A63), Color(0xFF12C7B7)],
-      action: HomeBannerAction.openVibeSyncRooms,
+      id: 'promo_recharge_001',
+      title: 'Recharge Promo',
+      fallbackIcon: Icons.bolt_rounded,
+      fallbackGradient: [Color(0xFFC99A3B), Color(0xFFE84C72)],
     ),
     HomeBanner(
-      title: 'Official Events',
-      subtitle: 'Events are available through banners and notifications.',
-      icon: Icons.workspace_premium_rounded,
-      gradient: [Color(0xFFC99A3B), Color(0xFFE84C72), Color(0xFF4A2A63)],
-      action: HomeBannerAction.openEvents,
+      id: 'event_vibes_001',
+      title: 'Vibes Event',
+      fallbackIcon: Icons.auto_awesome_rounded,
+      fallbackGradient: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
     ),
   ];
 
