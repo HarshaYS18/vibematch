@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/vibe_models.dart';
 
-class VibesSettingsPage extends StatelessWidget {
+class VibesSettingsPage extends StatefulWidget {
   const VibesSettingsPage({
     super.key,
     required this.whoCanMention,
@@ -15,6 +15,45 @@ class VibesSettingsPage extends StatelessWidget {
   final VibePrivacyAudience whoCanComment;
   final ValueChanged<VibePrivacyAudience> onMentionChanged;
   final ValueChanged<VibePrivacyAudience> onCommentChanged;
+
+  @override
+  State<VibesSettingsPage> createState() => _VibesSettingsPageState();
+}
+
+class _VibesSettingsPageState extends State<VibesSettingsPage> {
+  late VibePrivacyAudience _whoCanMention;
+  late VibePrivacyAudience _whoCanComment;
+
+  @override
+  void initState() {
+    super.initState();
+    _whoCanMention = widget.whoCanMention;
+    _whoCanComment = widget.whoCanComment;
+  }
+
+  void _setWhoCanMention(VibePrivacyAudience audience) {
+    setState(() => _whoCanMention = audience);
+    widget.onMentionChanged(audience);
+    _showFeedback('Mention privacy set to ${audience.label}');
+  }
+
+  void _setWhoCanComment(VibePrivacyAudience audience) {
+    setState(() => _whoCanComment = audience);
+    widget.onCommentChanged(audience);
+    _showFeedback('Comment privacy set to ${audience.label}');
+  }
+
+  void _showFeedback(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF251538),
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,15 +86,15 @@ class VibesSettingsPage extends StatelessWidget {
             _PrivacyCard(
               title: 'Who can mention you',
               subtitle: 'Controls @name mentions in Vibes and Vibe comments.',
-              value: whoCanMention,
-              onChanged: onMentionChanged,
+              value: _whoCanMention,
+              onChanged: _setWhoCanMention,
             ),
             const SizedBox(height: 12),
             _PrivacyCard(
               title: 'Who can comment',
               subtitle: 'Controls who can comment on your Vibes.',
-              value: whoCanComment,
-              onChanged: onCommentChanged,
+              value: _whoCanComment,
+              onChanged: _setWhoCanComment,
             ),
           ],
         ),
