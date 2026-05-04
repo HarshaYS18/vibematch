@@ -63,7 +63,7 @@ class RoomRankingsController {
       RoomRankingCategory.wealth => 'VIP ${user.vipLevel} · ${user.roleLabel}',
       RoomRankingCategory.sent => 'Sending Lv ${user.sendingLevel}',
       RoomRankingCategory.received => 'Receiving Lv ${user.receivingLevel}',
-      RoomRankingCategory.relation => user.familyName ?? user.roleLabel,
+      RoomRankingCategory.relation => user.familyName.trim().isEmpty ? user.roleLabel : user.familyName,
     };
   }
 }
