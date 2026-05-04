@@ -9,6 +9,7 @@ import 'sections/home_banner_section.dart';
 import 'sections/home_empty_state.dart';
 import 'sections/home_filters_section.dart';
 import 'sections/home_header_section.dart';
+import 'sections/home_policy_banner_section.dart';
 import 'sections/home_room_section_header.dart';
 import 'widgets/home_language_sheet.dart';
 import 'widgets/home_locked_room_sheet.dart';
@@ -191,6 +192,10 @@ class _HomePageState extends State<HomePage> {
     VmNavigator.openEvents(context);
   }
 
+  void _handlePolicyBannerTap(HomeBanner banner) {
+    _toast('${banner.title} page will connect next.');
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleRooms = _controller.visibleRooms;
@@ -255,12 +260,24 @@ class _HomePageState extends State<HomePage> {
                 )
               else
                 SliverList.builder(
-                  itemCount: visibleRooms.length,
+                  itemCount: visibleRooms.length + (visibleRooms.length >= 6 ? 1 : 0),
                   itemBuilder: (context, index) {
-                    final room = visibleRooms[index];
+                    if (visibleRooms.length >= 6 && index == 6) {
+                      return HomePolicyBannerSection(
+                        banners: _controller.policyBanners,
+                        selectedIndex: _controller.selectedPolicyBannerIndex,
+                        canManageBanners: _canManageHomeBanners,
+                        onBannerChanged: _controller.selectPolicyBanner,
+                        onBannerTap: _handlePolicyBannerTap,
+                        onManageTap: () => VmNavigator.openBannerManager(context),
+                      );
+                    }
+
+                    final roomIndex = index > 6 ? index - 1 : index;
+                    final room = visibleRooms[roomIndex];
                     return HomeRoomCard(
                       room: room,
-                      rank: index + 1,
+                      rank: roomIndex + 1,
                       onTap: () => _openRoom(room),
                     );
                   },
