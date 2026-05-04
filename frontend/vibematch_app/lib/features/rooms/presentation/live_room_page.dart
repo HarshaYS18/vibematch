@@ -238,6 +238,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               layoutId: _seatController.layoutId,
               selectedSeatIndex: _seatController.selectedSeatIndex,
               canManageSeats: _viewerCanManageRoom,
+              applyOnlyModeEnabled: _applyOnlyModeEnabled,
               admins: _roomAdmins,
               availableAdminUsers: _availableAdminUsers,
               onAddAdmin: _addRoomAdminFromInfo,
@@ -263,7 +264,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onSwitch: _seatController.switchSeat,
               onLock: _seatController.lockSeat,
               onUnlock: _seatController.unlockSeat,
+              onApplySeat: _applyForSeat,
               onApproveSeatApplication: _approveSeatApplication,
+              onRejectSeatApplication: _rejectSeatApplication,
               onSenderTap: _openMiniProfileFromChat,
               onMentionTap: _openMentionedUserProfile,
               onDismissOverlays: _dismissRoomOverlays,
@@ -311,14 +314,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       }
       return;
     }
+
     if (seat.user == null && !_viewerCanManageRoom) {
       if (_applyOnlyModeEnabled) {
-        _seatController.applyForSeat(index: index, messages: _roomMessageController.messages);
+        _seatController.toggleSelectedSeat(index);
       } else {
         _seatController.occupySeat(index);
       }
       return;
     }
+
     if (seat.user == null && _viewerCanManageRoom) _seatController.toggleSelectedSeat(index);
   }
 
@@ -329,6 +334,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _approveSeatApplication(ChatEntry entry) => _seatController.approveSeatApplication(entry: entry, messages: _roomMessageController.messages, allRoomUsers: _allRoomUsers);
+  void _rejectSeatApplication(ChatEntry entry) => _seatController.rejectSeatApplication(entry: entry, messages: _roomMessageController.messages);
+  void _applyForSeat(int index) => _seatController.applyForSeat(index: index, messages: _roomMessageController.messages);
   void _inviteSeat(int index) { _seatController.clearSelectedSeat(); _openSeatInviteSheet(index); }
 
   void _openSeatInviteSheet(int seatIndex) {
