@@ -62,6 +62,7 @@ class VmRoutes {
   static const String me = '/me';
 
   static const String liveRoom = '/rooms/live';
+  static const String roomLevel = '/rooms/level';
 
   static const String profile = '/profile';
   static const String events = '/events';
