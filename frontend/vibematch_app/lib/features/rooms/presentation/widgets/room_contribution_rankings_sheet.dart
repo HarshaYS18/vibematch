@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'rankings/contribution/chatroom_contribution_rankings_sheet.dart';
 import 'rankings/room_rankings_models.dart';
-import 'rankings/room_rankings_sheet.dart';
 
 class RoomContributionRankingsSheet extends StatelessWidget {
   const RoomContributionRankingsSheet({
@@ -10,7 +10,7 @@ class RoomContributionRankingsSheet extends StatelessWidget {
     required this.roomName,
     required this.users,
     this.roomPublicId = 'unknown_room',
-    this.initialCategory = RoomRankingCategory.wealth,
+    this.initialCategory = RoomRankingCategory.sent,
     this.initialPeriod = RoomRankingPeriod.daily,
     this.onUserTap,
   });
@@ -24,12 +24,11 @@ class RoomContributionRankingsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RoomRankingsSheet(
+    return ChatroomContributionRankingsSheet(
       roomPublicId: roomPublicId,
       roomName: roomName,
       users: users,
-      initialCategory: initialCategory,
-      initialPeriod: initialPeriod,
+      initialPeriod: initialPeriod == RoomRankingPeriod.weekly ? RoomRankingPeriod.weekly : RoomRankingPeriod.daily,
       onUserTap: onUserTap,
     );
   }
