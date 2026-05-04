@@ -53,10 +53,10 @@ class RoomRankingEntryTile extends StatelessWidget {
                   border: Border.all(color: rankColor.withValues(alpha: isTopThree ? 0.60 : 0.20)),
                 ),
                 child: Text(
-                  '${entry.rank}',
+                  entry.displayRank,
                   style: TextStyle(
                     color: rankColor,
-                    fontSize: 12,
+                    fontSize: entry.rank > 99 ? 10 : 12,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -116,13 +116,19 @@ class RoomRankingEntryTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    compactNumber(entry.score),
+                    entry.scoreText,
                     style: TextStyle(color: accentColor, fontSize: 14, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    entry.scoreLabel,
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.50), fontSize: 9.5, fontWeight: FontWeight.w800),
+                  SizedBox(
+                    width: 82,
+                    child: Text(
+                      entry.scoreLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.50), fontSize: 9.5, fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ],
               ),
