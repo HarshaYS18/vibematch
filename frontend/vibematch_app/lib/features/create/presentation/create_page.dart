@@ -69,16 +69,16 @@ class _CreatePageState extends State<CreatePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const _SheetHandle(),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               const Text(
                 'Choose room language',
                 style: TextStyle(
                   color: Color(0xFF251538),
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
@@ -88,8 +88,10 @@ class _CreatePageState extends State<CreatePage> {
                     final selected = language == _selectedLanguage;
 
                     return ListTile(
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       leading: Icon(
                         selected
@@ -98,11 +100,13 @@ class _CreatePageState extends State<CreatePage> {
                         color: selected
                             ? const Color(0xFF12C7B7)
                             : const Color(0xFF6A5877),
+                        size: 20,
                       ),
                       title: Text(
                         language,
                         style: TextStyle(
                           color: const Color(0xFF251538),
+                          fontSize: 13,
                           fontWeight:
                               selected ? FontWeight.w900 : FontWeight.w700,
                         ),
@@ -142,12 +146,12 @@ class _CreatePageState extends State<CreatePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const _SheetHandle(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Container(
-                width: 74,
-                height: 74,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(26),
+                  borderRadius: BorderRadius.circular(22),
                   gradient: const LinearGradient(
                     colors: [
                       Color(0xFF12C7B7),
@@ -157,42 +161,42 @@ class _CreatePageState extends State<CreatePage> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF8C5CF6).withValues(alpha: 0.28),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
+                      color: const Color(0xFF8C5CF6).withValues(alpha: 0.22),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
                     ),
                   ],
                 ),
                 child: const Icon(
                   Icons.graphic_eq_rounded,
                   color: Colors.white,
-                  size: 34,
+                  size: 29,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               const Text(
                 'Room Ready',
                 style: TextStyle(
                   color: Color(0xFF251538),
-                  fontSize: 24,
+                  fontSize: 21,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 7),
+              const SizedBox(height: 5),
               Text(
                 roomName,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: const Color(0xFF251538).withValues(alpha: 0.72),
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _ReadyInfoRow(label: 'Room ID', value: roomId),
               _ReadyInfoRow(label: 'Mode', value: _selectedMode.title),
               _ReadyInfoRow(label: 'Language', value: _selectedLanguage),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
               Row(
                 children: [
                   Expanded(
@@ -202,7 +206,7 @@ class _CreatePageState extends State<CreatePage> {
                       onTap: () => Navigator.pop(context),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: _PrimaryButton(
                       text: 'Enter Room',
@@ -241,18 +245,17 @@ class _CreatePageState extends State<CreatePage> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            SliverToBoxAdapter(child: _buildHeader()),
             SliverToBoxAdapter(child: _buildCreateCard()),
             SliverToBoxAdapter(child: _buildModeSection()),
             SliverToBoxAdapter(child: _buildRulesCard()),
-            const SliverToBoxAdapter(child: SizedBox(height: 110)),
+            const SliverToBoxAdapter(child: SizedBox(height: 92)),
           ],
         ),
       ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: _PrimaryButton(
             text: 'Create Room',
             icon: Icons.add_circle_rounded,
@@ -263,80 +266,19 @@ class _CreatePageState extends State<CreatePage> {
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF12C7B7),
-                  Color(0xFF8C5CF6),
-                ],
-              ),
-            ),
-            child: const Icon(
-              Icons.add_home_work_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 13),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Create Room',
-                  style: TextStyle(
-                    color: Color(0xFF251538),
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Start your own live vibe',
-                  style: TextStyle(
-                    color: Color(0xFF7B6A86),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: () => _toast('Create room help opened'),
-            icon: const Icon(
-              Icons.help_rounded,
-              color: Color(0xFF4A2A63),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildCreateCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(18, 8, 18, 16),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFEDE3D7)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF251538).withValues(alpha: 0.06),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: const Color(0xFF251538).withValues(alpha: 0.045),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -352,10 +294,10 @@ class _CreatePageState extends State<CreatePage> {
               );
             },
             child: Container(
-              width: 108,
-              height: 108,
+              width: 82,
+              height: 82,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(34),
+                borderRadius: BorderRadius.circular(27),
                 gradient: _roomImageSelected
                     ? const LinearGradient(
                         colors: [
@@ -375,49 +317,52 @@ class _CreatePageState extends State<CreatePage> {
                 color: _roomImageSelected
                     ? Colors.white
                     : const Color(0xFF7B6A86),
-                size: 38,
+                size: 30,
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 7),
           Text(
             _roomImageSelected ? 'Room image ready' : 'Tap to add room image',
             style: const TextStyle(
               color: Color(0xFF7B6A86),
-              fontSize: 12,
+              fontSize: 11.5,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 13),
           TextField(
             controller: _roomNameController,
             style: const TextStyle(
               color: Color(0xFF251538),
-              fontSize: 16,
+              fontSize: 14.5,
               fontWeight: FontWeight.w800,
             ),
             decoration: InputDecoration(
               labelText: 'Room name',
               labelStyle: const TextStyle(
                 color: Color(0xFF7B6A86),
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
               prefixIcon: const Icon(
                 Icons.graphic_eq_rounded,
                 color: Color(0xFF12C7B7),
+                size: 19,
               ),
               filled: true,
               fillColor: const Color(0xFFFAF7F1),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(18),
                 borderSide: const BorderSide(color: Color(0xFFEDE3D7)),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(18),
                 borderSide: const BorderSide(color: Color(0xFFEDE3D7)),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(18),
                 borderSide: const BorderSide(
                   color: Color(0xFF12C7B7),
                   width: 1.5,
@@ -425,14 +370,14 @@ class _CreatePageState extends State<CreatePage> {
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           GestureDetector(
             onTap: _openLanguageSheet,
             child: Container(
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFFAF7F1),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: const Color(0xFFEDE3D7)),
               ),
               child: Row(
@@ -440,14 +385,15 @@ class _CreatePageState extends State<CreatePage> {
                   const Icon(
                     Icons.language_rounded,
                     color: Color(0xFF8C5CF6),
+                    size: 19,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
                       'Room language',
                       style: TextStyle(
                         color: Color(0xFF7B6A86),
-                        fontSize: 13,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -456,14 +402,15 @@ class _CreatePageState extends State<CreatePage> {
                     _selectedLanguage,
                     style: const TextStyle(
                       color: Color(0xFF251538),
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 5),
                   const Icon(
                     Icons.keyboard_arrow_down_rounded,
                     color: Color(0xFF4A2A63),
+                    size: 20,
                   ),
                 ],
               ),
@@ -476,19 +423,21 @@ class _CreatePageState extends State<CreatePage> {
 
   Widget _buildModeSection() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Room mode',
-            style: TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
+          const Padding(
+            padding: EdgeInsets.only(left: 2, bottom: 9),
+            child: Text(
+              'Room mode',
+              style: TextStyle(
+                color: Color(0xFF251538),
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
-          const SizedBox(height: 12),
           ..._RoomMode.values.map(
             (mode) => _ModeCard(
               mode: mode,
@@ -503,11 +452,11 @@ class _CreatePageState extends State<CreatePage> {
 
   Widget _buildRulesCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF7E3),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFFFE4A8)),
       ),
       child: const Row(
@@ -516,16 +465,16 @@ class _CreatePageState extends State<CreatePage> {
           Icon(
             Icons.security_rounded,
             color: Color(0xFFC99A3B),
-            size: 22,
+            size: 19,
           ),
-          SizedBox(width: 12),
+          SizedBox(width: 10),
           Expanded(
             child: Text(
               'Backend later controls locked access, Secret Vibe privacy, member approval, image chat, guest messages, audit logs, and room moderation hierarchy.',
               style: TextStyle(
                 color: Color(0xFF6A4E18),
-                fontSize: 12.5,
-                height: 1.35,
+                fontSize: 11.5,
+                height: 1.28,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -598,35 +547,35 @@ class _ModeCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        margin: const EdgeInsets.only(bottom: 11),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
-          color: selected ? mode.color.withValues(alpha: 0.11) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          color: selected ? mode.color.withValues(alpha: 0.10) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? mode.color : const Color(0xFFEDE3D7),
-            width: selected ? 1.5 : 1,
+            width: selected ? 1.4 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF251538).withValues(alpha: 0.045),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+              color: const Color(0xFF251538).withValues(alpha: 0.035),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Row(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: mode.color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(17),
+                color: mode.color.withValues(alpha: 0.13),
+                borderRadius: BorderRadius.circular(15),
               ),
-              child: Icon(mode.icon, color: mode.color, size: 23),
+              child: Icon(mode.icon, color: mode.color, size: 20),
             ),
-            const SizedBox(width: 13),
+            const SizedBox(width: 11),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -635,17 +584,19 @@ class _ModeCard extends StatelessWidget {
                     mode.title,
                     style: const TextStyle(
                       color: Color(0xFF251538),
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     mode.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Color(0xFF7B6A86),
-                      fontSize: 12,
-                      height: 1.25,
+                      fontSize: 11.3,
+                      height: 1.2,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -655,6 +606,7 @@ class _ModeCard extends StatelessWidget {
             Icon(
               selected ? Icons.check_circle_rounded : Icons.circle_outlined,
               color: selected ? mode.color : const Color(0xFFD4C7BB),
+              size: 20,
             ),
           ],
         ),
@@ -679,9 +631,9 @@ class _PrimaryButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 54,
+        height: 50,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           gradient: const LinearGradient(
             colors: [
               Color(0xFF12C7B7),
@@ -690,22 +642,22 @@ class _PrimaryButton extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF12C7B7).withValues(alpha: 0.24),
-              blurRadius: 22,
-              offset: const Offset(0, 10),
+              color: const Color(0xFF12C7B7).withValues(alpha: 0.20),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
+            Icon(icon, color: Colors.white, size: 19),
+            const SizedBox(width: 7),
             Text(
               text,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -732,22 +684,22 @@ class _SecondaryButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 54,
+        height: 50,
         decoration: BoxDecoration(
           color: const Color(0xFFFAF7F1),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: const Color(0xFFEDE3D7)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: const Color(0xFF4A2A63), size: 20),
-            const SizedBox(width: 8),
+            Icon(icon, color: const Color(0xFF4A2A63), size: 19),
+            const SizedBox(width: 7),
             Text(
               text,
               style: const TextStyle(
                 color: Color(0xFF4A2A63),
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -768,19 +720,19 @@ class _CreateSheet extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.all(14),
       padding: EdgeInsets.fromLTRB(
-        18,
+        16,
         10,
-        18,
-        18 + MediaQuery.paddingOf(context).bottom,
+        16,
+        16 + MediaQuery.paddingOf(context).bottom,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -796,7 +748,7 @@ class _SheetHandle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 42,
+        width: 38,
         height: 5,
         decoration: BoxDecoration(
           color: const Color(0xFFE0D5CB),
@@ -819,11 +771,11 @@ class _ReadyInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 9),
-      padding: const EdgeInsets.all(13),
+      margin: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFFAF7F1),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFEDE3D7)),
       ),
       child: Row(
@@ -832,7 +784,7 @@ class _ReadyInfoRow extends StatelessWidget {
             label,
             style: const TextStyle(
               color: Color(0xFF7B6A86),
-              fontSize: 12,
+              fontSize: 11.5,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -841,7 +793,7 @@ class _ReadyInfoRow extends StatelessWidget {
             value,
             style: const TextStyle(
               color: Color(0xFF251538),
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: FontWeight.w900,
             ),
           ),
