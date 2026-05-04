@@ -24,7 +24,7 @@ enum ChatBackupFrequency {
 
 enum InboxSearchMatchType {
   chat('Chats'),
-  mutualFollow('Mutual follows'),
+  mutualFollow('Friends'),
   message('Messages');
 
   const InboxSearchMatchType(this.label);
