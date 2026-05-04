@@ -10,6 +10,7 @@ import '../features/love_bond/presentation/love_bond_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/public_profile_page.dart';
 import '../features/rankings/presentation/rankings_page.dart';
+import '../features/room_level/presentation/room_level_page.dart';
 import '../features/rooms/presentation/live_room_page.dart';
 import '../features/rooms/presentation/routes/live_room_route_args.dart';
 import '../features/rooms/presentation/routes/live_room_routes.dart';
@@ -42,6 +43,9 @@ class AppRouteFactory {
           );
         }
         return _buildRoute(settings, const LiveRoomPage());
+
+      case VmRoutes.roomLevel:
+        return _buildRoute(settings, const RoomLevelPage());
 
       case VmRoutes.profile:
         final args = settings.arguments;
