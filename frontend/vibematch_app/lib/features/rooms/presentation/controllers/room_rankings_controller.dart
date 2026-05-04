@@ -60,10 +60,10 @@ class RoomRankingsController {
 
   String _subtitleFor(SeatUser user, RoomRankingCategory category) {
     return switch (category) {
-      RoomRankingCategory.wealth => 'VIP ${user.vipLevel} · ${user.roleLabel}',
-      RoomRankingCategory.sent => 'Sending Lv ${user.sendingLevel}',
-      RoomRankingCategory.received => 'Receiving Lv ${user.receivingLevel}',
-      RoomRankingCategory.relation => user.familyName.trim().isEmpty ? user.roleLabel : user.familyName,
+      RoomRankingCategory.wealth => 'VIP ${user.vipLevel} · Global wealth',
+      RoomRankingCategory.sent => 'Sending Lv ${user.sendingLevel} · Global sent',
+      RoomRankingCategory.received => 'Receiving Lv ${user.receivingLevel} · Global received',
+      RoomRankingCategory.relation => user.familyName.trim().isEmpty ? 'Global relation score' : user.familyName,
     };
   }
 }
