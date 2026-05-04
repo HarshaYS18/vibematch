@@ -219,7 +219,7 @@ class _HomePageState extends State<HomePage> {
                   canManageHomeBanners: _canManageHomeBanners,
                   onBannerChanged: _controller.selectBanner,
                   onBannerTap: _handleBannerTap,
-                  onManageTap: () => _toast('Event/promo banner upload manager opens here.'),
+                  onManageTap: () => VmNavigator.openBannerManager(context),
                 ),
               ),
               SliverToBoxAdapter(
