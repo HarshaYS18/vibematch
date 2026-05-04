@@ -22,49 +22,36 @@ class HomeHeaderSection extends StatelessWidget {
     final hasRoom = myCreatedRoom != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 28, 18, 14),
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 10),
       child: Row(
         children: [
           GestureDetector(
             onTap: onMyRoomTap,
             child: Container(
-              width: 52,
-              height: 52,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFFEDE3D7)),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF251538).withValues(alpha: 0.05),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
+                    color: const Color(0xFF251538).withValues(alpha: 0.035),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
               child: Icon(
                 hasRoom ? Icons.home_rounded : Icons.add_home_work_rounded,
-                color: hasRoom ? const Color(0xFF12C7B7) : const Color(0xFF251538),
-                size: 24,
+                color: hasRoom ? const Color(0xFF12C7B7) : const Color(0xFF4A2A63),
+                size: 18,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              hasRoom ? myCreatedRoom!.name : 'Create your room',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF251538),
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.4,
-              ),
-            ),
-          ),
+          const Spacer(),
           HomeHeaderButton(icon: Icons.search_rounded, onTap: onSearchTap),
-          const SizedBox(width: 8),
+          const SizedBox(width: 7),
           HomeHeaderButton(icon: Icons.notifications_rounded, onTap: onNotificationsTap),
         ],
       ),
