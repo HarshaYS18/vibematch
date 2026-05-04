@@ -16,6 +16,8 @@ class LiveRoomSeatController {
   bool micMuted = false;
   List<RoomSeat> seats = <RoomSeat>[];
 
+  final Map<String, DateTime> _seatApplyCooldownUntil = <String, DateTime>{};
+
   List<SeatUser> get roomUsers {
     return seats
         .where((seat) => seat.user != null)
@@ -43,8 +45,17 @@ class LiveRoomSeatController {
   }
 
   void changeLayout(String nextLayoutId) {
+    final seatedUsers = roomUsers;
     layoutId = nextLayoutId;
-    seats = buildSeatsForLayout(nextLayoutId);
+    seats = List<RoomSeat>.generate(
+      SeatLayoutSpec.parse(nextLayoutId).totalSeats,
+      (index) => RoomSeat(index: index),
+    );
+
+    for (var i = 0; i < seatedUsers.length && i < seats.length; i++) {
+      seats[i] = seats[i].copyWith(user: seatedUsers[i]);
+    }
+
     selectedSeatIndex = null;
     onChanged();
   }
@@ -64,12 +75,16 @@ class LiveRoomSeatController {
       (seat) => seat.user?.id == currentUser.id,
     );
 
+    final userToMove = oldIndex >= 0
+        ? seats[oldIndex].user!
+        : currentUser.copyWith(selfMuted: micMuted);
+
     if (oldIndex >= 0) {
       seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
     }
 
     seats[index] = seats[index].copyWith(
-      user: currentUser,
+      user: userToMove.copyWith(selfMuted: micMuted || userToMove.selfMuted),
       locked: false,
     );
 
@@ -95,12 +110,14 @@ class LiveRoomSeatController {
       (seat) => seat.user?.id == invitedUser.id,
     );
 
+    final userToMove = oldIndex >= 0 ? seats[oldIndex].user! : invitedUser;
+
     if (oldIndex >= 0) {
       seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
     }
 
     seats[seatIndex] = seats[seatIndex].copyWith(
-      user: invitedUser,
+      user: userToMove,
       locked: false,
     );
 
@@ -114,12 +131,19 @@ class LiveRoomSeatController {
     required int index,
     required List<ChatEntry> messages,
   }) {
+    final now = DateTime.now();
+    final cooldownUntil = _seatApplyCooldownUntil[currentUser.id];
+    if (cooldownUntil != null && cooldownUntil.isAfter(now)) {
+      final secondsLeft = cooldownUntil.difference(now).inSeconds.clamp(1, 20);
+      onToast('You can reapply in ${secondsLeft}s');
+      return;
+    }
+
     final alreadyApplied = messages.any(
       (message) =>
           message.isSeatApplication &&
-          !message.applicationApproved &&
-          message.senderId == currentUser.id &&
-          message.seatIndex == index,
+          !message.applicationResolved &&
+          message.senderId == currentUser.id,
     );
 
     if (alreadyApplied) {
@@ -134,7 +158,7 @@ class LiveRoomSeatController {
       ChatEntry(
         senderName: currentUser.name,
         senderId: currentUser.id,
-        message: 'applied for seat ${index + 1}',
+        message: 'wants to join the mic',
         vipLevel: currentUser.vipLevel,
         sendingLevel: currentUser.sendingLevel,
         receivingLevel: currentUser.receivingLevel,
@@ -157,11 +181,13 @@ class LiveRoomSeatController {
       return;
     }
 
+    if (entry.applicationResolved) return;
+
     if (seats[seatIndex].user != null || seats[seatIndex].locked) {
       final index = messages.indexOf(entry);
       if (index >= 0) {
         messages[index] = entry.copyWith(
-          message: '${entry.message} • seat unavailable',
+          message: '${entry.senderName} seat request expired',
           applicationApproved: true,
         );
       }
@@ -174,20 +200,48 @@ class LiveRoomSeatController {
       orElse: () => currentUser,
     );
 
+    final oldIndex = seats.indexWhere((seat) => seat.user?.id == applicant.id);
+    final applicantToMove = oldIndex >= 0 ? seats[oldIndex].user! : applicant;
+    if (oldIndex >= 0) {
+      seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
+    }
+
     seats[seatIndex] = seats[seatIndex].copyWith(
-      user: applicant,
+      user: applicantToMove,
       locked: false,
     );
 
     final index = messages.indexOf(entry);
     if (index >= 0) {
       messages[index] = entry.copyWith(
-        message: '${entry.senderName} approved for seat ${seatIndex + 1}',
+        message: '${entry.senderName} joined the mic',
         applicationApproved: true,
       );
     }
 
     onChanged();
+  }
+
+  void rejectSeatApplication({
+    required ChatEntry entry,
+    required List<ChatEntry> messages,
+  }) {
+    if (!entry.isSeatApplication || entry.applicationResolved) return;
+
+    final index = messages.indexOf(entry);
+    if (index < 0) return;
+
+    if (entry.senderId != null) {
+      _seatApplyCooldownUntil[entry.senderId!] = DateTime.now().add(const Duration(seconds: 20));
+    }
+
+    messages[index] = entry.copyWith(
+      message: '${entry.senderName} seat request rejected',
+      applicationRejected: true,
+    );
+
+    onChanged();
+    onToast('${entry.senderName} can reapply after 20 seconds');
   }
 
   void switchSeat(int index) {
@@ -255,6 +309,10 @@ class LiveRoomSeatController {
       user: user.copyWith(selfMuted: !user.selfMuted),
     );
 
+    if (userId == currentUser.id) {
+      micMuted = !user.selfMuted;
+    }
+
     onChanged();
   }
 
@@ -308,8 +366,6 @@ class LiveRoomSeatController {
     onChanged();
   }
 
-  /// Current-user action: leave the mic seat only.
-  /// Moderator action on another seated user: clear that user and lock that seat.
   void leaveAndLockSeat(int seatIndex) {
     if (seatIndex < 0 || seatIndex >= seats.length) return;
 
@@ -326,7 +382,6 @@ class LiveRoomSeatController {
     onToast(isCurrentUserSeat ? 'You left the seat' : 'User locked off seat ${seatIndex + 1}');
   }
 
-  /// Moderator action: remove another user from the mic seat without locking it.
   void leaveSeatOnly(int seatIndex) {
     if (seatIndex < 0 || seatIndex >= seats.length) return;
 
