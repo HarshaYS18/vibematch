@@ -54,12 +54,12 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
           RibbonMessageOverlay(messages: _ribbonMessages),
           if (!hasActiveVideoGift)
             Positioned(
-              left: 16,
+              right: 24,
               bottom: 104 + widget.bottomPadding,
               child: const LiveRoomEventCarousel(),
             ),
           Positioned(
-            left: 18,
+            right: 18,
             bottom: 178 + widget.bottomPadding,
             child: ComboBuzzer(
               slide: widget.activeComboSlide,
