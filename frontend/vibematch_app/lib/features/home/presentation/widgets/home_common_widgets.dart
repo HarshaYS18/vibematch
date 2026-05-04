@@ -15,21 +15,21 @@ class HomeHeaderButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 42,
-        height: 42,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
           color: Colors.white,
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFFEDE3D7)),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF251538).withValues(alpha: 0.045),
-              blurRadius: 14,
-              offset: const Offset(0, 7),
+              color: const Color(0xFF251538).withValues(alpha: 0.035),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
-        child: Icon(icon, color: const Color(0xFF4A2A63), size: 21),
+        child: Icon(icon, color: const Color(0xFF4A2A63), size: 18),
       ),
     );
   }
