@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'chat_vip_badge.dart';
 
 class LiveRoomInviteSheet extends StatefulWidget {
   const LiveRoomInviteSheet({
@@ -171,15 +172,23 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${user.id} · ${user.name}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF251538),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${user.id} · ${user.name}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF251538),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    ChatVipBadge(level: user.vipLevel, showWhenZero: true),
+                  ],
                 ),
                 Text(
                   user.roleLabel.isEmpty ? 'Room user' : user.roleLabel,
