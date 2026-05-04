@@ -77,6 +77,39 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  bool inviteUserToSeat({
+    required int seatIndex,
+    required SeatUser invitedUser,
+  }) {
+    if (seatIndex < 0 || seatIndex >= seats.length) {
+      onToast('Seat unavailable');
+      return false;
+    }
+
+    if (seats[seatIndex].locked || seats[seatIndex].user != null) {
+      onToast('Seat ${seatIndex + 1} is no longer available');
+      return false;
+    }
+
+    final oldIndex = seats.indexWhere(
+      (seat) => seat.user?.id == invitedUser.id,
+    );
+
+    if (oldIndex >= 0) {
+      seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
+    }
+
+    seats[seatIndex] = seats[seatIndex].copyWith(
+      user: invitedUser,
+      locked: false,
+    );
+
+    selectedSeatIndex = null;
+    onChanged();
+    onToast('${invitedUser.name} accepted seat ${seatIndex + 1} invite');
+    return true;
+  }
+
   void applyForSeat({
     required int index,
     required List<ChatEntry> messages,
