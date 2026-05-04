@@ -15,12 +15,13 @@ class CompactGiftCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOwned = gift.category == GiftCategory.baggage;
+    final isLuckyPacket = gift.id == 'lucky_packet';
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: selected ? 0.15 : 0.07),
           borderRadius: BorderRadius.circular(14),
@@ -29,16 +30,24 @@ class CompactGiftCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            GiftVisual(icon: gift.icon, colors: gift.colors, assetPath: gift.assetPath, size: 30, padding: 2),
-            const SizedBox(height: 3),
-            Text(gift.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 9.7, fontWeight: FontWeight.w900)),
+            GiftVisual(icon: gift.icon, colors: gift.colors, assetPath: gift.assetPath, size: 28, padding: 2),
+            const SizedBox(height: 2),
+            Text(gift.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 9.2, fontWeight: FontWeight.w900)),
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                isOwned ? const Icon(Icons.inventory_2_rounded, color: RoomColors.aqua, size: 10) : const GoldCoinIcon(size: 10),
-                const SizedBox(width: 2),
-                Text(isOwned ? 'Owned' : '${gift.coins}', style: TextStyle(color: isOwned ? RoomColors.aqua : RoomColors.gold, fontSize: 9.4, fontWeight: FontWeight.w900)),
+                if (!isLuckyPacket)
+                  isOwned ? const Icon(Icons.inventory_2_rounded, color: RoomColors.aqua, size: 10) : const GoldCoinIcon(size: 10),
+                if (!isLuckyPacket) const SizedBox(width: 2),
+                Text(
+                  isLuckyPacket ? 'Custom' : (isOwned ? 'Owned' : '${gift.coins}'),
+                  style: TextStyle(
+                    color: isOwned ? RoomColors.aqua : RoomColors.gold,
+                    fontSize: isLuckyPacket ? 9.1 : 9.4,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ],
             ),
           ],
