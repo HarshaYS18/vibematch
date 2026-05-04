@@ -290,8 +290,7 @@ class LiveRoomGiftController {
   }
 
   void dismissLuckyPacketResults() {
-    final packet = activeLuckyPacket;
-    if (packet == null || packet.phase != LuckyPacketPhase.results) return;
+    if (activeLuckyPacket == null) return;
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
     _setLuckyPacket(null);
