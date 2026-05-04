@@ -80,8 +80,8 @@ class RoomRankingsController {
   String _maskCoinAmount(int value) {
     final raw = value.abs().toString();
     if (raw.length <= 3) return raw;
-    final hiddenCount = raw.length - 3;
-    return '${raw.substring(0, 2)}${'*' * hiddenCount}${raw.substring(raw.length - 1)}';
+    final hidden = List<String>.filled(raw.length - 3, '*').join();
+    return '${raw.substring(0, 2)}$hidden${raw.substring(raw.length - 1)}';
   }
 
   String _compactNumber(int value) {
