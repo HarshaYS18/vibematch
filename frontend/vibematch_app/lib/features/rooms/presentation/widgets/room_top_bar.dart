@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../social/widgets/friends_invite_sheet.dart';
 import '../live_room_models.dart';
 import 'room_contribution_rankings_sheet.dart';
 import 'room_info_sheet.dart';
@@ -75,8 +76,8 @@ class RoomTopBar extends StatelessWidget {
             ),
             const SizedBox(width: 7),
             RoundRoomButton(
-              icon: Icons.reply_rounded,
-              onTap: onShare,
+              icon: Icons.send_rounded,
+              onTap: () => _openRoomInviteOverlay(context),
               size: 30,
               iconSize: 15,
               background: Colors.black.withValues(alpha: 0.22),
@@ -113,6 +114,22 @@ class RoomTopBar extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  void _openRoomInviteOverlay(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      builder: (_) => FriendsInviteSheet(
+        title: 'Invite friends to $roomName',
+        actionLabel: 'Invite',
+        completedLabel: 'Invited',
+        onInvite: (_) {},
+      ),
     );
   }
 
