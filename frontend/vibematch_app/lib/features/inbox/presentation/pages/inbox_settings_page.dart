@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/inbox_models.dart';
 
-class InboxSettingsPage extends StatelessWidget {
+class InboxSettingsPage extends StatefulWidget {
   const InboxSettingsPage({
     super.key,
     required this.backupEnabled,
@@ -23,6 +23,48 @@ class InboxSettingsPage extends StatelessWidget {
   final VoidCallback onBackTap;
 
   @override
+  State<InboxSettingsPage> createState() => _InboxSettingsPageState();
+}
+
+class _InboxSettingsPageState extends State<InboxSettingsPage> {
+  late bool _backupEnabled;
+  late ChatBackupFrequency _frequency;
+
+  @override
+  void initState() {
+    super.initState();
+    _backupEnabled = widget.backupEnabled;
+    _frequency = widget.frequency;
+  }
+
+  void _setBackupEnabled(bool value) {
+    setState(() => _backupEnabled = value);
+    widget.onBackupEnabledChanged(value);
+    _showFeedback(value ? 'Chat backup enabled' : 'Chat backup disabled');
+  }
+
+  void _setFrequency(ChatBackupFrequency frequency) {
+    setState(() => _frequency = frequency);
+    widget.onFrequencyChanged(frequency);
+    _showFeedback('Backup frequency set to ${frequency.label}');
+  }
+
+  void _showFeedback(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF251538),
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
@@ -32,7 +74,7 @@ class InboxSettingsPage extends StatelessWidget {
           children: [
             Row(
               children: [
-                IconButton(onPressed: onBackTap, icon: const Icon(Icons.arrow_back_rounded)),
+                IconButton(onPressed: widget.onBackTap, icon: const Icon(Icons.arrow_back_rounded)),
                 const SizedBox(width: 6),
                 const Expanded(
                   child: Text(
@@ -52,16 +94,18 @@ class InboxSettingsPage extends StatelessWidget {
               child: Column(
                 children: [
                   SwitchListTile(
-                    value: backupEnabled,
-                    onChanged: onBackupEnabledChanged,
+                    value: _backupEnabled,
+                    onChanged: _setBackupEnabled,
                     activeThumbColor: const Color(0xFF12C7B7),
                     title: const Text(
                       'Chat backup',
                       style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900),
                     ),
-                    subtitle: const Text(
-                      'Back up chats securely like WhatsApp-style backup flow. Backend/Drive encryption connects later.',
-                      style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700),
+                    subtitle: Text(
+                      _backupEnabled
+                          ? 'Backup is on. ${_frequency.label} backup is selected.'
+                          : 'Backup is off. Turn it on before scheduling automatic backups.',
+                      style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700),
                     ),
                   ),
                   const Divider(color: Color(0xFFECE2D8)),
@@ -77,24 +121,28 @@ class InboxSettingsPage extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: ChatBackupFrequency.values.map((item) {
-                      final selected = item == frequency;
+                      final selected = item == _frequency;
                       return InkWell(
-                        onTap: () => onFrequencyChanged(item),
+                        onTap: _backupEnabled ? () => _setFrequency(item) : null,
                         borderRadius: BorderRadius.circular(999),
-                        child: AnimatedContainer(
+                        child: AnimatedOpacity(
                           duration: const Duration(milliseconds: 160),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
-                          ),
-                          child: Text(
-                            item.label,
-                            style: TextStyle(
-                              color: selected ? Colors.white : const Color(0xFF4A2A63),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w900,
+                          opacity: _backupEnabled ? 1 : 0.46,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                            decoration: BoxDecoration(
+                              color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
+                            ),
+                            child: Text(
+                              item.label,
+                              style: TextStyle(
+                                color: selected ? Colors.white : const Color(0xFF4A2A63),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
                         ),
@@ -111,15 +159,17 @@ class InboxSettingsPage extends StatelessWidget {
                   _ActionRow(
                     icon: Icons.cloud_upload_rounded,
                     title: 'Back up now',
-                    subtitle: 'Create a fresh encrypted backup later.',
-                    onTap: onBackupNow,
+                    subtitle: _backupEnabled
+                        ? 'Create a fresh encrypted backup later.'
+                        : 'Turn on chat backup before backing up.',
+                    onTap: _backupEnabled ? widget.onBackupNow : () => _showFeedback('Turn on chat backup first'),
                   ),
                   const Divider(color: Color(0xFFECE2D8)),
                   _ActionRow(
                     icon: Icons.restore_rounded,
                     title: 'Restore from backup',
                     subtitle: 'Restore from Google Drive / cloud backup later.',
-                    onTap: onRestoreTap,
+                    onTap: widget.onRestoreTap,
                   ),
                 ],
               ),
