@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_routes.dart';
 import '../../auth/models/current_user.dart';
 import 'public_profile_view_page.dart';
 
@@ -327,9 +328,9 @@ class MePage extends StatelessWidget {
                 context,
                 'Profile QR / share card will open.',
               ),
-              onWalletTap: () => _showAction(
+              onWalletTap: () => Navigator.pushNamed(
                 context,
-                'Wallet page will open.',
+                VmRoutes.wallet,
               ),
               onVipTap: () => _showAction(
                 context,
