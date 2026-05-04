@@ -31,6 +31,34 @@ class _WalletPageState extends State<WalletPage> {
       );
   }
 
+  void _openPaymentMethodSheet(CoinPackage package) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PaymentMethodSheet(
+        package: package,
+        onMethodSelected: (method) {
+          Navigator.pop(context);
+          _showMockToast('$method payment selected for ${package.coinsText} coins');
+        },
+      ),
+    );
+  }
+
+  void _openRubyConvertSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RubyConvertSheet(
+        onConvert: () {
+          Navigator.pop(context);
+          _showMockToast('30 Ruby converted to 30 Coins');
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
@@ -95,7 +123,13 @@ class _WalletPageState extends State<WalletPage> {
               children: [
                 _WalletOverviewCard(
                   selectedSection: _selectedSection,
-                  onRechargeTap: () => _showMockToast('Recharge flow opened'),
+                  onRechargeTap: () {
+                    if (_selectedSection == WalletSection.coins) {
+                      _showMockToast('Select a coin pack below');
+                    } else {
+                      _openRubyConvertSheet();
+                    }
+                  },
                   onHistoryTap: () => _showMockToast('Transaction history opened'),
                 ),
                 const SizedBox(height: 14),
@@ -111,14 +145,14 @@ class _WalletPageState extends State<WalletPage> {
                   child: _selectedSection == WalletSection.coins
                       ? _CoinsSection(
                           key: const ValueKey('coins'),
-                          onRechargeTap: () => _showMockToast('Coin recharge packages opened'),
+                          onPackageTap: _openPaymentMethodSheet,
                           onSendGiftTap: () => _showMockToast('Gift section opened'),
                           onLuckyPacketTap: () => _showMockToast('Lucky Packet wallet ledger opened'),
                           onGameCoinsTap: () => _showMockToast('Coin games wallet controls opened'),
                         )
                       : _RubySection(
                           key: const ValueKey('ruby'),
-                          onConvertTap: () => _showMockToast('Ruby conversion flow opened'),
+                          onConvertTap: _openRubyConvertSheet,
                           onEarningsTap: () => _showMockToast('Ruby earnings opened'),
                           onPayoutTap: () => _showMockToast('Ruby payout request opened'),
                           onRulesTap: () => _showMockToast('Ruby rules opened'),
@@ -142,6 +176,37 @@ enum WalletSection {
   final String label;
   final IconData icon;
 }
+
+class CoinPackage {
+  const CoinPackage({required this.coins, required this.priceInr, this.badge});
+
+  final int coins;
+  final int priceInr;
+  final String? badge;
+
+  String get coinsText => _formatNumber(coins);
+  String get priceText => '₹$priceInr';
+
+  static String _formatNumber(int value) {
+    final raw = value.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      final remaining = raw.length - i;
+      buffer.write(raw[i]);
+      if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
+    }
+    return buffer.toString();
+  }
+}
+
+const List<CoinPackage> _coinPackages = [
+  CoinPackage(coins: 20000, priceInr: 120, badge: 'Starter'),
+  CoinPackage(coins: 50000, priceInr: 300),
+  CoinPackage(coins: 100000, priceInr: 600, badge: 'Popular'),
+  CoinPackage(coins: 250000, priceInr: 1500),
+  CoinPackage(coins: 500000, priceInr: 3000, badge: 'Best Value'),
+  CoinPackage(coins: 1000000, priceInr: 6000, badge: 'Max'),
+];
 
 class _HeaderIconButton extends StatelessWidget {
   const _HeaderIconButton({required this.icon, required this.onTap});
@@ -188,7 +253,7 @@ class _WalletOverviewCard extends StatelessWidget {
     final isCoins = selectedSection == WalletSection.coins;
     final title = isCoins ? 'Coin Balance' : 'Ruby Balance';
     final value = isCoins ? '35,494' : '8,260';
-    final subtitle = isCoins ? 'For gifts, Lucky Packet, store and games' : 'Creator rewards and payout value';
+    final subtitle = isCoins ? 'For gifts, Lucky Packet, store and games' : '30% of gift coins received becomes Ruby';
     final icon = isCoins ? Icons.monetization_on_rounded : Icons.diamond_rounded;
     final colors = isCoins
         ? const [Color(0xFFFFD166), Color(0xFFE84C72), Color(0xFF6D5DF6)]
@@ -242,7 +307,7 @@ class _WalletOverviewCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _WalletPrimaryButton(
-                  label: isCoins ? 'Recharge' : 'Convert / Payout',
+                  label: isCoins ? 'Recharge' : 'Convert Ruby',
                   icon: isCoins ? Icons.add_circle_rounded : Icons.swap_horiz_rounded,
                   onTap: onRechargeTap,
                 ),
@@ -318,13 +383,13 @@ class _WalletSectionTabs extends StatelessWidget {
 class _CoinsSection extends StatelessWidget {
   const _CoinsSection({
     super.key,
-    required this.onRechargeTap,
+    required this.onPackageTap,
     required this.onSendGiftTap,
     required this.onLuckyPacketTap,
     required this.onGameCoinsTap,
   });
 
-  final VoidCallback onRechargeTap;
+  final ValueChanged<CoinPackage> onPackageTap;
   final VoidCallback onSendGiftTap;
   final VoidCallback onLuckyPacketTap;
   final VoidCallback onGameCoinsTap;
@@ -340,20 +405,133 @@ class _CoinsSection extends StatelessWidget {
           accent: const Color(0xFFC99A3B),
           rows: const [
             _WalletInfoRow(label: 'Available', value: '35,494'),
-            _WalletInfoRow(label: 'Today spent', value: '1,280'),
-            _WalletInfoRow(label: 'Pending refund', value: '0'),
+            _WalletInfoRow(label: 'Base pack', value: '20,000 coins / ₹120'),
+            _WalletInfoRow(label: 'Payment methods', value: 'UPI, GPay'),
           ],
         ),
         const SizedBox(height: 12),
+        _CoinPackageList(onPackageTap: onPackageTap),
+        const SizedBox(height: 12),
         _WalletActionGrid(
           actions: [
-            _WalletAction(title: 'Recharge Coins', subtitle: 'Buy coin packs', icon: Icons.add_card_rounded, onTap: onRechargeTap),
             _WalletAction(title: 'Send Gifts', subtitle: 'Gift spending', icon: Icons.card_giftcard_rounded, onTap: onSendGiftTap),
             _WalletAction(title: 'Lucky Packet', subtitle: 'Packet ledger', icon: Icons.redeem_rounded, onTap: onLuckyPacketTap),
             _WalletAction(title: 'Coin Games', subtitle: 'Game balance', icon: Icons.sports_esports_rounded, onTap: onGameCoinsTap),
+            _WalletAction(title: 'Transactions', subtitle: 'Coin ledger', icon: Icons.receipt_long_rounded, onTap: onGameCoinsTap),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _CoinPackageList extends StatelessWidget {
+  const _CoinPackageList({required this.onPackageTap});
+
+  final ValueChanged<CoinPackage> onPackageTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFECE2D8)),
+        boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.add_card_rounded, color: Color(0xFFC99A3B), size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Coin Recharge Packs', style: TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text('Tap a pack to choose UPI or GPay.', style: TextStyle(color: Color(0xFF6F627A), fontSize: 11.5, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _coinPackages.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.42,
+            ),
+            itemBuilder: (context, index) => _CoinPackageCard(
+              package: _coinPackages[index],
+              onTap: () => onPackageTap(_coinPackages[index]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CoinPackageCard extends StatelessWidget {
+  const _CoinPackageCard({required this.package, required this.onTap});
+
+  final CoinPackage package;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final badge = package.badge;
+    return Material(
+      color: const Color(0xFFFAF7F1),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFECE2D8)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(colors: [Color(0xFFFFD166), Color(0xFFC99A3B)]),
+                      boxShadow: [BoxShadow(color: const Color(0xFFC99A3B).withValues(alpha: 0.20), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: const Icon(Icons.monetization_on_rounded, color: Colors.white, size: 17),
+                  ),
+                  const Spacer(),
+                  if (badge != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE84C72).withValues(alpha: 0.11),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(badge, style: const TextStyle(color: Color(0xFFE84C72), fontSize: 8.5, fontWeight: FontWeight.w900)),
+                    ),
+                ],
+              ),
+              const Spacer(),
+              Text('${package.coinsText} coins', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 3),
+              Text(package.priceText, style: const TextStyle(color: Color(0xFFC99A3B), fontSize: 13, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -378,25 +556,230 @@ class _RubySection extends StatelessWidget {
       children: [
         _WalletInfoCard(
           title: 'Ruby',
-          subtitle: 'Ruby is the creator-side reward balance from eligible gifts, host activity, and campaigns.',
+          subtitle: 'Ruby balance is 30% of coins received from gifts. Example: 100 gift coins received = 30 Ruby.',
           icon: Icons.diamond_rounded,
           accent: const Color(0xFFE84C72),
           rows: const [
             _WalletInfoRow(label: 'Available Ruby', value: '8,260'),
-            _WalletInfoRow(label: 'Under review', value: '420'),
-            _WalletInfoRow(label: 'This month', value: '12.4K'),
+            _WalletInfoRow(label: 'Gift receive rule', value: '30% Ruby'),
+            _WalletInfoRow(label: 'Convert rule', value: '30 Ruby = 30 Coins'),
           ],
         ),
+        const SizedBox(height: 12),
+        _RubyRuleCard(onConvertTap: onConvertTap),
         const SizedBox(height: 12),
         _WalletActionGrid(
           actions: [
             _WalletAction(title: 'Ruby Earnings', subtitle: 'Reward details', icon: Icons.savings_rounded, onTap: onEarningsTap),
-            _WalletAction(title: 'Convert Ruby', subtitle: 'Mock conversion', icon: Icons.swap_horiz_rounded, onTap: onConvertTap),
+            _WalletAction(title: 'Convert Ruby', subtitle: '30 Ruby = 30 Coins', icon: Icons.swap_horiz_rounded, onTap: onConvertTap),
             _WalletAction(title: 'Payout', subtitle: 'Request review', icon: Icons.payments_rounded, onTap: onPayoutTap),
             _WalletAction(title: 'Ruby Rules', subtitle: 'Eligibility', icon: Icons.rule_rounded, onTap: onRulesTap),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _RubyRuleCard extends StatelessWidget {
+  const _RubyRuleCard({required this.onConvertTap});
+
+  final VoidCallback onConvertTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFECE2D8)),
+        boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: Column(
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.diamond_rounded, color: Color(0xFFE84C72), size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Ruby Conversion', style: TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const _RubyFormulaRow(left: '100 gift coins received', right: '30 Ruby'),
+          const SizedBox(height: 8),
+          const _RubyFormulaRow(left: '30 Ruby converted', right: '30 Coins'),
+          const SizedBox(height: 12),
+          _WalletPrimaryButton(label: 'Convert 30 Ruby', icon: Icons.swap_horiz_rounded, onTap: onConvertTap),
+        ],
+      ),
+    );
+  }
+}
+
+class _RubyFormulaRow extends StatelessWidget {
+  const _RubyFormulaRow({required this.left, required this.right});
+
+  final String left;
+  final String right;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(left, style: const TextStyle(color: Color(0xFF6F627A), fontSize: 12, fontWeight: FontWeight.w800))),
+        const Icon(Icons.arrow_forward_rounded, color: Color(0xFF8C8198), size: 16),
+        const SizedBox(width: 8),
+        Text(right, style: const TextStyle(color: Color(0xFFE84C72), fontSize: 12.5, fontWeight: FontWeight.w900)),
+      ],
+    );
+  }
+}
+
+class _PaymentMethodSheet extends StatelessWidget {
+  const _PaymentMethodSheet({required this.package, required this.onMethodSelected});
+
+  final CoinPackage package;
+  final ValueChanged<String> onMethodSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.paddingOf(context).bottom + 16),
+      decoration: const BoxDecoration(
+        color: Color(0xFF12101D),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(999)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Select Payment Method', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text('${package.coinsText} coins • ${package.priceText}', style: const TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 16),
+          _PaymentMethodTile(
+            icon: Icons.account_balance_rounded,
+            title: 'UPI',
+            subtitle: 'Pay with any UPI app',
+            onTap: () => onMethodSelected('UPI'),
+          ),
+          const SizedBox(height: 10),
+          _PaymentMethodTile(
+            icon: Icons.payments_rounded,
+            title: 'G Pay',
+            subtitle: 'Pay with Google Pay',
+            onTap: () => onMethodSelected('G Pay'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentMethodTile extends StatelessWidget {
+  const _PaymentMethodTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.10)),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Colors.white54, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RubyConvertSheet extends StatelessWidget {
+  const _RubyConvertSheet({required this.onConvert});
+
+  final VoidCallback onConvert;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.paddingOf(context).bottom + 16),
+      decoration: const BoxDecoration(
+        color: Color(0xFF12101D),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(999)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Convert Ruby', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          const Text('30 Ruby can be converted into 30 Coins.', style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: onConvert,
+            child: Container(
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: const LinearGradient(colors: [Color(0xFFE84C72), Color(0xFF8C5CF6)]),
+              ),
+              child: const Text('Convert 30 Ruby → 30 Coins', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
