@@ -9,6 +9,7 @@ class GiftBottomActionBar extends StatelessWidget {
     required this.comboValue,
     required this.comboOptions,
     required this.coinBalance,
+    required this.comboEnabled,
     required this.onSend,
     required this.onComboChanged,
     required this.onRecharge,
@@ -17,6 +18,7 @@ class GiftBottomActionBar extends StatelessWidget {
   final int comboValue;
   final List<int> comboOptions;
   final int coinBalance;
+  final bool comboEnabled;
   final VoidCallback onSend;
   final ValueChanged<int> onComboChanged;
   final VoidCallback onRecharge;
@@ -47,24 +49,29 @@ class GiftBottomActionBar extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.white12),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<int>(
-              value: comboValue,
-              dropdownColor: const Color(0xFF201A2C),
-              iconEnabledColor: Colors.white,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
-              items: comboOptions.map((combo) => DropdownMenuItem(value: combo, child: Text('x$combo'))).toList(),
-              onChanged: (value) {
-                if (value != null) onComboChanged(value);
-              },
+        Opacity(
+          opacity: comboEnabled ? 1 : 0.38,
+          child: Container(
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                value: comboValue,
+                dropdownColor: const Color(0xFF201A2C),
+                iconEnabledColor: Colors.white,
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
+                items: comboOptions.map((combo) => DropdownMenuItem(value: combo, child: Text('x$combo'))).toList(),
+                onChanged: comboEnabled
+                    ? (value) {
+                        if (value != null) onComboChanged(value);
+                      }
+                    : null,
+              ),
             ),
           ),
         ),
