@@ -18,6 +18,7 @@ import '../features/search/presentation/search_page.dart';
 import '../features/settings/presentation/settings_page.dart';
 import '../features/store/presentation/store_page.dart';
 import '../features/vip/presentation/vip_page.dart';
+import '../features/wallet/presentation/models/wallet_models.dart';
 import '../features/wallet/presentation/wallet_page_modular.dart';
 import 'app_routes.dart';
 
@@ -66,7 +67,12 @@ class AppRouteFactory {
       case VmRoutes.rankings:
         return _buildRoute(settings, const RankingsPage());
       case VmRoutes.wallet:
-        return _buildRoute(settings, const WalletPageModular());
+      case VmRoutes.recharge:
+      case VmRoutes.transactions:
+        return _buildRoute(settings, const WalletPageModular(initialSection: WalletSection.coins));
+      case VmRoutes.earnings:
+      case VmRoutes.payouts:
+        return _buildRoute(settings, const WalletPageModular(initialSection: WalletSection.ruby));
       case VmRoutes.store:
         return _buildRoute(settings, const StorePage());
       case VmRoutes.settings:
@@ -92,14 +98,6 @@ class AppRouteFactory {
         return _buildRoute(settings, const VmSkeletonPage(title: 'Gifts', subtitle: 'Gift catalog, normal gifts, lucky gifts, relationship gifts, premium animations, combo history, and received gifts.', icon: Icons.card_giftcard_rounded, highlights: ['Gift catalog must come from backend before production testing.', 'Gift sending must be wallet-ledger and WebSocket controlled.', 'Future backend: gift catalog, send gift, combo, received gift, and lucky gift APIs.']));
       case VmRoutes.inventory:
         return _buildRoute(settings, const VmSkeletonPage(title: 'Inventory', subtitle: 'Owned avatar frames, entrance effects, chat bubbles, room backgrounds, badges, and equipped cosmetics.', icon: Icons.inventory_2_rounded, highlights: ['Inventory should separate owned, expired, equipped, and pending-review items.', 'Custom room backgrounds require official approval before activation.', 'Future backend: inventory, equip, unequip, expiry, and review status APIs.']));
-      case VmRoutes.recharge:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Recharge', subtitle: 'Coin purchase, recharge packages, monthly SVIP progress, and test recharge flow.', icon: Icons.bolt_rounded, highlights: ['Recharge increases wallet balance through backend ledger transactions.', 'VIP/SVIP status should update from recharge rules.', 'Future backend: packages, payment intent, receipt verification, and recharge history APIs.']));
-      case VmRoutes.transactions:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Transactions', subtitle: 'Wallet ledger for recharge, gifts, store purchases, games, admin adjustments, and refunds.', icon: Icons.receipt_long_rounded, highlights: ['Every coin movement must be traceable.', 'Gift/game/store spending should never be client-authoritative.', 'Future backend: paginated wallet transaction APIs.']));
-      case VmRoutes.earnings:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Earnings', subtitle: 'Creator earnings, beans/rewards, host targets, gift revenue share, and fraud-review status.', icon: Icons.savings_rounded, highlights: ['Receivers earn from gifts based on backend economy rules.', 'Agency/host target rewards should remain audit logged.', 'Future backend: earnings summary, target progress, and fraud review APIs.']));
-      case VmRoutes.payouts:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Payouts', subtitle: 'Payout requests, payout eligibility, fraud review, approval history, and settlement status.', icon: Icons.payments_rounded, highlights: ['Payouts must stay below incoming revenue and pass fraud checks.', 'Admin approval/rejection must be audit logged.', 'Future backend: payout request, review, approval, and settlement APIs.']));
 
       case VmRoutes.admin:
         return _buildRoute(settings, const VmSkeletonPage(title: 'Admin', subtitle: 'Admin routes for users, roles, bans, device bans, audit logs, login history, reports, and reviews.', icon: Icons.shield_rounded, highlights: ['Admin tools must be backend role/permission enforced.', 'Every sensitive action must be audit logged.', 'Future: split into users, roles, audit logs, bans, device bans, reports, and review pages.']));
