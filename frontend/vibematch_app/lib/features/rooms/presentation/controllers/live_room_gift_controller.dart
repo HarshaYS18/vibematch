@@ -12,6 +12,7 @@ class LuckyPacketRoomEvent {
     required this.id,
     required this.senderName,
     required this.coinAmount,
+    required this.winnerCount,
     required this.message,
     required this.phase,
     required this.remainingSeconds,
@@ -23,6 +24,7 @@ class LuckyPacketRoomEvent {
   final String id;
   final String senderName;
   final int coinAmount;
+  final int winnerCount;
   final String message;
   final LuckyPacketPhase phase;
   final int remainingSeconds;
@@ -41,6 +43,7 @@ class LuckyPacketRoomEvent {
       id: id,
       senderName: senderName,
       coinAmount: coinAmount,
+      winnerCount: winnerCount,
       message: message,
       phase: phase ?? this.phase,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
@@ -223,6 +226,7 @@ class LiveRoomGiftController {
 
   bool sendLuckyPacket({
     required int coinAmount,
+    required int winnerCount,
     required String message,
     required List<SeatUser> roomUsers,
   }) {
@@ -239,6 +243,7 @@ class LiveRoomGiftController {
         id: 'lucky-packet-${DateTime.now().microsecondsSinceEpoch}',
         senderName: currentUser.name,
         coinAmount: coinAmount,
+        winnerCount: winnerCount,
         message: message.trim(),
         phase: LuckyPacketPhase.countdown,
         remainingSeconds: 30,
@@ -252,7 +257,7 @@ class LiveRoomGiftController {
       ChatEntry(
         senderName: currentUser.name,
         senderId: currentUser.id,
-        message: 'sent a Lucky Packet worth $coinAmount coins${message.trim().isEmpty ? '' : ': ${message.trim()}'}',
+        message: 'sent a Lucky Packet worth $coinAmount coins for $winnerCount people${message.trim().isEmpty ? '' : ': ${message.trim()}'}',
         vipLevel: currentUser.vipLevel,
         sendingLevel: currentUser.sendingLevel,
         receivingLevel: currentUser.receivingLevel,
@@ -268,20 +273,17 @@ class LiveRoomGiftController {
     final packet = activeLuckyPacket;
     if (packet == null || packet.phase != LuckyPacketPhase.claim || packet.claimedByCurrentUser) return;
 
-    final reward = _randomReward(packet.coinAmount);
-    final nextDistributions = Map<String, int>.from(packet.distributions)
-      ..[currentUser.name] = reward;
+    final distributions = packet.distributions.isEmpty
+        ? _buildLuckyPacketDistributions(packet: packet, roomUsers: roomUsers)
+        : Map<String, int>.from(packet.distributions);
+    final reward = distributions[currentUser.name] ?? _fallbackCurrentUserReward(distributions);
+    distributions[currentUser.name] = reward;
 
     _setLuckyPacket(
       packet.copyWith(
         claimedByCurrentUser: true,
         currentUserReward: reward,
-        distributions: _mockDistributions(
-          roomUsers: roomUsers,
-          coinAmount: packet.coinAmount,
-          currentUserReward: reward,
-          existing: nextDistributions,
-        ),
+        distributions: distributions,
       ),
     );
     onChanged();
@@ -347,7 +349,7 @@ class LiveRoomGiftController {
             phase: LuckyPacketPhase.results,
             remainingSeconds: 6,
             distributions: packet.distributions.isEmpty
-                ? _mockDistributions(roomUsers: roomUsers, coinAmount: packet.coinAmount, currentUserReward: 0, existing: const <String, int>{})
+                ? _buildLuckyPacketDistributions(packet: packet, roomUsers: roomUsers)
                 : packet.distributions,
           ),
         );
@@ -362,28 +364,37 @@ class LiveRoomGiftController {
     }
   }
 
-  int _randomReward(int coinAmount) {
-    final maxReward = max(1, (coinAmount * 0.45).floor());
-    final minReward = max(1, (coinAmount * 0.05).floor());
-    if (maxReward <= minReward) return minReward;
-    return minReward + _random.nextInt(maxReward - minReward + 1);
+  int _fallbackCurrentUserReward(Map<String, int> distributions) {
+    if (distributions.isEmpty) return 0;
+    return distributions.values.first;
   }
 
-  Map<String, int> _mockDistributions({
+  Map<String, int> _buildLuckyPacketDistributions({
+    required LuckyPacketRoomEvent packet,
     required List<SeatUser> roomUsers,
-    required int coinAmount,
-    required int currentUserReward,
-    required Map<String, int> existing,
   }) {
-    final result = Map<String, int>.from(existing);
-    var remaining = coinAmount - result.values.fold<int>(0, (sum, value) => sum + value);
-    if (remaining <= 0) return result;
+    final names = <String>[
+      currentUser.name,
+      ...roomUsers.map((user) => user.name),
+      ...List<String>.generate(packet.winnerCount, (index) => 'Vibe User ${index + 1}'),
+    ];
 
-    final candidates = roomUsers.where((user) => !result.containsKey(user.name)).take(4).toList(growable: false);
-    for (var i = 0; i < candidates.length && remaining > 0; i++) {
-      final isLast = i == candidates.length - 1;
-      final reward = isLast ? remaining : max(1, _random.nextInt(max(1, remaining ~/ 2)) + 1);
-      result[candidates[i].name] = reward;
+    final uniqueNames = <String>[];
+    final seen = <String>{};
+    for (final name in names) {
+      if (seen.add(name)) uniqueNames.add(name);
+      if (uniqueNames.length >= packet.winnerCount) break;
+    }
+
+    if (uniqueNames.isEmpty) return <String, int>{};
+
+    var remaining = packet.coinAmount;
+    final result = <String, int>{};
+    for (var i = 0; i < uniqueNames.length; i++) {
+      final slotsLeft = uniqueNames.length - i;
+      final minForRest = slotsLeft - 1;
+      final reward = slotsLeft == 1 ? remaining : 1 + _random.nextInt(max(1, remaining - minForRest));
+      result[uniqueNames[i]] = reward;
       remaining -= reward;
     }
     return result;
