@@ -1,23 +1,17 @@
 import 'package:flutter/material.dart';
 
 class HomeBanner {
+  final String id;
   final String title;
-  final String subtitle;
-  final IconData icon;
-  final List<Color> gradient;
-  final HomeBannerAction action;
+  final String? imageUrl;
+  final IconData fallbackIcon;
+  final List<Color> fallbackGradient;
 
   const HomeBanner({
+    required this.id,
     required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.gradient,
-    required this.action,
+    this.imageUrl,
+    required this.fallbackIcon,
+    required this.fallbackGradient,
   });
-}
-
-enum HomeBannerAction {
-  openEvents,
-  openTrendingRooms,
-  openVibeSyncRooms,
 }
