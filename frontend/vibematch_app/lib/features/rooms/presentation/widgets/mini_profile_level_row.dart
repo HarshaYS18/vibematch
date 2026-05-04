@@ -120,7 +120,7 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
               : LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: effectiveGradient!,
+                  colors: effectiveGradient,
                 ),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
