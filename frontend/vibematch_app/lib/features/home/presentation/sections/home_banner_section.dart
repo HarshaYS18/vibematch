@@ -23,137 +23,145 @@ class HomeBannerSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-      height: 166,
-      child: PageView.builder(
-        itemCount: banners.length,
-        onPageChanged: onBannerChanged,
-        itemBuilder: (context, index) {
-          final banner = banners[index];
+      margin: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+      height: 138,
+      child: Stack(
+        children: [
+          PageView.builder(
+            itemCount: banners.length,
+            onPageChanged: onBannerChanged,
+            itemBuilder: (context, index) {
+              final banner = banners[index];
 
-          return GestureDetector(
-            onTap: () => onBannerTap(banner),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(32),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: banner.gradient,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: banner.gradient.first.withValues(alpha: 0.25),
-                    blurRadius: 26,
-                    offset: const Offset(0, 14),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    right: -8,
-                    bottom: -18,
-                    child: Icon(
-                      banner.icon,
-                      size: 112,
-                      color: Colors.white.withValues(alpha: 0.13),
+              return GestureDetector(
+                onTap: () => onBannerTap(banner),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: banner.fallbackGradient,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: banner.fallbackGradient.first.withValues(alpha: 0.18),
+                          blurRadius: 18,
+                          offset: const Offset(0, 9),
+                        ),
+                      ],
                     ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.17),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Text(
-                          'Official Highlight',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
+                    child: banner.imageUrl == null
+                        ? _BannerFallback(banner: banner)
+                        : Image.network(
+                            banner.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => _BannerFallback(banner: banner),
                           ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        banner.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 23,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        banner.subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.78),
-                          fontSize: 12.5,
-                          height: 1.25,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          ...List.generate(
-                            banners.length,
-                            (dotIndex) => AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              margin: const EdgeInsets.only(right: 5),
-                              width: dotIndex == selectedIndex ? 18 : 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(
-                                  alpha: dotIndex == selectedIndex ? 0.95 : 0.38,
-                                ),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          if (canManageHomeBanners)
-                            GestureDetector(
-                              onTap: onManageTap,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.17),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 14),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      'Manage',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
                   ),
-                ],
+                ),
+              );
+            },
+          ),
+          Positioned(
+            left: 14,
+            bottom: 12,
+            child: _BannerDots(
+              length: banners.length,
+              selectedIndex: selectedIndex,
+            ),
+          ),
+          if (canManageHomeBanners)
+            Positioned(
+              right: 10,
+              top: 10,
+              child: GestureDetector(
+                onTap: onManageTap,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+                  ),
+                  child: const Icon(
+                    Icons.add_photo_alternate_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
               ),
             ),
-          );
-        },
+        ],
+      ),
+    );
+  }
+}
+
+class _BannerFallback extends StatelessWidget {
+  const _BannerFallback({required this.banner});
+
+  final HomeBanner banner;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned(
+          right: -18,
+          bottom: -28,
+          child: Icon(
+            banner.fallbackIcon,
+            size: 118,
+            color: Colors.white.withValues(alpha: 0.13),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Text(
+              banner.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.35,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BannerDots extends StatelessWidget {
+  const _BannerDots({required this.length, required this.selectedIndex});
+
+  final int length;
+  final int selectedIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(
+        length,
+        (index) => AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: const EdgeInsets.only(right: 5),
+          width: index == selectedIndex ? 16 : 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: index == selectedIndex ? 0.95 : 0.42),
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
       ),
     );
   }
