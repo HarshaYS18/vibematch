@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'experience/experience_level_models.dart';
 
 class MiniProfileLevelRow extends StatelessWidget {
   const MiniProfileLevelRow({
@@ -18,6 +19,9 @@ class MiniProfileLevelRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sentStyle = experiencePillStyleFor(type: ExperienceLevelType.sent, level: user.sendingLevel);
+    final receivedStyle = experiencePillStyleFor(type: ExperienceLevelType.received, level: user.receivingLevel);
+
     final items = <Widget>[
       if (user.svipLevel > 0)
         MiniProfileCleanLevelPill(
@@ -33,23 +37,25 @@ class MiniProfileLevelRow extends StatelessWidget {
         ),
       MiniProfileCleanLevelPill(
         label: 'Lv ${user.sendingLevel}',
-        icon: Icons.emoji_events_rounded,
+        icon: sentStyle.crownIcon,
         width: 68,
-        background: const Color(0xFFEFF3FF),
-        border: const Color(0xFF91A9E8),
-        textColor: const Color(0xFF465B9D),
-        shineColor: Colors.white,
+        background: sentStyle.gradient.first,
+        gradientColors: sentStyle.gradient,
+        border: sentStyle.glowColor,
+        textColor: sentStyle.textColor,
+        shineColor: sentStyle.crownColor,
         active: user.sendingLevel > 0,
         onTap: onSendingLevelTap,
       ),
       MiniProfileCleanLevelPill(
         label: 'Lv ${user.receivingLevel}',
-        icon: Icons.favorite_rounded,
+        icon: receivedStyle.crownIcon,
         width: 68,
-        background: const Color(0xFFFFDCEB),
-        border: const Color(0xFFE26A98),
-        textColor: const Color(0xFF661C3B),
-        shineColor: const Color(0xFFFFF0F7),
+        background: receivedStyle.gradient.first,
+        gradientColors: receivedStyle.gradient,
+        border: receivedStyle.glowColor,
+        textColor: receivedStyle.textColor,
+        shineColor: receivedStyle.crownColor,
         active: user.receivingLevel > 0,
         onTap: onReceivingLevelTap,
       ),
@@ -79,6 +85,7 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
     required this.textColor,
     required this.onTap,
     required this.shineColor,
+    this.gradientColors,
     this.active = true,
   });
 
@@ -86,6 +93,7 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
   final IconData icon;
   final double width;
   final Color background;
+  final List<Color>? gradientColors;
   final Color border;
   final Color textColor;
   final VoidCallback onTap;
@@ -97,6 +105,7 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
     final effectiveBackground = active ? background : const Color(0xFFE6E1E8);
     final effectiveBorder = active ? border : const Color(0xFFC7BEC9);
     final effectiveTextColor = active ? textColor : const Color(0xFF8D8392);
+    final effectiveGradient = active ? gradientColors : null;
 
     return InkWell(
       borderRadius: BorderRadius.circular(999),
@@ -105,7 +114,14 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
         width: width,
         height: 26,
         decoration: BoxDecoration(
-          color: effectiveBackground,
+          color: effectiveGradient == null ? effectiveBackground : null,
+          gradient: effectiveGradient == null
+              ? null
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: effectiveGradient!,
+                ),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: effectiveBorder.withValues(alpha: active ? 0.72 : 0.65),
@@ -114,8 +130,8 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
           boxShadow: active
               ? [
                   BoxShadow(
-                    color: effectiveBorder.withValues(alpha: 0.12),
-                    blurRadius: 8,
+                    color: effectiveBorder.withValues(alpha: 0.16),
+                    blurRadius: 9,
                     offset: const Offset(0, 3),
                   ),
                 ]
@@ -154,6 +170,9 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
                         color: effectiveTextColor,
                         fontSize: 10.2,
                         fontWeight: FontWeight.w900,
+                        shadows: active && effectiveGradient != null
+                            ? [Shadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 3)]
+                            : null,
                       ),
                     ),
                   ),
