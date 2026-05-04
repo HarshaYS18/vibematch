@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'room_theme.dart';
+import '../../../../app/app_routes.dart';
 
 class LiveRoomEventCarousel extends StatefulWidget {
   const LiveRoomEventCarousel({super.key});
@@ -46,6 +46,10 @@ class _LiveRoomEventCarouselState extends State<LiveRoomEventCarousel> {
     super.dispose();
   }
 
+  void _openEventsPage() {
+    Navigator.pushNamed(context, VmRoutes.events);
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -63,7 +67,7 @@ class _LiveRoomEventCarouselState extends State<LiveRoomEventCarousel> {
               final event = _events[index];
               return _MiniEventPng(
                 event: event,
-                onTap: () => RoomToast.show(context, '${event.title} event page will open here'),
+                onTap: _openEventsPage,
               );
             },
           ),
