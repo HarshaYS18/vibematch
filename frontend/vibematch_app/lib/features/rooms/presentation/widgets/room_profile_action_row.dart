@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'room_profile_actions/leave_seat_icon.dart';
+import 'room_profile_actions/room_profile_action_colors.dart';
+import 'room_profile_actions/room_profile_action_item_data.dart';
+import 'room_profile_actions/room_profile_action_tile.dart';
+
 class RoomProfileActionRow extends StatelessWidget {
   const RoomProfileActionRow({
     super.key,
@@ -24,45 +29,41 @@ class RoomProfileActionRow extends StatelessWidget {
   final VoidCallback onAdminMuteToggle;
   final VoidCallback? onKickOutTap;
 
-  static const Color _iconColor = Color(0xFF3B3B3F);
-  static const Color _labelColor = Color(0xFF8F8F95);
-  static const Color _dividerColor = Color(0xFFE4E1E6);
-
   @override
   Widget build(BuildContext context) {
-    final actions = <_ProfileActionItemData>[
+    final actions = <RoomProfileActionItemData>[
       if (isSelf)
-        _ProfileActionItemData(
-          icon: const _LeaveSeatIcon(color: _iconColor),
+        RoomProfileActionItemData(
+          icon: const LeaveSeatIcon(color: RoomProfileActionColors.icon),
           label: 'Leave',
           onTap: onLeaveSeatOnly,
         ),
       if (canModerate && !isSelf)
-        _ProfileActionItemData(
+        RoomProfileActionItemData(
           icon: const Icon(Icons.lock_rounded),
           label: 'Leave & Lock',
           onTap: onLeaveAndLock,
         ),
       if (canModerate && !isSelf)
-        _ProfileActionItemData(
-          icon: const _LeaveSeatIcon(color: _iconColor),
+        RoomProfileActionItemData(
+          icon: const LeaveSeatIcon(color: RoomProfileActionColors.icon),
           label: 'Leave',
           onTap: onLeaveSeatOnly,
         ),
       if (canModerate && !isSelf && onKickOutTap != null)
-        _ProfileActionItemData(
+        RoomProfileActionItemData(
           icon: const Icon(Icons.person_remove_alt_1_rounded),
           label: 'Kick out',
           onTap: onKickOutTap!,
         ),
       if (isSelf)
-        _ProfileActionItemData(
+        RoomProfileActionItemData(
           icon: Icon(selfMuted ? Icons.mic_off_rounded : Icons.mic_rounded),
           label: selfMuted ? 'Turn On' : 'Turn Off',
           onTap: onSelfMuteToggle,
         )
       else if (canModerate)
-        _ProfileActionItemData(
+        RoomProfileActionItemData(
           icon: Icon(adminMuted ? Icons.mic_rounded : Icons.mic_off_rounded),
           label: adminMuted ? 'Turn On' : 'Turn Off',
           onTap: onAdminMuteToggle,
@@ -77,102 +78,19 @@ class RoomProfileActionRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _dividerColor.withValues(alpha: 0.85)),
+        border: Border.all(color: RoomProfileActionColors.divider.withValues(alpha: 0.85)),
       ),
       child: Row(
         children: [
           for (var i = 0; i < actions.length; i++) ...[
-            Expanded(child: _ProfileActionTile(data: actions[i])),
+            Expanded(child: RoomProfileActionTile(data: actions[i])),
             if (i != actions.length - 1)
               Container(
                 width: 1,
                 height: 34,
-                color: _dividerColor,
+                color: RoomProfileActionColors.divider,
               ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileActionItemData {
-  const _ProfileActionItemData({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final Widget icon;
-  final String label;
-  final VoidCallback onTap;
-}
-
-class _ProfileActionTile extends StatelessWidget {
-  const _ProfileActionTile({required this.data});
-
-  final _ProfileActionItemData data;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: data.onTap,
-      child: SizedBox.expand(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconTheme(
-              data: const IconThemeData(
-                color: RoomProfileActionRow._iconColor,
-                size: 22,
-              ),
-              child: data.icon,
-            ),
-            const SizedBox(height: 5),
-            Text(
-              data.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: RoomProfileActionRow._labelColor,
-                fontSize: 11.2,
-                fontWeight: FontWeight.w700,
-                height: 1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LeaveSeatIcon extends StatelessWidget {
-  const _LeaveSeatIcon({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 28,
-      height: 24,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            left: 3,
-            top: 1,
-            child: Icon(Icons.mic_external_on_rounded, color: color, size: 20),
-          ),
-          Positioned(
-            right: 1,
-            bottom: 1,
-            child: Icon(Icons.keyboard_arrow_down_rounded, color: color, size: 18),
-          ),
         ],
       ),
     );
