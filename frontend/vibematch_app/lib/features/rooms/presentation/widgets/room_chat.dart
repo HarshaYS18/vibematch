@@ -23,6 +23,7 @@ class RoomChatFeed extends StatefulWidget {
     required this.messages,
     required this.canManageSeatApplications,
     required this.onApproveSeatApplication,
+    required this.onRejectSeatApplication,
     this.onSenderTap,
     this.onMentionTap,
   });
@@ -30,6 +31,7 @@ class RoomChatFeed extends StatefulWidget {
   final List<ChatEntry> messages;
   final bool canManageSeatApplications;
   final ValueChanged<ChatEntry> onApproveSeatApplication;
+  final ValueChanged<ChatEntry> onRejectSeatApplication;
   final ValueChanged<ChatEntry>? onSenderTap;
   final ValueChanged<String>? onMentionTap;
 
@@ -111,6 +113,7 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
             onSenderTap: widget.onSenderTap == null ? null : () => widget.onSenderTap!(message),
             onMentionTap: widget.onMentionTap,
             onApproveSeatApplication: () => widget.onApproveSeatApplication(message),
+            onRejectSeatApplication: () => widget.onRejectSeatApplication(message),
           ),
         );
       },
@@ -123,6 +126,7 @@ class _CompactChatLine extends StatelessWidget {
     required this.message,
     required this.canManageSeatApplications,
     required this.onApproveSeatApplication,
+    required this.onRejectSeatApplication,
     this.onSenderTap,
     this.onMentionTap,
   });
@@ -130,12 +134,13 @@ class _CompactChatLine extends StatelessWidget {
   final ChatEntry message;
   final bool canManageSeatApplications;
   final VoidCallback onApproveSeatApplication;
+  final VoidCallback onRejectSeatApplication;
   final VoidCallback? onSenderTap;
   final ValueChanged<String>? onMentionTap;
 
   @override
   Widget build(BuildContext context) {
-    final showAgree = message.isSeatApplication && canManageSeatApplications && !message.applicationApproved;
+    final showActions = message.isSeatApplication && canManageSeatApplications && !message.applicationResolved;
     final isSystem = message.senderId == 'system';
 
     if (isSystem) {
@@ -199,17 +204,20 @@ class _CompactChatLine extends StatelessWidget {
               ),
             ),
           ),
-          if (showAgree) ...[
+          if (showActions) ...[
             const SizedBox(width: 8),
-            GestureDetector(
+            _SeatApplicationActionButton(
+              label: 'Reject',
+              background: RoomColors.coral.withValues(alpha: 0.92),
+              foreground: Colors.white,
+              onTap: onRejectSeatApplication,
+            ),
+            const SizedBox(width: 6),
+            _SeatApplicationActionButton(
+              label: 'Agree',
+              background: RoomColors.aqua,
+              foreground: RoomColors.deep,
               onTap: onApproveSeatApplication,
-              child: Container(
-                height: 28,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: RoomColors.aqua, borderRadius: BorderRadius.circular(999)),
-                child: const Text('Agree', style: TextStyle(color: RoomColors.deep, fontSize: 11, fontWeight: FontWeight.w900)),
-              ),
             ),
           ],
         ],
@@ -270,6 +278,34 @@ class _CompactChatLine extends StatelessWidget {
         fontSize: 14.2,
         height: 1.15,
         fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w800,
+      ),
+    );
+  }
+}
+
+class _SeatApplicationActionButton extends StatelessWidget {
+  const _SeatApplicationActionButton({
+    required this.label,
+    required this.background,
+    required this.foreground,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(999)),
+        child: Text(label, style: TextStyle(color: foreground, fontSize: 11, fontWeight: FontWeight.w900)),
       ),
     );
   }
