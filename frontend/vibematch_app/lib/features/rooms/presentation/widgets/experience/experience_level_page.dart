@@ -48,7 +48,6 @@ class ExperienceLevelPage extends StatelessWidget {
                   user: user,
                   type: type,
                   progress: progress,
-                  todayTotalExp: todayTotalExp,
                   style: style,
                 ),
                 const SizedBox(height: 14),
@@ -80,14 +79,12 @@ class _ExperienceHeroCard extends StatelessWidget {
     required this.user,
     required this.type,
     required this.progress,
-    required this.todayTotalExp,
     required this.style,
   });
 
   final SeatUser user;
   final ExperienceLevelType type;
   final ExperienceLevelProgress progress;
-  final int todayTotalExp;
   final ExperiencePillStyle style;
 
   @override
@@ -148,10 +145,13 @@ class _ExperienceHeroCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 _LevelProgressBar(style: style, value: progress.progress.clamp(0, 1)),
-                const SizedBox(height: 10),
-                Text(
-                  'Today +${compactNumber(todayTotalExp)} EXP · Tier ${style.tier.label}',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    'Tier ${style.tier.label}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.76), fontSize: 11.5, fontWeight: FontWeight.w900),
+                  ),
                 ),
               ],
             ),
