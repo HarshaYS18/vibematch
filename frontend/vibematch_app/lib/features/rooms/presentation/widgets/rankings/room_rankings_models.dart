@@ -68,6 +68,7 @@ class RoomRankingEntry {
     required this.rank,
     required this.user,
     required this.score,
+    required this.scoreText,
     required this.scoreLabel,
     required this.subtitle,
   });
@@ -75,6 +76,7 @@ class RoomRankingEntry {
   final int rank;
   final SeatUser user;
   final int score;
+  final String scoreText;
   final String scoreLabel;
   final String subtitle;
 
