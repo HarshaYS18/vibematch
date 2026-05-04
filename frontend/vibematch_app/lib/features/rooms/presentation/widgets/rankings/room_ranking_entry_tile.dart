@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../live_room_models.dart';
 import '../chat_vip_badge.dart';
+import '../economy/gold_coin_icon.dart';
 import 'room_rankings_models.dart';
 
 class RoomRankingEntryTile extends StatelessWidget {
@@ -15,6 +16,8 @@ class RoomRankingEntryTile extends StatelessWidget {
   final RoomRankingEntry entry;
   final Color accentColor;
   final VoidCallback? onTap;
+
+  bool get _showsCoinIcon => entry.scoreLabel == 'coin';
 
   @override
   Widget build(BuildContext context) {
@@ -122,12 +125,17 @@ class RoomRankingEntryTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   SizedBox(
                     width: 82,
-                    child: Text(
-                      entry.scoreLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.50), fontSize: 9.5, fontWeight: FontWeight.w800),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _showsCoinIcon
+                          ? const GoldCoinIcon(size: 12)
+                          : Text(
+                              entry.scoreLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.50), fontSize: 9.5, fontWeight: FontWeight.w800),
+                            ),
                     ),
                   ),
                 ],
