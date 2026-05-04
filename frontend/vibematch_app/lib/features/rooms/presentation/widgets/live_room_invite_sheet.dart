@@ -24,8 +24,9 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
   List<SeatUser> get _sortedUsers {
     final sorted = [...widget.users];
     sorted.sort((a, b) {
-      final onlineCompare = _isOnline(b).compareTo(_isOnline(a));
-      if (onlineCompare != 0) return onlineCompare;
+      final aOnline = _isOnline(a);
+      final bOnline = _isOnline(b);
+      if (aOnline != bOnline) return aOnline ? -1 : 1;
       final idCompare = a.id.compareTo(b.id);
       if (idCompare != 0) return idCompare;
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
