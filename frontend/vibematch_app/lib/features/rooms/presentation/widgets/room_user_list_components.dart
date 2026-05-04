@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'chat_vip_badge.dart';
 import 'room_theme.dart';
 
 class RoomUserListHeader extends StatelessWidget {
@@ -135,23 +136,6 @@ class RoomUserListVipPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 7,
-      ),
-      decoration: BoxDecoration(
-        color: RoomColors.gold.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        'VIP $vipLevel',
-        style: const TextStyle(
-          color: RoomColors.gold,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
+    return ChatVipBadge(level: vipLevel, showWhenZero: true);
   }
 }
