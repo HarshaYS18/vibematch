@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
 import '../../create/presentation/create_page.dart';
-import '../../home/presentation/home_page.dart';
+import '../../home/presentation/home_page_modular.dart';
 import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/me_page.dart';
 import '../../vibes/presentation/vibes_page.dart';
