@@ -33,7 +33,7 @@ class GiftGalleryPager extends StatelessWidget {
       },
       itemBuilder: (context, index) {
         final category = GiftCategory.values[index];
-        final filtered = gifts.where((gift) => gift.category == category).toList();
+        final filtered = _orderedGiftsForCategory(category);
 
         return GridView.builder(
           padding: EdgeInsets.zero,
@@ -56,5 +56,17 @@ class GiftGalleryPager extends StatelessWidget {
         );
       },
     );
+  }
+
+  List<GiftItem> _orderedGiftsForCategory(GiftCategory category) {
+    final filtered = gifts.where((gift) => gift.category == category).toList();
+    if (category != GiftCategory.lucky) return filtered;
+
+    filtered.sort((left, right) {
+      if (left.id == 'lucky_packet') return 1;
+      if (right.id == 'lucky_packet') return -1;
+      return 0;
+    });
+    return filtered;
   }
 }
