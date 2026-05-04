@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
-import 'room_gifts.dart';
+import 'gift_modules/gift_panel_modular.dart';
 
 class LiveRoomGiftPanelSheet extends StatefulWidget {
   const LiveRoomGiftPanelSheet({
@@ -54,7 +54,7 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
   }
 
   GiftItem? _firstGiftForCategory(GiftCategory category) {
-    for (final gift in GiftPanel.withMockExtras(widget.gifts)) {
+    for (final gift in GiftPanelModular.withMockExtras(widget.gifts)) {
       if (gift.category == category) return gift;
     }
     return null;
@@ -66,7 +66,7 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return GiftPanel(
+    return GiftPanelModular(
       gifts: widget.gifts,
       users: widget.users,
       selectedCategory: _selectedCategory,
