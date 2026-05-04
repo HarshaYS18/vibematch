@@ -138,7 +138,7 @@ class _PodiumUser extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           Text(
-            entry == null ? '' : compactNumber(entry!.score),
+            entry?.scoreText ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
