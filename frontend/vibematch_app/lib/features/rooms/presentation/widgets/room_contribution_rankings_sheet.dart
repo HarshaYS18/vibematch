@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
+import 'chat_vip_badge.dart';
 import 'room_theme.dart';
 
 class RoomContributionRankingsSheet extends StatefulWidget {
@@ -304,22 +305,8 @@ class _ContributionRankTile extends StatelessWidget {
                             style: const TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900),
                           ),
                         ),
-                        if (user.vipLevel > 0) ...[
-                          const SizedBox(width: 5),
-                          Container(
-                            height: 17,
-                            padding: const EdgeInsets.symmetric(horizontal: 5),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: RoomColors.violet.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              'VIP ${user.vipLevel}',
-                              style: const TextStyle(color: RoomColors.violet, fontSize: 8.5, fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                        ],
+                        const SizedBox(width: 5),
+                        ChatVipBadge(level: user.vipLevel, showWhenZero: true),
                       ],
                     ),
                     const SizedBox(height: 3),
