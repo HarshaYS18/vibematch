@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../social/widgets/friends_invite_sheet.dart';
 import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
@@ -243,7 +244,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               imagesEnabled: _roomImagesEnabled,
               onBack: _openLeaveSheet,
               onJoinTap: _handleJoinRoom,
-              onShare: () => RoomToast.show(context, 'Share room invite opened'),
+              onShare: _openRoomShareSheet,
               onAnnouncement: _openAnnouncementSheet,
               onSettings: _openSettingsSheet,
               onUsersTap: _openRoomUsersSheet,
@@ -325,6 +326,24 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onInvite: (_) {},
       ),
     );
+  }
+
+  void _openRoomShareSheet() {
+    _clearRoomFocus();
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FriendsInviteSheet(
+        title: 'Invite friends to $_roomName',
+        actionLabel: 'Invite',
+        completedLabel: 'Sent',
+        onInvite: (friend) => _sendRoomInviteToInbox(friend.displayName),
+      ),
+    );
+  }
+
+  void _sendRoomInviteToInbox(String friendName) {
+    RoomToast.show(context, 'Room invite sent to $friendName\'s Inbox');
   }
 
   void _dismissRoomOverlays() { dismissRoomSeatActionPill(); _clearRoomFocus(); }
