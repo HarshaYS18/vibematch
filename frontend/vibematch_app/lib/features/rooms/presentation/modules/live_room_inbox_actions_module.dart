@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../inbox/presentation/inbox_page.dart';
@@ -16,23 +14,15 @@ class LiveRoomInboxActionsModule {
     FocusManager.instance.primaryFocus?.unfocus();
     roomStateController.clearInboxUnreadCount();
 
-    final overlayState = Overlay.of(context, rootOverlay: true);
-    final completer = Completer<void>();
-    OverlayEntry? entry;
-
-    void closeOverlay() {
-      if (entry?.mounted ?? false) {
-        entry?.remove();
-      }
-      entry = null;
-      if (!completer.isCompleted) {
-        completer.complete();
-      }
-    }
-
-    entry = OverlayEntry(
-      builder: (overlayContext) {
-        final height = MediaQuery.sizeOf(overlayContext).height * heightFactor;
+    return showGeneralDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      barrierLabel: 'Close room inbox',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 120),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        final height = MediaQuery.sizeOf(dialogContext).height * heightFactor;
 
         return Material(
           color: Colors.transparent,
@@ -41,7 +31,7 @@ class LiveRoomInboxActionsModule {
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: closeOverlay,
+                  onTap: () => Navigator.of(dialogContext).pop(),
                   child: Container(color: Colors.black.withValues(alpha: 0.18)),
                 ),
               ),
@@ -54,7 +44,7 @@ class LiveRoomInboxActionsModule {
                   onTap: () {},
                   onVerticalDragEnd: (details) {
                     final velocity = details.primaryVelocity ?? 0;
-                    if (velocity > 320) closeOverlay();
+                    if (velocity > 320) Navigator.of(dialogContext).pop();
                   },
                   child: Container(
                     height: height,
@@ -72,9 +62,6 @@ class LiveRoomInboxActionsModule {
         );
       },
     );
-
-    overlayState.insert(entry!);
-    return completer.future;
   }
 
   static void openInboxSheetAfterClosingCurrentSheet({
