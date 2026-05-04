@@ -26,27 +26,6 @@ class VmNavigator {
     );
   }
 
-  static Future<T?> openRoomPreview<T>(
-    BuildContext context, {
-    required String roomName,
-    required String roomId,
-    required String language,
-    required String modeTitle,
-    required int onlineCount,
-  }) {
-    return Navigator.pushNamed<T>(
-      context,
-      VmRoutes.roomPreview,
-      arguments: RoomPreviewRouteArgs(
-        roomName: roomName,
-        roomId: roomId,
-        language: language,
-        modeTitle: modeTitle,
-        onlineCount: onlineCount,
-      ),
-    );
-  }
-
   static Future<T?> openPublicProfile<T>(
     BuildContext context, {
     required String userId,
