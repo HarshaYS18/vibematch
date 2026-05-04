@@ -111,7 +111,13 @@ class LiveRoomMiniProfileLauncher {
         onSelfMuteToggle: () => onSelfMuteToggle(user.id),
         onAdminMuteToggle: () => onAdminMuteToggle(user.id),
         onGiftTap: () => onGiftTap(user.id),
-        onSocialRelationTap: () => _openSocialRelationInfo(context: context, user: user),
+        onSocialRelationTap: () => _openRankingsSheet(
+          context: context,
+          roomId: roomId,
+          roomName: roomName,
+          users: allRoomUsers,
+          initialCategory: RoomRankingCategory.relation,
+        ),
         onMessageTap: () => _openMessageInfo(context: context, user: user),
         onKickOutTap: canShowKickOut && onKickOutDurationSelected != null
             ? () => _openKickOutDurationSheet(
@@ -187,24 +193,6 @@ class LiveRoomMiniProfileLauncher {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => MiniProfileReportSheet(user: user),
-      );
-    });
-  }
-
-  static void _openSocialRelationInfo({
-    required BuildContext context,
-    required SeatUser user,
-  }) {
-    Navigator.pop(context);
-
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (!context.mounted) return;
-      LiveRoomProfileNavigator.openModulePage(
-        context: context,
-        title: 'Follow',
-        subtitle:
-            'Follow, follow back, following, and friends state for ${user.name} will connect to backend social graph here.',
-        icon: Icons.person_add_alt_1_rounded,
       );
     });
   }
