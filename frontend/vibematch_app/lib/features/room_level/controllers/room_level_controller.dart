@@ -7,13 +7,14 @@ class RoomLevelController {
 
   static const int maxLevel = 100;
   static const int dailyStayMinutesForReward = 30;
-  static const int maxDailyStayExpPerPerson = 300;
+  static const int stayExpPerThirtyMinutes = 300;
+  static const int maxDailyStayExp = 10000;
   static const int giftCoinsPerExp = 10;
 
   static const List<RoomLevelRule> rules = [
     RoomLevelRule(
       title: 'Daily stay EXP',
-      description: 'A user sitting in the chatroom for 30 minutes gives the room 300 EXP. Max 300 stay EXP per person per day.',
+      description: 'Users sitting in the chatroom generate stay EXP. Every 30 minutes gives 300 EXP, capped at 10,000 stay EXP per day.',
       icon: Icons.timer_rounded,
       colors: [Color(0xFF12C7B7), Color(0xFF5E6DFF)],
     ),
@@ -22,12 +23,6 @@ class RoomLevelController {
       description: 'Every 10 gift coins spent in the room gives 1 room EXP. Gift EXP has no daily limit.',
       icon: Icons.card_giftcard_rounded,
       colors: [Color(0xFFE84C72), Color(0xFFFFB45E)],
-    ),
-    RoomLevelRule(
-      title: 'Level curve',
-      description: 'Early levels are easy. Levels 1-50 become steadily harder. From 51 onward each level takes extreme effort, scaling insanely toward 100.',
-      icon: Icons.trending_up_rounded,
-      colors: [Color(0xFFC99A3B), Color(0xFF251538)],
     ),
   ];
 
@@ -103,7 +98,8 @@ class RoomLevelController {
 
   static int stayExpForMinutes(int minutes) {
     if (minutes < dailyStayMinutesForReward) return 0;
-    return maxDailyStayExpPerPerson;
+    final completedBlocks = minutes ~/ dailyStayMinutesForReward;
+    return (completedBlocks * stayExpPerThirtyMinutes).clamp(0, maxDailyStayExp);
   }
 
   static int giftExpForCoins(int coins) {
@@ -119,8 +115,8 @@ class RoomLevelController {
       currentLevelExp: (required * 0.62).round(),
       nextLevelRequiredExp: required,
       totalExp: 184620,
-      dailyStayMinutes: 30,
-      dailyStayExp: stayExpForMinutes(30),
+      dailyStayMinutes: 570,
+      dailyStayExp: 5700,
       giftCoinExp: giftExpForCoins(48600),
     );
   }
