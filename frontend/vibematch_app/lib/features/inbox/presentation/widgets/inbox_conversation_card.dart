@@ -17,25 +17,13 @@ class InboxConversationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFECE2D8)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF251538).withValues(alpha: 0.025),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
           child: Row(
             children: [
               Stack(
@@ -69,7 +57,7 @@ class InboxConversationCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: const Color(0xFF12C7B7),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: const Color(0xFFFAF7F1), width: 2),
                         ),
                       ),
                     ),
@@ -181,20 +169,12 @@ class _MiniPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAF7F1),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFECE2D8)),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Color(0xFF4A2A63),
-          fontSize: 9.8,
-          fontWeight: FontWeight.w900,
-        ),
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF4A2A63),
+        fontSize: 9.8,
+        fontWeight: FontWeight.w900,
       ),
     );
   }
