@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../inbox/presentation/inbox_page.dart';
 import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
@@ -15,21 +14,21 @@ import 'controllers/live_room_state_controller.dart';
 import 'controllers/live_room_users_controller.dart';
 import 'controllers/live_room_vibesync_controller.dart';
 import 'live_room_models.dart';
-import 'modules/live_room_message_composer_module.dart';
+import 'modules/live_room_emoji_actions_module.dart';
+import 'modules/live_room_games_actions_module.dart';
+import 'modules/live_room_gift_actions_module.dart';
+import 'modules/live_room_inbox_actions_module.dart';
+import 'modules/live_room_leave_actions_module.dart';
+import 'modules/live_room_message_actions_module.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_background_sheet.dart';
 import 'widgets/live_room_body.dart';
-import 'widgets/live_room_emoji_sheet.dart';
-import 'widgets/live_room_games_sheet.dart';
 import 'widgets/live_room_gift_overlay.dart';
-import 'widgets/live_room_gift_panel_sheet.dart';
 import 'widgets/live_room_info_sheet.dart';
 import 'widgets/live_room_invite_sheet.dart';
 import 'widgets/live_room_join_requests_sheet.dart';
-import 'widgets/live_room_leave_sheet.dart';
 import 'widgets/live_room_mini_profile_launcher.dart';
 import 'widgets/live_room_minimized_bubble.dart';
-import 'widgets/live_room_minimized_overlay_service.dart';
 import 'widgets/live_room_privacy_sheet.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
@@ -465,22 +464,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
   void _openMessageComposerWithMention() {
     _clearRoomFocus();
-
-    showModalBottomSheet<void>(
+    LiveRoomMessageActionsModule.openComposer(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) => LiveRoomMessageComposerModule(
-        controller: _messageController,
-        focusNode: _messageFocusNode,
-        imagesEnabled: _roomImagesEnabled,
-        onSendText: _sendMessage,
-        onImageTap: () {
-          RoomToast.show(context, 'Image message picker will connect here');
-        },
-        onSendFloatingText: _sendMessage,
-      ),
+      controller: _messageController,
+      focusNode: _messageFocusNode,
+      imagesEnabled: _roomImagesEnabled,
+      onSendText: _sendMessage,
+      onImageTap: () => RoomToast.show(context, 'Image message picker will connect here'),
+      onSendFloatingText: _sendMessage,
     );
   }
 
@@ -492,40 +483,28 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _openGiftPanel() {
     _clearRoomFocus();
-    _giftController.ensureDefaultReceiver(_roomUsers);
-    LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomGiftPanelSheet(gifts: mockGiftItems, users: _roomUsers, selectedCategory: _giftController.selectedCategory, selectedGift: _giftController.selectedGift, selectedReceiverIds: _giftController.selectedReceiverIds, selectedCombo: _giftController.selectedCombo, coinBalance: _giftController.coinBalance, onCategoryChanged: _giftController.selectCategory, onGiftSelected: _giftController.selectGift, onReceiverToggle: (id) => _giftController.toggleReceiver(id, _roomUsers), onComboChanged: _giftController.setCombo, onSend: () { Navigator.pop(context); _giftController.sendGift(_roomUsers); }, onRecharge: () => RoomToast.show(context, 'Wallet / coin recharge opened')));
+    LiveRoomGiftActionsModule.openGiftPanel(
+      context: context,
+      giftController: _giftController,
+      roomUsers: _roomUsers,
+    );
   }
 
   void _openInboxPage() {
     _clearRoomFocus();
-    _roomStateController.clearInboxUnreadCount();
-
-    showModalBottomSheet<void>(
+    LiveRoomInboxActionsModule.openInboxSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: false,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.18),
-      builder: (sheetContext) {
-        final height = MediaQuery.sizeOf(sheetContext).height * 0.50;
-
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            height: height,
-            clipBehavior: Clip.antiAlias,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-            ),
-            child: const InboxPage(),
-          ),
-        );
-      },
+      roomStateController: _roomStateController,
     );
   }
-  void _openInboxPageFromSheet(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openInboxPage(); }); }
-  void _openEmojiTray() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomEmojiSheet(onEmojiTap: (emoji) { Navigator.pop(context); RoomToast.show(context, '$emoji reaction will animate over avatar'); })); }
+  void _openInboxPageFromSheet(BuildContext sheetContext) {
+    LiveRoomInboxActionsModule.openInboxSheetAfterClosingCurrentSheet(
+      pageContext: context,
+      sheetContext: sheetContext,
+      roomStateController: _roomStateController,
+    );
+  }
+  void _openEmojiTray() { _clearRoomFocus(); LiveRoomEmojiActionsModule.openEmojiTray(context: context); }
 
   void _openSettingsSheet() {
     _clearRoomFocus();
@@ -556,7 +535,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onToggleRoomImages: (value) { _roomStateController.setRoomImagesEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.roomImagesSystemMessage(value)); },
         onToggleGuestMessages: (value) { _roomStateController.setGuestMessagesEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.guestMessagesSystemMessage(value)); },
         onToggleApplyOnlyMode: (value) { _roomStateController.setApplyOnlyModeEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.applyOnlyModeSystemMessage(value)); },
-        onCloseRoom: () => _leaveRoomFromSheet(context),
+        onCloseRoom: () => _leaveRoomFromSheet(sheetContext),
       ),
     );
   }
@@ -574,13 +553,35 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _openJoinRequestsSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => StatefulBuilder(builder: (context, setSheetState) => LiveRoomJoinRequestsSheet(users: _roomMessageController.joinRequestUsers, onApprove: (user) { _resolveJoinRequest(user, approved: true); setSheetState(() {}); }, onReject: (user) { _resolveJoinRequest(user, approved: false); setSheetState(() {}); }))); }
   void _resolveJoinRequest(SeatUser user, {required bool approved}) { _roomMessageController.resolveJoinRequest(user: user, approved: approved, roomName: _roomName); RoomToast.show(context, approved ? '${user.name} approved' : '${user.name} rejected'); }
   void _openPrivacySheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomPrivacySheet(currentMode: _privacyMode, onModeChanged: (mode) { _roomStateController.setPrivacyMode(mode); _insertSystemMessage(_settingsController.privacyModeSystemMessage(mode)); })); }
-  void _openGamesSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomGamesSheet(onCrystalHuntTap: () { Navigator.pop(context); RoomToast.show(context, 'Crystal Hunt opens here'); }, onLudoTap: () { Navigator.pop(context); RoomToast.show(context, 'Ludo opens here'); }, onCarromTap: () { Navigator.pop(context); RoomToast.show(context, 'Carrom opens here'); }, onPkTap: () { Navigator.pop(context); RoomToast.show(context, 'PK game opens here'); })); }
+  void _openGamesSheet() { _clearRoomFocus(); LiveRoomGamesActionsModule.openGamesSheet(context: context); }
   void _openSeatLayoutSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomSeatLayoutPickerSheet(selectedLayout: _seatController.layoutId, onSelected: (layout) { _seatController.changeLayout(layout); Navigator.pop(context); })); }
   void _openBackgroundSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomBackgroundSheet(currentTheme: _selectedBackgroundTheme, onThemeSelected: (theme) { _roomStateController.setSelectedBackgroundTheme(theme); RoomToast.show(context, _settingsController.backgroundAppliedToast(theme)); }, onStoreTap: () => RoomToast.show(context, 'Theme store opened'))); }
   void _openAnnouncementSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomAnnouncementSheet(controller: _announcementController, onSubmit: (message) { Navigator.pop(context); if (message.isNotEmpty) { _insertSystemMessage(message); _announcementController.clear(); } RoomToast.show(context, 'Announcement saved'); })); }
 
-  void _openLeaveSheet() { dismissRoomSeatActionPill(); if (!_navigationController.canOpenLeaveSheet(leaveSheetOpen: _leaveSheetOpen, exitingRoom: _exitingRoom)) return; _roomStateController.setLeaveSheetOpen(true); _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (sheetContext) => LiveRoomLeaveSheet(onStay: () { dismissRoomSeatActionPill(); _stayAndMinimize(sheetContext); }, onLeave: () { dismissRoomSeatActionPill(); _leaveRoomFromSheet(sheetContext); })).whenComplete(() { if (mounted) _roomStateController.setLeaveSheetOpen(false); }); }
-  void _stayAndMinimize(BuildContext sheetContext) { dismissRoomSeatActionPill(); final roomNavigator = Navigator.of(context); final rootNavigator = Navigator.of(context, rootNavigator: true); final roomName = _roomName; final roomId = _roomId; final language = widget.language; final modeTitle = widget.modeTitle; final onlineCount = widget.onlineCount; LiveRoomMinimizedOverlayService.show(context: rootNavigator.context, onRestore: () { rootNavigator.push(MaterialPageRoute(builder: (_) => LiveRoomPage(roomName: roomName, roomId: roomId, language: language, modeTitle: modeTitle, onlineCount: onlineCount))); }); Navigator.pop(sheetContext); if (!mounted) return; _roomStateController.setAllowRoomPop(true); WidgetsBinding.instance.addPostFrameCallback((_) { if (!mounted) return; if (roomNavigator.canPop()) { roomNavigator.pop(); } else { _roomStateController.setMinimized(true); } }); }
-  void _leaveRoomFromSheet(BuildContext sheetContext) { if (!_navigationController.canExitRoom(exitingRoom: _exitingRoom)) return; _roomStateController.setExitingRoom(true); Navigator.pop(sheetContext); if (!mounted) return; _roomStateController.setAllowRoomPop(true); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) Navigator.maybePop(context); }); }
+  void _openLeaveSheet() {
+    LiveRoomLeaveActionsModule.openLeaveSheet(
+      context: context,
+      navigationController: _navigationController,
+      roomStateController: _roomStateController,
+      roomName: _roomName,
+      roomId: _roomId,
+      language: widget.language,
+      modeTitle: widget.modeTitle,
+      onlineCount: widget.onlineCount,
+      dismissSeatActionPill: dismissRoomSeatActionPill,
+      clearFocus: _clearRoomFocus,
+      mountedGetter: () => mounted,
+    );
+  }
+
+  void _leaveRoomFromSheet(BuildContext sheetContext) {
+    LiveRoomLeaveActionsModule.leaveRoomFromSheet(
+      context: context,
+      sheetContext: sheetContext,
+      navigationController: _navigationController,
+      roomStateController: _roomStateController,
+      mountedGetter: () => mounted,
+    );
+  }
   void _openInfoSheet(String title, String body) { LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomInfoSheet(title: title, body: body)); }
 }
