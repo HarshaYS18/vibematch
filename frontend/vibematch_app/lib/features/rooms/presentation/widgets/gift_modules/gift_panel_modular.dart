@@ -81,7 +81,7 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
     final comboValue = comboOptions.contains(widget.selectedCombo) ? widget.selectedCombo : comboOptions.first;
 
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.345,
+      height: MediaQuery.sizeOf(context).height * 0.414,
       child: Container(
         padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
         decoration: const BoxDecoration(
