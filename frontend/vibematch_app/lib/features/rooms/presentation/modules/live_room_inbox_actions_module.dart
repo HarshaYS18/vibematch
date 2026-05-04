@@ -17,6 +17,8 @@ class LiveRoomInboxActionsModule {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       useSafeArea: false,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.18),
