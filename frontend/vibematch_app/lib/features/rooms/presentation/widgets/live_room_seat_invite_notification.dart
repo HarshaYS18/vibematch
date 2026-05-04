@@ -21,99 +21,100 @@ class LiveRoomSeatInviteNotification extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.96),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.16),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(colors: invitedUser.avatarColors),
-                  boxShadow: [
-                    BoxShadow(
-                      color: invitedUser.avatarColors.first.withValues(alpha: 0.20),
-                      blurRadius: 12,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: false,
+        child: Center(
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 18),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.96),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.20),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  avatarLetter(invitedUser.name),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: invitedUser.avatarColors),
+                    boxShadow: [
+                      BoxShadow(
+                        color: invitedUser.avatarColors.first.withValues(alpha: 0.20),
+                        blurRadius: 12,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    avatarLetter(invitedUser.name),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '$inviterName invited you to take seat ${seatIndex + 1}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: RoomColors.plum,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        height: 1.18,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$inviterName invited you to take seat ${seatIndex + 1}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: RoomColors.plum,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          height: 1.18,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Seat invitation for ${invitedUser.name}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF7B6A86),
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(height: 2),
+                      Text(
+                        'Seat invitation for ${invitedUser.name} • auto hides in 15s',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF7B6A86),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _SeatInviteActionButton(
-                label: 'Reject',
-                color: const Color(0xFFE85D75),
-                background: const Color(0xFFFFEDF1),
-                onTap: onReject,
-              ),
-              const SizedBox(width: 6),
-              _SeatInviteActionButton(
-                label: 'Accept',
-                color: const Color(0xFF129A63),
-                background: const Color(0xFFEAF9F1),
-                onTap: onAccept,
-              ),
-            ],
+                const SizedBox(width: 8),
+                _SeatInviteActionButton(
+                  label: 'Reject',
+                  color: const Color(0xFFE85D75),
+                  background: const Color(0xFFFFEDF1),
+                  onTap: onReject,
+                ),
+                const SizedBox(width: 6),
+                _SeatInviteActionButton(
+                  label: 'Accept',
+                  color: const Color(0xFF129A63),
+                  background: const Color(0xFFEAF9F1),
+                  onTap: onAccept,
+                ),
+              ],
+            ),
           ),
         ),
       ),
