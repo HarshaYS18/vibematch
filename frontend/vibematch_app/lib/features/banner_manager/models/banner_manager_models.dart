@@ -1,6 +1,7 @@
 enum ManagedBannerSection {
   eventBanner('Event Banner'),
-  displayBanner('Display Banner');
+  displayBanner('Display Banner'),
+  policyBanner('Policy Banner');
 
   const ManagedBannerSection(this.label);
 
@@ -11,6 +12,7 @@ enum ManagedBannerTarget {
   event('Event'),
   promo('Promo'),
   recharge('Recharge'),
+  policy('Rules / Policies'),
   externalLink('External Link Later');
 
   const ManagedBannerTarget(this.label);
