@@ -7,8 +7,12 @@ class InboxSettingsPage extends StatefulWidget {
     super.key,
     required this.backupEnabled,
     required this.frequency,
+    required this.strangersCanMessage,
+    required this.strangersCanMentionInVibes,
     required this.onBackupEnabledChanged,
     required this.onFrequencyChanged,
+    required this.onStrangersCanMessageChanged,
+    required this.onStrangersCanMentionInVibesChanged,
     required this.onBackupNow,
     required this.onRestoreTap,
     required this.onBackTap,
@@ -16,8 +20,12 @@ class InboxSettingsPage extends StatefulWidget {
 
   final bool backupEnabled;
   final ChatBackupFrequency frequency;
+  final bool strangersCanMessage;
+  final bool strangersCanMentionInVibes;
   final ValueChanged<bool> onBackupEnabledChanged;
   final ValueChanged<ChatBackupFrequency> onFrequencyChanged;
+  final ValueChanged<bool> onStrangersCanMessageChanged;
+  final ValueChanged<bool> onStrangersCanMentionInVibesChanged;
   final VoidCallback onBackupNow;
   final VoidCallback onRestoreTap;
   final VoidCallback onBackTap;
@@ -29,12 +37,16 @@ class InboxSettingsPage extends StatefulWidget {
 class _InboxSettingsPageState extends State<InboxSettingsPage> {
   late bool _backupEnabled;
   late ChatBackupFrequency _frequency;
+  late bool _strangersCanMessage;
+  late bool _strangersCanMentionInVibes;
 
   @override
   void initState() {
     super.initState();
     _backupEnabled = widget.backupEnabled;
     _frequency = widget.frequency;
+    _strangersCanMessage = widget.strangersCanMessage;
+    _strangersCanMentionInVibes = widget.strangersCanMentionInVibes;
   }
 
   void _setBackupEnabled(bool value) {
@@ -47,6 +59,18 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     setState(() => _frequency = frequency);
     widget.onFrequencyChanged(frequency);
     _showFeedback('Backup frequency set to ${frequency.label}');
+  }
+
+  void _setStrangersCanMessage(bool value) {
+    setState(() => _strangersCanMessage = value);
+    widget.onStrangersCanMessageChanged(value);
+    _showFeedback(value ? 'Strangers can message you' : 'Stranger messages disabled');
+  }
+
+  void _setStrangersCanMentionInVibes(bool value) {
+    setState(() => _strangersCanMentionInVibes = value);
+    widget.onStrangersCanMentionInVibesChanged(value);
+    _showFeedback(value ? 'Strangers can mention you in Vibes' : 'Stranger Vibes mentions disabled');
   }
 
   void _showFeedback(String message) {
@@ -90,6 +114,44 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
               ],
             ),
             const SizedBox(height: 10),
+            _SettingsCard(
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _strangersCanMessage,
+                    onChanged: _setStrangersCanMessage,
+                    activeThumbColor: const Color(0xFF12C7B7),
+                    title: const Text(
+                      'Stranger messages',
+                      style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900),
+                    ),
+                    subtitle: Text(
+                      _strangersCanMessage
+                          ? 'Strangers can message you. These appear under Stranger messages.'
+                          : 'Strangers cannot start new chats with you.',
+                      style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  SwitchListTile(
+                    value: _strangersCanMentionInVibes,
+                    onChanged: _setStrangersCanMentionInVibes,
+                    activeThumbColor: const Color(0xFF12C7B7),
+                    title: const Text(
+                      'Stranger Vibes mentions',
+                      style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900),
+                    ),
+                    subtitle: Text(
+                      _strangersCanMentionInVibes
+                          ? 'Strangers can mention you in Vibes and Vibe comments.'
+                          : 'Only friends/following rules can mention you in Vibes.',
+                      style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             _SettingsCard(
               child: Column(
                 children: [
@@ -183,7 +245,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Locked chats are backend account-level locks. They stay hidden and protected on every device after login.',
+                      'Locked chats are backend account-level locks. Stranger message and mention privacy will also be backend account-level settings.',
                       style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700),
                     ),
                   ),
