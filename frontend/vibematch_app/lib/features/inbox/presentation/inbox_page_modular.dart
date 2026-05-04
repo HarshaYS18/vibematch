@@ -163,6 +163,7 @@ class _InboxPageState extends State<InboxPage> {
       InboxChatPage(
         conversation: conversation,
         onMoreTap: () => _showChatOptions(conversation),
+        onBackTap: _closePanelOverlay,
       ),
     );
   }
@@ -172,6 +173,7 @@ class _InboxPageState extends State<InboxPage> {
       InboxSearchPage(
         controller: _controller,
         onOpenConversation: _openConversation,
+        onBackTap: _closePanelOverlay,
       ),
     );
   }
