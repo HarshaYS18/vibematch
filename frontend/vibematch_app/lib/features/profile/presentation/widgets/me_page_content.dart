@@ -94,15 +94,7 @@ class MePageContent extends StatelessWidget {
           onRoomTap: () => _showAction(context, 'Open ${MeProfileConstants.currentRoomName} room preview. Secret Vibe rooms will be hidden later.'),
         ),
         const SizedBox(height: 14),
-        MeVipSvipPanel(
-          vipLevel: MeProfileConstants.vipLevel,
-          svipLevel: MeProfileConstants.svipLevel,
-          vipFrozen: MeProfileConstants.vipFrozen,
-          vipColor: vipColor,
-          vipDark: vipDark,
-          onVipTap: () => _showAction(context, 'VIP progress, recharge points, freeze/reactivation rules will open.'),
-          onSvipTap: () => _showAction(context, 'Monthly SVIP benefits and recharge target will open.'),
-        ),
+        MeStatsRow(onAction: (message) => _showAction(context, message)),
         const SizedBox(height: 14),
         MeRelationshipPanel(
           relationshipLabel: relationshipType,
@@ -111,8 +103,6 @@ class MePageContent extends StatelessWidget {
           onBestieTap: () => _showAction(context, 'Bestie relationship details will open.'),
           onFamilyTap: () => _showAction(context, '$relationshipType relationship details will open.'),
         ),
-        const SizedBox(height: 14),
-        MeStatsRow(onAction: (message) => _showAction(context, message)),
         const SizedBox(height: 18),
         const Text(
           'Account',
