@@ -1,0 +1,182 @@
+import 'package:flutter/material.dart';
+
+import '../models/public_profile_models.dart';
+import 'public_profile_shared_widgets.dart';
+
+class PublicVibeCard extends StatelessWidget {
+  const PublicVibeCard({
+    super.key,
+    required this.vibe,
+    required this.onTap,
+    required this.onLikeTap,
+    required this.onCommentTap,
+    required this.onShareTap,
+  });
+
+  final PublicVibeItem vibe;
+  final VoidCallback onTap;
+  final VoidCallback onLikeTap;
+  final VoidCallback onCommentTap;
+  final VoidCallback onShareTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        decoration: publicProfileWhitePanelDecoration(),
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: vibe.colors),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(vibe.icon, color: Colors.white),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          vibe.title,
+                          style: const TextStyle(
+                            color: Color(0xFF251538),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${vibe.mediaType} · ${vibe.timeAgo}',
+                          style: const TextStyle(
+                            color: Color(0xFF8C7B8F),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 13),
+              Container(
+                height: 148,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: vibe.colors,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Stack(
+                  children: [
+                    const Positioned.fill(
+                      child: CustomPaint(painter: PublicCoverPatternPainter()),
+                    ),
+                    Center(
+                      child: Icon(
+                        vibe.icon,
+                        color: Colors.white.withValues(alpha: 0.86),
+                        size: 46,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 13),
+              Text(
+                vibe.body,
+                style: const TextStyle(
+                  color: Color(0xFF5E5363),
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _VibeActionButton(
+                    icon: Icons.favorite_rounded,
+                    label: vibe.likes,
+                    color: const Color(0xFFE84C72),
+                    onTap: onLikeTap,
+                  ),
+                  const SizedBox(width: 9),
+                  _VibeActionButton(
+                    icon: Icons.mode_comment_rounded,
+                    label: vibe.comments,
+                    color: const Color(0xFF6D5DF6),
+                    onTap: onCommentTap,
+                  ),
+                  const Spacer(),
+                  _VibeActionButton(
+                    icon: Icons.ios_share_rounded,
+                    label: 'Share',
+                    color: const Color(0xFF12C7B7),
+                    onTap: onShareTap,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VibeActionButton extends StatelessWidget {
+  const _VibeActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(99),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.09),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 15),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF251538),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
