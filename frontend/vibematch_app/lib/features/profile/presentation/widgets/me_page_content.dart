@@ -67,7 +67,7 @@ class MePageContent extends StatelessWidget {
   void _openLoverDetail(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const LoveBondDetailPage(bond: mockLoveBondCards[0]),
+        builder: (_) => LoveBondDetailPage(bond: mockLoveBondCards.first),
       ),
     );
   }
