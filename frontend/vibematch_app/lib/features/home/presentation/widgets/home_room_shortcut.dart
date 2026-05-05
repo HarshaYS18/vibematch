@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/icons/vm_icons.dart';
 import '../../models/home_room_data.dart';
 
 class HomeRoomShortcut extends StatelessWidget {
@@ -34,7 +35,7 @@ class HomeRoomShortcut extends StatelessWidget {
           ],
         ),
         child: Icon(
-          hasRoom ? Icons.home_rounded : Icons.add_home_work_rounded,
+          hasRoom ? VMIcons.home : VMIcons.createRoom,
           color: hasRoom ? const Color(0xFF12C7B7) : const Color(0xFF251538),
           size: 24,
         ),
