@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../rooms/presentation/widgets/mini_profile_family_badge.dart';
+import '../../../rooms/presentation/widgets/mini_profile_level_row.dart';
 import '../../../rooms/presentation/widgets/vip_badge.dart';
 import '../models/public_profile_models.dart';
 
@@ -162,9 +163,9 @@ class PublicBadge extends StatelessWidget {
   final String label;
   final Color color;
 
-  int? get _vipLevel {
+  int? _levelForPrefix(String prefix) {
     final clean = label.trim();
-    if (!clean.startsWith('VIP ')) return null;
+    if (!clean.startsWith('$prefix ')) return null;
     final parts = clean.split(' ');
     if (parts.length < 2) return null;
     return int.tryParse(parts[1]);
@@ -185,12 +186,27 @@ class PublicBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vipLevel = _vipLevel;
+    final vipLevel = _levelForPrefix('VIP');
     if (vipLevel != null) {
       return VipBadge(
         level: vipLevel,
         size: VipBadgeSize.small,
         showWhenZero: true,
+      );
+    }
+
+    final svipLevel = _levelForPrefix('SVIP');
+    if (svipLevel != null) {
+      return MiniProfileCleanLevelPill(
+        label: 'SVIP $svipLevel',
+        icon: Icons.diamond_rounded,
+        width: 82,
+        background: const Color(0xFF30220B),
+        border: const Color(0xFFD7AA45),
+        textColor: const Color(0xFFFFE2A1),
+        shineColor: const Color(0xFFFFF1B8),
+        active: svipLevel > 0,
+        onTap: () {},
       );
     }
 
