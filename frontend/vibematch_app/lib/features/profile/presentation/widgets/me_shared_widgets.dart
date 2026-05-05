@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../rooms/presentation/widgets/chat_vip_badge.dart';
+import '../../../rooms/presentation/widgets/mini_profile_family_badge.dart';
 import '../models/me_page_models.dart';
 
 BoxDecoration meWhitePanelDecoration({double radius = 28}) {
@@ -15,6 +17,13 @@ BoxDecoration meWhitePanelDecoration({double radius = 28}) {
       ),
     ],
   );
+}
+
+String meFamilyTierFromLevel(int level) {
+  if (level >= 20) return 'platinum';
+  if (level >= 10) return 'gold';
+  if (level >= 5) return 'silver';
+  return 'bronze';
 }
 
 class MePremiumAvatar extends StatelessWidget {
@@ -45,11 +54,7 @@ class MePremiumAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: [
-            Colors.white,
-            vipColor,
-            const Color(0xFFFFD36A),
-          ],
+          colors: [Colors.white, vipColor, const Color(0xFFFFD36A)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -175,28 +180,13 @@ class MeFamilyTagLight extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return MiniProfileFamilyBadge(
+      familyName: '$familyName Lv.$familyLevel',
+      familyLevel: meFamilyTierFromLevel(familyLevel),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(99),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFF12C7B7).withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: const Color(0xFF12C7B7).withValues(alpha: 0.25)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.family_restroom_rounded, color: Color(0xFF12C7B7), size: 14),
-            const SizedBox(width: 5),
-            Text(
-              '$familyName Lv.$familyLevel',
-              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
-            ),
-          ],
-        ),
-      ),
+      height: 24,
+      minWidth: 86,
+      maxWidth: 148,
     );
   }
 }
@@ -213,8 +203,19 @@ class MeProfileMiniBadge extends StatelessWidget {
   final IconData icon;
   final Color color;
 
+  int? get _vipLevel {
+    final parts = label.split(' ');
+    if (parts.isEmpty || parts.first.toUpperCase() != 'VIP') return null;
+    return parts.length > 1 ? int.tryParse(parts[1]) : null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final vipLevel = _vipLevel;
+    if (vipLevel != null) {
+      return ChatVipBadge(level: vipLevel);
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
