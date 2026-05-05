@@ -21,14 +21,9 @@ class LoveBondsPage extends StatelessWidget {
   }
 
   void _openBond(BuildContext context, LoveBondCardData bond) {
-    if (bond.type == LoveBondType.lover) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)),
-      );
-      return;
-    }
-
-    _showAction(context, '${bond.title} bond detail will use the same pattern as Lover Bond.');
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)),
+    );
   }
 
   @override
@@ -84,7 +79,7 @@ class LoveBondsPage extends StatelessWidget {
                   crossAxisCount: 2,
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 14,
-                  mainAxisExtent: 300,
+                  mainAxisExtent: 156,
                 ),
                 itemBuilder: (context, index) {
                   final bond = mockLoveBondCards[index];
@@ -110,7 +105,7 @@ class LoveBondsPage extends StatelessWidget {
                     SizedBox(width: 8),
                     Expanded(child: _BondSummary(title: 'Total Level', value: '7')),
                     SizedBox(width: 8),
-                    Expanded(child: _BondSummary(title: 'Affection', value: '159469')),
+                    Expanded(child: _BondSummary(title: 'Score', value: '346K')),
                     Icon(Icons.chevron_right_rounded, color: Color(0xFF8B3C75)),
                   ],
                 ),
