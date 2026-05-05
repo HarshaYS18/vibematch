@@ -27,10 +27,13 @@ abstract final class VMIcons {
   static const IconData refresh = Icons.refresh_rounded;
   static const IconData edit = Icons.edit_rounded;
   static const IconData share = Icons.share_rounded;
+  static const IconData logout = Icons.logout_rounded;
+  static const IconData helpCenter = Icons.help_center_rounded;
 
   // App/admin/status.
   static const IconData admin = Icons.admin_panel_settings_rounded;
   static const IconData verified = Icons.verified_rounded;
+  static const IconData verifiedUser = Icons.verified_user_rounded;
   static const IconData active = Icons.radio_button_checked_rounded;
   static const IconData inactive = Icons.radio_button_unchecked_rounded;
   static const IconData cloudDone = Icons.cloud_done_rounded;
@@ -45,6 +48,12 @@ abstract final class VMIcons {
   static const IconData music = Icons.music_note_rounded;
   static const IconData bolt = Icons.bolt_rounded;
   static const IconData audioWave = Icons.graphic_eq_rounded;
+
+  // Media / content.
+  static const IconData photo = Icons.photo_rounded;
+  static const IconData play = Icons.play_arrow_rounded;
+  static const IconData sparkle = Icons.auto_awesome_rounded;
+  static const IconData coverPhoto = Icons.image_rounded;
 
   // Social / profile.
   static const IconData user = Icons.person_rounded;
