@@ -58,23 +58,23 @@ const List<LoveBondCardData> mockLoveBondCards = [
 ];
 
 const List<LoveBondTaskData> mockLoverTasks = [
-  LoveBondTaskData(title: 'Spend time together', subtitle: 'Daily cap: 60 min / +300 max Lover Score', progressLabel: '45 / 60 min', progress: 0.75, reward: 300, icon: Icons.access_time_filled_rounded, capped: true),
-  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: 'Send or receive Lover relationship gifts', progressLabel: '1 / 3', progress: 0.34, reward: 450, icon: Icons.card_giftcard_rounded, capped: false),
+  LoveBondTaskData(title: 'Spend time together', subtitle: '1 min = 1 EXP = 1 Love Score. Daily cap: 60 min.', progressLabel: '45 / 60 min', progress: 0.75, reward: 45, icon: Icons.access_time_filled_rounded, capped: true),
+  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: '1 coin = 1 EXP = 1 Love Score. Gift score has no max limit.', progressLabel: '450 / ∞ coins', progress: 0.72, reward: 450, icon: Icons.card_giftcard_rounded, capped: false),
 ];
 
 const List<LoveBondTaskData> mockBestieTasks = [
-  LoveBondTaskData(title: 'Spend time together', subtitle: 'Daily cap: 45 min / +220 max Bestie Score', progressLabel: '22 / 45 min', progress: 0.49, reward: 220, icon: Icons.access_time_filled_rounded, capped: true),
-  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: 'Send or receive Bestie relationship gifts', progressLabel: '2 / 4', progress: 0.50, reward: 320, icon: Icons.card_giftcard_rounded, capped: false),
+  LoveBondTaskData(title: 'Spend time together', subtitle: '1 min = 1 EXP = 1 Love Score. Daily cap: 45 min.', progressLabel: '22 / 45 min', progress: 0.49, reward: 22, icon: Icons.access_time_filled_rounded, capped: true),
+  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: '1 coin = 1 EXP = 1 Love Score. Gift score has no max limit.', progressLabel: '320 / ∞ coins', progress: 0.58, reward: 320, icon: Icons.card_giftcard_rounded, capped: false),
 ];
 
 const List<LoveBondTaskData> mockBrotherTasks = [
-  LoveBondTaskData(title: 'Spend time together', subtitle: 'Daily cap: 40 min / +180 max Brother Score', progressLabel: '18 / 40 min', progress: 0.45, reward: 180, icon: Icons.access_time_filled_rounded, capped: true),
-  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: 'Send or receive Brother relationship gifts', progressLabel: '1 / 3', progress: 0.34, reward: 260, icon: Icons.card_giftcard_rounded, capped: false),
+  LoveBondTaskData(title: 'Spend time together', subtitle: '1 min = 1 EXP = 1 Love Score. Daily cap: 40 min.', progressLabel: '18 / 40 min', progress: 0.45, reward: 18, icon: Icons.access_time_filled_rounded, capped: true),
+  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: '1 coin = 1 EXP = 1 Love Score. Gift score has no max limit.', progressLabel: '260 / ∞ coins', progress: 0.52, reward: 260, icon: Icons.card_giftcard_rounded, capped: false),
 ];
 
 const List<LoveBondTaskData> mockSisterTasks = [
-  LoveBondTaskData(title: 'Spend time together', subtitle: 'Daily cap: 40 min / +180 max Sister Score', progressLabel: '28 / 40 min', progress: 0.70, reward: 180, icon: Icons.access_time_filled_rounded, capped: true),
-  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: 'Send or receive Sister relationship gifts', progressLabel: '1 / 3', progress: 0.34, reward: 260, icon: Icons.card_giftcard_rounded, capped: false),
+  LoveBondTaskData(title: 'Spend time together', subtitle: '1 min = 1 EXP = 1 Love Score. Daily cap: 40 min.', progressLabel: '28 / 40 min', progress: 0.70, reward: 28, icon: Icons.access_time_filled_rounded, capped: true),
+  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: '1 coin = 1 EXP = 1 Love Score. Gift score has no max limit.', progressLabel: '260 / ∞ coins', progress: 0.52, reward: 260, icon: Icons.card_giftcard_rounded, capped: false),
 ];
 
 List<LoveBondTaskData> tasksForBondType(LoveBondType type) {
