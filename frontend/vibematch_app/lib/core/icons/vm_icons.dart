@@ -1,26 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Central icon registry for VibeMatch.
 ///
 /// Do not import random icon packs directly inside feature screens.
-/// Screens should use this file first so we can later swap Material fallback
-/// icons to Phosphor/custom asset icons from one place without touching every UI.
+/// Screens should use this file first so we can later swap icon packs from one
+/// place without touching every UI.
 ///
-/// Current safe state:
-/// - Uses Flutter built-in icons as fallback so flutter analyze stays clean.
-/// - Supports raster asset icon packs through [VMIcon] when assets are added.
-///
-/// Later production upgrade:
-/// - Add `phosphor_flutter` to pubspec.yaml.
-/// - Replace selected [IconData] mappings here only.
-/// - Keep feature screens unchanged.
+/// Current production rule:
+/// - Common app/navigation icons use Phosphor through this central layer.
+/// - VM-specific premium icons still use [VMIcon] asset fallbacks.
+/// - Feature screens should not import `phosphor_flutter` directly.
 abstract final class VMIcons {
   // Main navigation.
-  static const IconData home = Icons.home_rounded;
-  static const IconData vibes = Icons.auto_awesome_rounded;
-  static const IconData create = Icons.add_circle_rounded;
-  static const IconData inbox = Icons.chat_bubble_rounded;
-  static const IconData profile = Icons.person_rounded;
+  static const IconData home = PhosphorIconsBold.house;
+  static const IconData vibes = PhosphorIconsBold.shootingStar;
+  static const IconData create = PhosphorIconsFill.plusCircle;
+  static const IconData inbox = PhosphorIconsBold.chatCircle;
+  static const IconData profile = PhosphorIconsBold.user;
 
   // Global actions.
   static const IconData search = Icons.search_rounded;
