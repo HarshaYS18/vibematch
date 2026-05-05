@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/icons/vm_icons.dart';
+
 class RoomColors {
   static const deep = Color(0xFF070414);
   static const plum = Color(0xFF251538);
@@ -650,7 +652,7 @@ class _BackgroundThemeTile extends StatelessWidget {
                           child: Padding(
                             padding: EdgeInsets.all(7),
                             child: Icon(
-                              Icons.check_circle_rounded,
+                              VMIcons.checkCircle,
                               color: Colors.white,
                               size: 20,
                             ),
@@ -659,7 +661,7 @@ class _BackgroundThemeTile extends StatelessWidget {
                       if (locked)
                         const Center(
                           child: Icon(
-                            Icons.lock_rounded,
+                            VMIcons.lock,
                             color: Colors.white,
                             size: 26,
                           ),
@@ -717,7 +719,7 @@ class _StorePill extends StatelessWidget {
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.storefront_rounded, color: Colors.white, size: 14),
+              Icon(VMIcons.store, color: Colors.white, size: 14),
               SizedBox(width: 5),
               Text(
                 'Store',
