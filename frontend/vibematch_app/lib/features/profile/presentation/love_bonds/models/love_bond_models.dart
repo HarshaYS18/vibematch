@@ -8,6 +8,7 @@ class LoveBondCardData {
     required this.title,
     required this.level,
     required this.displayName,
+    required this.partnerName,
     required this.primaryColor,
     required this.secondaryColor,
     required this.icon,
@@ -20,6 +21,7 @@ class LoveBondCardData {
   final String title;
   final int level;
   final String displayName;
+  final String partnerName;
   final Color primaryColor;
   final Color secondaryColor;
   final IconData icon;
@@ -54,6 +56,7 @@ const List<LoveBondCardData> mockLoveBondCards = [
     title: 'Lover',
     level: 3,
     displayName: 'REPSARAH → ♡',
+    partnerName: 'Repsarah',
     primaryColor: Color(0xFFFF5AAA),
     secondaryColor: Color(0xFFFFC2DC),
     icon: Icons.home_rounded,
@@ -66,6 +69,7 @@ const List<LoveBondCardData> mockLoveBondCards = [
     title: 'Bestie',
     level: 2,
     displayName: 'RIDE OR DIE → ☆',
+    partnerName: 'Aadhya',
     primaryColor: Color(0xFF9C5CFF),
     secondaryColor: Color(0xFFE2CCFF),
     icon: Icons.night_shelter_rounded,
@@ -78,6 +82,7 @@ const List<LoveBondCardData> mockLoveBondCards = [
     title: 'Brother',
     level: 1,
     displayName: 'BRO CODE → ⚡',
+    partnerName: 'Kiran',
     primaryColor: Color(0xFF4C8DFF),
     secondaryColor: Color(0xFFCFE2FF),
     icon: Icons.sports_esports_rounded,
@@ -90,6 +95,7 @@ const List<LoveBondCardData> mockLoveBondCards = [
     title: 'Sister',
     level: 1,
     displayName: 'SOUL SISTERS → ✿',
+    partnerName: 'Nithya',
     primaryColor: Color(0xFFFFA93D),
     secondaryColor: Color(0xFFFFE0A8),
     icon: Icons.diamond_rounded,
