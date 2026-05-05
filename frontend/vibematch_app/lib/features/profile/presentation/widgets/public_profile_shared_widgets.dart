@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../rooms/presentation/widgets/chat_vip_badge.dart';
 import '../../../rooms/presentation/widgets/mini_profile_family_badge.dart';
+import '../../../rooms/presentation/widgets/vip_badge.dart';
 import '../models/public_profile_models.dart';
 
 BoxDecoration publicProfileWhitePanelDecoration({double radius = 28}) {
@@ -187,7 +187,11 @@ class PublicBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final vipLevel = _vipLevel;
     if (vipLevel != null) {
-      return ChatVipBadge(level: vipLevel);
+      return VipBadge(
+        level: vipLevel,
+        size: VipBadgeSize.small,
+        showWhenZero: true,
+      );
     }
 
     if (_isFamilyBadge) {
