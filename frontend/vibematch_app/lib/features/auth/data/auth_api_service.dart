@@ -2,13 +2,13 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../../../core/constants/app_constants.dart';
+import '../../../core/network/vm_api_config.dart';
 import '../models/current_user.dart';
 
 class AuthApiService {
   const AuthApiService();
 
-  static const String baseUrl = AppConstants.apiBaseUrl;
+  static String get baseUrl => VmApiConfig.baseUrl;
 
   static String? _cachedAccessToken;
   static CurrentUser? _cachedUser;
@@ -34,7 +34,7 @@ class AuthApiService {
     String? displayName,
     String? deviceId,
   }) async {
-    final loginUri = Uri.parse('$baseUrl/auth/dev-login');
+    final loginUri = Uri.parse(VmApiConfig.endpoint('/auth/dev-login'));
 
     final safeEmail = email.trim();
     final safeUsername = username?.trim();
@@ -108,7 +108,7 @@ class AuthApiService {
       throw Exception('No access token available. Please login again.');
     }
 
-    final uri = Uri.parse('$baseUrl/users/me');
+    final uri = Uri.parse(VmApiConfig.endpoint('/users/me'));
 
     final response = await http.get(
       uri,
