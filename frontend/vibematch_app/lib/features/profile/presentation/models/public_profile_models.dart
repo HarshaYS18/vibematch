@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/icons/vm_icons.dart';
+
 enum PublicFollowStatus {
   none,
   following,
@@ -22,13 +24,13 @@ enum PublicFollowStatus {
   IconData get icon {
     switch (this) {
       case PublicFollowStatus.none:
-        return Icons.person_add_alt_1_rounded;
+        return VMIcons.userAdd;
       case PublicFollowStatus.following:
-        return Icons.verified_user_rounded;
+        return VMIcons.verifiedUser;
       case PublicFollowStatus.followBack:
-        return Icons.person_add_alt_1_rounded;
+        return VMIcons.userAdd;
       case PublicFollowStatus.mutual:
-        return Icons.handshake_rounded;
+        return VMIcons.friends;
     }
   }
 
@@ -90,7 +92,7 @@ const List<PublicCoverPhoto> publicProfileCoverPhotos = [
       Color(0xFF6D5DF6),
       Color(0xFFE84C72),
     ],
-    icon: Icons.auto_awesome_rounded,
+    icon: VMIcons.sparkle,
   ),
   PublicCoverPhoto(
     title: 'Music Night',
@@ -99,7 +101,7 @@ const List<PublicCoverPhoto> publicProfileCoverPhotos = [
       Color(0xFF12C7B7),
       Color(0xFFFFD36A),
     ],
-    icon: Icons.music_note_rounded,
+    icon: VMIcons.music,
   ),
   PublicCoverPhoto(
     title: 'Family Moment',
@@ -108,7 +110,7 @@ const List<PublicCoverPhoto> publicProfileCoverPhotos = [
       Color(0xFFE84C72),
       Color(0xFFFFC857),
     ],
-    icon: Icons.groups_rounded,
+    icon: VMIcons.users,
   ),
 ];
 
@@ -121,7 +123,7 @@ const List<PublicVibeItem> mockPublicVibes = [
     tag: 'Room',
     likes: '1.2K',
     comments: '86',
-    icon: Icons.photo_rounded,
+    icon: VMIcons.photo,
     colors: [
       Color(0xFF12C7B7),
       Color(0xFF6D5DF6),
@@ -135,7 +137,7 @@ const List<PublicVibeItem> mockPublicVibes = [
     tag: 'Vibe Sync',
     likes: '856',
     comments: '42',
-    icon: Icons.play_arrow_rounded,
+    icon: VMIcons.play,
     colors: [
       Color(0xFFE84C72),
       Color(0xFFFFD36A),
@@ -149,7 +151,7 @@ const List<PublicVibeItem> mockPublicVibes = [
     tag: 'Family',
     likes: '642',
     comments: '31',
-    icon: Icons.groups_rounded,
+    icon: VMIcons.users,
     colors: [
       Color(0xFF6D5DF6),
       Color(0xFFE84C72),
