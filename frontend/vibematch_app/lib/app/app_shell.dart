@@ -238,8 +238,8 @@ class _DevUserSwitcher extends StatelessWidget {
             ),
             child: Icon(
               selectedMode == _DevUserMode.founder
-                  ? Icons.admin_panel_settings_rounded
-                  : Icons.person_rounded,
+                  ? VMIcons.admin
+                  : VMIcons.profile,
               color: Colors.white,
               size: 19,
             ),
@@ -247,7 +247,7 @@ class _DevUserSwitcher extends StatelessWidget {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} Â· ${activeUser.primaryRole} Â· ID ${activeUser.visibleId}',
+              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} · ${activeUser.primaryRole} · ID ${activeUser.visibleId}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -401,9 +401,7 @@ class _VibeBottomNav extends StatelessWidget {
               onTap: () => onTabSelected(VmMainTab.inbox),
             ),
             _NavItem(
-              icon: isTestingAsFounder
-                  ? Icons.admin_panel_settings_rounded
-                  : VMIcons.profile,
+              icon: isTestingAsFounder ? VMIcons.admin : VMIcons.profile,
               label: VmMainTab.me.label,
               active: selectedTab == VmMainTab.me,
               onTap: () => onTabSelected(VmMainTab.me),
