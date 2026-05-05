@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/icons/vm_icons.dart';
 import '../../data/vibes_mock_data.dart';
 import '../../models/vibe_models.dart';
 
@@ -62,7 +63,7 @@ class _VibeCommentsPageModularState extends State<VibeCommentsPageModular> {
               child: Row(
                 children: [
                   _RoundIconButton(
-                    icon: Icons.arrow_back_rounded,
+                    icon: VMIcons.back,
                     onTap: () => Navigator.pop(context),
                   ),
                   const SizedBox(width: 12),
@@ -132,7 +133,7 @@ class _VibeCommentsPageModularState extends State<VibeCommentsPageModular> {
                         color: const Color(0xFF251538),
                         borderRadius: BorderRadius.circular(18),
                       ),
-                      child: const Icon(Icons.send_rounded, color: Colors.white),
+                      child: const Icon(VMIcons.send, color: Colors.white),
                     ),
                   ),
                 ],
@@ -174,7 +175,10 @@ class _CommentCard extends StatelessWidget {
               children: [
                 Text(comment.name, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
                 const SizedBox(height: 4),
-                Text(comment.text, style: const TextStyle(color: Color(0xFF5E526B), height: 1.3, fontWeight: FontWeight.w600)),
+                _MentionRichText(
+                  text: comment.text,
+                  baseStyle: const TextStyle(color: Color(0xFF5E526B), height: 1.3, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 5),
                 Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700)),
               ],
@@ -182,6 +186,46 @@ class _CommentCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MentionRichText extends StatelessWidget {
+  const _MentionRichText({required this.text, required this.baseStyle});
+
+  final String text;
+  final TextStyle baseStyle;
+
+  static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = <TextSpan>[];
+    var currentIndex = 0;
+
+    for (final match in _mentionPattern.allMatches(text)) {
+      if (match.start > currentIndex) {
+        spans.add(TextSpan(text: text.substring(currentIndex, match.start)));
+      }
+
+      spans.add(
+        TextSpan(
+          text: text.substring(match.start, match.end),
+          style: const TextStyle(
+            color: Color(0xFF6D5DF6),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      );
+      currentIndex = match.end;
+    }
+
+    if (currentIndex < text.length) {
+      spans.add(TextSpan(text: text.substring(currentIndex)));
+    }
+
+    return RichText(
+      text: TextSpan(style: baseStyle, children: spans),
     );
   }
 }
