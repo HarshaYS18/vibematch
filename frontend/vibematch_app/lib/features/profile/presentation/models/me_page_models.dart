@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/icons/vm_icons.dart';
+
 enum MePresenceStatus { online, offline }
 
 class MeActionItem {
@@ -57,7 +59,7 @@ const List<MeVibeItem> mockMyVibes = [
     mediaType: 'Photo',
     mentions: ['@team'],
     usesMentionAll: false,
-    icon: Icons.photo_rounded,
+    icon: VMIcons.photo,
     colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
   ),
   MeVibeItem(
@@ -70,7 +72,7 @@ const List<MeVibeItem> mockMyVibes = [
     mediaType: 'Video',
     mentions: ['@MoonFam'],
     usesMentionAll: true,
-    icon: Icons.play_arrow_rounded,
+    icon: VMIcons.play,
     colors: [Color(0xFFE84C72), Color(0xFFFFD36A)],
   ),
   MeVibeItem(
@@ -83,7 +85,7 @@ const List<MeVibeItem> mockMyVibes = [
     mediaType: 'Photo',
     mentions: [],
     usesMentionAll: false,
-    icon: Icons.auto_awesome_rounded,
+    icon: VMIcons.sparkle,
     colors: [Color(0xFF6D5DF6), Color(0xFFE84C72)],
   ),
 ];
@@ -95,77 +97,77 @@ List<MeActionItem> buildMeActionItems({
 }) {
   return [
     MeActionItem(
-      icon: Icons.person_rounded,
+      icon: VMIcons.profile,
       title: 'Edit Profile',
       subtitle: 'Avatar, name, bio, presence and profile display',
       color: Color(0xFF12C7B7),
       action: 'Edit Profile page will open.',
     ),
     MeActionItem(
-      icon: Icons.image_rounded,
+      icon: VMIcons.coverPhoto,
       title: 'Cover Photo',
       subtitle: coverPhotoStatus,
       color: Color(0xFF6D5DF6),
       action: 'Cover photo editor will open.',
     ),
     MeActionItem(
-      icon: Icons.workspace_premium_rounded,
+      icon: VMIcons.vip,
       title: 'VIP / SVIP Center',
       subtitle: 'VIP $vipLevel active · SVIP $svipLevel monthly',
       color: Color(0xFFC99A3B),
       action: 'VIP and SVIP center will open.',
     ),
     MeActionItem(
-      icon: Icons.favorite_rounded,
+      icon: VMIcons.heart,
       title: 'Love & Bonds',
       subtitle: 'View your linked relationships and badges',
       color: Color(0xFFE84C72),
       action: 'Relationships page will open.',
     ),
     MeActionItem(
-      icon: Icons.groups_rounded,
+      icon: VMIcons.family,
       title: 'Family',
       subtitle: 'Join a family, view members, and play family events',
       color: Color(0xFF12C7B7),
       action: 'Family page with events, members and rewards will open.',
     ),
     MeActionItem(
-      icon: Icons.storefront_rounded,
+      icon: VMIcons.store,
       title: 'Store & Inventory',
       subtitle: 'Themes, entrance effects, equipped items',
       color: Color(0xFF6D5DF6),
       action: 'Store and Inventory page will open.',
     ),
     MeActionItem(
-      icon: Icons.admin_panel_settings_rounded,
+      icon: VMIcons.admin,
       title: 'Control Center',
       subtitle: 'Shown only for allowed roles',
       color: Color(0xFFE84C72),
       action: 'Role-based Control Center will open if permitted.',
     ),
     MeActionItem(
-      icon: Icons.refresh_rounded,
+      icon: VMIcons.refresh,
       title: 'Refresh Profile',
       subtitle: 'Reload current user from backend',
       color: Color(0xFF12C7B7),
       action: 'refresh',
     ),
     MeActionItem(
-      icon: Icons.settings_rounded,
+      icon: VMIcons.settings,
       title: 'Settings',
       subtitle: 'Privacy, account, notifications, security',
       color: Color(0xFF251538),
       action: 'Settings page will open.',
     ),
     MeActionItem(
-      icon: Icons.help_center_rounded,
+      icon: VMIcons.helpCenter,
       title: 'Help Centre',
       subtitle: 'Support, FAQs, safety, reports and contact options',
       color: Color(0xFF12C7B7),
       action: 'Help Centre will open.',
     ),
     MeActionItem(
-      icon: Icons.logout_rounded,
+      icon: VMIcons.logout,
       title: 'Logout',
       subtitle: 'Return to login screen',
       color: Color(0xFFE84C72),
