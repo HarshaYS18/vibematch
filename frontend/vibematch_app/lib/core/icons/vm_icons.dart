@@ -3,16 +3,11 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Central icon registry for VibeMatch.
 ///
-/// Do not import random icon packs directly inside feature screens.
-/// Screens should use this file first so we can later swap icon packs from one
-/// place without touching every UI.
-///
-/// Current production rule:
-/// - Common app/navigation icons use Phosphor through this central layer.
-/// - VM-specific premium icons still use [VMIcon] asset fallbacks.
-/// - Feature screens should not import `phosphor_flutter` directly.
+/// Feature screens should use this file instead of importing random icon packs
+/// directly. This lets us change icon packs/styles from one place without
+/// touching every UI module.
 abstract final class VMIcons {
-  // Main navigation.
+  // Main navigation. These are already using Phosphor.
   static const IconData home = PhosphorIconsBold.house;
   static const IconData vibes = PhosphorIconsBold.shootingStar;
   static const IconData create = PhosphorIconsFill.plusCircle;
@@ -28,8 +23,15 @@ abstract final class VMIcons {
   static const IconData back = Icons.arrow_back_rounded;
   static const IconData chevronRight = Icons.chevron_right_rounded;
   static const IconData check = Icons.check_rounded;
+  static const IconData checkCircle = Icons.check_circle_rounded;
   static const IconData edit = Icons.edit_rounded;
   static const IconData share = Icons.share_rounded;
+
+  // App/admin/status.
+  static const IconData admin = Icons.admin_panel_settings_rounded;
+  static const IconData verified = Icons.verified_rounded;
+  static const IconData active = Icons.radio_button_checked_rounded;
+  static const IconData inactive = Icons.radio_button_unchecked_rounded;
 
   // Social / profile.
   static const IconData user = Icons.person_rounded;
@@ -58,6 +60,7 @@ abstract final class VMIcons {
   static const IconData language = Icons.language_rounded;
   static const IconData secret = Icons.visibility_off_rounded;
   static const IconData applyOnly = Icons.rule_rounded;
+  static const IconData roomBackground = Icons.wallpaper_rounded;
 
   // Monetization / store.
   static const IconData gift = Icons.card_giftcard_rounded;
