@@ -126,10 +126,7 @@ class PublicProfileHeader extends StatelessWidget {
               Positioned(
                 left: 18,
                 bottom: -54,
-                child: _PublicAvatar(
-                  displayName: displayName,
-                  showOfficialTick: showOfficialTick,
-                ),
+                child: _PublicAvatar(displayName: displayName),
               ),
             ],
           ),
@@ -167,7 +164,7 @@ class PublicProfileHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '@$username · ID $publicId',
+                  'ID $publicId',
                   style: const TextStyle(
                     color: Color(0xFF8C7B8F),
                     fontSize: 13,
@@ -252,78 +249,53 @@ class PublicProfileHeader extends StatelessWidget {
 }
 
 class _PublicAvatar extends StatelessWidget {
-  const _PublicAvatar({required this.displayName, required this.showOfficialTick});
+  const _PublicAvatar({required this.displayName});
 
   final String displayName;
-  final bool showOfficialTick;
 
   @override
   Widget build(BuildContext context) {
     final firstLetter = displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase();
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF251538).withValues(alpha: 0.18),
-                blurRadius: 18,
-                offset: const Offset(0, 9),
-              ),
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF251538).withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Container(
+        width: 96,
+        height: 96,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF6D5DF6),
+              Color(0xFFE84C72),
+              Color(0xFFFFD36A),
             ],
           ),
-          child: Container(
-            width: 96,
-            height: 96,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF6D5DF6),
-                  Color(0xFFE84C72),
-                  Color(0xFFFFD36A),
-                ],
-              ),
-            ),
-            child: Center(
-              child: Text(
-                firstLetter,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+        ),
+        child: Center(
+          child: Text(
+            firstLetter,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ),
-        if (showOfficialTick)
-          Positioned(
-            right: 4,
-            bottom: 8,
-            child: Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: const Color(0xFF251538),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFFFD36A), width: 2),
-              ),
-              child: const Icon(
-                Icons.verified_rounded,
-                color: Color(0xFFFFD36A),
-                size: 18,
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }
