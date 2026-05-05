@@ -35,9 +35,7 @@ class MeVipSvipPanel extends StatelessWidget {
             levelText: 'VIP $vipLevel',
             subtitle: vipFrozen ? 'Frozen' : 'Active',
             icon: vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
-            gradient: vipFrozen
-                ? const [Color(0xFFAAA2B4), Color(0xFF6B6178)]
-                : [vipDark, vipColor],
+            gradient: vipFrozen ? const [Color(0xFFAAA2B4), Color(0xFF6B6178)] : [vipDark, vipColor],
             onTap: onVipTap,
           ),
         ),
@@ -62,33 +60,12 @@ class MeRelationshipPanel extends StatelessWidget {
     super.key,
     required this.relationshipLabel,
     required this.onSeeAllTap,
-    required this.onCpTap,
-    required this.onBestieTap,
-    required this.onFamilyTap,
+    required this.onBondTap,
   });
 
   final String relationshipLabel;
   final VoidCallback onSeeAllTap;
-  final VoidCallback onCpTap;
-  final VoidCallback onBestieTap;
-  final VoidCallback onFamilyTap;
-
-  void _handleBondTap(LoveBondType type) {
-    switch (type) {
-      case LoveBondType.lover:
-        onCpTap();
-        return;
-      case LoveBondType.bestie:
-        onBestieTap();
-        return;
-      case LoveBondType.brother:
-        onFamilyTap();
-        return;
-      case LoveBondType.sister:
-        onFamilyTap();
-        return;
-    }
-  }
+  final ValueChanged<LoveBondCardData> onBondTap;
 
   @override
   Widget build(BuildContext context) {
@@ -103,11 +80,7 @@ class MeRelationshipPanel extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Love & Bonds',
-                  style: TextStyle(
-                    color: Color(0xFF251538),
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900),
                 ),
               ),
               InkWell(
@@ -122,11 +95,7 @@ class MeRelationshipPanel extends StatelessWidget {
                   ),
                   child: const Text(
                     'See all',
-                    style: TextStyle(
-                      color: Color(0xFF251538),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
                   ),
                 ),
               ),
@@ -141,7 +110,7 @@ class MeRelationshipPanel extends StatelessWidget {
                   Expanded(
                     child: LoveBondCard(
                       bond: mockLoveBondCards[index],
-                      onTap: () => _handleBondTap(mockLoveBondCards[index].type),
+                      onTap: () => onBondTap(mockLoveBondCards[index]),
                     ),
                   ),
                   if (index != mockLoveBondCards.length - 1) const SizedBox(width: 8),
@@ -192,31 +161,13 @@ class MeAccountCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.title,
-                      style: const TextStyle(
-                        color: Color(0xFF251538),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                    Text(item.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 15, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 4),
-                    Text(
-                      item.subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF7A6B86),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(item.subtitle, style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: Color(0xFF8C8198),
-              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF8C8198)),
             ],
           ),
         ),
@@ -252,23 +203,14 @@ class _CompactLevelCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: gradient),
           borderRadius: BorderRadius.circular(26),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.last.withValues(alpha: 0.20),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: gradient.last.withValues(alpha: 0.20), blurRadius: 18, offset: const Offset(0, 8))],
         ),
         child: Row(
           children: [
             Container(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(16),
-              ),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
               child: Icon(icon, color: Colors.white),
             ),
             const SizedBox(width: 11),
@@ -276,30 +218,9 @@ class _CompactLevelCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    levelText,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 11, fontWeight: FontWeight.w800)),
+                  Text(levelText, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                  Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 11, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
