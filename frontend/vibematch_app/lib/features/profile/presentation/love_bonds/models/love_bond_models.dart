@@ -51,95 +51,45 @@ class LoveBondTaskData {
 }
 
 const List<LoveBondCardData> mockLoveBondCards = [
-  LoveBondCardData(
-    type: LoveBondType.lover,
-    title: 'Lover',
-    level: 3,
-    displayName: 'REPSARAH → ♡',
-    partnerName: 'Repsarah',
-    primaryColor: Color(0xFFFF5AAA),
-    secondaryColor: Color(0xFFFFC2DC),
-    icon: Icons.home_rounded,
-    badgeIcon: Icons.favorite_rounded,
-    leftAvatarInitial: 'S',
-    rightAvatarInitial: 'R',
-  ),
-  LoveBondCardData(
-    type: LoveBondType.bestie,
-    title: 'Bestie',
-    level: 2,
-    displayName: 'RIDE OR DIE → ☆',
-    partnerName: 'Aadhya',
-    primaryColor: Color(0xFF9C5CFF),
-    secondaryColor: Color(0xFFE2CCFF),
-    icon: Icons.night_shelter_rounded,
-    badgeIcon: Icons.favorite_rounded,
-    leftAvatarInitial: 'A',
-    rightAvatarInitial: 'M',
-  ),
-  LoveBondCardData(
-    type: LoveBondType.brother,
-    title: 'Brother',
-    level: 1,
-    displayName: 'BRO CODE → ⚡',
-    partnerName: 'Kiran',
-    primaryColor: Color(0xFF4C8DFF),
-    secondaryColor: Color(0xFFCFE2FF),
-    icon: Icons.sports_esports_rounded,
-    badgeIcon: Icons.bolt_rounded,
-    leftAvatarInitial: 'K',
-    rightAvatarInitial: 'V',
-  ),
-  LoveBondCardData(
-    type: LoveBondType.sister,
-    title: 'Sister',
-    level: 1,
-    displayName: 'SOUL SISTERS → ✿',
-    partnerName: 'Nithya',
-    primaryColor: Color(0xFFFFA93D),
-    secondaryColor: Color(0xFFFFE0A8),
-    icon: Icons.diamond_rounded,
-    badgeIcon: Icons.local_florist_rounded,
-    leftAvatarInitial: 'N',
-    rightAvatarInitial: 'P',
-  ),
+  LoveBondCardData(type: LoveBondType.lover, title: 'Lover', level: 3, displayName: 'REPSARAH → ♡', partnerName: 'Repsarah', primaryColor: Color(0xFFFF5AAA), secondaryColor: Color(0xFFFFC2DC), icon: Icons.home_rounded, badgeIcon: Icons.favorite_rounded, leftAvatarInitial: 'S', rightAvatarInitial: 'R'),
+  LoveBondCardData(type: LoveBondType.bestie, title: 'Bestie', level: 2, displayName: 'RIDE OR DIE → ☆', partnerName: 'Aadhya', primaryColor: Color(0xFF9C5CFF), secondaryColor: Color(0xFFE2CCFF), icon: Icons.night_shelter_rounded, badgeIcon: Icons.favorite_rounded, leftAvatarInitial: 'A', rightAvatarInitial: 'M'),
+  LoveBondCardData(type: LoveBondType.brother, title: 'Brother', level: 1, displayName: 'BRO CODE → ⚡', partnerName: 'Kiran', primaryColor: Color(0xFF4C8DFF), secondaryColor: Color(0xFFCFE2FF), icon: Icons.sports_esports_rounded, badgeIcon: Icons.bolt_rounded, leftAvatarInitial: 'K', rightAvatarInitial: 'V'),
+  LoveBondCardData(type: LoveBondType.sister, title: 'Sister', level: 1, displayName: 'SOUL SISTERS → ✿', partnerName: 'Nithya', primaryColor: Color(0xFFFFA93D), secondaryColor: Color(0xFFFFE0A8), icon: Icons.diamond_rounded, badgeIcon: Icons.local_florist_rounded, leftAvatarInitial: 'N', rightAvatarInitial: 'P'),
 ];
 
 const List<LoveBondTaskData> mockLoverTasks = [
-  LoveBondTaskData(
-    title: 'Spend time together',
-    subtitle: 'Daily cap: 60 min / +300 max affection',
-    progressLabel: '45 / 60 min',
-    progress: 0.75,
-    reward: 300,
-    icon: Icons.access_time_filled_rounded,
-    capped: true,
-  ),
-  LoveBondTaskData(
-    title: 'Exchange relationship gifts',
-    subtitle: 'Send or receive relationship gifts',
-    progressLabel: '1 / 3',
-    progress: 0.34,
-    reward: 450,
-    icon: Icons.card_giftcard_rounded,
-    capped: false,
-  ),
-  LoveBondTaskData(
-    title: 'Send sweet messages',
-    subtitle: 'Send 10 messages',
-    progressLabel: '6 / 10',
-    progress: 0.60,
-    reward: 200,
-    icon: Icons.mark_email_unread_rounded,
-    capped: false,
-  ),
-  LoveBondTaskData(
-    title: 'Join a room together',
-    subtitle: 'Stay in the same room for 20 min',
-    progressLabel: '10 / 20 min',
-    progress: 0.50,
-    reward: 250,
-    icon: Icons.cottage_rounded,
-    capped: true,
-  ),
+  LoveBondTaskData(title: 'Spend time together', subtitle: 'Daily cap: 60 min / +300 max affection', progressLabel: '45 / 60 min', progress: 0.75, reward: 300, icon: Icons.access_time_filled_rounded, capped: true),
+  LoveBondTaskData(title: 'Exchange relationship gifts', subtitle: 'Send or receive relationship gifts', progressLabel: '1 / 3', progress: 0.34, reward: 450, icon: Icons.card_giftcard_rounded, capped: false),
+  LoveBondTaskData(title: 'Send sweet messages', subtitle: 'Send 10 sweet messages', progressLabel: '6 / 10', progress: 0.60, reward: 200, icon: Icons.mark_email_unread_rounded, capped: false),
+  LoveBondTaskData(title: 'Join a room together', subtitle: 'Daily cap: 20 min / +250 max affection', progressLabel: '10 / 20 min', progress: 0.50, reward: 250, icon: Icons.cottage_rounded, capped: true),
 ];
+
+const List<LoveBondTaskData> mockBestieTasks = [
+  LoveBondTaskData(title: 'Chill together', subtitle: 'Daily cap: 45 min / +220 max bond score', progressLabel: '22 / 45 min', progress: 0.49, reward: 220, icon: Icons.groups_2_rounded, capped: true),
+  LoveBondTaskData(title: 'Send bestie gifts', subtitle: 'Exchange friendship gifts', progressLabel: '2 / 4', progress: 0.50, reward: 320, icon: Icons.card_giftcard_rounded, capped: false),
+  LoveBondTaskData(title: 'React to Vibes', subtitle: 'Like or comment on bestie Vibes', progressLabel: '3 / 5', progress: 0.60, reward: 140, icon: Icons.favorite_rounded, capped: false),
+  LoveBondTaskData(title: 'Voice hangout', subtitle: 'Daily cap: one room session reward', progressLabel: '0 / 1', progress: 0.0, reward: 180, icon: Icons.mic_rounded, capped: true),
+];
+
+const List<LoveBondTaskData> mockBrotherTasks = [
+  LoveBondTaskData(title: 'Squad room time', subtitle: 'Daily cap: 40 min / +180 max bond score', progressLabel: '18 / 40 min', progress: 0.45, reward: 180, icon: Icons.sports_esports_rounded, capped: true),
+  LoveBondTaskData(title: 'Send brother gifts', subtitle: 'Exchange brotherhood gifts', progressLabel: '1 / 3', progress: 0.34, reward: 260, icon: Icons.card_giftcard_rounded, capped: false),
+  LoveBondTaskData(title: 'Protective cheers', subtitle: 'Send 5 supportive messages', progressLabel: '2 / 5', progress: 0.40, reward: 120, icon: Icons.shield_rounded, capped: false),
+  LoveBondTaskData(title: 'Play together', subtitle: 'Complete one game-room session', progressLabel: '0 / 1', progress: 0.0, reward: 200, icon: Icons.videogame_asset_rounded, capped: true),
+];
+
+const List<LoveBondTaskData> mockSisterTasks = [
+  LoveBondTaskData(title: 'Sister room time', subtitle: 'Daily cap: 40 min / +180 max bond score', progressLabel: '28 / 40 min', progress: 0.70, reward: 180, icon: Icons.local_florist_rounded, capped: true),
+  LoveBondTaskData(title: 'Send sister gifts', subtitle: 'Exchange sisterhood gifts', progressLabel: '1 / 3', progress: 0.34, reward: 260, icon: Icons.card_giftcard_rounded, capped: false),
+  LoveBondTaskData(title: 'Share Vibes love', subtitle: 'React to 5 Vibes', progressLabel: '4 / 5', progress: 0.80, reward: 140, icon: Icons.auto_awesome_rounded, capped: false),
+  LoveBondTaskData(title: 'Private catch-up', subtitle: 'Daily cap: one voice catch-up', progressLabel: '1 / 1', progress: 1.0, reward: 180, icon: Icons.record_voice_over_rounded, capped: true),
+];
+
+List<LoveBondTaskData> tasksForBondType(LoveBondType type) {
+  return switch (type) {
+    LoveBondType.lover => mockLoverTasks,
+    LoveBondType.bestie => mockBestieTasks,
+    LoveBondType.brother => mockBrotherTasks,
+    LoveBondType.sister => mockSisterTasks,
+  };
+}
