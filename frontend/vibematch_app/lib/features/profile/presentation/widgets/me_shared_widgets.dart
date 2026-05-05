@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../rooms/presentation/widgets/chat_vip_badge.dart';
 import '../../../rooms/presentation/widgets/mini_profile_family_badge.dart';
+import '../../../rooms/presentation/widgets/mini_profile_level_row.dart';
+import '../../../rooms/presentation/widgets/vip_badge.dart';
 import '../models/me_page_models.dart';
 
 BoxDecoration meWhitePanelDecoration({double radius = 28}) {
@@ -203,17 +204,36 @@ class MeProfileMiniBadge extends StatelessWidget {
   final IconData icon;
   final Color color;
 
-  int? get _vipLevel {
+  int? _levelForPrefix(String prefix) {
     final parts = label.split(' ');
-    if (parts.isEmpty || parts.first.toUpperCase() != 'VIP') return null;
+    if (parts.isEmpty || parts.first.toUpperCase() != prefix) return null;
     return parts.length > 1 ? int.tryParse(parts[1]) : null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final vipLevel = _vipLevel;
+    final vipLevel = _levelForPrefix('VIP');
     if (vipLevel != null) {
-      return ChatVipBadge(level: vipLevel);
+      return VipBadge(
+        level: vipLevel,
+        size: VipBadgeSize.small,
+        showWhenZero: true,
+      );
+    }
+
+    final svipLevel = _levelForPrefix('SVIP');
+    if (svipLevel != null) {
+      return MiniProfileCleanLevelPill(
+        label: 'SVIP $svipLevel',
+        icon: Icons.diamond_rounded,
+        width: 82,
+        background: const Color(0xFF30220B),
+        border: const Color(0xFFD7AA45),
+        textColor: const Color(0xFFFFE2A1),
+        shineColor: const Color(0xFFFFF1B8),
+        active: svipLevel > 0,
+        onTap: () {},
+      );
     }
 
     return Container(
