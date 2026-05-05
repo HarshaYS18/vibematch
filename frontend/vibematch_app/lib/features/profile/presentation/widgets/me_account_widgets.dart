@@ -134,24 +134,19 @@ class MeRelationshipPanel extends StatelessWidget {
           ),
           const SizedBox(height: 13),
           SizedBox(
-            height: 270,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: [
-                  for (var index = 0; index < mockLoveBondCards.length; index++) ...[
-                    SizedBox(
-                      width: 182,
-                      child: LoveBondCard(
-                        bond: mockLoveBondCards[index],
-                        onTap: () => _handleBondTap(mockLoveBondCards[index].type),
-                      ),
+            height: 156,
+            child: Row(
+              children: [
+                for (var index = 0; index < mockLoveBondCards.length; index++) ...[
+                  Expanded(
+                    child: LoveBondCard(
+                      bond: mockLoveBondCards[index],
+                      onTap: () => _handleBondTap(mockLoveBondCards[index].type),
                     ),
-                    if (index != mockLoveBondCards.length - 1) const SizedBox(width: 12),
-                  ],
+                  ),
+                  if (index != mockLoveBondCards.length - 1) const SizedBox(width: 8),
                 ],
-              ),
+              ],
             ),
           ),
         ],
