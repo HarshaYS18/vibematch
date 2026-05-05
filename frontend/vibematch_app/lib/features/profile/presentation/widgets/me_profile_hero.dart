@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/me_page_models.dart';
+import '../models/public_profile_models.dart';
 import 'me_shared_widgets.dart';
+import 'public_profile_shared_widgets.dart';
 
-class MePremiumProfileHero extends StatelessWidget {
+class MePremiumProfileHero extends StatefulWidget {
   const MePremiumProfileHero({
     super.key,
     required this.displayName,
@@ -54,166 +58,280 @@ class MePremiumProfileHero extends StatelessWidget {
   final VoidCallback onRoomTap;
 
   @override
+  State<MePremiumProfileHero> createState() => _MePremiumProfileHeroState();
+}
+
+class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
+  final PageController _coverController = PageController();
+  Timer? _coverTimer;
+  int _coverIndex = 0;
+
+  bool get _showOfficialTick {
+    final normalized = widget.role.toLowerCase().trim();
+    return normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _startCoverAutoScroll();
+  }
+
+  @override
+  void dispose() {
+    _coverTimer?.cancel();
+    _coverController.dispose();
+    super.dispose();
+  }
+
+  void _startCoverAutoScroll() {
+    _coverTimer?.cancel();
+    _coverTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted || !_coverController.hasClients || publicProfileCoverPhotos.length < 2) return;
+
+      final nextIndex = (_coverIndex + 1) % publicProfileCoverPhotos.length;
+      _coverController.animateToPage(
+        nextIndex,
+        duration: const Duration(milliseconds: 520),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: meWhitePanelDecoration(radius: 34),
+      decoration: publicProfileWhitePanelDecoration(radius: 34),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              InkWell(
-                onTap: onAvatarTap,
-                customBorder: const CircleBorder(),
-                child: MePremiumAvatar(
-                  displayName: displayName,
-                  vipColor: vipColor,
-                  presence: presence,
-                  showOpenIcon: true,
-                  size: 78,
+              SizedBox(
+                height: 164,
+                child: PageView.builder(
+                  controller: _coverController,
+                  itemCount: publicProfileCoverPhotos.length,
+                  onPageChanged: (index) => setState(() => _coverIndex = index),
+                  itemBuilder: (context, index) {
+                    return PublicCoverPhotoView(cover: publicProfileCoverPhotos[index]);
+                  },
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Positioned(
+                right: 14,
+                top: 14,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF251538),
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.45,
-                            ),
-                          ),
-                        ),
-                        if (_showOfficialTick) ...[
-                          const SizedBox(width: 6),
-                          const Icon(Icons.verified_rounded, color: Color(0xFFFFC857), size: 23),
-                        ],
-                      ],
+                    PublicHeaderIconButton(
+                      icon: Icons.add_photo_alternate_rounded,
+                      onTap: widget.onQrTap,
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      'ID $publicId',
-                      style: const TextStyle(
-                        color: Color(0xFF8C7B8F),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 9),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 7,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (roleTag != null)
-                          MeProfileMiniBadge(
-                            label: roleTag!,
-                            icon: roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
-                            color: const Color(0xFFC99A3B),
-                          ),
-                        InkWell(
-                          onTap: onVipTap,
-                          borderRadius: BorderRadius.circular(99),
-                          child: MeProfileMiniBadge(
-                            label: vipFrozen ? 'VIP $vipLevel Frozen' : 'VIP $vipLevel',
-                            icon: vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
-                            color: vipColor,
-                          ),
-                        ),
-                        InkWell(
-                          onTap: onVipTap,
-                          borderRadius: BorderRadius.circular(99),
-                          child: MeProfileMiniBadge(
-                            label: 'SVIP $svipLevel',
-                            icon: Icons.auto_awesome_rounded,
-                            color: const Color(0xFFC99A3B),
-                          ),
-                        ),
-                        MeFamilyTagLight(
-                          familyName: familyName,
-                          familyLevel: familyLevel,
-                          onTap: onFamilyTap,
-                        ),
-                      ],
+                    const SizedBox(width: 8),
+                    PublicHeaderIconButton(
+                      icon: Icons.qr_code_rounded,
+                      onTap: widget.onQrTap,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: onQrTap,
-                borderRadius: BorderRadius.circular(17),
-                child: Container(
-                  height: 40,
-                  width: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFAF7F1),
-                    borderRadius: BorderRadius.circular(17),
-                    border: Border.all(color: const Color(0xFFECE2D8)),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 12,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    publicProfileCoverPhotos.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: index == _coverIndex ? 18 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: index == _coverIndex ? 0.95 : 0.45),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
                   ),
-                  child: const Icon(Icons.qr_code_rounded, color: Color(0xFF251538), size: 20),
+                ),
+              ),
+              Positioned(
+                left: 18,
+                bottom: -54,
+                child: InkWell(
+                  onTap: widget.onAvatarTap,
+                  customBorder: const CircleBorder(),
+                  child: _MeCoverAvatar(displayName: widget.displayName),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 13),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _PresenceChip(presence: presence, lastSeenText: lastSeenText),
-              if (currentRoomName != null)
-                InkWell(
-                  onTap: onRoomTap,
-                  borderRadius: BorderRadius.circular(99),
-                  child: _RoomStatusChip(roomName: currentRoomName!),
+          const SizedBox(height: 62),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF251538),
+                          fontSize: 27,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.6,
+                        ),
+                      ),
+                    ),
+                    if (_showOfficialTick) ...[
+                      const SizedBox(width: 6),
+                      const Icon(Icons.verified_rounded, color: Color(0xFFFFC857), size: 24),
+                    ],
+                  ],
                 ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _BalanceCapsule(
-                  label: 'Rubies',
-                  value: diamonds,
-                  icon: Icons.diamond_rounded,
-                  color: const Color(0xFFE84C72),
-                  onTap: onWalletTap,
+                const SizedBox(height: 6),
+                Text(
+                  'ID ${widget.publicId}',
+                  style: const TextStyle(
+                    color: Color(0xFF8C7B8F),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _BalanceCapsule(
-                  label: 'Coins',
-                  value: coins,
-                  icon: Icons.monetization_on_rounded,
-                  color: const Color(0xFFC99A3B),
-                  onTap: onWalletTap,
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (widget.roleTag != null)
+                      MeProfileMiniBadge(
+                        label: widget.roleTag!,
+                        icon: widget.roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
+                        color: const Color(0xFFC99A3B),
+                      ),
+                    InkWell(
+                      onTap: widget.onVipTap,
+                      borderRadius: BorderRadius.circular(99),
+                      child: MeProfileMiniBadge(
+                        label: widget.vipFrozen ? 'VIP ${widget.vipLevel} Frozen' : 'VIP ${widget.vipLevel}',
+                        icon: widget.vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
+                        color: widget.vipColor,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: widget.onVipTap,
+                      borderRadius: BorderRadius.circular(99),
+                      child: MeProfileMiniBadge(
+                        label: 'SVIP ${widget.svipLevel}',
+                        icon: Icons.auto_awesome_rounded,
+                        color: const Color(0xFFC99A3B),
+                      ),
+                    ),
+                    MeFamilyTagLight(
+                      familyName: widget.familyName,
+                      familyLevel: widget.familyLevel,
+                      onTap: widget.onFamilyTap,
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _PresenceChip(presence: widget.presence, lastSeenText: widget.lastSeenText),
+                    if (widget.currentRoomName != null)
+                      InkWell(
+                        onTap: widget.onRoomTap,
+                        borderRadius: BorderRadius.circular(99),
+                        child: _RoomStatusChip(roomName: widget.currentRoomName!),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BalanceCapsule(
+                        label: 'Rubies',
+                        value: widget.diamonds,
+                        icon: Icons.diamond_rounded,
+                        color: const Color(0xFFE84C72),
+                        onTap: widget.onWalletTap,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _BalanceCapsule(
+                        label: 'Coins',
+                        value: widget.coins,
+                        icon: Icons.monetization_on_rounded,
+                        color: const Color(0xFFC99A3B),
+                        onTap: widget.onWalletTap,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  bool get _showOfficialTick {
-    final normalized = role.toLowerCase().trim();
-    return normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
+class _MeCoverAvatar extends StatelessWidget {
+  const _MeCoverAvatar({required this.displayName});
+
+  final String displayName;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstLetter = displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase();
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF251538).withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Container(
+        width: 96,
+        height: 96,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)],
+          ),
+        ),
+        child: Center(
+          child: Text(
+            firstLetter,
+            style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -247,11 +365,7 @@ class _PresenceChip extends StatelessWidget {
           const SizedBox(width: 7),
           Text(
             lastSeenText,
-            style: const TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -328,19 +442,11 @@ class _BalanceCapsule extends StatelessWidget {
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF251538),
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900),
                   ),
                   Text(
                     label,
-                    style: const TextStyle(
-                      color: Color(0xFF8C7B8F),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 11, fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
