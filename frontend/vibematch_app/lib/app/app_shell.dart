@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/icons/vm_icons.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/create/presentation/create_page.dart';
 import '../features/home/presentation/home_page_modular.dart';
@@ -246,7 +247,7 @@ class _DevUserSwitcher extends StatelessWidget {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} · ${activeUser.primaryRole} · ID ${activeUser.visibleId}',
+              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} Â· ${activeUser.primaryRole} Â· ID ${activeUser.visibleId}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -354,13 +355,13 @@ class _VibeBottomNav extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _NavItem(
-              icon: Icons.home_rounded,
+              icon: VMIcons.home,
               label: VmMainTab.home.label,
               active: selectedTab == VmMainTab.home,
               onTap: () => onTabSelected(VmMainTab.home),
             ),
             _NavItem(
-              icon: Icons.auto_awesome_rounded,
+              icon: VMIcons.vibes,
               label: VmMainTab.vibes.label,
               active: selectedTab == VmMainTab.vibes,
               onTap: () => onTabSelected(VmMainTab.vibes),
@@ -387,14 +388,14 @@ class _VibeBottomNav extends StatelessWidget {
                   ],
                 ),
                 child: const Icon(
-                  Icons.add_rounded,
+                  VMIcons.create,
                   color: Colors.white,
                   size: 30,
                 ),
               ),
             ),
             _NavItem(
-              icon: Icons.mail_rounded,
+              icon: VMIcons.inbox,
               label: VmMainTab.inbox.label,
               active: selectedTab == VmMainTab.inbox,
               onTap: () => onTabSelected(VmMainTab.inbox),
@@ -402,7 +403,7 @@ class _VibeBottomNav extends StatelessWidget {
             _NavItem(
               icon: isTestingAsFounder
                   ? Icons.admin_panel_settings_rounded
-                  : Icons.person_rounded,
+                  : VMIcons.profile,
               label: VmMainTab.me.label,
               active: selectedTab == VmMainTab.me,
               onTap: () => onTabSelected(VmMainTab.me),
