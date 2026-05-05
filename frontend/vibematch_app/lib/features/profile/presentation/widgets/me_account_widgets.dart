@@ -59,12 +59,10 @@ class MeRelationshipPanel extends StatelessWidget {
   const MeRelationshipPanel({
     super.key,
     required this.relationshipLabel,
-    required this.onSeeAllTap,
     required this.onBondTap,
   });
 
   final String relationshipLabel;
-  final VoidCallback onSeeAllTap;
   final ValueChanged<LoveBondCardData> onBondTap;
 
   @override
@@ -75,31 +73,9 @@ class MeRelationshipPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Love & Bonds',
-                  style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900),
-                ),
-              ),
-              InkWell(
-                onTap: onSeeAllTap,
-                borderRadius: BorderRadius.circular(99),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFAF7F1),
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: const Color(0xFFECE2D8)),
-                  ),
-                  child: const Text(
-                    'See all',
-                    style: TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-            ],
+          const Text(
+            'Love & Bonds',
+            style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 13),
           SizedBox(
