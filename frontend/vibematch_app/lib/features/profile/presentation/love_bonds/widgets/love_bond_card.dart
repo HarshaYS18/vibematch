@@ -71,27 +71,9 @@ class LoveBondCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned(
-                top: 31,
-                right: 7,
-                child: Container(
-                  width: 19,
-                  height: 19,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [Colors.white, bond.primaryColor.withValues(alpha: 0.86)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(color: Colors.white.withValues(alpha: 0.36), blurRadius: 6),
-                    ],
-                  ),
-                  child: Icon(bond.badgeIcon, color: Colors.white, size: 11),
-                ),
-              ),
               Positioned.fill(
-                top: 31,
-                bottom: 7,
+                top: 34,
+                bottom: 11,
                 left: 4,
                 right: 4,
                 child: Column(
@@ -126,18 +108,6 @@ class LoveBondCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Text(
-                      bond.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        fontSize: 7.4,
-                        fontWeight: FontWeight.w900,
-                        shadows: const [Shadow(color: Colors.black26, blurRadius: 3)],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -157,8 +127,8 @@ class _PartnerAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 43,
-      height: 43,
+      width: 45,
+      height: 45,
       padding: const EdgeInsets.all(2.2),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -171,7 +141,7 @@ class _PartnerAvatar extends StatelessWidget {
         backgroundColor: bond.primaryColor.withValues(alpha: 0.68),
         child: Text(
           bond.rightAvatarInitial,
-          style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
         ),
       ),
     );
