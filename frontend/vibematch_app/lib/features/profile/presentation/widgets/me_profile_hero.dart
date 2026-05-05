@@ -88,7 +88,6 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
     _coverTimer?.cancel();
     _coverTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted || !_coverController.hasClients || publicProfileCoverPhotos.length < 2) return;
-
       final nextIndex = (_coverIndex + 1) % publicProfileCoverPhotos.length;
       _coverController.animateToPage(
         nextIndex,
@@ -115,9 +114,7 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                   controller: _coverController,
                   itemCount: publicProfileCoverPhotos.length,
                   onPageChanged: (index) => setState(() => _coverIndex = index),
-                  itemBuilder: (context, index) {
-                    return PublicCoverPhotoView(cover: publicProfileCoverPhotos[index]);
-                  },
+                  itemBuilder: (context, index) => PublicCoverPhotoView(cover: publicProfileCoverPhotos[index]),
                 ),
               ),
               Positioned(
@@ -176,9 +173,10 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Expanded(
+                    Flexible(
                       child: Text(
                         widget.displayName,
                         maxLines: 1,
@@ -192,7 +190,7 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                       ),
                     ),
                     if (_showOfficialTick) ...[
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 5),
                       const Icon(Icons.verified_rounded, color: Color(0xFFFFC857), size: 24),
                     ],
                   ],
@@ -325,10 +323,7 @@ class _MeCoverAvatar extends StatelessWidget {
           ),
         ),
         child: Center(
-          child: Text(
-            firstLetter,
-            style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900),
-          ),
+          child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900)),
         ),
       ),
     );
@@ -344,29 +339,15 @@ class _PresenceChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOnline = presence == MePresenceStatus.online;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF12C7B7).withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(99),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFF12C7B7).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(99)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            height: 9,
-            width: 9,
-            decoration: BoxDecoration(
-              color: isOnline ? const Color(0xFF12C7B7) : const Color(0xFFB8B0C2),
-              shape: BoxShape.circle,
-            ),
-          ),
+          Container(height: 9, width: 9, decoration: BoxDecoration(color: isOnline ? const Color(0xFF12C7B7) : const Color(0xFFB8B0C2), shape: BoxShape.circle)),
           const SizedBox(width: 7),
-          Text(
-            lastSeenText,
-            style: const TextStyle(color: Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w900),
-          ),
+          Text(lastSeenText, style: const TextStyle(color: Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -382,21 +363,13 @@ class _RoomStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF6D5DF6).withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(99),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFF6D5DF6).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(99)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.graphic_eq_rounded, color: Color(0xFF6D5DF6), size: 14),
           const SizedBox(width: 6),
-          Text(
-            'In chatroom: $roomName',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
-          ),
+          Text('In chatroom: $roomName', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -404,13 +377,7 @@ class _RoomStatusChip extends StatelessWidget {
 }
 
 class _BalanceCapsule extends StatelessWidget {
-  const _BalanceCapsule({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
+  const _BalanceCapsule({required this.label, required this.value, required this.icon, required this.color, required this.onTap});
 
   final String label;
   final String value;
@@ -438,16 +405,8 @@ class _BalanceCapsule extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900),
-                  ),
-                  Text(
-                    label,
-                    style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 11, fontWeight: FontWeight.w800),
-                  ),
+                  Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900)),
+                  Text(label, style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 11, fontWeight: FontWeight.w800)),
                 ],
               ),
             ),
