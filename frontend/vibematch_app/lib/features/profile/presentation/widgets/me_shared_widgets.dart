@@ -104,11 +104,7 @@ class MePremiumAvatar extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: vipColor, width: 1.5),
                 ),
-                child: const Icon(
-                  Icons.open_in_new_rounded,
-                  color: Color(0xFF251538),
-                  size: 13,
-                ),
+                child: const Icon(Icons.open_in_new_rounded, color: Color(0xFF251538), size: 13),
               ),
             ),
         ],
@@ -142,7 +138,7 @@ class MeNameWithOfficialTick extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: centered ? MainAxisAlignment.center : MainAxisAlignment.start,
-      mainAxisSize: centered ? MainAxisSize.min : MainAxisSize.max,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Flexible(
           child: Text(
@@ -159,7 +155,7 @@ class MeNameWithOfficialTick extends StatelessWidget {
           ),
         ),
         if (_showTick) ...[
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           const Icon(Icons.verified_rounded, color: Color(0xFFFFD36A), size: 21),
         ],
       ],
@@ -185,9 +181,9 @@ class MeFamilyTagLight extends StatelessWidget {
       familyName: '$familyName Lv.$familyLevel',
       familyLevel: meFamilyTierFromLevel(familyLevel),
       onTap: onTap,
-      height: 24,
-      minWidth: 86,
-      maxWidth: 148,
+      height: 26,
+      minWidth: 92,
+      maxWidth: 152,
     );
   }
 }
@@ -214,43 +210,50 @@ class MeProfileMiniBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final vipLevel = _levelForPrefix('VIP');
     if (vipLevel != null) {
-      return VipBadge(
-        level: vipLevel,
-        size: VipBadgeSize.small,
-        showWhenZero: true,
+      return SizedBox(
+        height: 28,
+        child: Center(
+          child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true),
+        ),
       );
     }
 
     final svipLevel = _levelForPrefix('SVIP');
     if (svipLevel != null) {
-      return MiniProfileCleanLevelPill(
-        label: 'SVIP $svipLevel',
-        icon: Icons.diamond_rounded,
-        width: 82,
-        background: const Color(0xFF30220B),
-        border: const Color(0xFFD7AA45),
-        textColor: const Color(0xFFFFE2A1),
-        shineColor: const Color(0xFFFFF1B8),
-        active: svipLevel > 0,
-        onTap: () {},
+      return SizedBox(
+        height: 28,
+        child: Center(
+          child: MiniProfileCleanLevelPill(
+            label: 'SVIP $svipLevel',
+            icon: Icons.diamond_rounded,
+            width: 86,
+            background: const Color(0xFF30220B),
+            border: const Color(0xFFD7AA45),
+            textColor: const Color(0xFFFFE2A1),
+            shineColor: const Color(0xFFFFF1B8),
+            active: svipLevel > 0,
+            onTap: () {},
+          ),
+        ),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 13),
+          Icon(icon, color: color, size: 14),
           const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -310,15 +313,9 @@ class MeProfileStat extends StatelessWidget {
             children: [
               Icon(icon, color: const Color(0xFF6D5DF6), size: 20),
               const SizedBox(height: 5),
-              Text(
-                value,
-                style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900, fontSize: 17),
-              ),
+              Text(value, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900, fontSize: 17)),
               const SizedBox(height: 2),
-              Text(
-                label,
-                style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w700),
-              ),
+              Text(label, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w700)),
             ],
           ),
         ),
