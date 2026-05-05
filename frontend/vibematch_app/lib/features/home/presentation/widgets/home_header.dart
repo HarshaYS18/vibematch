@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/icons/vm_icons.dart';
 import '../../models/home_room_data.dart';
 import 'home_action_button.dart';
 import 'home_room_shortcut.dart';
@@ -39,10 +40,10 @@ class HomeHeader extends StatelessWidget {
               ),
             ),
           ),
-          HomeActionButton(icon: Icons.search_rounded, onTap: onSearchTap),
+          HomeActionButton(icon: VMIcons.search, onTap: onSearchTap),
           const SizedBox(width: 8),
           HomeActionButton(
-            icon: Icons.notifications_rounded,
+            icon: VMIcons.notifications,
             onTap: onNotificationsTap,
           ),
         ],
