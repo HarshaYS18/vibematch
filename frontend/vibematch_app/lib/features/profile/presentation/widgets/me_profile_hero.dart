@@ -97,6 +97,40 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
     });
   }
 
+  List<Widget> _badgeLineItems() {
+    return [
+      if (widget.roleTag != null)
+        MeProfileMiniBadge(
+          label: widget.roleTag!,
+          icon: widget.roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
+          color: const Color(0xFFC99A3B),
+        ),
+      InkWell(
+        onTap: widget.onVipTap,
+        borderRadius: BorderRadius.circular(99),
+        child: MeProfileMiniBadge(
+          label: widget.vipFrozen ? 'VIP ${widget.vipLevel} Frozen' : 'VIP ${widget.vipLevel}',
+          icon: widget.vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
+          color: widget.vipColor,
+        ),
+      ),
+      InkWell(
+        onTap: widget.onVipTap,
+        borderRadius: BorderRadius.circular(99),
+        child: MeProfileMiniBadge(
+          label: 'SVIP ${widget.svipLevel}',
+          icon: Icons.auto_awesome_rounded,
+          color: const Color(0xFFC99A3B),
+        ),
+      ),
+      MeFamilyTagLight(
+        familyName: widget.familyName,
+        familyLevel: widget.familyLevel,
+        onTap: widget.onFamilyTap,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -122,15 +156,9 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                 top: 14,
                 child: Row(
                   children: [
-                    PublicHeaderIconButton(
-                      icon: Icons.add_photo_alternate_rounded,
-                      onTap: widget.onQrTap,
-                    ),
+                    PublicHeaderIconButton(icon: Icons.add_photo_alternate_rounded, onTap: widget.onQrTap),
                     const SizedBox(width: 8),
-                    PublicHeaderIconButton(
-                      icon: Icons.qr_code_rounded,
-                      onTap: widget.onQrTap,
-                    ),
+                    PublicHeaderIconButton(icon: Icons.qr_code_rounded, onTap: widget.onQrTap),
                   ],
                 ),
               ),
@@ -198,48 +226,24 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                 const SizedBox(height: 6),
                 Text(
                   'ID ${widget.publicId}',
-                  style: const TextStyle(
-                    color: Color(0xFF8C7B8F),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 13, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (widget.roleTag != null)
-                      MeProfileMiniBadge(
-                        label: widget.roleTag!,
-                        icon: widget.roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
-                        color: const Color(0xFFC99A3B),
-                      ),
-                    InkWell(
-                      onTap: widget.onVipTap,
-                      borderRadius: BorderRadius.circular(99),
-                      child: MeProfileMiniBadge(
-                        label: widget.vipFrozen ? 'VIP ${widget.vipLevel} Frozen' : 'VIP ${widget.vipLevel}',
-                        icon: widget.vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
-                        color: widget.vipColor,
-                      ),
+                SizedBox(
+                  height: 30,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        for (var index = 0; index < _badgeLineItems().length; index++) ...[
+                          _badgeLineItems()[index],
+                          if (index != _badgeLineItems().length - 1) const SizedBox(width: 8),
+                        ],
+                      ],
                     ),
-                    InkWell(
-                      onTap: widget.onVipTap,
-                      borderRadius: BorderRadius.circular(99),
-                      child: MeProfileMiniBadge(
-                        label: 'SVIP ${widget.svipLevel}',
-                        icon: Icons.auto_awesome_rounded,
-                        color: const Color(0xFFC99A3B),
-                      ),
-                    ),
-                    MeFamilyTagLight(
-                      familyName: widget.familyName,
-                      familyLevel: widget.familyLevel,
-                      onTap: widget.onFamilyTap,
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -303,24 +307,14 @@ class _MeCoverAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF251538).withValues(alpha: 0.18),
-            blurRadius: 18,
-            offset: const Offset(0, 9),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9))],
       ),
       child: Container(
         width: 96,
         height: 96,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)],
-          ),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)]),
         ),
         child: Center(
           child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900)),
@@ -392,11 +386,7 @@ class _BalanceCapsule extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFAF7F1),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFECE2D8)),
-        ),
+        decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFECE2D8))),
         child: Row(
           children: [
             Icon(icon, color: color, size: 22),
