@@ -70,33 +70,22 @@ class PublicProfileHeader extends StatelessWidget {
                   controller: coverController,
                   itemCount: coverPhotos.length,
                   onPageChanged: onCoverChanged,
-                  itemBuilder: (context, index) {
-                    return PublicCoverPhotoView(cover: coverPhotos[index]);
-                  },
+                  itemBuilder: (context, index) => PublicCoverPhotoView(cover: coverPhotos[index]),
                 ),
               ),
               Positioned(
                 left: 14,
                 top: 14,
-                child: PublicHeaderIconButton(
-                  icon: Icons.arrow_back_rounded,
-                  onTap: onBackTap,
-                ),
+                child: PublicHeaderIconButton(icon: Icons.arrow_back_rounded, onTap: onBackTap),
               ),
               Positioned(
                 right: 14,
                 top: 14,
                 child: Row(
                   children: [
-                    PublicHeaderIconButton(
-                      icon: Icons.add_photo_alternate_rounded,
-                      onTap: onAddCoverTap,
-                    ),
+                    PublicHeaderIconButton(icon: Icons.add_photo_alternate_rounded, onTap: onAddCoverTap),
                     const SizedBox(width: 8),
-                    PublicHeaderIconButton(
-                      icon: Icons.ios_share_rounded,
-                      onTap: onShareTap,
-                    ),
+                    PublicHeaderIconButton(icon: Icons.ios_share_rounded, onTap: onShareTap),
                   ],
                 ),
               ),
@@ -114,9 +103,7 @@ class PublicProfileHeader extends StatelessWidget {
                       width: index == coverIndex ? 18 : 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(
-                          alpha: index == coverIndex ? 0.95 : 0.45,
-                        ),
+                        color: Colors.white.withValues(alpha: index == coverIndex ? 0.95 : 0.45),
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
@@ -137,9 +124,10 @@ class PublicProfileHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Expanded(
+                    Flexible(
                       child: Text(
                         displayName,
                         maxLines: 1,
@@ -153,78 +141,37 @@ class PublicProfileHeader extends StatelessWidget {
                       ),
                     ),
                     if (showOfficialTick) ...[
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.verified_rounded,
-                        color: Color(0xFFFFC857),
-                        size: 24,
-                      ),
+                      const SizedBox(width: 5),
+                      const Icon(Icons.verified_rounded, color: Color(0xFFFFC857), size: 24),
                     ],
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'ID $publicId',
-                  style: const TextStyle(
-                    color: Color(0xFF8C7B8F),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 13, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     if (roleTag != null)
-                      PublicBadge(
-                        icon: Icons.workspace_premium_rounded,
-                        label: roleTag!,
-                        color: const Color(0xFFFFD36A),
-                      ),
-                    PublicBadge(
-                      icon: Icons.diamond_rounded,
-                      label: 'VIP $vipLevel',
-                      color: const Color(0xFFE84C72),
-                    ),
-                    PublicBadge(
-                      icon: Icons.auto_awesome_rounded,
-                      label: 'SVIP $svipLevel',
-                      color: const Color(0xFF6D5DF6),
-                    ),
-                    PublicBadge(
-                      icon: Icons.family_restroom_rounded,
-                      label: '$familyName Lv.$familyLevel',
-                      color: const Color(0xFF12C7B7),
-                    ),
+                      PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
+                    PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72)),
+                    PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6)),
+                    PublicBadge(icon: Icons.family_restroom_rounded, label: '$familyName Lv.$familyLevel', color: const Color(0xFF12C7B7)),
                   ],
                 ),
                 const SizedBox(height: 12),
-                _PresenceLine(
-                  presenceLabel: presenceLabel,
-                  currentRoomName: currentRoomName,
-                  onRoomTap: onRoomTap,
-                ),
+                _PresenceLine(presenceLabel: presenceLabel, currentRoomName: currentRoomName, onRoomTap: onRoomTap),
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    Expanded(
-                      child: PublicMainProfileButton(
-                        label: followStatus.label,
-                        icon: followStatus.icon,
-                        filled: true,
-                        onTap: onFollowTap,
-                      ),
-                    ),
+                    Expanded(child: PublicMainProfileButton(label: followStatus.label, icon: followStatus.icon, filled: true, onTap: onFollowTap)),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: PublicMainProfileButton(
-                        label: 'Message',
-                        icon: Icons.chat_bubble_rounded,
-                        filled: false,
-                        onTap: onMessageTap,
-                      ),
-                    ),
+                    Expanded(child: PublicMainProfileButton(label: 'Message', icon: Icons.chat_bubble_rounded, filled: false, onTap: onMessageTap)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -263,11 +210,7 @@ class _PublicAvatar extends StatelessWidget {
         color: Colors.white,
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF251538).withValues(alpha: 0.18),
-            blurRadius: 18,
-            offset: const Offset(0, 9),
-          ),
+          BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9)),
         ],
       ),
       child: Container(
@@ -275,25 +218,10 @@ class _PublicAvatar extends StatelessWidget {
         height: 96,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF6D5DF6),
-              Color(0xFFE84C72),
-              Color(0xFFFFD36A),
-            ],
-          ),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)]),
         ),
         child: Center(
-          child: Text(
-            firstLetter,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 40,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900)),
         ),
       ),
     );
@@ -301,11 +229,7 @@ class _PublicAvatar extends StatelessWidget {
 }
 
 class _PresenceLine extends StatelessWidget {
-  const _PresenceLine({
-    required this.presenceLabel,
-    required this.currentRoomName,
-    required this.onRoomTap,
-  });
+  const _PresenceLine({required this.presenceLabel, required this.currentRoomName, required this.onRoomTap});
 
   final String presenceLabel;
   final String? currentRoomName;
@@ -314,26 +238,17 @@ class _PresenceLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roomName = currentRoomName;
-
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        PublicTinyStatusChip(
-          icon: Icons.circle,
-          label: presenceLabel,
-          color: const Color(0xFF12C7B7),
-        ),
+        PublicTinyStatusChip(icon: Icons.circle, label: presenceLabel, color: const Color(0xFF12C7B7)),
         if (roomName != null)
           InkWell(
             onTap: onRoomTap,
             borderRadius: BorderRadius.circular(99),
-            child: PublicTinyStatusChip(
-              icon: Icons.graphic_eq_rounded,
-              label: 'In chatroom: $roomName',
-              color: const Color(0xFF6D5DF6),
-            ),
+            child: PublicTinyStatusChip(icon: Icons.graphic_eq_rounded, label: 'In chatroom: $roomName', color: const Color(0xFF6D5DF6)),
           ),
       ],
     );
