@@ -88,33 +88,68 @@ class RoomWallpaperItem {
     required this.name,
     required this.type,
     required this.assetPath,
+    this.remoteUrl,
+    this.thumbnailUrl,
   });
 
   final String id;
   final String name;
   final RoomWallpaperType type;
   final String assetPath;
+  final String? remoteUrl;
+  final String? thumbnailUrl;
 
   bool get isVideo => type == RoomWallpaperType.video;
+  bool get isCdnReady => remoteUrl != null && remoteUrl!.trim().isNotEmpty;
 }
 
 const List<RoomWallpaperItem> ownedRoomWallpaperItems = [
   RoomWallpaperItem(
-    id: 'default_luxury_static',
-    name: 'Default Luxury',
+    id: 'celestial_falls',
+    name: 'Celestial Falls',
     type: RoomWallpaperType.image,
-    assetPath: 'assets/images/rooms/backgrounds/default_luxury.png',
+    assetPath: '$roomDefaultBackgroundAssetBase/celestial_falls.webp',
   ),
   RoomWallpaperItem(
-    id: 'default_dark_static',
-    name: 'Default Dark',
+    id: 'moonlit_biolume_shore',
+    name: 'Moonlit Biolume Shore',
     type: RoomWallpaperType.image,
-    assetPath: 'assets/images/rooms/backgrounds/default_dark.png',
+    assetPath: '$roomDefaultBackgroundAssetBase/moonlit_biolume_shore.webp',
   ),
   RoomWallpaperItem(
-    id: 'vibe_sync_static',
-    name: 'VibeSync',
+    id: 'aurora_frost_lake',
+    name: 'Aurora Frost Lake',
     type: RoomWallpaperType.image,
-    assetPath: 'assets/images/rooms/backgrounds/vibe_sync.png',
+    assetPath: '$roomDefaultBackgroundAssetBase/aurora_frost_lake.webp',
+  ),
+  RoomWallpaperItem(
+    id: 'desert_dusk_oasis',
+    name: 'Desert Dusk Oasis',
+    type: RoomWallpaperType.image,
+    assetPath: '$roomDefaultBackgroundAssetBase/desert_dusk_oasis.webp',
+  ),
+  RoomWallpaperItem(
+    id: 'alpine_twilight_mirror',
+    name: 'Alpine Twilight Mirror',
+    type: RoomWallpaperType.image,
+    assetPath: '$roomDefaultBackgroundAssetBase/alpine_twilight_mirror.webp',
+  ),
+  RoomWallpaperItem(
+    id: 'crimson_coast_beacon',
+    name: 'Crimson Coast Beacon',
+    type: RoomWallpaperType.image,
+    assetPath: '$roomDefaultBackgroundAssetBase/crimson_coast_beacon.webp',
+  ),
+  RoomWallpaperItem(
+    id: 'moonlit_whisper_grove',
+    name: 'Moonlit Whisper Grove',
+    type: RoomWallpaperType.image,
+    assetPath: '$roomDefaultBackgroundAssetBase/moonlit_whisper_grove.webp',
+  ),
+  RoomWallpaperItem(
+    id: 'cosmic_horizon_veil',
+    name: 'Cosmic Horizon Veil',
+    type: RoomWallpaperType.image,
+    assetPath: '$roomDefaultBackgroundAssetBase/cosmic_horizon_veil.webp',
   ),
 ];
