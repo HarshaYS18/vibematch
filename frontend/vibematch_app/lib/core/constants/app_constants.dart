@@ -6,12 +6,11 @@ class AppConstants {
   // Official app logo asset path.
   static const String logoPath = 'assets/images/branding/vibe_match_logo.png';
 
-  // Laptop Wi-Fi IP for testing on a real Android phone.
-  // Your current laptop IP from ipconfig: 192.168.29.240
-  static const String apiBaseUrl = 'http://192.168.29.240:8000';
+  // Default local backend URL for Flutter Web / Edge testing on the same laptop.
+  static const String apiBaseUrl = 'http://127.0.0.1:8000';
 
-  // Same backend URL for web/dev testing when needed.
-  static const String webApiBaseUrl = 'http://192.168.29.240:8000';
+  // Same backend URL for ApiClient-based modules like Home/Rooms/Splash.
+  static const String webApiBaseUrl = 'http://127.0.0.1:8000';
 
   static const Duration connectTimeout = Duration(seconds: 20);
   static const Duration receiveTimeout = Duration(seconds: 20);
