@@ -117,12 +117,7 @@ class PublicHeaderIconButton extends StatelessWidget {
 }
 
 class PublicTinyStatusChip extends StatelessWidget {
-  const PublicTinyStatusChip({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const PublicTinyStatusChip({super.key, required this.icon, required this.label, required this.color});
 
   final IconData icon;
   final String label;
@@ -132,19 +127,13 @@ class PublicTinyStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(99),
-      ),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(99)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: color, size: 13),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
-          ),
+          Text(label, style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -152,12 +141,7 @@ class PublicTinyStatusChip extends StatelessWidget {
 }
 
 class PublicBadge extends StatelessWidget {
-  const PublicBadge({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const PublicBadge({super.key, required this.icon, required this.label, required this.color});
 
   final IconData icon;
   final String label;
@@ -188,25 +172,29 @@ class PublicBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final vipLevel = _levelForPrefix('VIP');
     if (vipLevel != null) {
-      return VipBadge(
-        level: vipLevel,
-        size: VipBadgeSize.small,
-        showWhenZero: true,
+      return SizedBox(
+        height: 28,
+        child: Center(child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true)),
       );
     }
 
     final svipLevel = _levelForPrefix('SVIP');
     if (svipLevel != null) {
-      return MiniProfileCleanLevelPill(
-        label: 'SVIP $svipLevel',
-        icon: Icons.diamond_rounded,
-        width: 82,
-        background: const Color(0xFF30220B),
-        border: const Color(0xFFD7AA45),
-        textColor: const Color(0xFFFFE2A1),
-        shineColor: const Color(0xFFFFF1B8),
-        active: svipLevel > 0,
-        onTap: () {},
+      return SizedBox(
+        height: 28,
+        child: Center(
+          child: MiniProfileCleanLevelPill(
+            label: 'SVIP $svipLevel',
+            icon: Icons.diamond_rounded,
+            width: 86,
+            background: const Color(0xFF30220B),
+            border: const Color(0xFFD7AA45),
+            textColor: const Color(0xFFFFE2A1),
+            shineColor: const Color(0xFFFFF1B8),
+            active: svipLevel > 0,
+            onTap: () {},
+          ),
+        ),
       );
     }
 
@@ -215,28 +203,26 @@ class PublicBadge extends StatelessWidget {
         familyName: label,
         familyLevel: _familyTier,
         onTap: () {},
-        height: 24,
-        minWidth: 88,
-        maxWidth: 150,
+        height: 26,
+        minWidth: 92,
+        maxWidth: 152,
       );
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 15),
+          Icon(icon, color: color, size: 14),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
-          ),
+          Text(label, style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -244,13 +230,7 @@ class PublicBadge extends StatelessWidget {
 }
 
 class PublicMainProfileButton extends StatelessWidget {
-  const PublicMainProfileButton({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.filled,
-    required this.onTap,
-  });
+  const PublicMainProfileButton({super.key, required this.label, required this.icon, required this.filled, required this.onTap});
 
   final String label;
   final IconData icon;
@@ -274,14 +254,7 @@ class PublicMainProfileButton extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: filled ? Colors.white : const Color(0xFF251538)),
           const SizedBox(width: 7),
-          Text(
-            label,
-            style: TextStyle(
-              color: filled ? Colors.white : const Color(0xFF251538),
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          Text(label, style: TextStyle(color: filled ? Colors.white : const Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -305,17 +278,9 @@ class PublicStat extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(
-            value,
-            style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900),
-          ),
+          Text(value, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
           const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 10, fontWeight: FontWeight.w800),
-          ),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 10, fontWeight: FontWeight.w800)),
         ],
       ),
     );
