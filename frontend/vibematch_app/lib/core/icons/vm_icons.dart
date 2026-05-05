@@ -24,6 +24,7 @@ abstract final class VMIcons {
   static const IconData chevronRight = Icons.chevron_right_rounded;
   static const IconData check = Icons.check_rounded;
   static const IconData checkCircle = Icons.check_circle_rounded;
+  static const IconData refresh = Icons.refresh_rounded;
   static const IconData edit = Icons.edit_rounded;
   static const IconData share = Icons.share_rounded;
 
@@ -32,6 +33,18 @@ abstract final class VMIcons {
   static const IconData verified = Icons.verified_rounded;
   static const IconData active = Icons.radio_button_checked_rounded;
   static const IconData inactive = Icons.radio_button_unchecked_rounded;
+  static const IconData cloudDone = Icons.cloud_done_rounded;
+  static const IconData wifiOff = Icons.wifi_off_rounded;
+
+  // Home/discovery.
+  static const IconData createRoom = Icons.add_home_work_rounded;
+  static const IconData publicRoom = Icons.public_rounded;
+  static const IconData people = Icons.people_rounded;
+  static const IconData fire = Icons.local_fire_department_rounded;
+  static const IconData category = Icons.category_rounded;
+  static const IconData music = Icons.music_note_rounded;
+  static const IconData bolt = Icons.bolt_rounded;
+  static const IconData audioWave = Icons.graphic_eq_rounded;
 
   // Social / profile.
   static const IconData user = Icons.person_rounded;
