@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/icons/vm_icons.dart';
 import '../../models/home_room.dart';
 
 class HomeRoomCard extends StatelessWidget {
@@ -25,11 +26,11 @@ class HomeRoomCard extends StatelessWidget {
 
   IconData get _modeIcon {
     final mode = room.mode.toLowerCase();
-    if (mode.contains('secret')) return Icons.visibility_off_rounded;
-    if (mode.contains('lock')) return Icons.lock_rounded;
-    if (mode.contains('member')) return Icons.workspace_premium_rounded;
-    if (mode.contains('sync')) return Icons.graphic_eq_rounded;
-    return Icons.public_rounded;
+    if (mode.contains('secret')) return VMIcons.secret;
+    if (mode.contains('lock')) return VMIcons.lock;
+    if (mode.contains('member')) return VMIcons.vip;
+    if (mode.contains('sync')) return VMIcons.audioWave;
+    return VMIcons.publicRoom;
   }
 
   @override
@@ -126,10 +127,10 @@ class HomeRoomCard extends StatelessWidget {
                     spacing: 7,
                     runSpacing: 7,
                     children: [
-                      _HomeRoomMiniPill(icon: Icons.language_rounded, text: room.language),
-                      _HomeRoomMiniPill(icon: Icons.people_rounded, text: '${room.onlineCount}'),
-                      _HomeRoomMiniPill(icon: Icons.local_fire_department_rounded, text: '${room.trendingScore}'),
-                      _HomeRoomMiniPill(icon: Icons.category_rounded, text: room.type),
+                      _HomeRoomMiniPill(icon: VMIcons.language, text: room.language),
+                      _HomeRoomMiniPill(icon: VMIcons.people, text: '${room.onlineCount}'),
+                      _HomeRoomMiniPill(icon: VMIcons.fire, text: '${room.trendingScore}'),
+                      _HomeRoomMiniPill(icon: VMIcons.category, text: room.type),
                     ],
                   ),
                   const SizedBox(height: 9),
@@ -144,7 +145,7 @@ class HomeRoomCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF7B6A86)),
+                      const Icon(VMIcons.chevronRight, color: Color(0xFF7B6A86)),
                     ],
                   ),
                 ],
@@ -192,12 +193,12 @@ class _HomeRoomAvatar extends StatelessWidget {
       ),
       child: Icon(
         room.type == 'Gaming'
-            ? Icons.sports_esports_rounded
+            ? VMIcons.games
             : room.type == 'PK'
-                ? Icons.bolt_rounded
+                ? VMIcons.bolt
                 : room.type == 'Music'
-                    ? Icons.music_note_rounded
-                    : Icons.graphic_eq_rounded,
+                    ? VMIcons.music
+                    : VMIcons.audioWave,
         color: Colors.white,
         size: size * 0.42,
       ),
