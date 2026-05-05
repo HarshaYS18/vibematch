@@ -17,8 +17,6 @@ dependencies:
   device_info_plus: ^13.1.0
   uuid: ^4.5.3
   video_player: ^2.10.1
-
-  # Icon pack layer
   phosphor_flutter: ^2.1.0
   flutter_svg: ^2.0.10
 
@@ -41,17 +39,14 @@ flutter:
     - assets/images/events/
     - assets/videos/gifts/
     - assets/images/rooms/backgrounds/
-
     - assets/images/room_backgrounds/chat_room/default/
     - assets/images/room_backgrounds/chat_room/premium_dark/
     - assets/images/room_backgrounds/chat_room/pearl/
     - assets/images/room_backgrounds/chat_room/locked_room/
     - assets/images/room_backgrounds/chat_room/secret_vibe/
-
     - assets/images/room_backgrounds/vibe_sync/default/
     - assets/images/room_backgrounds/vibe_sync/premium/
     - assets/images/room_backgrounds/vibe_sync/event/
-
     - assets/images/room_backgrounds/vip/vip_1/
     - assets/images/room_backgrounds/vip/vip_5/
     - assets/images/room_backgrounds/vip/vip_10/
@@ -61,22 +56,18 @@ flutter:
     - assets/images/room_backgrounds/vip/vip_30/
     - assets/images/room_backgrounds/vip/vip_40/
     - assets/images/room_backgrounds/vip/vip_50/
-
     - assets/images/room_backgrounds/svip/svip_1/
     - assets/images/room_backgrounds/svip/svip_2/
     - assets/images/room_backgrounds/svip/svip_3/
     - assets/images/room_backgrounds/svip/monthly_exclusive/
-
     - assets/images/room_backgrounds/store/free/
     - assets/images/room_backgrounds/store/paid/
     - assets/images/room_backgrounds/store/vip/
     - assets/images/room_backgrounds/store/svip/
     - assets/images/room_backgrounds/store/limited/
-
     - assets/images/room_backgrounds/events/active/
     - assets/images/room_backgrounds/events/expired_preview/
     - assets/images/room_backgrounds/events/seasonal/
-
     - assets/images/room_backgrounds/custom_uploads_placeholder/
     - assets/images/family_badges/
     - assets/images/mini_profile_decorations/
