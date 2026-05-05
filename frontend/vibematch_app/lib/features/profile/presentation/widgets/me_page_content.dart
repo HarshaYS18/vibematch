@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
+import '../love_bonds/love_bonds_page.dart';
 import '../models/me_page_models.dart';
 import '../public_profile_view_page.dart';
 import 'me_account_widgets.dart';
@@ -55,6 +56,12 @@ class MePageContent extends StatelessWidget {
     );
   }
 
+  void _openLoveBonds(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const LoveBondsPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final vipColor = MeProfileConstants.vipMainColor(MeProfileConstants.vipLevel);
@@ -98,10 +105,10 @@ class MePageContent extends StatelessWidget {
         const SizedBox(height: 14),
         MeRelationshipPanel(
           relationshipLabel: relationshipType,
-          onSeeAllTap: () => _showAction(context, 'Relationships full page will open.'),
-          onCpTap: () => _showAction(context, 'Love CP card will open.'),
-          onBestieTap: () => _showAction(context, 'Bestie relationship details will open.'),
-          onFamilyTap: () => _showAction(context, '$relationshipType relationship details will open.'),
+          onSeeAllTap: () => _openLoveBonds(context),
+          onCpTap: () => _openLoveBonds(context),
+          onBestieTap: () => _openLoveBonds(context),
+          onFamilyTap: () => _openLoveBonds(context),
         ),
         const SizedBox(height: 18),
         const Text(
