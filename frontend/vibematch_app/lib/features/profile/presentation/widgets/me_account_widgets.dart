@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../love_bonds/models/love_bond_models.dart';
+import '../love_bonds/widgets/love_bond_card.dart';
 import '../models/me_page_models.dart';
 import 'me_shared_widgets.dart';
 
@@ -114,41 +116,34 @@ class MeRelationshipPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 13),
-          Row(
-            children: [
-              Expanded(
-                child: _BondCard(
-                  title: 'CP',
-                  name: 'Not linked',
-                  value: 'Open',
-                  icon: Icons.favorite_rounded,
-                  colors: const [Color(0xFFE84C72), Color(0xFFFFD36A)],
-                  onTap: onCpTap,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _BondCard(
-                  title: 'Bestie',
-                  name: 'Aadhya',
-                  value: 'Lv.8',
-                  icon: Icons.handshake_rounded,
-                  colors: const [Color(0xFF6D5DF6), Color(0xFF12C7B7)],
-                  onTap: onBestieTap,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _BondCard(
-                  title: relationshipLabel,
-                  name: 'Moon Fam',
-                  value: 'Lv.12',
-                  icon: Icons.family_restroom_rounded,
-                  colors: const [Color(0xFF12C7B7), Color(0xFF064D46)],
-                  onTap: onFamilyTap,
-                ),
-              ),
-            ],
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: mockLoveBondCards.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              mainAxisExtent: 270,
+            ),
+            itemBuilder: (context, index) {
+              final bond = mockLoveBondCards[index];
+              return LoveBondCard(
+                bond: bond,
+                onTap: () {
+                  switch (bond.type) {
+                    case LoveBondType.lover:
+                      onCpTap();
+                    case LoveBondType.bestie:
+                      onBestieTap();
+                    case LoveBondType.brother:
+                      onFamilyTap();
+                    case LoveBondType.sister:
+                      onFamilyTap();
+                  }
+                },
+              );
+            },
           ),
         ],
       ),
@@ -302,94 +297,6 @@ class _CompactLevelCard extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BondCard extends StatelessWidget {
-  const _BondCard({
-    required this.title,
-    required this.name,
-    required this.value,
-    required this.icon,
-    required this.colors,
-    required this.onTap,
-  });
-
-  final String title;
-  final String name;
-  final String value;
-  final IconData icon;
-  final List<Color> colors;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.20),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: Colors.white, size: 18),
-            ),
-            const SizedBox(height: 9),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.94),
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 7),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.17),
-                borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-              ),
-              child: Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
               ),
             ),
           ],
