@@ -45,6 +45,7 @@ enum RoomBackgroundOwnershipType {
 
 enum RoomBackgroundLockReason {
   none,
+  inactive,
   vipLevelRequired,
   vipFrozen,
   svipLevelRequired,
@@ -96,6 +97,7 @@ class RoomBackgroundTheme {
     required this.accent,
     this.assetPath,
     this.imageUrl,
+    this.thumbnailUrl,
     this.sourceType = RoomBackgroundSourceType.chatRoom,
     this.unlockType = RoomBackgroundUnlockType.free,
     this.ownershipType = RoomBackgroundOwnershipType.free,
@@ -105,6 +107,8 @@ class RoomBackgroundTheme {
     this.requiresActiveSvip = false,
     this.isPermanentUnlock = false,
     this.isRenewable = false,
+    this.isDefault = false,
+    this.isActive = true,
     this.ownedAt,
     this.expiresAt,
     this.approvalStatus,
@@ -116,6 +120,7 @@ class RoomBackgroundTheme {
   final String name;
   final String? assetPath;
   final String? imageUrl;
+  final String? thumbnailUrl;
   final Color accent;
   final RoomBackgroundSourceType sourceType;
   final RoomBackgroundUnlockType unlockType;
@@ -126,6 +131,8 @@ class RoomBackgroundTheme {
   final bool requiresActiveSvip;
   final bool isPermanentUnlock;
   final bool isRenewable;
+  final bool isDefault;
+  final bool isActive;
   final DateTime? ownedAt;
   final DateTime? expiresAt;
   final String? approvalStatus;
@@ -136,6 +143,7 @@ class RoomBackgroundTheme {
 
   bool get isAssetBacked => assetPath != null && assetPath!.trim().isNotEmpty;
   bool get isNetworkBacked => imageUrl != null && imageUrl!.trim().isNotEmpty;
+  bool get hasThumbnail => thumbnailUrl != null && thumbnailUrl!.trim().isNotEmpty;
   bool get hasExpiry => expiresAt != null;
 
   bool isExpired([DateTime? now]) {
@@ -146,6 +154,14 @@ class RoomBackgroundTheme {
 
   RoomBackgroundAccessState accessFor(RoomBackgroundViewerState viewer) {
     final currentNow = viewer.effectiveNow;
+
+    if (!isActive) {
+      return const RoomBackgroundAccessState(
+        available: false,
+        reason: RoomBackgroundLockReason.inactive,
+        label: 'Unavailable',
+      );
+    }
 
     if (approvalStatus == 'pending') {
       return const RoomBackgroundAccessState(
@@ -234,81 +250,125 @@ class RoomBackgroundTheme {
   }
 }
 
-const String legacyRoomBackgroundAssetBase = 'assets/images/rooms/backgrounds';
-const String roomBackgroundAssetBase = 'assets/images/room_backgrounds';
+const String roomDefaultBackgroundAssetBase =
+    'assets/images/room_backgrounds/chat_room/default';
 
-const RoomBackgroundTheme defaultRoomBackgroundTheme = RoomBackgroundTheme(
-  id: 'default_luxury',
-  name: 'Default Luxury',
-  assetPath: '$legacyRoomBackgroundAssetBase/default_luxury.png',
+const RoomBackgroundTheme celestialFallsRoomBackgroundTheme = RoomBackgroundTheme(
+  id: 'celestial_falls',
+  name: 'Celestial Falls',
+  assetPath: '$roomDefaultBackgroundAssetBase/celestial_falls.webp',
+  accent: RoomColors.aqua,
+  sourceType: RoomBackgroundSourceType.chatRoom,
+  unlockType: RoomBackgroundUnlockType.free,
+  ownershipType: RoomBackgroundOwnershipType.free,
+  isDefault: true,
+  overlayOpacity: 0.34,
+  fallbackColors: [Color(0xFF07131F), Color(0xFF183953)],
+);
+
+const RoomBackgroundTheme moonlitBiolumeShoreRoomBackgroundTheme = RoomBackgroundTheme(
+  id: 'moonlit_biolume_shore',
+  name: 'Moonlit Biolume Shore',
+  assetPath: '$roomDefaultBackgroundAssetBase/moonlit_biolume_shore.webp',
   accent: RoomColors.violet,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
   ownershipType: RoomBackgroundOwnershipType.free,
-  overlayOpacity: 0.42,
-  fallbackColors: [RoomColors.deep, RoomColors.plum],
+  isDefault: true,
+  overlayOpacity: 0.36,
+  fallbackColors: [Color(0xFF050A18), Color(0xFF182C4D)],
 );
 
-const RoomBackgroundTheme defaultDarkRoomBackgroundTheme = RoomBackgroundTheme(
-  id: 'default_dark',
-  name: 'Default Dark',
-  assetPath: '$legacyRoomBackgroundAssetBase/default_dark.png',
+const RoomBackgroundTheme auroraFrostLakeRoomBackgroundTheme = RoomBackgroundTheme(
+  id: 'aurora_frost_lake',
+  name: 'Aurora Frost Lake',
+  assetPath: '$roomDefaultBackgroundAssetBase/aurora_frost_lake.webp',
+  accent: RoomColors.aqua,
+  sourceType: RoomBackgroundSourceType.chatRoom,
+  unlockType: RoomBackgroundUnlockType.free,
+  ownershipType: RoomBackgroundOwnershipType.free,
+  isDefault: true,
+  overlayOpacity: 0.38,
+  fallbackColors: [Color(0xFF07121E), Color(0xFF0D4051)],
+);
+
+const RoomBackgroundTheme desertDuskOasisRoomBackgroundTheme = RoomBackgroundTheme(
+  id: 'desert_dusk_oasis',
+  name: 'Desert Dusk Oasis',
+  assetPath: '$roomDefaultBackgroundAssetBase/desert_dusk_oasis.webp',
   accent: RoomColors.gold,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
   ownershipType: RoomBackgroundOwnershipType.free,
-  overlayOpacity: 0.50,
-  fallbackColors: [RoomColors.deep, Color(0xFF120A24)],
+  isDefault: true,
+  overlayOpacity: 0.40,
+  fallbackColors: [Color(0xFF180B10), Color(0xFF4A2538)],
 );
 
-const RoomBackgroundTheme vip25PermanentRoomBackgroundTheme = RoomBackgroundTheme(
-  id: 'vip_25_royal_dark',
-  name: 'VIP 25 Royal Dark',
-  assetPath: '$roomBackgroundAssetBase/vip/vip_25/vip_25_royal_dark.png',
-  accent: RoomColors.gold,
-  sourceType: RoomBackgroundSourceType.vip,
-  unlockType: RoomBackgroundUnlockType.vipPermanent,
-  ownershipType: RoomBackgroundOwnershipType.permanent,
-  requiredVipLevel: 25,
-  requiresActiveVip: true,
-  isPermanentUnlock: true,
-  overlayOpacity: 0.46,
-  fallbackColors: [Color(0xFF08030F), Color(0xFF2D1746)],
+const RoomBackgroundTheme alpineTwilightMirrorRoomBackgroundTheme = RoomBackgroundTheme(
+  id: 'alpine_twilight_mirror',
+  name: 'Alpine Twilight Mirror',
+  assetPath: '$roomDefaultBackgroundAssetBase/alpine_twilight_mirror.webp',
+  accent: RoomColors.violet,
+  sourceType: RoomBackgroundSourceType.chatRoom,
+  unlockType: RoomBackgroundUnlockType.free,
+  ownershipType: RoomBackgroundOwnershipType.free,
+  isDefault: true,
+  overlayOpacity: 0.36,
+  fallbackColors: [Color(0xFF090B17), Color(0xFF2A1C45)],
 );
 
-const RoomBackgroundTheme svipMonthlyAuroraRoomBackgroundTheme = RoomBackgroundTheme(
-  id: 'svip_monthly_aurora',
-  name: 'SVIP Monthly Aurora',
-  assetPath: '$roomBackgroundAssetBase/svip/monthly_exclusive/svip_monthly_aurora.png',
-  accent: RoomColors.aqua,
-  sourceType: RoomBackgroundSourceType.svip,
-  unlockType: RoomBackgroundUnlockType.svipMonthly,
-  ownershipType: RoomBackgroundOwnershipType.subscription,
-  requiredSvipLevel: 1,
-  requiresActiveSvip: true,
-  overlayOpacity: 0.44,
-  fallbackColors: [Color(0xFF06111B), Color(0xFF12344A)],
-);
-
-const RoomBackgroundTheme storeLimitedMidnightRoomBackgroundTheme = RoomBackgroundTheme(
-  id: 'store_limited_midnight',
-  name: 'Limited Midnight',
-  assetPath: '$roomBackgroundAssetBase/store/limited/limited_midnight.png',
+const RoomBackgroundTheme crimsonCoastBeaconRoomBackgroundTheme = RoomBackgroundTheme(
+  id: 'crimson_coast_beacon',
+  name: 'Crimson Coast Beacon',
+  assetPath: '$roomDefaultBackgroundAssetBase/crimson_coast_beacon.webp',
   accent: RoomColors.coral,
-  sourceType: RoomBackgroundSourceType.store,
-  unlockType: RoomBackgroundUnlockType.storePurchase,
-  ownershipType: RoomBackgroundOwnershipType.timeLimited,
-  isRenewable: true,
-  overlayOpacity: 0.48,
-  fallbackColors: [Color(0xFF090411), Color(0xFF371225)],
+  sourceType: RoomBackgroundSourceType.chatRoom,
+  unlockType: RoomBackgroundUnlockType.free,
+  ownershipType: RoomBackgroundOwnershipType.free,
+  isDefault: true,
+  overlayOpacity: 0.42,
+  fallbackColors: [Color(0xFF160711), Color(0xFF4B1628)],
 );
+
+const RoomBackgroundTheme moonlitWhisperGroveRoomBackgroundTheme = RoomBackgroundTheme(
+  id: 'moonlit_whisper_grove',
+  name: 'Moonlit Whisper Grove',
+  assetPath: '$roomDefaultBackgroundAssetBase/moonlit_whisper_grove.webp',
+  accent: RoomColors.aqua,
+  sourceType: RoomBackgroundSourceType.chatRoom,
+  unlockType: RoomBackgroundUnlockType.free,
+  ownershipType: RoomBackgroundOwnershipType.free,
+  isDefault: true,
+  overlayOpacity: 0.40,
+  fallbackColors: [Color(0xFF030B12), Color(0xFF0F2937)],
+);
+
+const RoomBackgroundTheme cosmicHorizonVeilRoomBackgroundTheme = RoomBackgroundTheme(
+  id: 'cosmic_horizon_veil',
+  name: 'Cosmic Horizon Veil',
+  assetPath: '$roomDefaultBackgroundAssetBase/cosmic_horizon_veil.webp',
+  accent: RoomColors.violet,
+  sourceType: RoomBackgroundSourceType.chatRoom,
+  unlockType: RoomBackgroundUnlockType.free,
+  ownershipType: RoomBackgroundOwnershipType.free,
+  isDefault: true,
+  overlayOpacity: 0.44,
+  fallbackColors: [Color(0xFF070414), Color(0xFF251538)],
+);
+
+const RoomBackgroundTheme defaultRoomBackgroundTheme =
+    celestialFallsRoomBackgroundTheme;
 
 const List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
-  defaultRoomBackgroundTheme,
-  defaultDarkRoomBackgroundTheme,
-  vip25PermanentRoomBackgroundTheme,
-  svipMonthlyAuroraRoomBackgroundTheme,
-  storeLimitedMidnightRoomBackgroundTheme,
+  celestialFallsRoomBackgroundTheme,
+  moonlitBiolumeShoreRoomBackgroundTheme,
+  auroraFrostLakeRoomBackgroundTheme,
+  desertDuskOasisRoomBackgroundTheme,
+  alpineTwilightMirrorRoomBackgroundTheme,
+  crimsonCoastBeaconRoomBackgroundTheme,
+  moonlitWhisperGroveRoomBackgroundTheme,
+  cosmicHorizonVeilRoomBackgroundTheme,
 ];
 
 const List<RoomBackgroundTheme> mockRoomBackgroundThemes = ownedRoomBackgroundThemes;
@@ -352,24 +412,17 @@ class _RoomBackgroundImage extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         _FallbackGradient(colors: theme.fallbackColors),
-        if (theme.isAssetBacked)
-          Image.asset(
-            theme.assetPath!,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            errorBuilder: (context, error, stackTrace) {
-              return const SizedBox.shrink();
-            },
-          )
-        else if (theme.isNetworkBacked)
+        if (theme.isNetworkBacked)
           Image.network(
             theme.imageUrl!,
             fit: BoxFit.cover,
             alignment: Alignment.center,
             errorBuilder: (context, error, stackTrace) {
-              return const SizedBox.shrink();
+              return _AssetFallbackImage(theme: theme);
             },
-          ),
+          )
+        else
+          _AssetFallbackImage(theme: theme),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -384,6 +437,26 @@ class _RoomBackgroundImage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AssetFallbackImage extends StatelessWidget {
+  const _AssetFallbackImage({required this.theme});
+
+  final RoomBackgroundTheme theme;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!theme.isAssetBacked) return const SizedBox.shrink();
+
+    return Image.asset(
+      theme.assetPath!,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      errorBuilder: (context, error, stackTrace) {
+        return const SizedBox.shrink();
+      },
     );
   }
 }
@@ -413,13 +486,7 @@ class RoomBackgroundPickerSheet extends StatelessWidget {
     required this.currentTheme,
     required this.onThemeSelected,
     required this.onStoreTap,
-    this.viewerState = const RoomBackgroundViewerState(
-      vipLevel: 25,
-      vipActive: true,
-      svipLevel: 1,
-      svipActive: true,
-      ownedThemeIds: <String>{'store_limited_midnight'},
-    ),
+    this.viewerState = const RoomBackgroundViewerState(),
   });
 
   final RoomBackgroundTheme currentTheme;
@@ -463,7 +530,7 @@ class RoomBackgroundPickerSheet extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Default, VIP, SVIP, Store, Event & custom-ready themes',
+                      'Default themes now, backend/CDN themes later',
                       style: TextStyle(
                         color: Color(0xFF82758E),
                         fontSize: 11.5,
@@ -478,7 +545,7 @@ class RoomBackgroundPickerSheet extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           const Text(
-            'Available & Unlockable',
+            'Default Backgrounds',
             style: TextStyle(
               color: RoomColors.plum,
               fontSize: 13,
@@ -566,22 +633,16 @@ class _BackgroundThemeTile extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       _FallbackGradient(colors: theme.fallbackColors),
-                      if (theme.isAssetBacked)
-                        Image.asset(
-                          theme.assetPath!,
+                      if (theme.isNetworkBacked)
+                        Image.network(
+                          theme.thumbnailUrl ?? theme.imageUrl!,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            return const SizedBox.shrink();
+                            return _AssetFallbackImage(theme: theme);
                           },
                         )
-                      else if (theme.isNetworkBacked)
-                        Image.network(
-                          theme.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const SizedBox.shrink();
-                          },
-                        ),
+                      else
+                        _AssetFallbackImage(theme: theme),
                       Container(color: Colors.black.withValues(alpha: locked ? 0.45 : 0.12)),
                       if (selected && !locked)
                         const Align(
