@@ -73,6 +73,23 @@ class MeRelationshipPanel extends StatelessWidget {
   final VoidCallback onBestieTap;
   final VoidCallback onFamilyTap;
 
+  void _handleBondTap(LoveBondType type) {
+    switch (type) {
+      case LoveBondType.lover:
+        onCpTap();
+        return;
+      case LoveBondType.bestie:
+        onBestieTap();
+        return;
+      case LoveBondType.brother:
+        onFamilyTap();
+        return;
+      case LoveBondType.sister:
+        onFamilyTap();
+        return;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -116,34 +133,26 @@ class MeRelationshipPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 13),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: mockLoveBondCards.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              mainAxisExtent: 270,
+          SizedBox(
+            height: 270,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  for (var index = 0; index < mockLoveBondCards.length; index++) ...[
+                    SizedBox(
+                      width: 182,
+                      child: LoveBondCard(
+                        bond: mockLoveBondCards[index],
+                        onTap: () => _handleBondTap(mockLoveBondCards[index].type),
+                      ),
+                    ),
+                    if (index != mockLoveBondCards.length - 1) const SizedBox(width: 12),
+                  ],
+                ],
+              ),
             ),
-            itemBuilder: (context, index) {
-              final bond = mockLoveBondCards[index];
-              return LoveBondCard(
-                bond: bond,
-                onTap: () {
-                  switch (bond.type) {
-                    case LoveBondType.lover:
-                      onCpTap();
-                    case LoveBondType.bestie:
-                      onBestieTap();
-                    case LoveBondType.brother:
-                      onFamilyTap();
-                    case LoveBondType.sister:
-                      onFamilyTap();
-                  }
-                },
-              );
-            },
           ),
         ],
       ),
