@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'love_bond_breakup_page.dart';
 import 'models/love_bond_models.dart';
 import 'widgets/love_bond_task_list.dart';
 import 'widgets/love_bonds_background.dart';
@@ -9,27 +10,9 @@ class LoveBondDetailPage extends StatelessWidget {
 
   final LoveBondCardData bond;
 
-  String get _scoreLabel {
-    return bond.type == LoveBondType.lover ? 'Affection' : 'Bond Score';
-  }
+  String get _scoreLabel => '${bond.title} Score';
 
-  String get _relationshipLine {
-    return switch (bond.type) {
-      LoveBondType.lover => 'Love grows with every moment you spend together.',
-      LoveBondType.bestie => 'Friendship grows through rooms, Vibes and shared support.',
-      LoveBondType.brother => 'Brotherhood grows through support, play and room time.',
-      LoveBondType.sister => 'Sisterhood grows through care, Vibes and shared moments.',
-    };
-  }
-
-  String get _daysLabel {
-    return switch (bond.type) {
-      LoveBondType.lover => "We're Together",
-      LoveBondType.bestie => 'Besties Since',
-      LoveBondType.brother => 'Bonded Brothers',
-      LoveBondType.sister => 'Sisters Forever',
-    };
-  }
+  String get _daysLabel => 'Days Together';
 
   int get _daysCount {
     return switch (bond.type) {
@@ -59,6 +42,12 @@ class LoveBondDetailPage extends StatelessWidget {
           backgroundColor: bond.primaryColor,
         ),
       );
+  }
+
+  void _openBreakupPage(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LoveBondBreakupPage(bond: bond)),
+    );
   }
 
   @override
@@ -94,10 +83,9 @@ class LoveBondDetailPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _GuideButton(
-                    color: bond.primaryColor,
-                    icon: bond.badgeIcon,
-                    onTap: () => _showAction(context, '${bond.title} guide will open.'),
+                  _RelationNameButton(
+                    bond: bond,
+                    onTap: () => _openBreakupPage(context),
                   ),
                 ],
               ),
@@ -108,76 +96,8 @@ class LoveBondDetailPage extends StatelessWidget {
                 daysLabel: _daysLabel,
                 scoreLabel: _scoreLabel,
                 scoreValue: _scoreValue,
-                onPrimaryTap: () => _showAction(context, '${bond.title} management will open.'),
-                onScoreTap: () => _showAction(context, '$_scoreLabel history will open.'),
-              ),
-              const SizedBox(height: 14),
-              LoveBondsGlassPanel(
-                radius: 28,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: [bond.secondaryColor, bond.primaryColor]),
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Icon(bond.icon, color: Colors.white, size: 32),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${bond.title} Lv.${bond.level}',
-                                style: TextStyle(
-                                  color: bond.primaryColor,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 7),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(99),
-                                child: LinearProgressIndicator(
-                                  value: progress,
-                                  minHeight: 9,
-                                  backgroundColor: const Color(0xFFEED2E3),
-                                  valueColor: AlwaysStoppedAnimation<Color>(bond.primaryColor),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${bond.level * 300} / 1500 $_scoreLabel',
-                                style: const TextStyle(
-                                  color: Color(0xFF7A617C),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _relationshipLine,
-                      style: const TextStyle(
-                        color: Color(0xFF6D5570),
-                        fontSize: 13,
-                        height: 1.3,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+                progress: progress,
+                onRelationTap: () => _openBreakupPage(context),
               ),
               const SizedBox(height: 14),
               LoveBondTaskList(
@@ -202,8 +122,8 @@ class _BondHeroPanel extends StatelessWidget {
     required this.daysLabel,
     required this.scoreLabel,
     required this.scoreValue,
-    required this.onPrimaryTap,
-    required this.onScoreTap,
+    required this.progress,
+    required this.onRelationTap,
   });
 
   final LoveBondCardData bond;
@@ -211,8 +131,8 @@ class _BondHeroPanel extends StatelessWidget {
   final String daysLabel;
   final String scoreLabel;
   final int scoreValue;
-  final VoidCallback onPrimaryTap;
-  final VoidCallback onScoreTap;
+  final double progress;
+  final VoidCallback onRelationTap;
 
   @override
   Widget build(BuildContext context) {
@@ -222,32 +142,14 @@ class _BondHeroPanel extends StatelessWidget {
       child: Column(
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(child: _DaysCounter(days: daysCount, label: daysLabel, color: bond.primaryColor)),
               const SizedBox(width: 12),
-              InkWell(
-                onTap: onPrimaryTap,
-                borderRadius: BorderRadius.circular(99),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [bond.primaryColor, bond.secondaryColor]),
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.72), width: 1.4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(bond.badgeIcon, color: Colors.white, size: 18),
-                      const SizedBox(width: 6),
-                      Text(
-                        bond.title,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 18),
-                    ],
-                  ),
-                ),
+              _ScoreReadout(
+                label: scoreLabel,
+                value: scoreValue,
+                color: bond.primaryColor,
               ),
             ],
           ),
@@ -274,47 +176,109 @@ class _BondHeroPanel extends StatelessWidget {
             bond.partnerName,
             style: const TextStyle(color: Color(0xFF3C2840), fontSize: 24, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 5),
-          Text(
-            bond.displayName,
-            style: const TextStyle(color: Color(0xFF7A617C), fontSize: 13, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           InkWell(
-            onTap: onScoreTap,
-            borderRadius: BorderRadius.circular(24),
+            onTap: onRelationTap,
+            borderRadius: BorderRadius.circular(99),
             child: Container(
-              padding: const EdgeInsets.all(13),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.74),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
+                gradient: LinearGradient(colors: [bond.primaryColor, bond.secondaryColor]),
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.72), width: 1.4),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: bond.secondaryColor,
-                    child: Icon(bond.badgeIcon, color: bond.primaryColor, size: 21),
+                  Text(
+                    bond.title,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      '$scoreLabel\n$scoreValue',
-                      style: const TextStyle(
-                        color: Color(0xFF3A2B45),
-                        fontSize: 15,
-                        height: 1.25,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded, color: Color(0xFFB58AAA)),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 18),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 9,
+              backgroundColor: const Color(0xFFEED2E3),
+              valueColor: AlwaysStoppedAnimation<Color>(bond.primaryColor),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            '${bond.level * 300} / 1500 $scoreLabel',
+            style: const TextStyle(color: Color(0xFF7A617C), fontSize: 12, fontWeight: FontWeight.w800),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _ScoreReadout extends StatelessWidget {
+  const _ScoreReadout({required this.label, required this.value, required this.color});
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 138,
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            label,
+            textAlign: TextAlign.right,
+            style: const TextStyle(color: Color(0xFF7A617C), fontSize: 11, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value.toString(),
+            textAlign: TextAlign.right,
+            style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RelationNameButton extends StatelessWidget {
+  const _RelationNameButton({required this.bond, required this.onTap});
+
+  final LoveBondCardData bond;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(99),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.72), borderRadius: BorderRadius.circular(99)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(bond.title, style: TextStyle(color: bond.primaryColor, fontWeight: FontWeight.w900, fontSize: 12)),
+            Icon(Icons.chevron_right_rounded, color: bond.primaryColor, size: 18),
+          ],
+        ),
       ),
     );
   }
@@ -382,27 +346,6 @@ class _CircleIconButton extends StatelessWidget {
         height: 50,
         decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.72), shape: BoxShape.circle),
         child: Icon(icon, color: color, size: 32),
-      ),
-    );
-  }
-}
-
-class _GuideButton extends StatelessWidget {
-  const _GuideButton({required this.color, required this.icon, required this.onTap});
-
-  final Color color;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(99),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.72), borderRadius: BorderRadius.circular(99)),
-        child: Icon(icon, color: color, size: 23),
       ),
     );
   }
