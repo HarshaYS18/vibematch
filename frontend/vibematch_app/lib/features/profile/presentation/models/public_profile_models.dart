@@ -24,7 +24,7 @@ enum PublicFollowStatus {
       case PublicFollowStatus.none:
         return Icons.person_add_alt_1_rounded;
       case PublicFollowStatus.following:
-        return Icons.person_check_rounded;
+        return Icons.verified_user_rounded;
       case PublicFollowStatus.followBack:
         return Icons.person_add_alt_1_rounded;
       case PublicFollowStatus.mutual:
