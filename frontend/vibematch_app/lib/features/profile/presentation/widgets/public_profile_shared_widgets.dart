@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../rooms/presentation/widgets/chat_vip_badge.dart';
+import '../../../rooms/presentation/widgets/mini_profile_family_badge.dart';
 import '../models/public_profile_models.dart';
 
 BoxDecoration publicProfileWhitePanelDecoration({double radius = 28}) {
@@ -34,9 +36,7 @@ class PublicCoverPhotoView extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          const Positioned.fill(
-            child: CustomPaint(painter: PublicCoverPatternPainter()),
-          ),
+          const Positioned.fill(child: CustomPaint(painter: PublicCoverPatternPainter())),
           Positioned(
             right: 24,
             bottom: 24,
@@ -45,9 +45,7 @@ class PublicCoverPhotoView extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(99),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.26),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
               ),
               child: Row(
                 children: [
@@ -55,11 +53,7 @@ class PublicCoverPhotoView extends StatelessWidget {
                   const SizedBox(width: 7),
                   Text(
                     cover.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
                   ),
                 ],
               ),
@@ -82,11 +76,7 @@ class PublicCoverPatternPainter extends CustomPainter {
       ..strokeWidth = 1.2;
 
     for (var i = -size.height; i < size.width; i += 18) {
-      canvas.drawLine(
-        Offset(i.toDouble(), size.height),
-        Offset(i + size.height, 0),
-        paint,
-      );
+      canvas.drawLine(Offset(i.toDouble(), size.height), Offset(i + size.height, 0), paint);
     }
 
     final circlePaint = Paint()
@@ -152,11 +142,7 @@ class PublicTinyStatusChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -176,8 +162,45 @@ class PublicBadge extends StatelessWidget {
   final String label;
   final Color color;
 
+  int? get _vipLevel {
+    final clean = label.trim();
+    if (!clean.startsWith('VIP ')) return null;
+    final parts = clean.split(' ');
+    if (parts.length < 2) return null;
+    return int.tryParse(parts[1]);
+  }
+
+  String get _familyTier {
+    final parts = label.split('Lv.');
+    final level = parts.length > 1 ? int.tryParse(parts.last.trim()) ?? 1 : 1;
+    if (level >= 20) return 'platinum';
+    if (level >= 10) return 'gold';
+    if (level >= 5) return 'silver';
+    return 'bronze';
+  }
+
+  bool get _isFamilyBadge {
+    return icon == Icons.family_restroom_rounded || label.toLowerCase().contains('fam');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final vipLevel = _vipLevel;
+    if (vipLevel != null) {
+      return ChatVipBadge(level: vipLevel);
+    }
+
+    if (_isFamilyBadge) {
+      return MiniProfileFamilyBadge(
+        familyName: label,
+        familyLevel: _familyTier,
+        onTap: () {},
+        height: 24,
+        minWidth: 88,
+        maxWidth: 150,
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
@@ -192,11 +215,7 @@ class PublicBadge extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -226,9 +245,7 @@ class PublicMainProfileButton extends StatelessWidget {
         elevation: 0,
         backgroundColor: filled ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
         foregroundColor: filled ? Colors.white : const Color(0xFF251538),
-        side: BorderSide(
-          color: filled ? const Color(0xFF251538) : const Color(0xFFECE2D8),
-        ),
+        side: BorderSide(color: filled ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         padding: const EdgeInsets.symmetric(vertical: 13),
       ),
@@ -270,22 +287,14 @@ class PublicStat extends StatelessWidget {
         children: [
           Text(
             value,
-            style: const TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 2),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF8C7B8F),
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-            ),
+            style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 10, fontWeight: FontWeight.w800),
           ),
         ],
       ),
