@@ -56,193 +56,169 @@ class MePremiumProfileHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: vipDark,
-        borderRadius: BorderRadius.circular(34),
-        boxShadow: [
-          BoxShadow(
-            color: vipColor.withValues(alpha: 0.24),
-            blurRadius: 34,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
+      padding: const EdgeInsets.all(16),
+      decoration: meWhitePanelDecoration(radius: 34),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            right: -70,
-            top: -70,
-            child: Container(
-              height: 190,
-              width: 190,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: vipColor.withValues(alpha: 0.20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: onAvatarTap,
+                customBorder: const CircleBorder(),
+                child: MePremiumAvatar(
+                  displayName: displayName,
+                  vipColor: vipColor,
+                  presence: presence,
+                  showOpenIcon: true,
+                  size: 78,
+                ),
               ),
-            ),
-          ),
-          Positioned(
-            left: -48,
-            bottom: -56,
-            child: Container(
-              height: 150,
-              width: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 18,
-            bottom: 16,
-            child: Icon(
-              Icons.diamond_rounded,
-              color: Colors.white.withValues(alpha: 0.09),
-              size: 96,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              children: [
-                Row(
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: InkWell(
-                        onTap: onAvatarTap,
-                        customBorder: const CircleBorder(),
-                        child: MePremiumAvatar(
-                          displayName: displayName,
-                          vipColor: vipColor,
-                          presence: presence,
-                          showOpenIcon: true,
-                          size: 82,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF251538),
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.45,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          MeNameWithOfficialTick(
-                            displayName: displayName,
-                            role: role,
-                            fontSize: 23,
-                            letterSpacing: -0.4,
-                            centered: false,
-                          ),
-                          const SizedBox(height: 6),
-                          MeFamilyTagLight(
-                            familyName: familyName,
-                            familyLevel: familyLevel,
-                            onTap: onFamilyTap,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'ID $publicId',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.78),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 7),
-                          _PresenceTextLight(
-                            presence: presence,
-                            lastSeenText: lastSeenText,
-                          ),
-                          if (currentRoomName != null) ...[
-                            const SizedBox(height: 6),
-                            InkWell(
-                              onTap: onRoomTap,
-                              borderRadius: BorderRadius.circular(99),
-                              child: _RoomStatusTextLight(roomName: currentRoomName!),
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 7,
-                            runSpacing: 7,
-                            children: [
-                              if (roleTag != null)
-                                MeProfileMiniBadge(
-                                  label: roleTag!,
-                                  icon: roleTag == 'Host'
-                                      ? Icons.mic_external_on_rounded
-                                      : Icons.verified_user_rounded,
-                                  color: const Color(0xFFFFD36A),
-                                ),
-                              MeProfileMiniBadge(
-                                label: vipFrozen ? 'VIP $vipLevel Frozen' : 'VIP $vipLevel',
-                                icon: vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
-                                color: vipColor,
-                              ),
-                              MeProfileMiniBadge(
-                                label: 'SVIP $svipLevel',
-                                icon: Icons.auto_awesome_rounded,
-                                color: const Color(0xFFFFD36A),
-                              ),
-                            ],
-                          ),
+                        if (_showOfficialTick) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.verified_rounded, color: Color(0xFFFFC857), size: 23),
                         ],
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'ID $publicId',
+                      style: const TextStyle(
+                        color: Color(0xFF8C7B8F),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    InkWell(
-                      onTap: onQrTap,
-                      borderRadius: BorderRadius.circular(18),
-                      child: Container(
-                        height: 44,
-                        width: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+                    const SizedBox(height: 9),
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 7,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (roleTag != null)
+                          MeProfileMiniBadge(
+                            label: roleTag!,
+                            icon: roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
+                            color: const Color(0xFFC99A3B),
+                          ),
+                        InkWell(
+                          onTap: onVipTap,
+                          borderRadius: BorderRadius.circular(99),
+                          child: MeProfileMiniBadge(
+                            label: vipFrozen ? 'VIP $vipLevel Frozen' : 'VIP $vipLevel',
+                            icon: vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
+                            color: vipColor,
+                          ),
                         ),
-                        child: const Icon(Icons.qr_code_rounded, color: Colors.white),
-                      ),
+                        InkWell(
+                          onTap: onVipTap,
+                          borderRadius: BorderRadius.circular(99),
+                          child: MeProfileMiniBadge(
+                            label: 'SVIP $svipLevel',
+                            icon: Icons.auto_awesome_rounded,
+                            color: const Color(0xFFC99A3B),
+                          ),
+                        ),
+                        MeFamilyTagLight(
+                          familyName: familyName,
+                          familyLevel: familyLevel,
+                          onTap: onFamilyTap,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _HeroWalletTile(
-                        label: 'Diamonds',
-                        value: diamonds,
-                        icon: Icons.diamond_rounded,
-                        color: const Color(0xFF55B7FF),
-                        onTap: onWalletTap,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _HeroWalletTile(
-                        label: 'Coins',
-                        value: coins,
-                        icon: Icons.monetization_on_rounded,
-                        color: const Color(0xFFFFD36A),
-                        onTap: onWalletTap,
-                      ),
-                    ),
-                  ],
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: onQrTap,
+                borderRadius: BorderRadius.circular(17),
+                child: Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFAF7F1),
+                    borderRadius: BorderRadius.circular(17),
+                    border: Border.all(color: const Color(0xFFECE2D8)),
+                  ),
+                  child: const Icon(Icons.qr_code_rounded, color: Color(0xFF251538), size: 20),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _PresenceChip(presence: presence, lastSeenText: lastSeenText),
+              if (currentRoomName != null)
+                InkWell(
+                  onTap: onRoomTap,
+                  borderRadius: BorderRadius.circular(99),
+                  child: _RoomStatusChip(roomName: currentRoomName!),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _BalanceCapsule(
+                  label: 'Rubies',
+                  value: diamonds,
+                  icon: Icons.diamond_rounded,
+                  color: const Color(0xFFE84C72),
+                  onTap: onWalletTap,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _BalanceCapsule(
+                  label: 'Coins',
+                  value: coins,
+                  icon: Icons.monetization_on_rounded,
+                  color: const Color(0xFFC99A3B),
+                  onTap: onWalletTap,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  bool get _showOfficialTick {
+    final normalized = role.toLowerCase().trim();
+    return normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
+  }
 }
 
-class _PresenceTextLight extends StatelessWidget {
-  const _PresenceTextLight({required this.presence, required this.lastSeenText});
+class _PresenceChip extends StatelessWidget {
+  const _PresenceChip({required this.presence, required this.lastSeenText});
 
   final MePresenceStatus presence;
   final String lastSeenText;
@@ -251,56 +227,30 @@ class _PresenceTextLight extends StatelessWidget {
   Widget build(BuildContext context) {
     final isOnline = presence == MePresenceStatus.online;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          height: 8,
-          width: 8,
-          decoration: BoxDecoration(
-            color: isOnline ? const Color(0xFF12C7B7) : const Color(0xFFB8B0C2),
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 7),
-        Text(
-          lastSeenText,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.80),
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RoomStatusTextLight extends StatelessWidget {
-  const _RoomStatusTextLight({required this.roomName});
-
-  final String roomName;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF12C7B7).withValues(alpha: 0.14),
+        color: const Color(0xFF12C7B7).withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: const Color(0xFF12C7B7).withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.graphic_eq_rounded, color: Color(0xFF12C7B7), size: 14),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              'In chatroom: $roomName',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
+          Container(
+            height: 9,
+            width: 9,
+            decoration: BoxDecoration(
+              color: isOnline ? const Color(0xFF12C7B7) : const Color(0xFFB8B0C2),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            lastSeenText,
+            style: const TextStyle(
+              color: Color(0xFF251538),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -309,8 +259,38 @@ class _RoomStatusTextLight extends StatelessWidget {
   }
 }
 
-class _HeroWalletTile extends StatelessWidget {
-  const _HeroWalletTile({
+class _RoomStatusChip extends StatelessWidget {
+  const _RoomStatusChip({required this.roomName});
+
+  final String roomName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF6D5DF6).withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.graphic_eq_rounded, color: Color(0xFF6D5DF6), size: 14),
+          const SizedBox(width: 6),
+          Text(
+            'In chatroom: $roomName',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BalanceCapsule extends StatelessWidget {
+  const _BalanceCapsule({
     required this.label,
     required this.value,
     required this.icon,
@@ -328,17 +308,17 @@ class _HeroWalletTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.all(13),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          color: const Color(0xFFFAF7F1),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFECE2D8)),
         ),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 23),
+            Icon(icon, color: color, size: 22),
             const SizedBox(width: 9),
             Expanded(
               child: Column(
@@ -348,19 +328,24 @@ class _HeroWalletTile extends StatelessWidget {
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+                    style: const TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   Text(
                     label,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.70),
+                    style: const TextStyle(
+                      color: Color(0xFF8C7B8F),
                       fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
             ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFFB8A8BD), size: 20),
           ],
         ),
       ),
