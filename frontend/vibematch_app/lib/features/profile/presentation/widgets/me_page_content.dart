@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
 import '../love_bonds/love_bond_detail_page.dart';
-import '../love_bonds/love_bonds_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
 import '../public_profile_view_page.dart';
@@ -58,12 +57,6 @@ class MePageContent extends StatelessWidget {
     );
   }
 
-  void _openLoveBonds(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LoveBondsPage()),
-    );
-  }
-
   void _openBondDetail(BuildContext context, LoveBondCardData bond) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)),
@@ -113,7 +106,6 @@ class MePageContent extends StatelessWidget {
         const SizedBox(height: 14),
         MeRelationshipPanel(
           relationshipLabel: relationshipType,
-          onSeeAllTap: () => _openLoveBonds(context),
           onBondTap: (bond) => _openBondDetail(context, bond),
         ),
         const SizedBox(height: 18),
