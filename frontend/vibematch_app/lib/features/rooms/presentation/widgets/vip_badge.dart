@@ -32,22 +32,17 @@ class _VipBadgeState extends State<VipBadge>
 
   int get _safeLevel => widget.level.clamp(0, 50).toInt();
 
-  // VIP 0 is intentionally visible now. It uses the silver badge.
   bool get _visible => widget.level >= 0 || widget.showWhenZero;
-
   bool get _isChatBadge => widget.size == VipBadgeSize.tiny;
   bool get _premiumShine => _safeLevel >= 30;
 
   _VipBadgeTier get _tier {
     final value = _safeLevel;
-
     if (value >= 41) return _VipBadgeTier.purple;
     if (value >= 30) return _VipBadgeTier.green;
     if (value >= 21) return _VipBadgeTier.blue;
     if (value >= 11) return _VipBadgeTier.red;
     if (value >= 6) return _VipBadgeTier.blackGold;
-
-    // VIP 0, frozen VIP, and VIP 1-5 use the silver family.
     return _VipBadgeTier.silver;
   }
 
@@ -114,45 +109,41 @@ class _VipBadgeState extends State<VipBadge>
     };
   }
 
-  // Chat badge is intentionally tiny, but slightly bigger than the previous pass.
-  double get _chatBadgeSize => 22;
-  double get _chatPillWidth => 32;
-  double get _chatPillHeight => 13;
-  double get _chatTotalWidth => _chatPillWidth + (_chatBadgeSize * 0.52);
-
-  double get _iconTextHeight {
+  double get _badgeSize {
     return switch (widget.size) {
-      VipBadgeSize.tiny => _chatBadgeSize,
+      VipBadgeSize.tiny => 22,
       VipBadgeSize.small => 28,
       VipBadgeSize.medium => 38,
       VipBadgeSize.large => 52,
     };
   }
 
-  double get _iconTextWidth {
+  double get _pillWidth {
     return switch (widget.size) {
-      VipBadgeSize.tiny => _chatTotalWidth,
-      VipBadgeSize.small => 72,
-      VipBadgeSize.medium => 94,
-      VipBadgeSize.large => 126,
+      VipBadgeSize.tiny => 32,
+      VipBadgeSize.small => 48,
+      VipBadgeSize.medium => 64,
+      VipBadgeSize.large => 88,
     };
   }
 
-  double get _iconSize {
+  double get _pillHeight {
     return switch (widget.size) {
-      VipBadgeSize.tiny => _chatBadgeSize,
-      VipBadgeSize.small => 24,
-      VipBadgeSize.medium => 34,
-      VipBadgeSize.large => 46,
+      VipBadgeSize.tiny => 13,
+      VipBadgeSize.small => 17,
+      VipBadgeSize.medium => 24,
+      VipBadgeSize.large => 34,
     };
   }
+
+  double get _totalWidth => _pillWidth + (_badgeSize * 0.52);
 
   double get _fontSize {
     return switch (widget.size) {
       VipBadgeSize.tiny => 6.6,
-      VipBadgeSize.small => 10.8,
-      VipBadgeSize.medium => 14.2,
-      VipBadgeSize.large => 18.8,
+      VipBadgeSize.small => 9.2,
+      VipBadgeSize.medium => 12.4,
+      VipBadgeSize.large => 16.5,
     };
   }
 
@@ -171,9 +162,7 @@ class _VipBadgeState extends State<VipBadge>
     final oldPremium = oldWidget.level >= 30;
 
     if (oldPremium != _premiumShine || oldWidget.size != widget.size) {
-      _shineController.duration = Duration(
-        milliseconds: _premiumShine ? 1700 : 3000,
-      );
+      _shineController.duration = Duration(milliseconds: _premiumShine ? 1700 : 3000);
       _shineController.repeat();
     }
   }
@@ -188,8 +177,7 @@ class _VipBadgeState extends State<VipBadge>
   Widget build(BuildContext context) {
     if (!_visible) return const SizedBox.shrink();
 
-    final child = _isChatBadge ? _buildChatPillBadge() : _buildMiniProfileIconBadge();
-
+    final child = _buildOverlappingPillBadge();
     if (widget.onTap == null) return child;
 
     return Material(
@@ -203,10 +191,15 @@ class _VipBadgeState extends State<VipBadge>
     );
   }
 
-  Widget _buildChatPillBadge() {
+  Widget _buildOverlappingPillBadge() {
+    final badgeSize = _badgeSize;
+    final pillWidth = _pillWidth;
+    final pillHeight = _pillHeight;
+    final textLeftPadding = _isChatBadge ? 4.0 : badgeSize * 0.24;
+
     return SizedBox(
-      width: _chatTotalWidth,
-      height: _chatBadgeSize,
+      width: _totalWidth,
+      height: badgeSize,
       child: AnimatedBuilder(
         animation: _shineController,
         builder: (context, _) {
@@ -215,25 +208,23 @@ class _VipBadgeState extends State<VipBadge>
             alignment: Alignment.centerLeft,
             children: [
               Positioned(
-                left: _chatBadgeSize * 0.47,
+                left: badgeSize * 0.47,
                 child: _VipPillBody(
-                  width: _chatPillWidth,
-                  height: _chatPillHeight,
+                  width: pillWidth,
+                  height: pillHeight,
                   gradient: _pillGradient,
                   glowColor: _glowColor,
                   premiumShine: _premiumShine,
                   shineValue: _shineController.value,
-                  sharpCorners: true,
+                  sharpCorners: _isChatBadge,
                   child: Padding(
-                    // Moves the VIP text a little right so there is a clean gap
-                    // between the shield badge edge and the text.
-                    padding: const EdgeInsets.only(left: 4),
+                    padding: EdgeInsets.only(left: textLeftPadding),
                     child: _GoldenVipText(
                       label: 'VIP $_safeLevel',
                       fontSize: _fontSize,
                       premiumShine: _premiumShine,
                       shineValue: _shineController.value,
-                      compact: true,
+                      compact: _isChatBadge,
                     ),
                   ),
                 ),
@@ -244,47 +235,11 @@ class _VipBadgeState extends State<VipBadge>
                 bottom: 0,
                 child: _ShieldBadgeImage(
                   assetPath: _assetPath,
-                  size: _chatBadgeSize,
+                  size: badgeSize,
                   glowColor: _glowColor,
                   premiumShine: _premiumShine,
                   shineValue: _shineController.value,
                   fallbackGradient: _pillGradient,
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildMiniProfileIconBadge() {
-    return SizedBox(
-      width: _iconTextWidth,
-      height: _iconTextHeight,
-      child: AnimatedBuilder(
-        animation: _shineController,
-        builder: (context, _) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _ShieldBadgeImage(
-                assetPath: _assetPath,
-                size: _iconSize,
-                glowColor: _glowColor,
-                premiumShine: _premiumShine,
-                shineValue: _shineController.value,
-                fallbackGradient: _pillGradient,
-              ),
-              SizedBox(width: widget.size == VipBadgeSize.small ? 4 : 6),
-              Flexible(
-                child: _GoldenVipText(
-                  label: 'VIP $_safeLevel',
-                  fontSize: _fontSize,
-                  premiumShine: _premiumShine,
-                  shineValue: _shineController.value,
-                  compact: false,
                 ),
               ),
             ],
@@ -329,7 +284,6 @@ class _VipPillBody extends StatelessWidget {
           BoxShadow(
             color: glowColor.withValues(alpha: premiumShine ? 0.36 : 0.16),
             blurRadius: premiumShine ? 9 : 5,
-            spreadRadius: 0,
           ),
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.42),
@@ -537,10 +491,10 @@ class _GoldenVipText extends StatelessWidget {
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w900,
-            letterSpacing: compact ? -0.50 : 0.25,
+            letterSpacing: compact ? -0.50 : 0.05,
             foreground: Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = compact ? 1.0 : premiumShine ? 2.4 : 1.9
+              ..strokeWidth = compact ? 1.0 : premiumShine ? 2.0 : 1.55
               ..color = Colors.black.withValues(alpha: 0.68),
           ),
         ),
@@ -566,7 +520,7 @@ class _GoldenVipText extends StatelessWidget {
               color: Colors.white,
               fontSize: fontSize,
               fontWeight: FontWeight.w900,
-              letterSpacing: compact ? -0.50 : 0.25,
+              letterSpacing: compact ? -0.50 : 0.05,
               shadows: [
                 Shadow(
                   color: const Color(0xFFFFD766).withValues(
