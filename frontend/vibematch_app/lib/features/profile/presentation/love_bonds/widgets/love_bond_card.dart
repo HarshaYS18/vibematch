@@ -16,9 +16,8 @@ class LoveBondCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(22),
       child: Container(
-        height: 156,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -28,18 +27,18 @@ class LoveBondCard extends StatelessWidget {
               bond.secondaryColor.withValues(alpha: 0.92),
             ],
           ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.78), width: 1.6),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.78), width: 1.4),
           boxShadow: [
             BoxShadow(
-              color: bond.primaryColor.withValues(alpha: 0.18),
-              blurRadius: 14,
-              offset: const Offset(0, 7),
+              color: bond.primaryColor.withValues(alpha: 0.16),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           child: Stack(
             children: [
               Positioned.fill(
@@ -49,14 +48,14 @@ class LoveBondCard extends StatelessWidget {
               ),
               Positioned(
                 top: 0,
-                left: 12,
-                right: 12,
+                left: 9,
+                right: 9,
                 child: Container(
-                  height: 31,
+                  height: 27,
                   decoration: BoxDecoration(
                     color: bond.primaryColor.withValues(alpha: 0.82),
                     borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(17),
+                      bottom: Radius.circular(15),
                     ),
                   ),
                   alignment: Alignment.center,
@@ -66,36 +65,39 @@ class LoveBondCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 13.5,
+                      fontSize: 12.4,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
               ),
               Positioned(
-                top: 36,
-                right: 10,
+                top: 31,
+                right: 7,
                 child: Container(
-                  width: 24,
-                  height: 24,
+                  width: 19,
+                  height: 19,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [Colors.white, bond.primaryColor.withValues(alpha: 0.86)],
                     ),
                     boxShadow: [
-                      BoxShadow(color: Colors.white.withValues(alpha: 0.44), blurRadius: 8),
+                      BoxShadow(color: Colors.white.withValues(alpha: 0.36), blurRadius: 6),
                     ],
                   ),
-                  child: Icon(bond.badgeIcon, color: Colors.white, size: 14),
+                  child: Icon(bond.badgeIcon, color: Colors.white, size: 11),
                 ),
               ),
               Positioned.fill(
-                top: 35,
+                top: 31,
+                bottom: 7,
+                left: 4,
+                right: 4,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _PartnerAvatar(bond: bond),
-                    const SizedBox(height: 6),
                     Text(
                       bond.partnerName,
                       maxLines: 1,
@@ -103,14 +105,13 @@ class LoveBondCard extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 13.2,
+                        fontSize: 11.2,
                         fontWeight: FontWeight.w900,
-                        shadows: [Shadow(color: Colors.black26, blurRadius: 5)],
+                        shadows: [Shadow(color: Colors.black26, blurRadius: 4)],
                       ),
                     ),
-                    const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.24),
                         borderRadius: BorderRadius.circular(99),
@@ -120,12 +121,11 @@ class LoveBondCard extends StatelessWidget {
                         'Lv.${bond.level}',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 10.5,
+                          fontSize: 8.8,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 5),
                     Text(
                       bond.displayName,
                       maxLines: 1,
@@ -133,9 +133,9 @@ class LoveBondCard extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.92),
-                        fontSize: 9.5,
+                        fontSize: 7.4,
                         fontWeight: FontWeight.w900,
-                        shadows: const [Shadow(color: Colors.black26, blurRadius: 4)],
+                        shadows: const [Shadow(color: Colors.black26, blurRadius: 3)],
                       ),
                     ),
                   ],
@@ -157,21 +157,21 @@ class _PartnerAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 52,
-      height: 52,
-      padding: const EdgeInsets.all(2.6),
+      width: 43,
+      height: 43,
+      padding: const EdgeInsets.all(2.2),
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(color: bond.primaryColor.withValues(alpha: 0.30), blurRadius: 12),
+          BoxShadow(color: bond.primaryColor.withValues(alpha: 0.26), blurRadius: 9),
         ],
       ),
       child: CircleAvatar(
         backgroundColor: bond.primaryColor.withValues(alpha: 0.68),
         child: Text(
           bond.rightAvatarInitial,
-          style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900),
+          style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
         ),
       ),
     );
@@ -185,14 +185,14 @@ class _LoveBondCardPatternPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color.withValues(alpha: 0.15);
+    final paint = Paint()..color = color.withValues(alpha: 0.13);
     for (final point in [
       Offset(size.width * 0.15, size.height * 0.28),
       Offset(size.width * 0.77, size.height * 0.42),
       Offset(size.width * 0.22, size.height * 0.78),
       Offset(size.width * 0.86, size.height * 0.82),
     ]) {
-      canvas.drawCircle(point, 7, paint);
+      canvas.drawCircle(point, 6, paint);
     }
   }
 
