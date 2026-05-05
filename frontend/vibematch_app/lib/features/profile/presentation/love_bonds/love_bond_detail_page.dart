@@ -10,7 +10,7 @@ class LoveBondDetailPage extends StatelessWidget {
 
   final LoveBondCardData bond;
 
-  String get _scoreLabel => '${bond.title} Score';
+  String get _scoreLabel => 'Love Score';
 
   String get _daysLabel => 'Days Together';
 
