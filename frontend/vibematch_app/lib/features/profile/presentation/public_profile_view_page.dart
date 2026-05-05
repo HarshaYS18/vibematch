@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
 import 'models/public_profile_models.dart';
+import 'widgets/public_love_bonds_panel.dart';
 import 'widgets/public_profile_widgets.dart';
 
 class PublicProfileViewPage extends StatefulWidget {
@@ -196,6 +197,17 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 onRoomTap: () => _showAction(
                   context,
                   'Open ${widget.currentRoomName} if privacy rules allow it.',
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                child: PublicLoveBondsPanel(
+                  onVisitorTap: () => _showAction(
+                    context,
+                    'Bond details are private and cannot be opened by visitors.',
+                  ),
                 ),
               ),
             ),
