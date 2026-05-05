@@ -64,11 +64,9 @@ class MePageContent extends StatelessWidget {
     );
   }
 
-  void _openLoverDetail(BuildContext context) {
+  void _openBondDetail(BuildContext context, LoveBondCardData bond) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LoveBondDetailPage(bond: mockLoveBondCards.first),
-      ),
+      MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)),
     );
   }
 
@@ -116,9 +114,7 @@ class MePageContent extends StatelessWidget {
         MeRelationshipPanel(
           relationshipLabel: relationshipType,
           onSeeAllTap: () => _openLoveBonds(context),
-          onCpTap: () => _openLoverDetail(context),
-          onBestieTap: () => _openLoveBonds(context),
-          onFamilyTap: () => _openLoveBonds(context),
+          onBondTap: (bond) => _openBondDetail(context, bond),
         ),
         const SizedBox(height: 18),
         const Text(
