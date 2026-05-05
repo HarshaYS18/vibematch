@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/icons/vm_icons.dart';
 import '../../models/vibe_models.dart';
 
 class VibeCardModular extends StatelessWidget {
@@ -20,14 +21,26 @@ class VibeCardModular extends StatelessWidget {
   final VoidCallback onShareTap;
   final VoidCallback onMoreTap;
 
-  bool get _hasMentions => vibe.usesMentionAll || vibe.mentions.isNotEmpty;
+  String get _captionWithInlineMentions {
+    final caption = vibe.caption.trim();
+    final mentionTokens = <String>[];
 
-  String get _mentionDisplayText {
-    final names = <String>[...vibe.mentions];
-    if (vibe.usesMentionAll && !names.any((name) => name.toLowerCase() == 'all')) {
-      names.add('all');
+    for (final rawMention in vibe.mentions) {
+      final mention = rawMention.trim();
+      if (mention.isEmpty) continue;
+      final token = mention.startsWith('@') ? mention : '@$mention';
+      if (!caption.toLowerCase().contains(token.toLowerCase()) &&
+          !mentionTokens.any((item) => item.toLowerCase() == token.toLowerCase())) {
+        mentionTokens.add(token);
+      }
     }
-    return names.join(', ');
+
+    if (vibe.usesMentionAll && !caption.toLowerCase().contains('@all')) {
+      mentionTokens.add('@all');
+    }
+
+    if (mentionTokens.isEmpty) return caption;
+    return '$caption ${mentionTokens.join(' ')}';
   }
 
   @override
@@ -91,7 +104,7 @@ class VibeCardModular extends StatelessWidget {
                     borderRadius: BorderRadius.circular(99),
                     child: const Padding(
                       padding: EdgeInsets.all(5),
-                      child: Icon(Icons.more_horiz_rounded, color: Color(0xFF8C8198)),
+                      child: Icon(VMIcons.more, color: Color(0xFF8C8198)),
                     ),
                   ),
                 ],
@@ -102,34 +115,20 @@ class VibeCardModular extends StatelessWidget {
                 const SizedBox(height: 13),
               ] else
                 const SizedBox(height: 12),
-              Text(
-                vibe.caption,
-                style: TextStyle(
+              _MentionRichText(
+                text: _captionWithInlineMentions,
+                baseStyle: TextStyle(
                   color: const Color(0xFF5E526B),
                   fontSize: isTextOnly ? 14 : 13,
                   height: 1.35,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 11),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _InfoChip(icon: Icons.remove_red_eye_rounded, label: _formatCount(vibe.views), color: const Color(0xFF6D5DF6)),
-                  if (_hasMentions)
-                    _InfoChip(
-                      icon: Icons.alternate_email_rounded,
-                      label: _mentionDisplayText,
-                      color: vibe.usesMentionAll ? const Color(0xFFC99A3B) : const Color(0xFF6D5DF6),
-                    ),
-                ],
-              ),
               const SizedBox(height: 13),
               Row(
                 children: [
                   _ActionPill(
-                    icon: vibe.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    icon: vibe.likedByMe ? VMIcons.heart : Icons.favorite_border_rounded,
                     label: _formatCount(vibe.likes),
                     color: const Color(0xFFE84C72),
                     onTap: onLikeTap,
@@ -166,7 +165,7 @@ class _VibeMediaPreview extends StatelessWidget {
           height: 62,
           width: 62,
           decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
-          child: Icon(isVideo ? Icons.play_arrow_rounded : Icons.photo_rounded, color: Colors.white, size: isVideo ? 42 : 32),
+          child: Icon(isVideo ? VMIcons.play : VMIcons.photo, color: Colors.white, size: isVideo ? 42 : 32),
         ),
       ),
     );
@@ -204,17 +203,42 @@ class _VibeTag extends StatelessWidget {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label, required this.color});
-  final IconData icon;
-  final String label;
-  final Color color;
+class _MentionRichText extends StatelessWidget {
+  const _MentionRichText({required this.text, required this.baseStyle});
+
+  final String text;
+  final TextStyle baseStyle;
+
+  static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(999)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 14, color: color), const SizedBox(width: 5), Text(label, style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w900))]),
+    final spans = <TextSpan>[];
+    var currentIndex = 0;
+
+    for (final match in _mentionPattern.allMatches(text)) {
+      if (match.start > currentIndex) {
+        spans.add(TextSpan(text: text.substring(currentIndex, match.start)));
+      }
+
+      spans.add(
+        TextSpan(
+          text: text.substring(match.start, match.end),
+          style: const TextStyle(
+            color: Color(0xFF6D5DF6),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      );
+      currentIndex = match.end;
+    }
+
+    if (currentIndex < text.length) {
+      spans.add(TextSpan(text: text.substring(currentIndex)));
+    }
+
+    return RichText(
+      text: TextSpan(style: baseStyle, children: spans),
     );
   }
 }
