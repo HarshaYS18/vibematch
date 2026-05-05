@@ -81,7 +81,7 @@ const List<MeVibeItem> mockMyVibes = [
     likes: '722',
     comments: '39',
     mediaType: 'Photo',
-    mentions: const [],
+    mentions: [],
     usesMentionAll: false,
     icon: Icons.auto_awesome_rounded,
     colors: [Color(0xFF6D5DF6), Color(0xFFE84C72)],
