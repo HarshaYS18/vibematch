@@ -238,7 +238,7 @@ class MeProfileMiniBadge extends StatelessWidget {
             textColor: const Color(0xFFFFE2A1),
             shineColor: const Color(0xFFFFF1B8),
             active: svipLevel > 0,
-            onTap: onTap,
+            onTap: onTap ?? () {},
           ),
         ),
       );
