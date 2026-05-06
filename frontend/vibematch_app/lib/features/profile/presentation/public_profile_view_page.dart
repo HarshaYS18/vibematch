@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import '../../auth/models/current_user.dart';
 import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
+import '../../vip/presentation/vip_program_page.dart';
 import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
+import 'widgets/me_profile_constants.dart';
 import 'widgets/public_love_bonds_panel.dart';
 import 'widgets/public_profile_widgets.dart';
 
@@ -75,6 +77,20 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
+  }
+
+  void _openViewerVipProgram({required int initialTabIndex}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VipProgramPage(
+          initialTabIndex: initialTabIndex,
+          vipLevel: MeProfileConstants.vipLevel,
+          svipLevel: MeProfileConstants.svipLevel,
+          lifetimeRechargeCoins: MeProfileConstants.diamonds,
+          monthlyRechargeCoins: 42000,
+        ),
+      ),
+    );
   }
 
   void _toggleFollow() {
@@ -187,6 +203,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 onMessageTap: () => _showAction(context, 'Message request will open.'),
                 onRoomTap: () => _showAction(context, 'Open ${widget.currentRoomName} if privacy rules allow it.'),
                 onFamilyTap: _openFamilyPage,
+                onVipTap: () => _openViewerVipProgram(initialTabIndex: 0),
+                onSvipTap: () => _openViewerVipProgram(initialTabIndex: 1),
               ),
             ),
             SliverToBoxAdapter(
