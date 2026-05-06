@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'controllers/family_controller.dart';
 import 'family_list_page.dart';
+import 'invite/family_invite_flow_page.dart';
 import 'sheets/create_family_sheet.dart';
 import 'sheets/family_actions_sheet.dart';
 import 'sheets/family_level_details_sheet.dart';
@@ -41,7 +42,29 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
   }
 
   void _openInviteFlow() {
-    _toast('Invite family member flow will open here.');
+    _controller.clearInviteSelection();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FamilyInviteFlowPage(
+          familyName: _controller.profile.name,
+          actorType: _controller.inviteActorType,
+          friends: _controller.inviteFriends,
+          selectedUserIds: _controller.selectedInviteUserIds,
+          onToggleFriend: _controller.toggleInviteSelection,
+          onSendInvites: _sendFamilyInvites,
+        ),
+      ),
+    );
+  }
+
+  void _sendFamilyInvites() {
+    final selected = _controller.selectedInviteFriends();
+    final count = selected.length;
+    final flow = _controller.inviteActorType.needsOwnerApprovalAfterAccept
+        ? 'When a user accepts, owners/admins will receive an approval request. Approve = join, reject = invite link invalid.'
+        : 'When a user accepts, they join directly and owners/admins receive a system notification.';
+    _controller.markInvitesSent();
+    _toast('Sent $count family invite${count == 1 ? '' : 's'} through Inbox. $flow');
   }
 
   void _openFamilyList() {
