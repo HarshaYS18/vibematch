@@ -155,14 +155,7 @@ class PublicBadge extends StatelessWidget {
     return int.tryParse(parts[1]);
   }
 
-  String get _familyTier {
-    final parts = label.split('Lv.');
-    final level = parts.length > 1 ? int.tryParse(parts.last.trim()) ?? 1 : 1;
-    if (level >= 20) return 'platinum';
-    if (level >= 10) return 'gold';
-    if (level >= 5) return 'silver';
-    return 'bronze';
-  }
+  String get _familyTier => 'bronze';
 
   bool get _isFamilyBadge {
     return icon == Icons.family_restroom_rounded || label.toLowerCase().contains('fam');
