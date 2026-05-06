@@ -21,6 +21,16 @@ class FamilyMockData {
     );
   }
 
+  static const List<FamilyRankUiModel> rankings = [
+    FamilyRankUiModel(id: 'VMF1001', name: 'Solar Dynasty', rank: 1, totalExp: 98200000, memberCount: 186, maxMembers: 200, rankLabel: 'No. 1', minimumVipLabel: 'VIP 8', ownerUserId: 'rank_owner_01', avatarGradient: [Color(0xFFFFD36A), Color(0xFFE84C72)]),
+    FamilyRankUiModel(id: 'VMF1002', name: 'Night Crown', rank: 2, totalExp: 87600000, memberCount: 174, maxMembers: 200, rankLabel: 'No. 2', minimumVipLabel: 'VIP 6', ownerUserId: 'rank_owner_02', avatarGradient: [Color(0xFF251538), Color(0xFF7C3AED)]),
+    FamilyRankUiModel(id: 'VMF1003', name: 'Crystal Orbit', rank: 3, totalExp: 80300000, memberCount: 151, maxMembers: 180, rankLabel: 'No. 3', minimumVipLabel: 'VIP 5', ownerUserId: 'rank_owner_03', avatarGradient: [Color(0xFF06B6D4), Color(0xFFEAF0F8)]),
+    FamilyRankUiModel(id: 'VMF1004', name: 'Velvet Storm', rank: 4, totalExp: 72200000, memberCount: 132, maxMembers: 180, rankLabel: 'No. 4', minimumVipLabel: 'VIP 4', ownerUserId: 'rank_owner_04', avatarGradient: [Color(0xFFE84C72), Color(0xFFFFB8D7)]),
+    FamilyRankUiModel(id: 'VMF1005', name: 'Emerald Pulse', rank: 5, totalExp: 68900000, memberCount: 127, maxMembers: 180, rankLabel: 'No. 5', minimumVipLabel: 'VIP 3', ownerUserId: 'rank_owner_05', avatarGradient: [Color(0xFF166534), Color(0xFF86EFAC)]),
+    FamilyRankUiModel(id: 'VMF1006', name: 'Royal Comet', rank: 6, totalExp: 63100000, memberCount: 119, maxMembers: 160, rankLabel: 'No. 6', minimumVipLabel: 'VIP 3', ownerUserId: 'rank_owner_06', avatarGradient: [Color(0xFF312E81), Color(0xFFA78BFA)]),
+    FamilyRankUiModel(id: 'VMF1007', name: 'Ocean Flame', rank: 7, totalExp: 59400000, memberCount: 108, maxMembers: 160, rankLabel: 'No. 7', minimumVipLabel: 'VIP 2', ownerUserId: 'rank_owner_07', avatarGradient: [Color(0xFF0EA5E9), Color(0xFFFFD166)]),
+  ];
+
   static const List<FamilyMemberUiModel> members = [
     FamilyMemberUiModel(userId: 'family_owner_01', name: 'Nova Ray', role: FamilyRole.owner, contributionExp: 13530000, avatarGradient: [Color(0xFF12C7B7), Color(0xFF6D5DF6)], isFollowing: true),
     FamilyMemberUiModel(userId: 'family_admin_01', name: 'Orion Vale', role: FamilyRole.admin, contributionExp: 21830000, avatarGradient: [Color(0xFFE84C72), Color(0xFFFFD36A)], isFollowing: false),
