@@ -4,7 +4,7 @@ import '../../social/widgets/friends_invite_sheet.dart';
 import '../controllers/vibes_controller.dart';
 import '../models/vibe_models.dart';
 import 'pages/create_vibe_page_modular.dart';
-import 'pages/vibe_comments_page_modular.dart';
+import 'pages/vibe_detail_page_modular.dart';
 import 'pages/vibes_settings_page.dart';
 import 'widgets/vibe_card_modular.dart';
 
@@ -79,10 +79,10 @@ class _VibesPageState extends State<VibesPage> {
     );
   }
 
-  void _openComments(VibeItem vibe) {
+  void _openVibeDetail(VibeItem vibe) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => VibeCommentsPageModular(
+        builder: (_) => VibeDetailPageModular(
           vibe: vibe,
           onCommentAdded: () => _controller.incrementCommentCount(vibe),
         ),
@@ -204,7 +204,7 @@ class _VibesPageState extends State<VibesPage> {
                       vibe: vibe,
                       onProfileTap: () => _showAction('${vibe.authorName} profile will open.'),
                       onLikeTap: () => _controller.toggleLike(vibe),
-                      onCommentTap: () => _openComments(vibe),
+                      onCommentTap: () => _openVibeDetail(vibe),
                       onShareTap: () => _openShareSheet(vibe),
                       onMoreTap: () => _showAction('Vibe options will open.'),
                     );
