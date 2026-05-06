@@ -34,39 +34,97 @@ class VipShieldBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: _glowColor.withValues(alpha: _safeLevel >= 30 ? 0.44 : 0.28),
-            blurRadius: _safeLevel >= 30 ? 24 : 16,
-            spreadRadius: _safeLevel >= 30 ? 2 : 0,
-          ),
-        ],
-      ),
-      child: Image.asset(
-        _assetPath,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
+    final shineSize = size * 0.38;
+
+    return SizedBox(
+      width: size + 18,
+      height: size + 18,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: size,
+            height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [_glowColor.withValues(alpha: 0.92), const Color(0xFF251538)],
-              ),
-              border: Border.all(color: const Color(0xFFFFD36A), width: 1.4),
+              boxShadow: [
+                BoxShadow(
+                  color: _glowColor.withValues(alpha: _safeLevel >= 30 ? 0.62 : 0.42),
+                  blurRadius: _safeLevel >= 30 ? 34 : 26,
+                  spreadRadius: _safeLevel >= 30 ? 4 : 2,
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.20),
+                  blurRadius: 14,
+                  spreadRadius: -3,
+                  offset: const Offset(-3, -4),
+                ),
+              ],
             ),
-            child: const Icon(Icons.workspace_premium_rounded, color: Colors.white),
-          );
-        },
+            child: Image.asset(
+              _assetPath,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [_glowColor.withValues(alpha: 0.92), const Color(0xFF251538)],
+                    ),
+                    border: Border.all(color: const Color(0xFFFFD36A), width: 1.4),
+                  ),
+                  child: const Icon(Icons.workspace_premium_rounded, color: Colors.white),
+                );
+              },
+            ),
+          ),
+          Positioned(
+            left: size * 0.16,
+            top: size * 0.10,
+            child: IgnorePointer(
+              child: Transform.rotate(
+                angle: -0.55,
+                child: Container(
+                  width: shineSize,
+                  height: shineSize * 0.24,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.0),
+                        Colors.white.withValues(alpha: 0.78),
+                        Colors.white.withValues(alpha: 0.0),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: size * 0.05,
+            top: size * 0.04,
+            child: IgnorePointer(
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                color: Colors.white.withValues(alpha: _safeLevel >= 30 ? 0.92 : 0.72),
+                size: size * 0.22,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
