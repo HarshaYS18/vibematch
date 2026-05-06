@@ -31,6 +31,49 @@ enum FamilyInviteActorType {
   }
 }
 
+class FamilyRankUiModel {
+  const FamilyRankUiModel({
+    required this.id,
+    required this.name,
+    required this.rank,
+    required this.totalExp,
+    required this.memberCount,
+    required this.maxMembers,
+    required this.rankLabel,
+    required this.minimumVipLabel,
+    required this.ownerUserId,
+    required this.avatarGradient,
+  });
+
+  final String id;
+  final String name;
+  final int rank;
+  final int totalExp;
+  final int memberCount;
+  final int maxMembers;
+  final String rankLabel;
+  final String minimumVipLabel;
+  final String ownerUserId;
+  final List<Color> avatarGradient;
+
+  String get avatarText => name.trim().isEmpty ? 'F' : name.trim()[0].toUpperCase();
+
+  FamilyProfileUiModel toProfile() {
+    return FamilyProfileUiModel(
+      id: id,
+      name: name,
+      minimumVipLabel: minimumVipLabel,
+      memberCount: memberCount,
+      maxMembers: maxMembers,
+      rankLabel: rankLabel,
+      ownerUserId: ownerUserId,
+      quarterCarryExp: totalExp,
+      giftCoinsThisQuarter: 0,
+      timeMinutesToday: 0,
+    );
+  }
+}
+
 class FamilyInviteFriendUiModel {
   const FamilyInviteFriendUiModel({
     required this.userId,
