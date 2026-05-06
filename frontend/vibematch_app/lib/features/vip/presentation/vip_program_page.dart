@@ -268,8 +268,9 @@ class _VipHeroPagerState extends State<_VipHeroPager> {
     return Column(
       children: [
         SizedBox(
-          height: 172,
+          height: 196,
           child: PageView.builder(
+            clipBehavior: Clip.none,
             controller: _controller,
             itemCount: widget.levels.length,
             onPageChanged: (index) => setState(() => _pageIndex = index),
@@ -335,8 +336,9 @@ class _SvipHeroPagerState extends State<_SvipHeroPager> {
     return Column(
       children: [
         SizedBox(
-          height: 172,
+          height: 196,
           child: PageView.builder(
+            clipBehavior: Clip.none,
             controller: _controller,
             itemCount: widget.levels.length,
             onPageChanged: (index) => setState(() => _pageIndex = index),
@@ -377,34 +379,42 @@ class _VipHeroCard extends StatelessWidget {
     final palette = _vipPalette(level);
     final progress = requiredCoins <= 0 ? 1.0 : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _heroDecoration(palette.colors, palette.shadow),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -24,
-            top: -34,
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              color: Colors.white.withValues(alpha: 0.07),
-              size: 106,
-            ),
-          ),
-          Positioned(right: 0, top: 0, child: VipShieldBadge(level: level, size: 52)),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('VIP $level', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.1)),
-              const Spacer(),
-              _ProgressBlock(
-                progress: progress,
-                label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} coins',
-                color: palette.accent,
+    return Padding(
+      padding: const EdgeInsets.only(top: 26),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: _heroDecoration(palette.colors, palette.shadow),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              right: -24,
+              top: -34,
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                color: Colors.white.withValues(alpha: 0.07),
+                size: 106,
               ),
-            ],
-          ),
-        ],
+            ),
+            Positioned(
+              right: -8,
+              top: -48,
+              child: VipShieldBadge(level: level, size: 78),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('VIP $level', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.1)),
+                const Spacer(),
+                _ProgressBlock(
+                  progress: progress,
+                  label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} coins',
+                  color: palette.accent,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -426,39 +436,57 @@ class _SvipHeroCard extends StatelessWidget {
     final palette = _svipPalette(level);
     final progress = requiredCoins <= 0 ? 1.0 : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _heroDecoration(palette.colors, palette.shadow),
-      child: Stack(
-        children: [
-          Positioned(
-            right: 0,
-            top: 0,
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.34)),
-                boxShadow: [BoxShadow(color: palette.accent.withValues(alpha: 0.25), blurRadius: 18)],
+    return Padding(
+      padding: const EdgeInsets.only(top: 26),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: _heroDecoration(palette.colors, palette.shadow),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              right: -8,
+              top: -42,
+              child: Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.34)),
+                  boxShadow: [
+                    BoxShadow(color: palette.accent.withValues(alpha: 0.45), blurRadius: 28, spreadRadius: 3),
+                    BoxShadow(color: Colors.white.withValues(alpha: 0.20), blurRadius: 12, offset: const Offset(-3, -4)),
+                  ],
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(Icons.diamond_rounded, color: palette.accent, size: 36),
+                    Positioned(
+                      right: 3,
+                      top: 2,
+                      child: Icon(Icons.auto_awesome_rounded, color: Colors.white.withValues(alpha: 0.82), size: 15),
+                    ),
+                  ],
+                ),
               ),
-              child: Icon(Icons.diamond_rounded, color: palette.accent, size: 28),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('SVIP $level', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.1)),
-              const Spacer(),
-              _ProgressBlock(
-                progress: progress,
-                label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} monthly coins',
-                color: palette.accent,
-              ),
-            ],
-          ),
-        ],
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('SVIP $level', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.1)),
+                const Spacer(),
+                _ProgressBlock(
+                  progress: progress,
+                  label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} monthly coins',
+                  color: palette.accent,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
