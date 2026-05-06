@@ -11,7 +11,7 @@ class FamilyClanHero extends StatelessWidget {
     required this.level,
     required this.exp,
     required this.onBack,
-    required this.onShare,
+    required this.onInvite,
     required this.onRewards,
     required this.onOptions,
     required this.onLevelTap,
@@ -21,7 +21,7 @@ class FamilyClanHero extends StatelessWidget {
   final FamilyLevelProgress level;
   final FamilyExpBreakdown exp;
   final VoidCallback onBack;
-  final VoidCallback onShare;
+  final VoidCallback onInvite;
   final VoidCallback onRewards;
   final VoidCallback onOptions;
   final VoidCallback onLevelTap;
@@ -49,7 +49,7 @@ class FamilyClanHero extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            height: 204,
+            height: 210,
             child: Stack(
               children: [
                 Positioned.fill(
@@ -72,7 +72,7 @@ class FamilyClanHero extends StatelessWidget {
                     children: [
                       _HeroButton(icon: Icons.arrow_back_rounded, onTap: onBack),
                       const Spacer(),
-                      _HeroButton(icon: Icons.ios_share_rounded, onTap: onShare),
+                      _HeroButton(icon: Icons.person_add_alt_1_rounded, onTap: onInvite),
                       const SizedBox(width: 8),
                       _HeroButton(icon: Icons.redeem_rounded, onTap: onRewards),
                       const SizedBox(width: 8),
@@ -81,18 +81,14 @@ class FamilyClanHero extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  left: 8,
-                  bottom: 14,
-                  child: FamilyClanBadgeIcon(
-                    familyName: profile.name,
-                    familyLevel: 'gold',
-                    size: 112,
-                  ),
+                  left: 20,
+                  top: 72,
+                  child: _FamilyAvatarHolder(initial: profile.avatarText),
                 ),
                 Positioned(
-                  left: 132,
-                  right: 16,
-                  bottom: 28,
+                  left: 118,
+                  right: 18,
+                  top: 78,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -115,6 +111,15 @@ class FamilyClanHero extends StatelessWidget {
                     ],
                   ),
                 ),
+                Positioned(
+                  right: 8,
+                  bottom: -2,
+                  child: FamilyClanBadgeIcon(
+                    familyName: profile.name,
+                    familyLevel: level.tier.label,
+                    size: 88,
+                  ),
+                ),
               ],
             ),
           ),
@@ -135,14 +140,14 @@ class FamilyClanHero extends StatelessWidget {
                           borderRadius: BorderRadius.circular(15),
                           border: Border.all(color: const Color(0xFFFFD36A).withValues(alpha: 0.24)),
                         ),
-                        child: const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFFD36A), size: 24),
+                        child: const Icon(Icons.military_tech_rounded, color: Color(0xFFFFD36A), size: 24),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Family Power', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                            Text('Family Level: ${level.tier.label}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
                             const SizedBox(height: 4),
                             Text('Gift contribution + active family time', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w700)),
                           ],
@@ -167,6 +172,33 @@ class FamilyClanHero extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FamilyAvatarHolder extends StatelessWidget {
+  const _FamilyAvatarHolder({required this.initial});
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF21112E), Color(0xFFE84C72), Color(0xFFFFD36A)]),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20), width: 1.2),
+        boxShadow: [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 10))],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(child: CustomPaint(painter: _AvatarPatternPainter())),
+          Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900))),
+          Positioned(right: 7, bottom: 7, child: Container(width: 20, height: 20, decoration: const BoxDecoration(color: Color(0xFFFFD36A), shape: BoxShape.circle), child: const Icon(Icons.groups_rounded, color: Color(0xFF100A18), size: 13))),
         ],
       ),
     );
@@ -217,6 +249,18 @@ class _ClanPatternPainter extends CustomPainter {
     }
     final glow = Paint()..color = const Color(0xFFFFD36A).withValues(alpha: 0.13);
     canvas.drawCircle(Offset(size.width * 0.86, size.height * 0.24), 74, glow);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _AvatarPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white.withValues(alpha: 0.10)..style = PaintingStyle.stroke..strokeWidth = 1.2;
+    canvas.drawCircle(Offset(size.width * 0.28, size.height * 0.28), size.width * 0.45, paint);
+    canvas.drawCircle(Offset(size.width * 0.78, size.height * 0.72), size.width * 0.38, paint);
   }
 
   @override
