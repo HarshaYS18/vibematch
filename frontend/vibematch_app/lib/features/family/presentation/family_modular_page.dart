@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../models/family_ui_models.dart';
 import 'controllers/family_controller.dart';
 import 'family_list_page.dart';
 import 'invite/family_invite_flow_page.dart';
-import 'join/family_join_request_sheet.dart';
+import 'rankings/family_ranking_module.dart';
 import 'sheets/create_family_sheet.dart';
 import 'sheets/family_actions_sheet.dart';
 import 'sheets/family_level_details_sheet.dart';
 import 'widgets/family_chat_section.dart';
 import 'widgets/family_clan_hero.dart';
-import 'widgets/family_empty_state.dart';
 import 'widgets/family_ranked_member_strip.dart';
 import 'widgets/family_redesign_shared.dart';
 
@@ -93,24 +93,14 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     );
   }
 
-  void _openJoinFamilySheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => FamilyJoinRequestSheet(
-        family: _controller.profile,
-        onCreateFamily: () {
-          Navigator.pop(context);
-          _openCreateFamily();
-        },
-        onJoinFamily: () {
-          Navigator.pop(context);
-          _controller.requestJoinFamily();
-          _toast('System notification sent to ${_controller.profile.name} owner/admins: you want to join this family.');
-        },
-      ),
-    );
+  void _openRankedFamily(FamilyRankUiModel family) {
+    _controller.openFamilyFromRanking(family);
+    _toast('Opened ${family.name}. Join request can be sent from the ranking list.');
+  }
+
+  void _requestJoinRankedFamily(FamilyRankUiModel family) {
+    _controller.requestJoinFamily(family: family);
+    _toast('System notification sent to ${family.name} owner/admins: you want to join this family.');
   }
 
   void _openActions() {
@@ -154,15 +144,12 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
   @override
   Widget build(BuildContext context) {
     if (!_controller.hasFamily) {
-      return Scaffold(
-        backgroundColor: FamilyRedesignColors.page,
-        body: SafeArea(
-          child: FamilyEmptyState(
-            onCreateFamily: _openCreateFamily,
-            onJoinFamily: _openJoinFamilySheet,
-            joinRequestPending: _controller.joinRequestPending,
-          ),
-        ),
+      return FamilyRankingModule(
+        rankings: _controller.rankings,
+        joinRequestPending: _controller.joinRequestPending,
+        onOpenFamily: _openRankedFamily,
+        onJoinFamily: _requestJoinRankedFamily,
+        onCreateFamily: _openCreateFamily,
       );
     }
 
