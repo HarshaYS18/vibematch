@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/public_profile_models.dart';
+import 'profile_match_score_badge.dart';
 import 'public_profile_shared_widgets.dart';
 
 class PublicProfileHeader extends StatelessWidget {
@@ -21,6 +22,7 @@ class PublicProfileHeader extends StatelessWidget {
     required this.coverController,
     required this.coverIndex,
     required this.followStatus,
+    required this.matchScore,
     required this.onCoverChanged,
     required this.onBackTap,
     required this.onShareTap,
@@ -45,6 +47,7 @@ class PublicProfileHeader extends StatelessWidget {
   final PageController coverController;
   final int coverIndex;
   final PublicFollowStatus followStatus;
+  final int matchScore;
   final ValueChanged<int> onCoverChanged;
   final VoidCallback onBackTap;
   final VoidCallback onShareTap;
@@ -73,21 +76,15 @@ class PublicProfileHeader extends StatelessWidget {
                   itemBuilder: (context, index) => PublicCoverPhotoView(cover: coverPhotos[index]),
                 ),
               ),
-              Positioned(
-                left: 14,
-                top: 14,
-                child: PublicHeaderIconButton(icon: Icons.arrow_back_rounded, onTap: onBackTap),
-              ),
+              Positioned(left: 14, top: 14, child: PublicHeaderIconButton(icon: Icons.arrow_back_rounded, onTap: onBackTap)),
               Positioned(
                 right: 14,
                 top: 14,
-                child: Row(
-                  children: [
-                    PublicHeaderIconButton(icon: Icons.add_photo_alternate_rounded, onTap: onAddCoverTap),
-                    const SizedBox(width: 8),
-                    PublicHeaderIconButton(icon: Icons.ios_share_rounded, onTap: onShareTap),
-                  ],
-                ),
+                child: Row(children: [
+                  PublicHeaderIconButton(icon: Icons.add_photo_alternate_rounded, onTap: onAddCoverTap),
+                  const SizedBox(width: 8),
+                  PublicHeaderIconButton(icon: Icons.ios_share_rounded, onTap: onShareTap),
+                ]),
               ),
               Positioned(
                 left: 0,
@@ -110,11 +107,8 @@ class PublicProfileHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned(
-                left: 18,
-                bottom: -54,
-                child: _PublicAvatar(displayName: displayName),
-              ),
+              Positioned(left: 18, bottom: -54, child: _PublicAvatar(displayName: displayName)),
+              Positioned(right: 16, bottom: -42, child: ProfileMatchScoreBadge(score: matchScore, compact: true)),
             ],
           ),
           const SizedBox(height: 62),
@@ -132,12 +126,7 @@ class PublicProfileHeader extends StatelessWidget {
                         displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF251538),
-                          fontSize: 27,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.6,
-                        ),
+                        style: const TextStyle(color: Color(0xFF251538), fontSize: 27, fontWeight: FontWeight.w900, letterSpacing: -0.6),
                       ),
                     ),
                     if (showOfficialTick) ...[
@@ -147,18 +136,14 @@ class PublicProfileHeader extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  'ID $publicId',
-                  style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 13, fontWeight: FontWeight.w800),
-                ),
+                Text('ID $publicId', style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 13, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (roleTag != null)
-                      PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
+                    if (roleTag != null) PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
                     PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72)),
                     PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6)),
                     PublicBadge(icon: Icons.family_restroom_rounded, label: '$familyName Lv.$familyLevel', color: const Color(0xFF12C7B7)),
@@ -167,25 +152,21 @@ class PublicProfileHeader extends StatelessWidget {
                 const SizedBox(height: 12),
                 _PresenceLine(presenceLabel: presenceLabel, currentRoomName: currentRoomName, onRoomTap: onRoomTap),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: PublicMainProfileButton(label: followStatus.label, icon: followStatus.icon, filled: true, onTap: onFollowTap)),
-                    const SizedBox(width: 10),
-                    Expanded(child: PublicMainProfileButton(label: 'Message', icon: Icons.chat_bubble_rounded, filled: false, onTap: onMessageTap)),
-                  ],
-                ),
+                Row(children: [
+                  Expanded(child: PublicMainProfileButton(label: followStatus.label, icon: followStatus.icon, filled: true, onTap: onFollowTap)),
+                  const SizedBox(width: 10),
+                  Expanded(child: PublicMainProfileButton(label: 'Message', icon: Icons.chat_bubble_rounded, filled: false, onTap: onMessageTap)),
+                ]),
                 const SizedBox(height: 16),
-                const Row(
-                  children: [
-                    Expanded(child: PublicStat(value: '12.5K', label: 'Followers')),
-                    SizedBox(width: 6),
-                    Expanded(child: PublicStat(value: '864', label: 'Following')),
-                    SizedBox(width: 6),
-                    Expanded(child: PublicStat(value: '42', label: 'Rooms')),
-                    SizedBox(width: 6),
-                    Expanded(child: PublicStat(value: '3.6M', label: 'Received')),
-                  ],
-                ),
+                const Row(children: [
+                  Expanded(child: PublicStat(value: '12.5K', label: 'Followers')),
+                  SizedBox(width: 6),
+                  Expanded(child: PublicStat(value: '864', label: 'Following')),
+                  SizedBox(width: 6),
+                  Expanded(child: PublicStat(value: '42', label: 'Rooms')),
+                  SizedBox(width: 6),
+                  Expanded(child: PublicStat(value: '3.6M', label: 'Received')),
+                ]),
               ],
             ),
           ),
@@ -206,23 +187,12 @@ class _PublicAvatar extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9)),
-        ],
-      ),
+      decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9))]),
       child: Container(
         width: 96,
         height: 96,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)]),
-        ),
-        child: Center(
-          child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900)),
-        ),
+        decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)])),
+        child: Center(child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900))),
       ),
     );
   }
