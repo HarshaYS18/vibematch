@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'controllers/family_controller.dart';
+import 'sheets/create_family_sheet.dart';
+import 'sheets/family_actions_sheet.dart';
 import 'sheets/family_level_details_sheet.dart';
-import 'widgets/family_channel_tabs.dart';
 import 'widgets/family_chat_section.dart';
+import 'widgets/family_clan_channel_dock.dart';
+import 'widgets/family_clan_hero.dart';
 import 'widgets/family_empty_state.dart';
-import 'widgets/family_header_card.dart';
-import 'widgets/family_member_strip.dart';
+import 'widgets/family_ranked_member_strip.dart';
 import 'widgets/family_redesign_shared.dart';
 import 'widgets/family_vibes_section.dart';
 
@@ -39,6 +41,44 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
       ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: FamilyRedesignColors.ink, content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
   }
 
+  void _openCreateFamily() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CreateFamilySheet(
+        onCreate: (name, minimumVipLabel) {
+          Navigator.pop(context);
+          _controller.createFamily(name: name, minimumVipLabel: minimumVipLabel);
+        },
+      ),
+    );
+  }
+
+  void _openActions() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FamilyActionsSheet(
+        isOwner: _controller.isOwner,
+        adminCount: _controller.adminCount,
+        adminCapacity: _controller.adminCapacity,
+        onSetAdmins: () {
+          Navigator.pop(context);
+          _toast('Set admins sheet will open next.');
+        },
+        onExit: () {
+          Navigator.pop(context);
+          _controller.exitFamily();
+        },
+        onDisband: () {
+          Navigator.pop(context);
+          _controller.disbandFamily();
+        },
+      ),
+    );
+  }
+
   void _openLevelDetails() {
     showModalBottomSheet<void>(
       context: context,
@@ -58,11 +98,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     if (!_controller.hasFamily) {
       return Scaffold(
         backgroundColor: FamilyRedesignColors.page,
-        body: SafeArea(
-          child: FamilyEmptyState(
-            onCreateFamily: () => _controller.createFamily(name: 'Aurora Circle', minimumVipLabel: 'VIP 5'),
-          ),
-        ),
+        body: SafeArea(child: FamilyEmptyState(onCreateFamily: _openCreateFamily)),
       );
     }
 
@@ -73,19 +109,19 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-              child: FamilyHeaderCard(
+              child: FamilyClanHero(
                 profile: _controller.profile,
                 level: _controller.levelProgress,
                 exp: _controller.expBreakdown,
                 onBack: () => Navigator.pop(context),
                 onShare: () => _toast('Family share card will open here.'),
                 onRewards: () => _toast('Family rewards will open here.'),
-                onOptions: () => _toast('Family options sheet will open here.'),
+                onOptions: _openActions,
                 onLevelTap: _openLevelDetails,
               ),
             ),
             SliverToBoxAdapter(
-              child: FamilyMemberStrip(
+              child: FamilyRankedMemberStrip(
                 members: _controller.members,
                 totalCount: _controller.members.length,
                 onOpenMembers: () => _toast('Full family member page will open here.'),
@@ -93,7 +129,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
               ),
             ),
             SliverToBoxAdapter(
-              child: FamilyChannelTabs(
+              child: FamilyClanChannelDock(
                 selected: _controller.selectedTab,
                 canPost: _controller.canPostFamilyVibe,
                 onChanged: _controller.selectTab,
