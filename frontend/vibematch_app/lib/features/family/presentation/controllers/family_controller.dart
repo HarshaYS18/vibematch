@@ -9,17 +9,23 @@ class FamilyController extends ChangeNotifier {
   FamilyController()
       : profile = FamilyMockData.profile(),
         members = [...FamilyMockData.members],
+        inviteFriends = [...FamilyMockData.inviteFriends],
         messages = [...FamilyMockData.chats];
 
   static const FamilyLevelEngine _levelEngine = FamilyLevelEngine();
 
   FamilyProfileUiModel profile;
   final List<FamilyMemberUiModel> members;
+  final List<FamilyInviteFriendUiModel> inviteFriends;
   final List<FamilyChatUiModel> messages;
+  final Set<String> selectedInviteUserIds = {};
 
   bool hasFamily = true;
   bool isOwner = true;
   bool isAdmin = true;
+
+  FamilyInviteActorType get inviteActorType => (isOwner || isAdmin) ? FamilyInviteActorType.ownerAdmin : FamilyInviteActorType.member;
+  bool get canSelectMoreInvites => selectedInviteUserIds.length < 10;
 
   FamilyExpBreakdown get expBreakdown => _levelEngine.buildBreakdown(
         quarterCarryExp: profile.quarterCarryExp,
@@ -48,6 +54,30 @@ class FamilyController extends ChangeNotifier {
     hasFamily = true;
     isOwner = true;
     isAdmin = true;
+    notifyListeners();
+  }
+
+  void toggleInviteSelection(FamilyInviteFriendUiModel friend) {
+    if (!friend.canInvite) return;
+    if (selectedInviteUserIds.contains(friend.userId)) {
+      selectedInviteUserIds.remove(friend.userId);
+    } else if (selectedInviteUserIds.length < 10) {
+      selectedInviteUserIds.add(friend.userId);
+    }
+    notifyListeners();
+  }
+
+  void clearInviteSelection() {
+    selectedInviteUserIds.clear();
+    notifyListeners();
+  }
+
+  List<FamilyInviteFriendUiModel> selectedInviteFriends() {
+    return inviteFriends.where((friend) => selectedInviteUserIds.contains(friend.userId)).toList();
+  }
+
+  void markInvitesSent() {
+    selectedInviteUserIds.clear();
     notifyListeners();
   }
 
