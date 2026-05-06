@@ -162,29 +162,14 @@ class _VipTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final next = snapshot.nextVipLevel;
-    final nextRequired = next.requiredRechargeCoins;
-    final progressLabel = next.level <= snapshot.vipLevel
-        ? '${_formatCoins(snapshot.lifetimeRechargeCoins)} coins recharged'
-        : '${_formatCoins(snapshot.lifetimeRechargeCoins)} / ${_formatCoins(nextRequired)} coins';
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
-        _VipHeroCard(
-          level: snapshot.vipLevel,
-          title: 'VIP ${snapshot.vipLevel}',
-          progress: snapshot.vipProgress,
-          progressLabel: progressLabel,
-          onPrimaryAction: onRechargeTap,
-        ),
-        const SizedBox(height: 14),
-        _SectionTitle(title: 'Swipe VIP levels', subtitle: 'See coins required for every VIP level.'),
-        const SizedBox(height: 10),
-        _VipLevelPager(
+        _VipHeroPager(
           levels: snapshot.vipLevels,
           currentLevel: snapshot.vipLevel,
           currentCoins: snapshot.lifetimeRechargeCoins,
+          onRechargeTap: onRechargeTap,
         ),
         const SizedBox(height: 16),
         _SectionTitle(title: 'Privileges', subtitle: 'Backend can update rewards anytime.'),
@@ -218,32 +203,18 @@ class _SvipTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final next = snapshot.nextSvipLevel;
-    final nextRequired = next.monthlyRechargeCoins;
-    final progressLabel = next.level <= snapshot.svipLevel
-        ? '${_formatCoins(snapshot.monthlyRechargeCoins)} coins this month'
-        : '${_formatCoins(snapshot.monthlyRechargeCoins)} / ${_formatCoins(nextRequired)} monthly coins';
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
-        _SvipHeroCard(
-          level: snapshot.svipLevel,
-          progress: snapshot.svipProgress,
-          progressLabel: progressLabel,
-          onPrimaryAction: onRechargeTap,
-        ),
-        const SizedBox(height: 14),
-        _CompactPolicyCard(
-          text: 'SVIP is monthly. If the required monthly recharge is not maintained, it drops by 2 levels next month and can reach 0.',
-        ),
-        const SizedBox(height: 14),
-        _SectionTitle(title: 'Swipe SVIP levels', subtitle: 'See monthly coins required for SVIP 1–10.'),
-        const SizedBox(height: 10),
-        _SvipLevelPager(
+        _SvipHeroPager(
           levels: snapshot.svipLevels,
           currentLevel: snapshot.svipLevel,
           currentCoins: snapshot.monthlyRechargeCoins,
+          onRechargeTap: onRechargeTap,
+        ),
+        const SizedBox(height: 14),
+        const _CompactPolicyCard(
+          text: 'SVIP is monthly. If the required monthly recharge is not maintained, it drops by 2 levels next month and can reach 0.',
         ),
         const SizedBox(height: 16),
         _SectionTitle(title: 'Privileges', subtitle: 'Monthly rewards while SVIP is active.'),
@@ -264,23 +235,179 @@ class _SvipTab extends StatelessWidget {
   }
 }
 
+class _VipHeroPager extends StatefulWidget {
+  const _VipHeroPager({
+    required this.levels,
+    required this.currentLevel,
+    required this.currentCoins,
+    required this.onRechargeTap,
+  });
+
+  final List<VipLevelConfig> levels;
+  final int currentLevel;
+  final int currentCoins;
+  final VoidCallback onRechargeTap;
+
+  @override
+  State<_VipHeroPager> createState() => _VipHeroPagerState();
+}
+
+class _VipHeroPagerState extends State<_VipHeroPager> {
+  late final PageController _controller;
+  late int _pageIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialPage = (widget.currentLevel - 1).clamp(0, widget.levels.length - 1).toInt();
+    _pageIndex = initialPage;
+    _controller = PageController(initialPage: initialPage, viewportFraction: 1);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 300,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: widget.levels.length,
+            onPageChanged: (index) => setState(() => _pageIndex = index),
+            itemBuilder: (context, index) {
+              final level = widget.levels[index];
+              final previousRequired = index == 0 ? 0 : widget.levels[index - 1].requiredRechargeCoins;
+              final progress = _levelProgress(
+                currentCoins: widget.currentCoins,
+                previousRequired: previousRequired,
+                targetRequired: level.requiredRechargeCoins,
+                unlocked: level.level <= widget.currentLevel,
+              );
+              return _VipHeroCard(
+                level: level.level,
+                requiredCoins: level.requiredRechargeCoins,
+                currentCoins: widget.currentCoins,
+                progress: progress,
+                unlocked: level.level <= widget.currentLevel,
+                onPrimaryAction: widget.onRechargeTap,
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 9),
+        _HeroPageHint(
+          current: _pageIndex + 1,
+          total: widget.levels.length,
+          label: 'Swipe VIP levels',
+        ),
+      ],
+    );
+  }
+}
+
+class _SvipHeroPager extends StatefulWidget {
+  const _SvipHeroPager({
+    required this.levels,
+    required this.currentLevel,
+    required this.currentCoins,
+    required this.onRechargeTap,
+  });
+
+  final List<SvipLevelConfig> levels;
+  final int currentLevel;
+  final int currentCoins;
+  final VoidCallback onRechargeTap;
+
+  @override
+  State<_SvipHeroPager> createState() => _SvipHeroPagerState();
+}
+
+class _SvipHeroPagerState extends State<_SvipHeroPager> {
+  late final PageController _controller;
+  late int _pageIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialPage = (widget.currentLevel - 1).clamp(0, widget.levels.length - 1).toInt();
+    _pageIndex = initialPage;
+    _controller = PageController(initialPage: initialPage, viewportFraction: 1);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 300,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: widget.levels.length,
+            onPageChanged: (index) => setState(() => _pageIndex = index),
+            itemBuilder: (context, index) {
+              final level = widget.levels[index];
+              final previousRequired = index == 0 ? 0 : widget.levels[index - 1].monthlyRechargeCoins;
+              final progress = _levelProgress(
+                currentCoins: widget.currentCoins,
+                previousRequired: previousRequired,
+                targetRequired: level.monthlyRechargeCoins,
+                unlocked: level.level <= widget.currentLevel,
+              );
+              return _SvipHeroCard(
+                level: level.level,
+                requiredCoins: level.monthlyRechargeCoins,
+                currentCoins: widget.currentCoins,
+                progress: progress,
+                active: level.level <= widget.currentLevel,
+                onPrimaryAction: widget.onRechargeTap,
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 9),
+        _HeroPageHint(
+          current: _pageIndex + 1,
+          total: widget.levels.length,
+          label: 'Swipe SVIP levels',
+        ),
+      ],
+    );
+  }
+}
+
 class _VipHeroCard extends StatelessWidget {
   const _VipHeroCard({
     required this.level,
-    required this.title,
+    required this.requiredCoins,
+    required this.currentCoins,
     required this.progress,
-    required this.progressLabel,
+    required this.unlocked,
     required this.onPrimaryAction,
   });
 
   final int level;
-  final String title;
+  final int requiredCoins;
+  final int currentCoins;
   final double progress;
-  final String progressLabel;
+  final bool unlocked;
   final VoidCallback onPrimaryAction;
 
   @override
   Widget build(BuildContext context) {
+    final remaining = (requiredCoins - currentCoins).clamp(0, 999999999).toInt();
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: _heroDecoration(
@@ -302,11 +429,20 @@ class _VipHeroCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1.2)),
-              const SizedBox(height: 34),
-              _ProgressBlock(progress: progress, label: progressLabel, color: _VipProgramPageState.champagne),
+              const SizedBox(height: 8),
+              Text('VIP $level', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1.2)),
               const SizedBox(height: 18),
+              _CoinStatRow(
+                currentLabel: '${_formatCoins(currentCoins)} recharged',
+                requiredLabel: '${_formatCoins(requiredCoins)} required',
+              ),
+              const SizedBox(height: 16),
+              _ProgressBlock(
+                progress: progress,
+                label: unlocked ? 'Unlocked' : '${_formatCoins(remaining)} coins remaining',
+                color: _VipProgramPageState.champagne,
+              ),
+              const Spacer(),
               _PremiumButton(label: 'Recharge', onTap: onPrimaryAction),
             ],
           ),
@@ -319,18 +455,24 @@ class _VipHeroCard extends StatelessWidget {
 class _SvipHeroCard extends StatelessWidget {
   const _SvipHeroCard({
     required this.level,
+    required this.requiredCoins,
+    required this.currentCoins,
     required this.progress,
-    required this.progressLabel,
+    required this.active,
     required this.onPrimaryAction,
   });
 
   final int level;
+  final int requiredCoins;
+  final int currentCoins;
   final double progress;
-  final String progressLabel;
+  final bool active;
   final VoidCallback onPrimaryAction;
 
   @override
   Widget build(BuildContext context) {
+    final remaining = (requiredCoins - currentCoins).clamp(0, 999999999).toInt();
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: _heroDecoration(
@@ -357,11 +499,20 @@ class _SvipHeroCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text('SVIP $level', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1.2)),
-              const SizedBox(height: 34),
-              _ProgressBlock(progress: progress, label: progressLabel, color: const Color(0xFFFFD36A)),
               const SizedBox(height: 18),
+              _CoinStatRow(
+                currentLabel: '${_formatCoins(currentCoins)} this month',
+                requiredLabel: '${_formatCoins(requiredCoins)} required',
+              ),
+              const SizedBox(height: 16),
+              _ProgressBlock(
+                progress: progress,
+                label: active ? 'Active this month' : '${_formatCoins(remaining)} coins remaining',
+                color: const Color(0xFFFFD36A),
+              ),
+              const Spacer(),
               _PremiumButton(label: 'Recharge', onTap: onPrimaryAction),
             ],
           ),
@@ -371,180 +522,76 @@ class _SvipHeroCard extends StatelessWidget {
   }
 }
 
-class _VipLevelPager extends StatefulWidget {
-  const _VipLevelPager({
-    required this.levels,
-    required this.currentLevel,
-    required this.currentCoins,
-  });
+class _CoinStatRow extends StatelessWidget {
+  const _CoinStatRow({required this.currentLabel, required this.requiredLabel});
 
-  final List<VipLevelConfig> levels;
-  final int currentLevel;
-  final int currentCoins;
-
-  @override
-  State<_VipLevelPager> createState() => _VipLevelPagerState();
-}
-
-class _VipLevelPagerState extends State<_VipLevelPager> {
-  late final PageController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    final initialPage = (widget.currentLevel - 1).clamp(0, widget.levels.length - 1).toInt();
-    _controller = PageController(initialPage: initialPage, viewportFraction: 0.82);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 126,
-      child: PageView.builder(
-        controller: _controller,
-        itemCount: widget.levels.length,
-        itemBuilder: (context, index) {
-          final level = widget.levels[index];
-          final active = level.level <= widget.currentLevel;
-          final remaining = (level.requiredRechargeCoins - widget.currentCoins).clamp(0, 999999999).toInt();
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: _LevelRequirementCard(
-              title: 'VIP ${level.level}',
-              requiredLabel: '${_formatCoins(level.requiredRechargeCoins)} coins required',
-              detailLabel: active ? 'Unlocked' : '${_formatCoins(remaining)} coins remaining',
-              active: active,
-              accent: level.difficulty.color,
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SvipLevelPager extends StatefulWidget {
-  const _SvipLevelPager({
-    required this.levels,
-    required this.currentLevel,
-    required this.currentCoins,
-  });
-
-  final List<SvipLevelConfig> levels;
-  final int currentLevel;
-  final int currentCoins;
-
-  @override
-  State<_SvipLevelPager> createState() => _SvipLevelPagerState();
-}
-
-class _SvipLevelPagerState extends State<_SvipLevelPager> {
-  late final PageController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    final initialPage = (widget.currentLevel - 1).clamp(0, widget.levels.length - 1).toInt();
-    _controller = PageController(initialPage: initialPage, viewportFraction: 0.82);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 126,
-      child: PageView.builder(
-        controller: _controller,
-        itemCount: widget.levels.length,
-        itemBuilder: (context, index) {
-          final level = widget.levels[index];
-          final active = level.level <= widget.currentLevel;
-          final remaining = (level.monthlyRechargeCoins - widget.currentCoins).clamp(0, 999999999).toInt();
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: _LevelRequirementCard(
-              title: 'SVIP ${level.level}',
-              requiredLabel: '${_formatCoins(level.monthlyRechargeCoins)} monthly coins',
-              detailLabel: active ? 'Active' : '${_formatCoins(remaining)} coins remaining',
-              active: active,
-              accent: _VipProgramPageState.violet,
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _LevelRequirementCard extends StatelessWidget {
-  const _LevelRequirementCard({
-    required this.title,
-    required this.requiredLabel,
-    required this.detailLabel,
-    required this.active,
-    required this.accent,
-  });
-
-  final String title;
+  final String currentLabel;
   final String requiredLabel;
-  final String detailLabel;
-  final bool active;
-  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: _CoinStatPill(label: currentLabel, icon: Icons.account_balance_wallet_rounded)),
+        const SizedBox(width: 8),
+        Expanded(child: _CoinStatPill(label: requiredLabel, icon: Icons.flag_rounded)),
+      ],
+    );
+  }
+}
+
+class _CoinStatPill extends StatelessWidget {
+  const _CoinStatPill({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.98),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: active ? accent.withValues(alpha: 0.42) : _VipProgramPageState.softBorder),
-        boxShadow: [
-          BoxShadow(
-            color: _VipProgramPageState.plum.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Row(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(17),
-              color: accent.withValues(alpha: active ? 0.18 : 0.09),
-            ),
-            child: Icon(active ? Icons.check_rounded : Icons.lock_rounded, color: active ? accent : const Color(0xFF8C8198)),
-          ),
-          const SizedBox(width: 12),
+          Icon(icon, color: Colors.white.withValues(alpha: 0.82), size: 15),
+          const SizedBox(width: 6),
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: _VipProgramPageState.plum, fontSize: 19, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 5),
-                Text(requiredLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12.5, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
-                Text(detailLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? accent : _VipProgramPageState.coral, fontSize: 12.5, fontWeight: FontWeight.w900)),
-              ],
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 11.5, fontWeight: FontWeight.w900),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HeroPageHint extends StatelessWidget {
+  const _HeroPageHint({required this.current, required this.total, required this.label});
+
+  final int current;
+  final int total;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.swipe_rounded, size: 16, color: Color(0xFF8C8198)),
+        const SizedBox(width: 6),
+        Text(
+          '$label · $current/$total',
+          style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11.5, fontWeight: FontWeight.w900),
+        ),
+      ],
     );
   }
 }
@@ -817,6 +864,18 @@ BoxDecoration _heroDecoration(List<Color> colors, Color shadowColor) {
       ),
     ],
   );
+}
+
+double _levelProgress({
+  required int currentCoins,
+  required int previousRequired,
+  required int targetRequired,
+  required bool unlocked,
+}) {
+  if (unlocked) return 1;
+  if (targetRequired <= previousRequired) return 1;
+  final progress = (currentCoins - previousRequired) / (targetRequired - previousRequired);
+  return progress.clamp(0.0, 1.0).toDouble();
 }
 
 String _formatCoins(int value) {
