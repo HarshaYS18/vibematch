@@ -102,7 +102,7 @@ class MePageContent extends StatelessWidget {
           currentRoomName: MeProfileConstants.currentRoomName,
           familyName: MeProfileConstants.familyName,
           familyLevel: MeProfileConstants.familyLevel,
-          onFamilyTap: () => _openFamily(context),
+          onFamilyTap: () => _showAction(context, 'Family tag details will open here.'),
           onAvatarTap: () => _openProfile(context),
           onQrTap: () => _showAction(context, 'Profile QR / share card will open.'),
           onWalletTap: () => _showAction(context, 'Wallet page will open.'),
