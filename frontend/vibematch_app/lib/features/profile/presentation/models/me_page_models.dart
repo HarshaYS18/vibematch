@@ -99,9 +99,9 @@ List<MeActionItem> buildMeActionItems({
     MeActionItem(
       icon: VMIcons.profile,
       title: 'Edit Profile',
-      subtitle: 'Avatar, name, bio, presence and profile display',
+      subtitle: 'Avatar, name, bio, age, gender, interests and preferences',
       color: Color(0xFF12C7B7),
-      action: 'Edit Profile page will open.',
+      action: 'edit_profile',
     ),
     MeActionItem(
       icon: VMIcons.coverPhoto,
