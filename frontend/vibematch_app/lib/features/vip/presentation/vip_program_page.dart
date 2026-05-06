@@ -25,9 +25,6 @@ class VipProgramPage extends StatefulWidget {
 }
 
 class _VipProgramPageState extends State<VipProgramPage> {
-  late int _selectedTabIndex;
-  late VipProgramSnapshot _snapshot;
-
   static const Color pearl = Color(0xFFFAF7F1);
   static const Color plum = Color(0xFF251538);
   static const Color deepViolet = Color(0xFF4A2A63);
@@ -36,6 +33,9 @@ class _VipProgramPageState extends State<VipProgramPage> {
   static const Color coral = Color(0xFFE84C72);
   static const Color champagne = Color(0xFFC99A3B);
   static const Color softBorder = Color(0xFFECE2D8);
+
+  late int _selectedTabIndex;
+  late final VipProgramSnapshot _snapshot;
 
   @override
   void initState() {
@@ -172,7 +172,10 @@ class _VipTab extends StatelessWidget {
           onRechargeTap: onRechargeTap,
         ),
         const SizedBox(height: 16),
-        _SectionTitle(title: 'Privileges', subtitle: 'Backend can update rewards anytime.'),
+        const _SectionTitle(
+          title: 'Privileges',
+          subtitle: 'Backend can update rewards anytime.',
+        ),
         const SizedBox(height: 10),
         ...snapshot.vipRewards.map(
           (reward) => Padding(
@@ -217,7 +220,10 @@ class _SvipTab extends StatelessWidget {
           text: 'SVIP is monthly. If the required monthly recharge is not maintained, it drops by 2 levels next month and can reach 0.',
         ),
         const SizedBox(height: 16),
-        _SectionTitle(title: 'Privileges', subtitle: 'Monthly rewards while SVIP is active.'),
+        const _SectionTitle(
+          title: 'Privileges',
+          subtitle: 'Monthly rewards while SVIP is active.',
+        ),
         const SizedBox(height: 10),
         ...snapshot.svipRewards.map(
           (reward) => Padding(
@@ -259,9 +265,10 @@ class _VipHeroPagerState extends State<_VipHeroPager> {
   @override
   void initState() {
     super.initState();
-    final initialPage = (widget.currentLevel - 1).clamp(0, widget.levels.length - 1).toInt();
+    final maxIndex = widget.levels.isEmpty ? 0 : widget.levels.length - 1;
+    final initialPage = (widget.currentLevel - 1).clamp(0, maxIndex).toInt();
     _pageIndex = initialPage;
-    _controller = PageController(initialPage: initialPage, viewportFraction: 1);
+    _controller = PageController(initialPage: initialPage);
   }
 
   @override
@@ -272,6 +279,8 @@ class _VipHeroPagerState extends State<_VipHeroPager> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.levels.isEmpty) return const SizedBox.shrink();
+
     return Column(
       children: [
         SizedBox(
@@ -282,19 +291,10 @@ class _VipHeroPagerState extends State<_VipHeroPager> {
             onPageChanged: (index) => setState(() => _pageIndex = index),
             itemBuilder: (context, index) {
               final level = widget.levels[index];
-              final previousRequired = index == 0 ? 0 : widget.levels[index - 1].requiredRechargeCoins;
-              final progress = _levelProgress(
-                currentCoins: widget.currentCoins,
-                previousRequired: previousRequired,
-                targetRequired: level.requiredRechargeCoins,
-                unlocked: level.level <= widget.currentLevel,
-              );
               return _VipHeroCard(
                 level: level.level,
                 requiredCoins: level.requiredRechargeCoins,
                 currentCoins: widget.currentCoins,
-                progress: progress,
-                unlocked: level.level <= widget.currentLevel,
                 onPrimaryAction: widget.onRechargeTap,
               );
             },
@@ -335,9 +335,10 @@ class _SvipHeroPagerState extends State<_SvipHeroPager> {
   @override
   void initState() {
     super.initState();
-    final initialPage = (widget.currentLevel - 1).clamp(0, widget.levels.length - 1).toInt();
+    final maxIndex = widget.levels.isEmpty ? 0 : widget.levels.length - 1;
+    final initialPage = (widget.currentLevel - 1).clamp(0, maxIndex).toInt();
     _pageIndex = initialPage;
-    _controller = PageController(initialPage: initialPage, viewportFraction: 1);
+    _controller = PageController(initialPage: initialPage);
   }
 
   @override
@@ -348,6 +349,8 @@ class _SvipHeroPagerState extends State<_SvipHeroPager> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.levels.isEmpty) return const SizedBox.shrink();
+
     return Column(
       children: [
         SizedBox(
@@ -358,19 +361,10 @@ class _SvipHeroPagerState extends State<_SvipHeroPager> {
             onPageChanged: (index) => setState(() => _pageIndex = index),
             itemBuilder: (context, index) {
               final level = widget.levels[index];
-              final previousRequired = index == 0 ? 0 : widget.levels[index - 1].monthlyRechargeCoins;
-              final progress = _levelProgress(
-                currentCoins: widget.currentCoins,
-                previousRequired: previousRequired,
-                targetRequired: level.monthlyRechargeCoins,
-                unlocked: level.level <= widget.currentLevel,
-              );
               return _SvipHeroCard(
                 level: level.level,
                 requiredCoins: level.monthlyRechargeCoins,
                 currentCoins: widget.currentCoins,
-                progress: progress,
-                active: level.level <= widget.currentLevel,
                 onPrimaryAction: widget.onRechargeTap,
               );
             },
@@ -392,21 +386,19 @@ class _VipHeroCard extends StatelessWidget {
     required this.level,
     required this.requiredCoins,
     required this.currentCoins,
-    required this.progress,
-    required this.unlocked,
     required this.onPrimaryAction,
   });
 
   final int level;
   final int requiredCoins;
   final int currentCoins;
-  final double progress;
-  final bool unlocked;
   final VoidCallback onPrimaryAction;
 
   @override
   Widget build(BuildContext context) {
-    final remaining = (requiredCoins - currentCoins).clamp(0, 999999999).toInt();
+    final progress = requiredCoins <= 0
+        ? 1.0
+        : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -431,16 +423,16 @@ class _VipHeroCard extends StatelessWidget {
             children: [
               const SizedBox(height: 8),
               Text('VIP $level', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1.2)),
-              const SizedBox(height: 18),
-              _CoinStatRow(
-                currentLabel: '${_formatCoins(currentCoins)} recharged',
-                requiredLabel: '${_formatCoins(requiredCoins)} required',
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _ProgressBlock(
                 progress: progress,
-                label: unlocked ? 'Unlocked' : '${_formatCoins(remaining)} coins remaining',
+                label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} coins',
                 color: _VipProgramPageState.champagne,
+              ),
+              const SizedBox(height: 14),
+              _CoinStatRow(
+                currentLabel: '${_formatCoins(currentCoins)} recharged',
+                requiredLabel: '${_formatCoins(requiredCoins)} total',
               ),
               const Spacer(),
               _PremiumButton(label: 'Recharge', onTap: onPrimaryAction),
@@ -457,21 +449,19 @@ class _SvipHeroCard extends StatelessWidget {
     required this.level,
     required this.requiredCoins,
     required this.currentCoins,
-    required this.progress,
-    required this.active,
     required this.onPrimaryAction,
   });
 
   final int level;
   final int requiredCoins;
   final int currentCoins;
-  final double progress;
-  final bool active;
   final VoidCallback onPrimaryAction;
 
   @override
   Widget build(BuildContext context) {
-    final remaining = (requiredCoins - currentCoins).clamp(0, 999999999).toInt();
+    final progress = requiredCoins <= 0
+        ? 1.0
+        : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -501,16 +491,16 @@ class _SvipHeroCard extends StatelessWidget {
             children: [
               const SizedBox(height: 8),
               Text('SVIP $level', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1.2)),
-              const SizedBox(height: 18),
-              _CoinStatRow(
-                currentLabel: '${_formatCoins(currentCoins)} this month',
-                requiredLabel: '${_formatCoins(requiredCoins)} required',
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _ProgressBlock(
                 progress: progress,
-                label: active ? 'Active this month' : '${_formatCoins(remaining)} coins remaining',
+                label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} monthly coins',
                 color: const Color(0xFFFFD36A),
+              ),
+              const SizedBox(height: 14),
+              _CoinStatRow(
+                currentLabel: '${_formatCoins(currentCoins)} this month',
+                requiredLabel: '${_formatCoins(requiredCoins)} total',
               ),
               const Spacer(),
               _PremiumButton(label: 'Recharge', onTap: onPrimaryAction),
@@ -727,7 +717,13 @@ class _ProgressBlock extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.86), fontSize: 12.5, fontWeight: FontWeight.w900)),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            label,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.86), fontSize: 12.5, fontWeight: FontWeight.w900),
+          ),
+        ),
       ],
     );
   }
@@ -864,18 +860,6 @@ BoxDecoration _heroDecoration(List<Color> colors, Color shadowColor) {
       ),
     ],
   );
-}
-
-double _levelProgress({
-  required int currentCoins,
-  required int previousRequired,
-  required int targetRequired,
-  required bool unlocked,
-}) {
-  if (unlocked) return 1;
-  if (targetRequired <= previousRequired) return 1;
-  final progress = (currentCoins - previousRequired) / (targetRequired - previousRequired);
-  return progress.clamp(0.0, 1.0).toDouble();
 }
 
 String _formatCoins(int value) {
