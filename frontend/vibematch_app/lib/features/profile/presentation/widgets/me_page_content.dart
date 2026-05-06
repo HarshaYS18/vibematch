@@ -174,6 +174,7 @@ class MePageContent extends StatelessWidget {
           onQrTap: () => _showAction(context, 'Profile QR / share card will open.'),
           onWalletTap: () => _showAction(context, 'Wallet page will open.'),
           onVipTap: () => _openVipProgram(context),
+          onSvipTap: () => _openVipProgram(context, initialTabIndex: 1),
           onRoomTap: () => _showAction(context, 'Open ${MeProfileConstants.currentRoomName} room preview. Secret Vibe rooms will be hidden later.'),
         ),
         const SizedBox(height: 14),
