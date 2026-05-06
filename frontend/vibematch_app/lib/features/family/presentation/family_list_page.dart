@@ -130,23 +130,39 @@ class _FamilyMemberRow extends StatelessWidget {
               children: [
                 Text(member.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: FamilyRedesignColors.ink, fontSize: 15, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    FamilyRoleChip(role: member.role),
-                    FamilySmallPill(icon: Icons.auto_graph_rounded, label: compactFamilyNumber(member.contributionExp)),
-                  ],
-                ),
+                FamilyRoleChip(role: member.role),
               ],
             ),
           ),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(color: member.isFollowing ? FamilyRedesignColors.page : FamilyRedesignColors.neon, borderRadius: BorderRadius.circular(14)),
-            child: const Icon(Icons.person_add_alt_1_rounded, color: FamilyRedesignColors.ink),
-          ),
+          const SizedBox(width: 10),
+          _ContributionBadge(value: compactFamilyNumber(member.contributionExp)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContributionBadge extends StatelessWidget {
+  const _ContributionBadge({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 62),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F0FA),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: FamilyRedesignColors.violet.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.auto_graph_rounded, color: FamilyRedesignColors.violet, size: 14),
+          const SizedBox(width: 4),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: FamilyRedesignColors.soft, fontSize: 11, fontWeight: FontWeight.w900)),
         ],
       ),
     );
