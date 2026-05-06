@@ -3,9 +3,16 @@ import 'package:flutter/material.dart';
 import 'family_redesign_shared.dart';
 
 class FamilyEmptyState extends StatelessWidget {
-  const FamilyEmptyState({super.key, required this.onCreateFamily});
+  const FamilyEmptyState({
+    super.key,
+    required this.onCreateFamily,
+    required this.onJoinFamily,
+    required this.joinRequestPending,
+  });
 
   final VoidCallback onCreateFamily;
+  final VoidCallback onJoinFamily;
+  final bool joinRequestPending;
 
   @override
   Widget build(BuildContext context) {
@@ -28,12 +35,33 @@ class FamilyEmptyState extends StatelessWidget {
             const Text('No family joined', style: TextStyle(color: FamilyRedesignColors.ink, fontSize: 25, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             const Text(
-              'Create a family with a cover, name, and minimum VIP requirement.',
+              'Create your own family or request to join the family you are viewing.',
               textAlign: TextAlign.center,
               style: TextStyle(color: FamilyRedesignColors.soft, height: 1.3, fontWeight: FontWeight.w700),
             ),
+            if (joinRequestPending) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFFFFF4E8), borderRadius: BorderRadius.circular(18)),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.hourglass_top_rounded, color: FamilyRedesignColors.gold, size: 18),
+                    SizedBox(width: 8),
+                    Text('Join request pending', style: TextStyle(color: FamilyRedesignColors.ink, fontWeight: FontWeight.w900)),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
-            FamilyPrimaryButton(label: 'Create Family', onTap: onCreateFamily),
+            Row(
+              children: [
+                Expanded(child: FamilySecondaryButton(label: 'Join Family', onTap: joinRequestPending ? () {} : onJoinFamily)),
+                const SizedBox(width: 10),
+                Expanded(child: FamilyPrimaryButton(label: 'Create Family', onTap: onCreateFamily)),
+              ],
+            ),
           ],
         ),
       ),
