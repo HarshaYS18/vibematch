@@ -31,6 +31,7 @@ class MePremiumProfileHero extends StatefulWidget {
     required this.onQrTap,
     required this.onWalletTap,
     required this.onVipTap,
+    required this.onSvipTap,
     required this.onRoomTap,
   });
 
@@ -55,6 +56,7 @@ class MePremiumProfileHero extends StatefulWidget {
   final VoidCallback onQrTap;
   final VoidCallback onWalletTap;
   final VoidCallback onVipTap;
+  final VoidCallback onSvipTap;
   final VoidCallback onRoomTap;
 
   @override
@@ -115,7 +117,7 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
         ),
       ),
       InkWell(
-        onTap: widget.onVipTap,
+        onTap: widget.onSvipTap,
         borderRadius: BorderRadius.circular(99),
         child: MeProfileMiniBadge(
           label: 'SVIP ${widget.svipLevel}',
