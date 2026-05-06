@@ -6,12 +6,19 @@ import '../../models/family_level_models.dart';
 import '../../models/family_ui_models.dart';
 
 class FamilyController extends ChangeNotifier {
-  FamilyController()
-      : profile = FamilyMockData.profile(),
+  FamilyController({
+    bool initialHasFamily = false,
+    FamilyProfileUiModel? initialProfile,
+    bool initialIsOwner = false,
+    bool initialIsAdmin = false,
+  })  : profile = initialProfile ?? FamilyMockData.profile(),
         rankings = [...FamilyMockData.rankings],
         members = [...FamilyMockData.members],
         inviteFriends = [...FamilyMockData.inviteFriends],
-        messages = [...FamilyMockData.chats];
+        messages = [...FamilyMockData.chats],
+        hasFamily = initialHasFamily,
+        isOwner = initialIsOwner,
+        isAdmin = initialIsAdmin;
 
   static const FamilyLevelEngine _levelEngine = FamilyLevelEngine();
 
@@ -22,9 +29,9 @@ class FamilyController extends ChangeNotifier {
   final List<FamilyChatUiModel> messages;
   final Set<String> selectedInviteUserIds = {};
 
-  bool hasFamily = false;
-  bool isOwner = false;
-  bool isAdmin = false;
+  bool hasFamily;
+  bool isOwner;
+  bool isAdmin;
   bool joinRequestPending = false;
 
   FamilyInviteActorType get inviteActorType => (isOwner || isAdmin) ? FamilyInviteActorType.ownerAdmin : FamilyInviteActorType.member;
