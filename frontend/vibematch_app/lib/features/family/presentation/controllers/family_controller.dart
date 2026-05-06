@@ -94,6 +94,23 @@ class FamilyController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void applyAdminSelection(Set<String> adminUserIds) {
+    final cappedAdminIds = adminUserIds.take(adminCapacity).toSet();
+    for (var index = 0; index < members.length; index++) {
+      final member = members[index];
+      if (member.role == FamilyRole.owner) continue;
+      members[index] = FamilyMemberUiModel(
+        userId: member.userId,
+        name: member.name,
+        role: cappedAdminIds.contains(member.userId) ? FamilyRole.admin : FamilyRole.member,
+        contributionExp: member.contributionExp,
+        avatarGradient: member.avatarGradient,
+        isFollowing: member.isFollowing,
+      );
+    }
+    notifyListeners();
+  }
+
   void toggleInviteSelection(FamilyInviteFriendUiModel friend) {
     if (!friend.canInvite) return;
     if (selectedInviteUserIds.contains(friend.userId)) {
