@@ -194,11 +194,13 @@ class MeProfileMiniBadge extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.color,
+    this.onTap,
   });
 
   final String label;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 
   int? _levelForPrefix(String prefix) {
     final parts = label.split(' ');
@@ -210,10 +212,14 @@ class MeProfileMiniBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final vipLevel = _levelForPrefix('VIP');
     if (vipLevel != null) {
-      return SizedBox(
-        height: 28,
-        child: Center(
-          child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true),
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          height: 28,
+          child: Center(
+            child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true),
+          ),
         ),
       );
     }
@@ -232,30 +238,34 @@ class MeProfileMiniBadge extends StatelessWidget {
             textColor: const Color(0xFFFFE2A1),
             shineColor: const Color(0xFFFFF1B8),
             active: svipLevel > 0,
-            onTap: () {},
+            onTap: onTap,
           ),
         ),
       );
     }
 
-    return Container(
-      height: 28,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
-          ),
-        ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(99),
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 14),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
       ),
     );
   }
