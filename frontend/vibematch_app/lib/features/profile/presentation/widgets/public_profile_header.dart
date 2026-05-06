@@ -29,6 +29,7 @@ class PublicProfileHeader extends StatelessWidget {
     required this.onFollowTap,
     required this.onMessageTap,
     required this.onRoomTap,
+    required this.onFamilyTap,
   });
 
   final String displayName;
@@ -54,13 +55,14 @@ class PublicProfileHeader extends StatelessWidget {
   final VoidCallback onFollowTap;
   final VoidCallback onMessageTap;
   final VoidCallback onRoomTap;
+  final VoidCallback onFamilyTap;
 
   List<Widget> _badgeLineItems() {
     return [
       if (roleTag != null) PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
       PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72)),
       PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6)),
-      PublicBadge(icon: Icons.family_restroom_rounded, label: familyName, color: const Color(0xFF12C7B7)),
+      PublicBadge(icon: Icons.family_restroom_rounded, label: familyName, color: const Color(0xFF12C7B7), onTap: onFamilyTap),
     ];
   }
 
