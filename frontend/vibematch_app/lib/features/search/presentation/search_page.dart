@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_routes.dart';
+import '../../../core/navigation/vm_navigator.dart';
+import '../../../core/presentation/vm_skeleton_page.dart';
 import '../application/search_controller.dart';
 import '../models/search_result_item.dart';
+import '../models/search_result_type.dart';
 import 'widgets/search_category_tabs.dart';
 import 'widgets/search_discover_view.dart';
 import 'widgets/search_header.dart';
@@ -58,11 +62,61 @@ class _SearchPageState extends State<SearchPage> {
 
   void _openResult(SearchResultItem item) {
     _searchController.submitSearch(_searchController.query);
+    FocusManager.instance.primaryFocus?.unfocus();
 
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _SearchResultActionSheet(item: item),
+    switch (item.type) {
+      case SearchResultType.user:
+        _openUserResult(item);
+        return;
+      case SearchResultType.room:
+        _openRoomResult(item);
+        return;
+      case SearchResultType.vibe:
+        _openVibeResult(item);
+        return;
+    }
+  }
+
+  void _openUserResult(SearchResultItem item) {
+    VmNavigator.openPublicProfile(
+      context,
+      userId: item.userId ?? item.title,
+      displayName: item.title,
+      username: item.username,
+    );
+  }
+
+  void _openRoomResult(SearchResultItem item) {
+    VmNavigator.openLiveRoom(
+      context,
+      roomName: item.title,
+      roomId: item.roomId ?? item.title,
+      language: item.roomLanguage ?? 'All',
+      modeTitle: item.roomModeTitle ?? 'Open',
+      onlineCount: item.roomOnlineCount ?? 1,
+    );
+  }
+
+  void _openVibeResult(SearchResultItem item) {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        settings: RouteSettings(
+          name: VmRoutes.vibeDetail,
+          arguments: item,
+        ),
+        builder: (_) => VmSkeletonPage(
+          title: item.title,
+          subtitle: 'Vibe by ${item.vibeAuthorName ?? item.subtitle}. This opens the exact Vibe result from search; backend will later hydrate the full post by vibeId ${item.vibeId ?? 'unknown'}.',
+          icon: item.icon,
+          highlights: [
+            'Author: ${item.vibeAuthorName ?? 'Unknown'}',
+            'Author ID: ${item.vibeAuthorId ?? 'Pending backend ID'}',
+            'Vibe ID: ${item.vibeId ?? 'Pending backend ID'}',
+            'Later this should render the real Vibe detail/comment page for this post.',
+          ],
+        ),
+      ),
     );
   }
 
@@ -106,168 +160,6 @@ class _SearchPageState extends State<SearchPage> {
                       onRemoveRecentTap: _searchController.removeRecentSearch,
                       onClearRecentTap: _searchController.clearRecentSearches,
                     ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchResultActionSheet extends StatelessWidget {
-  const _SearchResultActionSheet({required this.item});
-
-  final SearchResultItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(14),
-      padding: EdgeInsets.fromLTRB(
-        18,
-        12,
-        18,
-        18 + MediaQuery.paddingOf(context).bottom,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 42,
-            height: 5,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0D5CB),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: 68,
-            height: 68,
-            decoration: BoxDecoration(
-              color: item.color.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(item.icon, color: item.color, size: 34),
-          ),
-          const SizedBox(height: 13),
-          Text(
-            item.title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            item.subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF7A6B86),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _SheetButton(
-                  text: 'Close',
-                  icon: Icons.close_rounded,
-                  filled: false,
-                  onTap: () => Navigator.pop(context),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SheetButton(
-                  text: 'Open',
-                  icon: Icons.open_in_new_rounded,
-                  filled: true,
-                  onTap: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context)
-                      ..clearSnackBars()
-                      ..showSnackBar(
-                        SnackBar(
-                          behavior: SnackBarBehavior.floating,
-                          backgroundColor: const Color(0xFF251538),
-                          content: Text(
-                            '${item.title} detail route will connect next.',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                      );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SheetButton extends StatelessWidget {
-  const _SheetButton({
-    required this.text,
-    required this.icon,
-    required this.filled,
-    required this.onTap,
-  });
-
-  final String text;
-  final IconData icon;
-  final bool filled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: filled ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: filled ? const Color(0xFF251538) : const Color(0xFFECE2D8),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: filled ? Colors.white : const Color(0xFF4A2A63),
-              size: 19,
-            ),
-            const SizedBox(width: 7),
-            Text(
-              text,
-              style: TextStyle(
-                color: filled ? Colors.white : const Color(0xFF4A2A63),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w900,
-              ),
             ),
           ],
         ),
