@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
+import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
 import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
@@ -25,6 +26,27 @@ class MePageContent extends StatelessWidget {
   final CurrentUser user;
   final Future<void> Function() onLogoutPressed;
   final Future<void> Function() onRefreshPressed;
+
+  static const String _familyId = 'VMF6922';
+  static const String _familyRank = 'No. 99+';
+  static const String _familyRole = 'Member';
+  static const int _familyMembers = 128;
+  static const int _familyTotalExp = 1085000;
+
+  FamilyProfileUiModel get _currentFamilyProfile {
+    return const FamilyProfileUiModel(
+      id: _familyId,
+      name: MeProfileConstants.familyName,
+      minimumVipLabel: 'VIP 5',
+      memberCount: _familyMembers,
+      maxMembers: 200,
+      rankLabel: _familyRank,
+      ownerUserId: 'family_owner_01',
+      quarterCarryExp: _familyTotalExp,
+      giftCoinsThisQuarter: _familyTotalExp,
+      timeMinutesToday: 12240,
+    );
+  }
 
   void _showAction(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -51,6 +73,17 @@ class MePageContent extends StatelessWidget {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FamilyModularPage()));
   }
 
+  void _openCurrentFamily(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FamilyModularPage(
+          openCurrentFamily: true,
+          initialFamilyProfile: _currentFamilyProfile,
+        ),
+      ),
+    );
+  }
+
   void _openFamilyDetails(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -59,12 +92,12 @@ class MePageContent extends StatelessWidget {
       builder: (_) => MeFamilyDetailsSheet(
         familyName: MeProfileConstants.familyName,
         familyLevel: MeProfileConstants.familyLevel,
-        familyId: 'VMF6922',
-        rankLabel: 'No. 99+',
-        memberRole: 'Member',
-        memberCount: 128,
-        totalExp: 1085000,
-        onOpenFamily: () => _openFamily(context),
+        familyId: _familyId,
+        rankLabel: _familyRank,
+        memberRole: _familyRole,
+        memberCount: _familyMembers,
+        totalExp: _familyTotalExp,
+        onOpenFamily: () => _openCurrentFamily(context),
       ),
     );
   }
