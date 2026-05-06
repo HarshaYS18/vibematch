@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'controllers/family_controller.dart';
+import 'family_list_page.dart';
 import 'sheets/create_family_sheet.dart';
 import 'sheets/family_actions_sheet.dart';
 import 'sheets/family_level_details_sheet.dart';
@@ -37,6 +38,21 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: FamilyRedesignColors.ink, content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
+  }
+
+  void _openInviteFlow() {
+    _toast('Invite family member flow will open here.');
+  }
+
+  void _openFamilyList() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FamilyListPage(
+          members: _controller.members,
+          onInvite: _openInviteFlow,
+        ),
+      ),
+    );
   }
 
   void _openCreateFamily() {
@@ -112,7 +128,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
                 level: _controller.levelProgress,
                 exp: _controller.expBreakdown,
                 onBack: () => Navigator.pop(context),
-                onShare: () => _toast('Family share card will open here.'),
+                onInvite: _openInviteFlow,
                 onRewards: () => _toast('Family rewards will open here.'),
                 onOptions: _openActions,
                 onLevelTap: _openLevelDetails,
@@ -122,8 +138,8 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
               child: FamilyRankedMemberStrip(
                 members: _controller.members,
                 totalCount: _controller.members.length,
-                onOpenMembers: () => _toast('Full family member page will open here.'),
-                onInvite: () => _toast('Invite member flow will open here.'),
+                onOpenMembers: _openFamilyList,
+                onInvite: _openInviteFlow,
               ),
             ),
             SliverToBoxAdapter(
