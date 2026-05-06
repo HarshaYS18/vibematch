@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_routes.dart';
 import '../../../core/navigation/vm_navigator.dart';
-import '../../../core/presentation/vm_skeleton_page.dart';
+import '../../vibes/data/vibes_mock_data.dart';
+import '../../vibes/models/vibe_models.dart';
+import '../../vibes/presentation/pages/vibe_detail_page_modular.dart';
 import '../application/search_controller.dart';
 import '../models/search_result_item.dart';
 import '../models/search_result_type.dart';
@@ -98,26 +100,57 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _openVibeResult(SearchResultItem item) {
+    final vibe = _resolveVibe(item);
+
     Navigator.push<void>(
       context,
       MaterialPageRoute(
         settings: RouteSettings(
           name: VmRoutes.vibeDetail,
-          arguments: item,
+          arguments: vibe,
         ),
-        builder: (_) => VmSkeletonPage(
-          title: item.title,
-          subtitle: 'Vibe by ${item.vibeAuthorName ?? item.subtitle}. This opens the exact Vibe result from search; backend will later hydrate the full post by vibeId ${item.vibeId ?? 'unknown'}.',
-          icon: item.icon,
-          highlights: [
-            'Author: ${item.vibeAuthorName ?? 'Unknown'}',
-            'Author ID: ${item.vibeAuthorId ?? 'Pending backend ID'}',
-            'Vibe ID: ${item.vibeId ?? 'Pending backend ID'}',
-            'Later this should render the real Vibe detail/comment page for this post.',
-          ],
-        ),
+        builder: (_) => VibeDetailPageModular(vibe: vibe),
       ),
     );
+  }
+
+  VibeItem _resolveVibe(SearchResultItem item) {
+    final byId = VibesMockData.vibes.where((vibe) => vibe.id == item.vibeId);
+    if (byId.isNotEmpty) return byId.first;
+
+    final byTitle = VibesMockData.vibes.where((vibe) {
+      return vibe.caption.toLowerCase().contains(item.title.toLowerCase()) ||
+          item.title.toLowerCase().contains(vibe.caption.toLowerCase());
+    });
+    if (byTitle.isNotEmpty) return byTitle.first;
+
+    return VibeItem(
+      id: item.vibeId ?? 'search_vibe_result',
+      authorName: item.vibeAuthorName ?? item.title,
+      authorId: item.vibeAuthorId ?? item.userId ?? 'unknown',
+      avatarText: (item.vibeAuthorName ?? item.title).trim().isEmpty
+          ? 'V'
+          : (item.vibeAuthorName ?? item.title).trim().characters.first.toUpperCase(),
+      timeAgo: 'Now',
+      mediaType: _inferMediaType(item),
+      caption: item.title,
+      tag: item.tag,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      views: 0,
+      isFollowing: false,
+      usesMentionAll: false,
+      mentions: const [],
+      colors: [item.color, const Color(0xFF251538)],
+    );
+  }
+
+  VibeMediaType _inferMediaType(SearchResultItem item) {
+    final text = '${item.title} ${item.subtitle} ${item.keywords.join(' ')}'.toLowerCase();
+    if (text.contains('video')) return VibeMediaType.video;
+    if (text.contains('text')) return VibeMediaType.text;
+    return VibeMediaType.photo;
   }
 
   @override
