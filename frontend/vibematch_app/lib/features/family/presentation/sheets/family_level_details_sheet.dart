@@ -26,13 +26,9 @@ class FamilyLevelDetailsSheet extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${level.tier.label} Family · Lv ${level.level}', style: const TextStyle(color: FamilyRedesignColors.ink, fontSize: 21, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 3),
-                    Text(level.tier.difficultyLabel, style: const TextStyle(color: FamilyRedesignColors.gold, fontWeight: FontWeight.w900)),
-                  ],
+                child: Text(
+                  '${level.tier.label} Family · Lv ${level.level}',
+                  style: const TextStyle(color: FamilyRedesignColors.ink, fontSize: 21, fontWeight: FontWeight.w900),
                 ),
               ),
             ],
@@ -45,11 +41,10 @@ class FamilyLevelDetailsSheet extends StatelessWidget {
           const SizedBox(height: 8),
           Text('${compactFamilyExp(level.expIntoLevel)} / ${compactFamilyExp(level.expNeededForNextLevel)} EXP to next level', style: const TextStyle(color: FamilyRedesignColors.soft, fontSize: 12.5, fontWeight: FontWeight.w800)),
           const SizedBox(height: 14),
-          const _RuleTile(icon: Icons.alt_route_rounded, title: 'Tier flow', body: 'Bronze → Silver → Gold → Platinum. Progression gets harder each tier.'),
           const _RuleTile(icon: Icons.card_giftcard_rounded, title: 'Gift EXP', body: 'Every 20 coins spent on gifts gives 2 family EXP.'),
-          const _RuleTile(icon: Icons.schedule_rounded, title: 'Time EXP', body: '20 EXP every 5 minutes, capped at 800 time EXP per day.'),
+          const _RuleTile(icon: Icons.schedule_rounded, title: 'Time EXP', body: 'Each member can contribute up to 800 time EXP per day by spending time in family activity.'),
           _InfoLine(title: 'Gift contribution', value: '${compactFamilyExp(exp.giftCoinsSpent)} coins → ${compactFamilyExp(exp.giftExp)} EXP'),
-          _InfoLine(title: 'Time contribution', value: '${compactFamilyExp(exp.timeMinutes)} min → ${compactFamilyExp(exp.timeExp)} / 800 EXP'),
+          _InfoLine(title: 'Time contribution', value: '${compactFamilyExp(exp.timeMinutes)} min → ${compactFamilyExp(exp.timeExp)} EXP'),
           const _RuleTile(icon: Icons.restart_alt_rounded, title: 'Quarterly reset', body: 'Family level and ranking reset quarterly. Backend should keep historical quarter records.'),
         ],
       ),
