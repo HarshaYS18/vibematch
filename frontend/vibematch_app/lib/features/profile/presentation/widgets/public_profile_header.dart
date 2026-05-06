@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/public_profile_models.dart';
-import 'profile_match_score_badge.dart';
 import 'public_profile_shared_widgets.dart';
 
 class PublicProfileHeader extends StatelessWidget {
@@ -56,14 +55,18 @@ class PublicProfileHeader extends StatelessWidget {
   final VoidCallback onMessageTap;
   final VoidCallback onRoomTap;
 
-  @override
-  Widget build(BuildContext context) {
-    final badges = <Widget>[
+  List<Widget> _badgeLineItems() {
+    return [
       if (roleTag != null) PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
       PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72)),
       PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6)),
       PublicBadge(icon: Icons.family_restroom_rounded, label: familyName, color: const Color(0xFF12C7B7)),
     ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final badges = _badgeLineItems();
 
     return Container(
       margin: const EdgeInsets.fromLTRB(18, 14, 18, 0),
@@ -115,7 +118,6 @@ class PublicProfileHeader extends StatelessWidget {
                 ),
               ),
               Positioned(left: 18, bottom: -54, child: _PublicAvatar(displayName: displayName)),
-              Positioned(right: 16, bottom: -42, child: ProfileMatchScoreBadge(score: matchScore, compact: true)),
             ],
           ),
           const SizedBox(height: 62),
@@ -125,27 +127,56 @@ class PublicProfileHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFF251538), fontSize: 27, fontWeight: FontWeight.w900, letterSpacing: -0.6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Color(0xFF251538), fontSize: 27, fontWeight: FontWeight.w900, letterSpacing: -0.6),
+                                ),
+                              ),
+                              if (showOfficialTick) ...[
+                                const SizedBox(width: 5),
+                                const Icon(Icons.verified_rounded, color: Color(0xFFFFC857), size: 24),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text('ID $publicId', style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 13, fontWeight: FontWeight.w800)),
+                        ],
                       ),
                     ),
-                    if (showOfficialTick) ...[
-                      const SizedBox(width: 5),
-                      const Icon(Icons.verified_rounded, color: Color(0xFFFFC857), size: 24),
-                    ],
+                    const SizedBox(width: 10),
+                    _PremiumMatchScorePill(score: matchScore),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text('ID $publicId', style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 13, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
-                _PublicBadgeGrid(badges: badges),
+                SizedBox(
+                  height: 30,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        for (var index = 0; index < badges.length; index++) ...[
+                          badges[index],
+                          if (index != badges.length - 1) const SizedBox(width: 8),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 _PresenceLine(presenceLabel: presenceLabel, currentRoomName: currentRoomName, onRoomTap: onRoomTap),
                 const SizedBox(height: 16),
@@ -173,53 +204,47 @@ class PublicProfileHeader extends StatelessWidget {
   }
 }
 
-class _PublicBadgeGrid extends StatelessWidget {
-  const _PublicBadgeGrid({required this.badges});
+class _PremiumMatchScorePill extends StatelessWidget {
+  const _PremiumMatchScorePill({required this.score});
 
-  final List<Widget> badges;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = <Widget>[];
-    for (var index = 0; index < badges.length; index += 2) {
-      final first = badges[index];
-      final second = index + 1 < badges.length ? badges[index + 1] : null;
-      rows.add(
-        Row(
-          children: [
-            Expanded(child: _PublicBadgeCell(child: first)),
-            const SizedBox(width: 8),
-            Expanded(child: second == null ? const SizedBox.shrink() : _PublicBadgeCell(child: second)),
-          ],
-        ),
-      );
-      if (index + 2 < badges.length) rows.add(const SizedBox(height: 8));
-    }
-
-    return Column(children: rows);
-  }
-}
-
-class _PublicBadgeCell extends StatelessWidget {
-  const _PublicBadgeCell({required this.child});
-
-  final Widget child;
+  final int score;
 
   @override
   Widget build(BuildContext context) {
+    final progress = (score / 100).clamp(0.0, 1.0);
     return Container(
-      height: 34,
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      width: 82,
+      padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
-        color: const Color(0xFFFAF7F1),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFECE2D8)),
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFF7FB), Color(0xFFFFEAF2)]),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE84C72).withValues(alpha: 0.20)),
+        boxShadow: [BoxShadow(color: const Color(0xFFE84C72).withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 7))],
       ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: child,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 34,
+                height: 34,
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 3.2,
+                  backgroundColor: const Color(0xFFE84C72).withValues(alpha: 0.12),
+                  color: const Color(0xFFE84C72),
+                ),
+              ),
+              const Icon(Icons.favorite_rounded, color: Color(0xFFE84C72), size: 18),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text('$score%', style: const TextStyle(color: Color(0xFFE84C72), fontSize: 13, fontWeight: FontWeight.w900, height: 1)),
+          const SizedBox(height: 2),
+          const Text('Match', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xFF7B6A86), fontSize: 9.5, fontWeight: FontWeight.w900, height: 1)),
+        ],
       ),
     );
   }
