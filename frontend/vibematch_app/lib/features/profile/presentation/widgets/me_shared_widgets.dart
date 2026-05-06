@@ -178,7 +178,7 @@ class MeFamilyTagLight extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MiniProfileFamilyBadge(
-      familyName: '$familyName Lv.$familyLevel',
+      familyName: familyName,
       familyLevel: meFamilyTierFromLevel(familyLevel),
       onTap: onTap,
       height: 26,
