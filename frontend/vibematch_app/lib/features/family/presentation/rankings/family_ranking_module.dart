@@ -34,7 +34,7 @@ class FamilyRankingModule extends StatelessWidget {
                 SliverToBoxAdapter(child: _RankingHeader(totalFamilies: sortedRankings.length)),
                 SliverToBoxAdapter(child: _TopFamilyPodium(rankings: sortedRankings.take(3).toList(), onOpenFamily: onOpenFamily, onJoinFamily: onJoinFamily)),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 112),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                   sliver: SliverList.separated(
                     itemCount: sortedRankings.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -56,7 +56,7 @@ class FamilyRankingModule extends StatelessWidget {
               left: 16,
               right: 16,
               bottom: 16,
-              child: _CreateFamilyBar(onCreateFamily: onCreateFamily),
+              child: _CreateFamilyPill(onCreateFamily: onCreateFamily),
             ),
           ],
         ),
@@ -221,28 +221,35 @@ class FamilyRankTile extends StatelessWidget {
   }
 }
 
-class _CreateFamilyBar extends StatelessWidget {
-  const _CreateFamilyBar({required this.onCreateFamily});
+class _CreateFamilyPill extends StatelessWidget {
+  const _CreateFamilyPill({required this.onCreateFamily});
 
   final VoidCallback onCreateFamily;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF100A18),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFFD36A).withValues(alpha: 0.16)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 22, offset: const Offset(0, 10))],
-      ),
-      child: Row(
-        children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: FamilyRedesignColors.gold.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.add_business_rounded, color: FamilyRedesignColors.gold)),
-          const SizedBox(width: 10),
-          const Expanded(child: Text('Start your own family', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900))),
-          FamilyPrimaryButton(label: 'Create', onTap: onCreateFamily),
-        ],
+    return Align(
+      alignment: Alignment.center,
+      child: InkWell(
+        onTap: onCreateFamily,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+          decoration: BoxDecoration(
+            color: const Color(0xFF100A18),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFFFD36A).withValues(alpha: 0.18)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 22, offset: const Offset(0, 10))],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add_rounded, color: FamilyRedesignColors.gold, size: 21),
+              SizedBox(width: 7),
+              Text('Create a Family', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
       ),
     );
   }
