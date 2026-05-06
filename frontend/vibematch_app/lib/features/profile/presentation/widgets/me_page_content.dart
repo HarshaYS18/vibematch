@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
+import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
@@ -38,6 +39,12 @@ class MePageContent extends StatelessWidget {
   Future<void> _endSession(BuildContext context) async {
     final shouldEnd = await showMeSessionSheet(context);
     if (shouldEnd == true) await onLogoutPressed();
+  }
+
+  void _openEditProfile(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => EditProfilePage(user: user)),
+    );
   }
 
   void _openProfile(BuildContext context) {
@@ -120,7 +127,9 @@ class MePageContent extends StatelessWidget {
             child: MeAccountCard(
               item: item,
               onTap: () async {
-                if (item.action == 'logout') {
+                if (item.action == 'edit_profile') {
+                  _openEditProfile(context);
+                } else if (item.action == 'logout') {
                   await _endSession(context);
                 } else if (item.action == 'refresh') {
                   await onRefreshPressed();
