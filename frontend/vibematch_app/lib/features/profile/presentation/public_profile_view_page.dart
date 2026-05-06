@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
+import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
 import 'widgets/public_love_bonds_panel.dart';
 import 'widgets/public_profile_widgets.dart';
@@ -43,6 +44,9 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   final bool _profileFollowsViewer = true;
   final bool _isBlocked = false;
 
+  final List<String> _viewerInterests = const ['Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Live Audio'];
+  final List<String> _profileInterests = const ['Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Premium UI', 'Live Audio'];
+
   @override
   void initState() {
     super.initState();
@@ -59,34 +63,16 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   void _startCoverAutoScroll() {
     _coverTimer?.cancel();
     _coverTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (!mounted ||
-          !_coverController.hasClients ||
-          publicProfileCoverPhotos.length < 2) {
-        return;
-      }
-
+      if (!mounted || !_coverController.hasClients || publicProfileCoverPhotos.length < 2) return;
       final nextIndex = (_coverIndex + 1) % publicProfileCoverPhotos.length;
-      _coverController.animateToPage(
-        nextIndex,
-        duration: const Duration(milliseconds: 520),
-        curve: Curves.easeOutCubic,
-      );
+      _coverController.animateToPage(nextIndex, duration: const Duration(milliseconds: 520), curve: Curves.easeOutCubic);
     });
   }
 
   void _showAction(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
   }
 
   void _toggleFollow() {
@@ -94,42 +80,20 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
       showPublicProfileAccessDialog(context);
       return;
     }
-
-    setState(() {
-      _viewerFollowsProfile = !_viewerFollowsProfile;
-    });
-
+    setState(() => _viewerFollowsProfile = !_viewerFollowsProfile);
     _showAction(context, _followStatus.message);
   }
 
   PublicFollowStatus get _followStatus {
-    if (_viewerFollowsProfile && _profileFollowsViewer) {
-      return PublicFollowStatus.mutual;
-    }
-
-    if (_viewerFollowsProfile) {
-      return PublicFollowStatus.following;
-    }
-
-    if (_profileFollowsViewer) {
-      return PublicFollowStatus.followBack;
-    }
-
+    if (_viewerFollowsProfile && _profileFollowsViewer) return PublicFollowStatus.mutual;
+    if (_viewerFollowsProfile) return PublicFollowStatus.following;
+    if (_profileFollowsViewer) return PublicFollowStatus.followBack;
     return PublicFollowStatus.none;
   }
 
-  String _displayName() {
-    return widget.user.displayName ?? widget.user.username ?? 'Vibe User';
-  }
-
-  String _username() {
-    return widget.user.username ?? 'vibe_user';
-  }
-
-  String _publicId() {
-    return widget.user.displayCustomId?.toString() ??
-        widget.user.publicUserId.toString();
-  }
+  String _displayName() => widget.user.displayName ?? widget.user.username ?? 'Vibe User';
+  String _username() => widget.user.username ?? 'vibe_user';
+  String _publicId() => widget.user.displayCustomId?.toString() ?? widget.user.publicUserId.toString();
 
   bool _showOfficialTick() {
     final role = widget.user.primaryRole.toLowerCase().trim();
@@ -138,7 +102,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
 
   String? _roleTag() {
     final role = widget.user.primaryRole.toLowerCase().trim();
-
     if (role == 'founder_owner') return 'Founder Owner';
     if (role == 'super_owner') return 'Super Owner';
     if (role == 'owner') return 'Owner';
@@ -146,8 +109,18 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     if (role == 'admin') return 'Admin';
     if (role == 'monitor') return 'Monitor';
     if (role == 'cs') return 'CS';
-
     return null;
+  }
+
+  int _matchScore() {
+    return calculateProfileMatchScore(
+      viewerInterests: _viewerInterests,
+      profileInterests: _profileInterests,
+      viewerGenderPreference: FriendGenderPreference.both,
+      profileGender: ProfileGender.male,
+      viewerMaritalPreference: FriendMaritalPreference.any,
+      profileMaritalStatus: MaritalStatus.single,
+    );
   }
 
   @override
@@ -179,88 +152,43 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 coverController: _coverController,
                 coverIndex: _coverIndex,
                 followStatus: _followStatus,
+                matchScore: _matchScore(),
                 onCoverChanged: (index) => setState(() => _coverIndex = index),
                 onBackTap: () => Navigator.pop(context),
-                onShareTap: () => _showAction(
-                  context,
-                  'Profile share sheet will open.',
-                ),
-                onAddCoverTap: () => _showAction(
-                  context,
-                  'Add cover photos flow will open. Users can upload multiple covers.',
-                ),
+                onShareTap: () => _showAction(context, 'Profile share sheet will open.'),
+                onAddCoverTap: () => _showAction(context, 'Add cover photos flow will open. Users can upload multiple covers.'),
                 onFollowTap: _toggleFollow,
-                onMessageTap: () => _showAction(
-                  context,
-                  'Message request will open.',
-                ),
-                onRoomTap: () => _showAction(
-                  context,
-                  'Open ${widget.currentRoomName} if privacy rules allow it.',
-                ),
+                onMessageTap: () => _showAction(context, 'Message request will open.'),
+                onRoomTap: () => _showAction(context, 'Open ${widget.currentRoomName} if privacy rules allow it.'),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                child: PublicLoveBondsPanel(
-                  onVisitorTap: () => _showAction(
-                    context,
-                    'Bond details are private and cannot be opened by visitors.',
-                  ),
-                ),
+                child: PublicLoveBondsPanel(onVisitorTap: () => _showAction(context, 'Bond details are private and cannot be opened by visitors.')),
               ),
             ),
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(18, 16, 18, 0),
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
                 child: PublicBioPanel(
-                  bio:
-                      'Building premium live rooms, Vibes, gifts, games and a trusted social-audio community.',
+                  bio: 'Building premium live rooms, Vibes, gifts, games and a trusted social-audio community.',
                   age: '27',
                   gender: 'Male',
-                  interests: [
-                    'Music Rooms',
-                    'Gaming',
-                    'Tech',
-                    'Fitness',
-                    'Premium UI',
-                    'Live Audio',
-                  ],
+                  interests: _profileInterests,
                 ),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                child: PublicFamilyPanel(
-                  familyName: widget.familyName,
-                  familyLevel: widget.familyLevel,
-                  onTap: () => _showAction(
-                    context,
-                    'Family profile will open.',
-                  ),
-                ),
+                child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: () => _showAction(context, 'Family profile will open.')),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 22, 18, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'My Vibes ($_vibesCount)',
-                        style: const TextStyle(
-                          color: Color(0xFF251538),
-                          fontSize: 23,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                child: Row(children: [Expanded(child: Text('My Vibes ($_vibesCount)', style: const TextStyle(color: Color(0xFF251538), fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -0.4)))]),
               ),
             ),
             SliverPadding(
@@ -270,25 +198,12 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 separatorBuilder: (context, index) => const SizedBox(height: 14),
                 itemBuilder: (context, index) {
                   final vibe = mockPublicVibes[index];
-
                   return PublicVibeCard(
                     vibe: vibe,
-                    onTap: () => _showAction(
-                      context,
-                      '${vibe.title} vibe details will open.',
-                    ),
-                    onLikeTap: () => _showAction(
-                      context,
-                      'Liked this Vibe locally.',
-                    ),
-                    onCommentTap: () => _showAction(
-                      context,
-                      'Comments will open.',
-                    ),
-                    onShareTap: () => _showAction(
-                      context,
-                      'Share this Vibe.',
-                    ),
+                    onTap: () => _showAction(context, '${vibe.title} vibe details will open.'),
+                    onLikeTap: () => _showAction(context, 'Liked this Vibe locally.'),
+                    onCommentTap: () => _showAction(context, 'Comments will open.'),
+                    onShareTap: () => _showAction(context, 'Share this Vibe.'),
                   );
                 },
               ),
