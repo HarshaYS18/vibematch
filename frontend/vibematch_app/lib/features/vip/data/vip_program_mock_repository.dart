@@ -12,8 +12,8 @@ class VipProgramMockRepository {
     int monthlyRechargeCoins = 42000,
   }) {
     return VipProgramSnapshot(
-      vipLevel: vipLevel.clamp(0, 50),
-      svipLevel: svipLevel.clamp(0, 10),
+      vipLevel: vipLevel.clamp(0, 50).toInt(),
+      svipLevel: svipLevel.clamp(0, 10).toInt(),
       lifetimeRechargeCoins: lifetimeRechargeCoins,
       monthlyRechargeCoins: monthlyRechargeCoins,
       vipLevels: _vipLevels,
