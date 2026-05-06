@@ -9,20 +9,17 @@ class FamilyController extends ChangeNotifier {
   FamilyController()
       : profile = FamilyMockData.profile(),
         members = [...FamilyMockData.members],
-        vibes = [...FamilyMockData.vibes],
         messages = [...FamilyMockData.chats];
 
   static const FamilyLevelEngine _levelEngine = FamilyLevelEngine();
 
   FamilyProfileUiModel profile;
   final List<FamilyMemberUiModel> members;
-  final List<FamilyVibeUiModel> vibes;
   final List<FamilyChatUiModel> messages;
 
   bool hasFamily = true;
   bool isOwner = true;
   bool isAdmin = true;
-  FamilyChannelTab selectedTab = FamilyChannelTab.vibes;
 
   FamilyExpBreakdown get expBreakdown => _levelEngine.buildBreakdown(
         quarterCarryExp: profile.quarterCarryExp,
@@ -34,12 +31,6 @@ class FamilyController extends ChangeNotifier {
 
   int get adminCapacity => _levelEngine.adminCapacityForLevel(levelProgress.level);
   int get adminCount => members.where((member) => member.role == FamilyRole.admin).length;
-  bool get canPostFamilyVibe => isOwner || isAdmin;
-
-  void selectTab(FamilyChannelTab tab) {
-    selectedTab = tab;
-    notifyListeners();
-  }
 
   void createFamily({required String name, required String minimumVipLabel}) {
     profile = FamilyProfileUiModel(
@@ -69,24 +60,6 @@ class FamilyController extends ChangeNotifier {
 
   void disbandFamily() {
     hasFamily = false;
-    notifyListeners();
-  }
-
-  void postFamilyVibe() {
-    if (!canPostFamilyVibe) return;
-    vibes.insert(
-      0,
-      const FamilyVibeUiModel(
-        id: 'local_family_vibe',
-        authorName: 'You',
-        caption: 'New family channel update posted locally.',
-        tag: 'New',
-        isVideo: false,
-        likes: 0,
-        comments: 0,
-        gradient: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-      ),
-    );
     notifyListeners();
   }
 
