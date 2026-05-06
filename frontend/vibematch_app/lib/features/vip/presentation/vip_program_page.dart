@@ -268,7 +268,7 @@ class _VipHeroPagerState extends State<_VipHeroPager> {
     return Column(
       children: [
         SizedBox(
-          height: 218,
+          height: 172,
           child: PageView.builder(
             controller: _controller,
             itemCount: widget.levels.length,
@@ -335,7 +335,7 @@ class _SvipHeroPagerState extends State<_SvipHeroPager> {
     return Column(
       children: [
         SizedBox(
-          height: 218,
+          height: 172,
           child: PageView.builder(
             controller: _controller,
             itemCount: widget.levels.length,
@@ -374,14 +374,12 @@ class _VipHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = _vipPalette(level);
     final progress = requiredCoins <= 0 ? 1.0 : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _heroDecoration(
-        const [Color(0xFF1C0F2A), Color(0xFF4A2A63), Color(0xFF111827)],
-        _VipProgramPageState.deepViolet,
-      ),
+      decoration: _heroDecoration(palette.colors, palette.shadow),
       child: Stack(
         children: [
           Positioned(
@@ -398,16 +396,11 @@ class _VipHeroCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('VIP $level', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.1)),
-              const SizedBox(height: 20),
+              const Spacer(),
               _ProgressBlock(
                 progress: progress,
                 label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} coins',
-                color: _VipProgramPageState.champagne,
-              ),
-              const SizedBox(height: 12),
-              _CoinStatRow(
-                currentLabel: '${_formatCoins(currentCoins)} recharged',
-                requiredLabel: '${_formatCoins(requiredCoins)} total',
+                color: palette.accent,
               ),
             ],
           ),
@@ -430,14 +423,12 @@ class _SvipHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = _svipPalette(level);
     final progress = requiredCoins <= 0 ? 1.0 : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: _heroDecoration(
-        const [Color(0xFF251538), Color(0xFF6D5DF6), Color(0xFFE84C72)],
-        _VipProgramPageState.violet,
-      ),
+      decoration: _heroDecoration(palette.colors, palette.shadow),
       child: Stack(
         children: [
           Positioned(
@@ -450,78 +441,22 @@ class _SvipHeroCard extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: Colors.white.withValues(alpha: 0.14),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.34)),
-                boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: 0.16), blurRadius: 18)],
+                boxShadow: [BoxShadow(color: palette.accent.withValues(alpha: 0.25), blurRadius: 18)],
               ),
-              child: const Icon(Icons.diamond_rounded, color: Color(0xFFFFD36A), size: 28),
+              child: Icon(Icons.diamond_rounded, color: palette.accent, size: 28),
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('SVIP $level', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.1)),
-              const SizedBox(height: 20),
+              const Spacer(),
               _ProgressBlock(
                 progress: progress,
                 label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} monthly coins',
-                color: const Color(0xFFFFD36A),
-              ),
-              const SizedBox(height: 12),
-              _CoinStatRow(
-                currentLabel: '${_formatCoins(currentCoins)} this month',
-                requiredLabel: '${_formatCoins(requiredCoins)} total',
+                color: palette.accent,
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CoinStatRow extends StatelessWidget {
-  const _CoinStatRow({required this.currentLabel, required this.requiredLabel});
-
-  final String currentLabel;
-  final String requiredLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: _CoinStatPill(label: currentLabel, icon: Icons.account_balance_wallet_rounded)),
-        const SizedBox(width: 8),
-        Expanded(child: _CoinStatPill(label: requiredLabel, icon: Icons.flag_rounded)),
-      ],
-    );
-  }
-}
-
-class _CoinStatPill extends StatelessWidget {
-  const _CoinStatPill({required this.label, required this.icon});
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white.withValues(alpha: 0.82), size: 14),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 11, fontWeight: FontWeight.w900),
-            ),
           ),
         ],
       ),
@@ -671,7 +606,7 @@ class _ProgressBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
@@ -684,10 +619,10 @@ class _ProgressBlock extends StatelessWidget {
         ),
         const SizedBox(height: 7),
         Align(
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.centerRight,
           child: Text(
             label,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.86), fontSize: 12, fontWeight: FontWeight.w900),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 12, fontWeight: FontWeight.w900),
           ),
         ),
       ],
@@ -784,6 +719,79 @@ class _RoundIconButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HeroPalette {
+  const _HeroPalette({required this.colors, required this.accent, required this.shadow});
+
+  final List<Color> colors;
+  final Color accent;
+  final Color shadow;
+}
+
+_HeroPalette _vipPalette(int level) {
+  if (level >= 41) {
+    return const _HeroPalette(
+      colors: [Color(0xFF2B063E), Color(0xFF7A1B9A), Color(0xFF151124)],
+      accent: Color(0xFFD65AFF),
+      shadow: Color(0xFFD65AFF),
+    );
+  }
+  if (level >= 30) {
+    return const _HeroPalette(
+      colors: [Color(0xFF052B1D), Color(0xFF0E8F58), Color(0xFF071A14)],
+      accent: Color(0xFF20FF99),
+      shadow: Color(0xFF20FF99),
+    );
+  }
+  if (level >= 21) {
+    return const _HeroPalette(
+      colors: [Color(0xFF061B3F), Color(0xFF1368C9), Color(0xFF071224)],
+      accent: Color(0xFF27B7FF),
+      shadow: Color(0xFF27B7FF),
+    );
+  }
+  if (level >= 11) {
+    return const _HeroPalette(
+      colors: [Color(0xFF3D0712), Color(0xFFC72A3B), Color(0xFF1C0710)],
+      accent: Color(0xFFFF4D5D),
+      shadow: Color(0xFFFF4D5D),
+    );
+  }
+  if (level >= 6) {
+    return const _HeroPalette(
+      colors: [Color(0xFF19120B), Color(0xFF8B651B), Color(0xFF0D0B09)],
+      accent: Color(0xFFFFC64C),
+      shadow: Color(0xFFFFC64C),
+    );
+  }
+  return const _HeroPalette(
+    colors: [Color(0xFF303744), Color(0xFF8A95A6), Color(0xFF141922)],
+    accent: Color(0xFFDDE1E8),
+    shadow: Color(0xFFDDE1E8),
+  );
+}
+
+_HeroPalette _svipPalette(int level) {
+  if (level >= 8) {
+    return const _HeroPalette(
+      colors: [Color(0xFF160727), Color(0xFF6D35FF), Color(0xFFE84C72)],
+      accent: Color(0xFFFFD36A),
+      shadow: Color(0xFF8C5CF6),
+    );
+  }
+  if (level >= 4) {
+    return const _HeroPalette(
+      colors: [Color(0xFF081E2A), Color(0xFF1768A8), Color(0xFF251538)],
+      accent: Color(0xFF70E6FF),
+      shadow: Color(0xFF70E6FF),
+    );
+  }
+  return const _HeroPalette(
+    colors: [Color(0xFF251538), Color(0xFF6D5DF6), Color(0xFF111827)],
+    accent: Color(0xFFFFD36A),
+    shadow: Color(0xFF6D5DF6),
+  );
 }
 
 BoxDecoration _heroDecoration(List<Color> colors, Color shadowColor) {
