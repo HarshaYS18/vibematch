@@ -9,6 +9,7 @@ import 'sheets/create_family_sheet.dart';
 import 'sheets/disband_family_confirmation_sheet.dart';
 import 'sheets/family_actions_sheet.dart';
 import 'sheets/family_level_details_sheet.dart';
+import 'sheets/set_family_admins_sheet.dart';
 import 'widgets/family_chat_section.dart';
 import 'widgets/family_clan_hero.dart';
 import 'widgets/family_ranked_member_strip.dart';
@@ -136,6 +137,22 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     );
   }
 
+  void _openSetAdminsSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => SetFamilyAdminsSheet(
+        members: _controller.members,
+        adminCapacity: _controller.adminCapacity,
+        onSave: (selectedAdminIds) {
+          _controller.applyAdminSelection(selectedAdminIds);
+          _toast('Family admins updated. ${selectedAdminIds.length}/${_controller.adminCapacity} selected.');
+        },
+      ),
+    );
+  }
+
   void _openActions() {
     showModalBottomSheet<void>(
       context: context,
@@ -146,7 +163,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
         adminCapacity: _controller.adminCapacity,
         onSetAdmins: () {
           Navigator.pop(context);
-          _toast('Set admins sheet will open next.');
+          _openSetAdminsSheet();
         },
         onExit: () {
           Navigator.pop(context);
