@@ -8,6 +8,7 @@ import '../../models/family_ui_models.dart';
 class FamilyController extends ChangeNotifier {
   FamilyController()
       : profile = FamilyMockData.profile(),
+        rankings = [...FamilyMockData.rankings],
         members = [...FamilyMockData.members],
         inviteFriends = [...FamilyMockData.inviteFriends],
         messages = [...FamilyMockData.chats];
@@ -15,14 +16,15 @@ class FamilyController extends ChangeNotifier {
   static const FamilyLevelEngine _levelEngine = FamilyLevelEngine();
 
   FamilyProfileUiModel profile;
+  final List<FamilyRankUiModel> rankings;
   final List<FamilyMemberUiModel> members;
   final List<FamilyInviteFriendUiModel> inviteFriends;
   final List<FamilyChatUiModel> messages;
   final Set<String> selectedInviteUserIds = {};
 
-  bool hasFamily = true;
-  bool isOwner = true;
-  bool isAdmin = true;
+  bool hasFamily = false;
+  bool isOwner = false;
+  bool isAdmin = false;
   bool joinRequestPending = false;
 
   FamilyInviteActorType get inviteActorType => (isOwner || isAdmin) ? FamilyInviteActorType.ownerAdmin : FamilyInviteActorType.member;
@@ -38,6 +40,11 @@ class FamilyController extends ChangeNotifier {
 
   int get adminCapacity => _levelEngine.adminCapacityForLevel(levelProgress.level);
   int get adminCount => members.where((member) => member.role == FamilyRole.admin).length;
+
+  void openFamilyFromRanking(FamilyRankUiModel family) {
+    profile = family.toProfile();
+    notifyListeners();
+  }
 
   void createFamily({required String name, required String minimumVipLabel}) {
     profile = FamilyProfileUiModel(
@@ -59,8 +66,9 @@ class FamilyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void requestJoinFamily() {
+  void requestJoinFamily({FamilyRankUiModel? family}) {
     if (hasFamily || joinRequestPending) return;
+    if (family != null) profile = family.toProfile();
     joinRequestPending = true;
     notifyListeners();
   }
