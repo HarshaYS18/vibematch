@@ -7,6 +7,7 @@ class VibesMockData {
 
   static const List<VibeItem> vibes = [
     VibeItem(
+      id: 'vibe_founder_001',
       authorName: 'Founder',
       authorId: '6922022',
       avatarText: 'F',
@@ -24,8 +25,9 @@ class VibesMockData {
       colors: [Color(0xFF6D5DF6), Color(0xFFE84C72)],
     ),
     VibeItem(
+      id: 'vibe_akhil_002',
       authorName: 'Akhil',
-      authorId: '6418001293',
+      authorId: '6418008421',
       avatarText: 'A',
       timeAgo: '18m ago',
       mediaType: VibeMediaType.video,
@@ -41,6 +43,7 @@ class VibesMockData {
       colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
     ),
     VibeItem(
+      id: 'vibe_meera_003',
       authorName: 'Meera',
       authorId: '6418004771',
       avatarText: 'M',
