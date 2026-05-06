@@ -107,23 +107,17 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
           icon: widget.roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
           color: const Color(0xFFC99A3B),
         ),
-      InkWell(
+      MeProfileMiniBadge(
+        label: widget.vipFrozen ? 'VIP ${widget.vipLevel} Frozen' : 'VIP ${widget.vipLevel}',
+        icon: widget.vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
+        color: widget.vipColor,
         onTap: widget.onVipTap,
-        borderRadius: BorderRadius.circular(99),
-        child: MeProfileMiniBadge(
-          label: widget.vipFrozen ? 'VIP ${widget.vipLevel} Frozen' : 'VIP ${widget.vipLevel}',
-          icon: widget.vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
-          color: widget.vipColor,
-        ),
       ),
-      InkWell(
+      MeProfileMiniBadge(
+        label: 'SVIP ${widget.svipLevel}',
+        icon: Icons.auto_awesome_rounded,
+        color: const Color(0xFFC99A3B),
         onTap: widget.onSvipTap,
-        borderRadius: BorderRadius.circular(99),
-        child: MeProfileMiniBadge(
-          label: 'SVIP ${widget.svipLevel}',
-          icon: Icons.auto_awesome_rounded,
-          color: const Color(0xFFC99A3B),
-        ),
       ),
       MeFamilyTagLight(
         familyName: widget.familyName,
