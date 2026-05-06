@@ -71,6 +71,11 @@ class VibesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void deleteVibe(VibeItem vibe) {
+    _vibes.removeWhere((item) => item.id == vibe.id && item.authorId == vibe.authorId);
+    notifyListeners();
+  }
+
   void toggleLike(VibeItem vibe) {
     final index = _vibes.indexOf(vibe);
     if (index < 0) return;
