@@ -8,6 +8,7 @@ import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
 import '../public_profile_view_page.dart';
 import 'me_account_widgets.dart';
+import 'me_family_details_sheet.dart';
 import 'me_profile_constants.dart';
 import 'me_profile_hero.dart';
 import 'me_session_sheet.dart';
@@ -48,6 +49,24 @@ class MePageContent extends StatelessWidget {
 
   void _openFamily(BuildContext context) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FamilyModularPage()));
+  }
+
+  void _openFamilyDetails(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MeFamilyDetailsSheet(
+        familyName: MeProfileConstants.familyName,
+        familyLevel: MeProfileConstants.familyLevel,
+        familyId: 'VMF6922',
+        rankLabel: 'No. 99+',
+        memberRole: 'Member',
+        memberCount: 128,
+        totalExp: 1085000,
+        onOpenFamily: () => _openFamily(context),
+      ),
+    );
   }
 
   void _openProfile(BuildContext context) {
@@ -102,7 +121,7 @@ class MePageContent extends StatelessWidget {
           currentRoomName: MeProfileConstants.currentRoomName,
           familyName: MeProfileConstants.familyName,
           familyLevel: MeProfileConstants.familyLevel,
-          onFamilyTap: () => _showAction(context, 'Family tag details will open here.'),
+          onFamilyTap: () => _openFamilyDetails(context),
           onAvatarTap: () => _openProfile(context),
           onQrTap: () => _showAction(context, 'Profile QR / share card will open.'),
           onWalletTap: () => _showAction(context, 'Wallet page will open.'),
