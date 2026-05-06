@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../../auth/models/current_user.dart';
+import '../../auth/models/current_user.dart';
 import 'models/edit_profile_models.dart';
 
 class EditProfilePage extends StatefulWidget {
