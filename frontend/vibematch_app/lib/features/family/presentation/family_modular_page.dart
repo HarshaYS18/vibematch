@@ -5,12 +5,10 @@ import 'sheets/create_family_sheet.dart';
 import 'sheets/family_actions_sheet.dart';
 import 'sheets/family_level_details_sheet.dart';
 import 'widgets/family_chat_section.dart';
-import 'widgets/family_clan_channel_dock.dart';
 import 'widgets/family_clan_hero.dart';
 import 'widgets/family_empty_state.dart';
 import 'widgets/family_ranked_member_strip.dart';
 import 'widgets/family_redesign_shared.dart';
-import 'widgets/family_vibes_section.dart';
 
 class FamilyModularPage extends StatefulWidget {
   const FamilyModularPage({super.key});
@@ -129,23 +127,12 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
               ),
             ),
             SliverToBoxAdapter(
-              child: FamilyClanChannelDock(
-                selected: _controller.selectedTab,
-                canPost: _controller.canPostFamilyVibe,
-                onChanged: _controller.selectTab,
-                onPost: _controller.postFamilyVibe,
+              child: FamilyChatSection(
+                messages: _controller.messages,
+                controller: _chatController,
+                onSend: _sendChat,
               ),
             ),
-            if (_controller.selectedTab.name == 'vibes')
-              FamilyVibesSection(vibes: _controller.vibes)
-            else
-              SliverToBoxAdapter(
-                child: FamilyChatSection(
-                  messages: _controller.messages,
-                  controller: _chatController,
-                  onSend: _sendChat,
-                ),
-              ),
           ],
         ),
       ),
