@@ -16,6 +16,8 @@ class VibesPage extends StatefulWidget {
 }
 
 class _VibesPageState extends State<VibesPage> {
+  static const String _mockCurrentUserId = '6922022';
+
   final VibesController _controller = VibesController();
 
   @override
@@ -46,6 +48,8 @@ class _VibesPageState extends State<VibesPage> {
         ),
       );
   }
+
+  bool _isSelfVibe(VibeItem vibe) => vibe.authorId == _mockCurrentUserId;
 
   void _openSettings() {
     Navigator.push(
@@ -85,6 +89,7 @@ class _VibesPageState extends State<VibesPage> {
         builder: (_) => VibeDetailPageModular(
           vibe: vibe,
           onCommentAdded: () => _controller.incrementCommentCount(vibe),
+          onDeleteVibe: () => _controller.deleteVibe(vibe),
         ),
       ),
     );
@@ -103,6 +108,24 @@ class _VibesPageState extends State<VibesPage> {
         completedLabel: 'Sent',
         onInvite: (friend) {
           _showAction('Vibe sent to ${friend.displayName}');
+        },
+      ),
+    );
+  }
+
+  void _openVibeActions(VibeItem vibe) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _VibeActionsSheet(
+        isSelfVibe: _isSelfVibe(vibe),
+        onDelete: () {
+          Navigator.pop(context);
+          _openVibeDetail(vibe);
+        },
+        onReport: () {
+          Navigator.pop(context);
+          _openVibeDetail(vibe);
         },
       ),
     );
@@ -206,7 +229,7 @@ class _VibesPageState extends State<VibesPage> {
                       onLikeTap: () => _controller.toggleLike(vibe),
                       onCommentTap: () => _openVibeDetail(vibe),
                       onShareTap: () => _openShareSheet(vibe),
-                      onMoreTap: () => _showAction('Vibe options will open.'),
+                      onMoreTap: () => _openVibeActions(vibe),
                     );
                   },
                 ),
@@ -220,6 +243,85 @@ class _VibesPageState extends State<VibesPage> {
         foregroundColor: Colors.white,
         icon: const Icon(Icons.auto_awesome_rounded),
         label: const Text('Create Vibe', style: TextStyle(fontWeight: FontWeight.w900)),
+      ),
+    );
+  }
+}
+
+class _VibeActionsSheet extends StatelessWidget {
+  const _VibeActionsSheet({required this.isSelfVibe, required this.onDelete, required this.onReport});
+
+  final bool isSelfVibe;
+  final VoidCallback onDelete;
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(14),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 24, offset: const Offset(0, 10))]),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
+          const SizedBox(height: 14),
+          if (isSelfVibe)
+            _VibeActionTile(
+              icon: Icons.delete_rounded,
+              title: 'Delete Vibe',
+              subtitle: 'Open delete confirmation for your own Vibe.',
+              color: const Color(0xFFE84C72),
+              onTap: onDelete,
+            )
+          else
+            _VibeActionTile(
+              icon: Icons.report_rounded,
+              title: 'Report Vibe',
+              subtitle: 'Report this Vibe to CS CP for review.',
+              color: const Color(0xFFC99A3B),
+              onTap: onReport,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VibeActionTile extends StatelessWidget {
+  const _VibeActionTile({required this.icon, required this.title, required this.subtitle, required this.color, required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(20)),
+        child: Row(
+          children: [
+            Container(width: 44, height: 44, decoration: BoxDecoration(color: color.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(16)), child: Icon(icon, color: color)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 15, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 3),
+                  Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.25, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF7B6A86)),
+          ],
+        ),
       ),
     );
   }
