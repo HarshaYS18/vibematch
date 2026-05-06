@@ -41,7 +41,7 @@ class FamilyRankedMemberStrip extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           SizedBox(
-            height: 116,
+            height: 128,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -70,9 +70,10 @@ class _RankedMemberCard extends StatelessWidget {
     final rankColor = rank == 1 ? FamilyRedesignColors.gold : rank == 2 ? FamilyRedesignColors.violet : FamilyRedesignColors.aqua;
     return Container(
       width: 92,
-      padding: const EdgeInsets.all(9),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(color: FamilyRedesignColors.page, borderRadius: BorderRadius.circular(22), border: Border.all(color: rankColor.withValues(alpha: 0.22))),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -81,12 +82,15 @@ class _RankedMemberCard extends StatelessWidget {
               Icon(member.role == FamilyRole.owner ? Icons.workspace_premium_rounded : member.role == FamilyRole.admin ? Icons.shield_rounded : Icons.person_rounded, color: rankColor, size: 16),
             ],
           ),
-          const SizedBox(height: 6),
-          FamilyGradientAvatar(text: member.avatarText, colors: member.avatarGradient, size: 44),
-          const SizedBox(height: 6),
-          Text(member.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: FamilyRedesignColors.ink, fontSize: 11, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          FamilyGradientAvatar(text: member.avatarText, colors: member.avatarGradient, size: 42),
+          const SizedBox(height: 5),
+          SizedBox(
+            height: 26,
+            child: Text(member.name, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: FamilyRedesignColors.ink, fontSize: 10.5, height: 1.05, fontWeight: FontWeight.w900)),
+          ),
           const SizedBox(height: 2),
-          Text(compactFamilyNumber(member.contributionExp), style: const TextStyle(color: FamilyRedesignColors.soft, fontSize: 10, fontWeight: FontWeight.w800)),
+          Text(compactFamilyNumber(member.contributionExp), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: FamilyRedesignColors.soft, fontSize: 10, fontWeight: FontWeight.w800)),
         ],
       ),
     );
