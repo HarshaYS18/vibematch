@@ -40,7 +40,7 @@ class _VipProgramPageState extends State<VipProgramPage> {
   @override
   void initState() {
     super.initState();
-    _selectedTabIndex = widget.initialTabIndex.clamp(0, 1);
+    _selectedTabIndex = widget.initialTabIndex.clamp(0, 1).toInt();
     _snapshot = const VipProgramMockRepository().loadSnapshot(
       vipLevel: widget.vipLevel,
       svipLevel: widget.svipLevel,
@@ -163,7 +163,7 @@ class _VipTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final next = snapshot.nextVipLevel;
-    final needed = (next.requiredRechargeCoins - snapshot.lifetimeRechargeCoins).clamp(0, 999999999);
+    final needed = (next.requiredRechargeCoins - snapshot.lifetimeRechargeCoins).clamp(0, 999999999).toInt();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
@@ -225,7 +225,7 @@ class _SvipTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final next = snapshot.nextSvipLevel;
-    final needed = (next.monthlyRechargeCoins - snapshot.monthlyRechargeCoins).clamp(0, 999999999);
+    final needed = (next.monthlyRechargeCoins - snapshot.monthlyRechargeCoins).clamp(0, 999999999).toInt();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
@@ -473,7 +473,7 @@ class _RewardCard extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       reward.description,
-                      style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12.5, fontWeight: FontWeight.w650, height: 1.25),
+                      style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.25),
                     ),
                   ],
                 ),
@@ -636,7 +636,7 @@ class _InfoRow extends StatelessWidget {
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w650),
+              style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w600),
               children: [
                 TextSpan(text: '${row.title}: ', style: const TextStyle(color: _VipProgramPageState.plum, fontWeight: FontWeight.w900)),
                 TextSpan(text: row.description),
