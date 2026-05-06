@@ -10,52 +10,152 @@ class VipProgramMockRepository {
     int svipLevel = 3,
     int lifetimeRechargeCoins = 128500,
     int monthlyRechargeCoins = 42000,
+    Map<String, dynamic>? programConfig,
   }) {
+    final vipLevels = _parseVipLevels(programConfig?['vip_levels']) ?? _defaultVipLevels;
+    final svipLevels = _parseSvipLevels(programConfig?['svip_levels']) ?? _defaultSvipLevels;
+
     return VipProgramSnapshot(
       vipLevel: vipLevel.clamp(0, 50).toInt(),
       svipLevel: svipLevel.clamp(0, 10).toInt(),
       lifetimeRechargeCoins: lifetimeRechargeCoins,
       monthlyRechargeCoins: monthlyRechargeCoins,
-      vipLevels: _vipLevels,
-      svipLevels: _svipLevels,
+      vipLevels: vipLevels,
+      svipLevels: svipLevels,
       vipRewards: _vipRewards,
       svipRewards: _svipRewards,
     );
   }
 
-  // Later backend mapping:
+  // Future backend mapping:
   // GET /vip/program-config
   // GET /vip/me
-  // The app renders whatever rewards/config are returned, so privileges can be
-  // enabled, disabled, renamed, reordered, or moved to another level without an
-  // app release.
-  static final List<VipLevelConfig> _vipLevels = List.generate(50, (index) {
-    final level = index + 1;
-    final difficulty = _vipDifficulty(level);
-    final requiredCoins = _vipRequiredCoins(level);
-    final rewards = <String>[
-      if (level == 20) 'vip_background_20',
-      if (level == 35) 'vip_mute_protection',
-      if (level == 40) 'vip_background_40',
-      if (level == 40) 'vip_kick_protection',
-    ];
+  //
+  // IMPORTANT:
+  // VIP/SVIP required coin amounts must come from backend config rows, not from
+  // Flutter formulas. Flutter should only render the received level config.
+  // That lets Super Owner/Owner operations change:
+  // - VIP level required_recharge_coins
+  // - SVIP level monthly_recharge_coins
+  // - difficulty labels
+  // - reward unlock mapping
+  // without publishing a new app update.
+  //
+  // Expected config shape:
+  // {
+  //   "vip_levels": [
+  //     {"level": 1, "required_recharge_coins": 1000, "difficulty": "easy", "reward_ids": []}
+  //   ],
+  //   "svip_levels": [
+  //     {"level": 1, "monthly_recharge_coins": 15000, "reward_id": "svip_1"}
+  //   ]
+  // }
 
-    return VipLevelConfig(
-      level: level,
-      requiredRechargeCoins: requiredCoins,
-      difficulty: difficulty,
-      rewardIds: rewards,
-    );
-  });
+  static final List<VipLevelConfig> _defaultVipLevels = _buildDefaultVipLevels();
+  static final List<SvipLevelConfig> _defaultSvipLevels = _buildDefaultSvipLevels();
 
-  static final List<SvipLevelConfig> _svipLevels = List.generate(10, (index) {
-    final level = index + 1;
-    return SvipLevelConfig(
-      level: level,
-      monthlyRechargeCoins: _svipRequiredCoins(level),
-      rewardId: 'svip_$level',
-    );
-  });
+  static List<VipLevelConfig>? _parseVipLevels(Object? rawLevels) {
+    if (rawLevels is! List) return null;
+
+    final parsed = <VipLevelConfig>[];
+    for (final rawLevel in rawLevels) {
+      if (rawLevel is! Map) continue;
+
+      final level = _readInt(rawLevel['level']);
+      final requiredCoins = _readInt(rawLevel['required_recharge_coins']);
+      if (level == null || requiredCoins == null || level <= 0) continue;
+
+      parsed.add(
+        VipLevelConfig(
+          level: level,
+          requiredRechargeCoins: requiredCoins,
+          difficulty: _readDifficulty(rawLevel['difficulty'], fallbackLevel: level),
+          rewardIds: _readStringList(rawLevel['reward_ids']),
+        ),
+      );
+    }
+
+    if (parsed.isEmpty) return null;
+    parsed.sort((a, b) => a.level.compareTo(b.level));
+    return parsed;
+  }
+
+  static List<SvipLevelConfig>? _parseSvipLevels(Object? rawLevels) {
+    if (rawLevels is! List) return null;
+
+    final parsed = <SvipLevelConfig>[];
+    for (final rawLevel in rawLevels) {
+      if (rawLevel is! Map) continue;
+
+      final level = _readInt(rawLevel['level']);
+      final monthlyCoins = _readInt(rawLevel['monthly_recharge_coins']);
+      if (level == null || monthlyCoins == null || level <= 0) continue;
+
+      parsed.add(
+        SvipLevelConfig(
+          level: level,
+          monthlyRechargeCoins: monthlyCoins,
+          rewardId: (rawLevel['reward_id'] ?? 'svip_$level').toString(),
+        ),
+      );
+    }
+
+    if (parsed.isEmpty) return null;
+    parsed.sort((a, b) => a.level.compareTo(b.level));
+    return parsed;
+  }
+
+  static List<VipLevelConfig> _buildDefaultVipLevels() {
+    return List.generate(50, (index) {
+      final level = index + 1;
+      final rewards = <String>[
+        if (level == 20) 'vip_background_20',
+        if (level == 35) 'vip_mute_protection',
+        if (level == 40) 'vip_background_40',
+        if (level == 40) 'vip_kick_protection',
+      ];
+
+      return VipLevelConfig(
+        level: level,
+        requiredRechargeCoins: _defaultVipRequiredCoins(level),
+        difficulty: _defaultVipDifficulty(level),
+        rewardIds: rewards,
+      );
+    });
+  }
+
+  static List<SvipLevelConfig> _buildDefaultSvipLevels() {
+    return List.generate(10, (index) {
+      final level = index + 1;
+      return SvipLevelConfig(
+        level: level,
+        monthlyRechargeCoins: _defaultSvipRequiredCoins(level),
+        rewardId: 'svip_$level',
+      );
+    });
+  }
+
+  static int? _readInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
+  }
+
+  static List<String> _readStringList(Object? value) {
+    if (value is! List) return const [];
+    return value.map((item) => item.toString()).where((item) => item.trim().isNotEmpty).toList();
+  }
+
+  static VipProgressDifficulty _readDifficulty(Object? value, {required int fallbackLevel}) {
+    final normalized = value?.toString().trim().toLowerCase().replaceAll('_', '');
+    if (normalized == 'easy') return VipProgressDifficulty.easy;
+    if (normalized == 'medium') return VipProgressDifficulty.medium;
+    if (normalized == 'hard') return VipProgressDifficulty.hard;
+    if (normalized == 'veryhard') return VipProgressDifficulty.veryHard;
+    if (normalized == 'insane') return VipProgressDifficulty.insane;
+    return _defaultVipDifficulty(fallbackLevel);
+  }
 
   static const List<VipRewardConfig> _vipRewards = [
     VipRewardConfig(
@@ -164,7 +264,7 @@ class VipProgramMockRepository {
     ),
   ];
 
-  static VipProgressDifficulty _vipDifficulty(int level) {
+  static VipProgressDifficulty _defaultVipDifficulty(int level) {
     if (level <= 10) return VipProgressDifficulty.easy;
     if (level <= 20) return VipProgressDifficulty.medium;
     if (level <= 30) return VipProgressDifficulty.hard;
@@ -172,7 +272,7 @@ class VipProgramMockRepository {
     return VipProgressDifficulty.insane;
   }
 
-  static int _vipRequiredCoins(int level) {
+  static int _defaultVipRequiredCoins(int level) {
     if (level <= 0) return 0;
     if (level <= 10) return level * 1000;
     if (level <= 20) return 10000 + ((level - 10) * 3500);
@@ -181,7 +281,7 @@ class VipProgramMockRepository {
     return 355000 + ((level - 40) * 58000);
   }
 
-  static int _svipRequiredCoins(int level) {
+  static int _defaultSvipRequiredCoins(int level) {
     if (level <= 0) return 0;
     if (level <= 3) return level * 15000;
     if (level <= 6) return 45000 + ((level - 3) * 35000);
