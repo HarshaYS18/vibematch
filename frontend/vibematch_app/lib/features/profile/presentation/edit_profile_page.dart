@@ -377,7 +377,7 @@ class _DropdownTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         items: values.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
         onChanged: (value) { if (value != null) onChanged(value); },
         decoration: InputDecoration(labelText: label, filled: true, fillColor: const Color(0xFFFAF7F1), border: OutlineInputBorder(borderRadius: BorderRadius.circular(18))),
