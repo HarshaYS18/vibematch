@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/family_level_models.dart';
 import '../../models/family_ui_models.dart';
+import 'family_clan_badge_icon.dart';
 import 'family_redesign_shared.dart';
 
 class FamilyClanHero extends StatelessWidget {
@@ -40,7 +41,7 @@ class FamilyClanHero extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            height: 178,
+            height: 196,
             child: Stack(
               children: [
                 Positioned.fill(
@@ -72,43 +73,32 @@ class FamilyClanHero extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  left: 18,
+                  left: 8,
+                  bottom: 12,
+                  child: FamilyClanBadgeIcon(
+                    familyName: profile.name,
+                    familyLevel: level.tier.label,
+                    size: 112,
+                  ),
+                ),
+                Positioned(
+                  left: 132,
                   right: 18,
-                  bottom: 18,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  bottom: 24,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(28),
-                          gradient: const LinearGradient(colors: [Color(0xFFFFD36A), Color(0xFFE84C72)]),
-                          boxShadow: [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.25), blurRadius: 22, offset: const Offset(0, 8))],
-                        ),
-                        child: Center(
-                          child: Text(profile.avatarText, style: const TextStyle(color: Color(0xFF100A18), fontSize: 42, fontWeight: FontWeight.w900)),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(profile.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                            const SizedBox(height: 7),
-                            Wrap(
-                              spacing: 7,
-                              runSpacing: 7,
-                              children: [
-                                _DarkPill(icon: Icons.tag_rounded, label: profile.id),
-                                _DarkPill(icon: Icons.workspace_premium_rounded, label: profile.minimumVipLabel),
-                                _DarkPill(icon: Icons.leaderboard_rounded, label: profile.rankLabel),
-                              ],
-                            ),
-                          ],
-                        ),
+                      Text(profile.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 7,
+                        runSpacing: 7,
+                        children: [
+                          _DarkPill(icon: Icons.tag_rounded, label: profile.id),
+                          _DarkPill(icon: Icons.workspace_premium_rounded, label: profile.minimumVipLabel),
+                          _DarkPill(icon: Icons.leaderboard_rounded, label: profile.rankLabel),
+                        ],
                       ),
                     ],
                   ),
