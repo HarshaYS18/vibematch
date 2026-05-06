@@ -197,7 +197,7 @@ class MePageContent extends StatelessWidget {
                   _openEditProfile(context);
                 } else if (item.action == 'family' || item.title == 'Family') {
                   _openFamily(context);
-                } else if (item.title == 'VIP / SVIP') {
+                } else if (item.title == 'VIP / SVIP Center' || item.title == 'VIP / SVIP') {
                   _openVipProgram(context, initialTabIndex: item.subtitle.contains('SVIP') ? 1 : 0);
                 } else if (item.action == 'logout') {
                   await _endSession(context);
