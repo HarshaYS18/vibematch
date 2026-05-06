@@ -17,6 +17,41 @@ enum FamilyChannelTab {
   final String label;
 }
 
+enum FamilyInviteActorType {
+  ownerAdmin,
+  member;
+
+  bool get needsOwnerApprovalAfterAccept => this == FamilyInviteActorType.ownerAdmin;
+
+  String get approvalCopy {
+    return switch (this) {
+      FamilyInviteActorType.ownerAdmin => 'Accepted invites create a join request for owners/admins to approve or reject.',
+      FamilyInviteActorType.member => 'Accepted invites join directly and notify owners/admins.',
+    };
+  }
+}
+
+class FamilyInviteFriendUiModel {
+  const FamilyInviteFriendUiModel({
+    required this.userId,
+    required this.name,
+    required this.statusLabel,
+    required this.avatarGradient,
+    this.isMutualFriend = true,
+    this.isInFamily = false,
+  });
+
+  final String userId;
+  final String name;
+  final String statusLabel;
+  final List<Color> avatarGradient;
+  final bool isMutualFriend;
+  final bool isInFamily;
+
+  String get avatarText => name.trim().isEmpty ? 'F' : name.trim()[0].toUpperCase();
+  bool get canInvite => isMutualFriend && !isInFamily;
+}
+
 class FamilyMemberUiModel {
   const FamilyMemberUiModel({
     required this.userId,
