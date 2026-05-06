@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
+import '../../family/models/family_ui_models.dart';
+import '../../family/presentation/family_modular_page.dart';
 import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
 import 'widgets/public_love_bonds_panel.dart';
@@ -84,6 +86,30 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     _showAction(context, _followStatus.message);
   }
 
+  void _openFamilyPage() {
+    final familyProfile = FamilyProfileUiModel(
+      id: 'VMF6922',
+      name: widget.familyName,
+      minimumVipLabel: 'VIP 5',
+      memberCount: 128,
+      maxMembers: 200,
+      rankLabel: 'No. 99+',
+      ownerUserId: 'family_owner_01',
+      quarterCarryExp: 1085000,
+      giftCoinsThisQuarter: 1085000,
+      timeMinutesToday: 12240,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FamilyModularPage(
+          openCurrentFamily: true,
+          initialFamilyProfile: familyProfile,
+        ),
+      ),
+    );
+  }
+
   PublicFollowStatus get _followStatus {
     if (_viewerFollowsProfile && _profileFollowsViewer) return PublicFollowStatus.mutual;
     if (_viewerFollowsProfile) return PublicFollowStatus.following;
@@ -160,6 +186,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 onFollowTap: _toggleFollow,
                 onMessageTap: () => _showAction(context, 'Message request will open.'),
                 onRoomTap: () => _showAction(context, 'Open ${widget.currentRoomName} if privacy rules allow it.'),
+                onFamilyTap: _openFamilyPage,
               ),
             ),
             SliverToBoxAdapter(
@@ -182,7 +209,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: () => _showAction(context, 'Family profile will open.')),
+                child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: _openFamilyPage),
               ),
             ),
             SliverToBoxAdapter(
