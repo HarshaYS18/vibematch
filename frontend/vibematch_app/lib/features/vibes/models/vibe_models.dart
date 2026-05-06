@@ -23,6 +23,7 @@ enum VibePrivacyAudience {
 
 class VibeItem {
   const VibeItem({
+    this.id = '',
     required this.authorName,
     required this.authorId,
     required this.avatarText,
@@ -41,6 +42,7 @@ class VibeItem {
     this.likedByMe = false,
   });
 
+  final String id;
   final String authorName;
   final String authorId;
   final String avatarText;
@@ -65,6 +67,7 @@ class VibeItem {
     bool? likedByMe,
   }) {
     return VibeItem(
+      id: id,
       authorName: authorName,
       authorId: authorId,
       avatarText: avatarText,
