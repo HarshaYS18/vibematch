@@ -6,6 +6,7 @@ import 'family_list_page.dart';
 import 'invite/family_invite_flow_page.dart';
 import 'rankings/family_ranking_module.dart';
 import 'sheets/create_family_sheet.dart';
+import 'sheets/disband_family_confirmation_sheet.dart';
 import 'sheets/family_actions_sheet.dart';
 import 'sheets/family_level_details_sheet.dart';
 import 'widgets/family_chat_section.dart';
@@ -103,6 +104,22 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     _toast('System notification sent to ${family.name} owner/admins: you want to join this family.');
   }
 
+  void _openDisbandConfirmation() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DisbandFamilyConfirmationSheet(
+        familyName: _controller.profile.name,
+        onConfirm: () {
+          Navigator.pop(context);
+          _controller.disbandFamily();
+          _toast('Family deleted. Members have been released from the family.');
+        },
+      ),
+    );
+  }
+
   void _openActions() {
     showModalBottomSheet<void>(
       context: context,
@@ -121,7 +138,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
         },
         onDisband: () {
           Navigator.pop(context);
-          _controller.disbandFamily();
+          _openDisbandConfirmation();
         },
       ),
     );
