@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'controllers/family_controller.dart';
 import 'family_list_page.dart';
 import 'invite/family_invite_flow_page.dart';
+import 'join/family_join_request_sheet.dart';
 import 'sheets/create_family_sheet.dart';
 import 'sheets/family_actions_sheet.dart';
 import 'sheets/family_level_details_sheet.dart';
@@ -92,6 +93,26 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     );
   }
 
+  void _openJoinFamilySheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FamilyJoinRequestSheet(
+        family: _controller.profile,
+        onCreateFamily: () {
+          Navigator.pop(context);
+          _openCreateFamily();
+        },
+        onJoinFamily: () {
+          Navigator.pop(context);
+          _controller.requestJoinFamily();
+          _toast('System notification sent to ${_controller.profile.name} owner/admins: you want to join this family.');
+        },
+      ),
+    );
+  }
+
   void _openActions() {
     showModalBottomSheet<void>(
       context: context,
@@ -135,7 +156,13 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     if (!_controller.hasFamily) {
       return Scaffold(
         backgroundColor: FamilyRedesignColors.page,
-        body: SafeArea(child: FamilyEmptyState(onCreateFamily: _openCreateFamily)),
+        body: SafeArea(
+          child: FamilyEmptyState(
+            onCreateFamily: _openCreateFamily,
+            onJoinFamily: _openJoinFamilySheet,
+            joinRequestPending: _controller.joinRequestPending,
+          ),
+        ),
       );
     }
 
