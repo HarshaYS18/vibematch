@@ -9,21 +9,27 @@ class VibeDetailPageModular extends StatefulWidget {
     super.key,
     required this.vibe,
     this.onCommentAdded,
+    this.onDeleteVibe,
   });
 
   final VibeItem vibe;
   final VoidCallback? onCommentAdded;
+  final VoidCallback? onDeleteVibe;
 
   @override
   State<VibeDetailPageModular> createState() => _VibeDetailPageModularState();
 }
 
 class _VibeDetailPageModularState extends State<VibeDetailPageModular> {
+  static const String _mockCurrentUserId = '6922022';
+
   final TextEditingController _commentController = TextEditingController();
   final List<VibeComment> _comments = [...VibesMockData.comments];
 
   bool _videoPlaying = false;
   double _videoProgress = 0.0;
+
+  bool get _isSelfVibe => widget.vibe.authorId == _mockCurrentUserId;
 
   @override
   void dispose() {
@@ -56,6 +62,45 @@ class _VibeDetailPageModularState extends State<VibeDetailPageModular> {
     widget.onCommentAdded?.call();
   }
 
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF251538),
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      );
+  }
+
+  Future<void> _openDeleteFlow() async {
+    final shouldDelete = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DeleteVibeSheet(vibe: widget.vibe),
+    );
+
+    if (shouldDelete != true || !mounted) return;
+
+    widget.onDeleteVibe?.call();
+    _showToast('Vibe deleted locally. Backend delete API will own this later.');
+    Navigator.pop(context);
+  }
+
+  Future<void> _openReportFlow() async {
+    final reportReason = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ReportVibeSheet(vibe: widget.vibe),
+    );
+
+    if (reportReason == null || reportReason.trim().isEmpty || !mounted) return;
+
+    _showToast('Report submitted to CS CP for review. Reason: $reportReason');
+  }
+
   @override
   Widget build(BuildContext context) {
     final vibe = widget.vibe;
@@ -65,7 +110,12 @@ class _VibeDetailPageModularState extends State<VibeDetailPageModular> {
       body: SafeArea(
         child: Column(
           children: [
-            _DetailHeader(vibe: vibe),
+            _DetailHeader(
+              vibe: vibe,
+              isSelfVibe: _isSelfVibe,
+              onDeleteTap: _openDeleteFlow,
+              onReportTap: _openReportFlow,
+            ),
             Expanded(
               child: ListView(
                 physics: const BouncingScrollPhysics(),
@@ -106,9 +156,17 @@ class _VibeDetailPageModularState extends State<VibeDetailPageModular> {
 }
 
 class _DetailHeader extends StatelessWidget {
-  const _DetailHeader({required this.vibe});
+  const _DetailHeader({
+    required this.vibe,
+    required this.isSelfVibe,
+    required this.onDeleteTap,
+    required this.onReportTap,
+  });
 
   final VibeItem vibe;
+  final bool isSelfVibe;
+  final VoidCallback onDeleteTap;
+  final VoidCallback onReportTap;
 
   @override
   Widget build(BuildContext context) {
@@ -151,8 +209,58 @@ class _DetailHeader extends StatelessWidget {
               ],
             ),
           ),
-          Icon(vibe.mediaType.icon, color: vibe.colors.first, size: 23),
+          _HeaderActionButton(
+            icon: isSelfVibe ? Icons.delete_rounded : Icons.report_rounded,
+            label: isSelfVibe ? 'Delete' : 'Report',
+            color: isSelfVibe ? const Color(0xFFE84C72) : const Color(0xFFC99A3B),
+            onTap: isSelfVibe ? onDeleteTap : onReportTap,
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _HeaderActionButton extends StatelessWidget {
+  const _HeaderActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.11),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.20)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 17),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -524,6 +632,266 @@ class _CommentCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DeleteVibeSheet extends StatelessWidget {
+  const _DeleteVibeSheet({required this.vibe});
+
+  final VibeItem vibe;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(14),
+      padding: EdgeInsets.fromLTRB(18, 12, 18, 18 + MediaQuery.paddingOf(context).bottom),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 28, offset: const Offset(0, 12))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
+          const SizedBox(height: 16),
+          Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(color: const Color(0xFFE84C72).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(22)),
+            child: const Icon(Icons.delete_rounded, color: Color(0xFFE84C72), size: 31),
+          ),
+          const SizedBox(height: 13),
+          const Text('Delete this Vibe?', style: TextStyle(color: Color(0xFF251538), fontSize: 21, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 7),
+          Text(
+            'This will remove your Vibe from the feed. Later this action must call backend delete and remove media from active storage/CDN safely.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _SheetButton(
+                  text: 'Cancel',
+                  icon: Icons.close_rounded,
+                  filled: false,
+                  onTap: () => Navigator.pop(context, false),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SheetButton(
+                  text: 'Delete',
+                  icon: Icons.delete_rounded,
+                  filled: true,
+                  danger: true,
+                  onTap: () => Navigator.pop(context, true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportVibeSheet extends StatefulWidget {
+  const _ReportVibeSheet({required this.vibe});
+
+  final VibeItem vibe;
+
+  @override
+  State<_ReportVibeSheet> createState() => _ReportVibeSheetState();
+}
+
+class _ReportVibeSheetState extends State<_ReportVibeSheet> {
+  static const List<String> _reasons = [
+    'Nudity or sexual content',
+    'Harassment or bullying',
+    'Hate or abusive content',
+    'Violence or dangerous behavior',
+    'Spam or scam',
+    'Fake identity or impersonation',
+    'Other safety issue',
+  ];
+
+  String? _selectedReason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(14),
+      padding: EdgeInsets.fromLTRB(18, 12, 18, 18 + MediaQuery.paddingOf(context).bottom),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 28, offset: const Offset(0, 12))],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999)))),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(color: const Color(0xFFC99A3B).withValues(alpha: 0.13), borderRadius: BorderRadius.circular(18)),
+                  child: const Icon(Icons.report_rounded, color: Color(0xFFC99A3B), size: 27),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Report Vibe', style: TextStyle(color: Color(0xFF251538), fontSize: 20, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Reported Vibes go to CS CP for review.',
+                        style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Text('Choose a reason', style: TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 9),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: _reasons.map((reason) {
+                    final selected = reason == _selectedReason;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () => setState(() => _selectedReason = reason),
+                        borderRadius: BorderRadius.circular(18),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? Colors.white : const Color(0xFF8C8198), size: 19),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  reason,
+                                  style: TextStyle(color: selected ? Colors.white : const Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFFFFF8E7), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))),
+              child: const Text(
+                'Future CS flow: CS can reject/no action, or accept and delete the Vibe. If accepted, the violated user receives an automated system warning about future violations.',
+                style: TextStyle(color: Color(0xFF7A5A12), fontSize: 11.2, height: 1.35, fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetButton(
+                    text: 'Cancel',
+                    icon: Icons.close_rounded,
+                    filled: false,
+                    onTap: () => Navigator.pop(context),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SheetButton(
+                    text: 'Submit',
+                    icon: Icons.send_rounded,
+                    filled: true,
+                    disabled: _selectedReason == null,
+                    onTap: _selectedReason == null ? null : () => Navigator.pop(context, _selectedReason),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetButton extends StatelessWidget {
+  const _SheetButton({
+    required this.text,
+    required this.icon,
+    required this.filled,
+    required this.onTap,
+    this.danger = false,
+    this.disabled = false,
+  });
+
+  final String text;
+  final IconData icon;
+  final bool filled;
+  final VoidCallback? onTap;
+  final bool danger;
+  final bool disabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = danger ? const Color(0xFFE84C72) : const Color(0xFF251538);
+    final isDisabled = disabled || onTap == null;
+
+    return InkWell(
+      onTap: isDisabled ? null : onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Opacity(
+        opacity: isDisabled ? 0.45 : 1,
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: filled ? activeColor : const Color(0xFFFAF7F1),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: filled ? activeColor : const Color(0xFFECE2D8)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: filled ? Colors.white : const Color(0xFF4A2A63), size: 19),
+              const SizedBox(width: 7),
+              Text(
+                text,
+                style: TextStyle(
+                  color: filled ? Colors.white : const Color(0xFF4A2A63),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
