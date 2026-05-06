@@ -15,14 +15,30 @@ import 'widgets/family_ranked_member_strip.dart';
 import 'widgets/family_redesign_shared.dart';
 
 class FamilyModularPage extends StatefulWidget {
-  const FamilyModularPage({super.key});
+  const FamilyModularPage({
+    super.key,
+    this.openCurrentFamily = false,
+    this.initialFamilyProfile,
+    this.initialIsOwner = false,
+    this.initialIsAdmin = false,
+  });
+
+  final bool openCurrentFamily;
+  final FamilyProfileUiModel? initialFamilyProfile;
+  final bool initialIsOwner;
+  final bool initialIsAdmin;
 
   @override
   State<FamilyModularPage> createState() => _FamilyModularPageState();
 }
 
 class _FamilyModularPageState extends State<FamilyModularPage> {
-  late final FamilyController _controller = FamilyController()..addListener(_sync);
+  late final FamilyController _controller = FamilyController(
+    initialHasFamily: widget.openCurrentFamily,
+    initialProfile: widget.initialFamilyProfile,
+    initialIsOwner: widget.initialIsOwner,
+    initialIsAdmin: widget.initialIsAdmin,
+  )..addListener(_sync);
   final TextEditingController _chatController = TextEditingController();
 
   @override
