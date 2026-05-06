@@ -8,12 +8,14 @@ class MiniProfileLevelRow extends StatelessWidget {
     super.key,
     required this.user,
     required this.onVipTap,
+    required this.onSvipTap,
     required this.onSendingLevelTap,
     required this.onReceivingLevelTap,
   });
 
   final SeatUser user;
   final VoidCallback onVipTap;
+  final VoidCallback onSvipTap;
   final VoidCallback onSendingLevelTap;
   final VoidCallback onReceivingLevelTap;
 
@@ -33,7 +35,7 @@ class MiniProfileLevelRow extends StatelessWidget {
           textColor: const Color(0xFFFFE2A1),
           shineColor: const Color(0xFFFFF1B8),
           active: true,
-          onTap: onVipTap,
+          onTap: onSvipTap,
         ),
       MiniProfileCleanLevelPill(
         label: 'Lv ${user.sendingLevel}',
