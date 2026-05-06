@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../models/family_level_models.dart';
 import '../../models/family_ui_models.dart';
 import 'family_clan_badge_icon.dart';
-import 'family_redesign_shared.dart';
 
 class FamilyClanHero extends StatelessWidget {
   const FamilyClanHero({
