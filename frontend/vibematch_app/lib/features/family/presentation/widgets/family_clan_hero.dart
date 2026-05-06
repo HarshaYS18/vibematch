@@ -26,6 +26,15 @@ class FamilyClanHero extends StatelessWidget {
   final VoidCallback onOptions;
   final VoidCallback onLevelTap;
 
+  int get _familyPower => exp.totalExp;
+
+  int get _targetPower {
+    if (_familyPower <= 250000) return 250000;
+    return ((_familyPower ~/ 250000) + 1) * 250000;
+  }
+
+  double get _progress => (_familyPower / _targetPower).clamp(0.0, 1.0);
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -40,7 +49,7 @@ class FamilyClanHero extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            height: 196,
+            height: 204,
             child: Stack(
               children: [
                 Positioned.fill(
@@ -73,29 +82,33 @@ class FamilyClanHero extends StatelessWidget {
                 ),
                 Positioned(
                   left: 8,
-                  bottom: 12,
+                  bottom: 14,
                   child: FamilyClanBadgeIcon(
                     familyName: profile.name,
-                    familyLevel: level.tier.label,
+                    familyLevel: 'gold',
                     size: 112,
                   ),
                 ),
                 Positioned(
                   left: 132,
-                  right: 18,
-                  bottom: 24,
+                  right: 16,
+                  bottom: 28,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(profile.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                      const SizedBox(height: 8),
+                      Text(
+                        profile.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 24, height: 1.02, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                      ),
+                      const SizedBox(height: 10),
                       Wrap(
                         spacing: 7,
                         runSpacing: 7,
                         children: [
                           _DarkPill(icon: Icons.tag_rounded, label: profile.id),
-                          _DarkPill(icon: Icons.workspace_premium_rounded, label: profile.minimumVipLabel),
                           _DarkPill(icon: Icons.leaderboard_rounded, label: profile.rankLabel),
                         ],
                       ),
@@ -117,17 +130,21 @@ class FamilyClanHero extends StatelessWidget {
                       Container(
                         width: 42,
                         height: 42,
-                        decoration: BoxDecoration(gradient: LinearGradient(colors: level.tier.colors), borderRadius: BorderRadius.circular(15)),
-                        child: Icon(level.tier.icon, color: Colors.white, size: 24),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD36A).withValues(alpha: 0.13),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: const Color(0xFFFFD36A).withValues(alpha: 0.24)),
+                        ),
+                        child: const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFFD36A), size: 24),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${level.tier.label} Family · Lv ${level.level}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                            const Text('Family Power', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
                             const SizedBox(height: 4),
-                            Text('Season EXP resets quarterly', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w700)),
+                            Text('Gift contribution + active family time', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w700)),
                           ],
                         ),
                       ),
@@ -137,12 +154,12 @@ class FamilyClanHero extends StatelessWidget {
                   const SizedBox(height: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(minHeight: 8, value: level.progress, backgroundColor: Colors.white.withValues(alpha: 0.10), color: const Color(0xFFFFD36A)),
+                    child: LinearProgressIndicator(minHeight: 8, value: _progress, backgroundColor: Colors.white.withValues(alpha: 0.10), color: const Color(0xFFFFD36A)),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(child: Text('${compactFamilyExp(level.expIntoLevel)} / ${compactFamilyExp(level.expNeededForNextLevel)} EXP', style: TextStyle(color: Colors.white.withValues(alpha: 0.66), fontSize: 11, fontWeight: FontWeight.w800))),
+                      Expanded(child: Text('${compactFamilyExp(_familyPower)} / ${compactFamilyExp(_targetPower)} power', style: TextStyle(color: Colors.white.withValues(alpha: 0.66), fontSize: 11, fontWeight: FontWeight.w800))),
                       Text('${compactFamilyExp(exp.giftExp)} gift EXP', style: const TextStyle(color: Color(0xFFFFD36A), fontSize: 11, fontWeight: FontWeight.w900)),
                     ],
                   ),
