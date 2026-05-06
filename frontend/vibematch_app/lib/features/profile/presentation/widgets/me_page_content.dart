@@ -179,7 +179,7 @@ class MePageContent extends StatelessWidget {
               onTap: () async {
                 if (item.action == 'edit_profile') {
                   _openEditProfile(context);
-                } else if (item.action == 'family') {
+                } else if (item.action == 'family' || item.title == 'Family') {
                   _openFamily(context);
                 } else if (item.action == 'logout') {
                   await _endSession(context);
