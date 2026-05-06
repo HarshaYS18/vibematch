@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
+import '../../../family/presentation/family_page.dart';
 import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
@@ -42,9 +43,11 @@ class MePageContent extends StatelessWidget {
   }
 
   void _openEditProfile(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => EditProfilePage(user: user)),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => EditProfilePage(user: user)));
+  }
+
+  void _openFamily(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FamilyPage()));
   }
 
   void _openProfile(BuildContext context) {
@@ -65,9 +68,7 @@ class MePageContent extends StatelessWidget {
   }
 
   void _openBondDetail(BuildContext context, LoveBondCardData bond) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)));
   }
 
   @override
@@ -101,7 +102,7 @@ class MePageContent extends StatelessWidget {
           currentRoomName: MeProfileConstants.currentRoomName,
           familyName: MeProfileConstants.familyName,
           familyLevel: MeProfileConstants.familyLevel,
-          onFamilyTap: () => _showAction(context, 'Family page with events, members and rewards will open.'),
+          onFamilyTap: () => _openFamily(context),
           onAvatarTap: () => _openProfile(context),
           onQrTap: () => _showAction(context, 'Profile QR / share card will open.'),
           onWalletTap: () => _showAction(context, 'Wallet page will open.'),
@@ -116,10 +117,7 @@ class MePageContent extends StatelessWidget {
           onBondTap: (bond) => _openBondDetail(context, bond),
         ),
         const SizedBox(height: 18),
-        const Text(
-          'Account',
-          style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4),
-        ),
+        const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
         const SizedBox(height: 12),
         ...items.map(
           (item) => Padding(
@@ -129,6 +127,8 @@ class MePageContent extends StatelessWidget {
               onTap: () async {
                 if (item.action == 'edit_profile') {
                   _openEditProfile(context);
+                } else if (item.action == 'family') {
+                  _openFamily(context);
                 } else if (item.action == 'logout') {
                   await _endSession(context);
                 } else if (item.action == 'refresh') {
