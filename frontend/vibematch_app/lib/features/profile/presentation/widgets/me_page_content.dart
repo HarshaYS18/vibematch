@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../auth/models/current_user.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
+import '../../../vip/presentation/vip_program_page.dart';
 import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
@@ -119,6 +120,20 @@ class MePageContent extends StatelessWidget {
     );
   }
 
+  void _openVipProgram(BuildContext context, {int initialTabIndex = 0}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VipProgramPage(
+          initialTabIndex: initialTabIndex,
+          vipLevel: MeProfileConstants.vipLevel,
+          svipLevel: MeProfileConstants.svipLevel,
+          lifetimeRechargeCoins: MeProfileConstants.diamonds,
+          monthlyRechargeCoins: 42000,
+        ),
+      ),
+    );
+  }
+
   void _openBondDetail(BuildContext context, LoveBondCardData bond) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)));
   }
@@ -158,7 +173,7 @@ class MePageContent extends StatelessWidget {
           onAvatarTap: () => _openProfile(context),
           onQrTap: () => _showAction(context, 'Profile QR / share card will open.'),
           onWalletTap: () => _showAction(context, 'Wallet page will open.'),
-          onVipTap: () => _showAction(context, 'VIP / SVIP details will open.'),
+          onVipTap: () => _openVipProgram(context),
           onRoomTap: () => _showAction(context, 'Open ${MeProfileConstants.currentRoomName} room preview. Secret Vibe rooms will be hidden later.'),
         ),
         const SizedBox(height: 14),
@@ -181,6 +196,8 @@ class MePageContent extends StatelessWidget {
                   _openEditProfile(context);
                 } else if (item.action == 'family' || item.title == 'Family') {
                   _openFamily(context);
+                } else if (item.title == 'VIP / SVIP') {
+                  _openVipProgram(context, initialTabIndex: item.subtitle.contains('SVIP') ? 1 : 0);
                 } else if (item.action == 'logout') {
                   await _endSession(context);
                 } else if (item.action == 'refresh') {
