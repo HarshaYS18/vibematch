@@ -17,6 +17,7 @@ class UserMiniProfileSheet extends StatelessWidget {
     required this.canModerate,
     required this.onAvatarTap,
     required this.onVipTap,
+    required this.onSvipTap,
     required this.onSendingLevelTap,
     required this.onReceivingLevelTap,
     required this.onSentRankingTap,
@@ -43,6 +44,7 @@ class UserMiniProfileSheet extends StatelessWidget {
   final bool canModerate;
   final VoidCallback onAvatarTap;
   final VoidCallback onVipTap;
+  final VoidCallback onSvipTap;
   final VoidCallback onSendingLevelTap;
   final VoidCallback onReceivingLevelTap;
   final VoidCallback onSentRankingTap;
@@ -102,6 +104,7 @@ class UserMiniProfileSheet extends StatelessWidget {
                 MiniProfileLevelRow(
                   user: user,
                   onVipTap: onVipTap,
+                  onSvipTap: onSvipTap,
                   onSendingLevelTap: onSendingLevelTap,
                   onReceivingLevelTap: onReceivingLevelTap,
                 ),
