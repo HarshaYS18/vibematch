@@ -23,6 +23,7 @@ class FamilyController extends ChangeNotifier {
   bool hasFamily = true;
   bool isOwner = true;
   bool isAdmin = true;
+  bool joinRequestPending = false;
 
   FamilyInviteActorType get inviteActorType => (isOwner || isAdmin) ? FamilyInviteActorType.ownerAdmin : FamilyInviteActorType.member;
   bool get canSelectMoreInvites => selectedInviteUserIds.length < 10;
@@ -54,6 +55,27 @@ class FamilyController extends ChangeNotifier {
     hasFamily = true;
     isOwner = true;
     isAdmin = true;
+    joinRequestPending = false;
+    notifyListeners();
+  }
+
+  void requestJoinFamily() {
+    if (hasFamily || joinRequestPending) return;
+    joinRequestPending = true;
+    notifyListeners();
+  }
+
+  void mockApproveJoinRequest() {
+    if (!joinRequestPending) return;
+    hasFamily = true;
+    isOwner = false;
+    isAdmin = false;
+    joinRequestPending = false;
+    notifyListeners();
+  }
+
+  void mockRejectJoinRequest() {
+    joinRequestPending = false;
     notifyListeners();
   }
 
@@ -85,17 +107,21 @@ class FamilyController extends ChangeNotifier {
     hasFamily = false;
     isOwner = false;
     isAdmin = false;
+    joinRequestPending = false;
     notifyListeners();
   }
 
   void disbandFamily() {
     hasFamily = false;
+    isOwner = false;
+    isAdmin = false;
+    joinRequestPending = false;
     notifyListeners();
   }
 
   void sendMessage(String text) {
     final clean = text.trim();
-    if (clean.isEmpty) return;
+    if (clean.isEmpty || !hasFamily) return;
     messages.insert(0, FamilyChatUiModel(senderName: 'You', message: clean, timeLabel: 'Now', isMine: true));
     notifyListeners();
   }
