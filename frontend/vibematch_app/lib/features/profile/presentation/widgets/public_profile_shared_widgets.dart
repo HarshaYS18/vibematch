@@ -141,11 +141,12 @@ class PublicTinyStatusChip extends StatelessWidget {
 }
 
 class PublicBadge extends StatelessWidget {
-  const PublicBadge({super.key, required this.icon, required this.label, required this.color});
+  const PublicBadge({super.key, required this.icon, required this.label, required this.color, this.onTap});
 
   final IconData icon;
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
   int? _levelForPrefix(String prefix) {
     final clean = label.trim();
@@ -165,9 +166,13 @@ class PublicBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final vipLevel = _levelForPrefix('VIP');
     if (vipLevel != null) {
-      return SizedBox(
-        height: 28,
-        child: Center(child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true)),
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(99),
+        child: SizedBox(
+          height: 28,
+          child: Center(child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true)),
+        ),
       );
     }
 
@@ -185,7 +190,7 @@ class PublicBadge extends StatelessWidget {
             textColor: const Color(0xFFFFE2A1),
             shineColor: const Color(0xFFFFF1B8),
             active: svipLevel > 0,
-            onTap: () {},
+            onTap: onTap ?? () {},
           ),
         ),
       );
@@ -195,14 +200,14 @@ class PublicBadge extends StatelessWidget {
       return MiniProfileFamilyBadge(
         familyName: label,
         familyLevel: _familyTier,
-        onTap: () {},
+        onTap: onTap ?? () {},
         height: 26,
         minWidth: 92,
         maxWidth: 152,
       );
     }
 
-    return Container(
+    final badge = Container(
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
@@ -219,6 +224,9 @@ class PublicBadge extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap == null) return badge;
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(99), child: badge);
   }
 }
 
