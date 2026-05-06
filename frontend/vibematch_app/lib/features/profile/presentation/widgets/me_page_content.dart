@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
-import '../../../family/presentation/family_page.dart';
+import '../../../family/presentation/family_modular_page.dart';
 import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
@@ -47,7 +47,7 @@ class MePageContent extends StatelessWidget {
   }
 
   void _openFamily(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FamilyPage()));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FamilyModularPage()));
   }
 
   void _openProfile(BuildContext context) {
