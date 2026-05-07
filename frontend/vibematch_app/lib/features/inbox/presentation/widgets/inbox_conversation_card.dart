@@ -61,6 +61,16 @@ class InboxConversationCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (conversation.isPinned)
+                    Positioned(
+                      left: -4,
+                      top: -5,
+                      child: _StateBadge(
+                        icon: Icons.push_pin_rounded,
+                        background: const Color(0xFFFFF4D7),
+                        color: const Color(0xFFC99A3B),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(width: 10),
@@ -82,8 +92,18 @@ class InboxConversationCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (conversation.isBlocked)
+                        if (conversation.isMuted) ...[
+                          const SizedBox(width: 5),
+                          const Icon(Icons.volume_off_rounded, color: Color(0xFF8C8198), size: 14),
+                        ],
+                        if (conversation.isPinned) ...[
+                          const SizedBox(width: 5),
+                          const Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 14),
+                        ],
+                        if (conversation.isBlocked) ...[
+                          const SizedBox(width: 5),
                           const Icon(Icons.block_rounded, color: Color(0xFFE84C72), size: 14),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 3),
@@ -101,6 +121,22 @@ class InboxConversationCard extends StatelessWidget {
                     Row(
                       children: [
                         _MiniPill(text: conversation.type.label),
+                        if (conversation.isPinned) ...[
+                          const SizedBox(width: 5),
+                          const _StatusPill(
+                            text: 'Pinned',
+                            icon: Icons.push_pin_rounded,
+                            color: Color(0xFFC99A3B),
+                          ),
+                        ],
+                        if (conversation.isMuted) ...[
+                          const SizedBox(width: 5),
+                          const _StatusPill(
+                            text: 'Muted',
+                            icon: Icons.volume_off_rounded,
+                            color: Color(0xFF8C8198),
+                          ),
+                        ],
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -150,6 +186,8 @@ class InboxConversationCard extends StatelessWidget {
                         ),
                       ),
                     )
+                  else if (conversation.isMuted)
+                    const Icon(Icons.notifications_off_rounded, color: Color(0xFF8C8198), size: 17)
                   else
                     const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5)),
                 ],
@@ -157,6 +195,78 @@ class InboxConversationCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StateBadge extends StatelessWidget {
+  const _StateBadge({
+    required this.icon,
+    required this.background,
+    required this.color,
+  });
+
+  final IconData icon;
+  final Color background;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        color: background,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFFAF7F1), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.18),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Icon(icon, color: color, size: 10),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({
+    required this.text,
+    required this.icon,
+    required this.color,
+  });
+
+  final String text;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 9),
+          const SizedBox(width: 2),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 8.8,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
