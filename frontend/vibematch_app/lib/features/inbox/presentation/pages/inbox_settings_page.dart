@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 
 import '../../models/inbox_models.dart';
+import '../widgets/inbox_lock_flow_sheets.dart';
 
 class InboxSettingsPage extends StatefulWidget {
   const InboxSettingsPage({
     super.key,
+    required this.lockStatus,
     required this.backupEnabled,
     required this.frequency,
     required this.strangersCanMessage,
     required this.strangersCanMentionInVibes,
+    required this.onStartLockSetup,
+    required this.onVerifyLockSetup,
+    required this.onChangeLock,
+    required this.onStartLockRecovery,
+    required this.onVerifyLockRecovery,
+    required this.onRequestCsLockRecovery,
     required this.onBackupEnabledChanged,
     required this.onFrequencyChanged,
     required this.onStrangersCanMessageChanged,
@@ -18,10 +26,17 @@ class InboxSettingsPage extends StatefulWidget {
     required this.onBackTap,
   });
 
+  final InboxLockStatus lockStatus;
   final bool backupEnabled;
   final ChatBackupFrequency frequency;
   final bool strangersCanMessage;
   final bool strangersCanMentionInVibes;
+  final Future<String?> Function(String mobileNumber) onStartLockSetup;
+  final Future<void> Function(String mobileNumber, String otp, String lockCode) onVerifyLockSetup;
+  final Future<void> Function(String currentLock, String newLock) onChangeLock;
+  final Future<String?> Function(String mobileNumber) onStartLockRecovery;
+  final Future<void> Function(String mobileNumber, String otp, String newLock) onVerifyLockRecovery;
+  final Future<String> Function() onRequestCsLockRecovery;
   final ValueChanged<bool> onBackupEnabledChanged;
   final ValueChanged<ChatBackupFrequency> onFrequencyChanged;
   final ValueChanged<bool> onStrangersCanMessageChanged;
@@ -47,6 +62,41 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     _frequency = widget.frequency;
     _strangersCanMessage = widget.strangersCanMessage;
     _strangersCanMentionInVibes = widget.strangersCanMentionInVibes;
+  }
+
+  void _openLockSetup() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => InboxLockSetupSheet(
+        onStartOtp: widget.onStartLockSetup,
+        onVerifySetup: widget.onVerifyLockSetup,
+      ),
+    );
+  }
+
+  void _openChangeLock() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => InboxLockChangeSheet(onChangeLock: widget.onChangeLock),
+    );
+  }
+
+  void _openRecovery() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => InboxLockRecoverySheet(
+        registeredMobile: widget.lockStatus.mobileNumber,
+        onStartRecovery: widget.onStartLockRecovery,
+        onVerifyRecovery: widget.onVerifyLockRecovery,
+        onRequestCs: widget.onRequestCsLockRecovery,
+      ),
+    );
   }
 
   void _setBackupEnabled(bool value) {
@@ -76,20 +126,12 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   void _showFeedback(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
-          content: Text(
-            message,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-        ),
-      );
+      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
   }
 
   @override
   Widget build(BuildContext context) {
+    final lockStatus = widget.lockStatus;
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
@@ -100,16 +142,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
               children: [
                 IconButton(onPressed: widget.onBackTap, icon: const Icon(Icons.arrow_back_rounded)),
                 const SizedBox(width: 6),
-                const Expanded(
-                  child: Text(
-                    'Inbox Settings',
-                    style: TextStyle(
-                      color: Color(0xFF251538),
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
+                const Expanded(child: Text('Inbox Settings', style: TextStyle(color: Color(0xFF251538), fontSize: 24, fontWeight: FontWeight.w900))),
                 const Icon(Icons.settings_rounded, color: Color(0xFF4A2A63)),
               ],
             ),
@@ -117,36 +150,42 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
             _SettingsCard(
               child: Column(
                 children: [
+                  _ActionRow(
+                    icon: lockStatus.isEnabled ? Icons.lock_rounded : Icons.lock_open_rounded,
+                    title: lockStatus.isEnabled ? 'Inbox lock active' : 'Set up Inbox lock',
+                    subtitle: lockStatus.isEnabled
+                        ? 'Recovery mobile: ${lockStatus.mobileNumber ?? 'linked'}'
+                        : 'Link mobile number, verify OTP, and create a private lock.',
+                    onTap: lockStatus.isEnabled ? _openChangeLock : _openLockSetup,
+                  ),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  _ActionRow(
+                    icon: Icons.lock_reset_rounded,
+                    title: lockStatus.isEnabled ? 'Recover Inbox lock' : 'Recovery setup',
+                    subtitle: lockStatus.recoveryRequested ? 'Recovery request submitted to CS.' : 'Recover by OTP or contact CS for review.',
+                    onTap: _openRecovery,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SettingsCard(
+              child: Column(
+                children: [
                   SwitchListTile(
                     value: _strangersCanMessage,
                     onChanged: _setStrangersCanMessage,
                     activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text(
-                      'Stranger messages',
-                      style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900),
-                    ),
-                    subtitle: Text(
-                      _strangersCanMessage
-                          ? 'Strangers can message you. These appear under Stranger messages.'
-                          : 'Strangers cannot start new chats with you.',
-                      style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700),
-                    ),
+                    title: const Text('Stranger messages', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    subtitle: Text(_strangersCanMessage ? 'Strangers can message you. These appear under Stranger messages.' : 'Strangers cannot start new chats with you.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
                   ),
                   const Divider(color: Color(0xFFECE2D8)),
                   SwitchListTile(
                     value: _strangersCanMentionInVibes,
                     onChanged: _setStrangersCanMentionInVibes,
                     activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text(
-                      'Stranger Vibes mentions',
-                      style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900),
-                    ),
-                    subtitle: Text(
-                      _strangersCanMentionInVibes
-                          ? 'Strangers can mention you in Vibes and Vibe comments.'
-                          : 'Only friends/following rules can mention you in Vibes.',
-                      style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700),
-                    ),
+                    title: const Text('Stranger Vibes mentions', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    subtitle: Text(_strangersCanMentionInVibes ? 'Strangers can mention you in Vibes and Vibe comments.' : 'Only friends/following rules can mention you in Vibes.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
@@ -159,25 +198,11 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                     value: _backupEnabled,
                     onChanged: _setBackupEnabled,
                     activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text(
-                      'Chat backup',
-                      style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900),
-                    ),
-                    subtitle: Text(
-                      _backupEnabled
-                          ? 'Backup is on. ${_frequency.label} backup is selected.'
-                          : 'Backup is off. Turn it on before scheduling automatic backups.',
-                      style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700),
-                    ),
+                    title: const Text('Chat backup', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    subtitle: Text(_backupEnabled ? 'Backup is on. ${_frequency.label} backup is selected.' : 'Backup is off. Turn it on before scheduling automatic backups.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
                   ),
                   const Divider(color: Color(0xFFECE2D8)),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Backup frequency',
-                      style: TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900),
-                    ),
-                  ),
+                  const Align(alignment: Alignment.centerLeft, child: Text('Backup frequency', style: TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900))),
                   const SizedBox(height: 9),
                   Wrap(
                     spacing: 8,
@@ -193,19 +218,8 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 160),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                            decoration: BoxDecoration(
-                              color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
-                            ),
-                            child: Text(
-                              item.label,
-                              style: TextStyle(
-                                color: selected ? Colors.white : const Color(0xFF4A2A63),
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
+                            decoration: BoxDecoration(color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(999), border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8))),
+                            child: Text(item.label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF4A2A63), fontSize: 11.5, fontWeight: FontWeight.w900)),
                           ),
                         ),
                       );
@@ -218,37 +232,20 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
             _SettingsCard(
               child: Column(
                 children: [
-                  _ActionRow(
-                    icon: Icons.cloud_upload_rounded,
-                    title: 'Back up now',
-                    subtitle: _backupEnabled
-                        ? 'Create a fresh encrypted backup later.'
-                        : 'Turn on chat backup before backing up.',
-                    onTap: _backupEnabled ? widget.onBackupNow : () => _showFeedback('Turn on chat backup first'),
-                  ),
+                  _ActionRow(icon: Icons.cloud_upload_rounded, title: 'Back up now', subtitle: _backupEnabled ? 'Create a fresh encrypted backup later.' : 'Turn on chat backup before backing up.', onTap: _backupEnabled ? widget.onBackupNow : () => _showFeedback('Turn on chat backup first')),
                   const Divider(color: Color(0xFFECE2D8)),
-                  _ActionRow(
-                    icon: Icons.restore_rounded,
-                    title: 'Restore from backup',
-                    subtitle: 'Restore from Google Drive / cloud backup later.',
-                    onTap: widget.onRestoreTap,
-                  ),
+                  _ActionRow(icon: Icons.restore_rounded, title: 'Restore from backup', subtitle: 'Restore from Google Drive / cloud backup later.', onTap: widget.onRestoreTap),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-            _SettingsCard(
-              child: const Row(
+            const _SettingsCard(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.lock_rounded, color: Color(0xFF4A2A63), size: 20),
+                  Icon(Icons.security_rounded, color: Color(0xFF4A2A63), size: 20),
                   SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Locked chats are backend account-level locks. Stranger message and mention privacy will also be backend account-level settings.',
-                      style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700),
-                    ),
-                  ),
+                  Expanded(child: Text('Locked chats use backend account-level security. Owner/Super Owner reset is allowed only after special recovery review.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700))),
                 ],
               ),
             ),
@@ -266,15 +263,7 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFECE2D8)),
-      ),
-      child: child,
-    );
+    return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFECE2D8))), child: child);
   }
 }
 
@@ -295,26 +284,9 @@ class _ActionRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8C5CF6).withValues(alpha: 0.11),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(icon, color: const Color(0xFF8C5CF6), size: 21),
-            ),
+            Container(width: 42, height: 42, decoration: BoxDecoration(color: const Color(0xFF8C5CF6).withValues(alpha: 0.11), borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: const Color(0xFF8C5CF6), size: 21)),
             const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 3),
-                  Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700))])),
             const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5)),
           ],
         ),
