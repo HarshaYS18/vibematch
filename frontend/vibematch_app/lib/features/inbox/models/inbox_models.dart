@@ -62,6 +62,30 @@ enum InboxReportStatus {
   final String label;
 }
 
+class InboxLockStatus {
+  const InboxLockStatus({
+    required this.isEnabled,
+    this.mobileNumber,
+    this.recoveryRequested = false,
+  });
+
+  final bool isEnabled;
+  final String? mobileNumber;
+  final bool recoveryRequested;
+
+  InboxLockStatus copyWith({
+    bool? isEnabled,
+    String? mobileNumber,
+    bool? recoveryRequested,
+  }) {
+    return InboxLockStatus(
+      isEnabled: isEnabled ?? this.isEnabled,
+      mobileNumber: mobileNumber ?? this.mobileNumber,
+      recoveryRequested: recoveryRequested ?? this.recoveryRequested,
+    );
+  }
+}
+
 class InboxConversation {
   const InboxConversation({
     required this.id,
