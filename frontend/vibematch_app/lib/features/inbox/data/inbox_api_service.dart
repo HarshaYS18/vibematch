@@ -90,10 +90,10 @@ class InboxApiService {
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/state')),
       headers: await _headers(),
       body: jsonEncode({
-        ?isMuted?.let((value) => MapEntry('is_muted', value)),
-        ?isPinned?.let((value) => MapEntry('is_pinned', value)),
-        ?isLocked?.let((value) => MapEntry('is_locked', value)),
-        ?isBlocked?.let((value) => MapEntry('is_blocked', value)),
+        ?_entry('is_muted', isMuted),
+        ?_entry('is_pinned', isPinned),
+        ?_entry('is_locked', isLocked),
+        ?_entry('is_blocked', isBlocked),
       }),
     );
     _throwIfFailed(response, 'update conversation state');
@@ -107,9 +107,9 @@ class InboxApiService {
       body: jsonEncode({
         'text': text,
         'type': type,
-        ?replyToText?.let((value) => MapEntry('reply_to_text', value)),
-        ?inviteRoomName?.let((value) => MapEntry('invite_room_name', value)),
-        ?attachmentUrl?.let((value) => MapEntry('attachment_url', value)),
+        ?_entry('reply_to_text', replyToText),
+        ?_entry('invite_room_name', inviteRoomName),
+        ?_entry('attachment_url', attachmentUrl),
       }),
     );
     _throwIfFailed(response, 'send message');
@@ -121,8 +121,8 @@ class InboxApiService {
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages/$messageId')),
       headers: await _headers(),
       body: jsonEncode({
-        ?reaction?.let((value) => MapEntry('reaction', value)),
-        ?isStarred?.let((value) => MapEntry('is_starred', value)),
+        ?_entry('reaction', reaction),
+        ?_entry('is_starred', isStarred),
       }),
     );
     _throwIfFailed(response, 'update message');
@@ -168,6 +168,8 @@ class InboxApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
     throw Exception('Inbox API failed to $action (${response.statusCode}): ${response.body}');
   }
+
+  MapEntry<String, Object>? _entry(String key, Object? value) => value == null ? null : MapEntry(key, value);
 
   InboxLockStatus lockStatusFromJson(Map<String, dynamic> json) {
     return InboxLockStatus(
@@ -276,8 +278,4 @@ class InboxApiService {
     if (hex.length == 6) hex = 'FF$hex';
     return Color(int.tryParse(hex, radix: 16) ?? 0xFF6D5DF6);
   }
-}
-
-extension _NullableMapEntry<T> on T {
-  MapEntry<String, T> let(String key) => MapEntry(key, this);
 }
