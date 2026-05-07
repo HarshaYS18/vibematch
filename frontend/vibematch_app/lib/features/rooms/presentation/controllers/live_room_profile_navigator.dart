@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
 import '../../../profile/presentation/public_profile_view_page.dart';
+import '../../../profile/presentation/widgets/me_profile_constants.dart';
+import '../../../vip/presentation/vip_program_page.dart';
 import '../live_room_models.dart';
 import '../widgets/experience/experience_level_models.dart';
 import '../widgets/experience/experience_level_page.dart';
@@ -128,29 +130,37 @@ class LiveRoomProfileNavigator {
     required BuildContext context,
     required SeatUser user,
   }) {
-    _pushRoomActionPageFromSheet(
-      context,
-      RoomActionPage(
-        title: 'VIP Centre',
-        subtitle:
-            '${user.name} is VIP ${user.vipLevel}. VIP benefits, SVIP rules, badges, and recharge progress will connect here.',
-        icon: Icons.workspace_premium_rounded,
-        cards: [
-          RoomActionCard(
-            title: 'Current VIP',
-            value: 'VIP ${user.vipLevel}',
-            icon: Icons.workspace_premium_rounded,
-            color: RoomColors.gold,
+    _openViewerVipProgram(context: context, initialTabIndex: 0);
+  }
+
+  static void openSvipCentrePage({
+    required BuildContext context,
+    required SeatUser user,
+  }) {
+    _openViewerVipProgram(context: context, initialTabIndex: 1);
+  }
+
+  static void _openViewerVipProgram({
+    required BuildContext context,
+    required int initialTabIndex,
+  }) {
+    Navigator.pop(context);
+
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!context.mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VipProgramPage(
+            initialTabIndex: initialTabIndex,
+            vipLevel: MeProfileConstants.vipLevel,
+            svipLevel: MeProfileConstants.svipLevel,
+            lifetimeRechargeCoins: MeProfileConstants.diamonds,
+            monthlyRechargeCoins: 42000,
           ),
-          RoomActionCard(
-            title: 'Monthly SVIP',
-            value: user.svipLevel > 0 ? 'SVIP ${user.svipLevel}' : 'Not active',
-            icon: Icons.auto_awesome_rounded,
-            color: RoomColors.violet,
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+    });
   }
 
   static void openSendingExperiencePage({
