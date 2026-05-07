@@ -27,7 +27,11 @@ class InboxController extends ChangeNotifier {
     InboxMockData.conversations,
   );
 
+  final List<InboxReportTask> _reportTasks = <InboxReportTask>[];
+
   List<InboxConversation> get conversations => List.unmodifiable(_conversations);
+  List<InboxReportTask> get reportTasks => List.unmodifiable(_reportTasks);
+  int get pendingReportTaskCount => _reportTasks.where((task) => task.isPending).length;
 
   List<InboxConversation> get unlockedConversations {
     return _sortedConversations(_conversations.where((conversation) => !conversation.isLockedByBackend).toList());
@@ -233,6 +237,92 @@ class InboxController extends ChangeNotifier {
         isMine: true,
         type: type,
         status: InboxMessageStatus.read,
+      ),
+    );
+  }
+
+  InboxReportTask submitConversationReport({
+    required InboxConversation conversation,
+    required String reason,
+  }) {
+    final snapshot = conversation.messages.length <= 30
+        ? conversation.messages
+        : conversation.messages.sublist(conversation.messages.length - 30);
+
+    final task = InboxReportTask(
+      id: 'report_${DateTime.now().microsecondsSinceEpoch}',
+      reportedConversationId: conversation.id,
+      reportedUserName: conversation.title,
+      reporterName: 'You',
+      reason: reason.trim().isEmpty ? 'Unsafe or abusive conversation' : reason.trim(),
+      snapshot: List<InboxMessage>.unmodifiable(snapshot),
+      createdAtLabel: 'Now',
+      status: InboxReportStatus.pendingCsReview,
+    );
+
+    _reportTasks.insert(0, task);
+    _sendTeamSystemMessage(
+      'Report submitted. CS will review the conversation snapshot and escalate if action is needed.',
+    );
+    notifyListeners();
+    return task;
+  }
+
+  void rejectReportTask(InboxReportTask task) {
+    _replaceReportTask(
+      task.id,
+      task.copyWith(
+        status: InboxReportStatus.rejectedByCs,
+        csNote: 'CS reviewed the snapshot and did not find enough evidence for punishment.',
+      ),
+    );
+    _sendTeamSystemMessage('Report failed. CS reviewed your report about ${task.reportedUserName}, but there was not enough evidence to punish the user.');
+  }
+
+  void acceptReportTask(InboxReportTask task) {
+    _replaceReportTask(
+      task.id,
+      task.copyWith(
+        status: InboxReportStatus.acceptedEscalated,
+        csNote: 'CS accepted the report and sent it to Monitor team for punishment action.',
+        monitorAction: 'Pending Monitor action',
+      ),
+    );
+    _sendTeamSystemMessage('Report successful. ${task.reportedUserName} has been sent to Monitor team for punishment review.');
+  }
+
+  void applyMonitorAction(InboxReportTask task, String actionLabel) {
+    _replaceReportTask(
+      task.id,
+      task.copyWith(
+        status: InboxReportStatus.monitorActionTaken,
+        monitorAction: actionLabel,
+      ),
+    );
+    _sendTeamSystemMessage('Report successful. ${task.reportedUserName} has been punished by Monitor team: $actionLabel.');
+  }
+
+  void _replaceReportTask(String taskId, InboxReportTask replacement) {
+    for (var index = 0; index < _reportTasks.length; index++) {
+      if (_reportTasks[index].id != taskId) continue;
+      _reportTasks[index] = replacement;
+      notifyListeners();
+      return;
+    }
+  }
+
+  void _sendTeamSystemMessage(String text) {
+    final team = conversationById('team_official');
+    if (team == null) return;
+    _appendMessage(
+      team.id,
+      InboxMessage(
+        id: 'system_${DateTime.now().microsecondsSinceEpoch}',
+        sender: 'Vibe Match Team',
+        text: text,
+        time: 'Now',
+        isMine: false,
+        type: InboxMessageType.system,
       ),
     );
   }
