@@ -254,6 +254,7 @@ class _InboxPageState extends State<InboxPage> {
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => sheet,
     );
   }
@@ -364,39 +365,49 @@ class _InboxChatOptionsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(14),
-      padding: EdgeInsets.fromLTRB(18, 10, 18, 18 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
-          const SizedBox(height: 14),
-          Text(conversation.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 12),
-          _OptionTile(icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: conversation.isPinned ? 'Unpin chat' : 'Pin chat', subtitle: 'Keep important chats at the top.', onTap: onTogglePin),
-          _OptionTile(icon: conversation.isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded, title: conversation.isMuted ? 'Unmute chat' : 'Mute chat', subtitle: 'Silence notifications locally for now.', onTap: conversation.isOfficial ? null : onToggleMute),
-          _OptionTile(icon: conversation.isArchived ? Icons.unarchive_rounded : Icons.archive_rounded, title: conversation.isArchived ? 'Unarchive chat' : 'Archive chat', subtitle: 'Hide chat from main Inbox list.', onTap: conversation.isOfficial ? null : onToggleArchive),
-          _OptionTile(icon: conversation.isLockedByBackend ? Icons.lock_open_rounded : Icons.lock_rounded, title: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat', subtitle: 'Backend account-level lock, not local device lock.', onTap: conversation.isOfficial ? null : onToggleLock),
-          _OptionTile(icon: conversation.isBlocked ? Icons.undo_rounded : Icons.block_rounded, title: conversation.isBlocked ? 'Unblock profile' : 'Block profile', subtitle: 'Blocks are synced by backend later.', onTap: conversation.isOfficial ? null : onToggleBlock),
-          _OptionTile(icon: Icons.report_rounded, title: 'Report profile', subtitle: 'Sends to CS/Monitor workflow later.', onTap: conversation.isOfficial ? null : onReport),
-        ],
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+        ),
+        padding: EdgeInsets.fromLTRB(14, 8, 14, 10 + bottomPadding),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))],
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
+              const SizedBox(height: 10),
+              Text(conversation.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 10),
+              _OptionTile(icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: conversation.isPinned ? 'Unpin chat' : 'Pin chat', onTap: onTogglePin),
+              _OptionTile(icon: conversation.isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded, title: conversation.isMuted ? 'Unmute chat' : 'Mute chat', onTap: conversation.isOfficial ? null : onToggleMute),
+              _OptionTile(icon: conversation.isArchived ? Icons.unarchive_rounded : Icons.archive_rounded, title: conversation.isArchived ? 'Unarchive chat' : 'Archive chat', onTap: conversation.isOfficial ? null : onToggleArchive),
+              _OptionTile(icon: conversation.isLockedByBackend ? Icons.lock_open_rounded : Icons.lock_rounded, title: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat', onTap: conversation.isOfficial ? null : onToggleLock),
+              _OptionTile(icon: conversation.isBlocked ? Icons.undo_rounded : Icons.block_rounded, title: conversation.isBlocked ? 'Unblock profile' : 'Block profile', onTap: conversation.isOfficial ? null : onToggleBlock),
+              _OptionTile(icon: Icons.report_rounded, title: 'Report profile', onTap: conversation.isOfficial ? null : onReport),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class _OptionTile extends StatelessWidget {
-  const _OptionTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  const _OptionTile({required this.icon, required this.title, required this.onTap});
 
   final IconData icon;
   final String title;
-  final String subtitle;
   final VoidCallback? onTap;
 
   @override
@@ -404,26 +415,19 @@ class _OptionTile extends StatelessWidget {
     final disabled = onTap == null;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: Opacity(
         opacity: disabled ? 0.45 : 1,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
           margin: const EdgeInsets.only(bottom: 7),
-          decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFECE2D8))),
+          decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))),
           child: Row(
             children: [
               Icon(icon, color: const Color(0xFF4A2A63), size: 20),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, fontWeight: FontWeight.w700)),
-                  ],
-                ),
+                child: Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
               ),
               const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5)),
             ],
