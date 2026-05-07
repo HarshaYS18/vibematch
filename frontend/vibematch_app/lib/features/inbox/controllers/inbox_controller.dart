@@ -204,6 +204,27 @@ class InboxController extends ChangeNotifier {
     _appendMessage(conversationId, InboxMessage(id: 'local_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: text, time: 'Now', isMine: true, type: type, status: InboxMessageStatus.read));
   }
 
+  void addPickedDocumentAttachment({
+    required String conversationId,
+    required String fileName,
+    required int sizeBytes,
+    String? filePath,
+  }) {
+    final sizeLabel = _formatBytes(sizeBytes);
+    _appendMessage(
+      conversationId,
+      InboxMessage(
+        id: 'doc_${DateTime.now().microsecondsSinceEpoch}',
+        sender: 'You',
+        text: '📄 $fileName • $sizeLabel',
+        time: 'Now',
+        isMine: true,
+        type: InboxMessageType.document,
+        status: InboxMessageStatus.read,
+      ),
+    );
+  }
+
   Future<InboxReportTask> submitConversationReport({required InboxConversation conversation, required String reason}) async {
     final snapshot = conversation.messages.length <= 30 ? conversation.messages : conversation.messages.sublist(conversation.messages.length - 30);
     final local = InboxReportTask(id: 'report_${DateTime.now().microsecondsSinceEpoch}', reportedConversationId: conversation.id, reportedUserName: conversation.title, reporterName: 'You', reason: reason.trim().isEmpty ? 'Unsafe or abusive conversation' : reason.trim(), snapshot: List<InboxMessage>.unmodifiable(snapshot), createdAtLabel: 'Now', status: InboxReportStatus.pendingCsReview);
@@ -253,6 +274,14 @@ class InboxController extends ChangeNotifier {
 
   void forwardMessage({required String fromConversationId, required InboxMessage message}) {
     _appendMessage(fromConversationId, message.copyWith(id: 'forward_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', time: 'Now', isMine: true, isForwarded: true, status: InboxMessageStatus.read));
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(kb >= 100 ? 0 : 1)} KB';
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB';
   }
 
   void _sendTeamSystemMessage(String text) {
