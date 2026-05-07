@@ -95,11 +95,7 @@ class _InboxPageState extends State<InboxPage> {
     );
   }
 
-  Future<void> _showPasscodeGate({
-    required String title,
-    required String subtitle,
-    required VoidCallback onUnlocked,
-  }) async {
+  Future<void> _showPasscodeGate({required String title, required String subtitle, required VoidCallback onUnlocked}) async {
     if (!_controller.lockStatus.isEnabled) {
       _toast('Set up Inbox lock first.');
       _openLockSetupSheet();
@@ -197,8 +193,7 @@ class _InboxPageState extends State<InboxPage> {
     _openInboxSubPage(
       InboxSettingsPage(
         lockStatus: _controller.lockStatus,
-        backupEnabled: _controller.backupEnabled,
-        frequency: _controller.backupFrequency,
+        backupStatus: _controller.backupStatus,
         strangersCanMessage: _controller.strangersCanMessage,
         strangersCanMentionInVibes: _controller.strangersCanMentionInVibes,
         onStartLockSetup: _controller.startLockSetup,
@@ -207,12 +202,14 @@ class _InboxPageState extends State<InboxPage> {
         onStartLockRecovery: _controller.startLockRecovery,
         onVerifyLockRecovery: (mobile, otp, newLock) => _controller.verifyLockRecovery(mobileNumber: mobile, otp: otp, newLockCode: newLock),
         onRequestCsLockRecovery: _controller.requestCsLockRecovery,
+        onStartGoogleDriveSetup: _controller.startGoogleDriveAuthorization,
+        onConnectGoogleDrive: (email, code) => _controller.connectGoogleDrive(googleDriveEmail: email, setupCode: code),
         onBackupEnabledChanged: _controller.setBackupEnabled,
         onFrequencyChanged: _controller.setBackupFrequency,
         onStrangersCanMessageChanged: _controller.setStrangersCanMessage,
         onStrangersCanMentionInVibesChanged: _controller.setStrangersCanMentionInVibes,
-        onBackupNow: () => _toast('Encrypted backup flow will connect to backend/Drive later.'),
-        onRestoreTap: () => _toast('Restore from backup flow will connect later.'),
+        onBackupNow: _controller.runBackupNow,
+        onRestoreTap: _controller.restoreLatestBackup,
         onBackTap: _closePanelOverlay,
       ),
     );
@@ -290,7 +287,6 @@ class _InboxPageState extends State<InboxPage> {
       setState(() => _panelOverlay = Align(alignment: Alignment.bottomCenter, child: sheet));
       return;
     }
-
     showModalBottomSheet<void>(context: context, isDismissible: true, enableDrag: true, backgroundColor: Colors.transparent, isScrollControlled: true, builder: (_) => sheet);
   }
 
@@ -348,7 +344,6 @@ class _InboxPageState extends State<InboxPage> {
 
 class _InboxChatOptionsSheet extends StatelessWidget {
   const _InboxChatOptionsSheet({required this.conversation, required this.onToggleLock, required this.onToggleBlock, required this.onToggleMute, required this.onTogglePin, required this.onReport});
-
   final InboxConversation conversation;
   final VoidCallback onToggleLock;
   final VoidCallback onToggleBlock;
@@ -368,20 +363,17 @@ class _InboxChatOptionsSheet extends StatelessWidget {
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))]),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
-              const SizedBox(height: 10),
-              Text(conversation.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 10),
-              _OptionTile(icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: conversation.isPinned ? 'Unpin chat' : 'Pin chat', onTap: onTogglePin),
-              _OptionTile(icon: conversation.isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded, title: conversation.isMuted ? 'Unmute chat' : 'Mute chat', onTap: conversation.isOfficial ? null : onToggleMute),
-              _OptionTile(icon: conversation.isLockedByBackend ? Icons.lock_open_rounded : Icons.lock_rounded, title: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat', onTap: conversation.isOfficial ? null : onToggleLock),
-              _OptionTile(icon: conversation.isBlocked ? Icons.undo_rounded : Icons.block_rounded, title: conversation.isBlocked ? 'Unblock profile' : 'Block profile', onTap: conversation.isOfficial ? null : onToggleBlock),
-              _OptionTile(icon: Icons.report_rounded, title: 'Report profile', onTap: conversation.isOfficial ? null : onReport),
-            ],
-          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
+            const SizedBox(height: 10),
+            Text(conversation.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            _OptionTile(icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: conversation.isPinned ? 'Unpin chat' : 'Pin chat', onTap: onTogglePin),
+            _OptionTile(icon: conversation.isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded, title: conversation.isMuted ? 'Unmute chat' : 'Mute chat', onTap: conversation.isOfficial ? null : onToggleMute),
+            _OptionTile(icon: conversation.isLockedByBackend ? Icons.lock_open_rounded : Icons.lock_rounded, title: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat', onTap: conversation.isOfficial ? null : onToggleLock),
+            _OptionTile(icon: conversation.isBlocked ? Icons.undo_rounded : Icons.block_rounded, title: conversation.isBlocked ? 'Unblock profile' : 'Block profile', onTap: conversation.isOfficial ? null : onToggleBlock),
+            _OptionTile(icon: Icons.report_rounded, title: 'Report profile', onTap: conversation.isOfficial ? null : onReport),
+          ]),
         ),
       ),
     );
