@@ -56,6 +56,10 @@ class LiveRoomMiniProfileLauncher {
           context: context,
           user: user,
         ),
+        onSvipTap: () => LiveRoomProfileNavigator.openSvipCentrePage(
+          context: context,
+          user: user,
+        ),
         onSendingLevelTap: () => LiveRoomProfileNavigator.openSendingExperiencePage(
           context: context,
           user: user,
