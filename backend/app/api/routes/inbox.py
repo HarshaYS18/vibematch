@@ -86,18 +86,30 @@ def get_backup_status(db: Session = Depends(get_db), current_user: User = Depend
 
 @router.patch("/backup/settings", response_model=InboxBackupStatusResponse)
 def update_backup_settings(request: InboxBackupSettingsRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    setting = inbox_backup_service.update_settings(db, current_user, is_enabled=request.is_enabled, frequency=request.frequency)
+    try:
+        setting = inbox_backup_service.update_settings(db, current_user, is_enabled=request.is_enabled, frequency=request.frequency)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return InboxBackupStatusResponse(**inbox_backup_service.status_payload(setting))
 
 
 @router.get("/backup/google/authorize", response_model=InboxGoogleDriveAuthStartResponse)
 def start_google_drive_authorization(current_user: User = Depends(get_current_user)):
-    return InboxGoogleDriveAuthStartResponse(authorization_url=inbox_backup_service.google_drive_authorize_url(current_user))
+    try:
+        url = inbox_backup_service.google_drive_authorize_url(current_user)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return InboxGoogleDriveAuthStartResponse(authorization_url=url)
 
 
 @router.post("/backup/google/connect", response_model=InboxBackupStatusResponse)
 def connect_google_drive(request: InboxGoogleDriveConnectRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    setting = inbox_backup_service.connect_google_drive_mock(db, current_user, google_email=request.google_drive_email)
+    if not request.authorization_code:
+        raise HTTPException(status_code=400, detail="Authorization code is required to connect Google Drive.")
+    try:
+        setting = inbox_backup_service.connect_google_drive(db, current_user, authorization_code=request.authorization_code, google_email=request.google_drive_email)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return InboxBackupStatusResponse(**inbox_backup_service.status_payload(setting))
 
 
