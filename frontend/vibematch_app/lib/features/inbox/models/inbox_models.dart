@@ -12,14 +12,22 @@ enum InboxConversationType {
 }
 
 enum ChatBackupFrequency {
-  daily('Daily'),
-  weekly('Weekly'),
-  monthly('Monthly'),
-  manual('Manual only');
+  daily('Daily', 'daily'),
+  weekly('Weekly', 'weekly'),
+  monthly('Monthly', 'monthly'),
+  manual('Manual only', 'manual');
 
-  const ChatBackupFrequency(this.label);
+  const ChatBackupFrequency(this.label, this.apiValue);
 
   final String label;
+  final String apiValue;
+
+  static ChatBackupFrequency fromApi(String? value) {
+    return ChatBackupFrequency.values.firstWhere(
+      (item) => item.apiValue == value,
+      orElse: () => ChatBackupFrequency.weekly,
+    );
+  }
 }
 
 enum InboxSearchMatchType {
@@ -63,27 +71,105 @@ enum InboxReportStatus {
 }
 
 class InboxLockStatus {
-  const InboxLockStatus({
-    required this.isEnabled,
-    this.mobileNumber,
-    this.recoveryRequested = false,
-  });
+  const InboxLockStatus({required this.isEnabled, this.mobileNumber, this.recoveryRequested = false});
 
   final bool isEnabled;
   final String? mobileNumber;
   final bool recoveryRequested;
 
-  InboxLockStatus copyWith({
-    bool? isEnabled,
-    String? mobileNumber,
-    bool? recoveryRequested,
-  }) {
+  InboxLockStatus copyWith({bool? isEnabled, String? mobileNumber, bool? recoveryRequested}) {
     return InboxLockStatus(
       isEnabled: isEnabled ?? this.isEnabled,
       mobileNumber: mobileNumber ?? this.mobileNumber,
       recoveryRequested: recoveryRequested ?? this.recoveryRequested,
     );
   }
+}
+
+class InboxBackupStatus {
+  const InboxBackupStatus({
+    required this.isEnabled,
+    required this.isAuthorized,
+    required this.provider,
+    required this.frequency,
+    required this.lastStatus,
+    this.googleDriveEmail,
+    this.googleDriveFolderId,
+    this.lastBackupAt,
+    this.lastRestoreAt,
+    this.lastError,
+    this.backupCount = 0,
+    this.restoreCount = 0,
+  });
+
+  final bool isEnabled;
+  final bool isAuthorized;
+  final String provider;
+  final ChatBackupFrequency frequency;
+  final String lastStatus;
+  final String? googleDriveEmail;
+  final String? googleDriveFolderId;
+  final String? lastBackupAt;
+  final String? lastRestoreAt;
+  final String? lastError;
+  final int backupCount;
+  final int restoreCount;
+
+  bool get isConnected => isAuthorized && googleDriveEmail != null;
+
+  InboxBackupStatus copyWith({
+    bool? isEnabled,
+    bool? isAuthorized,
+    String? provider,
+    ChatBackupFrequency? frequency,
+    String? lastStatus,
+    String? googleDriveEmail,
+    String? googleDriveFolderId,
+    String? lastBackupAt,
+    String? lastRestoreAt,
+    String? lastError,
+    int? backupCount,
+    int? restoreCount,
+  }) {
+    return InboxBackupStatus(
+      isEnabled: isEnabled ?? this.isEnabled,
+      isAuthorized: isAuthorized ?? this.isAuthorized,
+      provider: provider ?? this.provider,
+      frequency: frequency ?? this.frequency,
+      lastStatus: lastStatus ?? this.lastStatus,
+      googleDriveEmail: googleDriveEmail ?? this.googleDriveEmail,
+      googleDriveFolderId: googleDriveFolderId ?? this.googleDriveFolderId,
+      lastBackupAt: lastBackupAt ?? this.lastBackupAt,
+      lastRestoreAt: lastRestoreAt ?? this.lastRestoreAt,
+      lastError: lastError ?? this.lastError,
+      backupCount: backupCount ?? this.backupCount,
+      restoreCount: restoreCount ?? this.restoreCount,
+    );
+  }
+}
+
+class InboxBackupJob {
+  const InboxBackupJob({
+    required this.id,
+    required this.jobType,
+    required this.provider,
+    required this.status,
+    this.backupFileId,
+    this.backupFileName,
+    this.errorMessage,
+    this.createdAt,
+    this.completedAt,
+  });
+
+  final String id;
+  final String jobType;
+  final String provider;
+  final String status;
+  final String? backupFileId;
+  final String? backupFileName;
+  final String? errorMessage;
+  final String? createdAt;
+  final String? completedAt;
 }
 
 class InboxConversation {
@@ -228,15 +314,7 @@ class InboxMessage {
 }
 
 class InboxSearchResult {
-  const InboxSearchResult({
-    required this.conversation,
-    required this.matchType,
-    required this.title,
-    required this.preview,
-    required this.matchedText,
-    this.message,
-  });
-
+  const InboxSearchResult({required this.conversation, required this.matchType, required this.title, required this.preview, required this.matchedText, this.message});
   final InboxConversation conversation;
   final InboxSearchMatchType matchType;
   final String title;
@@ -246,18 +324,7 @@ class InboxSearchResult {
 }
 
 class InboxReportTask {
-  const InboxReportTask({
-    required this.id,
-    required this.reportedConversationId,
-    required this.reportedUserName,
-    required this.reporterName,
-    required this.reason,
-    required this.snapshot,
-    required this.createdAtLabel,
-    required this.status,
-    this.csNote,
-    this.monitorAction,
-  });
+  const InboxReportTask({required this.id, required this.reportedConversationId, required this.reportedUserName, required this.reporterName, required this.reason, required this.snapshot, required this.createdAtLabel, required this.status, this.csNote, this.monitorAction});
 
   final String id;
   final String reportedConversationId;
@@ -272,11 +339,7 @@ class InboxReportTask {
 
   bool get isPending => status == InboxReportStatus.pendingCsReview;
 
-  InboxReportTask copyWith({
-    InboxReportStatus? status,
-    String? csNote,
-    String? monitorAction,
-  }) {
+  InboxReportTask copyWith({InboxReportStatus? status, String? csNote, String? monitorAction}) {
     return InboxReportTask(
       id: id,
       reportedConversationId: reportedConversationId,
