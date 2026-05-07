@@ -1,0 +1,91 @@
+from datetime import datetime
+from pydantic import BaseModel, Field
+
+
+class InboxMessageResponse(BaseModel):
+    id: str
+    sender: str
+    text: str
+    time: str
+    is_mine: bool
+    type: str = "text"
+    status: str = "read"
+    reaction: str | None = None
+    reply_to_text: str | None = None
+    is_starred: bool = False
+    is_forwarded: bool = False
+    invite_room_name: str | None = None
+    created_at: datetime | None = None
+
+
+class InboxConversationResponse(BaseModel):
+    id: str
+    title: str
+    subtitle: str
+    time: str
+    avatar_text: str
+    type: str
+    unread_count: int = 0
+    is_online: bool = False
+    last_seen_text: str = "offline"
+    colors: list[str] = Field(default_factory=list)
+    messages: list[InboxMessageResponse] = Field(default_factory=list)
+    current_room_name: str | None = None
+    is_locked_by_backend: bool = False
+    is_blocked: bool = False
+    is_muted: bool = False
+    is_pinned: bool = False
+    is_archived: bool = False
+
+
+class InboxConversationListResponse(BaseModel):
+    conversations: list[InboxConversationResponse]
+
+
+class InboxSendMessageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+    type: str = "text"
+    reply_to_text: str | None = None
+    invite_room_name: str | None = None
+    attachment_url: str | None = None
+
+
+class InboxMessageActionRequest(BaseModel):
+    reaction: str | None = None
+    is_starred: bool | None = None
+
+
+class InboxConversationStateRequest(BaseModel):
+    is_muted: bool | None = None
+    is_pinned: bool | None = None
+    is_locked: bool | None = None
+    is_blocked: bool | None = None
+
+
+class InboxReportCreateRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class InboxReportTaskResponse(BaseModel):
+    id: str
+    reported_conversation_id: str
+    reported_user_name: str
+    reporter_name: str
+    reason: str
+    snapshot: list[InboxMessageResponse]
+    created_at_label: str
+    status: str
+    cs_note: str | None = None
+    monitor_action: str | None = None
+
+
+class InboxReportTaskListResponse(BaseModel):
+    tasks: list[InboxReportTaskResponse]
+
+
+class InboxReportDecisionRequest(BaseModel):
+    cs_note: str | None = None
+
+
+class InboxMonitorActionRequest(BaseModel):
+    action_label: str = Field(min_length=1, max_length=120)
