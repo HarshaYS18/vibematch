@@ -231,11 +231,6 @@ class _InboxPageState extends State<InboxPage> {
         _closeChatOptions();
         _toast(conversation.isPinned ? 'Chat unpinned.' : 'Chat pinned.');
       },
-      onToggleArchive: () {
-        _controller.toggleArchive(conversation);
-        _closeChatOptions();
-        _toast(conversation.isArchived ? 'Chat restored from archive.' : 'Chat archived locally.');
-      },
       onReport: () {
         _closeChatOptions();
         _toast('Report flow will connect to CS/Monitor workflow later.');
@@ -351,7 +346,6 @@ class _InboxChatOptionsSheet extends StatelessWidget {
     required this.onToggleBlock,
     required this.onToggleMute,
     required this.onTogglePin,
-    required this.onToggleArchive,
     required this.onReport,
   });
 
@@ -360,7 +354,6 @@ class _InboxChatOptionsSheet extends StatelessWidget {
   final VoidCallback onToggleBlock;
   final VoidCallback onToggleMute;
   final VoidCallback onTogglePin;
-  final VoidCallback onToggleArchive;
   final VoidCallback onReport;
 
   @override
@@ -391,7 +384,6 @@ class _InboxChatOptionsSheet extends StatelessWidget {
               const SizedBox(height: 10),
               _OptionTile(icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: conversation.isPinned ? 'Unpin chat' : 'Pin chat', onTap: onTogglePin),
               _OptionTile(icon: conversation.isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded, title: conversation.isMuted ? 'Unmute chat' : 'Mute chat', onTap: conversation.isOfficial ? null : onToggleMute),
-              _OptionTile(icon: conversation.isArchived ? Icons.unarchive_rounded : Icons.archive_rounded, title: conversation.isArchived ? 'Unarchive chat' : 'Archive chat', onTap: conversation.isOfficial ? null : onToggleArchive),
               _OptionTile(icon: conversation.isLockedByBackend ? Icons.lock_open_rounded : Icons.lock_rounded, title: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat', onTap: conversation.isOfficial ? null : onToggleLock),
               _OptionTile(icon: conversation.isBlocked ? Icons.undo_rounded : Icons.block_rounded, title: conversation.isBlocked ? 'Unblock profile' : 'Block profile', onTap: conversation.isOfficial ? null : onToggleBlock),
               _OptionTile(icon: Icons.report_rounded, title: 'Report profile', onTap: conversation.isOfficial ? null : onReport),
