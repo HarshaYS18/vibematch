@@ -6,6 +6,7 @@ import '../../auth/models/current_user.dart';
 import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
 import '../../vip/presentation/vip_program_page.dart';
+import '../data/profile_visitor_repository.dart';
 import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
 import 'widgets/me_profile_constants.dart';
@@ -55,6 +56,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   void initState() {
     super.initState();
     _startCoverAutoScroll();
+    _recordProfileVisit();
   }
 
   @override
@@ -62,6 +64,13 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     _coverTimer?.cancel();
     _coverController.dispose();
     super.dispose();
+  }
+
+  void _recordProfileVisit() {
+    ProfileVisitorRepository.instance.recordVisit(
+      profileOwner: widget.user,
+      visitor: CurrentUser.mockFounderOwner(),
+    );
   }
 
   void _startCoverAutoScroll() {
