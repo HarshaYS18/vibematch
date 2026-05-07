@@ -25,8 +25,6 @@ class _InboxChatPageState extends State<InboxChatPage> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? _replyToText;
-  String _query = '';
-  bool _searchOpen = false;
 
   InboxConversation get _conversation {
     return widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
@@ -137,16 +135,10 @@ class _InboxChatPageState extends State<InboxChatPage> {
     );
   }
 
-  List<InboxMessage> _filteredMessages(List<InboxMessage> messages) {
-    final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return messages;
-    return messages.where((message) => message.text.toLowerCase().contains(query)).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final conversation = _conversation;
-    final messages = _filteredMessages(conversation.messages);
+    final messages = conversation.messages;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
@@ -155,13 +147,9 @@ class _InboxChatPageState extends State<InboxChatPage> {
           children: [
             _ChatHeader(
               conversation: conversation,
-              searchOpen: _searchOpen,
               onBackTap: widget.onBackTap ?? () => Navigator.pop(context),
               onMoreTap: widget.onMoreTap,
-              onSearchTap: () => setState(() => _searchOpen = !_searchOpen),
               onVoiceCallTap: () => _showToast('Voice call will connect to WebRTC/Agora later.'),
-              onVideoCallTap: () => _showToast('Video call will connect later.'),
-              onSearchChanged: (value) => setState(() => _query = value),
             ),
             Expanded(
               child: ListView.separated(
@@ -205,23 +193,15 @@ class _InboxChatPageState extends State<InboxChatPage> {
 class _ChatHeader extends StatelessWidget {
   const _ChatHeader({
     required this.conversation,
-    required this.searchOpen,
     required this.onBackTap,
     required this.onMoreTap,
-    required this.onSearchTap,
     required this.onVoiceCallTap,
-    required this.onVideoCallTap,
-    required this.onSearchChanged,
   });
 
   final InboxConversation conversation;
-  final bool searchOpen;
   final VoidCallback onBackTap;
   final VoidCallback onMoreTap;
-  final VoidCallback onSearchTap;
   final VoidCallback onVoiceCallTap;
-  final VoidCallback onVideoCallTap;
-  final ValueChanged<String> onSearchChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -231,80 +211,53 @@ class _ChatHeader extends StatelessWidget {
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFECE2D8))),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              IconButton(onPressed: onBackTap, icon: const Icon(Icons.arrow_back_rounded)),
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(colors: conversation.colors),
-                ),
-                child: Center(
-                  child: Text(
-                    conversation.avatarText,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            conversation.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Color(0xFF251538), fontSize: 15, fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                        if (conversation.isMuted) const Icon(Icons.volume_off_rounded, color: Color(0xFF9B8CA5), size: 14),
-                        if (conversation.isPinned) const Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 14),
-                      ],
-                    ),
-                    Text(
-                      conversation.currentRoomName == null ? conversation.lastSeenText : 'In ${conversation.currentRoomName}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(onPressed: onVoiceCallTap, icon: const Icon(Icons.call_rounded, size: 20)),
-              IconButton(onPressed: onVideoCallTap, icon: const Icon(Icons.videocam_rounded, size: 21)),
-              IconButton(onPressed: onSearchTap, icon: const Icon(Icons.search_rounded, size: 21)),
-              IconButton(onPressed: onMoreTap, icon: const Icon(Icons.more_vert_rounded)),
-            ],
-          ),
-          if (searchOpen) ...[
-            const SizedBox(height: 8),
-            Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFAF7F1),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFECE2D8)),
-              ),
-              child: TextField(
-                onChanged: onSearchChanged,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  hintText: 'Search messages',
-                  hintStyle: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w700),
-                ),
+          IconButton(onPressed: onBackTap, icon: const Icon(Icons.arrow_back_rounded)),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: LinearGradient(colors: conversation.colors),
+            ),
+            child: Center(
+              child: Text(
+                conversation.avatarText,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
               ),
             ),
-          ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        conversation.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFF251538), fontSize: 15, fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    if (conversation.isMuted) const Icon(Icons.volume_off_rounded, color: Color(0xFF9B8CA5), size: 14),
+                    if (conversation.isPinned) const Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 14),
+                  ],
+                ),
+                Text(
+                  conversation.currentRoomName == null ? conversation.lastSeenText : 'In ${conversation.currentRoomName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+          IconButton(onPressed: onVoiceCallTap, icon: const Icon(Icons.call_rounded, size: 20)),
+          IconButton(onPressed: onMoreTap, icon: const Icon(Icons.more_vert_rounded)),
         ],
       ),
     );
