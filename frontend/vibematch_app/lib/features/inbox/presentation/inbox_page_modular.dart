@@ -47,16 +47,12 @@ class _InboxPageState extends State<InboxPage> {
       return;
     }
 
-    setState(() {
-      _panelOverlay = null;
-    });
+    setState(() => _panelOverlay = null);
   }
 
   void _handleBackInsideOverlay() {
     if (_panelOverlay != null) {
-      setState(() {
-        _panelOverlay = null;
-      });
+      setState(() => _panelOverlay = null);
       return;
     }
 
@@ -87,9 +83,7 @@ class _InboxPageState extends State<InboxPage> {
           subtitle: subtitle,
           onValidate: _controller.validatePasscode,
           onUnlocked: () {
-            setState(() {
-              _panelOverlay = null;
-            });
+            setState(() => _panelOverlay = null);
             onUnlocked();
           },
         );
@@ -148,20 +142,21 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _openLockedVaultPage() {
-    final page = LockedChatsPage(
-      conversations: _controller.lockedConversations,
-      onOpenConversation: _openConversation,
-      onShowOptions: _showChatOptions,
-      onBackTap: _closePanelOverlay,
+    _openInboxSubPage(
+      LockedChatsPage(
+        conversations: _controller.lockedConversations,
+        onOpenConversation: _openConversation,
+        onShowOptions: _showChatOptions,
+        onBackTap: _closePanelOverlay,
+      ),
     );
-
-    _openInboxSubPage(page);
   }
 
   void _openChat(InboxConversation conversation) {
     _openInboxSubPage(
       InboxChatPage(
         conversation: conversation,
+        controller: _controller,
         onMoreTap: () => _showChatOptions(conversation),
         onBackTap: _closePanelOverlay,
       ),
@@ -202,40 +197,48 @@ class _InboxPageState extends State<InboxPage> {
       return;
     }
 
-    setState(() {
-      _panelOverlay = page;
-    });
+    setState(() => _panelOverlay = page);
   }
 
   void _showChatOptions(InboxConversation conversation) {
+    void closeOverlay() => setState(() => _panelOverlay = null);
+
+    final sheet = _InboxChatOptionsSheet(
+      conversation: conversation,
+      onToggleLock: () {
+        _controller.toggleBackendLock(conversation);
+        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _toast(conversation.isLockedByBackend ? 'Chat unlocked locally.' : 'Chat locked locally.');
+      },
+      onToggleBlock: () {
+        _controller.toggleBlock(conversation);
+        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _toast(conversation.isBlocked ? 'Profile unblocked locally.' : 'Profile blocked locally.');
+      },
+      onToggleMute: () {
+        _controller.toggleMute(conversation);
+        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _toast(conversation.isMuted ? 'Chat unmuted.' : 'Chat muted.');
+      },
+      onTogglePin: () {
+        _controller.togglePin(conversation);
+        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _toast(conversation.isPinned ? 'Chat unpinned.' : 'Chat pinned.');
+      },
+      onToggleArchive: () {
+        _controller.toggleArchive(conversation);
+        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _toast(conversation.isArchived ? 'Chat restored from archive.' : 'Chat archived locally.');
+      },
+      onReport: () {
+        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _toast('Report flow will connect to CS/Monitor workflow later.');
+      },
+    );
+
     if (widget.openPagesInOverlay) {
       setState(() {
-        _panelOverlay = Align(
-          alignment: Alignment.bottomCenter,
-          child: _InboxChatOptionsSheet(
-            conversation: conversation,
-            onToggleLock: () {
-              _controller.toggleBackendLock(conversation);
-              setState(() {
-                _panelOverlay = null;
-              });
-              _toast('Backend chat lock state updated locally for now.');
-            },
-            onToggleBlock: () {
-              _controller.toggleBlock(conversation);
-              setState(() {
-                _panelOverlay = null;
-              });
-              _toast('Block state updated locally. Backend will own this later.');
-            },
-            onReport: () {
-              setState(() {
-                _panelOverlay = null;
-              });
-              _toast('Report flow will connect to CS/Monitor workflow later.');
-            },
-          ),
-        );
+        _panelOverlay = Align(alignment: Alignment.bottomCenter, child: sheet);
       });
       return;
     }
@@ -245,23 +248,7 @@ class _InboxPageState extends State<InboxPage> {
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _InboxChatOptionsSheet(
-        conversation: conversation,
-        onToggleLock: () {
-          Navigator.pop(context);
-          _controller.toggleBackendLock(conversation);
-          _toast('Backend chat lock state updated locally for now.');
-        },
-        onToggleBlock: () {
-          Navigator.pop(context);
-          _controller.toggleBlock(conversation);
-          _toast('Block state updated locally. Backend will own this later.');
-        },
-        onReport: () {
-          Navigator.pop(context);
-          _toast('Report flow will connect to CS/Monitor workflow later.');
-        },
-      ),
+      builder: (_) => sheet,
     );
   }
 
@@ -302,7 +289,7 @@ class _InboxPageState extends State<InboxPage> {
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 104),
                     sliver: SliverList.separated(
                       itemCount: visibleConversations.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 6),
+                      separatorBuilder: (context, index) => const SizedBox(height: 6),
                       itemBuilder: (context, index) {
                         final conversation = visibleConversations[index];
                         return InboxConversationCard(
@@ -326,11 +313,7 @@ class _InboxPageState extends State<InboxPage> {
                   Positioned.fill(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        setState(() {
-                          _panelOverlay = null;
-                        });
-                      },
+                      onTap: () => setState(() => _panelOverlay = null),
                     ),
                   ),
                   Positioned.fill(child: _panelOverlay!),
@@ -359,12 +342,18 @@ class _InboxChatOptionsSheet extends StatelessWidget {
     required this.conversation,
     required this.onToggleLock,
     required this.onToggleBlock,
+    required this.onToggleMute,
+    required this.onTogglePin,
+    required this.onToggleArchive,
     required this.onReport,
   });
 
   final InboxConversation conversation;
   final VoidCallback onToggleLock;
   final VoidCallback onToggleBlock;
+  final VoidCallback onToggleMute;
+  final VoidCallback onTogglePin;
+  final VoidCallback onToggleArchive;
   final VoidCallback onReport;
 
   @override
@@ -375,53 +364,21 @@ class _InboxChatOptionsSheet extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 42,
-            height: 5,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0D5CB),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
+          Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
           const SizedBox(height: 14),
-          Text(
-            conversation.title,
-            style: const TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          Text(conversation.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900)),
           const SizedBox(height: 12),
-          _OptionTile(
-            icon: conversation.isLockedByBackend ? Icons.lock_open_rounded : Icons.lock_rounded,
-            title: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat',
-            subtitle: 'Backend account-level lock, not local device lock.',
-            onTap: conversation.isOfficial ? null : onToggleLock,
-          ),
-          _OptionTile(
-            icon: conversation.isBlocked ? Icons.undo_rounded : Icons.block_rounded,
-            title: conversation.isBlocked ? 'Unblock profile' : 'Block profile',
-            subtitle: 'Blocks are synced by backend later.',
-            onTap: conversation.isOfficial ? null : onToggleBlock,
-          ),
-          _OptionTile(
-            icon: Icons.report_rounded,
-            title: 'Report profile',
-            subtitle: 'Sends to CS/Monitor workflow later.',
-            onTap: conversation.isOfficial ? null : onReport,
-          ),
+          _OptionTile(icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: conversation.isPinned ? 'Unpin chat' : 'Pin chat', subtitle: 'Keep important chats at the top.', onTap: onTogglePin),
+          _OptionTile(icon: conversation.isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded, title: conversation.isMuted ? 'Unmute chat' : 'Mute chat', subtitle: 'Silence notifications locally for now.', onTap: conversation.isOfficial ? null : onToggleMute),
+          _OptionTile(icon: conversation.isArchived ? Icons.unarchive_rounded : Icons.archive_rounded, title: conversation.isArchived ? 'Unarchive chat' : 'Archive chat', subtitle: 'Hide chat from main Inbox list.', onTap: conversation.isOfficial ? null : onToggleArchive),
+          _OptionTile(icon: conversation.isLockedByBackend ? Icons.lock_open_rounded : Icons.lock_rounded, title: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat', subtitle: 'Backend account-level lock, not local device lock.', onTap: conversation.isOfficial ? null : onToggleLock),
+          _OptionTile(icon: conversation.isBlocked ? Icons.undo_rounded : Icons.block_rounded, title: conversation.isBlocked ? 'Unblock profile' : 'Block profile', subtitle: 'Blocks are synced by backend later.', onTap: conversation.isOfficial ? null : onToggleBlock),
+          _OptionTile(icon: Icons.report_rounded, title: 'Report profile', subtitle: 'Sends to CS/Monitor workflow later.', onTap: conversation.isOfficial ? null : onReport),
         ],
       ),
     );
@@ -429,12 +386,7 @@ class _InboxChatOptionsSheet extends StatelessWidget {
 }
 
 class _OptionTile extends StatelessWidget {
-  const _OptionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+  const _OptionTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
 
   final IconData icon;
   final String title;
@@ -444,7 +396,6 @@ class _OptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onTap == null;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -453,11 +404,7 @@ class _OptionTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           margin: const EdgeInsets.only(bottom: 7),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFAF7F1),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFECE2D8)),
-          ),
+          decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFECE2D8))),
           child: Row(
             children: [
               Icon(icon, color: const Color(0xFF4A2A63), size: 20),
@@ -490,19 +437,8 @@ class _EmptyInboxState extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.all(24),
         padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: const Color(0xFFECE2D8)),
-        ),
-        child: const Text(
-          'No chats here',
-          style: TextStyle(
-            color: Color(0xFF7B6A86),
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), border: Border.all(color: const Color(0xFFECE2D8))),
+        child: const Text('No chats here', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 14, fontWeight: FontWeight.w800)),
       ),
     );
   }
