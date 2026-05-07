@@ -139,3 +139,44 @@ class InboxLockDebugOtpResponse(BaseModel):
     status: str
     expires_in_minutes: int
     debug_otp: str | None = None
+
+
+class InboxBackupStatusResponse(BaseModel):
+    is_enabled: bool
+    is_authorized: bool
+    provider: str
+    frequency: str
+    google_drive_email: str | None = None
+    google_drive_folder_id: str | None = None
+    last_backup_at: str | None = None
+    last_restore_at: str | None = None
+    last_status: str
+    last_error: str | None = None
+    backup_count: int = 0
+    restore_count: int = 0
+
+
+class InboxBackupSettingsRequest(BaseModel):
+    is_enabled: bool | None = None
+    frequency: str | None = None
+
+
+class InboxGoogleDriveAuthStartResponse(BaseModel):
+    authorization_url: str
+
+
+class InboxGoogleDriveConnectRequest(BaseModel):
+    google_drive_email: str | None = None
+    authorization_code: str | None = None
+
+
+class InboxBackupJobResponse(BaseModel):
+    id: str
+    job_type: str
+    provider: str
+    status: str
+    backup_file_id: str | None = None
+    backup_file_name: str | None = None
+    error_message: str | None = None
+    created_at: str | None = None
+    completed_at: str | None = None
