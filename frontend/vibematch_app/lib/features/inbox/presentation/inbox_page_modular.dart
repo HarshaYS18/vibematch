@@ -200,38 +200,44 @@ class _InboxPageState extends State<InboxPage> {
     setState(() => _panelOverlay = page);
   }
 
-  void _showChatOptions(InboxConversation conversation) {
-    void closeOverlay() => setState(() => _panelOverlay = null);
+  void _closeChatOptions() {
+    if (widget.openPagesInOverlay) {
+      setState(() => _panelOverlay = null);
+    } else {
+      Navigator.pop(context);
+    }
+  }
 
+  void _showChatOptions(InboxConversation conversation) {
     final sheet = _InboxChatOptionsSheet(
       conversation: conversation,
       onToggleLock: () {
         _controller.toggleBackendLock(conversation);
-        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _closeChatOptions();
         _toast(conversation.isLockedByBackend ? 'Chat unlocked locally.' : 'Chat locked locally.');
       },
       onToggleBlock: () {
         _controller.toggleBlock(conversation);
-        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _closeChatOptions();
         _toast(conversation.isBlocked ? 'Profile unblocked locally.' : 'Profile blocked locally.');
       },
       onToggleMute: () {
         _controller.toggleMute(conversation);
-        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _closeChatOptions();
         _toast(conversation.isMuted ? 'Chat unmuted.' : 'Chat muted.');
       },
       onTogglePin: () {
         _controller.togglePin(conversation);
-        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _closeChatOptions();
         _toast(conversation.isPinned ? 'Chat unpinned.' : 'Chat pinned.');
       },
       onToggleArchive: () {
         _controller.toggleArchive(conversation);
-        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _closeChatOptions();
         _toast(conversation.isArchived ? 'Chat restored from archive.' : 'Chat archived locally.');
       },
       onReport: () {
-        if (widget.openPagesInOverlay) closeOverlay(); else Navigator.pop(context);
+        _closeChatOptions();
         _toast('Report flow will connect to CS/Monitor workflow later.');
       },
     );
