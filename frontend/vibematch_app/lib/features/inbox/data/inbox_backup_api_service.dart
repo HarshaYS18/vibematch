@@ -34,8 +34,8 @@ class InboxBackupApiService {
       Uri.parse(VmApiConfig.endpoint('/inbox/backup/settings')),
       headers: await _headers(),
       body: jsonEncode({
-        if (isEnabled != null) 'is_enabled': isEnabled,
-        if (frequency != null) 'frequency': frequency.apiValue,
+        ?_entry('is_enabled', isEnabled),
+        ?_entry('frequency', frequency?.apiValue),
       }),
     );
     _throwIfFailed(response, 'update backup settings');
@@ -57,8 +57,8 @@ class InboxBackupApiService {
       Uri.parse(VmApiConfig.endpoint('/inbox/backup/google/connect')),
       headers: await _headers(),
       body: jsonEncode({
-        if (googleDriveEmail != null) 'google_drive_email': googleDriveEmail,
-        if (setupCode != null) 'authorization_code': setupCode,
+        ?_entry('google_drive_email', googleDriveEmail),
+        ?_entry('authorization_code', setupCode),
       }),
     );
     _throwIfFailed(response, 'connect Google Drive');
@@ -87,6 +87,8 @@ class InboxBackupApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
     throw Exception('Inbox backup API failed to $action (${response.statusCode}): ${response.body}');
   }
+
+  MapEntry<String, Object>? _entry(String key, Object? value) => value == null ? null : MapEntry(key, value);
 
   InboxBackupStatus backupStatusFromJson(Map<String, dynamic> json) {
     return InboxBackupStatus(
