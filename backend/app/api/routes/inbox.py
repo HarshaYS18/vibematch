@@ -7,10 +7,15 @@ from app.models.inbox import InboxConversation, InboxReport
 from app.models.role import RoleName
 from app.models.user import User
 from app.schemas.inbox import (
+    InboxBackupJobResponse,
+    InboxBackupSettingsRequest,
+    InboxBackupStatusResponse,
     InboxConversationListResponse,
     InboxConversationResponse,
     InboxConversationStateRequest,
     InboxDirectConversationRequest,
+    InboxGoogleDriveAuthStartResponse,
+    InboxGoogleDriveConnectRequest,
     InboxLockChangeRequest,
     InboxLockDebugOtpResponse,
     InboxLockRecoveryRequestResponse,
@@ -29,7 +34,7 @@ from app.schemas.inbox import (
     InboxReportTaskResponse,
     InboxSendMessageRequest,
 )
-from app.services import inbox_lock_service, inbox_service, role_service
+from app.services import inbox_backup_service, inbox_lock_service, inbox_service, role_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/inbox", tags=["Inbox"])
@@ -72,6 +77,46 @@ async def _broadcast_report_task(report: InboxReport) -> None:
     payload = inbox_service.report_to_dict(report)
     await inbox_ws_manager.broadcast_all_staff({"event": "inbox_report_task_updated", "task": payload})
     await inbox_ws_manager.send_to_user(report.reporter_user_id, {"event": "inbox_report_status_updated", "task": payload})
+
+
+@router.get("/backup/status", response_model=InboxBackupStatusResponse)
+def get_backup_status(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return InboxBackupStatusResponse(**inbox_backup_service.get_status(db, current_user))
+
+
+@router.patch("/backup/settings", response_model=InboxBackupStatusResponse)
+def update_backup_settings(request: InboxBackupSettingsRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    setting = inbox_backup_service.update_settings(db, current_user, is_enabled=request.is_enabled, frequency=request.frequency)
+    return InboxBackupStatusResponse(**inbox_backup_service.status_payload(setting))
+
+
+@router.get("/backup/google/authorize", response_model=InboxGoogleDriveAuthStartResponse)
+def start_google_drive_authorization(current_user: User = Depends(get_current_user)):
+    return InboxGoogleDriveAuthStartResponse(authorization_url=inbox_backup_service.google_drive_authorize_url(current_user))
+
+
+@router.post("/backup/google/connect", response_model=InboxBackupStatusResponse)
+def connect_google_drive(request: InboxGoogleDriveConnectRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    setting = inbox_backup_service.connect_google_drive_mock(db, current_user, google_email=request.google_drive_email)
+    return InboxBackupStatusResponse(**inbox_backup_service.status_payload(setting))
+
+
+@router.post("/backup/run", response_model=InboxBackupJobResponse)
+def run_backup_now(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        job = inbox_backup_service.run_backup_now(db, current_user)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return InboxBackupJobResponse(**inbox_backup_service.job_payload(job))
+
+
+@router.post("/backup/restore", response_model=InboxBackupJobResponse)
+def restore_latest_backup(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        job = inbox_backup_service.run_restore_latest(db, current_user)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return InboxBackupJobResponse(**inbox_backup_service.job_payload(job))
 
 
 @router.get("/lock/status", response_model=InboxLockStatusResponse)
