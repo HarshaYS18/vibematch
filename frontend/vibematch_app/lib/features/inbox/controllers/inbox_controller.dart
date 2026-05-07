@@ -30,11 +30,11 @@ class InboxController extends ChangeNotifier {
   List<InboxConversation> get conversations => List.unmodifiable(_conversations);
 
   List<InboxConversation> get unlockedConversations {
-    return _conversations.where((conversation) => !conversation.isLockedByBackend).toList();
+    return _sortedConversations(_conversations.where((conversation) => !conversation.isLockedByBackend).toList());
   }
 
   List<InboxConversation> get lockedConversations {
-    return _conversations.where((conversation) => conversation.isLockedByBackend).toList();
+    return _sortedConversations(_conversations.where((conversation) => conversation.isLockedByBackend).toList());
   }
 
   int get lockedCount => lockedConversations.length;
@@ -44,7 +44,7 @@ class InboxController extends ChangeNotifier {
   }
 
   List<InboxConversation> get visibleConversations {
-    final base = unlockedConversations;
+    final base = unlockedConversations.where((chat) => !chat.isArchived).toList();
 
     switch (selectedFilter) {
       case 'Unread':
@@ -62,6 +62,20 @@ class InboxController extends ChangeNotifier {
       default:
         return base;
     }
+  }
+
+  List<InboxConversation> _sortedConversations(List<InboxConversation> items) {
+    return [...items]..sort((a, b) {
+        if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+        return 0;
+      });
+  }
+
+  InboxConversation? conversationById(String conversationId) {
+    for (final conversation in _conversations) {
+      if (conversation.id == conversationId) return conversation;
+    }
+    return null;
   }
 
   List<InboxSearchResult> searchInbox(String query) {
@@ -153,23 +167,169 @@ class InboxController extends ChangeNotifier {
 
   void toggleBackendLock(InboxConversation conversation) {
     if (conversation.isOfficial) return;
+    _replaceConversation(conversation.id, (chat) => chat.copyWith(isLockedByBackend: !chat.isLockedByBackend));
+  }
 
+  void toggleBlock(InboxConversation conversation) {
+    if (conversation.isOfficial) return;
+    _replaceConversation(conversation.id, (chat) => chat.copyWith(isBlocked: !chat.isBlocked));
+  }
+
+  void toggleMute(InboxConversation conversation) {
+    if (conversation.isOfficial) return;
+    _replaceConversation(conversation.id, (chat) => chat.copyWith(isMuted: !chat.isMuted));
+  }
+
+  void togglePin(InboxConversation conversation) {
+    _replaceConversation(conversation.id, (chat) => chat.copyWith(isPinned: !chat.isPinned));
+  }
+
+  void toggleArchive(InboxConversation conversation) {
+    if (conversation.isOfficial) return;
+    _replaceConversation(conversation.id, (chat) => chat.copyWith(isArchived: !chat.isArchived));
+  }
+
+  void sendTextMessage({
+    required String conversationId,
+    required String text,
+    String? replyToText,
+  }) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    final message = InboxMessage(
+      id: 'local_${DateTime.now().microsecondsSinceEpoch}',
+      sender: 'You',
+      text: trimmed,
+      time: 'Now',
+      isMine: true,
+      status: InboxMessageStatus.read,
+      replyToText: replyToText,
+    );
+
+    _appendMessage(conversationId, message);
+  }
+
+  void addMockAttachment({
+    required String conversationId,
+    required InboxMessageType type,
+  }) {
+    final text = switch (type) {
+      InboxMessageType.image => '📷 Photo attached',
+      InboxMessageType.voice => '🎙 Voice message 0:08',
+      InboxMessageType.document => '📄 Document attached',
+      InboxMessageType.location => '📍 Shared location',
+      InboxMessageType.contact => '👤 Shared contact',
+      _ => 'Attachment',
+    };
+
+    _appendMessage(
+      conversationId,
+      InboxMessage(
+        id: 'local_${DateTime.now().microsecondsSinceEpoch}',
+        sender: 'You',
+        text: text,
+        time: 'Now',
+        isMine: true,
+        type: type,
+        status: InboxMessageStatus.read,
+      ),
+    );
+  }
+
+  void setReaction({
+    required String conversationId,
+    required InboxMessage message,
+    required String reaction,
+  }) {
+    _updateMessage(
+      conversationId: conversationId,
+      message: message,
+      mapper: (item) => item.copyWith(reaction: reaction),
+    );
+  }
+
+  void toggleStarMessage({
+    required String conversationId,
+    required InboxMessage message,
+  }) {
+    _updateMessage(
+      conversationId: conversationId,
+      message: message,
+      mapper: (item) => item.copyWith(isStarred: !item.isStarred),
+    );
+  }
+
+  void deleteMessage({
+    required String conversationId,
+    required InboxMessage message,
+  }) {
+    _replaceConversation(conversationId, (chat) {
+      final updated = chat.messages.where((item) => !_sameMessage(item, message)).toList();
+      return chat.copyWith(
+        messages: updated,
+        subtitle: updated.isEmpty ? 'No messages yet' : updated.last.text,
+      );
+    });
+  }
+
+  void forwardMessage({
+    required String fromConversationId,
+    required InboxMessage message,
+  }) {
+    _appendMessage(
+      fromConversationId,
+      message.copyWith(
+        id: 'forward_${DateTime.now().microsecondsSinceEpoch}',
+        sender: 'You',
+        time: 'Now',
+        isMine: true,
+        isForwarded: true,
+        status: InboxMessageStatus.read,
+      ),
+    );
+  }
+
+  void _appendMessage(String conversationId, InboxMessage message) {
+    _replaceConversation(conversationId, (chat) {
+      final updated = [...chat.messages, message];
+      return chat.copyWith(
+        messages: updated,
+        subtitle: message.text,
+        time: 'Now',
+        unreadCount: 0,
+      );
+    });
+  }
+
+  void _updateMessage({
+    required String conversationId,
+    required InboxMessage message,
+    required InboxMessage Function(InboxMessage item) mapper,
+  }) {
+    _replaceConversation(conversationId, (chat) {
+      final updated = chat.messages.map((item) {
+        if (!_sameMessage(item, message)) return item;
+        return mapper(item);
+      }).toList();
+      return chat.copyWith(messages: updated);
+    });
+  }
+
+  void _replaceConversation(
+    String conversationId,
+    InboxConversation Function(InboxConversation chat) mapper,
+  ) {
     _conversations = _conversations.map((chat) {
-      if (chat.id != conversation.id) return chat;
-      return chat.copyWith(isLockedByBackend: !chat.isLockedByBackend);
+      if (chat.id != conversationId) return chat;
+      return mapper(chat);
     }).toList();
 
     notifyListeners();
   }
 
-  void toggleBlock(InboxConversation conversation) {
-    if (conversation.isOfficial) return;
-
-    _conversations = _conversations.map((chat) {
-      if (chat.id != conversation.id) return chat;
-      return chat.copyWith(isBlocked: !chat.isBlocked);
-    }).toList();
-
-    notifyListeners();
+  bool _sameMessage(InboxMessage a, InboxMessage b) {
+    if (a.id != null && b.id != null) return a.id == b.id;
+    return a.sender == b.sender && a.text == b.text && a.time == b.time && a.isMine == b.isMine;
   }
 }
