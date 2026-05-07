@@ -7,8 +7,7 @@ class InboxSettingsPage extends StatefulWidget {
   const InboxSettingsPage({
     super.key,
     required this.lockStatus,
-    required this.backupEnabled,
-    required this.frequency,
+    required this.backupStatus,
     required this.strangersCanMessage,
     required this.strangersCanMentionInVibes,
     required this.onStartLockSetup,
@@ -17,6 +16,8 @@ class InboxSettingsPage extends StatefulWidget {
     required this.onStartLockRecovery,
     required this.onVerifyLockRecovery,
     required this.onRequestCsLockRecovery,
+    required this.onStartGoogleDriveSetup,
+    required this.onConnectGoogleDrive,
     required this.onBackupEnabledChanged,
     required this.onFrequencyChanged,
     required this.onStrangersCanMessageChanged,
@@ -27,8 +28,7 @@ class InboxSettingsPage extends StatefulWidget {
   });
 
   final InboxLockStatus lockStatus;
-  final bool backupEnabled;
-  final ChatBackupFrequency frequency;
+  final InboxBackupStatus backupStatus;
   final bool strangersCanMessage;
   final bool strangersCanMentionInVibes;
   final Future<String?> Function(String mobileNumber) onStartLockSetup;
@@ -37,12 +37,14 @@ class InboxSettingsPage extends StatefulWidget {
   final Future<String?> Function(String mobileNumber) onStartLockRecovery;
   final Future<void> Function(String mobileNumber, String otp, String newLock) onVerifyLockRecovery;
   final Future<String> Function() onRequestCsLockRecovery;
-  final ValueChanged<bool> onBackupEnabledChanged;
-  final ValueChanged<ChatBackupFrequency> onFrequencyChanged;
+  final Future<String> Function() onStartGoogleDriveSetup;
+  final Future<void> Function(String? email, String? setupCode) onConnectGoogleDrive;
+  final Future<void> Function(bool) onBackupEnabledChanged;
+  final Future<void> Function(ChatBackupFrequency) onFrequencyChanged;
   final ValueChanged<bool> onStrangersCanMessageChanged;
   final ValueChanged<bool> onStrangersCanMentionInVibesChanged;
-  final VoidCallback onBackupNow;
-  final VoidCallback onRestoreTap;
+  final Future<void> Function() onBackupNow;
+  final Future<void> Function() onRestoreTap;
   final VoidCallback onBackTap;
 
   @override
@@ -50,16 +52,13 @@ class InboxSettingsPage extends StatefulWidget {
 }
 
 class _InboxSettingsPageState extends State<InboxSettingsPage> {
-  late bool _backupEnabled;
-  late ChatBackupFrequency _frequency;
   late bool _strangersCanMessage;
   late bool _strangersCanMentionInVibes;
+  bool _backupBusy = false;
 
   @override
   void initState() {
     super.initState();
-    _backupEnabled = widget.backupEnabled;
-    _frequency = widget.frequency;
     _strangersCanMessage = widget.strangersCanMessage;
     _strangersCanMentionInVibes = widget.strangersCanMentionInVibes;
   }
@@ -69,10 +68,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => InboxLockSetupSheet(
-        onStartOtp: widget.onStartLockSetup,
-        onVerifySetup: widget.onVerifyLockSetup,
-      ),
+      builder: (_) => InboxLockSetupSheet(onStartOtp: widget.onStartLockSetup, onVerifySetup: widget.onVerifyLockSetup),
     );
   }
 
@@ -99,16 +95,80 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     );
   }
 
-  void _setBackupEnabled(bool value) {
-    setState(() => _backupEnabled = value);
-    widget.onBackupEnabledChanged(value);
-    _showFeedback(value ? 'Chat backup enabled' : 'Chat backup disabled');
+  void _openGoogleDriveSetup() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _GoogleDriveSetupSheet(
+        currentEmail: widget.backupStatus.googleDriveEmail,
+        onStart: widget.onStartGoogleDriveSetup,
+        onConnect: widget.onConnectGoogleDrive,
+      ),
+    );
   }
 
-  void _setFrequency(ChatBackupFrequency frequency) {
-    setState(() => _frequency = frequency);
-    widget.onFrequencyChanged(frequency);
-    _showFeedback('Backup frequency set to ${frequency.label}');
+  Future<void> _setBackupEnabled(bool value) async {
+    if (value && !widget.backupStatus.isAuthorized) {
+      _showFeedback('Connect Google Drive first.');
+      _openGoogleDriveSetup();
+      return;
+    }
+    setState(() => _backupBusy = true);
+    try {
+      await widget.onBackupEnabledChanged(value);
+      _showFeedback(value ? 'Chat backup enabled' : 'Chat backup disabled');
+    } catch (_) {
+      _showFeedback('Could not update backup setting.');
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _setFrequency(ChatBackupFrequency frequency) async {
+    setState(() => _backupBusy = true);
+    try {
+      await widget.onFrequencyChanged(frequency);
+      _showFeedback('Backup frequency set to ${frequency.label}');
+    } catch (_) {
+      _showFeedback('Could not update backup frequency.');
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _backupNow() async {
+    if (!widget.backupStatus.isAuthorized) {
+      _showFeedback('Connect Google Drive first.');
+      _openGoogleDriveSetup();
+      return;
+    }
+    setState(() => _backupBusy = true);
+    try {
+      await widget.onBackupNow();
+      _showFeedback('Inbox backup completed.');
+    } catch (_) {
+      _showFeedback('Backup failed. Check Google Drive setup.');
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _restore() async {
+    if (!widget.backupStatus.isAuthorized) {
+      _showFeedback('Connect Google Drive first.');
+      _openGoogleDriveSetup();
+      return;
+    }
+    setState(() => _backupBusy = true);
+    try {
+      await widget.onRestoreTap();
+      _showFeedback('Inbox restore completed.');
+    } catch (_) {
+      _showFeedback('Restore failed. No backup found or Drive setup failed.');
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
   }
 
   void _setStrangersCanMessage(bool value) {
@@ -132,6 +192,11 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final lockStatus = widget.lockStatus;
+    final backup = widget.backupStatus;
+    final backupSubtitle = backup.isConnected
+        ? '${backup.googleDriveEmail} • ${backup.frequency.label}'
+        : 'Authorize Google Drive to store encrypted chat backups.';
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
@@ -153,9 +218,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                   _ActionRow(
                     icon: lockStatus.isEnabled ? Icons.lock_rounded : Icons.lock_open_rounded,
                     title: lockStatus.isEnabled ? 'Inbox lock active' : 'Set up Inbox lock',
-                    subtitle: lockStatus.isEnabled
-                        ? 'Recovery mobile: ${lockStatus.mobileNumber ?? 'linked'}'
-                        : 'Link mobile number, verify OTP, and create a private lock.',
+                    subtitle: lockStatus.isEnabled ? 'Recovery mobile: ${lockStatus.mobileNumber ?? 'linked'}' : 'Link mobile number, verify OTP, and create a private lock.',
                     onTap: lockStatus.isEnabled ? _openChangeLock : _openLockSetup,
                   ),
                   const Divider(color: Color(0xFFECE2D8)),
@@ -165,6 +228,61 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                     subtitle: lockStatus.recoveryRequested ? 'Recovery request submitted to CS.' : 'Recover by OTP or contact CS for review.',
                     onTap: _openRecovery,
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SettingsCard(
+              child: Column(
+                children: [
+                  _ActionRow(
+                    icon: Icons.add_to_drive_rounded,
+                    title: backup.isConnected ? 'Google Drive connected' : 'Connect Google Drive',
+                    subtitle: backupSubtitle,
+                    onTap: _openGoogleDriveSetup,
+                  ),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  SwitchListTile(
+                    value: backup.isEnabled,
+                    onChanged: _backupBusy ? null : _setBackupEnabled,
+                    activeThumbColor: const Color(0xFF12C7B7),
+                    title: const Text('Chat backup', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    subtitle: Text(backup.isEnabled ? 'Backup is on. ${backup.frequency.label} backup is selected.' : 'Backup is off. Connect Drive before enabling automatic backups.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  const Align(alignment: Alignment.centerLeft, child: Text('Backup frequency', style: TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900))),
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ChatBackupFrequency.values.map((item) {
+                      final selected = item == backup.frequency;
+                      return InkWell(
+                        onTap: backup.isEnabled && !_backupBusy ? () => _setFrequency(item) : null,
+                        borderRadius: BorderRadius.circular(999),
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 160),
+                          opacity: backup.isEnabled ? 1 : 0.46,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                            decoration: BoxDecoration(color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(999), border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8))),
+                            child: Text(item.label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF4A2A63), fontSize: 11.5, fontWeight: FontWeight.w900)),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SettingsCard(
+              child: Column(
+                children: [
+                  _ActionRow(icon: Icons.cloud_upload_rounded, title: 'Back up now', subtitle: backup.lastBackupAt == null ? 'Create your first encrypted Drive backup.' : 'Last backup: ${backup.lastBackupAt}', onTap: _backupBusy ? () {} : _backupNow),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  _ActionRow(icon: Icons.restore_rounded, title: 'Restore from backup', subtitle: backup.lastRestoreAt == null ? 'Restore latest available Drive backup.' : 'Last restore: ${backup.lastRestoreAt}', onTap: _backupBusy ? () {} : _restore),
                 ],
               ),
             ),
@@ -191,61 +309,13 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
               ),
             ),
             const SizedBox(height: 12),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    value: _backupEnabled,
-                    onChanged: _setBackupEnabled,
-                    activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text('Chat backup', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                    subtitle: Text(_backupEnabled ? 'Backup is on. ${_frequency.label} backup is selected.' : 'Backup is off. Turn it on before scheduling automatic backups.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  const Align(alignment: Alignment.centerLeft, child: Text('Backup frequency', style: TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900))),
-                  const SizedBox(height: 9),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: ChatBackupFrequency.values.map((item) {
-                      final selected = item == _frequency;
-                      return InkWell(
-                        onTap: _backupEnabled ? () => _setFrequency(item) : null,
-                        borderRadius: BorderRadius.circular(999),
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 160),
-                          opacity: _backupEnabled ? 1 : 0.46,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                            decoration: BoxDecoration(color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(999), border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8))),
-                            child: Text(item.label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF4A2A63), fontSize: 11.5, fontWeight: FontWeight.w900)),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  _ActionRow(icon: Icons.cloud_upload_rounded, title: 'Back up now', subtitle: _backupEnabled ? 'Create a fresh encrypted backup later.' : 'Turn on chat backup before backing up.', onTap: _backupEnabled ? widget.onBackupNow : () => _showFeedback('Turn on chat backup first')),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  _ActionRow(icon: Icons.restore_rounded, title: 'Restore from backup', subtitle: 'Restore from Google Drive / cloud backup later.', onTap: widget.onRestoreTap),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
             const _SettingsCard(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.security_rounded, color: Color(0xFF4A2A63), size: 20),
                   SizedBox(width: 10),
-                  Expanded(child: Text('Locked chats use backend account-level security. Owner/Super Owner reset is allowed only after special recovery review.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700))),
+                  Expanded(child: Text('Inbox backups are prepared as encrypted payloads before Drive upload. Production OAuth client secrets and server-side encryption keys must be configured before launch.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700))),
                 ],
               ),
             ),
@@ -256,11 +326,160 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   }
 }
 
+class _GoogleDriveSetupSheet extends StatefulWidget {
+  const _GoogleDriveSetupSheet({required this.currentEmail, required this.onStart, required this.onConnect});
+
+  final String? currentEmail;
+  final Future<String> Function() onStart;
+  final Future<void> Function(String? email, String? setupCode) onConnect;
+
+  @override
+  State<_GoogleDriveSetupSheet> createState() => _GoogleDriveSetupSheetState();
+}
+
+class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
+  final _email = TextEditingController();
+  final _code = TextEditingController();
+  bool _busy = false;
+  String? _authUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _email.text = widget.currentEmail ?? '';
+  }
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _code.dispose();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    setState(() => _busy = true);
+    try {
+      final url = await widget.onStart();
+      setState(() => _authUrl = url);
+      _toast('Google Drive authorization started. Paste auth code after approval.');
+    } catch (_) {
+      _toast('Could not start Google Drive setup.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _connect() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onConnect(_email.text.trim().isEmpty ? null : _email.text.trim(), _code.text.trim().isEmpty ? null : _code.text.trim());
+      if (mounted) Navigator.pop(context);
+      _toast('Google Drive connected for Inbox backup.');
+    } catch (_) {
+      _toast('Could not connect Google Drive.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.all(14),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))]),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999)))),
+              const SizedBox(height: 12),
+              const Text('Google Drive Backup', style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 5),
+              const Text('Authorize Google Drive so Vibe Match can store encrypted Inbox backups and restore them later.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12.2, height: 1.35, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: _inputDecoration('Google account email', Icons.alternate_email_rounded),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _code,
+                decoration: _inputDecoration('Authorization code optional in mock', Icons.key_rounded),
+              ),
+              if (_authUrl != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))),
+                  child: Text(_authUrl!, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(child: _SheetButton(label: 'Start auth', icon: Icons.open_in_new_rounded, busy: _busy, onTap: _start, dark: false)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _SheetButton(label: 'Connect', icon: Icons.add_to_drive_rounded, busy: _busy, onTap: _connect, dark: true)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      prefixIcon: Icon(icon, color: const Color(0xFF4A2A63), size: 20),
+      labelText: label,
+      labelStyle: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800),
+      filled: true,
+      fillColor: const Color(0xFFFAF7F1),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF12C7B7), width: 1.4)),
+    );
+  }
+}
+
+class _SheetButton extends StatelessWidget {
+  const _SheetButton({required this.label, required this.icon, required this.busy, required this.onTap, required this.dark});
+  final String label;
+  final IconData icon;
+  final bool busy;
+  final VoidCallback onTap;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: busy ? null : onTap,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(color: dark ? const Color(0xFF251538) : const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18), border: Border.all(color: dark ? const Color(0xFF251538) : const Color(0xFFECE2D8))),
+        child: Center(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: dark ? Colors.white : const Color(0xFF4A2A63), size: 18), const SizedBox(width: 6), Text(label, style: TextStyle(color: dark ? Colors.white : const Color(0xFF251538), fontWeight: FontWeight.w900))])),
+      ),
+    );
+  }
+}
+
 class _SettingsCard extends StatelessWidget {
   const _SettingsCard({required this.child});
-
   final Widget child;
-
   @override
   Widget build(BuildContext context) {
     return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFECE2D8))), child: child);
@@ -269,12 +488,10 @@ class _SettingsCard extends StatelessWidget {
 
 class _ActionRow extends StatelessWidget {
   const _ActionRow({required this.icon, required this.title, required this.subtitle, required this.onTap});
-
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -282,14 +499,12 @@ class _ActionRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Container(width: 42, height: 42, decoration: BoxDecoration(color: const Color(0xFF8C5CF6).withValues(alpha: 0.11), borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: const Color(0xFF8C5CF6), size: 21)),
-            const SizedBox(width: 11),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700))])),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5)),
-          ],
-        ),
+        child: Row(children: [
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: const Color(0xFF8C5CF6).withValues(alpha: 0.11), borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: const Color(0xFF8C5CF6), size: 21)),
+          const SizedBox(width: 11),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700))])),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5)),
+        ]),
       ),
     );
   }
