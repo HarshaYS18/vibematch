@@ -51,6 +51,17 @@ enum InboxMessageStatus {
   failed;
 }
 
+enum InboxReportStatus {
+  pendingCsReview('Pending CS review'),
+  rejectedByCs('Rejected by CS'),
+  acceptedEscalated('Accepted • Sent to Monitor'),
+  monitorActionTaken('Monitor action taken');
+
+  const InboxReportStatus(this.label);
+
+  final String label;
+}
+
 class InboxConversation {
   const InboxConversation({
     required this.id,
@@ -208,4 +219,51 @@ class InboxSearchResult {
   final String preview;
   final String matchedText;
   final InboxMessage? message;
+}
+
+class InboxReportTask {
+  const InboxReportTask({
+    required this.id,
+    required this.reportedConversationId,
+    required this.reportedUserName,
+    required this.reporterName,
+    required this.reason,
+    required this.snapshot,
+    required this.createdAtLabel,
+    required this.status,
+    this.csNote,
+    this.monitorAction,
+  });
+
+  final String id;
+  final String reportedConversationId;
+  final String reportedUserName;
+  final String reporterName;
+  final String reason;
+  final List<InboxMessage> snapshot;
+  final String createdAtLabel;
+  final InboxReportStatus status;
+  final String? csNote;
+  final String? monitorAction;
+
+  bool get isPending => status == InboxReportStatus.pendingCsReview;
+
+  InboxReportTask copyWith({
+    InboxReportStatus? status,
+    String? csNote,
+    String? monitorAction,
+  }) {
+    return InboxReportTask(
+      id: id,
+      reportedConversationId: reportedConversationId,
+      reportedUserName: reportedUserName,
+      reporterName: reporterName,
+      reason: reason,
+      snapshot: snapshot,
+      createdAtLabel: createdAtLabel,
+      status: status ?? this.status,
+      csNote: csNote ?? this.csNote,
+      monitorAction: monitorAction ?? this.monitorAction,
+    );
+  }
 }
