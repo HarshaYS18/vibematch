@@ -42,6 +42,10 @@ class InboxConversationListResponse(BaseModel):
     conversations: list[InboxConversationResponse]
 
 
+class InboxDirectConversationRequest(BaseModel):
+    target_user_id: int = Field(gt=0)
+
+
 class InboxSendMessageRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     type: str = "text"
