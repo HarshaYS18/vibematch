@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/inbox_controller.dart';
@@ -114,14 +115,43 @@ class _InboxChatPageState extends State<InboxChatPage> {
     );
   }
 
-  void _openAttachmentSheet() {
+  Future<void> _pickDocumentAttachment() async {
     if (_readOnly) return;
-    showModalBottomSheet<void>(
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.any,
+        withData: false,
+        withReadStream: false,
+      );
+
+      final file = result?.files.single;
+      if (file == null) return;
+
+      widget.controller.addPickedDocumentAttachment(
+        conversationId: _conversation.id,
+        fileName: file.name,
+        sizeBytes: file.size,
+        filePath: file.path,
+      );
+    } catch (error) {
+      _showToast('Document picker failed. Please try again.');
+    }
+  }
+
+  Future<void> _openAttachmentSheet() async {
+    if (_readOnly) return;
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => _AttachmentSheet(
-        onPick: (type) {
+        onPick: (type) async {
           Navigator.pop(context);
+          if (type == InboxMessageType.document) {
+            await _pickDocumentAttachment();
+            return;
+          }
           widget.controller.addMockAttachment(conversationId: _conversation.id, type: type);
         },
       ),
