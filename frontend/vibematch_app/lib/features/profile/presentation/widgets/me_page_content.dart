@@ -11,6 +11,7 @@ import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
+import '../profile_qr/profile_qr_pages.dart';
 import '../profile_rooms_page.dart';
 import '../profile_visitors_page.dart';
 import '../public_profile_view_page.dart';
@@ -82,6 +83,10 @@ class MePageContent extends StatelessWidget {
 
   void _openEditProfile(BuildContext context) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => EditProfilePage(user: user)));
+  }
+
+  void _openProfileQrActions(BuildContext context) {
+    ProfileQrActionsSheet.show(context, user: user);
   }
 
   void _openFamily(BuildContext context) {
@@ -231,7 +236,7 @@ class MePageContent extends StatelessWidget {
           familyLevel: MeProfileConstants.familyLevel,
           onFamilyTap: () => _openFamilyDetails(context),
           onAvatarTap: () => _openProfile(context),
-          onQrTap: () => _showAction(context, 'Profile QR / share card will open.'),
+          onQrTap: () => _openProfileQrActions(context),
           onWalletTap: () => _showAction(context, 'Wallet page will open.'),
           onVipTap: () => _openVipProgram(context),
           onSvipTap: () => _openVipProgram(context, initialTabIndex: 1),
