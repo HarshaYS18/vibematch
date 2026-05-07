@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/network/vm_api_config.dart';
@@ -17,24 +18,25 @@ class InboxApiService {
     if (token == null || token.trim().isEmpty) {
       throw Exception('No auth token available for Inbox API. Login first.');
     }
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+    return {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
   }
 
   Future<List<InboxConversation>> loadConversations() async {
-    final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/inbox/conversations')),
-      headers: await _headers(),
-    );
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/inbox/conversations')), headers: await _headers());
     _throwIfFailed(response, 'load conversations');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final items = decoded['conversations'] as List<dynamic>? ?? const [];
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(_conversationFromJson)
-        .toList();
+    return items.whereType<Map<String, dynamic>>().map(conversationFromJson).toList();
+  }
+
+  Future<InboxConversation> createDirectConversation({required int targetUserId}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/direct')),
+      headers: await _headers(),
+      body: jsonEncode({'target_user_id': targetUserId}),
+    );
+    _throwIfFailed(response, 'create direct conversation');
+    return conversationFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<InboxConversation> updateConversationState({
@@ -55,7 +57,7 @@ class InboxApiService {
       }),
     );
     _throwIfFailed(response, 'update conversation state');
-    return _conversationFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return conversationFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<InboxMessage> sendMessage({
@@ -78,32 +80,21 @@ class InboxApiService {
       }),
     );
     _throwIfFailed(response, 'send message');
-    return _messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<InboxMessage> updateMessage({
-    required String conversationId,
-    required String messageId,
-    String? reaction,
-    bool? isStarred,
-  }) async {
+  Future<InboxMessage> updateMessage({required String conversationId, required String messageId, String? reaction, bool? isStarred}) async {
     final response = await http.patch(
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages/$messageId')),
       headers: await _headers(),
-      body: jsonEncode({
-        if (reaction != null) 'reaction': reaction,
-        if (isStarred != null) 'is_starred': isStarred,
-      }),
+      body: jsonEncode({if (reaction != null) 'reaction': reaction, if (isStarred != null) 'is_starred': isStarred}),
     );
     _throwIfFailed(response, 'update message');
-    return _messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<void> deleteMessage({required String conversationId, required String messageId}) async {
-    final response = await http.delete(
-      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages/$messageId')),
-      headers: await _headers(),
-    );
+    final response = await http.delete(Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages/$messageId')), headers: await _headers());
     _throwIfFailed(response, 'delete message');
   }
 
@@ -114,18 +105,16 @@ class InboxApiService {
       body: jsonEncode({'reason': reason}),
     );
     _throwIfFailed(response, 'submit report');
-    return _reportFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return reportFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<List<InboxReportTask>> loadReportTasks() async {
-    final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/inbox/reports/tasks')),
-      headers: await _headers(),
-    );
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/inbox/reports/tasks')), headers: await _headers());
+    if (response.statusCode == 403) return const [];
     _throwIfFailed(response, 'load report tasks');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final items = decoded['tasks'] as List<dynamic>? ?? const [];
-    return items.whereType<Map<String, dynamic>>().map(_reportFromJson).toList();
+    return items.whereType<Map<String, dynamic>>().map(reportFromJson).toList();
   }
 
   Future<InboxReportTask> rejectReport(InboxReportTask task) async => _postReportDecision(task.id, 'reject');
@@ -138,17 +127,13 @@ class InboxApiService {
       body: jsonEncode({'action_label': actionLabel}),
     );
     _throwIfFailed(response, 'apply monitor action');
-    return _reportFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return reportFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<InboxReportTask> _postReportDecision(String id, String action) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/reports/tasks/$id/$action')),
-      headers: await _headers(),
-      body: jsonEncode({}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/reports/tasks/$id/$action')), headers: await _headers(), body: jsonEncode({}));
     _throwIfFailed(response, '$action report');
-    return _reportFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return reportFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   void _throwIfFailed(http.Response response, String action) {
@@ -156,10 +141,8 @@ class InboxApiService {
     throw Exception('Inbox API failed to $action (${response.statusCode}): ${response.body}');
   }
 
-  InboxConversation _conversationFromJson(Map<String, dynamic> json) {
-    final colors = (json['colors'] as List<dynamic>? ?? const ['#6D5DF6', '#E84C72'])
-        .map((value) => _colorFromHex(value.toString()))
-        .toList();
+  InboxConversation conversationFromJson(Map<String, dynamic> json) {
+    final colors = (json['colors'] as List<dynamic>? ?? const ['#6D5DF6', '#E84C72']).map((value) => _colorFromHex(value.toString())).toList();
     return InboxConversation(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'Chat',
@@ -171,10 +154,7 @@ class InboxApiService {
       isOnline: json['is_online'] == true,
       lastSeenText: json['last_seen_text']?.toString() ?? 'offline',
       colors: colors,
-      messages: (json['messages'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(_messageFromJson)
-          .toList(),
+      messages: (json['messages'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().map(messageFromJson).toList(),
       currentRoomName: json['current_room_name']?.toString(),
       isLockedByBackend: json['is_locked_by_backend'] == true,
       isBlocked: json['is_blocked'] == true,
@@ -184,7 +164,7 @@ class InboxApiService {
     );
   }
 
-  InboxMessage _messageFromJson(Map<String, dynamic> json) {
+  InboxMessage messageFromJson(Map<String, dynamic> json) {
     return InboxMessage(
       id: json['id']?.toString(),
       sender: json['sender']?.toString() ?? 'User',
@@ -201,17 +181,14 @@ class InboxApiService {
     );
   }
 
-  InboxReportTask _reportFromJson(Map<String, dynamic> json) {
+  InboxReportTask reportFromJson(Map<String, dynamic> json) {
     return InboxReportTask(
       id: json['id']?.toString() ?? '',
       reportedConversationId: json['reported_conversation_id']?.toString() ?? '',
       reportedUserName: json['reported_user_name']?.toString() ?? 'User',
       reporterName: json['reporter_name']?.toString() ?? 'Reporter',
       reason: json['reason']?.toString() ?? '',
-      snapshot: (json['snapshot'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(_messageFromJson)
-          .toList(),
+      snapshot: (json['snapshot'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().map(messageFromJson).toList(),
       createdAtLabel: json['created_at_label']?.toString() ?? 'Now',
       status: _reportStatusFromApi(json['status']?.toString()),
       csNote: json['cs_note']?.toString(),
