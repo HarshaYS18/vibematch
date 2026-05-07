@@ -30,6 +30,9 @@ class _InboxPageState extends State<InboxPage> {
   void initState() {
     super.initState();
     _controller.addListener(_handleControllerChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.loadFromBackend();
+    });
   }
 
   @override
@@ -313,7 +316,12 @@ class _InboxPageState extends State<InboxPage> {
                     onChanged: _controller.selectFilter,
                   ),
                 ),
-                if (visibleConversations.isEmpty)
+                if (_controller.isLoading && visibleConversations.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (visibleConversations.isEmpty)
                   const SliverFillRemaining(
                     hasScrollBody: false,
                     child: _EmptyInboxState(),
