@@ -29,6 +29,7 @@ class MePremiumProfileHero extends StatefulWidget {
     required this.onFamilyTap,
     required this.onAvatarTap,
     required this.onQrTap,
+    required this.onEditCoverPhotosTap,
     required this.onWalletTap,
     required this.onVipTap,
     required this.onSvipTap,
@@ -54,6 +55,7 @@ class MePremiumProfileHero extends StatefulWidget {
   final VoidCallback onFamilyTap;
   final VoidCallback onAvatarTap;
   final VoidCallback onQrTap;
+  final VoidCallback onEditCoverPhotosTap;
   final VoidCallback onWalletTap;
   final VoidCallback onVipTap;
   final VoidCallback onSvipTap;
@@ -152,9 +154,9 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                 top: 14,
                 child: Row(
                   children: [
-                    PublicHeaderIconButton(icon: Icons.add_photo_alternate_rounded, onTap: widget.onQrTap),
-                    const SizedBox(width: 8),
                     PublicHeaderIconButton(icon: Icons.qr_code_rounded, onTap: widget.onQrTap),
+                    const SizedBox(width: 8),
+                    PublicHeaderIconButton(icon: Icons.edit_rounded, onTap: widget.onEditCoverPhotosTap),
                   ],
                 ),
               ),
