@@ -81,14 +81,33 @@ int calculateProfileMatchScore({
   required ProfileGender profileGender,
   required FriendMaritalPreference viewerMaritalPreference,
   required MaritalStatus profileMaritalStatus,
+  ProfileGender? viewerGender,
+  FriendGenderPreference? profileGenderPreference,
 }) {
   final viewerSet = viewerInterests.map((item) => item.toLowerCase()).toSet();
   final profileSet = profileInterests.map((item) => item.toLowerCase()).toSet();
   final commonCount = viewerSet.intersection(profileSet).length;
   final interestBase = profileSet.isEmpty ? 0 : ((commonCount / profileSet.length.clamp(1, 99)) * 70).round();
-  final genderMatch = viewerGenderPreference == FriendGenderPreference.both ||
-      (viewerGenderPreference == FriendGenderPreference.male && profileGender == ProfileGender.male) ||
-      (viewerGenderPreference == FriendGenderPreference.female && profileGender == ProfileGender.female);
+  final viewerAcceptsProfile = _genderPreferenceAccepts(
+    preference: viewerGenderPreference,
+    gender: profileGender,
+  );
+  final profileAcceptsViewer = viewerGender == null || profileGenderPreference == null
+      ? true
+      : _genderPreferenceAccepts(
+          preference: profileGenderPreference,
+          gender: viewerGender,
+        );
+  final genderMatch = viewerAcceptsProfile && profileAcceptsViewer;
   final maritalMatch = viewerMaritalPreference == FriendMaritalPreference.any || viewerMaritalPreference.label == profileMaritalStatus.label;
   return (interestBase + (genderMatch ? 15 : 0) + (maritalMatch ? 15 : 0)).clamp(0, 100);
+}
+
+bool _genderPreferenceAccepts({
+  required FriendGenderPreference preference,
+  required ProfileGender gender,
+}) {
+  return preference == FriendGenderPreference.both ||
+      (preference == FriendGenderPreference.male && gender == ProfileGender.male) ||
+      (preference == FriendGenderPreference.female && gender == ProfileGender.female);
 }
