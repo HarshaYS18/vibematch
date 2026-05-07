@@ -8,7 +8,11 @@ from app.models import (
     AdminLog,
     AuthIdentity,
     DeviceBan,
+    InboxBackupJob,
+    InboxBackupSetting,
     InboxConversation,
+    InboxLockOtp,
+    InboxLockSetting,
     InboxMessage,
     InboxParticipant,
     InboxReport,
@@ -36,18 +40,12 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {
-        "message": "Vibe Match backend running",
-        "status": "ok",
-    }
+    return {"message": "Vibe Match backend running", "status": "ok"}
 
 
 @app.get("/health")
 def health():
-    return {
-        "status": "healthy",
-        "service": "vibe-match-backend",
-    }
+    return {"status": "healthy", "service": "vibe-match-backend"}
 
 
 app.include_router(auth.router)
