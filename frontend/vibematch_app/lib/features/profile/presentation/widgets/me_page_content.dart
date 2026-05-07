@@ -11,6 +11,7 @@ import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
+import '../profile_rooms_page.dart';
 import '../profile_visitors_page.dart';
 import '../public_profile_view_page.dart';
 import 'me_account_widgets.dart';
@@ -171,6 +172,12 @@ class MePageContent extends StatelessWidget {
     );
   }
 
+  void _openRooms(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ProfileRoomsPage(userId: user.id)),
+    );
+  }
+
   void _openCurrentRoom(BuildContext context) {
     final roomName = MeProfileConstants.currentRoomName;
     if (roomName == null || roomName.trim().isEmpty) {
@@ -234,7 +241,7 @@ class MePageContent extends StatelessWidget {
         MeStatsRow(
           onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1),
           onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0),
-          onRoomsTap: () => _openCurrentRoom(context),
+          onRoomsTap: () => _openRooms(context),
           onVisitorsTap: () => _openVisitors(context),
         ),
         const SizedBox(height: 14),
