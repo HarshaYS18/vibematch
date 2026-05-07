@@ -373,7 +373,12 @@ class _SwitchRow extends StatelessWidget {
             const SizedBox(height: 3),
             Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, height: 1.22, fontWeight: FontWeight.w700)),
           ])),
-          Switch.adaptive(value: value, activeColor: const Color(0xFF12C7B7), onChanged: active ? onChanged : null),
+          Switch.adaptive(
+            value: value,
+            activeThumbColor: const Color(0xFF12C7B7),
+            activeTrackColor: const Color(0xFF12C7B7).withValues(alpha: 0.35),
+            onChanged: active ? onChanged : null,
+          ),
         ]),
       ),
     );
