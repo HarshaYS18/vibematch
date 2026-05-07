@@ -11,6 +11,7 @@ import '../cover_photos/edit_cover_photos_page.dart';
 import '../edit_profile_page.dart';
 import '../help_center/help_center_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
+import '../love_bonds/love_bonds_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
 import '../profile_qr/profile_qr_pages.dart';
@@ -111,6 +112,10 @@ class MePageContent extends StatelessWidget {
 
   void _openStore(BuildContext context) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VmStorePage()));
+  }
+
+  void _openLoveBonds(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoveBondsPage()));
   }
 
   void _openFamily(BuildContext context) {
@@ -294,6 +299,8 @@ class MePageContent extends StatelessWidget {
                   _openFamily(context);
                 } else if (item.title == 'VIP / SVIP Center' || item.title == 'VIP / SVIP') {
                   _openVipProgram(context, initialTabIndex: item.subtitle.contains('SVIP') ? 1 : 0);
+                } else if (item.title == 'Love & Bonds') {
+                  _openLoveBonds(context);
                 } else if (item.title == 'Store & Inventory') {
                   _openStore(context);
                 } else if (item.title == 'Settings') {
