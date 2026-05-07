@@ -21,4 +21,14 @@ from app.models.inbox import (
     InboxMessageStatus,
     InboxReport,
     InboxReportStatus,
+    InboxLockSetting,
+    InboxLockOtp,
+    InboxLockOtpPurpose,
+)
+from app.models.inbox_backup import (
+    InboxBackupSetting,
+    InboxBackupJob,
+    InboxBackupProvider,
+    InboxBackupStatus,
+    InboxBackupFrequency,
 )
