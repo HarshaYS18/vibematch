@@ -104,13 +104,6 @@ List<MeActionItem> buildMeActionItems({
       action: 'edit_profile',
     ),
     MeActionItem(
-      icon: VMIcons.coverPhoto,
-      title: 'Cover Photo',
-      subtitle: coverPhotoStatus,
-      color: Color(0xFF6D5DF6),
-      action: 'Cover photo editor will open.',
-    ),
-    MeActionItem(
       icon: VMIcons.vip,
       title: 'VIP / SVIP Center',
       subtitle: 'VIP $vipLevel active · SVIP $svipLevel monthly',
