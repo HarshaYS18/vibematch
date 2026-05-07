@@ -67,7 +67,7 @@ class VmStoreRepository {
     final nextInventory = state.inventory.map((entry) {
       if (entry.isExpired) return entry.copyWith(isEquipped: false);
       if (entry.itemId == item.id) return entry.copyWith(isEquipped: true);
-      final entryItem = VmStoreCatalog.dynamicItems.where((catalogItem) => catalogItem.id == entry.itemId).firstOrNull;
+      final entryItem = _findCatalogItem(entry.itemId);
       if (entryItem != null && entryItem.section == item.section) return entry.copyWith(isEquipped: false);
       return entry;
     }).toList();
@@ -99,6 +99,13 @@ class VmStoreRepository {
     await prefs.setInt(_coinBalanceKey, state.coinBalance);
     await prefs.setBool(_hasLoveRelationshipKey, state.hasLoveRelationship);
     await prefs.setString(_inventoryKey, jsonEncode(state.inventory.map((entry) => entry.toJson()).toList()));
+  }
+
+  static VmStoreItem? _findCatalogItem(String itemId) {
+    for (final item in VmStoreCatalog.dynamicItems) {
+      if (item.id == itemId) return item;
+    }
+    return null;
   }
 
   static int _ownedCount(VmStoreUserState state, String itemId) {
