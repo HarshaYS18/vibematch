@@ -23,8 +23,7 @@ enum MaritalStatus {
   single('Single'),
   married('Married'),
   committed('Committed'),
-  divorced('Divorced'),
-  preferNotToSay('Prefer not to say');
+  divorced('Divorced');
 
   const MaritalStatus(this.label);
   final String label;
