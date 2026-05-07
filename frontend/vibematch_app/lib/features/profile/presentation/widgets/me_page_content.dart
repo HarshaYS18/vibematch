@@ -11,6 +11,7 @@ import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
+import '../profile_visitors_page.dart';
 import '../public_profile_view_page.dart';
 import 'me_account_widgets.dart';
 import 'me_family_details_sheet.dart';
@@ -162,6 +163,14 @@ class MePageContent extends StatelessWidget {
     );
   }
 
+  void _openVisitors(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProfileVisitorsPage(profileOwnerUserId: user.id),
+      ),
+    );
+  }
+
   void _openCurrentRoom(BuildContext context) {
     final roomName = MeProfileConstants.currentRoomName;
     if (roomName == null || roomName.trim().isEmpty) {
@@ -226,7 +235,7 @@ class MePageContent extends StatelessWidget {
           onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1),
           onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0),
           onRoomsTap: () => _openCurrentRoom(context),
-          onVisitorsTap: () => _showAction(context, 'Recent profile visitors will open.'),
+          onVisitorsTap: () => _openVisitors(context),
         ),
         const SizedBox(height: 14),
         MeRelationshipPanel(
