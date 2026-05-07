@@ -62,7 +62,7 @@ class ProfileRoomsPage extends StatelessWidget {
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
                       itemCount: rooms.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (context, index) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final room = rooms[index];
                         return _RoomCard(
