@@ -28,62 +28,38 @@ class InboxApiService {
   }
 
   Future<String?> startLockSetup({required String mobileNumber}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/lock/setup/start')),
-      headers: await _headers(),
-      body: jsonEncode({'mobile_number': mobileNumber}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/lock/setup/start')), headers: await _headers(), body: jsonEncode({'mobile_number': mobileNumber}));
     _throwIfFailed(response, 'start inbox lock setup');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return decoded['debug_otp']?.toString();
   }
 
   Future<InboxLockStatus> verifyLockSetup({required String mobileNumber, required String otp, required String lockCode}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/lock/setup/verify')),
-      headers: await _headers(),
-      body: jsonEncode({'mobile_number': mobileNumber, 'otp': otp, 'lock_code': lockCode}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/lock/setup/verify')), headers: await _headers(), body: jsonEncode({'mobile_number': mobileNumber, 'otp': otp, 'lock_code': lockCode}));
     _throwIfFailed(response, 'verify inbox lock setup');
     return lockStatusFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<void> verifyLock({required String lockCode}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/lock/verify')),
-      headers: await _headers(),
-      body: jsonEncode({'lock_code': lockCode}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/lock/verify')), headers: await _headers(), body: jsonEncode({'lock_code': lockCode}));
     _throwIfFailed(response, 'verify inbox lock');
   }
 
   Future<InboxLockStatus> changeLock({required String currentLockCode, required String newLockCode}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/lock/change')),
-      headers: await _headers(),
-      body: jsonEncode({'current_lock_code': currentLockCode, 'new_lock_code': newLockCode}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/lock/change')), headers: await _headers(), body: jsonEncode({'current_lock_code': currentLockCode, 'new_lock_code': newLockCode}));
     _throwIfFailed(response, 'change inbox lock');
     return lockStatusFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<String?> startLockRecovery({required String mobileNumber}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/lock/recovery/start')),
-      headers: await _headers(),
-      body: jsonEncode({'mobile_number': mobileNumber}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/lock/recovery/start')), headers: await _headers(), body: jsonEncode({'mobile_number': mobileNumber}));
     _throwIfFailed(response, 'start inbox lock recovery');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return decoded['debug_otp']?.toString();
   }
 
   Future<InboxLockStatus> verifyLockRecovery({required String mobileNumber, required String otp, required String newLockCode}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/lock/recovery/verify')),
-      headers: await _headers(),
-      body: jsonEncode({'mobile_number': mobileNumber, 'otp': otp, 'new_lock_code': newLockCode}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/lock/recovery/verify')), headers: await _headers(), body: jsonEncode({'mobile_number': mobileNumber, 'otp': otp, 'new_lock_code': newLockCode}));
     _throwIfFailed(response, 'recover inbox lock');
     return lockStatusFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -104,53 +80,36 @@ class InboxApiService {
   }
 
   Future<InboxConversation> createDirectConversation({required int targetUserId}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/direct')),
-      headers: await _headers(),
-      body: jsonEncode({'target_user_id': targetUserId}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/conversations/direct')), headers: await _headers(), body: jsonEncode({'target_user_id': targetUserId}));
     _throwIfFailed(response, 'create direct conversation');
     return conversationFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<InboxConversation> updateConversationState({
-    required String conversationId,
-    bool? isMuted,
-    bool? isPinned,
-    bool? isLocked,
-    bool? isBlocked,
-  }) async {
+  Future<InboxConversation> updateConversationState({required String conversationId, bool? isMuted, bool? isPinned, bool? isLocked, bool? isBlocked}) async {
     final response = await http.patch(
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/state')),
       headers: await _headers(),
       body: jsonEncode({
-        if (isMuted != null) 'is_muted': isMuted,
-        if (isPinned != null) 'is_pinned': isPinned,
-        if (isLocked != null) 'is_locked': isLocked,
-        if (isBlocked != null) 'is_blocked': isBlocked,
+        ?isMuted?.let((value) => MapEntry('is_muted', value)),
+        ?isPinned?.let((value) => MapEntry('is_pinned', value)),
+        ?isLocked?.let((value) => MapEntry('is_locked', value)),
+        ?isBlocked?.let((value) => MapEntry('is_blocked', value)),
       }),
     );
     _throwIfFailed(response, 'update conversation state');
     return conversationFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<InboxMessage> sendMessage({
-    required String conversationId,
-    required String text,
-    String type = 'text',
-    String? replyToText,
-    String? inviteRoomName,
-    String? attachmentUrl,
-  }) async {
+  Future<InboxMessage> sendMessage({required String conversationId, required String text, String type = 'text', String? replyToText, String? inviteRoomName, String? attachmentUrl}) async {
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages')),
       headers: await _headers(),
       body: jsonEncode({
         'text': text,
         'type': type,
-        if (replyToText != null) 'reply_to_text': replyToText,
-        if (inviteRoomName != null) 'invite_room_name': inviteRoomName,
-        if (attachmentUrl != null) 'attachment_url': attachmentUrl,
+        ?replyToText?.let((value) => MapEntry('reply_to_text', value)),
+        ?inviteRoomName?.let((value) => MapEntry('invite_room_name', value)),
+        ?attachmentUrl?.let((value) => MapEntry('attachment_url', value)),
       }),
     );
     _throwIfFailed(response, 'send message');
@@ -161,7 +120,10 @@ class InboxApiService {
     final response = await http.patch(
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages/$messageId')),
       headers: await _headers(),
-      body: jsonEncode({if (reaction != null) 'reaction': reaction, if (isStarred != null) 'is_starred': isStarred}),
+      body: jsonEncode({
+        ?reaction?.let((value) => MapEntry('reaction', value)),
+        ?isStarred?.let((value) => MapEntry('is_starred', value)),
+      }),
     );
     _throwIfFailed(response, 'update message');
     return messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
@@ -173,11 +135,7 @@ class InboxApiService {
   }
 
   Future<InboxReportTask> submitReport({required InboxConversation conversation, required String reason}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/${conversation.id}/reports')),
-      headers: await _headers(),
-      body: jsonEncode({'reason': reason}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/conversations/${conversation.id}/reports')), headers: await _headers(), body: jsonEncode({'reason': reason}));
     _throwIfFailed(response, 'submit report');
     return reportFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -195,11 +153,7 @@ class InboxApiService {
   Future<InboxReportTask> acceptReport(InboxReportTask task) async => _postReportDecision(task.id, 'accept');
 
   Future<InboxReportTask> applyMonitorAction(InboxReportTask task, String actionLabel) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/reports/tasks/${task.id}/monitor-action')),
-      headers: await _headers(),
-      body: jsonEncode({'action_label': actionLabel}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/reports/tasks/${task.id}/monitor-action')), headers: await _headers(), body: jsonEncode({'action_label': actionLabel}));
     _throwIfFailed(response, 'apply monitor action');
     return reportFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -322,4 +276,8 @@ class InboxApiService {
     if (hex.length == 6) hex = 'FF$hex';
     return Color(int.tryParse(hex, radix: 16) ?? 0xFF6D5DF6);
   }
+}
+
+extension _NullableMapEntry<T> on T {
+  MapEntry<String, T> let(String key) => MapEntry(key, this);
 }
