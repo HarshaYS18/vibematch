@@ -86,44 +86,45 @@ class InboxApiService {
   }
 
   Future<InboxConversation> updateConversationState({required String conversationId, bool? isMuted, bool? isPinned, bool? isLocked, bool? isBlocked}) async {
+    final body = <String, Object>{};
+    if (isMuted != null) body['is_muted'] = isMuted;
+    if (isPinned != null) body['is_pinned'] = isPinned;
+    if (isLocked != null) body['is_locked'] = isLocked;
+    if (isBlocked != null) body['is_blocked'] = isBlocked;
+
     final response = await http.patch(
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/state')),
       headers: await _headers(),
-      body: jsonEncode({
-        ?_entry('is_muted', isMuted),
-        ?_entry('is_pinned', isPinned),
-        ?_entry('is_locked', isLocked),
-        ?_entry('is_blocked', isBlocked),
-      }),
+      body: jsonEncode(body),
     );
     _throwIfFailed(response, 'update conversation state');
     return conversationFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<InboxMessage> sendMessage({required String conversationId, required String text, String type = 'text', String? replyToText, String? inviteRoomName, String? attachmentUrl}) async {
+    final body = <String, Object>{'text': text, 'type': type};
+    if (replyToText != null) body['reply_to_text'] = replyToText;
+    if (inviteRoomName != null) body['invite_room_name'] = inviteRoomName;
+    if (attachmentUrl != null) body['attachment_url'] = attachmentUrl;
+
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages')),
       headers: await _headers(),
-      body: jsonEncode({
-        'text': text,
-        'type': type,
-        ?_entry('reply_to_text', replyToText),
-        ?_entry('invite_room_name', inviteRoomName),
-        ?_entry('attachment_url', attachmentUrl),
-      }),
+      body: jsonEncode(body),
     );
     _throwIfFailed(response, 'send message');
     return messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<InboxMessage> updateMessage({required String conversationId, required String messageId, String? reaction, bool? isStarred}) async {
+    final body = <String, Object>{};
+    if (reaction != null) body['reaction'] = reaction;
+    if (isStarred != null) body['is_starred'] = isStarred;
+
     final response = await http.patch(
       Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages/$messageId')),
       headers: await _headers(),
-      body: jsonEncode({
-        ?_entry('reaction', reaction),
-        ?_entry('is_starred', isStarred),
-      }),
+      body: jsonEncode(body),
     );
     _throwIfFailed(response, 'update message');
     return messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
@@ -168,8 +169,6 @@ class InboxApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
     throw Exception('Inbox API failed to $action (${response.statusCode}): ${response.body}');
   }
-
-  MapEntry<String, Object>? _entry(String key, Object? value) => value == null ? null : MapEntry(key, value);
 
   InboxLockStatus lockStatusFromJson(Map<String, dynamic> json) {
     return InboxLockStatus(
