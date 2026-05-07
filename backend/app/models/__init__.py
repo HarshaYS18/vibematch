@@ -12,3 +12,13 @@ from app.models.login_history import (
     LoginHistoryStatus,
     LoginHistoryFailureReason,
 )
+from app.models.inbox import (
+    InboxConversation,
+    InboxConversationType,
+    InboxParticipant,
+    InboxMessage,
+    InboxMessageType,
+    InboxMessageStatus,
+    InboxReport,
+    InboxReportStatus,
+)
