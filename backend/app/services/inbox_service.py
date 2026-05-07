@@ -33,6 +33,19 @@ def _display_name(user: User | None) -> str:
     return user.display_name or user.username or f"User {user.public_user_id}"
 
 
+def _avatar_text(title: str) -> str:
+    parts = [part for part in title.strip().split(" ") if part]
+    if not parts:
+        return "VM"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return f"{parts[0][0]}{parts[1][0]}".upper()
+
+
+def participant_user_ids(conversation: InboxConversation) -> list[int]:
+    return [participant.user_id for participant in conversation.participants]
+
+
 def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
     conversation = db.query(InboxConversation).join(InboxParticipant).filter(InboxConversation.public_id == TEAM_PUBLIC_ID, InboxParticipant.user_id == user.id).first()
     if conversation:
@@ -54,6 +67,23 @@ def list_conversations(db: Session, user: User) -> list[InboxConversation]:
 
 def get_conversation_for_user(db: Session, user: User, conversation_public_id: str) -> InboxConversation | None:
     return db.query(InboxConversation).join(InboxParticipant).filter(InboxConversation.public_id == conversation_public_id, InboxParticipant.user_id == user.id).first()
+
+
+def create_direct_conversation(db: Session, current_user: User, target_user: User) -> InboxConversation:
+    current_conversations = db.query(InboxConversation).join(InboxParticipant).filter(InboxConversation.conversation_type == InboxConversationType.CHAT.value, InboxParticipant.user_id == current_user.id).all()
+    for conversation in current_conversations:
+        ids = set(participant_user_ids(conversation))
+        if current_user.id in ids and target_user.id in ids:
+            return conversation
+
+    title = _display_name(target_user)
+    conversation = InboxConversation(public_id=_public_id("chat"), title=title, avatar_text=_avatar_text(title), conversation_type=InboxConversationType.CHAT.value, metadata_json={"colors": DEFAULT_COLORS})
+    db.add(conversation)
+    db.flush()
+    db.add_all([InboxParticipant(conversation_id=conversation.id, user_id=current_user.id), InboxParticipant(conversation_id=conversation.id, user_id=target_user.id)])
+    db.commit()
+    db.refresh(conversation)
+    return conversation
 
 
 def send_message(db: Session, conversation: InboxConversation, sender: User, text: str, message_type: str = InboxMessageType.TEXT.value, reply_to_text: str | None = None, invite_room_name: str | None = None, attachment_url: str | None = None) -> InboxMessage:
