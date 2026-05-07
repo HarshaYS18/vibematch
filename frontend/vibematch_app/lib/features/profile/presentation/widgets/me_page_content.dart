@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../auth/models/current_user.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
+import '../../../rooms/presentation/live_room_models.dart';
+import '../../../rooms/presentation/live_room_page.dart';
+import '../../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../edit_profile_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
@@ -48,6 +51,15 @@ class MePageContent extends StatelessWidget {
       timeMinutesToday: 12240,
     );
   }
+
+  SeatUser get _viewerSeatUser {
+    return mockRoomUsers.firstWhere(
+      (item) => item.isCurrentUser,
+      orElse: () => mockRoomUsers.first,
+    );
+  }
+
+  List<SeatUser> get _socialPreviewUsers => const [...mockRoomUsers, ...mockInviteUsers];
 
   void _showAction(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -138,6 +150,38 @@ class MePageContent extends StatelessWidget {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)));
   }
 
+  void _openFollowersFollowed(BuildContext context, {required int initialTabIndex}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowersFollowedPage(
+          user: _viewerSeatUser,
+          users: _socialPreviewUsers,
+          initialTabIndex: initialTabIndex,
+        ),
+      ),
+    );
+  }
+
+  void _openCurrentRoom(BuildContext context) {
+    final roomName = MeProfileConstants.currentRoomName;
+    if (roomName == null || roomName.trim().isEmpty) {
+      _showAction(context, 'No active room right now.');
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LiveRoomPage(
+          roomName: roomName,
+          roomId: 'VM257808',
+          language: 'Telugu',
+          modeTitle: 'Open',
+          onlineCount: 128,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final vipColor = MeProfileConstants.vipMainColor(MeProfileConstants.vipLevel);
@@ -175,10 +219,15 @@ class MePageContent extends StatelessWidget {
           onWalletTap: () => _showAction(context, 'Wallet page will open.'),
           onVipTap: () => _openVipProgram(context),
           onSvipTap: () => _openVipProgram(context, initialTabIndex: 1),
-          onRoomTap: () => _showAction(context, 'Open ${MeProfileConstants.currentRoomName} room preview. Secret Vibe rooms will be hidden later.'),
+          onRoomTap: () => _openCurrentRoom(context),
         ),
         const SizedBox(height: 14),
-        MeStatsRow(onAction: (message) => _showAction(context, message)),
+        MeStatsRow(
+          onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1),
+          onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0),
+          onRoomsTap: () => _openCurrentRoom(context),
+          onVisitorsTap: () => _showAction(context, 'Recent profile visitors will open.'),
+        ),
         const SizedBox(height: 14),
         MeRelationshipPanel(
           relationshipLabel: relationshipType,
