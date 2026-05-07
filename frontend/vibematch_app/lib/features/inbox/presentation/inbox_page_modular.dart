@@ -10,6 +10,7 @@ import 'pages/locked_chats_page.dart';
 import 'widgets/inbox_conversation_card.dart';
 import 'widgets/inbox_filter_bar.dart';
 import 'widgets/inbox_header.dart';
+import 'widgets/inbox_lock_flow_sheets.dart';
 import 'widgets/inbox_passcode_sheet.dart';
 import 'widgets/report_conversation_sheet.dart';
 
@@ -51,7 +52,6 @@ class _InboxPageState extends State<InboxPage> {
       Navigator.pop(context);
       return;
     }
-
     setState(() => _panelOverlay = null);
   }
 
@@ -60,20 +60,39 @@ class _InboxPageState extends State<InboxPage> {
       setState(() => _panelOverlay = null);
       return;
     }
-
     Navigator.pop(context);
   }
 
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
-        ),
-      );
+      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
+  }
+
+  void _openLockSetupSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => InboxLockSetupSheet(
+        onStartOtp: _controller.startLockSetup,
+        onVerifySetup: (mobile, otp, lock) => _controller.verifyLockSetup(mobileNumber: mobile, otp: otp, lockCode: lock),
+      ),
+    );
+  }
+
+  void _openLockRecoverySheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => InboxLockRecoverySheet(
+        registeredMobile: _controller.lockStatus.mobileNumber,
+        onStartRecovery: _controller.startLockRecovery,
+        onVerifyRecovery: (mobile, otp, newLock) => _controller.verifyLockRecovery(mobileNumber: mobile, otp: otp, newLockCode: newLock),
+        onRequestCs: _controller.requestCsLockRecovery,
+      ),
+    );
   }
 
   Future<void> _showPasscodeGate({
@@ -81,12 +100,19 @@ class _InboxPageState extends State<InboxPage> {
     required String subtitle,
     required VoidCallback onUnlocked,
   }) async {
+    if (!_controller.lockStatus.isEnabled) {
+      _toast('Set up Inbox lock first.');
+      _openLockSetupSheet();
+      return;
+    }
+
     if (widget.openPagesInOverlay) {
       setState(() {
         _panelOverlay = InboxPasscodeSheet(
           title: title,
           subtitle: subtitle,
-          onValidate: _controller.validatePasscode,
+          onValidate: _controller.verifyLock,
+          onRecoverTap: _openLockRecoverySheet,
           onUnlocked: () {
             setState(() => _panelOverlay = null);
             onUnlocked();
@@ -105,7 +131,8 @@ class _InboxPageState extends State<InboxPage> {
       builder: (_) => InboxPasscodeSheet(
         title: title,
         subtitle: subtitle,
-        onValidate: _controller.validatePasscode,
+        onValidate: _controller.verifyLock,
+        onRecoverTap: _openLockRecoverySheet,
         onUnlocked: () {
           Navigator.pop(context);
           onUnlocked();
@@ -118,31 +145,28 @@ class _InboxPageState extends State<InboxPage> {
     if (conversation.isLockedByBackend && !_controller.lockedVaultUnlocked) {
       _showPasscodeGate(
         title: 'Unlock chat',
-        subtitle: 'This chat is backend-locked for your account. Enter passcode to open it on this device.',
-        onUnlocked: () {
-          _controller.unlockLockedVault();
-          _openChat(conversation);
-        },
+        subtitle: 'This chat is locked for your account. Enter your Inbox lock to open it.',
+        onUnlocked: () => _openChat(conversation),
       );
       return;
     }
-
     _openChat(conversation);
   }
 
   void _openLockedVault() {
+    if (!_controller.lockStatus.isEnabled) {
+      _toast('Set up Inbox lock first.');
+      _openLockSetupSheet();
+      return;
+    }
     if (_controller.lockedVaultUnlocked) {
       _openLockedVaultPage();
       return;
     }
-
     _showPasscodeGate(
       title: 'Locked chats',
-      subtitle: 'Locked chats are hidden from Inbox and require account passcode before viewing.',
-      onUnlocked: () {
-        _controller.unlockLockedVault();
-        _openLockedVaultPage();
-      },
+      subtitle: 'Enter your Inbox lock before viewing locked conversations.',
+      onUnlocked: _openLockedVaultPage,
     );
   }
 
@@ -158,42 +182,31 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _openCsReportTasks() {
-    _openInboxSubPage(
-      CsReportTasksPage(
-        controller: _controller,
-        onBackTap: _closePanelOverlay,
-      ),
-    );
+    _openInboxSubPage(CsReportTasksPage(controller: _controller, onBackTap: _closePanelOverlay));
   }
 
   void _openChat(InboxConversation conversation) {
-    _openInboxSubPage(
-      InboxChatPage(
-        conversation: conversation,
-        controller: _controller,
-        onMoreTap: () => _showChatOptions(conversation),
-        onBackTap: _closePanelOverlay,
-      ),
-    );
+    _openInboxSubPage(InboxChatPage(conversation: conversation, controller: _controller, onMoreTap: () => _showChatOptions(conversation), onBackTap: _closePanelOverlay));
   }
 
   void _openSearch() {
-    _openInboxSubPage(
-      InboxSearchPage(
-        controller: _controller,
-        onOpenConversation: _openConversation,
-        onBackTap: _closePanelOverlay,
-      ),
-    );
+    _openInboxSubPage(InboxSearchPage(controller: _controller, onOpenConversation: _openConversation, onBackTap: _closePanelOverlay));
   }
 
   void _openSettings() {
     _openInboxSubPage(
       InboxSettingsPage(
+        lockStatus: _controller.lockStatus,
         backupEnabled: _controller.backupEnabled,
         frequency: _controller.backupFrequency,
         strangersCanMessage: _controller.strangersCanMessage,
         strangersCanMentionInVibes: _controller.strangersCanMentionInVibes,
+        onStartLockSetup: _controller.startLockSetup,
+        onVerifyLockSetup: (mobile, otp, lock) => _controller.verifyLockSetup(mobileNumber: mobile, otp: otp, lockCode: lock),
+        onChangeLock: (currentLock, newLock) => _controller.changeLock(currentLockCode: currentLock, newLockCode: newLock),
+        onStartLockRecovery: _controller.startLockRecovery,
+        onVerifyLockRecovery: (mobile, otp, newLock) => _controller.verifyLockRecovery(mobileNumber: mobile, otp: otp, newLockCode: newLock),
+        onRequestCsLockRecovery: _controller.requestCsLockRecovery,
         onBackupEnabledChanged: _controller.setBackupEnabled,
         onFrequencyChanged: _controller.setBackupFrequency,
         onStrangersCanMessageChanged: _controller.setStrangersCanMessage,
@@ -210,7 +223,6 @@ class _InboxPageState extends State<InboxPage> {
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
       return;
     }
-
     setState(() => _panelOverlay = page);
   }
 
@@ -224,10 +236,8 @@ class _InboxPageState extends State<InboxPage> {
 
   void _openReportSheet(InboxConversation conversation) {
     _closeChatOptions();
-
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (!mounted) return;
-
       showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -248,14 +258,20 @@ class _InboxPageState extends State<InboxPage> {
     final sheet = _InboxChatOptionsSheet(
       conversation: conversation,
       onToggleLock: () {
+        if (!_controller.lockStatus.isEnabled && !conversation.isLockedByBackend) {
+          _closeChatOptions();
+          _toast('Set up Inbox lock before locking chats.');
+          _openLockSetupSheet();
+          return;
+        }
         _controller.toggleBackendLock(conversation);
         _closeChatOptions();
-        _toast(conversation.isLockedByBackend ? 'Chat unlocked locally.' : 'Chat locked locally.');
+        _toast(conversation.isLockedByBackend ? 'Chat unlocked.' : 'Chat locked.');
       },
       onToggleBlock: () {
         _controller.toggleBlock(conversation);
         _closeChatOptions();
-        _toast(conversation.isBlocked ? 'Profile unblocked locally.' : 'Profile blocked locally.');
+        _toast(conversation.isBlocked ? 'Profile unblocked.' : 'Profile blocked.');
       },
       onToggleMute: () {
         _controller.toggleMute(conversation);
@@ -271,26 +287,16 @@ class _InboxPageState extends State<InboxPage> {
     );
 
     if (widget.openPagesInOverlay) {
-      setState(() {
-        _panelOverlay = Align(alignment: Alignment.bottomCenter, child: sheet);
-      });
+      setState(() => _panelOverlay = Align(alignment: Alignment.bottomCenter, child: sheet));
       return;
     }
 
-    showModalBottomSheet<void>(
-      context: context,
-      isDismissible: true,
-      enableDrag: true,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => sheet,
-    );
+    showModalBottomSheet<void>(context: context, isDismissible: true, enableDrag: true, backgroundColor: Colors.transparent, isScrollControlled: true, builder: (_) => sheet);
   }
 
   @override
   Widget build(BuildContext context) {
     final visibleConversations = _controller.visibleConversations;
-
     final page = Stack(
       children: [
         Scaffold(
@@ -299,33 +305,12 @@ class _InboxPageState extends State<InboxPage> {
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(
-                  child: InboxHeader(
-                    lockedCount: _controller.lockedCount,
-                    reportTaskCount: _controller.pendingReportTaskCount,
-                    onLockTap: _openLockedVault,
-                    onReportTasksTap: _openCsReportTasks,
-                    onSettingsTap: _openSettings,
-                    onSearchTap: _openSearch,
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: InboxFilterBar(
-                    filters: _controller.filters,
-                    selectedFilter: _controller.selectedFilter,
-                    onChanged: _controller.selectFilter,
-                  ),
-                ),
+                SliverToBoxAdapter(child: InboxHeader(lockedCount: _controller.lockedCount, reportTaskCount: _controller.pendingReportTaskCount, onLockTap: _openLockedVault, onReportTasksTap: _openCsReportTasks, onSettingsTap: _openSettings, onSearchTap: _openSearch)),
+                SliverToBoxAdapter(child: InboxFilterBar(filters: _controller.filters, selectedFilter: _controller.selectedFilter, onChanged: _controller.selectFilter)),
                 if (_controller.isLoading && visibleConversations.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
+                  const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
                 else if (visibleConversations.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyInboxState(),
-                  )
+                  const SliverFillRemaining(hasScrollBody: false, child: _EmptyInboxState())
                 else
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 104),
@@ -334,11 +319,7 @@ class _InboxPageState extends State<InboxPage> {
                       separatorBuilder: (context, index) => const SizedBox(height: 6),
                       itemBuilder: (context, index) {
                         final conversation = visibleConversations[index];
-                        return InboxConversationCard(
-                          conversation: conversation,
-                          onTap: () => _openConversation(conversation),
-                          onLongPress: () => _showChatOptions(conversation),
-                        );
+                        return InboxConversationCard(conversation: conversation, onTap: () => _openConversation(conversation), onLongPress: () => _showChatOptions(conversation));
                       },
                     ),
                   ),
@@ -352,12 +333,7 @@ class _InboxPageState extends State<InboxPage> {
               color: const Color(0x66000000),
               child: Stack(
                 children: [
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => setState(() => _panelOverlay = null),
-                    ),
-                  ),
+                  Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => setState(() => _panelOverlay = null))),
                   Positioned.fill(child: _panelOverlay!),
                 ],
               ),
@@ -365,29 +341,13 @@ class _InboxPageState extends State<InboxPage> {
           ),
       ],
     );
-
     if (!widget.openPagesInOverlay) return page;
-
-    return PopScope<void>(
-      canPop: _panelOverlay == null,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        _handleBackInsideOverlay();
-      },
-      child: page,
-    );
+    return PopScope<void>(canPop: _panelOverlay == null, onPopInvokedWithResult: (didPop, result) { if (didPop) return; _handleBackInsideOverlay(); }, child: page);
   }
 }
 
 class _InboxChatOptionsSheet extends StatelessWidget {
-  const _InboxChatOptionsSheet({
-    required this.conversation,
-    required this.onToggleLock,
-    required this.onToggleBlock,
-    required this.onToggleMute,
-    required this.onTogglePin,
-    required this.onReport,
-  });
+  const _InboxChatOptionsSheet({required this.conversation, required this.onToggleLock, required this.onToggleBlock, required this.onToggleMute, required this.onTogglePin, required this.onReport});
 
   final InboxConversation conversation;
   final VoidCallback onToggleLock;
@@ -399,20 +359,13 @@ class _InboxChatOptionsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
-
     return SafeArea(
       top: false,
       child: Container(
         margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.72,
-        ),
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.72),
         padding: EdgeInsets.fromLTRB(14, 8, 14, 10 + bottomPadding),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))],
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))]),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Column(
@@ -437,11 +390,9 @@ class _InboxChatOptionsSheet extends StatelessWidget {
 
 class _OptionTile extends StatelessWidget {
   const _OptionTile({required this.icon, required this.title, required this.onTap});
-
   final IconData icon;
   final String title;
   final VoidCallback? onTap;
-
   @override
   Widget build(BuildContext context) {
     final disabled = onTap == null;
@@ -454,16 +405,7 @@ class _OptionTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
           margin: const EdgeInsets.only(bottom: 7),
           decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))),
-          child: Row(
-            children: [
-              Icon(icon, color: const Color(0xFF4A2A63), size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
-              ),
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5)),
-            ],
-          ),
+          child: Row(children: [Icon(icon, color: const Color(0xFF4A2A63), size: 20), const SizedBox(width: 10), Expanded(child: Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900))), const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5))]),
         ),
       ),
     );
@@ -472,16 +414,8 @@ class _OptionTile extends StatelessWidget {
 
 class _EmptyInboxState extends StatelessWidget {
   const _EmptyInboxState();
-
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), border: Border.all(color: const Color(0xFFECE2D8))),
-        child: const Text('No chats here', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 14, fontWeight: FontWeight.w800)),
-      ),
-    );
+    return Center(child: Container(margin: const EdgeInsets.all(24), padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), border: Border.all(color: const Color(0xFFECE2D8))), child: const Text('No chats here', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 14, fontWeight: FontWeight.w800))));
   }
 }
