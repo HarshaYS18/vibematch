@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     # Founder Owner
     FOUNDER_OWNER_PUBLIC_ID: int = 6922022
 
+    # Google Drive backup OAuth
+    GOOGLE_DRIVE_CLIENT_ID: str = ""
+    GOOGLE_DRIVE_CLIENT_SECRET: str = ""
+    GOOGLE_DRIVE_REDIRECT_URI: str = "http://127.0.0.1:8000/inbox/backup/google/callback"
+    GOOGLE_DRIVE_SCOPES: str = "https://www.googleapis.com/auth/drive.file"
+    INBOX_BACKUP_ENCRYPTION_KEY: str = "change-this-32-byte-key-before-production"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
