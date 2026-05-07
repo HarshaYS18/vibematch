@@ -9,6 +9,7 @@ import '../../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../cover_photos/edit_cover_photos_page.dart';
 import '../edit_profile_page.dart';
+import '../help_center/help_center_page.dart';
 import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
@@ -101,6 +102,10 @@ class MePageContent extends StatelessWidget {
         builder: (_) => AccountSettingsPage(svipLevel: MeProfileConstants.svipLevel),
       ),
     );
+  }
+
+  void _openHelpCentre(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HelpCenterPage()));
   }
 
   void _openFamily(BuildContext context) {
@@ -286,6 +291,8 @@ class MePageContent extends StatelessWidget {
                   _openVipProgram(context, initialTabIndex: item.subtitle.contains('SVIP') ? 1 : 0);
                 } else if (item.title == 'Settings') {
                   _openAccountSettings(context);
+                } else if (item.title == 'Help Centre') {
+                  _openHelpCentre(context);
                 } else if (item.action == 'logout') {
                   await _endSession(context);
                 } else if (item.action == 'refresh') {
