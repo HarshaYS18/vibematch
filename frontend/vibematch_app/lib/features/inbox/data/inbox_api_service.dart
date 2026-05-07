@@ -21,6 +21,80 @@ class InboxApiService {
     return {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
   }
 
+  Future<InboxLockStatus> loadLockStatus() async {
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/inbox/lock/status')), headers: await _headers());
+    _throwIfFailed(response, 'load inbox lock status');
+    return lockStatusFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<String?> startLockSetup({required String mobileNumber}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/lock/setup/start')),
+      headers: await _headers(),
+      body: jsonEncode({'mobile_number': mobileNumber}),
+    );
+    _throwIfFailed(response, 'start inbox lock setup');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return decoded['debug_otp']?.toString();
+  }
+
+  Future<InboxLockStatus> verifyLockSetup({required String mobileNumber, required String otp, required String lockCode}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/lock/setup/verify')),
+      headers: await _headers(),
+      body: jsonEncode({'mobile_number': mobileNumber, 'otp': otp, 'lock_code': lockCode}),
+    );
+    _throwIfFailed(response, 'verify inbox lock setup');
+    return lockStatusFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<void> verifyLock({required String lockCode}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/lock/verify')),
+      headers: await _headers(),
+      body: jsonEncode({'lock_code': lockCode}),
+    );
+    _throwIfFailed(response, 'verify inbox lock');
+  }
+
+  Future<InboxLockStatus> changeLock({required String currentLockCode, required String newLockCode}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/lock/change')),
+      headers: await _headers(),
+      body: jsonEncode({'current_lock_code': currentLockCode, 'new_lock_code': newLockCode}),
+    );
+    _throwIfFailed(response, 'change inbox lock');
+    return lockStatusFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<String?> startLockRecovery({required String mobileNumber}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/lock/recovery/start')),
+      headers: await _headers(),
+      body: jsonEncode({'mobile_number': mobileNumber}),
+    );
+    _throwIfFailed(response, 'start inbox lock recovery');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return decoded['debug_otp']?.toString();
+  }
+
+  Future<InboxLockStatus> verifyLockRecovery({required String mobileNumber, required String otp, required String newLockCode}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/lock/recovery/verify')),
+      headers: await _headers(),
+      body: jsonEncode({'mobile_number': mobileNumber, 'otp': otp, 'new_lock_code': newLockCode}),
+    );
+    _throwIfFailed(response, 'recover inbox lock');
+    return lockStatusFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<String> requestCsLockRecovery() async {
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/lock/recovery/request-cs')), headers: await _headers());
+    _throwIfFailed(response, 'request CS lock recovery');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return decoded['message']?.toString() ?? 'Recovery request submitted.';
+  }
+
   Future<List<InboxConversation>> loadConversations() async {
     final response = await http.get(Uri.parse(VmApiConfig.endpoint('/inbox/conversations')), headers: await _headers());
     _throwIfFailed(response, 'load conversations');
@@ -139,6 +213,14 @@ class InboxApiService {
   void _throwIfFailed(http.Response response, String action) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
     throw Exception('Inbox API failed to $action (${response.statusCode}): ${response.body}');
+  }
+
+  InboxLockStatus lockStatusFromJson(Map<String, dynamic> json) {
+    return InboxLockStatus(
+      isEnabled: json['is_enabled'] == true,
+      mobileNumber: json['mobile_number']?.toString(),
+      recoveryRequested: json['recovery_requested'] == true,
+    );
   }
 
   InboxConversation conversationFromJson(Map<String, dynamic> json) {
