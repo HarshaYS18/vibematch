@@ -96,6 +96,10 @@ class InboxConversation {
   bool get isMutualFollowChat => type == InboxConversationType.chat && !isStranger;
 
   InboxConversation copyWith({
+    String? subtitle,
+    String? time,
+    int? unreadCount,
+    List<InboxMessage>? messages,
     bool? isLockedByBackend,
     bool? isBlocked,
     bool? isMuted,
@@ -105,15 +109,15 @@ class InboxConversation {
     return InboxConversation(
       id: id,
       title: title,
-      subtitle: subtitle,
-      time: time,
+      subtitle: subtitle ?? this.subtitle,
+      time: time ?? this.time,
       avatarText: avatarText,
       type: type,
-      unreadCount: unreadCount,
+      unreadCount: unreadCount ?? this.unreadCount,
       isOnline: isOnline,
       lastSeenText: lastSeenText,
       colors: colors,
-      messages: messages,
+      messages: messages ?? this.messages,
       currentRoomName: currentRoomName,
       isLockedByBackend: isLockedByBackend ?? this.isLockedByBackend,
       isBlocked: isBlocked ?? this.isBlocked,
