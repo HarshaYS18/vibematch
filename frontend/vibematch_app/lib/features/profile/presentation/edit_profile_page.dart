@@ -20,7 +20,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController _bioController = TextEditingController(
     text: 'Building premium live rooms, Vibes, gifts and a trusted social-audio community.',
   );
-  final TextEditingController _ageController = TextEditingController(text: '27');
 
   ProfileGender _gender = ProfileGender.male;
   FriendGenderPreference _friendGenderPreference = FriendGenderPreference.both;
@@ -30,11 +29,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
   DateTime _dob = DateTime(1998, 6, 18);
   final Set<String> _interests = {'Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Live Audio'};
 
+  int get _age => _calculateAgeFromDob(_dob);
+
   @override
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
-    _ageController.dispose();
     super.dispose();
   }
 
@@ -122,7 +122,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       _CompactTextField(label: 'Bio', controller: _bioController, maxLines: 3, maxLength: 120),
                       Row(
                         children: [
-                          Expanded(child: _CompactTextField(label: 'Age', controller: _ageController, keyboardType: TextInputType.number, maxLength: 2)),
+                          Expanded(child: _ReadOnlyInfoTile(label: 'Age', value: _age.toString(), helper: 'From D.O.B')),
                           const SizedBox(width: 10),
                           Expanded(child: _PickerTile(label: 'D.O.B', value: _formatDob(_dob), onTap: _openDobPicker)),
                         ],
@@ -204,6 +204,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
       ),
     );
+  }
+
+  int _calculateAgeFromDob(DateTime dob) {
+    final today = DateTime.now();
+    var age = today.year - dob.year;
+    final birthdayPassedThisYear = today.month > dob.month || (today.month == dob.month && today.day >= dob.day);
+    if (!birthdayPassedThisYear) age--;
+    return age.clamp(0, 120);
   }
 
   String _formatDob(DateTime date) {
@@ -335,6 +343,48 @@ class _CompactTextField extends StatelessWidget {
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF12C7B7))),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadOnlyInfoTile extends StatelessWidget {
+  const _ReadOnlyInfoTile({required this.label, required this.value, this.helper});
+  final String label;
+  final String value;
+  final String? helper;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFECE2D8))),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(label, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w800)),
+                  Row(
+                    children: [
+                      Text(value, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                      if (helper != null) ...[
+                        const SizedBox(width: 6),
+                        Flexible(child: Text(helper!, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800))),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.lock_rounded, color: Color(0xFF8C8198), size: 17),
+          ],
         ),
       ),
     );
