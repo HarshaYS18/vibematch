@@ -38,6 +38,11 @@ class InboxReportStatus(str, Enum):
     MONITOR_ACTION_TAKEN = "monitor_action_taken"
 
 
+class InboxLockOtpPurpose(str, Enum):
+    SETUP = "setup"
+    RECOVERY = "recovery"
+
+
 class InboxConversation(Base):
     __tablename__ = "inbox_conversations"
 
@@ -122,3 +127,33 @@ class InboxReport(Base):
 
     conversation = relationship("InboxConversation")
     reporter = relationship("User")
+
+
+class InboxLockSetting(Base):
+    __tablename__ = "inbox_lock_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True, nullable=False)
+    mobile_number: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    lock_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    recovery_requested: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
+
+    user = relationship("User")
+
+
+class InboxLockOtp(Base):
+    __tablename__ = "inbox_lock_otps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    mobile_number: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    otp_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")
