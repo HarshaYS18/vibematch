@@ -32,6 +32,25 @@ enum InboxSearchMatchType {
   final String label;
 }
 
+enum InboxMessageType {
+  text,
+  image,
+  voice,
+  document,
+  location,
+  contact,
+  roomInvite,
+  system;
+}
+
+enum InboxMessageStatus {
+  sending,
+  sent,
+  delivered,
+  read,
+  failed;
+}
+
 class InboxConversation {
   const InboxConversation({
     required this.id,
@@ -48,6 +67,9 @@ class InboxConversation {
     this.currentRoomName,
     this.isLockedByBackend = false,
     this.isBlocked = false,
+    this.isMuted = false,
+    this.isPinned = false,
+    this.isArchived = false,
   });
 
   final String id;
@@ -64,6 +86,9 @@ class InboxConversation {
   final String? currentRoomName;
   final bool isLockedByBackend;
   final bool isBlocked;
+  final bool isMuted;
+  final bool isPinned;
+  final bool isArchived;
 
   bool get isOfficial => type == InboxConversationType.official;
   bool get isStranger => type == InboxConversationType.stranger;
@@ -73,6 +98,9 @@ class InboxConversation {
   InboxConversation copyWith({
     bool? isLockedByBackend,
     bool? isBlocked,
+    bool? isMuted,
+    bool? isPinned,
+    bool? isArchived,
   }) {
     return InboxConversation(
       id: id,
@@ -89,6 +117,9 @@ class InboxConversation {
       currentRoomName: currentRoomName,
       isLockedByBackend: isLockedByBackend ?? this.isLockedByBackend,
       isBlocked: isBlocked ?? this.isBlocked,
+      isMuted: isMuted ?? this.isMuted,
+      isPinned: isPinned ?? this.isPinned,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 }
@@ -99,14 +130,62 @@ class InboxMessage {
     required this.text,
     required this.time,
     required this.isMine,
+    this.id,
+    this.type = InboxMessageType.text,
+    this.status = InboxMessageStatus.read,
+    this.reaction,
+    this.replyToText,
+    this.isStarred = false,
+    this.isForwarded = false,
     this.inviteRoomName,
   });
 
+  final String? id;
   final String sender;
   final String text;
   final String time;
   final bool isMine;
+  final InboxMessageType type;
+  final InboxMessageStatus status;
+  final String? reaction;
+  final String? replyToText;
+  final bool isStarred;
+  final bool isForwarded;
   final String? inviteRoomName;
+
+  bool get isInvite => inviteRoomName != null || type == InboxMessageType.roomInvite;
+
+  InboxMessage copyWith({
+    String? id,
+    String? sender,
+    String? text,
+    String? time,
+    bool? isMine,
+    InboxMessageType? type,
+    InboxMessageStatus? status,
+    String? reaction,
+    bool clearReaction = false,
+    String? replyToText,
+    bool clearReply = false,
+    bool? isStarred,
+    bool? isForwarded,
+    String? inviteRoomName,
+  }) {
+    return InboxMessage(
+      id: id ?? this.id,
+      sender: sender ?? this.sender,
+      text: text ?? this.text,
+      time: time ?? this.time,
+      isMine: isMine ?? this.isMine,
+      type: type ?? this.type,
+      status: status ?? this.status,
+      reaction: clearReaction ? null : reaction ?? this.reaction,
+      replyToText: clearReply ? null : replyToText ?? this.replyToText,
+      isStarred: isStarred ?? this.isStarred,
+      isForwarded: isForwarded ?? this.isForwarded,
+      inviteRoomName: inviteRoomName ?? this.inviteRoomName,
+    );
+  }
 }
 
 class InboxSearchResult {
