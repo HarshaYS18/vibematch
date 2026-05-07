@@ -216,7 +216,7 @@ class MeProfileMiniBadge extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: SizedBox(
-          height: 28,
+          height: 30,
           child: Center(
             child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true),
           ),
@@ -226,19 +226,26 @@ class MeProfileMiniBadge extends StatelessWidget {
 
     final svipLevel = _levelForPrefix('SVIP');
     if (svipLevel != null) {
-      return SizedBox(
-        height: 28,
-        child: Center(
-          child: MiniProfileCleanLevelPill(
-            label: 'SVIP $svipLevel',
-            icon: Icons.diamond_rounded,
-            width: 86,
-            background: const Color(0xFF30220B),
-            border: const Color(0xFFD7AA45),
-            textColor: const Color(0xFFFFE2A1),
-            shineColor: const Color(0xFFFFF1B8),
-            active: svipLevel > 0,
-            onTap: onTap ?? () {},
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          height: 30,
+          width: 90,
+          child: Center(
+            child: IgnorePointer(
+              child: MiniProfileCleanLevelPill(
+                label: 'SVIP $svipLevel',
+                icon: Icons.diamond_rounded,
+                width: 86,
+                background: const Color(0xFF30220B),
+                border: const Color(0xFFD7AA45),
+                textColor: const Color(0xFFFFE2A1),
+                shineColor: const Color(0xFFFFF1B8),
+                active: svipLevel > 0,
+                onTap: () {},
+              ),
+            ),
           ),
         ),
       );
