@@ -2,17 +2,22 @@ import 'package:flutter/foundation.dart';
 
 import '../data/inbox_api_service.dart';
 import '../data/inbox_mock_data.dart';
+import '../data/inbox_socket_service.dart';
 import '../models/inbox_models.dart';
 
 class InboxController extends ChangeNotifier {
-  InboxController({InboxApiService? apiService}) : _apiService = apiService ?? InboxApiService();
+  InboxController({InboxApiService? apiService, InboxSocketService? socketService})
+      : _apiService = apiService ?? InboxApiService(),
+        _socketService = socketService ?? InboxSocketService();
 
   static const String mockAccountPasscode = '1234';
 
   final InboxApiService _apiService;
+  final InboxSocketService _socketService;
   String selectedFilter = 'All';
   bool lockedVaultUnlocked = false;
   bool isLoading = false;
+  bool _disposed = false;
   String? errorMessage;
   ChatBackupFrequency backupFrequency = ChatBackupFrequency.weekly;
   bool backupEnabled = true;
@@ -46,20 +51,88 @@ class InboxController extends ChangeNotifier {
     }
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    _socketService.disconnect();
+    super.dispose();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
+
   Future<void> loadFromBackend() async {
     isLoading = true;
     errorMessage = null;
-    notifyListeners();
+    _safeNotify();
     try {
       _conversations = await _apiService.loadConversations();
       _reportTasks
         ..clear()
         ..addAll(await _apiService.loadReportTasks());
+      await _socketService.connect(onEvent: _handleRealtimeEvent);
     } catch (error) {
       errorMessage = error.toString();
     } finally {
       isLoading = false;
-      notifyListeners();
+      _safeNotify();
+    }
+  }
+
+  void _handleRealtimeEvent(Map<String, dynamic> event) {
+    final name = event['event']?.toString();
+    switch (name) {
+      case 'inbox_message_created':
+        final conversationId = event['conversation_id']?.toString();
+        final rawMessage = event['message'];
+        if (conversationId != null && rawMessage is Map<String, dynamic>) {
+          final message = _apiService.messageFromJson(rawMessage);
+          final conversation = conversationById(conversationId);
+          final alreadyExists = conversation?.messages.any((item) => item.id != null && item.id == message.id) ?? false;
+          if (!alreadyExists) _appendMessage(conversationId, message);
+        }
+        break;
+      case 'inbox_message_updated':
+        final conversationId = event['conversation_id']?.toString();
+        final rawMessage = event['message'];
+        if (conversationId != null && rawMessage is Map<String, dynamic>) {
+          final message = _apiService.messageFromJson(rawMessage);
+          _updateMessage(conversationId: conversationId, message: message, mapper: (_) => message);
+        }
+        break;
+      case 'inbox_message_deleted':
+        final conversationId = event['conversation_id']?.toString();
+        final messageId = event['message_id']?.toString();
+        if (conversationId != null && messageId != null) {
+          _removeMessageById(conversationId, messageId);
+        }
+        break;
+      case 'inbox_conversation_updated':
+        loadFromBackend();
+        break;
+      case 'inbox_report_task_updated':
+      case 'inbox_report_status_updated':
+        final rawTask = event['task'];
+        if (rawTask is Map<String, dynamic>) {
+          final task = _apiService.reportFromJson(rawTask);
+          _upsertReportTask(task);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<InboxConversation?> createDirectConversation({required int targetUserId}) async {
+    try {
+      final conversation = await _apiService.createDirectConversation(targetUserId: targetUserId);
+      _upsertConversation(conversation);
+      return conversation;
+    } catch (error) {
+      errorMessage = error.toString();
+      _safeNotify();
+      return null;
     }
   }
 
@@ -92,13 +165,13 @@ class InboxController extends ChangeNotifier {
   }
 
   bool validatePasscode(String value) => value.trim() == mockAccountPasscode;
-  void unlockLockedVault() { lockedVaultUnlocked = true; notifyListeners(); }
-  void lockLockedVault() { lockedVaultUnlocked = false; notifyListeners(); }
-  void selectFilter(String filter) { selectedFilter = filter; notifyListeners(); }
-  void setBackupEnabled(bool value) { backupEnabled = value; notifyListeners(); }
-  void setBackupFrequency(ChatBackupFrequency frequency) { backupFrequency = frequency; notifyListeners(); }
-  void setStrangersCanMessage(bool value) { strangersCanMessage = value; notifyListeners(); }
-  void setStrangersCanMentionInVibes(bool value) { strangersCanMentionInVibes = value; notifyListeners(); }
+  void unlockLockedVault() { lockedVaultUnlocked = true; _safeNotify(); }
+  void lockLockedVault() { lockedVaultUnlocked = false; _safeNotify(); }
+  void selectFilter(String filter) { selectedFilter = filter; _safeNotify(); }
+  void setBackupEnabled(bool value) { backupEnabled = value; _safeNotify(); }
+  void setBackupFrequency(ChatBackupFrequency frequency) { backupFrequency = frequency; _safeNotify(); }
+  void setStrangersCanMessage(bool value) { strangersCanMessage = value; _safeNotify(); }
+  void setStrangersCanMentionInVibes(bool value) { strangersCanMentionInVibes = value; _safeNotify(); }
 
   Future<void> toggleBackendLock(InboxConversation conversation) => _updateState(conversation, isLocked: !conversation.isLockedByBackend);
   Future<void> toggleBlock(InboxConversation conversation) => _updateState(conversation, isBlocked: !conversation.isBlocked);
@@ -136,7 +209,7 @@ class InboxController extends ChangeNotifier {
     final local = InboxReportTask(id: 'report_${DateTime.now().microsecondsSinceEpoch}', reportedConversationId: conversation.id, reportedUserName: conversation.title, reporterName: 'You', reason: reason.trim().isEmpty ? 'Unsafe or abusive conversation' : reason.trim(), snapshot: List<InboxMessage>.unmodifiable(snapshot), createdAtLabel: 'Now', status: InboxReportStatus.pendingCsReview);
     _reportTasks.insert(0, local);
     _sendTeamSystemMessage('Report submitted. CS will review the conversation snapshot and escalate if action is needed.');
-    notifyListeners();
+    _safeNotify();
     try {
       final remote = await _apiService.submitReport(conversation: conversation, reason: local.reason);
       _replaceReportTask(local.id, remote);
@@ -190,8 +263,11 @@ class InboxController extends ChangeNotifier {
 
   void _appendMessage(String conversationId, InboxMessage message) => _replaceConversation(conversationId, (chat) => chat.copyWith(messages: [...chat.messages, message], subtitle: message.text, time: 'Now', unreadCount: 0));
   void _replaceLocalMessage(String conversationId, InboxMessage local, InboxMessage remote) => _updateMessage(conversationId: conversationId, message: local, mapper: (_) => remote);
+  void _removeMessageById(String conversationId, String messageId) => _replaceConversation(conversationId, (chat) { final updated = chat.messages.where((item) => item.id != messageId).toList(); return chat.copyWith(messages: updated, subtitle: updated.isEmpty ? 'No messages yet' : updated.last.text); });
   void _updateMessage({required String conversationId, required InboxMessage message, required InboxMessage Function(InboxMessage item) mapper}) => _replaceConversation(conversationId, (chat) => chat.copyWith(messages: chat.messages.map((item) => _sameMessage(item, message) ? mapper(item) : item).toList()));
-  void _replaceConversation(String conversationId, InboxConversation Function(InboxConversation chat) mapper) { _conversations = _conversations.map((chat) => chat.id == conversationId ? mapper(chat) : chat).toList(); notifyListeners(); }
-  void _replaceReportTask(String taskId, InboxReportTask replacement) { for (var index = 0; index < _reportTasks.length; index++) { if (_reportTasks[index].id == taskId) { _reportTasks[index] = replacement; notifyListeners(); return; } } }
+  void _replaceConversation(String conversationId, InboxConversation Function(InboxConversation chat) mapper) { _conversations = _conversations.map((chat) => chat.id == conversationId ? mapper(chat) : chat).toList(); _safeNotify(); }
+  void _upsertConversation(InboxConversation conversation) { final index = _conversations.indexWhere((item) => item.id == conversation.id); if (index == -1) { _conversations.insert(0, conversation); } else { _conversations[index] = conversation; } _safeNotify(); }
+  void _replaceReportTask(String taskId, InboxReportTask replacement) { for (var index = 0; index < _reportTasks.length; index++) { if (_reportTasks[index].id == taskId) { _reportTasks[index] = replacement; _safeNotify(); return; } } }
+  void _upsertReportTask(InboxReportTask task) { final index = _reportTasks.indexWhere((item) => item.id == task.id); if (index == -1) { _reportTasks.insert(0, task); } else { _reportTasks[index] = task; } _safeNotify(); }
   bool _sameMessage(InboxMessage a, InboxMessage b) => a.id != null && b.id != null ? a.id == b.id : a.sender == b.sender && a.text == b.text && a.time == b.time && a.isMine == b.isMine;
 }
