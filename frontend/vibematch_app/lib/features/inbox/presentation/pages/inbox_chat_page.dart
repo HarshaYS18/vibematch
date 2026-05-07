@@ -622,7 +622,6 @@ class _AttachmentSheet extends StatelessWidget {
       _AttachmentItem(type: InboxMessageType.image, icon: Icons.image_rounded, label: 'Gallery'),
       _AttachmentItem(type: InboxMessageType.document, icon: Icons.description_rounded, label: 'Document'),
       _AttachmentItem(type: InboxMessageType.location, icon: Icons.location_on_rounded, label: 'Location'),
-      _AttachmentItem(type: InboxMessageType.contact, icon: Icons.person_rounded, label: 'Contact'),
     ];
 
     return Container(
@@ -630,7 +629,7 @@ class _AttachmentSheet extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
       child: GridView.count(
-        crossAxisCount: 4,
+        crossAxisCount: 3,
         shrinkWrap: true,
         children: items.map((item) {
           return InkWell(
