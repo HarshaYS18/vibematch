@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/inbox_api_service.dart';
-import '../data/inbox_mock_data.dart';
 import '../data/inbox_socket_service.dart';
 import '../models/inbox_models.dart';
 
@@ -10,8 +9,6 @@ class InboxController extends ChangeNotifier {
       : _apiService = apiService ?? InboxApiService(),
         _socketService = socketService ?? InboxSocketService();
 
-  static const String mockAccountPasscode = '1234';
-
   final InboxApiService _apiService;
   final InboxSocketService _socketService;
   String selectedFilter = 'All';
@@ -19,6 +16,8 @@ class InboxController extends ChangeNotifier {
   bool isLoading = false;
   bool _disposed = false;
   String? errorMessage;
+  InboxLockStatus lockStatus = const InboxLockStatus(isEnabled: false);
+  String? lastDebugOtp;
   ChatBackupFrequency backupFrequency = ChatBackupFrequency.weekly;
   bool backupEnabled = true;
   bool strangersCanMessage = true;
@@ -26,7 +25,7 @@ class InboxController extends ChangeNotifier {
 
   final List<String> filters = const ['All', 'Unread', 'Online', 'Room Invites', 'Official', 'Strangers', 'Blocked'];
 
-  List<InboxConversation> _conversations = List<InboxConversation>.from(InboxMockData.conversations);
+  List<InboxConversation> _conversations = <InboxConversation>[];
   final List<InboxReportTask> _reportTasks = <InboxReportTask>[];
 
   List<InboxConversation> get conversations => List.unmodifiable(_conversations);
@@ -67,6 +66,7 @@ class InboxController extends ChangeNotifier {
     errorMessage = null;
     _safeNotify();
     try {
+      lockStatus = await _apiService.loadLockStatus();
       _conversations = await _apiService.loadConversations();
       _reportTasks
         ..clear()
@@ -74,10 +74,59 @@ class InboxController extends ChangeNotifier {
       await _socketService.connect(onEvent: _handleRealtimeEvent);
     } catch (error) {
       errorMessage = error.toString();
+      _conversations = <InboxConversation>[];
     } finally {
       isLoading = false;
       _safeNotify();
     }
+  }
+
+  Future<String?> startLockSetup(String mobileNumber) async {
+    lastDebugOtp = await _apiService.startLockSetup(mobileNumber: mobileNumber);
+    _safeNotify();
+    return lastDebugOtp;
+  }
+
+  Future<void> verifyLockSetup({required String mobileNumber, required String otp, required String lockCode}) async {
+    lockStatus = await _apiService.verifyLockSetup(mobileNumber: mobileNumber, otp: otp, lockCode: lockCode);
+    lockedVaultUnlocked = true;
+    _safeNotify();
+  }
+
+  Future<bool> verifyLock(String lockCode) async {
+    try {
+      await _apiService.verifyLock(lockCode: lockCode);
+      lockedVaultUnlocked = true;
+      _safeNotify();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> changeLock({required String currentLockCode, required String newLockCode}) async {
+    lockStatus = await _apiService.changeLock(currentLockCode: currentLockCode, newLockCode: newLockCode);
+    _safeNotify();
+  }
+
+  Future<String?> startLockRecovery(String mobileNumber) async {
+    lastDebugOtp = await _apiService.startLockRecovery(mobileNumber: mobileNumber);
+    lockStatus = lockStatus.copyWith(recoveryRequested: true);
+    _safeNotify();
+    return lastDebugOtp;
+  }
+
+  Future<void> verifyLockRecovery({required String mobileNumber, required String otp, required String newLockCode}) async {
+    lockStatus = await _apiService.verifyLockRecovery(mobileNumber: mobileNumber, otp: otp, newLockCode: newLockCode);
+    lockedVaultUnlocked = true;
+    _safeNotify();
+  }
+
+  Future<String> requestCsLockRecovery() async {
+    final message = await _apiService.requestCsLockRecovery();
+    lockStatus = lockStatus.copyWith(recoveryRequested: true);
+    _safeNotify();
+    return message;
   }
 
   void _handleRealtimeEvent(Map<String, dynamic> event) {
@@ -104,9 +153,7 @@ class InboxController extends ChangeNotifier {
       case 'inbox_message_deleted':
         final conversationId = event['conversation_id']?.toString();
         final messageId = event['message_id']?.toString();
-        if (conversationId != null && messageId != null) {
-          _removeMessageById(conversationId, messageId);
-        }
+        if (conversationId != null && messageId != null) _removeMessageById(conversationId, messageId);
         break;
       case 'inbox_conversation_updated':
         loadFromBackend();
@@ -114,10 +161,7 @@ class InboxController extends ChangeNotifier {
       case 'inbox_report_task_updated':
       case 'inbox_report_status_updated':
         final rawTask = event['task'];
-        if (rawTask is Map<String, dynamic>) {
-          final task = _apiService.reportFromJson(rawTask);
-          _upsertReportTask(task);
-        }
+        if (rawTask is Map<String, dynamic>) _upsertReportTask(_apiService.reportFromJson(rawTask));
         break;
       default:
         break;
@@ -136,9 +180,7 @@ class InboxController extends ChangeNotifier {
     }
   }
 
-  List<InboxConversation> _sortedConversations(List<InboxConversation> items) {
-    return [...items]..sort((a, b) => a.isPinned == b.isPinned ? 0 : (a.isPinned ? -1 : 1));
-  }
+  List<InboxConversation> _sortedConversations(List<InboxConversation> items) => [...items]..sort((a, b) => a.isPinned == b.isPinned ? 0 : (a.isPinned ? -1 : 1));
 
   InboxConversation? conversationById(String conversationId) {
     for (final conversation in _conversations) {
@@ -164,7 +206,7 @@ class InboxController extends ChangeNotifier {
     return results;
   }
 
-  bool validatePasscode(String value) => value.trim() == mockAccountPasscode;
+  bool validatePasscode(String value) => false;
   void unlockLockedVault() { lockedVaultUnlocked = true; _safeNotify(); }
   void lockLockedVault() { lockedVaultUnlocked = false; _safeNotify(); }
   void selectFilter(String filter) { selectedFilter = filter; _safeNotify(); }
@@ -204,32 +246,15 @@ class InboxController extends ChangeNotifier {
     _appendMessage(conversationId, InboxMessage(id: 'local_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: text, time: 'Now', isMine: true, type: type, status: InboxMessageStatus.read));
   }
 
-  void addPickedDocumentAttachment({
-    required String conversationId,
-    required String fileName,
-    required int sizeBytes,
-    String? filePath,
-  }) {
+  void addPickedDocumentAttachment({required String conversationId, required String fileName, required int sizeBytes, String? filePath}) {
     final sizeLabel = _formatBytes(sizeBytes);
-    _appendMessage(
-      conversationId,
-      InboxMessage(
-        id: 'doc_${DateTime.now().microsecondsSinceEpoch}',
-        sender: 'You',
-        text: '📄 $fileName • $sizeLabel',
-        time: 'Now',
-        isMine: true,
-        type: InboxMessageType.document,
-        status: InboxMessageStatus.read,
-      ),
-    );
+    _appendMessage(conversationId, InboxMessage(id: 'doc_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: '📄 $fileName • $sizeLabel', time: 'Now', isMine: true, type: InboxMessageType.document, status: InboxMessageStatus.read));
   }
 
   Future<InboxReportTask> submitConversationReport({required InboxConversation conversation, required String reason}) async {
     final snapshot = conversation.messages.length <= 30 ? conversation.messages : conversation.messages.sublist(conversation.messages.length - 30);
     final local = InboxReportTask(id: 'report_${DateTime.now().microsecondsSinceEpoch}', reportedConversationId: conversation.id, reportedUserName: conversation.title, reporterName: 'You', reason: reason.trim().isEmpty ? 'Unsafe or abusive conversation' : reason.trim(), snapshot: List<InboxMessage>.unmodifiable(snapshot), createdAtLabel: 'Now', status: InboxReportStatus.pendingCsReview);
     _reportTasks.insert(0, local);
-    _sendTeamSystemMessage('Report submitted. CS will review the conversation snapshot and escalate if action is needed.');
     _safeNotify();
     try {
       final remote = await _apiService.submitReport(conversation: conversation, reason: local.reason);
@@ -238,58 +263,16 @@ class InboxController extends ChangeNotifier {
     } catch (_) { return local; }
   }
 
-  Future<void> rejectReportTask(InboxReportTask task) async {
-    _replaceReportTask(task.id, task.copyWith(status: InboxReportStatus.rejectedByCs, csNote: 'CS reviewed the snapshot and did not find enough evidence for punishment.'));
-    _sendTeamSystemMessage('Report failed. CS reviewed your report about ${task.reportedUserName}, but there was not enough evidence to punish the user.');
-    try { _replaceReportTask(task.id, await _apiService.rejectReport(task)); } catch (_) {}
-  }
+  Future<void> rejectReportTask(InboxReportTask task) async { _replaceReportTask(task.id, task.copyWith(status: InboxReportStatus.rejectedByCs)); try { _replaceReportTask(task.id, await _apiService.rejectReport(task)); } catch (_) {} }
+  Future<void> acceptReportTask(InboxReportTask task) async { _replaceReportTask(task.id, task.copyWith(status: InboxReportStatus.acceptedEscalated, monitorAction: 'Pending Monitor action')); try { _replaceReportTask(task.id, await _apiService.acceptReport(task)); } catch (_) {} }
+  Future<void> applyMonitorAction(InboxReportTask task, String actionLabel) async { _replaceReportTask(task.id, task.copyWith(status: InboxReportStatus.monitorActionTaken, monitorAction: actionLabel)); try { _replaceReportTask(task.id, await _apiService.applyMonitorAction(task, actionLabel)); } catch (_) {} }
 
-  Future<void> acceptReportTask(InboxReportTask task) async {
-    _replaceReportTask(task.id, task.copyWith(status: InboxReportStatus.acceptedEscalated, csNote: 'CS accepted the report and sent it to Monitor team for punishment action.', monitorAction: 'Pending Monitor action'));
-    _sendTeamSystemMessage('Report successful. ${task.reportedUserName} has been sent to Monitor team for punishment review.');
-    try { _replaceReportTask(task.id, await _apiService.acceptReport(task)); } catch (_) {}
-  }
+  Future<void> setReaction({required String conversationId, required InboxMessage message, required String reaction}) async { _updateMessage(conversationId: conversationId, message: message, mapper: (item) => item.copyWith(reaction: reaction)); if (message.id != null) { try { await _apiService.updateMessage(conversationId: conversationId, messageId: message.id!, reaction: reaction); } catch (_) {} } }
+  Future<void> toggleStarMessage({required String conversationId, required InboxMessage message}) async { final next = !message.isStarred; _updateMessage(conversationId: conversationId, message: message, mapper: (item) => item.copyWith(isStarred: next)); if (message.id != null) { try { await _apiService.updateMessage(conversationId: conversationId, messageId: message.id!, isStarred: next); } catch (_) {} } }
+  Future<void> deleteMessage({required String conversationId, required InboxMessage message}) async { _replaceConversation(conversationId, (chat) { final updated = chat.messages.where((item) => !_sameMessage(item, message)).toList(); return chat.copyWith(messages: updated, subtitle: updated.isEmpty ? 'No messages yet' : updated.last.text); }); if (message.id != null) { try { await _apiService.deleteMessage(conversationId: conversationId, messageId: message.id!); } catch (_) {} } }
+  void forwardMessage({required String fromConversationId, required InboxMessage message}) { _appendMessage(fromConversationId, message.copyWith(id: 'forward_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', time: 'Now', isMine: true, isForwarded: true, status: InboxMessageStatus.read)); }
 
-  Future<void> applyMonitorAction(InboxReportTask task, String actionLabel) async {
-    _replaceReportTask(task.id, task.copyWith(status: InboxReportStatus.monitorActionTaken, monitorAction: actionLabel));
-    _sendTeamSystemMessage('Report successful. ${task.reportedUserName} has been punished by Monitor team: $actionLabel.');
-    try { _replaceReportTask(task.id, await _apiService.applyMonitorAction(task, actionLabel)); } catch (_) {}
-  }
-
-  Future<void> setReaction({required String conversationId, required InboxMessage message, required String reaction}) async {
-    _updateMessage(conversationId: conversationId, message: message, mapper: (item) => item.copyWith(reaction: reaction));
-    if (message.id != null) { try { await _apiService.updateMessage(conversationId: conversationId, messageId: message.id!, reaction: reaction); } catch (_) {} }
-  }
-
-  Future<void> toggleStarMessage({required String conversationId, required InboxMessage message}) async {
-    final next = !message.isStarred;
-    _updateMessage(conversationId: conversationId, message: message, mapper: (item) => item.copyWith(isStarred: next));
-    if (message.id != null) { try { await _apiService.updateMessage(conversationId: conversationId, messageId: message.id!, isStarred: next); } catch (_) {} }
-  }
-
-  Future<void> deleteMessage({required String conversationId, required InboxMessage message}) async {
-    _replaceConversation(conversationId, (chat) { final updated = chat.messages.where((item) => !_sameMessage(item, message)).toList(); return chat.copyWith(messages: updated, subtitle: updated.isEmpty ? 'No messages yet' : updated.last.text); });
-    if (message.id != null) { try { await _apiService.deleteMessage(conversationId: conversationId, messageId: message.id!); } catch (_) {} }
-  }
-
-  void forwardMessage({required String fromConversationId, required InboxMessage message}) {
-    _appendMessage(fromConversationId, message.copyWith(id: 'forward_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', time: 'Now', isMine: true, isForwarded: true, status: InboxMessageStatus.read));
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    final kb = bytes / 1024;
-    if (kb < 1024) return '${kb.toStringAsFixed(kb >= 100 ? 0 : 1)} KB';
-    final mb = kb / 1024;
-    return '${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB';
-  }
-
-  void _sendTeamSystemMessage(String text) {
-    final team = conversationById('team_official');
-    if (team == null) return;
-    _appendMessage(team.id, InboxMessage(id: 'system_${DateTime.now().microsecondsSinceEpoch}', sender: 'Vibe Match Team', text: text, time: 'Now', isMine: false, type: InboxMessageType.system));
-  }
-
+  String _formatBytes(int bytes) { if (bytes < 1024) return '$bytes B'; final kb = bytes / 1024; if (kb < 1024) return '${kb.toStringAsFixed(kb >= 100 ? 0 : 1)} KB'; final mb = kb / 1024; return '${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB'; }
   void _appendMessage(String conversationId, InboxMessage message) => _replaceConversation(conversationId, (chat) => chat.copyWith(messages: [...chat.messages, message], subtitle: message.text, time: 'Now', unreadCount: 0));
   void _replaceLocalMessage(String conversationId, InboxMessage local, InboxMessage remote) => _updateMessage(conversationId: conversationId, message: local, mapper: (_) => remote);
   void _removeMessageById(String conversationId, String messageId) => _replaceConversation(conversationId, (chat) { final updated = chat.messages.where((item) => item.id != messageId).toList(); return chat.copyWith(messages: updated, subtitle: updated.isEmpty ? 'No messages yet' : updated.last.text); });
