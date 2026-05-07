@@ -9,6 +9,7 @@ import '../../vip/presentation/vip_program_page.dart';
 import '../data/profile_visitor_repository.dart';
 import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
+import 'profile_qr/profile_qr_pages.dart';
 import 'widgets/me_profile_constants.dart';
 import 'widgets/public_love_bonds_panel.dart';
 import 'widgets/public_profile_widgets.dart';
@@ -86,6 +87,10 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
+  }
+
+  void _openProfileQrActions() {
+    ProfileQrActionsSheet.show(context, user: widget.user, title: '${_displayName()} QR');
   }
 
   void _openViewerVipProgram({required int initialTabIndex}) {
@@ -206,6 +211,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 matchScore: _matchScore(),
                 onCoverChanged: (index) => setState(() => _coverIndex = index),
                 onBackTap: () => Navigator.pop(context),
+                onQrTap: _openProfileQrActions,
                 onShareTap: () => _showAction(context, 'Profile share sheet will open.'),
                 onAddCoverTap: () => _showAction(context, 'Add cover photos flow will open. Users can upload multiple covers.'),
                 onFollowTap: _toggleFollow,
