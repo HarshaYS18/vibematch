@@ -24,6 +24,7 @@ class PublicProfileHeader extends StatelessWidget {
     required this.matchScore,
     required this.onCoverChanged,
     required this.onBackTap,
+    required this.onQrTap,
     required this.onShareTap,
     required this.onAddCoverTap,
     required this.onFollowTap,
@@ -52,6 +53,7 @@ class PublicProfileHeader extends StatelessWidget {
   final int matchScore;
   final ValueChanged<int> onCoverChanged;
   final VoidCallback onBackTap;
+  final VoidCallback onQrTap;
   final VoidCallback onShareTap;
   final VoidCallback onAddCoverTap;
   final VoidCallback onFollowTap;
@@ -98,6 +100,8 @@ class PublicProfileHeader extends StatelessWidget {
                 top: 14,
                 child: Row(children: [
                   PublicHeaderIconButton(icon: Icons.add_photo_alternate_rounded, onTap: onAddCoverTap),
+                  const SizedBox(width: 8),
+                  PublicHeaderIconButton(icon: Icons.qr_code_2_rounded, onTap: onQrTap),
                   const SizedBox(width: 8),
                   PublicHeaderIconButton(icon: Icons.ios_share_rounded, onTap: onShareTap),
                 ]),
