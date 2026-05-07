@@ -138,7 +138,7 @@ class MyProfileQrPage extends StatelessWidget {
                         const SizedBox(height: 12),
                         Text(displayName, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
                         const SizedBox(height: 5),
-                        Text('ID ${payload.visibleId} • $roleLabel', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, fontWeight: FontWeight.w800)),
+                        Text('ID ${payload.visibleId} - $roleLabel', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 22),
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -172,7 +172,7 @@ class MyProfileQrPage extends StatelessWidget {
                   _ProfileQrInfoCard(
                     icon: Icons.verified_user_rounded,
                     title: 'Only Vibe Match profile QR codes work',
-                    body: 'Other QR codes will show “Invalid QR” and will not navigate anywhere.',
+                    body: 'Other QR codes will show Invalid QR and will not navigate anywhere.',
                   ),
                 ],
               ),
