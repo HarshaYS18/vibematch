@@ -469,7 +469,7 @@ class _ProfileQrInfoCard extends StatelessWidget {
       decoration: _profileQrPanelDecoration(radius: 24),
       child: Row(
         children: [
-          Container(width: 42, height: 42, decoration: const BoxDecoration(color: Color(0x1412C7B7), shape: BoxShape.circle), child: const Icon(Icons.verified_user_rounded, color: Color(0xFF12C7B7), size: 22)),
+          Container(width: 42, height: 42, decoration: const BoxDecoration(color: Color(0x1412C7B7), shape: BoxShape.circle), child: Icon(icon, color: const Color(0xFF12C7B7), size: 22)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900)),
