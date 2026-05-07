@@ -11,6 +11,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
     required this.canModerate,
     required this.onAvatarTap,
     required this.onVipTap,
+    required this.onSvipTap,
     required this.onSendingLevelTap,
     required this.onReceivingLevelTap,
     required this.onSentRankingTap,
@@ -38,6 +39,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
 
   final VoidCallback onAvatarTap;
   final VoidCallback onVipTap;
+  final VoidCallback onSvipTap;
   final VoidCallback onSendingLevelTap;
   final VoidCallback onReceivingLevelTap;
   final VoidCallback onSentRankingTap;
@@ -66,6 +68,7 @@ class LiveRoomMiniProfileSheet extends StatelessWidget {
       canModerate: canModerate,
       onAvatarTap: onAvatarTap,
       onVipTap: onVipTap,
+      onSvipTap: onSvipTap,
       onSendingLevelTap: onSendingLevelTap,
       onReceivingLevelTap: onReceivingLevelTap,
       onSentRankingTap: onSentRankingTap,
