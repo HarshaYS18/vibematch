@@ -93,3 +93,49 @@ class InboxReportDecisionRequest(BaseModel):
 
 class InboxMonitorActionRequest(BaseModel):
     action_label: str = Field(min_length=1, max_length=120)
+
+
+class InboxLockStatusResponse(BaseModel):
+    is_enabled: bool
+    mobile_number: str | None = None
+    recovery_requested: bool = False
+
+
+class InboxLockStartSetupRequest(BaseModel):
+    mobile_number: str = Field(min_length=8, max_length=32)
+
+
+class InboxLockVerifySetupRequest(BaseModel):
+    mobile_number: str = Field(min_length=8, max_length=32)
+    otp: str = Field(min_length=4, max_length=8)
+    lock_code: str = Field(min_length=4, max_length=12)
+
+
+class InboxLockVerifyRequest(BaseModel):
+    lock_code: str = Field(min_length=4, max_length=12)
+
+
+class InboxLockChangeRequest(BaseModel):
+    current_lock_code: str = Field(min_length=4, max_length=12)
+    new_lock_code: str = Field(min_length=4, max_length=12)
+
+
+class InboxLockRecoveryStartRequest(BaseModel):
+    mobile_number: str = Field(min_length=8, max_length=32)
+
+
+class InboxLockRecoveryVerifyRequest(BaseModel):
+    mobile_number: str = Field(min_length=8, max_length=32)
+    otp: str = Field(min_length=4, max_length=8)
+    new_lock_code: str = Field(min_length=4, max_length=12)
+
+
+class InboxLockRecoveryRequestResponse(BaseModel):
+    status: str
+    message: str
+
+
+class InboxLockDebugOtpResponse(BaseModel):
+    status: str
+    expires_in_minutes: int
+    debug_otp: str | None = None
