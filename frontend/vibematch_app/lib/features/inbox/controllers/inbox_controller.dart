@@ -1,15 +1,21 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/inbox_api_service.dart';
+import '../data/inbox_backup_api_service.dart';
 import '../data/inbox_socket_service.dart';
 import '../models/inbox_models.dart';
 
 class InboxController extends ChangeNotifier {
-  InboxController({InboxApiService? apiService, InboxSocketService? socketService})
-      : _apiService = apiService ?? InboxApiService(),
+  InboxController({
+    InboxApiService? apiService,
+    InboxBackupApiService? backupApiService,
+    InboxSocketService? socketService,
+  })  : _apiService = apiService ?? InboxApiService(),
+        _backupApiService = backupApiService ?? const InboxBackupApiService(),
         _socketService = socketService ?? InboxSocketService();
 
   final InboxApiService _apiService;
+  final InboxBackupApiService _backupApiService;
   final InboxSocketService _socketService;
   String selectedFilter = 'All';
   bool lockedVaultUnlocked = false;
@@ -17,11 +23,22 @@ class InboxController extends ChangeNotifier {
   bool _disposed = false;
   String? errorMessage;
   InboxLockStatus lockStatus = const InboxLockStatus(isEnabled: false);
+  InboxBackupStatus backupStatus = const InboxBackupStatus(
+    isEnabled: false,
+    isAuthorized: false,
+    provider: 'google_drive',
+    frequency: ChatBackupFrequency.weekly,
+    lastStatus: 'not_connected',
+  );
+  InboxBackupJob? lastBackupJob;
+  InboxBackupJob? lastRestoreJob;
+  String? lastGoogleDriveAuthorizationUrl;
   String? lastDebugOtp;
-  ChatBackupFrequency backupFrequency = ChatBackupFrequency.weekly;
-  bool backupEnabled = true;
   bool strangersCanMessage = true;
   bool strangersCanMentionInVibes = true;
+
+  bool get backupEnabled => backupStatus.isEnabled;
+  ChatBackupFrequency get backupFrequency => backupStatus.frequency;
 
   final List<String> filters = const ['All', 'Unread', 'Online', 'Room Invites', 'Official', 'Strangers', 'Blocked'];
 
@@ -67,6 +84,7 @@ class InboxController extends ChangeNotifier {
     _safeNotify();
     try {
       lockStatus = await _apiService.loadLockStatus();
+      backupStatus = await _backupApiService.loadStatus();
       _conversations = await _apiService.loadConversations();
       _reportTasks
         ..clear()
@@ -79,6 +97,44 @@ class InboxController extends ChangeNotifier {
       isLoading = false;
       _safeNotify();
     }
+  }
+
+  Future<String> startGoogleDriveAuthorization() async {
+    lastGoogleDriveAuthorizationUrl = await _backupApiService.loadGoogleDriveSetupUrl();
+    _safeNotify();
+    return lastGoogleDriveAuthorizationUrl!;
+  }
+
+  Future<void> connectGoogleDrive({String? googleDriveEmail, String? setupCode}) async {
+    backupStatus = await _backupApiService.connectGoogleDrive(
+      googleDriveEmail: googleDriveEmail,
+      setupCode: setupCode,
+    );
+    _safeNotify();
+  }
+
+  Future<void> setBackupEnabled(bool value) async {
+    backupStatus = await _backupApiService.updateSettings(isEnabled: value);
+    _safeNotify();
+  }
+
+  Future<void> setBackupFrequency(ChatBackupFrequency frequency) async {
+    backupStatus = await _backupApiService.updateSettings(frequency: frequency);
+    _safeNotify();
+  }
+
+  Future<InboxBackupJob> runBackupNow() async {
+    lastBackupJob = await _backupApiService.runBackupNow();
+    backupStatus = await _backupApiService.loadStatus();
+    _safeNotify();
+    return lastBackupJob!;
+  }
+
+  Future<InboxBackupJob> restoreLatestBackup() async {
+    lastRestoreJob = await _backupApiService.restoreLatestBackup();
+    backupStatus = await _backupApiService.loadStatus();
+    await loadFromBackend();
+    return lastRestoreJob!;
   }
 
   Future<String?> startLockSetup(String mobileNumber) async {
@@ -210,8 +266,6 @@ class InboxController extends ChangeNotifier {
   void unlockLockedVault() { lockedVaultUnlocked = true; _safeNotify(); }
   void lockLockedVault() { lockedVaultUnlocked = false; _safeNotify(); }
   void selectFilter(String filter) { selectedFilter = filter; _safeNotify(); }
-  void setBackupEnabled(bool value) { backupEnabled = value; _safeNotify(); }
-  void setBackupFrequency(ChatBackupFrequency frequency) { backupFrequency = frequency; _safeNotify(); }
   void setStrangersCanMessage(bool value) { strangersCanMessage = value; _safeNotify(); }
   void setStrangersCanMentionInVibes(bool value) { strangersCanMentionInVibes = value; _safeNotify(); }
 
