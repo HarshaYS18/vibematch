@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
+import '../widgets/social_emoji_pack_sheet.dart';
 
 class InboxChatPage extends StatefulWidget {
   const InboxChatPage({
@@ -85,6 +86,26 @@ class _InboxChatPageState extends State<InboxChatPage> {
           content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
         ),
       );
+  }
+
+  void _openEmojiPack() {
+    if (_readOnly) return;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => SocialEmojiPackSheet(
+        onEmojiSelected: (emoji) {
+          Navigator.pop(context);
+          widget.controller.sendTextMessage(
+            conversationId: _conversation.id,
+            text: '${emoji.emoji} ${emoji.label}',
+            replyToText: _replyToText,
+          );
+          setState(() => _replyToText = null);
+        },
+      ),
+    );
   }
 
   void _openAttachmentSheet() {
@@ -179,7 +200,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
               readOnly: _readOnly,
               controller: _textController,
               onAttachTap: _openAttachmentSheet,
-              onEmojiTap: () => _showToast('Emoji/sticker picker will open.'),
+              onEmojiTap: _openEmojiPack,
               onVoiceTap: () => widget.controller.addMockAttachment(conversationId: conversation.id, type: InboxMessageType.voice),
               onSendTap: _sendText,
             ),
