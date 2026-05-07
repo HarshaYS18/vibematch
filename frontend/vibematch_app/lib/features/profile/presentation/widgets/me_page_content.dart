@@ -16,6 +16,7 @@ import '../profile_qr/profile_qr_pages.dart';
 import '../profile_rooms_page.dart';
 import '../profile_visitors_page.dart';
 import '../public_profile_view_page.dart';
+import '../settings/account_settings_page.dart';
 import 'me_account_widgets.dart';
 import 'me_family_details_sheet.dart';
 import 'me_profile_constants.dart';
@@ -92,6 +93,14 @@ class MePageContent extends StatelessWidget {
 
   void _openEditCoverPhotos(BuildContext context) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditCoverPhotosPage()));
+  }
+
+  void _openAccountSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AccountSettingsPage(svipLevel: MeProfileConstants.svipLevel),
+      ),
+    );
   }
 
   void _openFamily(BuildContext context) {
@@ -275,6 +284,8 @@ class MePageContent extends StatelessWidget {
                   _openFamily(context);
                 } else if (item.title == 'VIP / SVIP Center' || item.title == 'VIP / SVIP') {
                   _openVipProgram(context, initialTabIndex: item.subtitle.contains('SVIP') ? 1 : 0);
+                } else if (item.title == 'Settings') {
+                  _openAccountSettings(context);
                 } else if (item.action == 'logout') {
                   await _endSession(context);
                 } else if (item.action == 'refresh') {
