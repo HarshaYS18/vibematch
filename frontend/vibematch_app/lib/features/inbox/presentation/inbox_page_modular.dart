@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/inbox_controller.dart';
 import '../models/inbox_models.dart';
+import 'pages/cs_report_tasks_page.dart';
 import 'pages/inbox_chat_page.dart';
 import 'pages/inbox_search_page.dart';
 import 'pages/inbox_settings_page.dart';
@@ -10,6 +11,7 @@ import 'widgets/inbox_conversation_card.dart';
 import 'widgets/inbox_filter_bar.dart';
 import 'widgets/inbox_header.dart';
 import 'widgets/inbox_passcode_sheet.dart';
+import 'widgets/report_conversation_sheet.dart';
 
 class InboxPage extends StatefulWidget {
   const InboxPage({super.key, this.openPagesInOverlay = false});
@@ -152,6 +154,15 @@ class _InboxPageState extends State<InboxPage> {
     );
   }
 
+  void _openCsReportTasks() {
+    _openInboxSubPage(
+      CsReportTasksPage(
+        controller: _controller,
+        onBackTap: _closePanelOverlay,
+      ),
+    );
+  }
+
   void _openChat(InboxConversation conversation) {
     _openInboxSubPage(
       InboxChatPage(
@@ -208,6 +219,28 @@ class _InboxPageState extends State<InboxPage> {
     }
   }
 
+  void _openReportSheet(InboxConversation conversation) {
+    _closeChatOptions();
+
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!mounted) return;
+
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => ReportConversationSheet(
+          conversation: conversation,
+          onSubmit: (reason) {
+            Navigator.pop(context);
+            _controller.submitConversationReport(conversation: conversation, reason: reason);
+            _toast('Report sent to CS task list with conversation snapshot.');
+          },
+        ),
+      );
+    });
+  }
+
   void _showChatOptions(InboxConversation conversation) {
     final sheet = _InboxChatOptionsSheet(
       conversation: conversation,
@@ -231,10 +264,7 @@ class _InboxPageState extends State<InboxPage> {
         _closeChatOptions();
         _toast(conversation.isPinned ? 'Chat unpinned.' : 'Chat pinned.');
       },
-      onReport: () {
-        _closeChatOptions();
-        _toast('Report flow will connect to CS/Monitor workflow later.');
-      },
+      onReport: () => _openReportSheet(conversation),
     );
 
     if (widget.openPagesInOverlay) {
@@ -269,7 +299,9 @@ class _InboxPageState extends State<InboxPage> {
                 SliverToBoxAdapter(
                   child: InboxHeader(
                     lockedCount: _controller.lockedCount,
+                    reportTaskCount: _controller.pendingReportTaskCount,
                     onLockTap: _openLockedVault,
+                    onReportTasksTap: _openCsReportTasks,
                     onSettingsTap: _openSettings,
                     onSearchTap: _openSearch,
                   ),
