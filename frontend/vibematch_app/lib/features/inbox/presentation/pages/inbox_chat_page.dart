@@ -76,6 +76,20 @@ class _InboxChatPageState extends State<InboxChatPage> {
     setState(() => _replyToText = null);
   }
 
+  void _insertEmoji(String emoji) {
+    final selection = _textController.selection;
+    final oldText = _textController.text;
+    final start = selection.start >= 0 ? selection.start : oldText.length;
+    final end = selection.end >= 0 ? selection.end : oldText.length;
+    final newText = oldText.replaceRange(start, end, emoji);
+    final newOffset = start + emoji.length;
+
+    _textController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newOffset),
+    );
+  }
+
   void _showToast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -95,15 +109,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => SocialEmojiPackSheet(
-        onEmojiSelected: (emoji) {
-          Navigator.pop(context);
-          widget.controller.sendTextMessage(
-            conversationId: _conversation.id,
-            text: '${emoji.emoji} ${emoji.label}',
-            replyToText: _replyToText,
-          );
-          setState(() => _replyToText = null);
-        },
+        onEmojiSelected: _insertEmoji,
       ),
     );
   }
