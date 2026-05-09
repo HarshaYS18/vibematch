@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_routes.dart';
+import '../../features/auth/models/current_user.dart';
 
 class VmNavigator {
   const VmNavigator._();
@@ -12,6 +13,7 @@ class VmNavigator {
     required String language,
     required String modeTitle,
     required int onlineCount,
+    CurrentUser? currentUser,
   }) {
     return Navigator.pushNamed<T>(
       context,
@@ -22,6 +24,7 @@ class VmNavigator {
         language: language,
         modeTitle: modeTitle,
         onlineCount: onlineCount,
+        currentUser: currentUser,
       ),
     );
   }
