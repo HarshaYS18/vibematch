@@ -8,7 +8,7 @@ import '../../../rooms/presentation/live_room_page.dart';
 import '../../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/presentation/wallet_page.dart';
-import '../control_center/control_center_ultra_page.dart';
+import '../control_center/super_power_panel_page.dart';
 import '../cover_photos/edit_cover_photos_page.dart';
 import '../edit_profile_page.dart';
 import '../help_center/help_center_page.dart';
@@ -127,7 +127,7 @@ class MePageContent extends StatelessWidget {
   void _openControlCentre(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => UltraControlCentrePage(currentRole: user.primaryRole),
+        builder: (_) => SuperPowerPanelPage(currentRole: user.primaryRole),
       ),
     );
   }
