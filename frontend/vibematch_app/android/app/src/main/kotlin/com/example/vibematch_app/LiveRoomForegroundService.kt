@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -18,7 +19,16 @@ class LiveRoomForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val roomName = intent?.getStringExtra(EXTRA_ROOM_NAME)?.takeIf { it.isNotBlank() } ?: "Live Room"
         val roomId = intent?.getStringExtra(EXTRA_ROOM_ID)?.takeIf { it.isNotBlank() } ?: "Vibe Match"
-        startForeground(NOTIFICATION_ID, buildNotification(roomName, roomId))
+        val notification = buildNotification(roomName, roomId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
         return START_STICKY
     }
 
@@ -46,7 +56,7 @@ class LiveRoomForegroundService : Service() {
             "Live room connection",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Keeps Vibe Match live room connection active while the room is open."
+            description = "Keeps Vibe Match live room audio active while the room is open."
             setShowBadge(false)
         }
         manager.createNotificationChannel(channel)
