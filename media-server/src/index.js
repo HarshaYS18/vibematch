@@ -15,18 +15,20 @@ app.use(express.json());
 
 const rooms = new Map();
 
+function log(type, payload = {}) {
+  const time = new Date().toISOString();
+  console.log(`[${time}] ${type}`, payload);
+}
+
 function getOrCreateRoom(roomId) {
   const id = String(roomId || '').trim();
   if (!id) throw new Error('room_id is required');
 
   let room = rooms.get(id);
   if (!room) {
-    room = {
-      id,
-      peers: new Map(),
-      createdAt: new Date().toISOString(),
-    };
+    room = { id, peers: new Map(), createdAt: new Date().toISOString() };
     rooms.set(id, room);
+    log('room/created', { room_id: id });
   }
   return room;
 }
@@ -84,6 +86,7 @@ wss.on('connection', (ws) => {
   let currentRoom = null;
   let currentPeer = null;
 
+  log('ws/connected');
   send(ws, 'media/connected', {
     server_time: new Date().toISOString(),
     message: 'Connected to Vibe Match media signaling server.',
@@ -94,12 +97,14 @@ wss.on('connection', (ws) => {
     try {
       message = JSON.parse(raw.toString());
     } catch (_error) {
+      log('ws/error_invalid_json', { raw: raw.toString().slice(0, 200) });
       send(ws, 'error', { detail: 'Invalid JSON message.' });
       return;
     }
 
     const type = message.type;
     const payload = message.payload || {};
+    log('event/received', { type, payload });
 
     try {
       if (type === 'room/join') {
@@ -117,18 +122,10 @@ wss.on('connection', (ws) => {
         currentRoom = room;
         currentPeer = peer;
         room.peers.set(peer.id, peer);
+        log('room/joined', { room_id: room.id, peer_id: peer.id, user_id: peer.userId, display_name: peer.displayName, peer_count: room.peers.size });
 
-        send(ws, 'room/joined', {
-          peer_id: peer.id,
-          room: roomSnapshot(room),
-        });
-
-        broadcast(room, 'room/peer_joined', {
-          peer_id: peer.id,
-          user_id: peer.userId,
-          display_name: peer.displayName,
-          room: roomSnapshot(room),
-        }, peer.id);
+        send(ws, 'room/joined', { peer_id: peer.id, room: roomSnapshot(room) });
+        broadcast(room, 'room/peer_joined', { peer_id: peer.id, user_id: peer.userId, display_name: peer.displayName, room: roomSnapshot(room) }, peer.id);
         return;
       }
 
@@ -141,6 +138,7 @@ wss.on('connection', (ws) => {
         const room = currentRoom;
         const peer = currentPeer;
         room.peers.delete(peer.id);
+        log('room/left', { room_id: room.id, peer_id: peer.id, peer_count: room.peers.size });
         broadcast(room, 'room/peer_left', { peer_id: peer.id, room: roomSnapshot(room) });
         send(ws, 'room/left', { peer_id: peer.id });
         if (room.peers.size === 0) rooms.delete(room.id);
@@ -151,36 +149,23 @@ wss.on('connection', (ws) => {
 
       if (type === 'seat/take') {
         currentPeer.seatIndex = payload.seat_index;
-        broadcast(currentRoom, 'seat/updated', {
-          peer_id: currentPeer.id,
-          user_id: currentPeer.userId,
-          seat_index: currentPeer.seatIndex,
-          room: roomSnapshot(currentRoom),
-        });
+        log('seat/take', { room_id: currentRoom.id, peer_id: currentPeer.id, seat_index: currentPeer.seatIndex });
+        broadcast(currentRoom, 'seat/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, seat_index: currentPeer.seatIndex, room: roomSnapshot(currentRoom) });
         return;
       }
 
       if (type === 'seat/leave') {
         currentPeer.seatIndex = null;
         currentPeer.micEnabled = false;
-        broadcast(currentRoom, 'seat/updated', {
-          peer_id: currentPeer.id,
-          user_id: currentPeer.userId,
-          seat_index: null,
-          mic_enabled: false,
-          room: roomSnapshot(currentRoom),
-        });
+        log('seat/leave', { room_id: currentRoom.id, peer_id: currentPeer.id });
+        broadcast(currentRoom, 'seat/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, seat_index: null, mic_enabled: false, room: roomSnapshot(currentRoom) });
         return;
       }
 
       if (type === 'mic/set_enabled') {
         currentPeer.micEnabled = Boolean(payload.enabled) && currentPeer.seatIndex != null;
-        broadcast(currentRoom, 'mic/updated', {
-          peer_id: currentPeer.id,
-          user_id: currentPeer.userId,
-          mic_enabled: currentPeer.micEnabled,
-          room: roomSnapshot(currentRoom),
-        });
+        log('mic/set_enabled', { room_id: currentRoom.id, peer_id: currentPeer.id, mic_enabled: currentPeer.micEnabled });
+        broadcast(currentRoom, 'mic/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, mic_enabled: currentPeer.micEnabled, room: roomSnapshot(currentRoom) });
         return;
       }
 
@@ -191,15 +176,13 @@ wss.on('connection', (ws) => {
           send(ws, 'error', { detail: 'Target peer not found for WebRTC signaling.' });
           return;
         }
-        send(target.ws, type, {
-          ...payload,
-          from_peer_id: currentPeer.id,
-          from_user_id: currentPeer.userId,
-        });
+        log(type, { room_id: currentRoom.id, from_peer_id: currentPeer.id, target_peer_id: targetPeerId });
+        send(target.ws, type, { ...payload, from_peer_id: currentPeer.id, from_user_id: currentPeer.userId });
         return;
       }
 
       if (type === 'room/chat') {
+        log('room/chat', { room_id: currentRoom.id, peer_id: currentPeer.id, text_length: String(payload.text || '').length });
         broadcast(currentRoom, 'room/chat', {
           id: randomUUID(),
           peer_id: currentPeer.id,
@@ -211,17 +194,23 @@ wss.on('connection', (ws) => {
         return;
       }
 
+      log('event/unsupported', { type });
       send(ws, 'error', { detail: `Unsupported event type: ${type}` });
     } catch (error) {
+      log('event/error', { type, detail: error.message || 'Unhandled media server error.' });
       send(ws, 'error', { detail: error.message || 'Unhandled media server error.' });
     }
   });
 
   ws.on('close', () => {
-    if (!currentRoom || !currentPeer) return;
+    if (!currentRoom || !currentPeer) {
+      log('ws/closed_without_room');
+      return;
+    }
     const room = currentRoom;
     const peer = currentPeer;
     room.peers.delete(peer.id);
+    log('ws/closed', { room_id: room.id, peer_id: peer.id, peer_count: room.peers.size });
     broadcast(room, 'room/peer_left', { peer_id: peer.id, room: roomSnapshot(room) });
     if (room.peers.size === 0) rooms.delete(room.id);
   });
