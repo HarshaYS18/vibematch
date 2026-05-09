@@ -5,6 +5,7 @@ from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserMeResponse
+from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
 
 
@@ -49,8 +50,9 @@ def get_current_user(
 
 @router.get("/me", response_model=UserMeResponse)
 def get_me(current_user: User = Depends(get_current_user)):
-    roles = [role.value for role in get_user_roles(current_user)]
-    primary_role = get_primary_role(current_user).value
+    user_roles = get_user_roles(current_user)
+    roles = [role.value for role in user_roles]
+    primary_role = get_primary_role(current_user)
 
     return UserMeResponse(
         id=current_user.id,
@@ -60,7 +62,9 @@ def get_me(current_user: User = Depends(get_current_user)):
         display_name=current_user.display_name,
         avatar_url=current_user.avatar_url,
         roles=roles,
-        primary_role=primary_role,
+        primary_role=primary_role.value,
+        primary_role_badge=get_primary_role_badge(primary_role),
+        role_badges=get_role_badges(user_roles),
         is_active=current_user.is_active,
         is_banned=current_user.is_banned,
         last_device_id=current_user.last_device_id,
