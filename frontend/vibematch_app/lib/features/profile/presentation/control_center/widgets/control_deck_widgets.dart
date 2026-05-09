@@ -12,6 +12,8 @@ class ControlDeckShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final subtitleText = subtitle;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -21,11 +23,11 @@ class ControlDeckShell extends StatelessWidget {
         children: [
           Row(children: [
             Expanded(child: Text(title, style: const TextStyle(color: SuperPowerDesign.text, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: -0.2))),
-            if (trailing != null) trailing!,
+            if (trailing case final trailingWidget?) trailingWidget,
           ]),
-          if (subtitle != null) ...[
+          if (subtitleText != null) ...[
             const SizedBox(height: 3),
-            Text(subtitle!, style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 11, height: 1.25, fontWeight: FontWeight.w700)),
+            Text(subtitleText, style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 11, height: 1.25, fontWeight: FontWeight.w700)),
           ],
           const SizedBox(height: 10),
           ...children,
