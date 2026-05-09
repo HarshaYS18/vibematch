@@ -155,6 +155,10 @@ class LiveRoomSeatController {
 
   bool inviteUserToSeat({required int seatIndex, required SeatUser invitedUser}) {
     if (seatIndex < 0 || seatIndex >= seats.length || seats[seatIndex].locked || seats[seatIndex].user != null) return false;
+    if (invitedUser.id == currentUser.id) {
+      onToast('You cannot invite yourself to a seat');
+      return false;
+    }
     final oldIndex = seats.indexWhere((seat) => seat.user?.id == invitedUser.id);
     final userToMove = oldIndex >= 0 ? seats[oldIndex].user! : invitedUser;
     if (oldIndex >= 0) seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
@@ -243,9 +247,35 @@ class LiveRoomSeatController {
     onChanged();
   }
 
+  void kickUserFromRoom({required String userId, required String duration}) {
+    var removedCurrentUser = false;
+    var removed = false;
+    for (var i = 0; i < seats.length; i++) {
+      if (seats[i].user?.id == userId) {
+        removedCurrentUser = removedCurrentUser || userId == currentUser.id;
+        seats[i] = seats[i].copyWith(clearUser: true);
+        removed = true;
+      }
+    }
+    selectedSeatIndex = null;
+    LiveRoomMediaSignalingService.instance.kickUser(targetUserId: userId, duration: duration);
+    if (removedCurrentUser) LiveRoomMediaSignalingService.instance.leaveSeat();
+    if (removed) onChanged();
+  }
+
   void toggleMic() {
-    micMuted = !micMuted;
     final index = seats.indexWhere((seat) => seat.user?.id == currentUser.id);
+    final localUser = index >= 0 ? seats[index].user : null;
+    if (localUser?.adminMuted ?? false) {
+      micMuted = true;
+      if (index >= 0) seats[index] = seats[index].copyWith(user: localUser!.copyWith(selfMuted: true));
+      LiveRoomMediaSignalingService.instance.setMicEnabled(false);
+      onToast('You are muted by the room admin');
+      onChanged();
+      return;
+    }
+
+    micMuted = !micMuted;
     if (index >= 0) seats[index] = seats[index].copyWith(user: seats[index].user!.copyWith(selfMuted: micMuted));
     LiveRoomMediaSignalingService.instance.setMicEnabled(!micMuted && index >= 0);
     onChanged();
@@ -254,8 +284,17 @@ class LiveRoomSeatController {
   void toggleSelfMute(String userId) {
     final index = seats.indexWhere((seat) => seat.user?.id == userId);
     if (index < 0) return;
-    final nextMuted = !seats[index].user!.selfMuted;
-    seats[index] = seats[index].copyWith(user: seats[index].user!.copyWith(selfMuted: nextMuted));
+    final user = seats[index].user!;
+    if (user.adminMuted && userId == currentUser.id) {
+      seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: true));
+      micMuted = true;
+      LiveRoomMediaSignalingService.instance.setMicEnabled(false);
+      onToast('You are muted by the room admin');
+      onChanged();
+      return;
+    }
+    final nextMuted = !user.selfMuted;
+    seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: nextMuted));
     if (userId == currentUser.id) micMuted = nextMuted;
     onChanged();
   }
@@ -265,7 +304,7 @@ class LiveRoomSeatController {
     if (index < 0) return;
     final user = seats[index].user!;
     final nextMuted = !user.adminMuted;
-    seats[index] = seats[index].copyWith(user: user.copyWith(adminMuted: nextMuted));
+    seats[index] = seats[index].copyWith(user: user.copyWith(adminMuted: nextMuted, selfMuted: nextMuted ? true : user.selfMuted));
     LiveRoomMediaSignalingService.instance.setAdminMute(targetUserId: userId, muted: nextMuted);
     onChanged();
   }
