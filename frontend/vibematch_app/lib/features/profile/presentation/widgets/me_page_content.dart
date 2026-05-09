@@ -270,6 +270,7 @@ class MePageContent extends StatelessWidget {
           publicId: user.publicUserId.toString(),
           role: user.primaryRole,
           roleTag: MeProfileConstants.roleTagFor(user.primaryRole),
+          roleBadge: user.primaryRoleBadge,
           vipLevel: MeProfileConstants.vipLevel,
           svipLevel: MeProfileConstants.svipLevel,
           vipFrozen: MeProfileConstants.vipFrozen,
