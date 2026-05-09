@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import (
     admin,
     auth,
+    coin_economy,
     inbox,
     inbox_ws,
     internal_multi_device,
@@ -21,6 +22,8 @@ from app.database import Base, engine
 from app.models import (
     AdminLog,
     AuthIdentity,
+    CoinBalance,
+    CoinTransaction,
     DeviceBan,
     InboxBackupJob,
     InboxBackupSetting,
@@ -77,3 +80,4 @@ app.include_router(mvp_operations.router)
 app.include_router(mvp_room_modes.router)
 app.include_router(internal_test.router)
 app.include_router(internal_multi_device.router)
+app.include_router(coin_economy.router)
