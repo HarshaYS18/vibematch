@@ -24,6 +24,7 @@ class LiveRoomAudioService {
   dynamic _audioProducer;
   dynamic _routerRtpCapabilities;
   Timer? _produceRetryTimer;
+  DateTime? _sendTransportWarmupUntil;
   int _produceRetryCount = 0;
   bool _joined = false;
   bool _connecting = false;
@@ -136,6 +137,7 @@ class LiveRoomAudioService {
     _producerInfoById.clear();
     _closingRemoteProducerIds.clear();
     _rebuildSendPipelineOnRetry = false;
+    _sendTransportWarmupUntil = null;
     _closeSendTransport();
     _closeRecvTransport();
     final socket = _socket;
@@ -313,12 +315,22 @@ class LiveRoomAudioService {
       });
 
       _sendTransport = transport;
-      _debug('send transport created id=${transport.id}');
+      _sendTransportWarmupUntil = DateTime.now().add(const Duration(milliseconds: 1400));
+      _debug('send transport created id=${transport.id}; warming up before produce');
     } catch (error) {
       _setError('Send transport create failed: $error');
     } finally {
       _sendTransportCreating = false;
     }
+  }
+
+  Future<void> _waitForSendTransportWarmup() async {
+    final until = _sendTransportWarmupUntil;
+    if (until == null) return;
+    final remaining = until.difference(DateTime.now());
+    if (remaining.isNegative || remaining == Duration.zero) return;
+    _debug('waiting ${remaining.inMilliseconds}ms for send transport warmup');
+    await Future<void>.delayed(remaining);
   }
 
   Future<void> _ensureRecvTransport() async {
@@ -380,9 +392,11 @@ class LiveRoomAudioService {
     _producerCreating = true;
     try {
       await _ensureSendTransport();
+      await _waitForSendTransportWarmup();
       final transport = _sendTransport;
       final stream = _localAudioStream;
       if (transport == null || stream == null) return;
+      if (!_seated || _selfMuted || _audioProducer != null) return;
       final audioTracks = stream.getAudioTracks();
       if (audioTracks.isEmpty) throw Exception('No local audio track available');
       final audioTrack = audioTracks.first;
@@ -440,7 +454,7 @@ class LiveRoomAudioService {
     }
     _produceRetryCount += 1;
     _debug('audio produce retry scheduled #$_produceRetryCount reason=$reason rebuild=$_rebuildSendPipelineOnRetry');
-    _produceRetryTimer = Timer(Duration(milliseconds: 450 + (_produceRetryCount * 300)), () {
+    _produceRetryTimer = Timer(Duration(milliseconds: 700 + (_produceRetryCount * 400)), () {
       _produceRetryTimer = null;
       if (!_seated || _selfMuted || _audioProducer != null) return;
       _debug('audio produce retry running #$_produceRetryCount rebuild=$_rebuildSendPipelineOnRetry');
@@ -455,7 +469,7 @@ class LiveRoomAudioService {
       _debug('audio produce retry rebuilding mic stream and send transport');
       _closeSendTransport();
       await _stopLocalMicCapture();
-      await Future<void>.delayed(const Duration(milliseconds: 180));
+      await Future<void>.delayed(const Duration(milliseconds: 250));
       if (!_seated || _selfMuted) return;
       await _startLocalMicCapture();
     }
@@ -585,6 +599,7 @@ class LiveRoomAudioService {
   void _closeSendTransport() {
     final transport = _sendTransport;
     _sendTransport = null;
+    _sendTransportWarmupUntil = null;
     _cancelProduceRetry();
     try {
       transport?.close();
