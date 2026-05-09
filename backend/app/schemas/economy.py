@@ -75,6 +75,32 @@ class GiftEconomyPreviewResponse(BaseModel):
     rule: str
 
 
+class GiftSendRequest(BaseModel):
+    receiver_user_id: int
+    gift_id: str = Field(..., min_length=1, max_length=80)
+    coin_value: int = Field(..., gt=0)
+    quantity: int = Field(default=1, gt=0)
+    room_id: int | None = None
+    relationship_id: int | None = None
+    is_relationship_gift: bool = False
+
+
+class GiftSendResponse(BaseModel):
+    gift_transaction_id: int
+    sender_user_id: int
+    receiver_user_id: int
+    total_coin_value: int
+    receiver_ruby_amount: int
+    platform_share_coin_value: int
+    send_exp_amount: int
+    receive_exp_amount: int
+    room_exp_amount: int
+    love_score_amount: int
+    sender_coin_balance: int
+    receiver_ruby_balance: int
+    rule: str
+
+
 class RubyConversionRequest(BaseModel):
     ruby_amount: int = Field(..., gt=0)
 
