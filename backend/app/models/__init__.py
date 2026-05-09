@@ -32,3 +32,4 @@ from app.models.inbox_backup import (
     InboxBackupStatus,
     InboxBackupFrequency,
 )
+from app.models.mvp_feature import MvpFeatureState
