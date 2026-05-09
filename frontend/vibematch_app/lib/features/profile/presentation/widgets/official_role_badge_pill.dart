@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../auth/models/role_badge.dart';
+import '../../../auth/models/role_badge.dart';
 
 class OfficialRoleBadgePill extends StatelessWidget {
   const OfficialRoleBadgePill({
