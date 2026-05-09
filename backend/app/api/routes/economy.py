@@ -5,7 +5,7 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.economy import CoinSupplyPool, GamePool, UserWallet
 from app.models.user import User
-from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, RubyConversionRequest, RubyWithdrawRequestCreate
+from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, GiftSendRequest, GiftSendResponse, RubyConversionRequest, RubyWithdrawRequestCreate
 from app.services import economy_service
 
 router = APIRouter(prefix="/economy", tags=["Economy"])
@@ -51,6 +51,27 @@ def get_my_economy_dashboard(current_user: User = Depends(get_current_user), db:
 def preview_gift_economy(payload: GiftEconomyPreviewRequest):
     return GiftEconomyPreviewResponse(
         **economy_service.preview_gift_economy(
+            coin_value=payload.coin_value,
+            quantity=payload.quantity,
+            room_id=payload.room_id,
+            relationship_id=payload.relationship_id,
+            is_relationship_gift=payload.is_relationship_gift,
+        )
+    )
+
+
+@router.post("/gifts/send", response_model=GiftSendResponse)
+def send_gift(
+    payload: GiftSendRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return GiftSendResponse(
+        **economy_service.send_gift(
+            db=db,
+            sender=current_user,
+            receiver_user_id=payload.receiver_user_id,
+            gift_id=payload.gift_id,
             coin_value=payload.coin_value,
             quantity=payload.quantity,
             room_id=payload.room_id,
