@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
+import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
 import '../../../rooms/presentation/live_room_models.dart';
@@ -101,11 +102,7 @@ class MePageContent extends StatelessWidget {
   }
 
   void _openAccountSettings(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AccountSettingsPage(svipLevel: MeProfileConstants.svipLevel),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => AccountSettingsPage(svipLevel: MeProfileConstants.svipLevel)));
   }
 
   void _openHelpCentre(BuildContext context) {
@@ -125,11 +122,11 @@ class MePageContent extends StatelessWidget {
   }
 
   void _openControlCentre(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SuperPowerPanelPage(currentRole: user.primaryRole),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => SuperPowerPanelPage(currentRole: user.primaryRole)));
+  }
+
+  void _openMerchantSellerPanel(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MerchantSellerPanelPage()));
   }
 
   void _openFamily(BuildContext context) {
@@ -137,14 +134,7 @@ class MePageContent extends StatelessWidget {
   }
 
   void _openCurrentFamily(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => FamilyModularPage(
-          openCurrentFamily: true,
-          initialFamilyProfile: _currentFamilyProfile,
-        ),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => FamilyModularPage(openCurrentFamily: true, initialFamilyProfile: _currentFamilyProfile)));
   }
 
   void _openFamilyDetails(BuildContext context) {
@@ -201,29 +191,15 @@ class MePageContent extends StatelessWidget {
   }
 
   void _openFollowersFollowed(BuildContext context, {required int initialTabIndex}) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => FollowersFollowedPage(
-          user: _viewerSeatUser,
-          users: _socialPreviewUsers,
-          initialTabIndex: initialTabIndex,
-        ),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => FollowersFollowedPage(user: _viewerSeatUser, users: _socialPreviewUsers, initialTabIndex: initialTabIndex)));
   }
 
   void _openVisitors(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ProfileVisitorsPage(profileOwnerUserId: user.id),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProfileVisitorsPage(profileOwnerUserId: user.id)));
   }
 
   void _openRooms(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ProfileRoomsPage(userId: user.id)),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProfileRoomsPage(userId: user.id)));
   }
 
   void _openCurrentRoom(BuildContext context) {
@@ -251,11 +227,7 @@ class MePageContent extends StatelessWidget {
     final vipColor = MeProfileConstants.vipMainColor(MeProfileConstants.vipLevel);
     final vipDark = MeProfileConstants.vipDarkColor(MeProfileConstants.vipLevel);
     final relationshipType = MeProfileConstants.relationshipTypeFor(user);
-    final items = buildMeActionItems(
-      vipLevel: MeProfileConstants.vipLevel,
-      svipLevel: MeProfileConstants.svipLevel,
-      coverPhotoStatus: MeProfileConstants.coverPhotoStatus,
-    );
+    final items = buildMeActionItems(vipLevel: MeProfileConstants.vipLevel, svipLevel: MeProfileConstants.svipLevel, coverPhotoStatus: MeProfileConstants.coverPhotoStatus);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 116),
@@ -287,17 +259,9 @@ class MePageContent extends StatelessWidget {
           onRoomTap: () => _openCurrentRoom(context),
         ),
         const SizedBox(height: 14),
-        MeStatsRow(
-          onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1),
-          onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0),
-          onRoomsTap: () => _openRooms(context),
-          onVisitorsTap: () => _openVisitors(context),
-        ),
+        MeStatsRow(onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1), onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0), onRoomsTap: () => _openRooms(context), onVisitorsTap: () => _openVisitors(context)),
         const SizedBox(height: 14),
-        MeRelationshipPanel(
-          relationshipLabel: relationshipType,
-          onBondTap: (bond) => _openBondDetail(context, bond),
-        ),
+        MeRelationshipPanel(relationshipLabel: relationshipType, onBondTap: (bond) => _openBondDetail(context, bond)),
         const SizedBox(height: 18),
         const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
         const SizedBox(height: 12),
@@ -319,6 +283,8 @@ class MePageContent extends StatelessWidget {
                   _openStore(context);
                 } else if (item.title == 'Control Center') {
                   _openControlCentre(context);
+                } else if (item.title == 'Merchant & Seller Panel') {
+                  _openMerchantSellerPanel(context);
                 } else if (item.title == 'Settings') {
                   _openAccountSettings(context);
                 } else if (item.title == 'Help Centre') {
