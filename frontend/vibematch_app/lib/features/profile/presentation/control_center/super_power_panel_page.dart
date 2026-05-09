@@ -549,15 +549,35 @@ class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> 
   final TextEditingController _user = TextEditingController();
   final TextEditingController _reason = TextEditingController();
   final TextEditingController _days = TextEditingController(text: '1');
-  final TextEditingController _device = TextEditingController();
-  String _action = 'CUSTOM_BAN_DAYS';
+  String? _selectedDeviceId;
+List<String> _deviceIds = const <String>[];
+String _action = 'CUSTOM_BAN_DAYS';
+
+static const Map<String, List<String>> _mockUserDevices = <String, List<String>>{
+  '1': <String>['web-install-founder-01', 'android-emulator-founder-01', 'edge-browser-founder-01'],
+  '2': <String>['web-install-user-02', 'android-device-user-02'],
+  '6922022': <String>['web-install-6922022-main', 'edge-browser-6922022', 'android-founder-6922022'],
+};
+
+void _loadUserDevices(String userId) {
+  final trimmed = userId.trim();
+  final devices = _mockUserDevices[trimmed] ??
+      <String>[
+        'web-install-$trimmed-primary',
+        'android-device-$trimmed-last-login',
+      ];
+
+  setState(() {
+    _deviceIds = devices;
+    _selectedDeviceId = devices.isEmpty ? null : devices.first;
+  });
+}
 
   @override
   void dispose() {
     _user.dispose();
     _reason.dispose();
     _days.dispose();
-    _device.dispose();
     super.dispose();
   }
 
@@ -565,18 +585,20 @@ class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> 
     final userId = _user.text.trim();
     final reason = _reason.text.trim();
     if (userId.isEmpty || reason.isEmpty) return;
-    final deviceId = _device.text.trim();
+    final deviceId = _selectedDeviceId ?? '';
     final days = int.tryParse(_days.text.trim()) ?? 0;
     final label = switch (_action) {
       'CUSTOM_BAN_DAYS' => 'Custom ban',
       'DEVICE_BAN' => 'Device ban',
+      'DEVICE_UNBAN' => 'Device unban',
       'BAN_USER' => 'Ban user',
       'UNBAN_USER' => 'Unban user',
       _ => _action,
     };
     final detail = switch (_action) {
-      'CUSTOM_BAN_DAYS' => '$days day(s) â€¢ $reason',
-      'DEVICE_BAN' => 'device_id=${deviceId.isEmpty ? 'not_provided' : deviceId} â€¢ $reason',
+      'CUSTOM_BAN_DAYS' => '$days day(s) • $reason',
+      'DEVICE_BAN' => 'device_id=${deviceId.isEmpty ? 'not_selected' : deviceId} • $reason',
+      'DEVICE_UNBAN' => 'device_id=${deviceId.isEmpty ? 'not_selected' : deviceId} • $reason',
       _ => reason,
     };
     Navigator.pop(
@@ -586,7 +608,7 @@ class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> 
         label: label,
         userId: userId,
         reason: detail,
-        resourceType: _action == 'DEVICE_BAN' ? 'device_ban' : 'user_ban',
+        resourceType: _action == 'DEVICE_BAN' || _action == 'DEVICE_UNBAN' ? 'device_ban' : 'user_ban',
       ),
     );
   }
@@ -609,6 +631,7 @@ class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> 
               items: const [
                 DropdownMenuItem(value: 'CUSTOM_BAN_DAYS', child: Text('Custom ban days')),
                 DropdownMenuItem(value: 'DEVICE_BAN', child: Text('Device ban')),
+                DropdownMenuItem(value: 'DEVICE_UNBAN', child: Text('Device unban')),
                 DropdownMenuItem(value: 'BAN_USER', child: Text('Ban user')),
                 DropdownMenuItem(value: 'UNBAN_USER', child: Text('Unban / restore user')),
               ],
@@ -616,14 +639,29 @@ class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> 
               decoration: _input('Action'),
             ),
             const SizedBox(height: 8),
-            TextField(controller: _user, decoration: _input('Target user ID')),
+            TextField(controller: _user, decoration: _input('Target user ID'), onChanged: _loadUserDevices),
             if (_action == 'CUSTOM_BAN_DAYS') ...[
               const SizedBox(height: 8),
               TextField(controller: _days, keyboardType: TextInputType.number, decoration: _input('No. of ban days')),
             ],
-            if (_action == 'DEVICE_BAN') ...[
+            if (_action == 'DEVICE_BAN' || _action == 'DEVICE_UNBAN') ...[
               const SizedBox(height: 8),
-              TextField(controller: _device, decoration: _input('Device ID')),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedDeviceId,
+                items: _deviceIds
+                    .map((deviceId) => DropdownMenuItem<String>(
+                          value: deviceId,
+                          child: Text(deviceId, overflow: TextOverflow.ellipsis),
+                        ))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedDeviceId = value),
+                decoration: _input('Device ID from login history'),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Later backend: fetch from /admin/login-history/user/{user_id} or /admin/users/{user_id}/devices.',
+                style: TextStyle(color: Color(0xFF6B6474), fontSize: 10.5, fontWeight: FontWeight.w700),
+              ),
             ],
             const SizedBox(height: 8),
             TextField(controller: _reason, minLines: 2, maxLines: 3, decoration: _input('Reason')),
@@ -646,4 +684,6 @@ class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> 
     );
   }
 }
+
+
 
