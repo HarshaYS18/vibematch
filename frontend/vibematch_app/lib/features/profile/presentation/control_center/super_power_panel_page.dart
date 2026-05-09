@@ -4,6 +4,7 @@ import 'control_center_models.dart';
 import 'control_center_store.dart';
 import 'widgets/control_action_sheets.dart';
 import 'widgets/control_deck_widgets.dart';
+import 'widgets/control_performance_panel.dart';
 import 'widgets/control_power_categories_panel.dart';
 import 'widgets/control_review_panel.dart';
 import 'widgets/control_role_panel.dart';
@@ -150,7 +151,8 @@ class _SuperPowerPanelPageState extends State<SuperPowerPanelPage> {
 
   Widget _body(ControlCenterState state) {
     return switch (_section) {
-      ControlCenterSection.overview => _Overview(state: state, onMint: () => _changePool(add: true), onRemovePool: () => _changePool(add: false), onSendCoins: _sendCoins, onPower: () => setState(() => _section = ControlCenterSection.powers), onReview: () => setState(() => _section = ControlCenterSection.review), onRole: () => setState(() => _section = ControlCenterSection.powers)),
+      ControlCenterSection.overview => _Overview(state: state, onMint: () => _changePool(add: true), onRemovePool: () => _changePool(add: false), onSendCoins: _sendCoins, onPower: () => setState(() => _section = ControlCenterSection.powers), onReview: () => setState(() => _section = ControlCenterSection.review), onRole: () => setState(() => _section = ControlCenterSection.powers), onPerformance: () => setState(() => _section = ControlCenterSection.performance)),
+      ControlCenterSection.performance => const ControlPerformancePanel(),
       ControlCenterSection.invisibility => _Stealth(state: state, save: _save),
       ControlCenterSection.logs => _Logs(logs: state.logs),
       ControlCenterSection.powers => Column(children: [ControlRolePanel(roles: state.roleAssignments, onAssignRole: _assignRole, onRemoveRole: _removeRole), const SizedBox(height: 12), ControlPowerCategoriesPanel(grants: state.powerGrants, onGrantPower: _grantPower, onToggleGrant: _togglePower)]),
@@ -240,7 +242,7 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
 }
 
 class _Overview extends StatelessWidget {
-  const _Overview({required this.state, required this.onMint, required this.onRemovePool, required this.onSendCoins, required this.onPower, required this.onReview, required this.onRole});
+  const _Overview({required this.state, required this.onMint, required this.onRemovePool, required this.onSendCoins, required this.onPower, required this.onReview, required this.onRole, required this.onPerformance});
   final ControlCenterState state;
   final VoidCallback onMint;
   final VoidCallback onRemovePool;
@@ -248,11 +250,13 @@ class _Overview extends StatelessWidget {
   final VoidCallback onPower;
   final VoidCallback onReview;
   final VoidCallback onRole;
+  final VoidCallback onPerformance;
 
   @override
   Widget build(BuildContext context) {
     return Column(children: [
       ControlDeckShell(title: 'Command Stack', subtitle: 'Most-used Founder controls in one compact deck.', children: [
+        ControlDeckRow(icon: Icons.insights_rounded, title: 'Performance Command', subtitle: 'Compare officials, sellers, merchants, agencies and users', accent: SuperPowerDesign.aqua, onTap: onPerformance),
         ControlDeckRow(icon: Icons.verified_user_rounded, title: 'Official roles', subtitle: 'Assign or remove official app roles', accent: SuperPowerDesign.gold, onTap: onRole),
         ControlDeckRow(icon: Icons.admin_panel_settings_rounded, title: 'Power categories', subtitle: 'Moderation, economy, rooms, identity, reviews', accent: SuperPowerDesign.violet, onTap: onPower),
         ControlDeckRow(icon: Icons.fact_check_rounded, title: 'Mapped review panel', subtitle: 'Official mapping, issue details, accept/reject', accent: SuperPowerDesign.aqua, onTap: onReview),
