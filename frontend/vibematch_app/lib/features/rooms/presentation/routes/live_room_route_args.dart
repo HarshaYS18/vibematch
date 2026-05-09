@@ -1,3 +1,5 @@
+import '../../../auth/models/current_user.dart';
+
 class LiveRoomRouteViewArgs {
   const LiveRoomRouteViewArgs({
     required this.roomName,
@@ -5,6 +7,7 @@ class LiveRoomRouteViewArgs {
     required this.language,
     required this.modeTitle,
     required this.onlineCount,
+    this.currentUser,
   });
 
   final String roomName;
@@ -12,4 +15,5 @@ class LiveRoomRouteViewArgs {
   final String language;
   final String modeTitle;
   final int onlineCount;
+  final CurrentUser? currentUser;
 }
