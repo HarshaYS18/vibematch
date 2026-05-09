@@ -66,7 +66,9 @@ class UserMiniProfileSheet extends StatelessWidget {
   final VoidCallback? onKickOutTap;
 
   bool get _isSelf => user.id == currentUser.id;
-  bool get _showAdminMenu => canModerate && !_isSelf;
+  bool get _showAdminMenu => canModerate && !_isSelf && _currentUserPower >= 100 && _targetPower < 100;
+  int get _currentUserPower => _roomPower(currentUser);
+  int get _targetPower => _roomPower(user);
 
   @override
   Widget build(BuildContext context) {
@@ -127,8 +129,8 @@ class UserMiniProfileSheet extends StatelessWidget {
                 ],
                 const SizedBox(height: 10),
                 RoomProfileActionRow(
-                  isSelf: _isSelf,
-                  canModerate: canModerate,
+                  user: user,
+                  currentUser: currentUser,
                   selfMuted: user.selfMuted,
                   adminMuted: user.adminMuted,
                   onLeaveAndLock: onLeaveAndLock,
@@ -153,5 +155,21 @@ class UserMiniProfileSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static int _roomPower(SeatUser user) {
+    final role = user.roleLabel.toLowerCase();
+    final isOwner = user.isHost ||
+        user.id == 'user_6922022' ||
+        user.id == 'founder_owner' ||
+        role.contains('owner') ||
+        role.contains('channel host') ||
+        role == 'host';
+    if (isOwner) return 100;
+
+    final isAdmin = user.isRoomAdmin || role.contains('admin') || role.contains('administrator');
+    if (isAdmin) return 90;
+
+    return 0;
   }
 }
