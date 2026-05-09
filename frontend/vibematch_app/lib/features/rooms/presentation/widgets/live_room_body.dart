@@ -198,19 +198,21 @@ class LiveRoomBody extends StatelessWidget {
               if (invite == null || invite.seatIndex < 0) return const SizedBox.shrink();
               final currentUser = media.activeLoggedInSeatUser;
               if (currentUser == null) return const SizedBox.shrink();
-              return Positioned(
-                left: 12,
-                right: 12,
-                top: 92,
-                child: LiveRoomSeatInviteNotification(
-                  inviterName: invite.inviterName,
-                  invitedUser: currentUser,
-                  seatIndex: invite.seatIndex,
-                  onReject: media.clearSeatInvite,
-                  onAccept: () {
-                    media.takeSeat(invite.seatIndex);
-                    media.clearSeatInvite();
-                  },
+              return Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: false,
+                  child: Center(
+                    child: LiveRoomSeatInviteNotification(
+                      inviterName: invite.inviterName,
+                      invitedUser: currentUser,
+                      seatIndex: invite.seatIndex,
+                      onReject: media.clearSeatInvite,
+                      onAccept: () {
+                        media.takeSeat(invite.seatIndex);
+                        media.clearSeatInvite();
+                      },
+                    ),
+                  ),
                 ),
               );
             },
