@@ -72,6 +72,16 @@ class _SuperPowerPanelPageState extends State<SuperPowerPanelPage> {
     });
   }
 
+  Future<void> _setGlobalStealth(bool value) async {
+    await _save(
+      (state) => state.copyWith(globalInvisible: value),
+      action: value ? 'INVISIBILITY_ON' : 'INVISIBILITY_OFF',
+      resourceType: 'presence',
+      reason: 'Global stealth toggled from cockpit overview',
+    );
+    _toast(value ? 'Stealth mode enabled.' : 'Stealth mode disabled.');
+  }
+
   Future<void> _changePool({required bool add}) async {
     final draft = await ControlNumberSheet.show(context, title: add ? 'Mint coins into authority pool' : 'Remove coins from authority pool');
     if (draft == null) return;
@@ -242,6 +252,7 @@ class _SuperPowerPanelPageState extends State<SuperPowerPanelPage> {
           onPower: () => setState(() => _section = ControlCenterSection.powers),
           onReview: () => setState(() => _section = ControlCenterSection.review),
           onRole: () => setState(() => _section = ControlCenterSection.powers),
+          onStealthChanged: _setGlobalStealth,
         ),
       ControlCenterSection.performance => const ControlPerformancePanel(),
       ControlCenterSection.invisibility => _Stealth(state: state, save: _save),
