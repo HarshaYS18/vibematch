@@ -265,12 +265,37 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       if (payload is Map<String, dynamic>) {
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
-          roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
+          final nextSnapshot = LiveMediaRoomSnapshot.fromJson(roomData);
+          if (type == 'admin_mute/updated') {
+            roomSnapshot.value = _overlayAdminMute(nextSnapshot, payload);
+          } else {
+            roomSnapshot.value = nextSnapshot;
+          }
+        } else if (type == 'admin_mute/updated') {
+          roomSnapshot.value = _overlayAdminMute(roomSnapshot.value, payload);
         }
       }
     } catch (error) {
       _debug('media received unreadable message: $raw');
     }
+  }
+
+  LiveMediaRoomSnapshot? _overlayAdminMute(LiveMediaRoomSnapshot? snapshot, Map<String, dynamic> payload) {
+    if (snapshot == null) return null;
+    final targetPeerId = payload['peer_id']?.toString();
+    final targetUserId = payload['user_id']?.toString();
+    final muted = payload['admin_muted'] == true || payload['adminMuted'] == true;
+    final micEnabled = payload.containsKey('mic_enabled') ? payload['mic_enabled'] == true : null;
+
+    return LiveMediaRoomSnapshot(
+      roomId: snapshot.roomId,
+      peers: snapshot.peers.map((peer) {
+        final matchesPeer = targetPeerId != null && targetPeerId.isNotEmpty && peer.peerId == targetPeerId;
+        final matchesUser = targetUserId != null && targetUserId.isNotEmpty && peer.userId == targetUserId;
+        if (!matchesPeer && !matchesUser) return peer;
+        return peer.copyWith(adminMuted: muted, micEnabled: micEnabled ?? (muted ? false : peer.micEnabled));
+      }).toList(),
+    );
   }
 
   void _resetConnectionState() {
@@ -308,6 +333,17 @@ class LiveMediaPeerSnapshot {
   final int? seatIndex;
   final bool micEnabled;
   final bool adminMuted;
+
+  LiveMediaPeerSnapshot copyWith({bool? micEnabled, bool? adminMuted}) {
+    return LiveMediaPeerSnapshot(
+      peerId: peerId,
+      userId: userId,
+      displayName: displayName,
+      seatIndex: seatIndex,
+      micEnabled: micEnabled ?? this.micEnabled,
+      adminMuted: adminMuted ?? this.adminMuted,
+    );
+  }
 
   factory LiveMediaPeerSnapshot.fromJson(Map<String, dynamic> json) {
     final adminMutedValue = json['admin_muted'] ?? json['adminMuted'];
