@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
 
@@ -21,6 +22,11 @@ class LiveRoomSeatInviteNotification extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activeUserId = LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id;
+    if (activeUserId != null && invitedUser.id != activeUserId) {
+      return const SizedBox.shrink();
+    }
+
     return Positioned.fill(
       child: IgnorePointer(
         ignoring: false,
@@ -74,7 +80,7 @@ class LiveRoomSeatInviteNotification extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '$inviterName has invited you to take seat',
+                  '$inviterName has invited you to take seat ${seatIndex + 1}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: RoomColors.plum,
