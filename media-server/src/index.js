@@ -371,6 +371,25 @@ wss.on('connection', (ws) => {
         return;
       }
 
+      if (type === 'admin/kick_remove') {
+        const targetUserId = String(payload.target_user_id || '').trim();
+        if (!targetUserId) throw new Error('target_user_id is required for kick remove');
+        const existed = currentRoom.kickedUsers.delete(targetUserId);
+        cleanupExpiredKickouts(currentRoom);
+        log('admin/kick_remove', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_user_id: targetUserId, removed: existed });
+        broadcast(currentRoom, 'kick_block/removed', {
+          target_user_id: targetUserId,
+          removed: existed,
+          room: roomSnapshot(currentRoom),
+        });
+        send(ws, 'kick_block/remove_result', {
+          target_user_id: targetUserId,
+          removed: existed,
+          room: roomSnapshot(currentRoom),
+        });
+        return;
+      }
+
       if (type === 'webrtc/offer' || type === 'webrtc/answer' || type === 'webrtc/ice_candidate') {
         const targetPeerId = payload.target_peer_id;
         const target = currentRoom.peers.get(targetPeerId);
