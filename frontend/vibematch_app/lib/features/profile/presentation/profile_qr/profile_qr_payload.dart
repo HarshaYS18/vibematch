@@ -1,4 +1,5 @@
 import '../../../auth/models/current_user.dart';
+import '../../../auth/models/role_badge.dart';
 
 class ProfileQrPayload {
   const ProfileQrPayload({
@@ -61,6 +62,7 @@ class ProfileQrPayload {
   CurrentUser toResolvedUser() {
     final now = DateTime.now();
     final role = primaryRole.trim().isEmpty ? 'user' : primaryRole.trim();
+    final roleBadge = RoleBadge.fromRole(role);
 
     return CurrentUser(
       id: publicUserId,
@@ -71,6 +73,8 @@ class ProfileQrPayload {
       avatarUrl: avatarUrl,
       roles: <String>[role],
       primaryRole: role,
+      primaryRoleBadge: roleBadge,
+      roleBadges: [roleBadge],
       isActive: true,
       isBanned: false,
       lastDeviceId: null,
