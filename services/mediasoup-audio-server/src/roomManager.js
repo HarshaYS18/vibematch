@@ -19,6 +19,7 @@ function createSeatMap() {
       producerId: null,
       selfMuted: false,
       adminMuted: false,
+      locked: false,
     });
   }
 
@@ -133,6 +134,7 @@ function getSeatSnapshot(room) {
     producerId: seat.producerId,
     selfMuted: seat.selfMuted,
     adminMuted: seat.adminMuted,
+    locked: seat.locked,
   }));
 }
 
@@ -143,6 +145,7 @@ function takeSeat(room, peerId, requestedSeatNo) {
   const seatNo = Number(requestedSeatNo);
   const seat = room.seats.get(seatNo);
   if (!seat) throw new Error(`invalid seat number. Allowed seats: 1-${config.maxSpeakersPerRoom}`);
+  if (seat.locked) throw new Error(`seat ${seatNo} is locked`);
 
   if (seat.peerId && seat.peerId !== peerId) {
     throw new Error(`seat ${seatNo} is already occupied`);
@@ -180,6 +183,34 @@ function leaveSeat(room, peerId) {
   touchRoom(room);
 
   return seat;
+}
+
+function lockSeat(room, requestedSeatNo) {
+  const seatNo = Number(requestedSeatNo);
+  const seat = room.seats.get(seatNo);
+  if (!seat) throw new Error(`invalid seat number. Allowed seats: 1-${config.maxSpeakersPerRoom}`);
+  if (seat.peerId) leaveSeat(room, seat.peerId);
+  seat.locked = true;
+  touchRoom(room);
+  return seat;
+}
+
+function unlockSeat(room, requestedSeatNo) {
+  const seatNo = Number(requestedSeatNo);
+  const seat = room.seats.get(seatNo);
+  if (!seat) throw new Error(`invalid seat number. Allowed seats: 1-${config.maxSpeakersPerRoom}`);
+  seat.locked = false;
+  touchRoom(room);
+  return seat;
+}
+
+function forceLeaveSeat(room, targetPeerId) {
+  return leaveSeat(room, String(targetPeerId));
+}
+
+function forceLeaveAndLockSeat(room, requestedSeatNo, targetPeerId) {
+  forceLeaveSeat(room, String(targetPeerId));
+  return lockSeat(room, Number(requestedSeatNo));
 }
 
 function setSeatProducer(room, peerId, producerId) {
@@ -272,17 +303,9 @@ function removePeer(roomId, peerId) {
 
   leaveSeat(room, peerId);
 
-  for (const consumer of peer.consumers.values()) {
-    consumer.close();
-  }
-
-  for (const producer of peer.producers.values()) {
-    producer.close();
-  }
-
-  for (const transport of peer.transports.values()) {
-    transport.close();
-  }
+  for (const consumer of peer.consumers.values()) consumer.close();
+  for (const producer of peer.producers.values()) producer.close();
+  for (const transport of peer.transports.values()) transport.close();
 
   room.peers.delete(peerId);
   touchRoom(room);
@@ -301,6 +324,10 @@ module.exports = {
   getSeatSnapshot,
   takeSeat,
   leaveSeat,
+  lockSeat,
+  unlockSeat,
+  forceLeaveSeat,
+  forceLeaveAndLockSeat,
   setSeatProducer,
   setSelfMuted,
   setAdminMuted,
