@@ -38,18 +38,11 @@ class _AppShellState extends State<AppShell> {
     final activeUser = _activeUser;
 
     return [
-      HomePage(
-        user: activeUser,
-        currentUser: activeUser,
-      ),
+      HomePage(user: activeUser, currentUser: activeUser),
       const VibesPage(),
-      const CreatePage(),
+      CreatePage(currentUser: activeUser),
       const InboxPage(),
-      MePage(
-        user: activeUser,
-        onLogoutPressed: widget.onLogoutPressed,
-        onRefreshPressed: widget.onRefreshPressed,
-      ),
+      MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: widget.onRefreshPressed),
     ];
   }
 
@@ -69,22 +62,13 @@ class _AppShellState extends State<AppShell> {
           Column(
             children: [
               _LoggedInUserBanner(activeUser: activeUser),
-              Expanded(
-                child: IndexedStack(
-                  index: _selectedTab.tabIndex,
-                  children: _pages,
-                ),
-              ),
+              Expanded(child: IndexedStack(index: _selectedTab.tabIndex, children: _pages)),
             ],
           ),
           const _LiveRoomMiniBubbleLayer(),
         ],
       ),
-      bottomNavigationBar: _VibeBottomNav(
-        selectedTab: _selectedTab,
-        isTestingAsFounder: _isTestingAsFounder,
-        onTabSelected: _selectTab,
-      ),
+      bottomNavigationBar: _VibeBottomNav(selectedTab: _selectedTab, isTestingAsFounder: _isTestingAsFounder, onTabSelected: _selectTab),
     );
   }
 }
@@ -187,11 +171,7 @@ class _LoggedInUserBanner extends StatelessWidget {
             ),
             child: Text(
               isFounderOrOwner ? 'Official' : 'User',
-              style: TextStyle(
-                color: isFounderOrOwner ? Colors.white : const Color(0xFF4A2A63),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w900,
-              ),
+              style: TextStyle(color: isFounderOrOwner ? Colors.white : const Color(0xFF4A2A63), fontSize: 10.5, fontWeight: FontWeight.w900),
             ),
           ),
         ],
