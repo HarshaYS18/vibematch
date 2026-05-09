@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/network/vm_media_config.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
+import 'live_room_foreground_service.dart';
 
 class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   LiveRoomMediaSignalingService._() {
@@ -27,6 +28,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   bool _joined = false;
   bool _shouldStayConnected = false;
   bool _appInForeground = true;
+  bool _foregroundServiceStarted = false;
 
   final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot = ValueNotifier<LiveMediaRoomSnapshot?>(null);
 
@@ -85,6 +87,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final effectiveUser = effectiveCurrentUser(currentUser);
     _currentUser = effectiveUser;
     _shouldStayConnected = true;
+    await _startForegroundServiceIfNeeded();
     await _joinRoomInternal(reason: 'join requested');
   }
 
@@ -122,6 +125,24 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     await _channel?.sink.close();
     _channel = null;
     _connecting = false;
+    await _stopForegroundServiceIfNeeded();
+  }
+
+  Future<void> _startForegroundServiceIfNeeded() async {
+    if (_foregroundServiceStarted) return;
+    _foregroundServiceStarted = true;
+    await LiveRoomForegroundService.start(
+      roomName: _roomName ?? 'Live Room',
+      roomId: _roomId ?? 'Vibe Match',
+    );
+    _debug('live room foreground service started');
+  }
+
+  Future<void> _stopForegroundServiceIfNeeded() async {
+    if (!_foregroundServiceStarted) return;
+    _foregroundServiceStarted = false;
+    await LiveRoomForegroundService.stop();
+    _debug('live room foreground service stopped');
   }
 
   Future<void> _joinRoomInternal({required String reason}) async {
