@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:mediasfu_mediasoup_client/mediasfu_mediasoup_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../core/network/vm_media_config.dart';
@@ -17,14 +18,22 @@ class LiveRoomAudioService {
   String? _peerId;
   SeatUser? _currentUser;
   MediaStream? _localAudioStream;
+  Device? _device;
+  dynamic _sendTransport;
+  dynamic _audioProducer;
+  dynamic _routerRtpCapabilities;
   bool _joined = false;
   bool _connecting = false;
   bool _selfMuted = true;
   bool _seated = false;
+  bool _deviceLoading = false;
+  bool _sendTransportCreating = false;
+  bool _producerCreating = false;
 
   final ValueNotifier<bool> connected = ValueNotifier<bool>(false);
   final ValueNotifier<bool> joined = ValueNotifier<bool>(false);
   final ValueNotifier<bool> localMicCapturing = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> audioPublishing = ValueNotifier<bool>(false);
   final ValueNotifier<List<AudioSeatSnapshot>> seats = ValueNotifier<List<AudioSeatSnapshot>>(<AudioSeatSnapshot>[]);
   final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
 
@@ -53,8 +62,10 @@ class LiveRoomAudioService {
         if (ack['ok'] == true) {
           _joined = true;
           joined.value = true;
+          _routerRtpCapabilities = ack['rtpCapabilities'];
           seats.value = AudioSeatSnapshot.listFromJson(ack['room']?['seats']);
           _debug('audio join ok room=$safeRoomId peer=$safePeerId');
+          unawaited(_ensureDeviceLoaded());
         } else {
           _setError('Audio join failed: ${ack['error'] ?? 'unknown'}');
         }
@@ -81,7 +92,7 @@ class LiveRoomAudioService {
     if (!_canSendRoomEvent()) return;
     _seated = false;
     _selfMuted = true;
-    unawaited(_stopLocalMicCapture());
+    unawaited(_stopPublishingAndCapture());
     _emitWithAck(
       'leaveSeat',
       <String, Object?>{'roomId': _roomId, 'peerId': _peerId},
@@ -101,7 +112,7 @@ class LiveRoomAudioService {
   }
 
   Future<void> leaveRoom() async {
-    await _stopLocalMicCapture();
+    await _stopPublishingAndCapture();
     _joined = false;
     _seated = false;
     _selfMuted = true;
@@ -110,6 +121,9 @@ class LiveRoomAudioService {
     _roomId = null;
     _peerId = null;
     _currentUser = null;
+    _routerRtpCapabilities = null;
+    _device = null;
+    _closeSendTransport();
     final socket = _socket;
     _socket = null;
     socket?.dispose();
@@ -141,7 +155,8 @@ class LiveRoomAudioService {
       _joined = false;
       joined.value = false;
       _seated = false;
-      unawaited(_stopLocalMicCapture());
+      unawaited(_stopPublishingAndCapture());
+      _closeSendTransport();
       _debug('audio socket disconnected');
     });
 
@@ -160,7 +175,7 @@ class LiveRoomAudioService {
         _seated = nextSeats.any((seat) => seat.peerId == _peerId);
         if (!_seated) {
           _selfMuted = true;
-          unawaited(_stopLocalMicCapture());
+          unawaited(_stopPublishingAndCapture());
         }
         _debug('audio seats updated count=${seats.value.length} seated=$_seated');
       }
@@ -190,8 +205,9 @@ class LiveRoomAudioService {
   Future<void> _syncLocalMicCapture() async {
     if (_seated && !_selfMuted) {
       await _startLocalMicCapture();
+      await _ensurePublishingAudio();
     } else {
-      await _stopLocalMicCapture();
+      await _stopPublishingAndCapture();
     }
   }
 
@@ -217,6 +233,149 @@ class LiveRoomAudioService {
     }
   }
 
+  Future<void> _ensureDeviceLoaded() async {
+    if (_device != null || _deviceLoading) return;
+    final rawCaps = _routerRtpCapabilities;
+    if (rawCaps == null) return;
+    _deviceLoading = true;
+    try {
+      final caps = RtpCapabilities.fromMap(Map<String, dynamic>.from(rawCaps as Map));
+      final device = Device();
+      await device.load(routerRtpCapabilities: caps);
+      _device = device;
+      _debug('mediasoup device loaded');
+    } catch (error) {
+      _setError('Mediasoup device load failed: $error');
+    } finally {
+      _deviceLoading = false;
+    }
+  }
+
+  Future<void> _ensureSendTransport() async {
+    if (_sendTransport != null || _sendTransportCreating) return;
+    if (!_canSendRoomEvent()) return;
+    await _ensureDeviceLoaded();
+    final device = _device;
+    if (device == null) return;
+
+    _sendTransportCreating = true;
+    try {
+      final ack = await _emitWithAckFuture('createWebRtcTransport', <String, Object?>{
+        'roomId': _roomId,
+        'peerId': _peerId,
+        'direction': 'send',
+      });
+      if (ack['ok'] != true) {
+        throw Exception(ack['error'] ?? 'createWebRtcTransport failed');
+      }
+
+      final params = Map<String, dynamic>.from(ack['params'] as Map);
+      final transport = device.createSendTransportFromMap(
+        params,
+        producerCallback: (Producer producer) {
+          _audioProducer = producer;
+          audioPublishing.value = true;
+          _debug('audio producer callback id=${producer.id} kind=${producer.kind}');
+        },
+      );
+
+      transport.on('connect', (dynamic data) async {
+        try {
+          final dtlsParameters = _toPlainMap(data['dtlsParameters']);
+          final connectAck = await _emitWithAckFuture('connectTransport', <String, Object?>{
+            'roomId': _roomId,
+            'peerId': _peerId,
+            'transportId': transport.id,
+            'dtlsParameters': dtlsParameters,
+          });
+          if (connectAck['ok'] == true) {
+            data['callback']();
+            _debug('send transport connected id=${transport.id}');
+          } else {
+            data['errback'](connectAck['error'] ?? 'connectTransport failed');
+          }
+        } catch (error) {
+          data['errback'](error);
+        }
+      });
+
+      transport.on('produce', (dynamic data) async {
+        try {
+          final produceAck = await _emitWithAckFuture('produce', <String, Object?>{
+            'roomId': _roomId,
+            'peerId': _peerId,
+            'transportId': transport.id,
+            'kind': data['kind'],
+            'rtpParameters': _toPlainMap(data['rtpParameters']),
+          });
+          if (produceAck['ok'] == true) {
+            final producerId = produceAck['producerId']?.toString() ?? produceAck['id']?.toString() ?? '';
+            data['callback'](producerId);
+            _debug('produce ack producer=$producerId');
+          } else {
+            data['errback'](produceAck['error'] ?? 'produce failed');
+          }
+        } catch (error) {
+          data['errback'](error);
+        }
+      });
+
+      transport.on('connectionstatechange', (dynamic state) {
+        _debug('send transport state=$state');
+      });
+
+      _sendTransport = transport;
+      _debug('send transport created id=${transport.id}');
+    } catch (error) {
+      _setError('Send transport create failed: $error');
+    } finally {
+      _sendTransportCreating = false;
+    }
+  }
+
+  Future<void> _ensurePublishingAudio() async {
+    if (_producerCreating || _audioProducer != null) return;
+    if (!_seated || _selfMuted || _localAudioStream == null) return;
+    _producerCreating = true;
+    try {
+      await _ensureSendTransport();
+      final transport = _sendTransport;
+      final stream = _localAudioStream;
+      if (transport == null || stream == null) return;
+      final audioTracks = stream.getAudioTracks();
+      if (audioTracks.isEmpty) throw Exception('No local audio track available');
+      final audioTrack = audioTracks.first;
+      _audioProducer = await transport.produce(
+        source: 'mic',
+        stream: stream,
+        track: audioTrack,
+        appData: <String, dynamic>{'mediaTag': 'mic-audio'},
+      );
+      audioPublishing.value = true;
+      _debug('audio publishing started producer=${_audioProducer?.id}');
+    } catch (error) {
+      _setError('Audio produce failed: $error');
+    } finally {
+      _producerCreating = false;
+    }
+  }
+
+  Future<void> _stopPublishingAndCapture() async {
+    await _stopAudioProducer();
+    await _stopLocalMicCapture();
+  }
+
+  Future<void> _stopAudioProducer() async {
+    final producer = _audioProducer;
+    if (producer == null) return;
+    _audioProducer = null;
+    try {
+      producer.close();
+    } catch (_) {}
+    audioPublishing.value = false;
+    _debug('audio producer closed locally');
+  }
+
   Future<void> _stopLocalMicCapture() async {
     final stream = _localAudioStream;
     if (stream == null) return;
@@ -233,6 +392,25 @@ class LiveRoomAudioService {
     _debug('local mic capture stopped');
   }
 
+  void _closeSendTransport() {
+    final transport = _sendTransport;
+    _sendTransport = null;
+    try {
+      transport?.close();
+    } catch (_) {}
+    _audioProducer = null;
+    audioPublishing.value = false;
+  }
+
+  Map<String, dynamic> _toPlainMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    final dynamicValue = value as dynamic;
+    final mapped = dynamicValue.toMap();
+    if (mapped is Map<String, dynamic>) return mapped;
+    return Map<String, dynamic>.from(mapped as Map);
+  }
+
   bool _canSendRoomEvent() {
     return _socket?.connected == true && _joined && _roomId != null && _peerId != null;
   }
@@ -245,6 +423,22 @@ class LiveRoomAudioService {
       final ack = rawAck is Map ? Map<String, dynamic>.from(rawAck) : <String, dynamic>{'ok': false, 'error': 'Invalid ack'};
       onAck(ack);
     });
+  }
+
+  Future<Map<String, dynamic>> _emitWithAckFuture(String event, Map<String, Object?> payload) {
+    final socket = _socket;
+    if (socket == null) return Future<Map<String, dynamic>>.value(<String, dynamic>{'ok': false, 'error': 'Socket not connected'});
+    final completer = Completer<Map<String, dynamic>>();
+    _debug('audio send $event $payload');
+    socket.emitWithAck(event, payload, ack: (dynamic rawAck) {
+      if (completer.isCompleted) return;
+      final ack = rawAck is Map ? Map<String, dynamic>.from(rawAck) : <String, dynamic>{'ok': false, 'error': 'Invalid ack'};
+      completer.complete(ack);
+    });
+    return completer.future.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () => <String, dynamic>{'ok': false, 'error': '$event timed out'},
+    );
   }
 
   void _handleSeatAck(Map<String, dynamic> ack) {
