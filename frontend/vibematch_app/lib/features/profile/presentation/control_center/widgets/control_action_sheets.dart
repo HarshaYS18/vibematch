@@ -19,6 +19,20 @@ class UserTextDraft {
   final String text;
 }
 
+class CustomIdDraft {
+  const CustomIdDraft({
+    required this.targetType,
+    required this.targetId,
+    required this.customId,
+    required this.validityText,
+  });
+
+  final String targetType;
+  final String targetId;
+  final String customId;
+  final String validityText;
+}
+
 class PowerDraft {
   const PowerDraft({required this.userId, required this.role, required this.authorities, required this.reason});
   final String userId;
@@ -149,6 +163,113 @@ class _ControlUserTextSheetState extends State<ControlUserTextSheet> {
       onSubmit: () {
         if (_user.text.trim().isEmpty || _text.text.trim().isEmpty) return;
         Navigator.pop(context, UserTextDraft(userId: _user.text.trim(), text: _text.text.trim()));
+      },
+    );
+  }
+}
+
+class ControlCustomIdSheet extends StatefulWidget {
+  const ControlCustomIdSheet({super.key});
+
+  static Future<CustomIdDraft?> show(BuildContext context) {
+    return showModalBottomSheet<CustomIdDraft>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const ControlCustomIdSheet(),
+    );
+  }
+
+  @override
+  State<ControlCustomIdSheet> createState() => _ControlCustomIdSheetState();
+}
+
+class _ControlCustomIdSheetState extends State<ControlCustomIdSheet> {
+  final TextEditingController _targetId = TextEditingController();
+  final TextEditingController _customId = TextEditingController();
+  String _targetType = 'User';
+  String _validityMode = 'No expiry';
+  DateTime? _expiresAt;
+
+  @override
+  void dispose() {
+    _targetId.dispose();
+    _customId.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickExpiry() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _expiresAt ?? now.add(const Duration(days: 30)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 10, 12, 31),
+    );
+    if (selected == null) return;
+    setState(() => _expiresAt = selected);
+  }
+
+  String get _validityText {
+    if (_validityMode == 'No expiry') return 'no_expiry';
+    if (_expiresAt == null) return 'expiry_not_selected';
+    return _expiresAt!.toIso8601String().split('T').first;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SheetFrame(
+      title: 'Assign custom ID',
+      fields: [
+        DropdownButtonFormField<String>(
+          initialValue: _targetType,
+          items: const [
+            DropdownMenuItem(value: 'User', child: Text('User custom ID')),
+            DropdownMenuItem(value: 'Room', child: Text('Room custom ID')),
+          ],
+          onChanged: (value) => setState(() => _targetType = value ?? _targetType),
+          decoration: _input('Target type'),
+        ),
+        const SizedBox(height: 8),
+        _field(_targetId, _targetType == 'User' ? 'Target user ID' : 'Target room ID'),
+        _field(_customId, 'Custom ID'),
+        DropdownButtonFormField<String>(
+          initialValue: _validityMode,
+          items: const [
+            DropdownMenuItem(value: 'No expiry', child: Text('No expiry')),
+            DropdownMenuItem(value: 'Expires on date', child: Text('Expires on date')),
+          ],
+          onChanged: (value) => setState(() => _validityMode = value ?? _validityMode),
+          decoration: _input('Validity'),
+        ),
+        if (_validityMode == 'Expires on date') ...[
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: _pickExpiry,
+            borderRadius: BorderRadius.circular(13),
+            child: InputDecorator(
+              decoration: _input('Expiry date'),
+              child: Text(
+                _expiresAt == null ? 'Select expiry date' : _expiresAt!.toIso8601String().split('T').first,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+      ],
+      onSubmit: () {
+        if (_targetId.text.trim().isEmpty || _customId.text.trim().isEmpty) return;
+        if (_validityMode == 'Expires on date' && _expiresAt == null) return;
+        Navigator.pop(
+          context,
+          CustomIdDraft(
+            targetType: _targetType.toLowerCase(),
+            targetId: _targetId.text.trim(),
+            customId: _customId.text.trim(),
+            validityText: _validityText,
+          ),
+        );
       },
     );
   }
