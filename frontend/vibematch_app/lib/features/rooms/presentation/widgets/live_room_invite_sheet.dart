@@ -28,18 +28,34 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
     final currentUserId = LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id;
     if (snapshot == null) return const <SeatUser>[];
 
-    final realtimeIds = snapshot.peers.map((peer) => peer.userId).toSet();
-    final seatedIds = snapshot.peers
-        .where((peer) => peer.seatIndex != null)
-        .map((peer) => peer.userId)
-        .toSet();
+    final seatedIds = snapshot.peers.where((peer) => peer.seatIndex != null).map((peer) => peer.userId).toSet();
     final seen = <String>{};
 
-    return widget.users.where((user) {
-      if (currentUserId != null && user.id == currentUserId) return false;
-      if (!realtimeIds.contains(user.id)) return false;
-      if (seatedIds.contains(user.id)) return false;
-      return seen.add(user.id);
+    return snapshot.peers.where((peer) {
+      if (currentUserId != null && peer.userId == currentUserId) return false;
+      if (seatedIds.contains(peer.userId)) return false;
+      return seen.add(peer.userId);
+    }).map((peer) {
+      final existing = widget.users.firstWhereOrNull((user) => user.id == peer.userId);
+      if (existing != null) {
+        return existing.copyWith(selfMuted: !peer.micEnabled, adminMuted: peer.adminMuted);
+      }
+      return SeatUser(
+        id: peer.userId,
+        name: peer.displayName,
+        roleLabel: 'Member',
+        familyName: '',
+        relationshipText: '',
+        vipLevel: 1,
+        sendingLevel: 1,
+        receivingLevel: 1,
+        sentExp: 0,
+        receivedExp: 0,
+        medals: const [],
+        avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+        selfMuted: !peer.micEnabled,
+        adminMuted: peer.adminMuted,
+      );
     }).toList();
   }
 
@@ -115,5 +131,14 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
       invited: invited,
       onInvite: () => _invite(user),
     );
+  }
+}
+
+extension _FirstWhereOrNull<T> on Iterable<T> {
+  T? firstWhereOrNull(bool Function(T item) test) {
+    for (final item in this) {
+      if (test(item)) return item;
+    }
+    return null;
   }
 }
