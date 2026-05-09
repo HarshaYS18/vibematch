@@ -304,7 +304,7 @@ class _Logs extends StatelessWidget {
   const _Logs({required this.logs});
   final List<ControlLogEntry> logs;
   @override
-  Widget build(BuildContext context) => ControlDeckShell(title: 'Audit Stream', subtitle: 'Grouped backend-style logs: actor, target, room/resource and reason.', trailing: ControlDeckPill(label: '${logs.length} logs'), children: logs.map((log) => SuperPowerLineRow(title: log.action, subtitle: '${log.targetUserId} • ${log.resourceType} • ${log.reason}', trailing: log.chatRoomId == '-' ? 'LOG' : log.chatRoomId)).toList());
+  Widget build(BuildContext context) => ControlDeckShell(title: 'Audit Stream', subtitle: 'Grouped backend-style logs: actor, target, room/resource and reason.', trailing: ControlDeckPill(label: '${logs.length} logs'), children: logs.map((log) => ControlDeckRow(icon: Icons.receipt_long_rounded, title: log.action, subtitle: '${log.targetUserId} • ${log.resourceType} • ${log.reason}', trailing: ControlDeckPill(label: log.chatRoomId == '-' ? 'LOG' : log.chatRoomId), accent: SuperPowerDesign.gold, onTap: null)).toList());
 }
 
 class _MiniStat extends StatelessWidget {
