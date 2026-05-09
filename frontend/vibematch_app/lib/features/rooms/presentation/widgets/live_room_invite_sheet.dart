@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import 'live_room_invite_components.dart';
 
@@ -22,12 +23,29 @@ class LiveRoomInviteSheet extends StatefulWidget {
 class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
   final Set<String> _invitedIds = <String>{};
 
+  List<SeatUser> get _realtimeUsers {
+    final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
+    final currentUserId = LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id;
+    if (snapshot == null) return const <SeatUser>[];
+
+    final realtimeIds = snapshot.peers.map((peer) => peer.userId).toSet();
+    final seatedIds = snapshot.peers
+        .where((peer) => peer.seatIndex != null)
+        .map((peer) => peer.userId)
+        .toSet();
+    final seen = <String>{};
+
+    return widget.users.where((user) {
+      if (currentUserId != null && user.id == currentUserId) return false;
+      if (!realtimeIds.contains(user.id)) return false;
+      if (seatedIds.contains(user.id)) return false;
+      return seen.add(user.id);
+    }).toList();
+  }
+
   List<SeatUser> get _sortedUsers {
-    final sorted = [...widget.users];
+    final sorted = [..._realtimeUsers];
     sorted.sort((a, b) {
-      final aOnline = _isOnline(a);
-      final bOnline = _isOnline(b);
-      if (aOnline != bOnline) return aOnline ? -1 : 1;
       final idCompare = a.id.compareTo(b.id);
       if (idCompare != 0) return idCompare;
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
@@ -36,10 +54,14 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
   }
 
   bool _isOnline(SeatUser user) {
-    return user.id == 'riya' || user.id == 'akhil' || user.isHost || user.isRoomAdmin;
+    final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
+    return snapshot?.peers.any((peer) => peer.userId == user.id) ?? false;
   }
 
   void _invite(SeatUser user) {
+    final currentUserId = LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id;
+    if (currentUserId != null && user.id == currentUserId) return;
+    if (!_isOnline(user)) return;
     setState(() => _invitedIds.add(user.id));
     widget.onInvite(user);
   }
@@ -47,8 +69,6 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
   @override
   Widget build(BuildContext context) {
     final users = _sortedUsers;
-    final onlineUsers = users.where(_isOnline).toList();
-    final otherUsers = users.where((user) => !_isOnline(user)).toList();
 
     return FractionallySizedBox(
       heightFactor: 0.40,
@@ -75,15 +95,8 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
                   : ListView(
                       physics: const BouncingScrollPhysics(),
                       children: [
-                        if (onlineUsers.isNotEmpty) ...[
-                          const LiveRoomInviteSectionLabel('Online'),
-                          ...onlineUsers.map(_userRow),
-                          const SizedBox(height: 8),
-                        ],
-                        if (otherUsers.isNotEmpty) ...[
-                          const LiveRoomInviteSectionLabel('Users'),
-                          ...otherUsers.map(_userRow),
-                        ],
+                        const LiveRoomInviteSectionLabel('In this room'),
+                        ...users.map(_userRow),
                       ],
                     ),
             ),
