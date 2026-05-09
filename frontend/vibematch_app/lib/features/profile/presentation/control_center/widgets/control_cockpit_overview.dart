@@ -13,6 +13,7 @@ class ControlCockpitOverview extends StatelessWidget {
     required this.onPower,
     required this.onReview,
     required this.onRole,
+    required this.onStealthChanged,
   });
 
   final ControlCenterState state;
@@ -22,6 +23,7 @@ class ControlCockpitOverview extends StatelessWidget {
   final VoidCallback onPower;
   final VoidCallback onReview;
   final VoidCallback onRole;
+  final ValueChanged<bool> onStealthChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -82,14 +84,10 @@ class ControlCockpitOverview extends StatelessWidget {
                     onTap: onReview,
                   ),
                   const SizedBox(height: 10),
-                  _BentoTile(
+                  _StealthToggleTile(
                     height: 88,
-                    title: 'Stealth',
-                    value: state.globalInvisible ? 'ON' : 'OFF',
-                    subtitle: 'hidden presence',
-                    icon: Icons.visibility_off_rounded,
-                    accent: state.globalInvisible ? SuperPowerDesign.mint : SuperPowerDesign.muted,
-                    onTap: null,
+                    enabled: state.globalInvisible,
+                    onChanged: onStealthChanged,
                   ),
                   const SizedBox(height: 10),
                   _BentoTile(
@@ -117,6 +115,83 @@ class ControlCockpitOverview extends StatelessWidget {
           onRole: onRole,
         ),
       ],
+    );
+  }
+}
+
+class _StealthToggleTile extends StatelessWidget {
+  const _StealthToggleTile({required this.height, required this.enabled, required this.onChanged});
+
+  final double height;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = enabled ? SuperPowerDesign.mint : SuperPowerDesign.muted;
+    return InkWell(
+      onTap: () => onChanged(!enabled),
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        height: height,
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [accent.withValues(alpha: 0.16), const Color(0xFF101624), const Color(0xFF070A12)],
+          ),
+          border: Border.all(color: accent.withValues(alpha: 0.32)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(enabled ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: accent, size: 18),
+              const Spacer(),
+              _MiniSwitch(enabled: enabled, color: accent),
+            ]),
+            const Spacer(),
+            Text(enabled ? 'ON' : 'OFF', maxLines: 1, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.7)),
+            const SizedBox(height: 1),
+            Text('Stealth', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent, fontSize: 10.8, fontWeight: FontWeight.w900)),
+            const Text('tap to toggle', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: SuperPowerDesign.muted, fontSize: 9.2, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniSwitch extends StatelessWidget {
+  const _MiniSwitch({required this.enabled, required this.color});
+
+  final bool enabled;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 33,
+      height: 18,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: enabled ? color.withValues(alpha: 0.26) : Colors.white.withValues(alpha: 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.40)),
+      ),
+      child: AnimatedAlign(
+        duration: const Duration(milliseconds: 180),
+        alignment: enabled ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: enabled ? color : SuperPowerDesign.muted, shape: BoxShape.circle),
+        ),
+      ),
     );
   }
 }
