@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../core/network/vm_media_config.dart';
@@ -15,11 +16,15 @@ class LiveRoomAudioService {
   String? _roomId;
   String? _peerId;
   SeatUser? _currentUser;
+  MediaStream? _localAudioStream;
   bool _joined = false;
   bool _connecting = false;
+  bool _selfMuted = true;
+  bool _seated = false;
 
   final ValueNotifier<bool> connected = ValueNotifier<bool>(false);
   final ValueNotifier<bool> joined = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> localMicCapturing = ValueNotifier<bool>(false);
   final ValueNotifier<List<AudioSeatSnapshot>> seats = ValueNotifier<List<AudioSeatSnapshot>>(<AudioSeatSnapshot>[]);
   final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
 
@@ -62,12 +67,21 @@ class LiveRoomAudioService {
     _emitWithAck(
       'takeSeat',
       <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'seatNo': seatIndex + 1},
-      onAck: _handleSeatAck,
+      onAck: (ack) {
+        _handleSeatAck(ack);
+        if (ack['ok'] == true) {
+          _seated = true;
+          unawaited(_syncLocalMicCapture());
+        }
+      },
     );
   }
 
   void leaveSeat() {
     if (!_canSendRoomEvent()) return;
+    _seated = false;
+    _selfMuted = true;
+    unawaited(_stopLocalMicCapture());
     _emitWithAck(
       'leaveSeat',
       <String, Object?>{'roomId': _roomId, 'peerId': _peerId},
@@ -77,6 +91,8 @@ class LiveRoomAudioService {
 
   void setSelfMuted(bool muted) {
     if (!_canSendRoomEvent()) return;
+    _selfMuted = muted;
+    unawaited(_syncLocalMicCapture());
     _emitWithAck(
       'setSelfMuted',
       <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'muted': muted},
@@ -85,7 +101,10 @@ class LiveRoomAudioService {
   }
 
   Future<void> leaveRoom() async {
+    await _stopLocalMicCapture();
     _joined = false;
+    _seated = false;
+    _selfMuted = true;
     joined.value = false;
     seats.value = <AudioSeatSnapshot>[];
     _roomId = null;
@@ -121,6 +140,8 @@ class LiveRoomAudioService {
       connected.value = false;
       _joined = false;
       joined.value = false;
+      _seated = false;
+      unawaited(_stopLocalMicCapture());
       _debug('audio socket disconnected');
     });
 
@@ -134,8 +155,14 @@ class LiveRoomAudioService {
 
     socket.on('seatsUpdated', (dynamic payload) {
       if (payload is Map) {
-        seats.value = AudioSeatSnapshot.listFromJson(payload['seats']);
-        _debug('audio seats updated count=${seats.value.length}');
+        final nextSeats = AudioSeatSnapshot.listFromJson(payload['seats']);
+        seats.value = nextSeats;
+        _seated = nextSeats.any((seat) => seat.peerId == _peerId);
+        if (!_seated) {
+          _selfMuted = true;
+          unawaited(_stopLocalMicCapture());
+        }
+        _debug('audio seats updated count=${seats.value.length} seated=$_seated');
       }
     });
 
@@ -158,6 +185,52 @@ class LiveRoomAudioService {
     _socket = socket;
     socket.connect();
     _connecting = false;
+  }
+
+  Future<void> _syncLocalMicCapture() async {
+    if (_seated && !_selfMuted) {
+      await _startLocalMicCapture();
+    } else {
+      await _stopLocalMicCapture();
+    }
+  }
+
+  Future<void> _startLocalMicCapture() async {
+    if (_localAudioStream != null) return;
+    try {
+      final stream = await navigator.mediaDevices.getUserMedia(<String, dynamic>{
+        'audio': <String, dynamic>{
+          'echoCancellation': true,
+          'noiseSuppression': true,
+          'autoGainControl': true,
+        },
+        'video': false,
+      });
+      for (final track in stream.getAudioTracks()) {
+        track.enabled = true;
+      }
+      _localAudioStream = stream;
+      localMicCapturing.value = true;
+      _debug('local mic capture started tracks=${stream.getAudioTracks().length}');
+    } catch (error) {
+      _setError('Local mic capture failed: $error');
+    }
+  }
+
+  Future<void> _stopLocalMicCapture() async {
+    final stream = _localAudioStream;
+    if (stream == null) return;
+    _localAudioStream = null;
+    for (final track in stream.getTracks()) {
+      try {
+        track.stop();
+      } catch (_) {}
+    }
+    try {
+      await stream.dispose();
+    } catch (_) {}
+    localMicCapturing.value = false;
+    _debug('local mic capture stopped');
   }
 
   bool _canSendRoomEvent() {
