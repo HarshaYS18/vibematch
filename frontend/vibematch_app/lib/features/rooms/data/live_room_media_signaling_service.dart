@@ -22,7 +22,6 @@ class LiveRoomMediaSignalingService {
   SeatUser? _activeLoggedInSeatUser;
   bool _connecting = false;
   bool _joined = false;
-  bool _internalSmokeTestSent = false;
 
   bool get isConnected => _channel != null;
   bool get isJoined => _joined;
@@ -35,7 +34,6 @@ class LiveRoomMediaSignalingService {
   void configureRoom({required String roomId, required String roomName}) {
     _roomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
     _roomName = roomName.trim().isEmpty ? 'Live Room' : roomName.trim();
-    _internalSmokeTestSent = false;
   }
 
   void setActiveLoggedInUser(CurrentUser user) {
@@ -76,7 +74,6 @@ class LiveRoomMediaSignalingService {
     await _connect();
     _send('room/join', _joinPayload(effectiveUser, safeRoomId));
     _joined = true;
-    _runInternalSmokeTestOnce();
   }
 
   void takeSeat(int seatIndex) {
@@ -104,7 +101,6 @@ class LiveRoomMediaSignalingService {
     }
     _joined = false;
     _peerId = null;
-    _internalSmokeTestSent = false;
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
@@ -143,31 +139,6 @@ class LiveRoomMediaSignalingService {
     final stablePeerId = '${safeRoomId}_${user.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
     _peerId = stablePeerId;
     return {'room_id': safeRoomId, 'peer_id': stablePeerId, 'user_id': user.id, 'display_name': user.name, 'seat_index': null};
-  }
-
-  void _runInternalSmokeTestOnce() {
-    if (_internalSmokeTestSent) return;
-    _internalSmokeTestSent = true;
-    Future<void>.delayed(const Duration(milliseconds: 600), () {
-      if (!_joined || _channel == null) return;
-      _debug('internal smoke test: seat/take 0');
-      takeSeat(0);
-    });
-    Future<void>.delayed(const Duration(milliseconds: 1000), () {
-      if (!_joined || _channel == null) return;
-      _debug('internal smoke test: mic/set_enabled true');
-      setMicEnabled(true);
-    });
-    Future<void>.delayed(const Duration(milliseconds: 1400), () {
-      if (!_joined || _channel == null) return;
-      _debug('internal smoke test: mic/set_enabled false');
-      setMicEnabled(false);
-    });
-    Future<void>.delayed(const Duration(milliseconds: 1800), () {
-      if (!_joined || _channel == null) return;
-      _debug('internal smoke test: seat/leave');
-      leaveSeat();
-    });
   }
 
   void _send(String type, Map<String, Object?> payload) {
