@@ -30,6 +30,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   bool _shouldStayConnected = false;
   bool _appInForeground = true;
   bool _foregroundServiceStarted = false;
+  bool _showingRoomBlockDialog = false;
 
   final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot = ValueNotifier<LiveMediaRoomSnapshot?>(null);
   final ValueNotifier<LiveMediaRoomBlock?> roomBlock = ValueNotifier<LiveMediaRoomBlock?>(null);
@@ -144,6 +145,11 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _send('admin/kick', {'target_user_id': targetUserId, 'reason': reason, 'duration': duration});
   }
 
+  void removeKickBlock({required String targetUserId}) {
+    if (targetUserId.trim().isEmpty) return;
+    _send('admin/kick_remove', {'target_user_id': targetUserId});
+  }
+
   void setMicEnabled(bool enabled) {
     if (enabled && _currentUserIsAdminMuted()) {
       _debug('mic enable blocked because current user is admin-muted');
@@ -205,6 +211,49 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _channel = null;
     _connecting = false;
     await _stopForegroundServiceIfNeeded();
+    _exitRoomAndShowBlockDialog(block);
+  }
+
+  void _exitRoomAndShowBlockDialog(LiveMediaRoomBlock block) {
+    if (_showingRoomBlockDialog) return;
+    _showingRoomBlockDialog = true;
+
+    Future<void>.delayed(const Duration(milliseconds: 120), () async {
+      final rootContext = WidgetsBinding.instance.rootElement;
+      if (rootContext == null) {
+        _showingRoomBlockDialog = false;
+        return;
+      }
+
+      final navigator = Navigator.of(rootContext, rootNavigator: true);
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      final dialogContext = WidgetsBinding.instance.rootElement;
+      if (dialogContext == null) {
+        _showingRoomBlockDialog = false;
+        return;
+      }
+
+      await showDialog<void>(
+        context: dialogContext,
+        barrierDismissible: true,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: const Text('Room access blocked'),
+          content: Text(block.displayMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      _showingRoomBlockDialog = false;
+    });
   }
 
   Future<void> _startForegroundServiceIfNeeded() async {
@@ -471,6 +520,26 @@ class LiveMediaRoomBlock {
   final String reason;
   final DateTime? kickedUntil;
   final int? remainingMs;
+
+  bool get isKick => type == 'room/kicked' || type == 'room/join_blocked';
+
+  String get durationLabel {
+    final ms = remainingMs ?? (kickedUntil == null ? null : kickedUntil!.difference(DateTime.now()).inMilliseconds);
+    if (ms == null) return 'a permanent duration';
+    final safeMs = ms < 0 ? 0 : ms;
+    final totalMinutes = (safeMs / 60000).ceil();
+    if (totalMinutes <= 1) return 'less than 1 minute';
+    if (totalMinutes < 60) return '$totalMinutes minutes';
+    final hours = (totalMinutes / 60).ceil();
+    if (hours < 24) return '$hours hour${hours == 1 ? '' : 's'}';
+    final days = (hours / 24).ceil();
+    return '$days day${days == 1 ? '' : 's'}';
+  }
+
+  String get displayMessage {
+    if (isKick) return 'You were kicked out of this room for $durationLabel. You can enter again after the kick duration ends or when a room owner removes the block.';
+    return reason;
+  }
 
   factory LiveMediaRoomBlock.fromJson(Map<String, dynamic> json, {required String type}) {
     return LiveMediaRoomBlock(
