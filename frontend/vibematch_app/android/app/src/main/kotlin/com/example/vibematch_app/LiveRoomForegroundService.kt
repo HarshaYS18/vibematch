@@ -39,10 +39,13 @@ class LiveRoomForegroundService : Service() {
             .setSmallIcon(applicationInfo.icon)
             .setContentTitle("Vibe Match live room active")
             .setContentText("$roomName • $roomId")
+            .setSubText("Microphone in use")
             .setOngoing(true)
+            .setAutoCancel(false)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
     }
 
@@ -53,17 +56,18 @@ class LiveRoomForegroundService : Service() {
         if (existing != null) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Live room connection",
-            NotificationManager.IMPORTANCE_LOW,
+            "Live room audio",
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
-            description = "Keeps Vibe Match live room audio active while the room is open."
+            description = "Keeps Vibe Match live room microphone and audio active while the room is open."
             setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         manager.createNotificationChannel(channel)
     }
 
     companion object {
-        const val CHANNEL_ID = "vibematch_live_room_connection"
+        const val CHANNEL_ID = "vibematch_live_room_audio_v2"
         const val NOTIFICATION_ID = 6922022
         const val EXTRA_ROOM_NAME = "room_name"
         const val EXTRA_ROOM_ID = "room_id"
