@@ -145,6 +145,12 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   void setMicEnabled(bool enabled) {
+    if (enabled && _currentUserIsAdminMuted()) {
+      _debug('mic enable blocked because current user is admin-muted');
+      LiveRoomAudioService.instance.setSelfMuted(true);
+      _send('mic/set_enabled', {'enabled': false});
+      return;
+    }
     LiveRoomAudioService.instance.setSelfMuted(!enabled);
     _send('mic/set_enabled', {'enabled': enabled});
   }
@@ -152,6 +158,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void setAdminMute({required String targetUserId, required bool muted}) {
     if (targetUserId.trim().isEmpty) return;
     _applyAdminMuteToCurrentSnapshot(targetUserId: targetUserId, muted: muted);
+    _enforceAdminMuteIfCurrentUser(targetUserId: targetUserId, muted: muted);
     _send('admin_mute/set', {'target_user_id': targetUserId, 'muted': muted});
   }
 
@@ -280,7 +287,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   Map<String, Object?> _joinPayload(SeatUser user, String safeRoomId) {
-    final stablePeerId = '${safeRoomId}_${user.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+    final stablePeerId = '${safeRoomId}_${user.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\\-]'), '_');
     _peerId = stablePeerId;
     return {'room_id': safeRoomId, 'peer_id': stablePeerId, 'user_id': user.id, 'display_name': user.name, 'seat_index': null};
   }
@@ -324,8 +331,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
           } else {
             roomSnapshot.value = nextSnapshot;
           }
+          _enforceCurrentUserAdminMuteFromSnapshot(roomSnapshot.value);
         } else if (type == 'admin_mute/updated') {
           roomSnapshot.value = _overlayAdminMute(roomSnapshot.value, payload);
+          _enforceAdminMutePayloadIfCurrentUser(payload);
         }
       }
     } catch (error) {
@@ -373,6 +382,53 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         return peer.copyWith(adminMuted: muted, micEnabled: micEnabled ?? (muted ? false : peer.micEnabled));
       }).toList(),
     );
+  }
+
+  bool _currentUserIsAdminMuted() {
+    final snapshot = roomSnapshot.value;
+    if (snapshot == null) return false;
+    final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
+    final currentPeerId = _peerId;
+    for (final peer in snapshot.peers) {
+      final matchesUser = currentUserId != null && peer.userId == currentUserId;
+      final matchesPeer = currentPeerId != null && peer.peerId == currentPeerId;
+      if ((matchesUser || matchesPeer) && peer.adminMuted) return true;
+    }
+    return false;
+  }
+
+  void _enforceCurrentUserAdminMuteFromSnapshot(LiveMediaRoomSnapshot? snapshot) {
+    if (snapshot == null) return;
+    final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
+    final currentPeerId = _peerId;
+    for (final peer in snapshot.peers) {
+      final matchesUser = currentUserId != null && peer.userId == currentUserId;
+      final matchesPeer = currentPeerId != null && peer.peerId == currentPeerId;
+      if ((matchesUser || matchesPeer) && peer.adminMuted) {
+        _debug('admin mute enforced from room snapshot for current user');
+        LiveRoomAudioService.instance.setSelfMuted(true);
+        return;
+      }
+    }
+  }
+
+  void _enforceAdminMutePayloadIfCurrentUser(Map<String, dynamic> payload) {
+    final targetPeerId = payload['peer_id']?.toString();
+    final targetUserId = payload['user_id']?.toString();
+    final muted = payload['admin_muted'] == true || payload['adminMuted'] == true;
+    if (!muted) return;
+    _enforceAdminMuteIfCurrentUser(targetUserId: targetUserId, targetPeerId: targetPeerId, muted: muted);
+  }
+
+  void _enforceAdminMuteIfCurrentUser({String? targetUserId, String? targetPeerId, required bool muted}) {
+    if (!muted) return;
+    final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
+    final currentPeerId = _peerId;
+    final matchesUser = targetUserId != null && targetUserId.isNotEmpty && currentUserId == targetUserId;
+    final matchesPeer = targetPeerId != null && targetPeerId.isNotEmpty && currentPeerId == targetPeerId;
+    if (!matchesUser && !matchesPeer) return;
+    _debug('admin mute enforced on current user audio producer');
+    LiveRoomAudioService.instance.setSelfMuted(true);
   }
 
   void _resetConnectionState() {
