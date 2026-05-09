@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../../core/network/vm_media_config.dart';
+import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
 
 class LiveRoomMediaSignalingService {
@@ -17,6 +19,7 @@ class LiveRoomMediaSignalingService {
   String? _roomName;
   String? _peerId;
   SeatUser? _currentUser;
+  SeatUser? _activeLoggedInSeatUser;
   bool _connecting = false;
   bool _joined = false;
 
@@ -25,25 +28,50 @@ class LiveRoomMediaSignalingService {
   String? get roomId => _roomId;
   String? get peerId => _peerId;
 
-  void configureRoom({
-    required String roomId,
-    required String roomName,
-  }) {
+  void configureRoom({required String roomId, required String roomName}) {
     _roomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
     _roomName = roomName.trim().isEmpty ? 'Live Room' : roomName.trim();
   }
 
+  void setActiveLoggedInUser(CurrentUser user) {
+    final isOfficial = user.canSeeOwnerControls;
+    final roleLabel = user.primaryRoleBadge?.badgeLabel ?? user.roleDisplayLabel;
+    _activeLoggedInSeatUser = SeatUser(
+      id: 'user_${user.publicUserId}',
+      name: user.displayName ?? user.username ?? 'Vibe User',
+      roleLabel: isOfficial ? roleLabel : 'Member',
+      familyName: '',
+      familyLevel: 'bronze',
+      relationshipText: '',
+      vipLevel: isOfficial ? 32 : 1,
+      svipLevel: isOfficial ? 3 : 0,
+      sendingLevel: isOfficial ? 52 : 1,
+      receivingLevel: isOfficial ? 44 : 1,
+      sentExp: 0,
+      receivedExp: 0,
+      medals: const [],
+      avatarColors: isOfficial
+          ? const [Color(0xFFFFC857), Color(0xFFE84C72)]
+          : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      isCurrentUser: true,
+      isHost: isOfficial,
+      isRoomAdmin: isOfficial,
+    );
+    _debug('active logged-in room identity set: ${_activeLoggedInSeatUser!.id} ${_activeLoggedInSeatUser!.name}');
+  }
+
   Future<void> joinRoom({required SeatUser currentUser}) async {
-    _currentUser = currentUser;
+    final effectiveUser = _activeLoggedInSeatUser ?? currentUser;
+    _currentUser = effectiveUser;
     final safeRoomId = _roomId ?? 'VM257808';
 
     if (_joined && _channel != null) {
-      _send('room/join', _joinPayload(currentUser, safeRoomId));
+      _send('room/join', _joinPayload(effectiveUser, safeRoomId));
       return;
     }
 
     await _connect();
-    _send('room/join', _joinPayload(currentUser, safeRoomId));
+    _send('room/join', _joinPayload(effectiveUser, safeRoomId));
     _joined = true;
   }
 
@@ -118,9 +146,7 @@ class LiveRoomMediaSignalingService {
     };
   }
 
-  int? _currentSeatIndexFor(SeatUser user) {
-    return null;
-  }
+  int? _currentSeatIndexFor(SeatUser user) => null;
 
   void _send(String type, Map<String, Object?> payload) {
     final channel = _channel;
