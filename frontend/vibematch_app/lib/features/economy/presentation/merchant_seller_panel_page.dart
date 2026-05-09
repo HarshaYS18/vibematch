@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../auth/data/auth_local_storage.dart';
+import '../../auth/data/auth_local_storage.dart';
 import '../../../core/network/vm_api_config.dart';
 
 class MerchantSellerPanelPage extends StatefulWidget {
