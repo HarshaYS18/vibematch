@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/network/vm_media_config.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
+import 'live_room_audio_service.dart';
 import 'live_room_foreground_service.dart';
 
 class LiveRoomMediaSignalingService with WidgetsBindingObserver {
@@ -98,6 +99,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void takeSeat(int seatIndex) {
     if (seatIndex < 0) return;
     seatInvite.value = null;
+    LiveRoomAudioService.instance.takeSeat(seatIndex);
     _send('seat/take', {'seat_index': seatIndex});
   }
 
@@ -113,6 +115,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   void leaveSeat() {
+    LiveRoomAudioService.instance.leaveSeat();
     _send('seat/leave', <String, Object?>{});
   }
 
@@ -142,6 +145,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   void setMicEnabled(bool enabled) {
+    LiveRoomAudioService.instance.setSelfMuted(!enabled);
     _send('mic/set_enabled', {'enabled': enabled});
   }
 
@@ -169,6 +173,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     roomSnapshot.value = null;
     roomBlock.value = null;
     seatInvite.value = null;
+    await LiveRoomAudioService.instance.leaveRoom();
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
@@ -186,6 +191,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _peerId = null;
     roomSnapshot.value = null;
     seatInvite.value = null;
+    await LiveRoomAudioService.instance.leaveRoom();
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
@@ -303,6 +309,9 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
           unawaited(_disconnectAfterServerRemoval(block: LiveMediaRoomBlock.fromJson(payload, type: type)));
           return;
         }
+        if (type == 'room/joined') {
+          _joinAudioAfterMediaJoin();
+        }
         if (type == 'seat_invite/received') {
           seatInvite.value = LiveMediaSeatInvite.fromJson(payload);
           return;
@@ -322,6 +331,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     } catch (error) {
       _debug('media received unreadable message: $raw');
     }
+  }
+
+  void _joinAudioAfterMediaJoin() {
+    final roomId = _roomId;
+    final user = _currentUser ?? _activeLoggedInSeatUser;
+    if (roomId == null || user == null) return;
+    unawaited(LiveRoomAudioService.instance.joinRoom(roomId: roomId, currentUser: user));
   }
 
   void _applyAdminMuteToCurrentSnapshot({required String targetUserId, required bool muted}) {
