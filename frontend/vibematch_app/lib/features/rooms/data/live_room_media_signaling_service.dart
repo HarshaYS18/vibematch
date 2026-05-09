@@ -180,7 +180,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final safeRoomId = _roomId ?? 'VM257808';
     if (effectiveUser == null) return;
 
-    if (_joined && _channel != null) return;
+    if (_joined && _channel != null) {
+      _debug('media room already joined; preserving active session for $reason');
+      return;
+    }
 
     _debug('joining media room: $reason');
     await _connect();
