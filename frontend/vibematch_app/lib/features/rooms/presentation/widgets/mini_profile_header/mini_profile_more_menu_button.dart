@@ -20,7 +20,7 @@ class MiniProfileMoreMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canRemoveAdmin = user.isRoomAdmin && !user.isHost;
+    final canRemoveChannelAdmin = user.isRoomAdmin && !user.isHost;
 
     return PopupMenuButton<String>(
       tooltip: 'More',
@@ -28,27 +28,27 @@ class MiniProfileMoreMenuButton extends StatelessWidget {
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       onSelected: (value) {
-        if (value == 'set_admin') onSetAdminTap();
-        if (value == 'remove_admin') onRemoveAdminTap();
+        if (value == 'set_channel_admin') onSetAdminTap();
+        if (value == 'remove_channel_admin') onRemoveAdminTap();
         if (value == 'report') onReportTap();
       },
       itemBuilder: (context) => [
-        if (canRemoveAdmin)
+        if (canRemoveChannelAdmin)
           const PopupMenuItem<String>(
-            value: 'remove_admin',
+            value: 'remove_channel_admin',
             child: MiniProfileMenuRow(
               icon: Icons.shield_moon_rounded,
               color: RoomColors.coral,
-              label: 'Remove admin',
+              label: 'Remove Channel Admin',
             ),
           )
         else if (!user.isRoomAdmin && !user.isHost)
           const PopupMenuItem<String>(
-            value: 'set_admin',
+            value: 'set_channel_admin',
             child: MiniProfileMenuRow(
               icon: Icons.shield_rounded,
               color: RoomColors.aqua,
-              label: 'Set as admin',
+              label: 'Set as Channel Admin',
             ),
           ),
         const PopupMenuItem<String>(
