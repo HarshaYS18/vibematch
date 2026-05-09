@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
+import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
 import '../../../rooms/presentation/live_room_models.dart';
@@ -130,6 +131,10 @@ class MePageContent extends StatelessWidget {
         builder: (_) => SuperPowerPanelPage(currentRole: user.primaryRole),
       ),
     );
+  }
+
+  void _openMerchantSellerPanel(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MerchantSellerPanelPage()));
   }
 
   void _openFamily(BuildContext context) {
@@ -319,6 +324,8 @@ class MePageContent extends StatelessWidget {
                   _openStore(context);
                 } else if (item.title == 'Control Center') {
                   _openControlCentre(context);
+                } else if (item.title == 'Merchant & Seller Panel') {
+                  _openMerchantSellerPanel(context);
                 } else if (item.title == 'Settings') {
                   _openAccountSettings(context);
                 } else if (item.title == 'Help Centre') {
