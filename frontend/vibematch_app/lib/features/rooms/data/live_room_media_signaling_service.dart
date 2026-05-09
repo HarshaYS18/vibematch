@@ -31,6 +31,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   bool _foregroundServiceStarted = false;
 
   final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot = ValueNotifier<LiveMediaRoomSnapshot?>(null);
+  final ValueNotifier<LiveMediaRoomBlock?> roomBlock = ValueNotifier<LiveMediaRoomBlock?>(null);
 
   bool get isConnected => _channel != null;
   bool get isJoined => _joined;
@@ -55,6 +56,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _roomName = roomName.trim().isEmpty ? 'Live Room' : roomName.trim();
     if (roomSnapshot.value?.roomId != nextRoomId) {
       roomSnapshot.value = null;
+      roomBlock.value = null;
     }
   }
 
@@ -120,9 +122,9 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _send('admin/seat_leave_lock', {'seat_index': seatIndex, 'target_user_id': targetUserId});
   }
 
-  void kickUser({required String targetUserId, String reason = 'Removed by room admin'}) {
+  void kickUser({required String targetUserId, String reason = 'Removed by room admin', String duration = '1h'}) {
     if (targetUserId.trim().isEmpty) return;
-    _send('admin/kick', {'target_user_id': targetUserId, 'reason': reason});
+    _send('admin/kick', {'target_user_id': targetUserId, 'reason': reason, 'duration': duration});
   }
 
   void setMicEnabled(bool enabled) {
@@ -148,6 +150,23 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (_channel != null && _joined) {
       _send('room/leave', <String, Object?>{});
     }
+    _joined = false;
+    _peerId = null;
+    roomSnapshot.value = null;
+    roomBlock.value = null;
+    await _subscription?.cancel();
+    _subscription = null;
+    await _channel?.sink.close();
+    _channel = null;
+    _connecting = false;
+    await _stopForegroundServiceIfNeeded();
+  }
+
+  Future<void> _disconnectAfterServerRemoval({required LiveMediaRoomBlock block}) async {
+    roomBlock.value = block;
+    _shouldStayConnected = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _joined = false;
     _peerId = null;
     roomSnapshot.value = null;
@@ -264,6 +283,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       final payload = decoded['payload'];
       _debug('media received: $type $payload');
       if (payload is Map<String, dynamic>) {
+        if (type == 'room/kicked' || type == 'room/join_blocked') {
+          unawaited(_disconnectAfterServerRemoval(block: LiveMediaRoomBlock.fromJson(payload, type: type)));
+          return;
+        }
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
           final nextSnapshot = LiveMediaRoomSnapshot.fromJson(roomData);
@@ -324,6 +347,24 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void _debug(String message) {
     // ignore: avoid_print
     print('[VibeMatchMedia] $message');
+  }
+}
+
+class LiveMediaRoomBlock {
+  const LiveMediaRoomBlock({required this.type, required this.reason, this.kickedUntil, this.remainingMs});
+
+  final String type;
+  final String reason;
+  final DateTime? kickedUntil;
+  final int? remainingMs;
+
+  factory LiveMediaRoomBlock.fromJson(Map<String, dynamic> json, {required String type}) {
+    return LiveMediaRoomBlock(
+      type: type,
+      reason: json['reason']?.toString() ?? 'You cannot enter this room right now.',
+      kickedUntil: DateTime.tryParse(json['kicked_until']?.toString() ?? ''),
+      remainingMs: int.tryParse(json['remaining_ms']?.toString() ?? '') ?? int.tryParse(json['duration_ms']?.toString() ?? ''),
+    );
   }
 }
 
