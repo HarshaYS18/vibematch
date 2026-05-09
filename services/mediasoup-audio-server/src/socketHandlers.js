@@ -8,6 +8,10 @@ const {
   getSeatSnapshot,
   takeSeat,
   leaveSeat,
+  lockSeat,
+  unlockSeat,
+  forceLeaveSeat,
+  forceLeaveAndLockSeat,
   setSeatProducer,
   setSelfMuted,
   setAdminMuted,
@@ -78,6 +82,12 @@ function safeCallback(callback, payload) {
   if (typeof callback === 'function') callback(payload);
 }
 
+function emitSeatsUpdated(io, roomId, room, extra = {}) {
+  const payload = { ...extra, seats: getSeatSnapshot(room) };
+  io.to(roomId).emit('seatsUpdated', payload);
+  return payload;
+}
+
 function registerSocketHandlers(io) {
   io.on('connection', (socket) => {
     console.log(`[socket] connected socket=${socket.id}`);
@@ -130,8 +140,7 @@ function registerSocketHandlers(io) {
         if (!room) throw new Error('room not found');
 
         const seat = takeSeat(room, String(peerId), Number(seatNo));
-        const payload = { seat, seats: getSeatSnapshot(room) };
-        io.to(roomId).emit('seatsUpdated', payload);
+        const payload = emitSeatsUpdated(io, roomId, room, { seat });
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[takeSeat] error', error);
@@ -149,11 +158,96 @@ function registerSocketHandlers(io) {
         if (peer) closePeerProducers(room, peer, io);
 
         const seat = leaveSeat(room, String(peerId));
-        const payload = { seat, seats: getSeatSnapshot(room) };
-        io.to(roomId).emit('seatsUpdated', payload);
+        const payload = emitSeatsUpdated(io, roomId, room, { seat });
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[leaveSeat] error', error);
+        safeCallback(callback, { ok: false, error: error.message });
+      }
+    });
+
+    socket.on('adminSeatLeave', ({ roomId, targetPeerId }, callback) => {
+      try {
+        if (String(roomId) !== String(joinedRoomId)) throw new Error('room session mismatch');
+        const room = getRoom(roomId);
+        if (!room) throw new Error('room not found');
+
+        const peer = room.peers.get(String(targetPeerId));
+        if (peer) closePeerProducers(room, peer, io);
+
+        const seat = forceLeaveSeat(room, String(targetPeerId));
+        const payload = emitSeatsUpdated(io, roomId, room, { seat, targetPeerId: String(targetPeerId) });
+        safeCallback(callback, { ok: true, ...payload });
+      } catch (error) {
+        console.error('[adminSeatLeave] error', error);
+        safeCallback(callback, { ok: false, error: error.message });
+      }
+    });
+
+    socket.on('adminSeatLock', ({ roomId, seatNo }, callback) => {
+      try {
+        if (String(roomId) !== String(joinedRoomId)) throw new Error('room session mismatch');
+        const room = getRoom(roomId);
+        if (!room) throw new Error('room not found');
+
+        const seat = lockSeat(room, Number(seatNo));
+        const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        safeCallback(callback, { ok: true, ...payload });
+      } catch (error) {
+        console.error('[adminSeatLock] error', error);
+        safeCallback(callback, { ok: false, error: error.message });
+      }
+    });
+
+    socket.on('adminSeatUnlock', ({ roomId, seatNo }, callback) => {
+      try {
+        if (String(roomId) !== String(joinedRoomId)) throw new Error('room session mismatch');
+        const room = getRoom(roomId);
+        if (!room) throw new Error('room not found');
+
+        const seat = unlockSeat(room, Number(seatNo));
+        const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        safeCallback(callback, { ok: true, ...payload });
+      } catch (error) {
+        console.error('[adminSeatUnlock] error', error);
+        safeCallback(callback, { ok: false, error: error.message });
+      }
+    });
+
+    socket.on('adminSeatLeaveLock', ({ roomId, seatNo, targetPeerId }, callback) => {
+      try {
+        if (String(roomId) !== String(joinedRoomId)) throw new Error('room session mismatch');
+        const room = getRoom(roomId);
+        if (!room) throw new Error('room not found');
+
+        const peer = room.peers.get(String(targetPeerId));
+        if (peer) closePeerProducers(room, peer, io);
+
+        const seat = forceLeaveAndLockSeat(room, Number(seatNo), String(targetPeerId));
+        const payload = emitSeatsUpdated(io, roomId, room, { seat, targetPeerId: String(targetPeerId) });
+        safeCallback(callback, { ok: true, ...payload });
+      } catch (error) {
+        console.error('[adminSeatLeaveLock] error', error);
+        safeCallback(callback, { ok: false, error: error.message });
+      }
+    });
+
+    socket.on('adminKick', ({ roomId, targetPeerId, reason }, callback) => {
+      try {
+        if (String(roomId) !== String(joinedRoomId)) throw new Error('room session mismatch');
+        const room = getRoom(roomId);
+        if (!room) throw new Error('room not found');
+
+        const targetPeerIdString = String(targetPeerId);
+        const peer = room.peers.get(targetPeerIdString);
+        if (peer) closePeerProducers(room, peer, io);
+
+        const updatedRoom = removePeer(roomId, targetPeerIdString);
+        io.to(roomId).emit('peerKicked', { peerId: targetPeerIdString, reason: reason || 'Removed by room admin' });
+        if (updatedRoom) emitSeatsUpdated(io, roomId, updatedRoom, { targetPeerId: targetPeerIdString });
+        safeCallback(callback, { ok: true, targetPeerId: targetPeerIdString });
+      } catch (error) {
+        console.error('[adminKick] error', error);
         safeCallback(callback, { ok: false, error: error.message });
       }
     });
@@ -285,8 +379,7 @@ function registerSocketHandlers(io) {
         if (peer) pausePeerProducers(peer, Boolean(muted));
 
         const seat = setSelfMuted(room, String(peerId), Boolean(muted));
-        const payload = { seat, seats: getSeatSnapshot(room) };
-        io.to(roomId).emit('seatsUpdated', payload);
+        const payload = emitSeatsUpdated(io, roomId, room, { seat });
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[setSelfMuted] error', error);
@@ -304,8 +397,7 @@ function registerSocketHandlers(io) {
         if (peer) pausePeerProducers(peer, Boolean(muted));
 
         const seat = setAdminMuted(room, String(targetPeerId), Boolean(muted));
-        const payload = { seat, seats: getSeatSnapshot(room) };
-        io.to(roomId).emit('seatsUpdated', payload);
+        const payload = emitSeatsUpdated(io, roomId, room, { seat });
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[setAdminMuted] error', error);
