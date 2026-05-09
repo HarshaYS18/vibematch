@@ -23,6 +23,8 @@ class LiveRoomMediaSignalingService {
   bool _connecting = false;
   bool _joined = false;
 
+  final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot = ValueNotifier<LiveMediaRoomSnapshot?>(null);
+
   bool get isConnected => _channel != null;
   bool get isJoined => _joined;
   String? get roomId => _roomId;
@@ -32,8 +34,12 @@ class LiveRoomMediaSignalingService {
   SeatUser effectiveCurrentUser(SeatUser fallback) => _activeLoggedInSeatUser ?? fallback;
 
   void configureRoom({required String roomId, required String roomName}) {
-    _roomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
+    final nextRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
+    _roomId = nextRoomId;
     _roomName = roomName.trim().isEmpty ? 'Live Room' : roomName.trim();
+    if (roomSnapshot.value?.roomId != nextRoomId) {
+      roomSnapshot.value = null;
+    }
   }
 
   void setActiveLoggedInUser(CurrentUser user) {
@@ -101,6 +107,7 @@ class LiveRoomMediaSignalingService {
     }
     _joined = false;
     _peerId = null;
+    roomSnapshot.value = null;
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
@@ -159,6 +166,12 @@ class LiveRoomMediaSignalingService {
       final type = decoded['type']?.toString() ?? 'unknown';
       final payload = decoded['payload'];
       _debug('media received: $type $payload');
+      if (payload is Map<String, dynamic>) {
+        final roomData = payload['room'];
+        if (roomData is Map<String, dynamic>) {
+          roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
+        }
+      }
     } catch (error) {
       _debug('media received unreadable message: $raw');
     }
@@ -174,5 +187,40 @@ class LiveRoomMediaSignalingService {
   void _debug(String message) {
     // ignore: avoid_print
     print('[VibeMatchMedia] $message');
+  }
+}
+
+class LiveMediaRoomSnapshot {
+  const LiveMediaRoomSnapshot({required this.roomId, required this.peers});
+
+  final String roomId;
+  final List<LiveMediaPeerSnapshot> peers;
+
+  factory LiveMediaRoomSnapshot.fromJson(Map<String, dynamic> json) {
+    final rawPeers = json['peers'];
+    final peers = rawPeers is List
+        ? rawPeers.whereType<Map<String, dynamic>>().map(LiveMediaPeerSnapshot.fromJson).toList()
+        : <LiveMediaPeerSnapshot>[];
+    return LiveMediaRoomSnapshot(roomId: json['room_id']?.toString() ?? '', peers: peers);
+  }
+}
+
+class LiveMediaPeerSnapshot {
+  const LiveMediaPeerSnapshot({required this.peerId, required this.userId, required this.displayName, required this.seatIndex, required this.micEnabled});
+
+  final String peerId;
+  final String userId;
+  final String displayName;
+  final int? seatIndex;
+  final bool micEnabled;
+
+  factory LiveMediaPeerSnapshot.fromJson(Map<String, dynamic> json) {
+    return LiveMediaPeerSnapshot(
+      peerId: json['peer_id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      displayName: json['display_name']?.toString() ?? 'Vibe User',
+      seatIndex: json['seat_index'] is int ? json['seat_index'] as int : int.tryParse(json['seat_index']?.toString() ?? ''),
+      micEnabled: json['mic_enabled'] == true,
+    );
   }
 }
