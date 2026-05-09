@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_media_signaling_service.dart';
 import '../controllers/live_room_navigation_controller.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../controllers/live_room_state_controller.dart';
@@ -84,13 +87,14 @@ class LiveRoomLeaveActionsModule {
     final roomNavigator = Navigator.of(context);
 
     roomStateController.setExitingRoom(true);
+    unawaited(LiveRoomMediaSignalingService.instance.leaveRoom());
     Navigator.pop(sheetContext);
 
     if (!mountedGetter()) return;
 
     roomStateController.setAllowRoomPop(true);
 
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
       if (!mountedGetter()) return;
       roomNavigator.maybePop();
     });
