@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 enum ControlCenterSection {
   overview('Command', Icons.dashboard_customize_rounded),
+  performance('Performance', Icons.insights_rounded),
   invisibility('Stealth', Icons.visibility_off_rounded),
   logs('Logs', Icons.manage_search_rounded),
   powers('Powers', Icons.admin_panel_settings_rounded),
