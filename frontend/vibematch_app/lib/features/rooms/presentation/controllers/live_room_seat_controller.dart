@@ -57,7 +57,10 @@ class LiveRoomSeatController {
     final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
     if (snapshot == null || seats.isEmpty) return;
 
-    final nextSeats = List<RoomSeat>.generate(seats.length, (index) => RoomSeat(index: index, locked: seats[index].locked));
+    final nextSeats = List<RoomSeat>.generate(
+      seats.length,
+      (index) => RoomSeat(index: index, locked: snapshot.lockedSeatIndexes.contains(index)),
+    );
     final usedSeatIndexes = <int>{};
 
     for (final peer in snapshot.peers) {
@@ -71,13 +74,20 @@ class LiveRoomSeatController {
         selfMuted: !peer.micEnabled,
         adminMuted: peer.adminMuted,
       );
-      nextSeats[seatIndex] = nextSeats[seatIndex].copyWith(user: seatUser, locked: false);
+      nextSeats[seatIndex] = nextSeats[seatIndex].copyWith(
+        user: seatUser,
+        locked: snapshot.lockedSeatIndexes.contains(seatIndex),
+      );
       usedSeatIndexes.add(seatIndex);
     }
 
     seats = nextSeats;
     final localSeat = seats.firstWhereOrNull((seat) => seat.user?.id == currentUser.id);
     micMuted = localSeat?.user?.selfMuted ?? micMuted;
+    if (selectedSeatIndex != null && selectedSeatIndex! >= 0 && selectedSeatIndex! < seats.length) {
+      final selectedSeat = seats[selectedSeatIndex!];
+      if (selectedSeat.user != null) selectedSeatIndex = null;
+    }
     onChanged();
   }
 
