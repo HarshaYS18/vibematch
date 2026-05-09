@@ -1,16 +1,30 @@
 import 'package:flutter/material.dart';
 
 enum ControlCenterSection {
-  overview('Overview', Icons.dashboard_rounded),
-  invisibility('Invisibility', Icons.visibility_off_rounded),
+  overview('Command', Icons.dashboard_customize_rounded),
+  invisibility('Stealth', Icons.visibility_off_rounded),
   logs('Logs', Icons.manage_search_rounded),
-  powers('Power Provider', Icons.admin_panel_settings_rounded),
-  bans('Ban & Unban', Icons.gavel_rounded),
-  review('Review Panel', Icons.fact_check_rounded),
+  powers('Powers', Icons.admin_panel_settings_rounded),
+  bans('Authority', Icons.gavel_rounded),
+  review('Review', Icons.fact_check_rounded),
   economy('Coins', Icons.monetization_on_rounded),
-  identity('Custom ID', Icons.badge_rounded);
+  identity('Identity', Icons.badge_rounded);
 
   const ControlCenterSection(this.label, this.icon);
+  final String label;
+  final IconData icon;
+}
+
+enum PowerCategory {
+  moderation('Moderation', Icons.gavel_rounded),
+  roles('Roles', Icons.verified_user_rounded),
+  economy('Economy', Icons.account_balance_wallet_rounded),
+  rooms('Rooms', Icons.meeting_room_rounded),
+  reviews('Reviews', Icons.fact_check_rounded),
+  identity('Identity', Icons.badge_rounded),
+  agency('Agency', Icons.groups_rounded);
+
+  const PowerCategory(this.label, this.icon);
   final String label;
   final IconData icon;
 }
@@ -29,20 +43,69 @@ const List<String> controlCenterRoles = [
   'user',
 ];
 
-const List<String> controlCenterAuthorities = [
-  'ASSIGN_ROLE',
-  'REVOKE_ROLE',
-  'BAN_USER',
-  'UNBAN_USER',
-  'TEMP_BAN_USER',
-  'PERMANENT_BAN_USER',
-  'SEND_COINS',
-  'ASSIGN_CUSTOM_ID',
-  'REVIEW_REPORTS',
-  'APPROVE_ASSETS',
-  'MANAGE_ROOMS',
-  'MANAGE_AGENCIES',
-];
+const Map<String, int> controlCenterRolePower = {
+  'founder_owner': 100,
+  'owner': 90,
+  'superadmin': 80,
+  'admin': 70,
+  'monitor': 60,
+  'agency_owner': 50,
+  'bd': 45,
+  'coin_seller': 40,
+  'merchant': 40,
+  'reseller': 35,
+  'cs': 30,
+  'user': 10,
+};
+
+const Map<PowerCategory, List<String>> controlCenterAuthorityGroups = {
+  PowerCategory.moderation: [
+    'BAN_USER',
+    'UNBAN_USER',
+    'TEMP_BAN_USER',
+    'PERMANENT_BAN_USER',
+    'DEVICE_BAN',
+    'DEVICE_UNBAN_FOUNDER_ONLY',
+  ],
+  PowerCategory.roles: [
+    'ASSIGN_ROLE',
+    'REMOVE_ROLE',
+    'REVOKE_ROLE',
+    'VIEW_ADMIN_USERS',
+  ],
+  PowerCategory.economy: [
+    'SEND_COINS',
+    'MINT_AUTHORITY_POOL',
+    'REMOVE_AUTHORITY_POOL',
+    'VIEW_WALLET_LOGS',
+  ],
+  PowerCategory.rooms: [
+    'MANAGE_ROOMS',
+    'ROOM_STEALTH_ENTRY',
+    'ROOM_KICK',
+    'ROOM_MUTE',
+    'SECRET_VIBE_ACCESS',
+  ],
+  PowerCategory.reviews: [
+    'REVIEW_REPORTS',
+    'APPROVE_ASSETS',
+    'REJECT_ASSETS',
+    'REVIEW_DP',
+    'REVIEW_PAYOUTS',
+  ],
+  PowerCategory.identity: [
+    'ASSIGN_CUSTOM_ID',
+    'RESERVE_OFFICIAL_HANDLE',
+    'VERIFY_PROFILE',
+  ],
+  PowerCategory.agency: [
+    'MANAGE_AGENCIES',
+    'CLOSE_AGENCY',
+    'VIEW_HOST_REPORTS',
+  ],
+};
+
+List<String> get controlCenterAuthorities => controlCenterAuthorityGroups.values.expand((items) => items).toSet().toList();
 
 class ControlCenterState {
   const ControlCenterState({
@@ -55,6 +118,7 @@ class ControlCenterState {
     required this.logs,
     required this.powerGrants,
     required this.reviewItems,
+    required this.roleAssignments,
   });
 
   final bool globalInvisible;
@@ -66,6 +130,7 @@ class ControlCenterState {
   final List<ControlLogEntry> logs;
   final List<PowerGrantEntry> powerGrants;
   final List<ReviewQueueItem> reviewItems;
+  final List<RoleAssignmentEntry> roleAssignments;
 
   ControlCenterState copyWith({
     bool? globalInvisible,
@@ -77,6 +142,7 @@ class ControlCenterState {
     List<ControlLogEntry>? logs,
     List<PowerGrantEntry>? powerGrants,
     List<ReviewQueueItem>? reviewItems,
+    List<RoleAssignmentEntry>? roleAssignments,
   }) {
     return ControlCenterState(
       globalInvisible: globalInvisible ?? this.globalInvisible,
@@ -88,6 +154,7 @@ class ControlCenterState {
       logs: logs ?? this.logs,
       powerGrants: powerGrants ?? this.powerGrants,
       reviewItems: reviewItems ?? this.reviewItems,
+      roleAssignments: roleAssignments ?? this.roleAssignments,
     );
   }
 }
@@ -190,6 +257,63 @@ class PowerGrantEntry {
   }
 }
 
+class RoleAssignmentEntry {
+  const RoleAssignmentEntry({
+    required this.id,
+    required this.userId,
+    required this.role,
+    required this.assignedByUserId,
+    required this.reason,
+    required this.isActive,
+    required this.createdAt,
+    this.removedAt,
+  });
+
+  final String id;
+  final String userId;
+  final String role;
+  final String assignedByUserId;
+  final String reason;
+  final bool isActive;
+  final DateTime createdAt;
+  final DateTime? removedAt;
+
+  RoleAssignmentEntry copyWith({bool? isActive, DateTime? removedAt}) => RoleAssignmentEntry(
+        id: id,
+        userId: userId,
+        role: role,
+        assignedByUserId: assignedByUserId,
+        reason: reason,
+        isActive: isActive ?? this.isActive,
+        createdAt: createdAt,
+        removedAt: removedAt ?? this.removedAt,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'user_id': userId,
+        'role': role,
+        'assigned_by_user_id': assignedByUserId,
+        'reason': reason,
+        'is_active': isActive,
+        'created_at': createdAt.toIso8601String(),
+        if (removedAt != null) 'removed_at': removedAt!.toIso8601String(),
+      };
+
+  factory RoleAssignmentEntry.fromJson(Map<String, dynamic> json) {
+    return RoleAssignmentEntry(
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      role: json['role']?.toString() ?? 'user',
+      assignedByUserId: json['assigned_by_user_id']?.toString() ?? '6922022',
+      reason: json['reason']?.toString() ?? '',
+      isActive: json['is_active'] != false,
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+      removedAt: DateTime.tryParse(json['removed_at']?.toString() ?? ''),
+    );
+  }
+}
+
 class ReviewQueueItem {
   const ReviewQueueItem({
     required this.id,
@@ -199,6 +323,13 @@ class ReviewQueueItem {
     required this.roomId,
     required this.status,
     required this.createdAt,
+    required this.mappedOfficialRole,
+    required this.mappedOfficialName,
+    required this.mappedOfficialUserId,
+    required this.mappedAt,
+    required this.issueDetails,
+    required this.priority,
+    required this.evidenceLabel,
   });
 
   final String id;
@@ -208,6 +339,13 @@ class ReviewQueueItem {
   final String roomId;
   final String status;
   final DateTime createdAt;
+  final String mappedOfficialRole;
+  final String mappedOfficialName;
+  final String mappedOfficialUserId;
+  final DateTime mappedAt;
+  final String issueDetails;
+  final String priority;
+  final String evidenceLabel;
 
   ReviewQueueItem copyWith({String? status}) => ReviewQueueItem(
         id: id,
@@ -217,5 +355,12 @@ class ReviewQueueItem {
         roomId: roomId,
         status: status ?? this.status,
         createdAt: createdAt,
+        mappedOfficialRole: mappedOfficialRole,
+        mappedOfficialName: mappedOfficialName,
+        mappedOfficialUserId: mappedOfficialUserId,
+        mappedAt: mappedAt,
+        issueDetails: issueDetails,
+        priority: priority,
+        evidenceLabel: evidenceLabel,
       );
 }
