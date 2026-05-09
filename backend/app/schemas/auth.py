@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+
+from app.schemas.role_badge import RoleBadgeResponse
 
 
 class DevLoginRequest(BaseModel):
@@ -19,3 +21,6 @@ class AuthResponse(BaseModel):
     user_id: int
     public_user_id: int
     roles: list[str]
+    primary_role: str
+    primary_role_badge: RoleBadgeResponse | None = None
+    role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
