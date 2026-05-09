@@ -141,9 +141,6 @@ class LiveRoomSeatController {
     return 0;
   }
 
-  bool _isOwner(SeatUser user) => _roomPower(user) >= 100;
-  bool _isAdmin(SeatUser user) => _roomPower(user) >= 90 && _roomPower(user) < 100;
-
   bool _canModerateTarget(SeatUser target) {
     final viewerPower = _roomPower(currentUser);
     final targetPower = _roomPower(target);
@@ -290,17 +287,8 @@ class LiveRoomSeatController {
       onToast('You cannot remove this user');
       return;
     }
-    var removed = false;
-    for (var i = 0; i < seats.length; i++) {
-      if (seats[i].user?.id == userId) {
-        seats[i] = seats[i].copyWith(clearUser: true);
-        removed = true;
-      }
-    }
-    if (!removed) return;
     selectedSeatIndex = null;
     LiveRoomMediaSignalingService.instance.kickUser(targetUserId: userId);
-    onChanged();
   }
 
   void kickUserFromRoom({required String userId, required String duration}) {
@@ -309,34 +297,21 @@ class LiveRoomSeatController {
       onToast('You cannot kick this user');
       return;
     }
-    var removed = false;
-    for (var i = 0; i < seats.length; i++) {
-      if (seats[i].user?.id == userId) {
-        seats[i] = seats[i].copyWith(clearUser: true);
-        removed = true;
-      }
-    }
     selectedSeatIndex = null;
     LiveRoomMediaSignalingService.instance.kickUser(targetUserId: userId, duration: duration);
-    if (removed) onChanged();
   }
 
   void toggleMic() {
     final index = seats.indexWhere((seat) => seat.user?.id == currentUser.id);
     final localUser = index >= 0 ? seats[index].user : null;
     if (localUser?.adminMuted ?? false) {
-      micMuted = true;
-      if (index >= 0) seats[index] = seats[index].copyWith(user: localUser!.copyWith(selfMuted: true));
       LiveRoomMediaSignalingService.instance.setMicEnabled(false);
       onToast('You are muted by the room admin');
-      onChanged();
       return;
     }
 
-    micMuted = !micMuted;
-    if (index >= 0) seats[index] = seats[index].copyWith(user: seats[index].user!.copyWith(selfMuted: micMuted));
-    LiveRoomMediaSignalingService.instance.setMicEnabled(!micMuted && index >= 0);
-    onChanged();
+    final nextMuted = !(localUser?.selfMuted ?? micMuted);
+    LiveRoomMediaSignalingService.instance.setMicEnabled(!nextMuted && index >= 0);
   }
 
   void toggleSelfMute(String userId) {
@@ -348,18 +323,12 @@ class LiveRoomSeatController {
       return;
     }
     if (user.adminMuted) {
-      seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: true));
-      micMuted = true;
       LiveRoomMediaSignalingService.instance.setMicEnabled(false);
       onToast('You are muted by the room admin');
-      onChanged();
       return;
     }
     final nextMuted = !user.selfMuted;
-    seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: nextMuted));
-    micMuted = nextMuted;
     LiveRoomMediaSignalingService.instance.setMicEnabled(!nextMuted);
-    onChanged();
   }
 
   void toggleAdminMute(String userId) {
@@ -371,9 +340,7 @@ class LiveRoomSeatController {
       return;
     }
     final nextMuted = !user.adminMuted;
-    seats[index] = seats[index].copyWith(user: user.copyWith(adminMuted: nextMuted, selfMuted: nextMuted ? true : user.selfMuted));
     LiveRoomMediaSignalingService.instance.setAdminMute(targetUserId: userId, muted: nextMuted);
-    onChanged();
   }
 
   void setUserAsAdmin(String userId) {
@@ -385,7 +352,7 @@ class LiveRoomSeatController {
     for (var i = 0; i < seats.length; i++) {
       final user = seats[i].user;
       if (user?.id == userId) {
-        seats[i] = seats[i].copyWith(user: user!.copyWith(isRoomAdmin: true, roleLabel: 'Administrator'));
+        seats[i] = seats[i].copyWith(user: user!.copyWith(isRoomAdmin: true, roleLabel: 'Channel Admin'));
       }
     }
     onChanged();
@@ -417,18 +384,11 @@ class LiveRoomSeatController {
       onToast('You cannot leave-lock this user');
       return;
     }
-    final isCurrentUserSeat = seatedUser?.id == currentUser.id;
-    seats[seatIndex] = RoomSeat(index: seatIndex, locked: !isCurrentUserSeat);
-    selectedSeatIndex = null;
     if (seatedUser != null) {
       LiveRoomMediaSignalingService.instance.leaveAndLockSeat(seatIndex: seatIndex, targetUserId: seatedUser.id);
     } else {
       LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: seatIndex);
     }
-    if (isCurrentUserSeat) {
-      LiveRoomMediaSignalingService.instance.leaveSeat();
-    }
-    onChanged();
   }
 
   void leaveSeatOnly(int seatIndex) {
@@ -438,11 +398,7 @@ class LiveRoomSeatController {
 
     final isCurrentUserSeat = seatedUser.id == currentUser.id;
     if (isCurrentUserSeat) {
-      seats[seatIndex] = RoomSeat(index: seatIndex);
-      micMuted = true;
-      selectedSeatIndex = null;
       LiveRoomMediaSignalingService.instance.leaveSeat();
-      onChanged();
       return;
     }
 
@@ -454,10 +410,7 @@ class LiveRoomSeatController {
       onToast('You cannot remove this user from seat');
       return;
     }
-    seats[seatIndex] = RoomSeat(index: seatIndex);
-    selectedSeatIndex = null;
     LiveRoomMediaSignalingService.instance.forceLeaveSeat(seatIndex: seatIndex, targetUserId: seatedUser.id);
-    onChanged();
   }
 }
 
