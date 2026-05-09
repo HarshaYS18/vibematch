@@ -309,6 +309,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (snapshot == null) return;
     roomSnapshot.value = LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
+      peerCount: snapshot.peerCount,
       lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
         final matchesUser = peer.userId == targetUserId || peer.peerId == targetUserId;
@@ -327,6 +328,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     return LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
+      peerCount: snapshot.peerCount,
       lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
         final matchesPeer = targetPeerId != null && targetPeerId.isNotEmpty && peer.peerId == targetPeerId;
@@ -369,9 +371,10 @@ class LiveMediaRoomBlock {
 }
 
 class LiveMediaRoomSnapshot {
-  const LiveMediaRoomSnapshot({required this.roomId, required this.peers, this.lockedSeatIndexes = const <int>{}});
+  const LiveMediaRoomSnapshot({required this.roomId, required this.peers, int? peerCount, this.lockedSeatIndexes = const <int>{}}) : peerCount = peerCount ?? peers.length;
 
   final String roomId;
+  final int peerCount;
   final List<LiveMediaPeerSnapshot> peers;
   final Set<int> lockedSeatIndexes;
 
@@ -380,7 +383,8 @@ class LiveMediaRoomSnapshot {
     final peers = rawPeers is List ? rawPeers.whereType<Map<String, dynamic>>().map(LiveMediaPeerSnapshot.fromJson).toList() : <LiveMediaPeerSnapshot>[];
     final rawLockedSeats = json['locked_seat_indexes'] ?? json['lockedSeatIndexes'];
     final lockedSeatIndexes = rawLockedSeats is List ? rawLockedSeats.map((item) => int.tryParse(item.toString())).whereType<int>().toSet() : <int>{};
-    return LiveMediaRoomSnapshot(roomId: json['room_id']?.toString() ?? '', peers: peers, lockedSeatIndexes: lockedSeatIndexes);
+    final parsedPeerCount = int.tryParse(json['peer_count']?.toString() ?? '');
+    return LiveMediaRoomSnapshot(roomId: json['room_id']?.toString() ?? '', peerCount: parsedPeerCount ?? peers.length, peers: peers, lockedSeatIndexes: lockedSeatIndexes);
   }
 }
 
