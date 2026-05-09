@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../live_room_models.dart';
 import 'room_profile_actions/leave_seat_icon.dart';
 import 'room_profile_actions/room_profile_action_colors.dart';
 import 'room_profile_actions/room_profile_action_item_data.dart';
@@ -8,8 +9,8 @@ import 'room_profile_actions/room_profile_action_tile.dart';
 class RoomProfileActionRow extends StatelessWidget {
   const RoomProfileActionRow({
     super.key,
-    required this.isSelf,
-    required this.canModerate,
+    required this.user,
+    required this.currentUser,
     required this.selfMuted,
     required this.adminMuted,
     required this.onLeaveAndLock,
@@ -19,8 +20,8 @@ class RoomProfileActionRow extends StatelessWidget {
     this.onKickOutTap,
   });
 
-  final bool isSelf;
-  final bool canModerate;
+  final SeatUser user;
+  final SeatUser currentUser;
   final bool selfMuted;
   final bool adminMuted;
   final VoidCallback onLeaveAndLock;
@@ -29,40 +30,55 @@ class RoomProfileActionRow extends StatelessWidget {
   final VoidCallback onAdminMuteToggle;
   final VoidCallback? onKickOutTap;
 
+  bool get _isSelf => user.id == currentUser.id;
+  int get _viewerPower => _roomPower(currentUser);
+  int get _targetPower => _roomPower(user);
+
+  bool get _viewerIsOwner => _viewerPower >= 100;
+  bool get _viewerIsAdmin => _viewerPower >= 90 && _viewerPower < 100;
+  bool get _targetIsOwner => _targetPower >= 100;
+  bool get _canModerateTarget {
+    if (_isSelf) return false;
+    if (_targetIsOwner) return false;
+    if (_viewerIsOwner) return _targetPower < 100;
+    if (_viewerIsAdmin) return _targetPower < 90;
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final actions = <RoomProfileActionItemData>[
-      if (isSelf)
+      if (_isSelf)
         RoomProfileActionItemData(
           icon: const LeaveSeatIcon(color: RoomProfileActionColors.icon),
           label: 'Leave',
           onTap: onLeaveSeatOnly,
         ),
-      if (canModerate && !isSelf)
+      if (_canModerateTarget)
         RoomProfileActionItemData(
           icon: const Icon(Icons.lock_rounded),
           label: 'Leave & Lock',
           onTap: onLeaveAndLock,
         ),
-      if (canModerate && !isSelf)
+      if (_canModerateTarget)
         RoomProfileActionItemData(
           icon: const LeaveSeatIcon(color: RoomProfileActionColors.icon),
           label: 'Leave',
           onTap: onLeaveSeatOnly,
         ),
-      if (canModerate && !isSelf && onKickOutTap != null)
+      if (_canModerateTarget && onKickOutTap != null)
         RoomProfileActionItemData(
           icon: const Icon(Icons.person_remove_alt_1_rounded),
           label: 'Kick out',
           onTap: onKickOutTap!,
         ),
-      if (isSelf)
+      if (_isSelf)
         RoomProfileActionItemData(
           icon: Icon(selfMuted ? Icons.mic_off_rounded : Icons.mic_rounded),
           label: selfMuted ? 'Turn On' : 'Turn Off',
           onTap: onSelfMuteToggle,
         )
-      else if (canModerate)
+      else if (_canModerateTarget)
         RoomProfileActionItemData(
           icon: Icon(adminMuted ? Icons.mic_rounded : Icons.mic_off_rounded),
           label: adminMuted ? 'Turn On' : 'Turn Off',
@@ -94,5 +110,21 @@ class RoomProfileActionRow extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static int _roomPower(SeatUser user) {
+    final role = user.roleLabel.toLowerCase();
+    final isOwner = user.isHost ||
+        user.id == 'user_6922022' ||
+        user.id == 'founder_owner' ||
+        role.contains('owner') ||
+        role.contains('channel host') ||
+        role == 'host';
+    if (isOwner) return 100;
+
+    final isAdmin = user.isRoomAdmin || role.contains('admin') || role.contains('administrator');
+    if (isAdmin) return 90;
+
+    return 0;
   }
 }
