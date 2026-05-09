@@ -53,7 +53,6 @@ def participant_user_ids(conversation: InboxConversation) -> list[int]:
 
 def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
     user_team_public_id = _team_public_id(user)
-
     conversation = (
         db.query(InboxConversation)
         .join(InboxParticipant)
@@ -193,7 +192,7 @@ def update_message(db: Session, conversation: InboxConversation, message_public_
 
 
 def delete_message(db: Session, conversation: InboxConversation, message_public_id: str) -> bool:
-    message = db.query(InboxMessage).filter(InboxMessage.public_id == message_public_id, message.conversation_id == conversation.id).first()
+    message = db.query(InboxMessage).filter(InboxMessage.public_id == message_public_id, InboxMessage.conversation_id == conversation.id).first()
     if not message:
         return False
     db.delete(message)
