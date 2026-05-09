@@ -412,7 +412,7 @@ class LiveRoomAudioService {
         rethrow;
       }
       _debug('audio produce requested');
-      _scheduleProduceRetry('producer callback watchdog');
+      _scheduleProduceRetry('producer callback watchdog', rebuildPipeline: true);
     } catch (error) {
       if (_isRecoverableProduceStartupError(error.toString())) {
         _debug('audio produce recoverable outer error; rebuilding send pipeline and retrying');
