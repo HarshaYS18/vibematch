@@ -19,8 +19,7 @@ class LiveRoomModerationController {
     required int backendOnlineCount,
     required int visibleRoomUsersCount,
   }) {
-    final adjustedBackendCount = backendOnlineCount - _locallyKickedOutUserIds.length;
-    return adjustedBackendCount > visibleRoomUsersCount ? adjustedBackendCount : visibleRoomUsersCount;
+    return visibleRoomUsersCount < 0 ? 0 : visibleRoomUsersCount;
   }
 
   bool canKickOutUser({
