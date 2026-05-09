@@ -6,6 +6,7 @@ from app.api.routes import (
     auth,
     inbox,
     inbox_ws,
+    internal_test,
     moderation,
     mvp_core,
     mvp_economy,
@@ -73,3 +74,4 @@ app.include_router(mvp_social.router)
 app.include_router(mvp_economy.router)
 app.include_router(mvp_operations.router)
 app.include_router(mvp_room_modes.router)
+app.include_router(internal_test.router)
