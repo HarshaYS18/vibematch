@@ -33,6 +33,7 @@ class LiveRoomAudioService {
   bool _sendTransportCreating = false;
   bool _recvTransportCreating = false;
   bool _producerCreating = false;
+  bool _rebuildSendPipelineOnRetry = false;
 
   final Set<String> _pendingProducerIds = <String>{};
   final Set<String> _consumingProducerIds = <String>{};
@@ -55,7 +56,7 @@ class LiveRoomAudioService {
 
   Future<void> joinRoom({required String roomId, required SeatUser currentUser}) async {
     final safeRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
-    final safePeerId = '${safeRoomId}_${currentUser.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+    final safePeerId = '${safeRoomId}_${currentUser.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\\-]'), '_');
 
     if (_joined && _roomId == safeRoomId && _peerId == safePeerId) return;
 
@@ -134,6 +135,7 @@ class LiveRoomAudioService {
     _pendingProducerIds.clear();
     _producerInfoById.clear();
     _closingRemoteProducerIds.clear();
+    _rebuildSendPipelineOnRetry = false;
     _closeSendTransport();
     _closeRecvTransport();
     final socket = _socket;
@@ -274,6 +276,7 @@ class LiveRoomAudioService {
         producerCallback: (Producer producer) {
           _cancelProduceRetry();
           _produceRetryCount = 0;
+          _rebuildSendPipelineOnRetry = false;
           _audioProducer = producer;
           audioPublishing.value = true;
           _debug('audio producer callback id=${producer.id} kind=${producer.kind}');
@@ -393,15 +396,16 @@ class LiveRoomAudioService {
         if (maybeProducer != null) {
           _cancelProduceRetry();
           _produceRetryCount = 0;
+          _rebuildSendPipelineOnRetry = false;
           _audioProducer = maybeProducer;
           audioPublishing.value = true;
           _debug('audio publishing started producer=${maybeProducer.id}');
         }
       } catch (error, stackTrace) {
         final message = error.toString();
-        if (message.contains('Null check operator used on a null value')) {
-          _debug('audio produce startup race detected; scheduling automatic retry');
-          _scheduleProduceRetry('initial produce race');
+        if (_isRecoverableProduceStartupError(message)) {
+          _debug('audio produce startup race detected; rebuilding send pipeline and retrying');
+          _scheduleProduceRetry('recoverable produce error', rebuildPipeline: true);
           return;
         }
         _debug('$error\n$stackTrace');
@@ -410,32 +414,59 @@ class LiveRoomAudioService {
       _debug('audio produce requested');
       _scheduleProduceRetry('producer callback watchdog');
     } catch (error) {
-      _setError('Audio produce failed: $error');
+      if (_isRecoverableProduceStartupError(error.toString())) {
+        _debug('audio produce recoverable outer error; rebuilding send pipeline and retrying');
+        _scheduleProduceRetry('recoverable outer produce error', rebuildPipeline: true);
+      } else {
+        _setError('Audio produce failed: $error');
+      }
     } finally {
       _producerCreating = false;
     }
   }
 
-  void _scheduleProduceRetry(String reason) {
+  bool _isRecoverableProduceStartupError(String message) {
+    final lower = message.toLowerCase();
+    return lower.contains('null check operator used on a null value') || lower.contains('track is null') || lower.contains('addtransceiver');
+  }
+
+  void _scheduleProduceRetry(String reason, {bool rebuildPipeline = false}) {
     if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null) return;
+    if (rebuildPipeline) _rebuildSendPipelineOnRetry = true;
     if (_produceRetryTimer?.isActive ?? false) return;
     if (_produceRetryCount >= 3) {
       _debug('audio produce retry limit reached');
       return;
     }
     _produceRetryCount += 1;
-    _debug('audio produce retry scheduled #$_produceRetryCount reason=$reason');
-    _produceRetryTimer = Timer(Duration(milliseconds: 450 + (_produceRetryCount * 250)), () {
+    _debug('audio produce retry scheduled #$_produceRetryCount reason=$reason rebuild=$_rebuildSendPipelineOnRetry');
+    _produceRetryTimer = Timer(Duration(milliseconds: 450 + (_produceRetryCount * 300)), () {
       _produceRetryTimer = null;
-      if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null) return;
-      _debug('audio produce retry running #$_produceRetryCount');
-      unawaited(_ensurePublishingAudio());
+      if (!_seated || _selfMuted || _audioProducer != null) return;
+      _debug('audio produce retry running #$_produceRetryCount rebuild=$_rebuildSendPipelineOnRetry');
+      unawaited(_runProduceRetry());
     });
+  }
+
+  Future<void> _runProduceRetry() async {
+    if (!_seated || _selfMuted || _audioProducer != null) return;
+    if (_rebuildSendPipelineOnRetry) {
+      _rebuildSendPipelineOnRetry = false;
+      _debug('audio produce retry rebuilding mic stream and send transport');
+      _closeSendTransport();
+      await _stopLocalMicCapture();
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      if (!_seated || _selfMuted) return;
+      await _startLocalMicCapture();
+    }
+    if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null) return;
+    await _ensurePublishingAudio();
   }
 
   void _cancelProduceRetry() {
     _produceRetryTimer?.cancel();
     _produceRetryTimer = null;
+    _rebuildSendPipelineOnRetry = false;
   }
 
   void _rememberProducers(dynamic rawProducers) {
