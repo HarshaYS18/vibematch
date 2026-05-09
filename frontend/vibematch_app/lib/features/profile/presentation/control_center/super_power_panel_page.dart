@@ -313,7 +313,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Super Owner Panel', style: TextStyle(color: SuperPowerDesign.text, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-            Text('Master controls â€¢ simple view', style: TextStyle(color: SuperPowerDesign.muted, fontSize: 11, fontWeight: FontWeight.w800)),
+            Text('Master controls - simple view', style: TextStyle(color: SuperPowerDesign.muted, fontSize: 11, fontWeight: FontWeight.w800)),
           ])),
           if (busy) const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(color: SuperPowerDesign.gold, strokeWidth: 2)),
         ]),
@@ -456,7 +456,7 @@ class _Logs extends StatelessWidget {
         title: 'Audit Stream',
         subtitle: 'Grouped backend-style logs: actor, target, room/resource and reason.',
         trailing: ControlDeckPill(label: '${logs.length} logs'),
-        children: logs.map((log) => ControlDeckRow(icon: Icons.receipt_long_rounded, title: log.action, subtitle: '${log.targetUserId} â€¢ ${log.resourceType} â€¢ ${log.reason}', trailing: ControlDeckPill(label: log.chatRoomId == '-' ? 'LOG' : log.chatRoomId), accent: SuperPowerDesign.gold, onTap: null)).toList(),
+        children: logs.map((log) => ControlDeckRow(icon: Icons.receipt_long_rounded, title: log.action, subtitle: '${log.targetUserId} - ${log.resourceType} - ${log.reason}', trailing: ControlDeckPill(label: log.chatRoomId == '-' ? 'LOG' : log.chatRoomId), accent: SuperPowerDesign.gold, onTap: null)).toList(),
       );
 }
 
@@ -684,6 +684,8 @@ void _loadUserDevices(String userId) {
     );
   }
 }
+
+
 
 
 
