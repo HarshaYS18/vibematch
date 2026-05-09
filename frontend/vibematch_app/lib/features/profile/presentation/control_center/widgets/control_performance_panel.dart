@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import 'control_deck_widgets.dart';
 import 'super_power_design.dart';
@@ -182,7 +182,7 @@ class _RangeAndTypeRail extends StatelessWidget {
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: PerformanceEntityType.values.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 7),
+          separatorBuilder: (context, index) => const SizedBox(width: 7),
           itemBuilder: (context, index) {
             final item = PerformanceEntityType.values[index];
             final active = item == type;
@@ -196,7 +196,7 @@ class _RangeAndTypeRail extends StatelessWidget {
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: PerformanceRange.values.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 7),
+          separatorBuilder: (context, index) => const SizedBox(width: 7),
           itemBuilder: (context, index) {
             final item = PerformanceRange.values[index];
             final active = item == range;
@@ -348,7 +348,7 @@ class _PerformanceRow extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(entity.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.text, fontSize: 12.8, fontWeight: FontWeight.w900)),
           const SizedBox(height: 2),
-          Text('${entity.roleLabel} • ${entity.id}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
+          Text('${entity.roleLabel} â€¢ ${entity.id}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           Row(children: [
             _MetricTiny(label: 'Primary', value: entity.primaryMetric.toString()),
@@ -464,3 +464,4 @@ final List<PerformanceEntity> _mockPerformance = <PerformanceEntity>[
   PerformanceEntity(id: 'user_1', name: 'Harsha', type: PerformanceEntityType.user, roleLabel: 'User', score: 98, primaryMetric: 240000, secondaryMetric: 125000, trendPercent: 31.2, points: [26, 42, 59, 69, 83, 92, 98]),
   PerformanceEntity(id: 'user_2', name: 'Riya', type: PerformanceEntityType.user, roleLabel: 'Host/User', score: 89, primaryMetric: 190000, secondaryMetric: 151000, trendPercent: 11.4, points: [28, 35, 47, 61, 78, 84, 89]),
 ];
+
