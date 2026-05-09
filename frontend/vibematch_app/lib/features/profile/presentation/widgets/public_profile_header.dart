@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../auth/models/role_badge.dart';
 import '../models/public_profile_models.dart';
+import 'official_role_badge_pill.dart';
 import 'public_profile_shared_widgets.dart';
 
 class PublicProfileHeader extends StatelessWidget {
@@ -10,6 +12,7 @@ class PublicProfileHeader extends StatelessWidget {
     required this.username,
     required this.publicId,
     required this.roleTag,
+    required this.roleBadge,
     required this.showOfficialTick,
     required this.vipLevel,
     required this.svipLevel,
@@ -39,6 +42,7 @@ class PublicProfileHeader extends StatelessWidget {
   final String username;
   final String publicId;
   final String? roleTag;
+  final RoleBadge? roleBadge;
   final bool showOfficialTick;
   final int vipLevel;
   final int svipLevel;
@@ -65,7 +69,10 @@ class PublicProfileHeader extends StatelessWidget {
 
   List<Widget> _badgeLineItems() {
     return [
-      if (roleTag != null) PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
+      if (roleBadge != null)
+        OfficialRoleBadgePill(badge: roleBadge!)
+      else if (roleTag != null)
+        PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
       PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72), onTap: onVipTap),
       PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6), onTap: onSvipTap),
       PublicBadge(icon: Icons.family_restroom_rounded, label: familyName, color: const Color(0xFF12C7B7), onTap: onFamilyTap),
