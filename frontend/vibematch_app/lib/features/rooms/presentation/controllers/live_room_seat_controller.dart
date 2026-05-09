@@ -40,7 +40,7 @@ class LiveRoomSeatController {
       } else if (mockUser.id == currentUser.id) {
         builtSeats[i] = RoomSeat(index: i, user: currentUser);
       } else {
-        builtSeats[i] = RoomSeat(index: i, user: mockUser.copyWith(isCurrentUser: false));
+        builtSeats[i] = RoomSeat(index: i, user: mockUser);
       }
     }
 
