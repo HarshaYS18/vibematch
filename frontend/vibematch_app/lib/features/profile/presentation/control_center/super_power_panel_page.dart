@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import 'control_center_models.dart';
 import 'control_center_store.dart';
@@ -313,7 +313,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Super Owner Panel', style: TextStyle(color: SuperPowerDesign.text, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-            Text('Master controls • simple view', style: TextStyle(color: SuperPowerDesign.muted, fontSize: 11, fontWeight: FontWeight.w800)),
+            Text('Master controls â€¢ simple view', style: TextStyle(color: SuperPowerDesign.muted, fontSize: 11, fontWeight: FontWeight.w800)),
           ])),
           if (busy) const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(color: SuperPowerDesign.gold, strokeWidth: 2)),
         ]),
@@ -456,7 +456,7 @@ class _Logs extends StatelessWidget {
         title: 'Audit Stream',
         subtitle: 'Grouped backend-style logs: actor, target, room/resource and reason.',
         trailing: ControlDeckPill(label: '${logs.length} logs'),
-        children: logs.map((log) => ControlDeckRow(icon: Icons.receipt_long_rounded, title: log.action, subtitle: '${log.targetUserId} • ${log.resourceType} • ${log.reason}', trailing: ControlDeckPill(label: log.chatRoomId == '-' ? 'LOG' : log.chatRoomId), accent: SuperPowerDesign.gold, onTap: null)).toList(),
+        children: logs.map((log) => ControlDeckRow(icon: Icons.receipt_long_rounded, title: log.action, subtitle: '${log.targetUserId} â€¢ ${log.resourceType} â€¢ ${log.reason}', trailing: ControlDeckPill(label: log.chatRoomId == '-' ? 'LOG' : log.chatRoomId), accent: SuperPowerDesign.gold, onTap: null)).toList(),
       );
 }
 
@@ -491,44 +491,6 @@ class _SwitchCommand extends StatelessWidget {
         child: Row(children: [
           Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.text, fontSize: 12.5, fontWeight: FontWeight.w900))),
           Switch.adaptive(value: value, activeThumbColor: SuperPowerDesign.gold, activeTrackColor: const Color(0x55FFD36A), onChanged: onChanged),
-        ]),
-      );
-}
-
-class _ConsoleMetric extends StatelessWidget {
-  const _ConsoleMetric({required this.label, required this.value, required this.icon, required this.color});
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: SuperPowerDesign.obsidian.withValues(alpha: 0.78), borderRadius: BorderRadius.circular(17), border: Border.all(color: SuperPowerDesign.stroke)),
-        child: Row(children: [
-          Icon(icon, color: color, size: 19),
-          const SizedBox(width: 8),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 9.5, fontWeight: FontWeight.w800)),
-            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.w900)),
-          ])),
-        ]),
-      );
-}
-
-class _MiniHeaderPill extends StatelessWidget {
-  const _MiniHeaderPill({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-  @override
-  Widget build(BuildContext context) => Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(color: SuperPowerDesign.obsidian.withValues(alpha: 0.72), borderRadius: BorderRadius.circular(999), border: Border.all(color: SuperPowerDesign.stroke)),
-        child: Row(children: [
-          Icon(icon, color: SuperPowerDesign.gold, size: 15),
-          const SizedBox(width: 6),
-          Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.text, fontSize: 10.5, fontWeight: FontWeight.w800))),
         ]),
       );
 }
@@ -613,8 +575,8 @@ class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> 
       _ => _action,
     };
     final detail = switch (_action) {
-      'CUSTOM_BAN_DAYS' => '$days day(s) • $reason',
-      'DEVICE_BAN' => 'device_id=${deviceId.isEmpty ? 'not_provided' : deviceId} • $reason',
+      'CUSTOM_BAN_DAYS' => '$days day(s) â€¢ $reason',
+      'DEVICE_BAN' => 'device_id=${deviceId.isEmpty ? 'not_provided' : deviceId} â€¢ $reason',
       _ => reason,
     };
     Navigator.pop(
@@ -684,3 +646,4 @@ class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> 
     );
   }
 }
+
