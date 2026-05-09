@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
@@ -104,26 +103,6 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
 
-  void _handleSeatTap(int index) {
-    if (index >= 0 && index < seats.length) {
-      final seat = seats[index];
-      if (!seat.locked && seat.user == null && !applyOnlyModeEnabled) {
-        LiveRoomMediaSignalingService.instance.takeSeat(index);
-      }
-    }
-    onSeatTap(index);
-  }
-
-  void _handleSwitchSeat(int index) {
-    LiveRoomMediaSignalingService.instance.takeSeat(index);
-    onSwitch(index);
-  }
-
-  void _handleMicTap() {
-    LiveRoomMediaSignalingService.instance.setMicEnabled(micMuted);
-    onMicTap();
-  }
-
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -160,10 +139,10 @@ class LiveRoomBody extends StatelessWidget {
               selectedSeatIndex: selectedSeatIndex,
               canManageSeats: canManageSeats,
               applyOnlyModeEnabled: applyOnlyModeEnabled,
-              onSeatTap: _handleSeatTap,
+              onSeatTap: onSeatTap,
               onUserTap: onUserTap,
               onInvite: onInvite,
-              onSwitch: _handleSwitchSeat,
+              onSwitch: onSwitch,
               onLock: onLock,
               onUnlock: onUnlock,
               onApply: onApplySeat,
@@ -196,7 +175,7 @@ class LiveRoomBody extends StatelessWidget {
             onInboxTap: onInboxTap,
             onEmojiTap: onEmojiTap,
             onSendTap: onSendTap,
-            onMicTap: _handleMicTap,
+            onMicTap: onMicTap,
             onGamesTap: onGamesTap,
             onGiftTap: onGiftTap,
           ),
