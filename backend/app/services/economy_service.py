@@ -20,6 +20,7 @@ from app.models.economy import (
     UserWallet,
     WalletLedger,
 )
+from app.models.room import Room
 from app.models.user import User
 
 RUBY_EARNING_BASIS_POINTS = 3000
@@ -171,6 +172,9 @@ def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, co
     receiver = db.query(User).filter(User.id == receiver_user_id).first()
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver not found")
+
+    if room_id is not None and not db.query(Room).filter(Room.id == room_id).first():
+        raise HTTPException(status_code=404, detail="Room not found. Use room_id = null for wallet-only gift test, or pass a valid internal rooms.id value.")
 
     total_coin_value = coin_value * quantity
     receiver_ruby_amount = total_coin_value * RUBY_EARNING_BASIS_POINTS // 10000
