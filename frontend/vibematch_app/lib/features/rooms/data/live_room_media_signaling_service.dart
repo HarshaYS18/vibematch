@@ -32,6 +32,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot = ValueNotifier<LiveMediaRoomSnapshot?>(null);
   final ValueNotifier<LiveMediaRoomBlock?> roomBlock = ValueNotifier<LiveMediaRoomBlock?>(null);
+  final ValueNotifier<LiveMediaSeatInvite?> seatInvite = ValueNotifier<LiveMediaSeatInvite?>(null);
 
   bool get isConnected => _channel != null;
   bool get isJoined => _joined;
@@ -57,6 +58,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (roomSnapshot.value?.roomId != nextRoomId) {
       roomSnapshot.value = null;
       roomBlock.value = null;
+      seatInvite.value = null;
     }
   }
 
@@ -95,7 +97,19 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   void takeSeat(int seatIndex) {
     if (seatIndex < 0) return;
+    seatInvite.value = null;
     _send('seat/take', {'seat_index': seatIndex});
+  }
+
+  void sendSeatInvite({required int seatIndex, required String targetUserId}) {
+    if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
+    final currentUserId = _activeLoggedInSeatUser?.id ?? _currentUser?.id;
+    if (currentUserId != null && targetUserId == currentUserId) return;
+    _send('seat_invite/send', {'seat_index': seatIndex, 'target_user_id': targetUserId});
+  }
+
+  void clearSeatInvite() {
+    seatInvite.value = null;
   }
 
   void leaveSeat() {
@@ -154,6 +168,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _peerId = null;
     roomSnapshot.value = null;
     roomBlock.value = null;
+    seatInvite.value = null;
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
@@ -170,6 +185,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _joined = false;
     _peerId = null;
     roomSnapshot.value = null;
+    seatInvite.value = null;
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
@@ -287,6 +303,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
           unawaited(_disconnectAfterServerRemoval(block: LiveMediaRoomBlock.fromJson(payload, type: type)));
           return;
         }
+        if (type == 'seat_invite/received') {
+          seatInvite.value = LiveMediaSeatInvite.fromJson(payload);
+          return;
+        }
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
           final nextSnapshot = LiveMediaRoomSnapshot.fromJson(roomData);
@@ -349,6 +369,26 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void _debug(String message) {
     // ignore: avoid_print
     print('[VibeMatchMedia] $message');
+  }
+}
+
+class LiveMediaSeatInvite {
+  const LiveMediaSeatInvite({required this.inviteId, required this.roomId, required this.seatIndex, required this.inviterUserId, required this.inviterName});
+
+  final String inviteId;
+  final String roomId;
+  final int seatIndex;
+  final String inviterUserId;
+  final String inviterName;
+
+  factory LiveMediaSeatInvite.fromJson(Map<String, dynamic> json) {
+    return LiveMediaSeatInvite(
+      inviteId: json['invite_id']?.toString() ?? '',
+      roomId: json['room_id']?.toString() ?? '',
+      seatIndex: int.tryParse(json['seat_index']?.toString() ?? '') ?? -1,
+      inviterUserId: json['inviter_user_id']?.toString() ?? '',
+      inviterName: json['inviter_name']?.toString() ?? 'Room admin',
+    );
   }
 }
 
