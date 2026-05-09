@@ -448,18 +448,284 @@ class _Identity extends StatelessWidget {
       );
 }
 
-class _Logs extends StatelessWidget {
+class _Logs extends StatefulWidget {
   const _Logs({required this.logs});
+
   final List<ControlLogEntry> logs;
+
   @override
-  Widget build(BuildContext context) => ControlDeckShell(
-        title: 'Audit Stream',
-        subtitle: 'Grouped backend-style logs: actor, target, room/resource and reason.',
-        trailing: ControlDeckPill(label: '${logs.length} logs'),
-        children: logs.map((log) => ControlDeckRow(icon: Icons.receipt_long_rounded, title: log.action, subtitle: '${log.targetUserId} - ${log.resourceType} - ${log.reason}', trailing: ControlDeckPill(label: log.chatRoomId == '-' ? 'LOG' : log.chatRoomId), accent: SuperPowerDesign.gold, onTap: null)).toList(),
-      );
+  State<_Logs> createState() => _LogsState();
 }
 
+class _LogsState extends State<_Logs> {
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  List<ControlLogEntry> get _filteredLogs {
+    final query = _search.text.trim().toLowerCase();
+    if (query.isEmpty) return widget.logs;
+
+    return widget.logs.where((log) {
+      return log.actorUserId.toLowerCase().contains(query) ||
+          log.targetUserId.toLowerCase().contains(query) ||
+          log.chatRoomId.toLowerCase().contains(query) ||
+          log.action.toLowerCase().contains(query) ||
+          log.resourceType.toLowerCase().contains(query) ||
+          log.reason.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  bool _isUserExactMatch(ControlLogEntry log, String query) {
+    return log.actorUserId.toLowerCase() == query || log.targetUserId.toLowerCase() == query;
+  }
+
+  bool _isRoomExactMatch(ControlLogEntry log, String query) {
+    return log.chatRoomId.toLowerCase() == query;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _search.text.trim().toLowerCase();
+    final filtered = _filteredLogs;
+    final exactUserLogs = query.isEmpty ? 0 : widget.logs.where((log) => _isUserExactMatch(log, query)).length;
+    final exactRoomLogs = query.isEmpty ? 0 : widget.logs.where((log) => _isRoomExactMatch(log, query)).length;
+
+    return ControlDeckShell(
+      title: 'Audit Search',
+      subtitle: 'Search user ID, actor ID, target ID, room ID, action, resource, or reason.',
+      trailing: ControlDeckPill(label: '${filtered.length} logs'),
+      children: [
+        TextField(
+          controller: _search,
+          onChanged: (_) => setState(() {}),
+          style: const TextStyle(color: SuperPowerDesign.text, fontSize: 13, fontWeight: FontWeight.w800),
+          decoration: InputDecoration(
+            hintText: 'Search user ID or room ID',
+            hintStyle: const TextStyle(color: SuperPowerDesign.muted, fontSize: 12, fontWeight: FontWeight.w700),
+            prefixIcon: const Icon(Icons.search_rounded, color: SuperPowerDesign.gold, size: 20),
+            suffixIcon: _search.text.trim().isEmpty
+                ? null
+                : IconButton(
+                    onPressed: () {
+                      _search.clear();
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.close_rounded, color: SuperPowerDesign.muted, size: 18),
+                  ),
+            filled: true,
+            fillColor: SuperPowerDesign.obsidian,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: SuperPowerDesign.stroke),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: SuperPowerDesign.stroke),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: SuperPowerDesign.gold),
+            ),
+          ),
+        ),
+        if (query.isNotEmpty) ...[
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              Expanded(
+                child: _LogSearchStat(
+                  label: 'User logs',
+                  value: exactUserLogs.toString(),
+                  icon: Icons.person_search_rounded,
+                  color: SuperPowerDesign.aqua,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _LogSearchStat(
+                  label: 'Room logs',
+                  value: exactRoomLogs.toString(),
+                  icon: Icons.meeting_room_rounded,
+                  color: SuperPowerDesign.gold,
+                ),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 10),
+        if (filtered.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: SuperPowerDesign.obsidian,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: SuperPowerDesign.stroke),
+            ),
+            child: const Text(
+              'No logs found for this user ID or room ID.',
+              style: TextStyle(color: SuperPowerDesign.muted, fontSize: 12, fontWeight: FontWeight.w800),
+            ),
+          )
+        else
+          ...filtered.map((log) {
+            final time = log.createdAt.toLocal().toString().split('.').first;
+            final roomLabel = log.chatRoomId == '-' ? 'No room' : log.chatRoomId;
+
+            return _DetailedLogRow(
+              log: log,
+              time: time,
+              roomLabel: roomLabel,
+            );
+          }),
+      ],
+    );
+  }
+}
+
+class _LogSearchStat extends StatelessWidget {
+  const _LogSearchStat({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: SuperPowerDesign.obsidian,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 17),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 10.5, fontWeight: FontWeight.w800),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailedLogRow extends StatelessWidget {
+  const _DetailedLogRow({
+    required this.log,
+    required this.time,
+    required this.roomLabel,
+  });
+
+  final ControlLogEntry log;
+  final String time;
+  final String roomLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: SuperPowerDesign.obsidian,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SuperPowerDesign.stroke),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long_rounded, color: SuperPowerDesign.gold, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  log.action,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: SuperPowerDesign.text, fontSize: 12.8, fontWeight: FontWeight.w900),
+                ),
+              ),
+              ControlDeckPill(label: roomLabel),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _LogChip(label: 'Actor', value: log.actorUserId, color: SuperPowerDesign.gold),
+              _LogChip(label: 'Target', value: log.targetUserId, color: SuperPowerDesign.aqua),
+              _LogChip(label: 'Room', value: roomLabel, color: SuperPowerDesign.violet),
+              _LogChip(label: 'Type', value: log.resourceType, color: SuperPowerDesign.mint),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            log.reason.isEmpty ? 'No reason recorded.' : log.reason,
+            style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 11, fontWeight: FontWeight.w700, height: 1.25),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            time,
+            style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 9.8, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LogChip extends StatelessWidget {
+  const _LogChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(color: color, fontSize: 9.6, fontWeight: FontWeight.w900),
+      ),
+    );
+  }
+}
 class _Vault extends StatelessWidget {
   const _Vault({required this.balance});
   final int balance;
@@ -684,6 +950,7 @@ void _loadUserDevices(String userId) {
     );
   }
 }
+
 
 
 
