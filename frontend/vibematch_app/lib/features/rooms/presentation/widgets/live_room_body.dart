@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
+import 'live_room_seat_invite_notification.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
 import 'room_top_bar.dart';
@@ -105,79 +107,113 @@ class LiveRoomBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final media = LiveRoomMediaSignalingService.instance;
+
     return SafeArea(
-      child: Column(
+      child: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-            child: RoomTopBar(
-              roomName: roomName,
-              roomId: roomId,
-              privacyMode: privacyMode,
-              onlineCount: onlineCount,
-              canManageAdmins: canManageSeats,
-              admins: admins,
-              availableAdminUsers: availableAdminUsers,
-              onAddAdmin: onAddAdmin,
-              onRemoveAdmin: onRemoveAdmin,
-              onBack: onBack,
-              onJoinTap: onJoinTap,
-              onShare: onShare,
-              onAnnouncement: onAnnouncement,
-              onSettings: onSettings,
-              onUsersTap: onUsersTap,
-              onRoomRankingsTap: onRoomRankingsTap,
-              onRoomLevelTap: onRoomLevelTap,
-            ),
-          ),
-          const SizedBox(height: 22),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: RoomSeatLayout(
-              seats: seats,
-              layoutId: layoutId,
-              selectedSeatIndex: selectedSeatIndex,
-              canManageSeats: canManageSeats,
-              applyOnlyModeEnabled: applyOnlyModeEnabled,
-              onSeatTap: onSeatTap,
-              onUserTap: onUserTap,
-              onInvite: onInvite,
-              onSwitch: onSwitch,
-              onLock: onLock,
-              onUnlock: onUnlock,
-              onApply: onApplySeat,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: onDismissOverlays,
-              child: Padding(
+          Column(
+            children: [
+              ValueListenableBuilder<LiveMediaRoomSnapshot?>(
+                valueListenable: media.roomSnapshot,
+                builder: (context, snapshot, _) {
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    child: RoomTopBar(
+                      roomName: roomName,
+                      roomId: roomId,
+                      privacyMode: privacyMode,
+                      onlineCount: snapshot?.peerCount ?? onlineCount,
+                      canManageAdmins: canManageSeats,
+                      admins: admins,
+                      availableAdminUsers: availableAdminUsers,
+                      onAddAdmin: onAddAdmin,
+                      onRemoveAdmin: onRemoveAdmin,
+                      onBack: onBack,
+                      onJoinTap: onJoinTap,
+                      onShare: onShare,
+                      onAnnouncement: onAnnouncement,
+                      onSettings: onSettings,
+                      onUsersTap: onUsersTap,
+                      onRoomRankingsTap: onRoomRankingsTap,
+                      onRoomLevelTap: onRoomLevelTap,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 22),
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: RoomChatFeed(
-                  messages: messages,
-                  canManageSeatApplications: canManageSeatApplications,
-                  onApproveSeatApplication: onApproveSeatApplication,
-                  onRejectSeatApplication: onRejectSeatApplication,
-                  onSenderTap: onSenderTap,
-                  onMentionTap: onMentionTap,
+                child: RoomSeatLayout(
+                  seats: seats,
+                  layoutId: layoutId,
+                  selectedSeatIndex: selectedSeatIndex,
+                  canManageSeats: canManageSeats,
+                  applyOnlyModeEnabled: applyOnlyModeEnabled,
+                  onSeatTap: onSeatTap,
+                  onUserTap: onUserTap,
+                  onInvite: onInvite,
+                  onSwitch: onSwitch,
+                  onLock: onLock,
+                  onUnlock: onUnlock,
+                  onApply: onApplySeat,
                 ),
               ),
-            ),
+              const SizedBox(height: 6),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: onDismissOverlays,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: RoomChatFeed(
+                      messages: messages,
+                      canManageSeatApplications: canManageSeatApplications,
+                      onApproveSeatApplication: onApproveSeatApplication,
+                      onRejectSeatApplication: onRejectSeatApplication,
+                      onSenderTap: onSenderTap,
+                      onMentionTap: onMentionTap,
+                    ),
+                  ),
+                ),
+              ),
+              RoomInputDock(
+                controller: messageController,
+                focusNode: messageFocusNode,
+                micMuted: micMuted,
+                inboxUnreadCount: inboxUnreadCount,
+                imagesEnabled: imagesEnabled,
+                onInboxTap: onInboxTap,
+                onEmojiTap: onEmojiTap,
+                onSendTap: onSendTap,
+                onMicTap: onMicTap,
+                onGamesTap: onGamesTap,
+                onGiftTap: onGiftTap,
+              ),
+            ],
           ),
-          RoomInputDock(
-            controller: messageController,
-            focusNode: messageFocusNode,
-            micMuted: micMuted,
-            inboxUnreadCount: inboxUnreadCount,
-            imagesEnabled: imagesEnabled,
-            onInboxTap: onInboxTap,
-            onEmojiTap: onEmojiTap,
-            onSendTap: onSendTap,
-            onMicTap: onMicTap,
-            onGamesTap: onGamesTap,
-            onGiftTap: onGiftTap,
+          ValueListenableBuilder<LiveMediaSeatInvite?>(
+            valueListenable: media.seatInvite,
+            builder: (context, invite, _) {
+              if (invite == null || invite.seatIndex < 0) return const SizedBox.shrink();
+              final currentUser = media.activeLoggedInSeatUser;
+              if (currentUser == null) return const SizedBox.shrink();
+              return Positioned(
+                left: 12,
+                right: 12,
+                top: 92,
+                child: LiveRoomSeatInviteNotification(
+                  inviterName: invite.inviterName,
+                  invitedUser: currentUser,
+                  seatIndex: invite.seatIndex,
+                  onReject: media.clearSeatInvite,
+                  onAccept: () {
+                    media.takeSeat(invite.seatIndex);
+                    media.clearSeatInvite();
+                  },
+                ),
+              );
+            },
           ),
         ],
       ),
