@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'control_center_models.dart';
 import 'control_center_store.dart';
 import 'widgets/control_action_sheets.dart';
-import 'widgets/control_cockpit_overview.dart';
 import 'widgets/control_deck_widgets.dart';
 import 'widgets/control_performance_panel.dart';
 import 'widgets/control_power_categories_panel.dart';
 import 'widgets/control_review_panel.dart';
 import 'widgets/control_role_panel.dart';
+import 'widgets/control_simple_overview.dart';
 import 'widgets/super_power_design.dart';
 
 class SuperPowerPanelPage extends StatefulWidget {
@@ -77,7 +77,7 @@ class _SuperPowerPanelPageState extends State<SuperPowerPanelPage> {
       (state) => state.copyWith(globalInvisible: value),
       action: value ? 'INVISIBILITY_ON' : 'INVISIBILITY_OFF',
       resourceType: 'presence',
-      reason: 'Global stealth toggled from cockpit overview',
+      reason: 'Global stealth toggled from Super Owner overview',
     );
     _toast(value ? 'Stealth mode enabled.' : 'Stealth mode disabled.');
   }
@@ -194,10 +194,23 @@ class _SuperPowerPanelPageState extends State<SuperPowerPanelPage> {
   }
 
   Future<void> _userAction(String action) async {
-    final draft = await ControlUserTextSheet.show(context, title: action, label: 'Reason / room ID');
+    final draft = await ControlUserTextSheet.show(context, title: action, label: 'Reason / days / device ID');
     if (draft == null) return;
     await _save((state) => state, action: action, targetUserId: draft.userId, resourceType: 'user_action', reason: draft.text);
     _toast('$action logged.');
+  }
+
+  Future<void> _showUserControl() async {
+    final draft = await _SuperOwnerUserActionSheet.show(context);
+    if (draft == null) return;
+    await _save(
+      (state) => state,
+      action: draft.action,
+      targetUserId: draft.userId,
+      resourceType: draft.resourceType,
+      reason: draft.reason,
+    );
+    _toast('${draft.label} logged.');
   }
 
   Future<void> _review(ReviewQueueItem item, String status) async {
@@ -244,15 +257,16 @@ class _SuperPowerPanelPageState extends State<SuperPowerPanelPage> {
 
   Widget _body(ControlCenterState state) {
     return switch (_section) {
-      ControlCenterSection.overview => ControlCockpitOverview(
+      ControlCenterSection.overview => ControlSimpleOverview(
           state: state,
-          onMint: () => _changePool(add: true),
-          onRemovePool: () => _changePool(add: false),
-          onSendCoins: _sendCoins,
-          onPower: () => setState(() => _section = ControlCenterSection.powers),
-          onReview: () => setState(() => _section = ControlCenterSection.review),
-          onRole: () => setState(() => _section = ControlCenterSection.powers),
           onStealthChanged: _setGlobalStealth,
+          onMint: () => _changePool(add: true),
+          onSendCoins: _sendCoins,
+          onUserControl: _showUserControl,
+          onPowerControl: () => setState(() => _section = ControlCenterSection.powers),
+          onRoleControl: () => setState(() => _section = ControlCenterSection.powers),
+          onReview: () => setState(() => _section = ControlCenterSection.review),
+          onPerformance: () => setState(() => _section = ControlCenterSection.performance),
         ),
       ControlCenterSection.performance => const ControlPerformancePanel(),
       ControlCenterSection.invisibility => _Stealth(state: state, save: _save),
@@ -292,28 +306,16 @@ class _Header extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 10, 12, 8),
       padding: const EdgeInsets.all(14),
-      decoration: SuperPowerDesign.glowShell(radius: 28),
+      decoration: SuperPowerDesign.glowShell(radius: 24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           _RoundIcon(icon: Icons.arrow_back_rounded, onTap: onBack),
           const SizedBox(width: 10),
           const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Super Power Panel', style: TextStyle(color: SuperPowerDesign.text, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: -0.6)),
-            Text('Founder command deck • role-safe • audit-first', style: TextStyle(color: SuperPowerDesign.muted, fontSize: 11, fontWeight: FontWeight.w800)),
+            Text('Super Owner Panel', style: TextStyle(color: SuperPowerDesign.text, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+            Text('Master controls • simple view', style: TextStyle(color: SuperPowerDesign.muted, fontSize: 11, fontWeight: FontWeight.w800)),
           ])),
           if (busy) const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(color: SuperPowerDesign.gold, strokeWidth: 2)),
-        ]),
-        const SizedBox(height: 14),
-        Row(children: [
-          Expanded(child: _ConsoleMetric(label: 'Pool', value: SuperPowerDesign.compactCoins(state.coinAuthorityBalance), icon: Icons.all_inclusive_rounded, color: SuperPowerDesign.gold)),
-          const SizedBox(width: 8),
-          Expanded(child: _ConsoleMetric(label: 'Stealth', value: state.globalInvisible ? 'ON' : 'OFF', icon: Icons.visibility_off_rounded, color: state.globalInvisible ? SuperPowerDesign.aqua : SuperPowerDesign.muted)),
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: _MiniHeaderPill(icon: Icons.verified_user_rounded, label: '${state.roleAssignments.where((item) => item.isActive).length} roles')),
-          const SizedBox(width: 8),
-          Expanded(child: _MiniHeaderPill(icon: Icons.fact_check_rounded, label: '${state.reviewItems.where((item) => item.status == 'Pending').length} mapped reviews')),
         ]),
       ]),
     );
@@ -324,6 +326,15 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
   _NavDelegate({required this.selected, required this.onSelected});
   final ControlCenterSection selected;
   final ValueChanged<ControlCenterSection> onSelected;
+
+  static const List<ControlCenterSection> _visibleSections = <ControlCenterSection>[
+    ControlCenterSection.overview,
+    ControlCenterSection.powers,
+    ControlCenterSection.bans,
+    ControlCenterSection.review,
+    ControlCenterSection.performance,
+    ControlCenterSection.logs,
+  ];
 
   @override
   double get minExtent => 50;
@@ -337,10 +348,10 @@ class _NavDelegate extends SliverPersistentHeaderDelegate {
       padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: ControlCenterSection.values.length,
+        itemCount: _visibleSections.length,
         separatorBuilder: (context, index) => const SizedBox(width: 7),
         itemBuilder: (context, index) {
-          final item = ControlCenterSection.values[index];
+          final item = _visibleSections[index];
           final active = item == selected;
           return InkWell(
             onTap: () => onSelected(item),
@@ -418,10 +429,10 @@ class _UserAuthority extends StatelessWidget {
         title: 'User Authority',
         subtitle: 'Super Owner user actions with reason logs.',
         children: [
-          ControlDeckRow(icon: Icons.timer_rounded, title: 'Temporary restriction', subtitle: 'Timed restriction or warning action', accent: SuperPowerDesign.gold, onTap: () => onAction('TEMP_BAN_USER')),
-          ControlDeckRow(icon: Icons.block_rounded, title: 'Restrict user', subtitle: 'User restriction with reason', accent: SuperPowerDesign.rose, onTap: () => onAction('BAN_USER')),
-          ControlDeckRow(icon: Icons.warning_rounded, title: 'Permanent restriction', subtitle: 'Owner-level permanent action', accent: SuperPowerDesign.rose, onTap: () => onAction('PERMANENT_BAN_USER')),
-          ControlDeckRow(icon: Icons.lock_open_rounded, title: 'Restore user', subtitle: 'Restore access / unban action', accent: SuperPowerDesign.aqua, onTap: () => onAction('UNBAN_USER')),
+          ControlDeckRow(icon: Icons.timer_rounded, title: 'Custom ban days', subtitle: 'Select any number of ban days for a user', accent: SuperPowerDesign.gold, onTap: () => onAction('CUSTOM_BAN_DAYS')),
+          ControlDeckRow(icon: Icons.devices_other_rounded, title: 'Device ban', subtitle: 'Permanent device-level action', accent: SuperPowerDesign.rose, onTap: () => onAction('DEVICE_BAN')),
+          ControlDeckRow(icon: Icons.block_rounded, title: 'Ban user', subtitle: 'User ban with reason', accent: SuperPowerDesign.rose, onTap: () => onAction('BAN_USER')),
+          ControlDeckRow(icon: Icons.lock_open_rounded, title: 'Unban / restore user', subtitle: 'Restore access', accent: SuperPowerDesign.aqua, onTap: () => onAction('UNBAN_USER')),
         ],
       );
 }
@@ -544,4 +555,132 @@ class _Denied extends StatelessWidget {
           child: ControlDeckRow(icon: Icons.lock_rounded, title: 'Protected panel', subtitle: 'Founder/Super Owner or Owner access required', accent: SuperPowerDesign.gold, onTap: onBack),
         ),
       );
+}
+
+class _SuperOwnerUserActionDraft {
+  const _SuperOwnerUserActionDraft({required this.action, required this.label, required this.userId, required this.reason, required this.resourceType});
+
+  final String action;
+  final String label;
+  final String userId;
+  final String reason;
+  final String resourceType;
+}
+
+class _SuperOwnerUserActionSheet extends StatefulWidget {
+  const _SuperOwnerUserActionSheet();
+
+  static Future<_SuperOwnerUserActionDraft?> show(BuildContext context) {
+    return showModalBottomSheet<_SuperOwnerUserActionDraft>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _SuperOwnerUserActionSheet(),
+    );
+  }
+
+  @override
+  State<_SuperOwnerUserActionSheet> createState() => _SuperOwnerUserActionSheetState();
+}
+
+class _SuperOwnerUserActionSheetState extends State<_SuperOwnerUserActionSheet> {
+  final TextEditingController _user = TextEditingController();
+  final TextEditingController _reason = TextEditingController();
+  final TextEditingController _days = TextEditingController(text: '1');
+  final TextEditingController _device = TextEditingController();
+  String _action = 'CUSTOM_BAN_DAYS';
+
+  @override
+  void dispose() {
+    _user.dispose();
+    _reason.dispose();
+    _days.dispose();
+    _device.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final userId = _user.text.trim();
+    final reason = _reason.text.trim();
+    if (userId.isEmpty || reason.isEmpty) return;
+    final deviceId = _device.text.trim();
+    final days = int.tryParse(_days.text.trim()) ?? 0;
+    final label = switch (_action) {
+      'CUSTOM_BAN_DAYS' => 'Custom ban',
+      'DEVICE_BAN' => 'Device ban',
+      'BAN_USER' => 'Ban user',
+      'UNBAN_USER' => 'Unban user',
+      _ => _action,
+    };
+    final detail = switch (_action) {
+      'CUSTOM_BAN_DAYS' => '$days day(s) • $reason',
+      'DEVICE_BAN' => 'device_id=${deviceId.isEmpty ? 'not_provided' : deviceId} • $reason',
+      _ => reason,
+    };
+    Navigator.pop(
+      context,
+      _SuperOwnerUserActionDraft(
+        action: _action,
+        label: label,
+        userId: userId,
+        reason: detail,
+        resourceType: _action == 'DEVICE_BAN' ? 'device_ban' : 'user_ban',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom + MediaQuery.paddingOf(context).bottom;
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: EdgeInsets.fromLTRB(14, 14, 14, 14 + bottom),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22)),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            const Text('User Control', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF170D20))),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: _action,
+              items: const [
+                DropdownMenuItem(value: 'CUSTOM_BAN_DAYS', child: Text('Custom ban days')),
+                DropdownMenuItem(value: 'DEVICE_BAN', child: Text('Device ban')),
+                DropdownMenuItem(value: 'BAN_USER', child: Text('Ban user')),
+                DropdownMenuItem(value: 'UNBAN_USER', child: Text('Unban / restore user')),
+              ],
+              onChanged: (value) => setState(() => _action = value ?? _action),
+              decoration: _input('Action'),
+            ),
+            const SizedBox(height: 8),
+            TextField(controller: _user, decoration: _input('Target user ID')),
+            if (_action == 'CUSTOM_BAN_DAYS') ...[
+              const SizedBox(height: 8),
+              TextField(controller: _days, keyboardType: TextInputType.number, decoration: _input('No. of ban days')),
+            ],
+            if (_action == 'DEVICE_BAN') ...[
+              const SizedBox(height: 8),
+              TextField(controller: _device, decoration: _input('Device ID')),
+            ],
+            const SizedBox(height: 8),
+            TextField(controller: _reason, minLines: 2, maxLines: 3, decoration: _input('Reason')),
+            const SizedBox(height: 12),
+            SizedBox(width: double.infinity, height: 46, child: FilledButton(onPressed: _submit, child: const Text('Apply action'))),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _input(String label) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: const Color(0xFFFAF7F1),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFC99A3B))),
+    );
+  }
 }
