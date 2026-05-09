@@ -24,17 +24,22 @@ class LiveRoomAudioService {
   dynamic _audioProducer;
   dynamic _routerRtpCapabilities;
   Timer? _produceRetryTimer;
+  Timer? _recoveryTimer;
   DateTime? _sendTransportWarmupUntil;
+  int? _desiredSeatIndex;
   int _produceRetryCount = 0;
   bool _joined = false;
   bool _connecting = false;
   bool _selfMuted = true;
+  bool _desiredSelfMuted = true;
   bool _seated = false;
+  bool _shouldStayConnected = false;
   bool _deviceLoading = false;
   bool _sendTransportCreating = false;
   bool _recvTransportCreating = false;
   bool _producerCreating = false;
   bool _rebuildSendPipelineOnRetry = false;
+  bool _recovering = false;
 
   final Set<String> _pendingProducerIds = <String>{};
   final Set<String> _consumingProducerIds = <String>{};
@@ -59,34 +64,24 @@ class LiveRoomAudioService {
     final safeRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
     final safePeerId = '${safeRoomId}_${currentUser.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\\-]'), '_');
 
-    if (_joined && _roomId == safeRoomId && _peerId == safePeerId) return;
-
+    _shouldStayConnected = true;
     _roomId = safeRoomId;
     _peerId = safePeerId;
     _currentUser = currentUser;
 
+    if (_joined && _socket?.connected == true) return;
+
     await _connectIfNeeded();
-    _emitWithAck(
-      'joinRoom',
-      <String, Object?>{'roomId': safeRoomId, 'peerId': safePeerId},
-      onAck: (ack) {
-        if (ack['ok'] == true) {
-          _joined = true;
-          joined.value = true;
-          _routerRtpCapabilities = ack['rtpCapabilities'];
-          seats.value = AudioSeatSnapshot.listFromJson(ack['room']?['seats']);
-          _rememberProducers(ack['room']?['producers']);
-          _debug('audio join ok room=$safeRoomId peer=$safePeerId');
-          unawaited(_ensureDeviceLoaded().then((_) => _consumePendingProducers()));
-        } else {
-          _setError('Audio join failed: ${ack['error'] ?? 'unknown'}');
-        }
-      },
-    );
+    _sendJoinRoom();
   }
 
   void takeSeat(int seatIndex) {
-    if (!_canSendRoomEvent() || seatIndex < 0) return;
+    if (seatIndex < 0) return;
+    _desiredSeatIndex = seatIndex;
+    if (!_canSendRoomEvent()) {
+      _scheduleRecovery('takeSeat while disconnected');
+      return;
+    }
     _emitWithAck(
       'takeSeat',
       <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'seatNo': seatIndex + 1},
@@ -102,24 +97,40 @@ class LiveRoomAudioService {
   }
 
   void leaveSeat() {
+    _desiredSeatIndex = null;
     if (!_canSendRoomEvent()) return;
     _seated = false;
     _selfMuted = true;
+    _desiredSelfMuted = true;
     _cancelProduceRetry();
     unawaited(_stopPublishingAndCapture());
     _emitWithAck('leaveSeat', <String, Object?>{'roomId': _roomId, 'peerId': _peerId}, onAck: _handleSeatAck);
   }
 
   void setSelfMuted(bool muted) {
-    if (!_canSendRoomEvent()) return;
+    _desiredSelfMuted = muted;
     _selfMuted = muted;
     if (!muted) _produceRetryCount = 0;
     if (muted) _cancelProduceRetry();
+    if (!_canSendRoomEvent()) {
+      if (!muted) _scheduleRecovery('unmute while disconnected');
+      return;
+    }
     unawaited(_syncLocalMicCapture());
     _emitWithAck('setSelfMuted', <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'muted': muted}, onAck: _handleSeatAck);
   }
 
+  Future<void> recoverAfterForeground() async {
+    _debug('audio foreground recovery requested');
+    await _recoverSession('app foreground');
+  }
+
   Future<void> leaveRoom() async {
+    _shouldStayConnected = false;
+    _desiredSeatIndex = null;
+    _desiredSelfMuted = true;
+    _recoveryTimer?.cancel();
+    _recoveryTimer = null;
     _cancelProduceRetry();
     await _stopPublishingAndCapture();
     await _closeAllRemoteConsumers();
@@ -152,28 +163,41 @@ class LiveRoomAudioService {
 
     final socket = io.io(
       VmMediaConfig.audioUrl,
-      io.OptionBuilder().setTransports(<String>['websocket']).disableAutoConnect().enableReconnection().setReconnectionAttempts(20).setReconnectionDelay(700).build(),
+      io.OptionBuilder()
+          .setTransports(<String>['websocket'])
+          .disableAutoConnect()
+          .enableReconnection()
+          .setReconnectionAttempts(999)
+          .setReconnectionDelay(700)
+          .setReconnectionDelayMax(2500)
+          .build(),
     );
 
     socket.onConnect((_) {
       connected.value = true;
       _debug('audio socket connected ${VmMediaConfig.audioUrl}');
+      if (_shouldStayConnected && _roomId != null && _currentUser != null) {
+        _sendJoinRoom();
+      }
     });
 
     socket.onDisconnect((_) {
       connected.value = false;
       _joined = false;
       joined.value = false;
-      _seated = false;
       _cancelProduceRetry();
       unawaited(_stopPublishingAndCapture());
       unawaited(_closeAllRemoteConsumers());
       _closeSendTransport();
       _closeRecvTransport();
-      _debug('audio socket disconnected');
+      _debug('audio socket disconnected; desiredSeat=$_desiredSeatIndex desiredMuted=$_desiredSelfMuted');
+      if (_shouldStayConnected) _scheduleRecovery('audio socket disconnected');
     });
 
-    socket.onConnectError((dynamic error) => _setError('Audio socket connect error: $error'));
+    socket.onConnectError((dynamic error) {
+      _setError('Audio socket connect error: $error');
+      if (_shouldStayConnected) _scheduleRecovery('audio connect error');
+    });
     socket.onError((dynamic error) => _setError('Audio socket error: $error'));
 
     socket.on('seatsUpdated', (dynamic payload) {
@@ -181,12 +205,12 @@ class LiveRoomAudioService {
         final nextSeats = AudioSeatSnapshot.listFromJson(payload['seats']);
         seats.value = nextSeats;
         _seated = nextSeats.any((seat) => seat.peerId == _peerId);
-        if (!_seated) {
+        if (!_seated && _desiredSeatIndex == null) {
           _selfMuted = true;
           _cancelProduceRetry();
           unawaited(_stopPublishingAndCapture());
         }
-        _debug('audio seats updated count=${seats.value.length} seated=$_seated');
+        _debug('audio seats updated count=${seats.value.length} seated=$_seated desiredSeat=$_desiredSeatIndex');
       }
     });
 
@@ -213,6 +237,64 @@ class LiveRoomAudioService {
     _socket = socket;
     socket.connect();
     _connecting = false;
+  }
+
+  void _sendJoinRoom() {
+    final safeRoomId = _roomId;
+    final safePeerId = _peerId;
+    if (safeRoomId == null || safePeerId == null || _socket?.connected != true) return;
+    _emitWithAck(
+      'joinRoom',
+      <String, Object?>{'roomId': safeRoomId, 'peerId': safePeerId},
+      onAck: (ack) {
+        if (ack['ok'] == true) {
+          _joined = true;
+          joined.value = true;
+          _routerRtpCapabilities = ack['rtpCapabilities'];
+          seats.value = AudioSeatSnapshot.listFromJson(ack['room']?['seats']);
+          _rememberProducers(ack['room']?['producers']);
+          _debug('audio join ok room=$safeRoomId peer=$safePeerId');
+          unawaited(_restoreDesiredAudioStateAfterJoin());
+        } else {
+          _setError('Audio join failed: ${ack['error'] ?? 'unknown'}');
+          _scheduleRecovery('audio join failed');
+        }
+      },
+    );
+  }
+
+  Future<void> _restoreDesiredAudioStateAfterJoin() async {
+    await _ensureDeviceLoaded();
+    await _consumePendingProducers();
+    final desiredSeat = _desiredSeatIndex;
+    if (desiredSeat != null) {
+      _debug('restoring desired audio seat=$desiredSeat muted=$_desiredSelfMuted');
+      takeSeat(desiredSeat);
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      setSelfMuted(_desiredSelfMuted);
+    }
+  }
+
+  void _scheduleRecovery(String reason) {
+    if (!_shouldStayConnected || _roomId == null || _currentUser == null) return;
+    if (_recoveryTimer?.isActive ?? false) return;
+    _debug('audio recovery scheduled: $reason');
+    _recoveryTimer = Timer(const Duration(milliseconds: 900), () {
+      _recoveryTimer = null;
+      unawaited(_recoverSession(reason));
+    });
+  }
+
+  Future<void> _recoverSession(String reason) async {
+    if (!_shouldStayConnected || _roomId == null || _currentUser == null || _recovering) return;
+    _recovering = true;
+    try {
+      _debug('audio recovery running: $reason');
+      await _connectIfNeeded();
+      if (_socket?.connected == true) _sendJoinRoom();
+    } finally {
+      _recovering = false;
+    }
   }
 
   Future<void> _syncLocalMicCapture() async {
