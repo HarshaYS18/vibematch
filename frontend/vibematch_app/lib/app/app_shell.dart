@@ -11,11 +11,6 @@ import '../features/rooms/presentation/widgets/live_room_minimized_overlay_servi
 import '../features/vibes/presentation/vibes_page_modular.dart';
 import 'app_routes.dart';
 
-enum _DevUserMode {
-  founder,
-  normalUser,
-}
-
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -34,18 +29,10 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   VmMainTab _selectedTab = VmMainTab.home;
-  _DevUserMode _devUserMode = _DevUserMode.founder;
 
-  CurrentUser get _activeUser {
-    switch (_devUserMode) {
-      case _DevUserMode.founder:
-        return CurrentUser.mockFounderOwner();
-      case _DevUserMode.normalUser:
-        return CurrentUser.mockNormalUser();
-    }
-  }
+  CurrentUser get _activeUser => widget.currentUser;
 
-  bool get _isTestingAsFounder => _devUserMode == _DevUserMode.founder;
+  bool get _isTestingAsFounder => _activeUser.canSeeOwnerControls;
 
   List<Widget> get _pages {
     final activeUser = _activeUser;
@@ -68,33 +55,7 @@ class _AppShellState extends State<AppShell> {
 
   void _selectTab(VmMainTab tab) {
     if (_selectedTab == tab) return;
-
-    setState(() {
-      _selectedTab = tab;
-    });
-  }
-
-  void _switchDevUser(_DevUserMode mode) {
-    setState(() {
-      _devUserMode = mode;
-      _selectedTab = VmMainTab.me;
-    });
-
-    final userLabel =
-        mode == _DevUserMode.founder ? 'Founder Owner' : 'Normal User';
-
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
-          content: Text(
-            'Testing as $userLabel',
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-        ),
-      );
+    setState(() => _selectedTab = tab);
   }
 
   @override
@@ -107,12 +68,7 @@ class _AppShellState extends State<AppShell> {
         children: [
           Column(
             children: [
-              _DevUserSwitcher(
-                activeUser: activeUser,
-                selectedMode: _devUserMode,
-                onFounderTap: () => _switchDevUser(_DevUserMode.founder),
-                onUserTap: () => _switchDevUser(_DevUserMode.normalUser),
-              ),
+              _LoggedInUserBanner(activeUser: activeUser),
               Expanded(
                 child: IndexedStack(
                   index: _selectedTab.tabIndex,
@@ -141,8 +97,7 @@ class _LiveRoomMiniBubbleLayer extends StatefulWidget {
 }
 
 class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
-  final LiveRoomMinimizedOverlayService _service =
-      LiveRoomMinimizedOverlayService.instance;
+  final LiveRoomMinimizedOverlayService _service = LiveRoomMinimizedOverlayService.instance;
 
   @override
   void initState() {
@@ -177,44 +132,28 @@ class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
           (_service.offset.dx + details.delta.dx).clamp(8.0, maxX),
           (_service.offset.dy + details.delta.dy).clamp(40.0, maxY),
         );
-
         _service.updateOffset(nextOffset);
       },
     );
   }
 }
 
-class _DevUserSwitcher extends StatelessWidget {
-  const _DevUserSwitcher({
-    required this.activeUser,
-    required this.selectedMode,
-    required this.onFounderTap,
-    required this.onUserTap,
-  });
+class _LoggedInUserBanner extends StatelessWidget {
+  const _LoggedInUserBanner({required this.activeUser});
 
   final CurrentUser activeUser;
-  final _DevUserMode selectedMode;
-  final VoidCallback onFounderTap;
-  final VoidCallback onUserTap;
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
+    final isFounderOrOwner = activeUser.canSeeOwnerControls;
 
     return Container(
       padding: EdgeInsets.fromLTRB(12, topPadding + 6, 12, 7),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.98),
-        border: const Border(
-          bottom: BorderSide(color: Color(0xFFECE2D8)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF251538).withValues(alpha: 0.045),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        border: const Border(bottom: BorderSide(color: Color(0xFFECE2D8))),
+        boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.045), blurRadius: 12, offset: const Offset(0, 5))],
       ),
       child: Row(
         children: [
@@ -224,25 +163,10 @@ class _DevUserSwitcher extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
               gradient: LinearGradient(
-                colors: selectedMode == _DevUserMode.founder
-                    ? const [
-                        Color(0xFFFFC857),
-                        Color(0xFFE84C72),
-                        Color(0xFF8C5CF6),
-                      ]
-                    : const [
-                        Color(0xFF12C7B7),
-                        Color(0xFF6D5DF6),
-                      ],
+                colors: isFounderOrOwner ? const [Color(0xFFFFC857), Color(0xFFE84C72), Color(0xFF8C5CF6)] : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
               ),
             ),
-            child: Icon(
-              selectedMode == _DevUserMode.founder
-                  ? VMIcons.admin
-                  : VMIcons.profile,
-              color: Colors.white,
-              size: 19,
-            ),
+            child: Icon(isFounderOrOwner ? VMIcons.admin : VMIcons.profile, color: Colors.white, size: 19),
           ),
           const SizedBox(width: 9),
           Expanded(
@@ -250,24 +174,25 @@ class _DevUserSwitcher extends StatelessWidget {
               '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} · ${activeUser.primaryRole} · ID ${activeUser.visibleId}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF251538),
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
+              style: const TextStyle(color: Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w900),
             ),
           ),
           const SizedBox(width: 8),
-          _DevModeButton(
-            text: 'Founder',
-            selected: selectedMode == _DevUserMode.founder,
-            onTap: onFounderTap,
-          ),
-          const SizedBox(width: 6),
-          _DevModeButton(
-            text: 'User',
-            selected: selectedMode == _DevUserMode.normalUser,
-            onTap: onUserTap,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: isFounderOrOwner ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: isFounderOrOwner ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
+            ),
+            child: Text(
+              isFounderOrOwner ? 'Official' : 'User',
+              style: TextStyle(
+                color: isFounderOrOwner ? Colors.white : const Color(0xFF4A2A63),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
         ],
       ),
@@ -275,52 +200,8 @@ class _DevUserSwitcher extends StatelessWidget {
   }
 }
 
-class _DevModeButton extends StatelessWidget {
-  const _DevModeButton({
-    required this.text,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String text;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color:
-                selected ? const Color(0xFF251538) : const Color(0xFFECE2D8),
-          ),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF4A2A63),
-            fontSize: 10.5,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _VibeBottomNav extends StatelessWidget {
-  const _VibeBottomNav({
-    required this.selectedTab,
-    required this.isTestingAsFounder,
-    required this.onTabSelected,
-  });
+  const _VibeBottomNav({required this.selectedTab, required this.isTestingAsFounder, required this.onTabSelected});
 
   final VmMainTab selectedTab;
   final bool isTestingAsFounder;
@@ -343,29 +224,13 @@ class _VibeBottomNav extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.96),
           borderRadius: BorderRadius.circular(26),
           border: Border.all(color: softBorder),
-          boxShadow: [
-            BoxShadow(
-              color: deepPlum.withValues(alpha: 0.08),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: deepPlum.withValues(alpha: 0.08), blurRadius: 22, offset: const Offset(0, 8))],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _NavItem(
-              icon: VMIcons.home,
-              label: VmMainTab.home.label,
-              active: selectedTab == VmMainTab.home,
-              onTap: () => onTabSelected(VmMainTab.home),
-            ),
-            _NavItem(
-              icon: VMIcons.vibes,
-              label: VmMainTab.vibes.label,
-              active: selectedTab == VmMainTab.vibes,
-              onTap: () => onTabSelected(VmMainTab.vibes),
-            ),
+            _NavItem(icon: VMIcons.home, label: VmMainTab.home.label, active: selectedTab == VmMainTab.home, onTap: () => onTabSelected(VmMainTab.home)),
+            _NavItem(icon: VMIcons.vibes, label: VmMainTab.vibes.label, active: selectedTab == VmMainTab.vibes, onTap: () => onTabSelected(VmMainTab.vibes)),
             GestureDetector(
               onTap: () => onTabSelected(VmMainTab.create),
               child: AnimatedContainer(
@@ -374,38 +239,14 @@ class _VibeBottomNav extends StatelessWidget {
                 width: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [aqua, violet, coral],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: violet.withValues(alpha: selectedTab == VmMainTab.create ? 0.44 : 0.34),
-                      blurRadius: selectedTab == VmMainTab.create ? 23 : 18,
-                      offset: const Offset(0, 7),
-                    ),
-                  ],
+                  gradient: const LinearGradient(colors: [aqua, violet, coral], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  boxShadow: [BoxShadow(color: violet.withValues(alpha: selectedTab == VmMainTab.create ? 0.44 : 0.34), blurRadius: selectedTab == VmMainTab.create ? 23 : 18, offset: const Offset(0, 7))],
                 ),
-                child: const Icon(
-                  VMIcons.create,
-                  color: Colors.white,
-                  size: 30,
-                ),
+                child: const Icon(VMIcons.create, color: Colors.white, size: 30),
               ),
             ),
-            _NavItem(
-              icon: VMIcons.inbox,
-              label: VmMainTab.inbox.label,
-              active: selectedTab == VmMainTab.inbox,
-              onTap: () => onTabSelected(VmMainTab.inbox),
-            ),
-            _NavItem(
-              icon: isTestingAsFounder ? VMIcons.admin : VMIcons.profile,
-              label: VmMainTab.me.label,
-              active: selectedTab == VmMainTab.me,
-              onTap: () => onTabSelected(VmMainTab.me),
-            ),
+            _NavItem(icon: VMIcons.inbox, label: VmMainTab.inbox.label, active: selectedTab == VmMainTab.inbox, onTap: () => onTabSelected(VmMainTab.inbox)),
+            _NavItem(icon: isTestingAsFounder ? VMIcons.admin : VMIcons.profile, label: VmMainTab.me.label, active: selectedTab == VmMainTab.me, onTap: () => onTabSelected(VmMainTab.me)),
           ],
         ),
       ),
@@ -414,12 +255,7 @@ class _VibeBottomNav extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
+  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap});
 
   final IconData icon;
   final String label;
@@ -438,27 +274,13 @@ class _NavItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? aqua.withValues(alpha: 0.11) : Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-        ),
+        decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.11) : Colors.transparent, borderRadius: BorderRadius.circular(18)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: active ? deepPlum : muted,
-            ),
+            Icon(icon, size: 22, color: active ? deepPlum : muted),
             const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active ? deepPlum : muted,
-              ),
-            ),
+            Text(label, style: TextStyle(fontSize: 10, fontWeight: active ? FontWeight.w800 : FontWeight.w600, color: active ? deepPlum : muted)),
           ],
         ),
       ),
