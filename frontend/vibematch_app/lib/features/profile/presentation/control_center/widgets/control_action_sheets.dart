@@ -174,6 +174,8 @@ class _ControlPowerSheetState extends State<ControlPowerSheet> {
   final TextEditingController _user = TextEditingController();
   final TextEditingController _reason = TextEditingController();
   String _role = 'monitor';
+  String _validityMode = 'No expiry';
+  DateTime? _expiresAt;
   final Set<String> _selected = <String>{'TEMP_BAN_USER'};
 
   @override
@@ -181,6 +183,24 @@ class _ControlPowerSheetState extends State<ControlPowerSheet> {
     _user.dispose();
     _reason.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickExpiry() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _expiresAt ?? now.add(const Duration(days: 30)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 10, 12, 31),
+    );
+    if (selected == null) return;
+    setState(() => _expiresAt = selected);
+  }
+
+  String get _validityText {
+    if (_validityMode == 'No expiry') return 'no_expiry';
+    if (_expiresAt == null) return 'expiry_not_selected';
+    return _expiresAt!.toIso8601String().split('T').first;
   }
 
   @override
@@ -195,6 +215,30 @@ class _ControlPowerSheetState extends State<ControlPowerSheet> {
           onChanged: (value) => setState(() => _role = value ?? _role),
           decoration: _input('Role'),
         ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _validityMode,
+          items: const [
+            DropdownMenuItem(value: 'No expiry', child: Text('No expiry')),
+            DropdownMenuItem(value: 'Expires on date', child: Text('Expires on date')),
+          ],
+          onChanged: (value) => setState(() => _validityMode = value ?? _validityMode),
+          decoration: _input('Validity'),
+        ),
+        if (_validityMode == 'Expires on date') ...[
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: _pickExpiry,
+            borderRadius: BorderRadius.circular(13),
+            child: InputDecorator(
+              decoration: _input('Expiry date'),
+              child: Text(
+                _expiresAt == null ? 'Select expiry date' : _expiresAt!.toIso8601String().split('T').first,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Wrap(
           spacing: 5,
@@ -211,7 +255,9 @@ class _ControlPowerSheetState extends State<ControlPowerSheet> {
       ],
       onSubmit: () {
         if (_user.text.trim().isEmpty || _reason.text.trim().isEmpty || _selected.isEmpty) return;
-        Navigator.pop(context, PowerDraft(userId: _user.text.trim(), role: _role, authorities: _selected.toList(), reason: _reason.text.trim()));
+        if (_validityMode == 'Expires on date' && _expiresAt == null) return;
+        final reasonWithValidity = '${_reason.text.trim()} | validity=$_validityText';
+        Navigator.pop(context, PowerDraft(userId: _user.text.trim(), role: _role, authorities: _selected.toList(), reason: reasonWithValidity));
       },
     );
   }
