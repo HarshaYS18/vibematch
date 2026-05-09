@@ -151,22 +151,9 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   String _username() => widget.user.username ?? 'vibe_user';
   String _publicId() => widget.user.displayCustomId?.toString() ?? widget.user.publicUserId.toString();
 
-  bool _showOfficialTick() {
-    final role = widget.user.primaryRole.toLowerCase().trim();
-    return role == 'founder_owner' || role == 'super_owner' || role == 'owner';
-  }
+  bool _showOfficialTick() => widget.user.shouldShowOfficialYellowTick;
 
-  String? _roleTag() {
-    final role = widget.user.primaryRole.toLowerCase().trim();
-    if (role == 'founder_owner') return 'Founder Owner';
-    if (role == 'super_owner') return 'Super Owner';
-    if (role == 'owner') return 'Owner';
-    if (role == 'superadmin') return 'SuperAdmin';
-    if (role == 'admin') return 'Admin';
-    if (role == 'monitor') return 'Monitor';
-    if (role == 'cs') return 'CS';
-    return null;
-  }
+  String? _roleTag() => widget.user.primaryRoleBadge?.badgeLabel ?? MeProfileConstants.roleTagFor(widget.user.primaryRole);
 
   int _matchScore() {
     return calculateProfileMatchScore(
@@ -197,6 +184,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 username: username,
                 publicId: publicId,
                 roleTag: _roleTag(),
+                roleBadge: widget.user.primaryRoleBadge,
                 showOfficialTick: _showOfficialTick(),
                 vipLevel: widget.vipLevel,
                 svipLevel: widget.svipLevel,
