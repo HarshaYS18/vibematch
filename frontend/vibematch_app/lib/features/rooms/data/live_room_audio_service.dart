@@ -23,6 +23,8 @@ class LiveRoomAudioService {
   dynamic _recvTransport;
   dynamic _audioProducer;
   dynamic _routerRtpCapabilities;
+  Timer? _produceRetryTimer;
+  int _produceRetryCount = 0;
   bool _joined = false;
   bool _connecting = false;
   bool _selfMuted = true;
@@ -64,10 +66,7 @@ class LiveRoomAudioService {
     await _connectIfNeeded();
     _emitWithAck(
       'joinRoom',
-      <String, Object?>{
-        'roomId': safeRoomId,
-        'peerId': safePeerId,
-      },
+      <String, Object?>{'roomId': safeRoomId, 'peerId': safePeerId},
       onAck: (ack) {
         if (ack['ok'] == true) {
           _joined = true;
@@ -93,6 +92,7 @@ class LiveRoomAudioService {
         _handleSeatAck(ack);
         if (ack['ok'] == true) {
           _seated = true;
+          if (!_selfMuted) _produceRetryCount = 0;
           unawaited(_syncLocalMicCapture());
         }
       },
@@ -103,26 +103,22 @@ class LiveRoomAudioService {
     if (!_canSendRoomEvent()) return;
     _seated = false;
     _selfMuted = true;
+    _cancelProduceRetry();
     unawaited(_stopPublishingAndCapture());
-    _emitWithAck(
-      'leaveSeat',
-      <String, Object?>{'roomId': _roomId, 'peerId': _peerId},
-      onAck: _handleSeatAck,
-    );
+    _emitWithAck('leaveSeat', <String, Object?>{'roomId': _roomId, 'peerId': _peerId}, onAck: _handleSeatAck);
   }
 
   void setSelfMuted(bool muted) {
     if (!_canSendRoomEvent()) return;
     _selfMuted = muted;
+    if (!muted) _produceRetryCount = 0;
+    if (muted) _cancelProduceRetry();
     unawaited(_syncLocalMicCapture());
-    _emitWithAck(
-      'setSelfMuted',
-      <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'muted': muted},
-      onAck: _handleSeatAck,
-    );
+    _emitWithAck('setSelfMuted', <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'muted': muted}, onAck: _handleSeatAck);
   }
 
   Future<void> leaveRoom() async {
+    _cancelProduceRetry();
     await _stopPublishingAndCapture();
     await _closeAllRemoteConsumers();
     _joined = false;
@@ -152,13 +148,7 @@ class LiveRoomAudioService {
 
     final socket = io.io(
       VmMediaConfig.audioUrl,
-      io.OptionBuilder()
-          .setTransports(<String>['websocket'])
-          .disableAutoConnect()
-          .enableReconnection()
-          .setReconnectionAttempts(20)
-          .setReconnectionDelay(700)
-          .build(),
+      io.OptionBuilder().setTransports(<String>['websocket']).disableAutoConnect().enableReconnection().setReconnectionAttempts(20).setReconnectionDelay(700).build(),
     );
 
     socket.onConnect((_) {
@@ -171,6 +161,7 @@ class LiveRoomAudioService {
       _joined = false;
       joined.value = false;
       _seated = false;
+      _cancelProduceRetry();
       unawaited(_stopPublishingAndCapture());
       unawaited(_closeAllRemoteConsumers());
       _closeSendTransport();
@@ -178,13 +169,8 @@ class LiveRoomAudioService {
       _debug('audio socket disconnected');
     });
 
-    socket.onConnectError((dynamic error) {
-      _setError('Audio socket connect error: $error');
-    });
-
-    socket.onError((dynamic error) {
-      _setError('Audio socket error: $error');
-    });
+    socket.onConnectError((dynamic error) => _setError('Audio socket connect error: $error'));
+    socket.onError((dynamic error) => _setError('Audio socket error: $error'));
 
     socket.on('seatsUpdated', (dynamic payload) {
       if (payload is Map) {
@@ -193,19 +179,15 @@ class LiveRoomAudioService {
         _seated = nextSeats.any((seat) => seat.peerId == _peerId);
         if (!_seated) {
           _selfMuted = true;
+          _cancelProduceRetry();
           unawaited(_stopPublishingAndCapture());
         }
         _debug('audio seats updated count=${seats.value.length} seated=$_seated');
       }
     });
 
-    socket.on('peerJoined', (dynamic payload) {
-      _debug('audio peer joined $payload');
-    });
-
-    socket.on('peerLeft', (dynamic payload) {
-      _debug('audio peer left $payload');
-    });
+    socket.on('peerJoined', (dynamic payload) => _debug('audio peer joined $payload'));
+    socket.on('peerLeft', (dynamic payload) => _debug('audio peer left $payload'));
 
     socket.on('newProducer', (dynamic payload) {
       _debug('audio new producer $payload');
@@ -220,9 +202,7 @@ class LiveRoomAudioService {
       _debug('audio producer closed $payload');
       if (payload is Map) {
         final producerId = payload['producerId']?.toString();
-        if (producerId != null && producerId.isNotEmpty) {
-          unawaited(_closeRemoteConsumer(producerId));
-        }
+        if (producerId != null && producerId.isNotEmpty) unawaited(_closeRemoteConsumer(producerId));
       }
     });
 
@@ -244,11 +224,7 @@ class LiveRoomAudioService {
     if (_localAudioStream != null) return;
     try {
       final stream = await navigator.mediaDevices.getUserMedia(<String, dynamic>{
-        'audio': <String, dynamic>{
-          'echoCancellation': true,
-          'noiseSuppression': true,
-          'autoGainControl': true,
-        },
+        'audio': <String, dynamic>{'echoCancellation': true, 'noiseSuppression': true, 'autoGainControl': true},
         'video': false,
       });
       for (final track in stream.getAudioTracks()) {
@@ -289,19 +265,15 @@ class LiveRoomAudioService {
 
     _sendTransportCreating = true;
     try {
-      final ack = await _emitWithAckFuture('createWebRtcTransport', <String, Object?>{
-        'roomId': _roomId,
-        'peerId': _peerId,
-        'direction': 'send',
-      });
-      if (ack['ok'] != true) {
-        throw Exception(ack['error'] ?? 'createWebRtcTransport failed');
-      }
+      final ack = await _emitWithAckFuture('createWebRtcTransport', <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'direction': 'send'});
+      if (ack['ok'] != true) throw Exception(ack['error'] ?? 'createWebRtcTransport failed');
 
       final params = Map<String, dynamic>.from(ack['params'] as Map);
       final transport = device.createSendTransportFromMap(
         params,
         producerCallback: (Producer producer) {
+          _cancelProduceRetry();
+          _produceRetryCount = 0;
           _audioProducer = producer;
           audioPublishing.value = true;
           _debug('audio producer callback id=${producer.id} kind=${producer.kind}');
@@ -333,6 +305,8 @@ class LiveRoomAudioService {
 
       transport.on('connectionstatechange', (dynamic state) {
         _debug('send transport state=$state');
+        final stateText = state.toString().toLowerCase();
+        if (stateText.contains('connected')) _scheduleProduceRetry('send transport connected');
       });
 
       _sendTransport = transport;
@@ -353,28 +327,17 @@ class LiveRoomAudioService {
 
     _recvTransportCreating = true;
     try {
-      final ack = await _emitWithAckFuture('createWebRtcTransport', <String, Object?>{
-        'roomId': _roomId,
-        'peerId': _peerId,
-        'direction': 'recv',
-      });
-      if (ack['ok'] != true) {
-        throw Exception(ack['error'] ?? 'create recv transport failed');
-      }
+      final ack = await _emitWithAckFuture('createWebRtcTransport', <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'direction': 'recv'});
+      if (ack['ok'] != true) throw Exception(ack['error'] ?? 'create recv transport failed');
 
       final params = Map<String, dynamic>.from(ack['params'] as Map);
       final transport = device.createRecvTransportFromMap(
         params,
-        consumerCallback: (Consumer consumer, dynamic _) {
-          _attachRemoteConsumer(consumer);
-        },
+        consumerCallback: (Consumer consumer, dynamic _) => _attachRemoteConsumer(consumer),
       );
 
       _bindTransportConnect(transport, label: 'recv');
-
-      transport.on('connectionstatechange', (dynamic state) {
-        _debug('recv transport state=$state');
-      });
+      transport.on('connectionstatechange', (dynamic state) => _debug('recv transport state=$state'));
 
       _recvTransport = transport;
       _debug('recv transport created id=${transport.id}');
@@ -398,6 +361,7 @@ class LiveRoomAudioService {
         if (connectAck['ok'] == true) {
           data['callback']();
           _debug('$label transport connected id=${transport.id}');
+          if (label == 'send') _scheduleProduceRetry('send transport connect callback');
         } else {
           data['errback'](connectAck['error'] ?? 'connectTransport failed');
         }
@@ -427,6 +391,8 @@ class LiveRoomAudioService {
           appData: <String, dynamic>{'mediaTag': 'mic-audio'},
         );
         if (maybeProducer != null) {
+          _cancelProduceRetry();
+          _produceRetryCount = 0;
           _audioProducer = maybeProducer;
           audioPublishing.value = true;
           _debug('audio publishing started producer=${maybeProducer.id}');
@@ -434,18 +400,42 @@ class LiveRoomAudioService {
       } catch (error, stackTrace) {
         final message = error.toString();
         if (message.contains('Null check operator used on a null value')) {
-          _debug('audio produce initial callback warning ignored; waiting for producer callback');
+          _debug('audio produce startup race detected; scheduling automatic retry');
+          _scheduleProduceRetry('initial produce race');
           return;
         }
         _debug('$error\n$stackTrace');
         rethrow;
       }
       _debug('audio produce requested');
+      _scheduleProduceRetry('producer callback watchdog');
     } catch (error) {
       _setError('Audio produce failed: $error');
     } finally {
       _producerCreating = false;
     }
+  }
+
+  void _scheduleProduceRetry(String reason) {
+    if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null) return;
+    if (_produceRetryTimer?.isActive ?? false) return;
+    if (_produceRetryCount >= 3) {
+      _debug('audio produce retry limit reached');
+      return;
+    }
+    _produceRetryCount += 1;
+    _debug('audio produce retry scheduled #$_produceRetryCount reason=$reason');
+    _produceRetryTimer = Timer(Duration(milliseconds: 450 + (_produceRetryCount * 250)), () {
+      _produceRetryTimer = null;
+      if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null) return;
+      _debug('audio produce retry running #$_produceRetryCount');
+      unawaited(_ensurePublishingAudio());
+    });
+  }
+
+  void _cancelProduceRetry() {
+    _produceRetryTimer?.cancel();
+    _produceRetryTimer = null;
   }
 
   void _rememberProducers(dynamic rawProducers) {
@@ -519,12 +509,8 @@ class LiveRoomAudioService {
       _remoteAudioRenderersByProducerId[producerId] = renderer;
       remoteAudioCount.value = _remoteConsumersByProducerId.length;
 
-      consumer.on('transportclose', () {
-        unawaited(_closeRemoteConsumer(producerId));
-      });
-      consumer.on('trackended', () {
-        unawaited(_closeRemoteConsumer(producerId));
-      });
+      consumer.on('transportclose', () => unawaited(_closeRemoteConsumer(producerId)));
+      consumer.on('trackended', () => unawaited(_closeRemoteConsumer(producerId)));
 
       _debug('remote audio consumer attached producer=$producerId consumer=${consumer.id} track=${consumer.track.id}');
     } catch (error) {
@@ -533,6 +519,7 @@ class LiveRoomAudioService {
   }
 
   Future<void> _stopPublishingAndCapture() async {
+    _cancelProduceRetry();
     await _stopAudioProducer();
     await _stopLocalMicCapture();
   }
@@ -567,6 +554,7 @@ class LiveRoomAudioService {
   void _closeSendTransport() {
     final transport = _sendTransport;
     _sendTransport = null;
+    _cancelProduceRetry();
     try {
       transport?.close();
     } catch (_) {}
@@ -598,9 +586,7 @@ class LiveRoomAudioService {
     } catch (_) {}
     remoteAudioCount.value = _remoteConsumersByProducerId.length;
     _closingRemoteProducerIds.remove(producerId);
-    if (consumer != null || renderer != null) {
-      _debug('remote audio consumer closed producer=$producerId');
-    }
+    if (consumer != null || renderer != null) _debug('remote audio consumer closed producer=$producerId');
   }
 
   Future<void> _closeAllRemoteConsumers() async {
@@ -621,9 +607,7 @@ class LiveRoomAudioService {
     return Map<String, dynamic>.from(mapped as Map);
   }
 
-  bool _canSendRoomEvent() {
-    return _socket?.connected == true && _joined && _roomId != null && _peerId != null;
-  }
+  bool _canSendRoomEvent() => _socket?.connected == true && _joined && _roomId != null && _peerId != null;
 
   void _emitWithAck(String event, Map<String, Object?> payload, {required void Function(Map<String, dynamic> ack) onAck}) {
     final socket = _socket;
@@ -645,10 +629,7 @@ class LiveRoomAudioService {
       final ack = rawAck is Map ? Map<String, dynamic>.from(rawAck) : <String, dynamic>{'ok': false, 'error': 'Invalid ack'};
       completer.complete(ack);
     });
-    return completer.future.timeout(
-      const Duration(seconds: 8),
-      onTimeout: () => <String, dynamic>{'ok': false, 'error': '$event timed out'},
-    );
+    return completer.future.timeout(const Duration(seconds: 8), onTimeout: () => <String, dynamic>{'ok': false, 'error': '$event timed out'});
   }
 
   void _handleSeatAck(Map<String, dynamic> ack) {
@@ -685,12 +666,7 @@ class RemoteProducerInfo {
     final peerId = map['peerId']?.toString();
     final kind = map['kind']?.toString() ?? 'audio';
     if (producerId == null || producerId.isEmpty || peerId == null || peerId.isEmpty) return null;
-    return RemoteProducerInfo(
-      producerId: producerId,
-      peerId: peerId,
-      kind: kind,
-      seatNo: int.tryParse(map['seatNo']?.toString() ?? ''),
-    );
+    return RemoteProducerInfo(producerId: producerId, peerId: peerId, kind: kind, seatNo: int.tryParse(map['seatNo']?.toString() ?? ''));
   }
 }
 
