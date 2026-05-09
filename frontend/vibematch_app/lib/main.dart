@@ -4,6 +4,7 @@ import 'app/app_route_factory.dart';
 import 'app/app_routes.dart';
 import 'features/auth/presentation/auth_gate.dart';
 
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
@@ -19,6 +20,7 @@ class VibeMatchApp extends StatelessWidget {
     return MaterialApp(
       title: 'Vibe Match',
       debugShowCheckedModeBanner: false,
+      navigatorKey: rootNavigatorKey,
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       initialRoute: VmRoutes.auth,
       onGenerateRoute: AppRouteFactory.onGenerateRoute,
