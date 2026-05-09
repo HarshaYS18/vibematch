@@ -8,13 +8,16 @@ import '../../../core/network/vm_media_config.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
 
-class LiveRoomMediaSignalingService {
-  LiveRoomMediaSignalingService._();
+class LiveRoomMediaSignalingService with WidgetsBindingObserver {
+  LiveRoomMediaSignalingService._() {
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   static final LiveRoomMediaSignalingService instance = LiveRoomMediaSignalingService._();
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
+  Timer? _reconnectTimer;
   String? _roomId;
   String? _roomName;
   String? _peerId;
@@ -22,6 +25,8 @@ class LiveRoomMediaSignalingService {
   SeatUser? _activeLoggedInSeatUser;
   bool _connecting = false;
   bool _joined = false;
+  bool _shouldStayConnected = false;
+  bool _appInForeground = true;
 
   final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot = ValueNotifier<LiveMediaRoomSnapshot?>(null);
 
@@ -32,6 +37,15 @@ class LiveRoomMediaSignalingService {
   SeatUser? get activeLoggedInSeatUser => _activeLoggedInSeatUser;
 
   SeatUser effectiveCurrentUser(SeatUser fallback) => _activeLoggedInSeatUser ?? fallback;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appInForeground = state == AppLifecycleState.resumed;
+    _debug('app lifecycle changed: $state');
+    if (_appInForeground) {
+      _scheduleReconnect(reason: 'app resumed');
+    }
+  }
 
   void configureRoom({required String roomId, required String roomName}) {
     final nextRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
@@ -70,16 +84,8 @@ class LiveRoomMediaSignalingService {
   Future<void> joinRoom({required SeatUser currentUser}) async {
     final effectiveUser = effectiveCurrentUser(currentUser);
     _currentUser = effectiveUser;
-    final safeRoomId = _roomId ?? 'VM257808';
-
-    if (_joined && _channel != null) {
-      _send('room/join', _joinPayload(effectiveUser, safeRoomId));
-      return;
-    }
-
-    await _connect();
-    _send('room/join', _joinPayload(effectiveUser, safeRoomId));
-    _joined = true;
+    _shouldStayConnected = true;
+    await _joinRoomInternal(reason: 'join requested');
   }
 
   void takeSeat(int seatIndex) {
@@ -102,6 +108,9 @@ class LiveRoomMediaSignalingService {
   }
 
   Future<void> leaveRoom() async {
+    _shouldStayConnected = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     if (_channel != null && _joined) {
       _send('room/leave', <String, Object?>{});
     }
@@ -113,6 +122,23 @@ class LiveRoomMediaSignalingService {
     await _channel?.sink.close();
     _channel = null;
     _connecting = false;
+  }
+
+  Future<void> _joinRoomInternal({required String reason}) async {
+    final effectiveUser = _currentUser;
+    final safeRoomId = _roomId ?? 'VM257808';
+    if (effectiveUser == null) return;
+
+    if (_joined && _channel != null) return;
+
+    _debug('joining media room: $reason');
+    await _connect();
+    if (_channel == null) {
+      _scheduleReconnect(reason: 'join failed without channel');
+      return;
+    }
+    _send('room/join', _joinPayload(effectiveUser, safeRoomId));
+    _joined = true;
   }
 
   Future<void> _connect() async {
@@ -127,19 +153,34 @@ class LiveRoomMediaSignalingService {
         onError: (Object error) {
           _debug('media websocket error: $error');
           _resetConnectionState();
+          _scheduleReconnect(reason: 'socket error');
         },
         onDone: () {
           _debug('media websocket closed');
           _resetConnectionState();
+          _scheduleReconnect(reason: 'socket closed');
         },
       );
       _debug('media websocket connecting: ${VmMediaConfig.wsUrl}');
     } catch (error) {
       _debug('media websocket connect failed: $error');
       _resetConnectionState();
+      _scheduleReconnect(reason: 'connect exception');
     } finally {
       _connecting = false;
     }
+  }
+
+  void _scheduleReconnect({required String reason}) {
+    if (!_shouldStayConnected || !_appInForeground || _currentUser == null || _roomId == null) return;
+    if (_channel != null || _connecting) return;
+    _reconnectTimer?.cancel();
+    _debug('media reconnect scheduled: $reason');
+    _reconnectTimer = Timer(const Duration(milliseconds: 900), () {
+      _reconnectTimer = null;
+      if (!_shouldStayConnected || !_appInForeground) return;
+      unawaited(_joinRoomInternal(reason: 'reconnect: $reason'));
+    });
   }
 
   Map<String, Object?> _joinPayload(SeatUser user, String safeRoomId) {
@@ -152,6 +193,7 @@ class LiveRoomMediaSignalingService {
     final channel = _channel;
     if (channel == null) {
       _debug('media send skipped, socket not connected: $type');
+      _scheduleReconnect(reason: 'send skipped for $type');
       return;
     }
 
@@ -198,9 +240,7 @@ class LiveMediaRoomSnapshot {
 
   factory LiveMediaRoomSnapshot.fromJson(Map<String, dynamic> json) {
     final rawPeers = json['peers'];
-    final peers = rawPeers is List
-        ? rawPeers.whereType<Map<String, dynamic>>().map(LiveMediaPeerSnapshot.fromJson).toList()
-        : <LiveMediaPeerSnapshot>[];
+    final peers = rawPeers is List ? rawPeers.whereType<Map<String, dynamic>>().map(LiveMediaPeerSnapshot.fromJson).toList() : <LiveMediaPeerSnapshot>[];
     return LiveMediaRoomSnapshot(roomId: json['room_id']?.toString() ?? '', peers: peers);
   }
 }
