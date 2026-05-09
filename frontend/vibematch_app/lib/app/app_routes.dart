@@ -1,3 +1,5 @@
+import '../features/auth/models/current_user.dart';
+
 enum VmMainTab {
   home(
     tabIndex: 0,
@@ -115,6 +117,7 @@ class LiveRoomRouteArgs {
   final String language;
   final String modeTitle;
   final int onlineCount;
+  final CurrentUser? currentUser;
 
   const LiveRoomRouteArgs({
     required this.roomName,
@@ -122,6 +125,7 @@ class LiveRoomRouteArgs {
     required this.language,
     required this.modeTitle,
     required this.onlineCount,
+    this.currentUser,
   });
 }
 
