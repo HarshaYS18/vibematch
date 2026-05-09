@@ -1,4 +1,5 @@
 import '../../auth/models/current_user.dart';
+import '../../auth/models/role_badge.dart';
 
 class ProfileVisitorRecord {
   const ProfileVisitorRecord({
@@ -59,24 +60,6 @@ class ProfileVisitorRepository {
     ),
   ];
 
-  // Future backend mapping:
-  // POST /profile-visitors
-  // Body: {
-  //   "profile_owner_user_id": 123,
-  //   "visitor_user_id": 456,
-  //   "source": "public_profile"
-  // }
-  //
-  // GET /profile-visitors/me?cursor=...
-  // Returns visitors who opened the authenticated user's public profile.
-  //
-  // Rules:
-  // - A visitor is recorded when user Y opens user X's PublicProfileViewPage.
-  // - Do not create duplicate spam records for repeated opens in a short window;
-  //   backend should update visited_at for the same visitor/profile pair instead.
-  // - Do not record self-visits.
-  // - Respect blocked/private/hidden-presence rules when backend connects.
-
   void recordVisit({
     required CurrentUser profileOwner,
     required CurrentUser visitor,
@@ -104,9 +87,7 @@ class ProfileVisitorRepository {
   }
 
   List<ProfileVisitorRecord> visitorsForUser(int profileOwnerUserId) {
-    final results = _records
-        .where((record) => record.profileOwnerUserId == profileOwnerUserId)
-        .toList()
+    final results = _records.where((record) => record.profileOwnerUserId == profileOwnerUserId).toList()
       ..sort((a, b) => b.visitedAt.compareTo(a.visitedAt));
     return List.unmodifiable(results);
   }
@@ -118,6 +99,7 @@ class ProfileVisitorRepository {
     required String displayName,
   }) {
     final now = DateTime.now();
+    final roleBadge = RoleBadge.fromRole('user');
     return CurrentUser(
       id: id,
       publicUserId: publicUserId,
@@ -127,6 +109,8 @@ class ProfileVisitorRepository {
       avatarUrl: null,
       roles: const ['user'],
       primaryRole: 'user',
+      primaryRoleBadge: roleBadge,
+      roleBadges: [roleBadge],
       isActive: true,
       isBanned: false,
       lastDeviceId: 'mock-device-$id',
