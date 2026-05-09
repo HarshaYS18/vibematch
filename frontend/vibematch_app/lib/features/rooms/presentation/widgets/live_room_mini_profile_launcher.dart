@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_media_signaling_service.dart';
 import '../../data/room_moderation_repository.dart';
 import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
@@ -33,7 +34,11 @@ class LiveRoomMiniProfileLauncher {
     required ValueChanged<String> onAdminMuteToggle,
     required ValueChanged<String> onGiftTap,
   }) {
-    final canShowKickOut = canModerate && user.id != currentUser.id;
+    final effectiveCurrentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser);
+    final viewerPower = _roomPower(effectiveCurrentUser);
+    final targetPower = _roomPower(user);
+    final canModerateTarget = user.id != effectiveCurrentUser.id && targetPower < 100 && ((viewerPower >= 100 && targetPower < 100) || (viewerPower >= 90 && targetPower < 90));
+    final canShowKickOut = canModerateTarget;
 
     showModalBottomSheet<void>(
       context: context,
@@ -41,8 +46,8 @@ class LiveRoomMiniProfileLauncher {
       backgroundColor: Colors.transparent,
       builder: (_) => LiveRoomMiniProfileSheet(
         user: user,
-        currentUser: currentUser,
-        canModerate: canModerate,
+        currentUser: effectiveCurrentUser,
+        canModerate: canModerateTarget,
         onAvatarTap: () {
           Navigator.pop(context);
           LiveRoomProfileNavigator.openExistingPublicProfile(
@@ -132,6 +137,25 @@ class LiveRoomMiniProfileLauncher {
             : null,
       ),
     );
+  }
+
+  static int _roomPower(SeatUser user) {
+    final id = user.id.toLowerCase();
+    final role = user.roleLabel.toLowerCase();
+    final isOwner = user.isHost ||
+        id == 'user_6922022' ||
+        id == 'founder_owner' ||
+        role.contains('founder owner') ||
+        role.contains('super owner') ||
+        role.contains('owner') ||
+        role.contains('channel host') ||
+        role == 'host';
+    if (isOwner) return 100;
+
+    final isChannelAdmin = user.isRoomAdmin || role.contains('channel admin') || role.contains('room admin') || role.contains('administrator');
+    if (isChannelAdmin) return 90;
+
+    return 0;
   }
 
   static void _openRankingsSheet({
