@@ -104,6 +104,11 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _send('mic/set_enabled', {'enabled': enabled});
   }
 
+  void setAdminMute({required String targetUserId, required bool muted}) {
+    if (targetUserId.trim().isEmpty) return;
+    _send('admin_mute/set', {'target_user_id': targetUserId, 'muted': muted});
+  }
+
   void sendRoomChat(String text) {
     final safeText = text.trim();
     if (safeText.isEmpty) return;
@@ -267,21 +272,24 @@ class LiveMediaRoomSnapshot {
 }
 
 class LiveMediaPeerSnapshot {
-  const LiveMediaPeerSnapshot({required this.peerId, required this.userId, required this.displayName, required this.seatIndex, required this.micEnabled});
+  const LiveMediaPeerSnapshot({required this.peerId, required this.userId, required this.displayName, required this.seatIndex, required this.micEnabled, required this.adminMuted});
 
   final String peerId;
   final String userId;
   final String displayName;
   final int? seatIndex;
   final bool micEnabled;
+  final bool adminMuted;
 
   factory LiveMediaPeerSnapshot.fromJson(Map<String, dynamic> json) {
+    final adminMutedValue = json['admin_muted'] ?? json['adminMuted'];
     return LiveMediaPeerSnapshot(
       peerId: json['peer_id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
       displayName: json['display_name']?.toString() ?? 'Vibe User',
       seatIndex: json['seat_index'] is int ? json['seat_index'] as int : int.tryParse(json['seat_index']?.toString() ?? ''),
       micEnabled: json['mic_enabled'] == true,
+      adminMuted: adminMutedValue == true,
     );
   }
 }
