@@ -40,6 +40,7 @@ class AppRouteFactory {
               language: args.language,
               modeTitle: args.modeTitle,
               onlineCount: args.onlineCount,
+              currentUser: args.currentUser,
             ),
           );
         }
@@ -129,29 +130,17 @@ class AppRouteFactory {
         return _buildRoute(settings, const VmSkeletonPage(title: 'Vibe Comments', subtitle: 'Comments, replies, reactions, mentions, and moderation actions for vibe posts.', icon: Icons.mode_comment_rounded, highlights: ['Comments should support mentions and report actions.', 'Reactions should appear in Inbox reactions.', 'Future backend: comment thread, reactions, report, and notification APIs.']));
 
       default:
-        return _buildRoute(
-          settings,
-          UnknownRoutePage(routeName: settings.name ?? 'unknown'),
-        );
+        return _buildRoute(settings, UnknownRoutePage(routeName: settings.name ?? 'unknown'));
     }
   }
 
-  static MaterialPageRoute<dynamic> _buildRoute(
-    RouteSettings settings,
-    Widget page,
-  ) {
-    return MaterialPageRoute<dynamic>(
-      settings: settings,
-      builder: (_) => page,
-    );
+  static MaterialPageRoute<dynamic> _buildRoute(RouteSettings settings, Widget page) {
+    return MaterialPageRoute<dynamic>(settings: settings, builder: (_) => page);
   }
 }
 
 class UnknownRoutePage extends StatelessWidget {
-  const UnknownRoutePage({
-    super.key,
-    required this.routeName,
-  });
+  const UnknownRoutePage({super.key, required this.routeName});
 
   final String routeName;
 
@@ -159,24 +148,11 @@ class UnknownRoutePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
-      appBar: AppBar(
-        title: const Text('Route not found'),
-        backgroundColor: const Color(0xFFFAF7F1),
-        foregroundColor: const Color(0xFF251538),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Route not found'), backgroundColor: const Color(0xFFFAF7F1), foregroundColor: const Color(0xFF251538), elevation: 0),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(
-            'No route is registered for $routeName',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          child: Text('No route is registered for $routeName', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900)),
         ),
       ),
     );
