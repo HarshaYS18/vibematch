@@ -73,7 +73,7 @@ class MiniProfileMetaRow extends StatelessWidget {
         if (officialRoleBadge != null)
           OfficialRoleBadgePill(badge: officialRoleBadge, compact: true)
         else if (_isChannelHost)
-          const MiniProfileMetaPill(icon: Icons.crown_rounded, label: 'Channel Host', color: RoomColors.gold)
+          const MiniProfileMetaPill(icon: Icons.workspace_premium_rounded, label: 'Channel Host', color: RoomColors.gold)
         else if (_isChannelAdmin)
           const MiniProfileMetaPill(icon: Icons.admin_panel_settings_rounded, label: 'Channel Admin', color: RoomColors.aqua)
         else if (user.roleLabel.isNotEmpty && _normalizedRoleLabel != 'member')
