@@ -65,7 +65,10 @@ class LiveRoomSeatController {
 
       final isLocalUser = peer.userId == currentUser.id;
       final existingUser = _findKnownSeatUser(peer.userId);
-      final seatUser = (isLocalUser ? currentUser : existingUser).copyWith(selfMuted: !peer.micEnabled);
+      final seatUser = (isLocalUser ? currentUser : existingUser).copyWith(
+        selfMuted: !peer.micEnabled,
+        adminMuted: peer.adminMuted,
+      );
       nextSeats[seatIndex] = nextSeats[seatIndex].copyWith(user: seatUser, locked: false);
       usedSeatIndexes.add(seatIndex);
     }
@@ -246,7 +249,9 @@ class LiveRoomSeatController {
     final index = seats.indexWhere((seat) => seat.user?.id == userId);
     if (index < 0) return;
     final user = seats[index].user!;
-    seats[index] = seats[index].copyWith(user: user.copyWith(adminMuted: !user.adminMuted));
+    final nextMuted = !user.adminMuted;
+    seats[index] = seats[index].copyWith(user: user.copyWith(adminMuted: nextMuted));
+    LiveRoomMediaSignalingService.instance.setAdminMute(targetUserId: userId, muted: nextMuted);
     onChanged();
   }
 
