@@ -1,7 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, auth, inbox, inbox_ws, moderation, users
+from app.api.routes import (
+    admin,
+    auth,
+    inbox,
+    inbox_ws,
+    moderation,
+    mvp_core,
+    mvp_economy,
+    mvp_operations,
+    mvp_room_modes,
+    mvp_social,
+    users,
+)
 from app.api.routes.rooms import rooms
 from app.database import Base, engine
 from app.models import (
@@ -16,6 +28,7 @@ from app.models import (
     InboxMessage,
     InboxParticipant,
     InboxReport,
+    MvpFeatureState,
     Room,
     SpecialPermission,
     User,
@@ -55,3 +68,8 @@ app.include_router(moderation.router)
 app.include_router(rooms.router)
 app.include_router(inbox.router)
 app.include_router(inbox_ws.router)
+app.include_router(mvp_core.router)
+app.include_router(mvp_social.router)
+app.include_router(mvp_economy.router)
+app.include_router(mvp_operations.router)
+app.include_router(mvp_room_modes.router)
