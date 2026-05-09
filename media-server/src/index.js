@@ -26,18 +26,18 @@ function getOrCreateRoom(roomId) {
 
   let room = rooms.get(id);
   if (!room) {
-    room = { id, peers: new Map(), lockedSeatIndexes: new Set(), createdAt: new Date().toISOString() };
+    room = {
+      id,
+      peers: new Map(),
+      lockedSeatIndexes: new Set(),
+      createdAt: new Date().toISOString(),
+    };
     rooms.set(id, room);
     log('room/created', { room_id: id });
   }
+
   if (!room.lockedSeatIndexes) room.lockedSeatIndexes = new Set();
   return room;
-}
-
-function normalizeSeatIndex(value) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return parsed;
 }
 
 function roomSnapshot(room) {
@@ -70,10 +70,6 @@ function broadcast(room, type, payload = {}, exceptPeerId = null) {
   }
 }
 
-function broadcastSnapshot(room, type, payload = {}, exceptPeerId = null) {
-  broadcast(room, type, { ...payload, room: roomSnapshot(room) }, exceptPeerId);
-}
-
 function findPeerByUserId(room, userId) {
   const targetUserId = String(userId || '').trim();
   if (!targetUserId) return null;
@@ -81,6 +77,12 @@ function findPeerByUserId(room, userId) {
     if (peer.userId === targetUserId || peer.id === targetUserId) return peer;
   }
   return null;
+}
+
+function normalizeSeatIndex(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
 }
 
 function clearPeerSeat(peer) {
@@ -94,6 +96,10 @@ function clearSeatOccupant(room, seatIndex) {
   for (const peer of room.peers.values()) {
     if (peer.seatIndex === seatIndex) clearPeerSeat(peer);
   }
+}
+
+function broadcastRoomSnapshot(room, type, payload = {}) {
+  broadcast(room, type, { ...payload, room: roomSnapshot(room) });
 }
 
 app.get('/health', (_req, res) => {
@@ -184,28 +190,31 @@ wss.on('connection', (ws) => {
       }
 
       if (type === 'seat/take') {
-        const seatIndex = normalizeSeatIndex(payload.seat_index);
-        if (seatIndex == null) throw new Error('seat_index is required');
-        if (currentRoom.lockedSeatIndexes.has(seatIndex)) throw new Error(`Seat ${seatIndex + 1} is locked`);
-        clearSeatOccupant(currentRoom, seatIndex);
+        const seatIndex = payload.seat_index;
+        if (currentRoom.lockedSeatIndexes.has(Number(seatIndex))) {
+          send(ws, 'error', { detail: `Seat ${Number(seatIndex) + 1} is locked.` });
+          return;
+        }
         currentPeer.seatIndex = seatIndex;
         currentPeer.adminMuted = false;
         log('seat/take', { room_id: currentRoom.id, peer_id: currentPeer.id, seat_index: currentPeer.seatIndex });
-        broadcastSnapshot(currentRoom, 'seat/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, seat_index: currentPeer.seatIndex });
+        broadcast(currentRoom, 'seat/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, seat_index: currentPeer.seatIndex, room: roomSnapshot(currentRoom) });
         return;
       }
 
       if (type === 'seat/leave') {
-        clearPeerSeat(currentPeer);
+        currentPeer.seatIndex = null;
+        currentPeer.micEnabled = false;
+        currentPeer.adminMuted = false;
         log('seat/leave', { room_id: currentRoom.id, peer_id: currentPeer.id });
-        broadcastSnapshot(currentRoom, 'seat/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, seat_index: null, mic_enabled: false });
+        broadcast(currentRoom, 'seat/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, seat_index: null, mic_enabled: false, room: roomSnapshot(currentRoom) });
         return;
       }
 
       if (type === 'mic/set_enabled') {
         currentPeer.micEnabled = Boolean(payload.enabled) && currentPeer.seatIndex != null && currentPeer.adminMuted !== true;
         log('mic/set_enabled', { room_id: currentRoom.id, peer_id: currentPeer.id, mic_enabled: currentPeer.micEnabled });
-        broadcastSnapshot(currentRoom, 'mic/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, mic_enabled: currentPeer.micEnabled });
+        broadcast(currentRoom, 'mic/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, mic_enabled: currentPeer.micEnabled, room: roomSnapshot(currentRoom) });
         return;
       }
 
@@ -215,7 +224,7 @@ wss.on('connection', (ws) => {
         target.adminMuted = Boolean(payload.muted);
         if (target.adminMuted) target.micEnabled = false;
         log('admin_mute/set', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target.id, target_user_id: target.userId, muted: target.adminMuted });
-        broadcastSnapshot(currentRoom, 'admin_mute/updated', { peer_id: target.id, user_id: target.userId, admin_muted: target.adminMuted, mic_enabled: target.micEnabled });
+        broadcast(currentRoom, 'admin_mute/updated', { peer_id: target.id, user_id: target.userId, admin_muted: target.adminMuted, mic_enabled: target.micEnabled, room: roomSnapshot(currentRoom) });
         return;
       }
 
@@ -224,7 +233,7 @@ wss.on('connection', (ws) => {
         if (!target) throw new Error('Target user not found for seat leave');
         clearPeerSeat(target);
         log('admin/seat_leave', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target.id, target_user_id: target.userId });
-        broadcastSnapshot(currentRoom, 'seat/updated', { peer_id: target.id, user_id: target.userId, seat_index: null, mic_enabled: false });
+        broadcast(currentRoom, 'seat/updated', { peer_id: target.id, user_id: target.userId, seat_index: null, mic_enabled: false, room: roomSnapshot(currentRoom) });
         return;
       }
 
@@ -234,7 +243,7 @@ wss.on('connection', (ws) => {
         clearSeatOccupant(currentRoom, seatIndex);
         currentRoom.lockedSeatIndexes.add(seatIndex);
         log('admin/seat_lock', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, seat_index: seatIndex });
-        broadcastSnapshot(currentRoom, 'seat/locked', { seat_index: seatIndex, locked: true });
+        broadcastRoomSnapshot(currentRoom, 'seat/locked', { seat_index: seatIndex, locked: true });
         return;
       }
 
@@ -243,7 +252,7 @@ wss.on('connection', (ws) => {
         if (seatIndex == null) throw new Error('seat_index is required');
         currentRoom.lockedSeatIndexes.delete(seatIndex);
         log('admin/seat_unlock', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, seat_index: seatIndex });
-        broadcastSnapshot(currentRoom, 'seat/locked', { seat_index: seatIndex, locked: false });
+        broadcastRoomSnapshot(currentRoom, 'seat/locked', { seat_index: seatIndex, locked: false });
         return;
       }
 
@@ -255,7 +264,7 @@ wss.on('connection', (ws) => {
         clearSeatOccupant(currentRoom, seatIndex);
         currentRoom.lockedSeatIndexes.add(seatIndex);
         log('admin/seat_leave_lock', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target?.id, seat_index: seatIndex });
-        broadcastSnapshot(currentRoom, 'seat/locked', { peer_id: target?.id, user_id: target?.userId, seat_index: seatIndex, locked: true });
+        broadcastRoomSnapshot(currentRoom, 'seat/locked', { peer_id: target?.id, user_id: target?.userId, seat_index: seatIndex, locked: true });
         return;
       }
 
@@ -265,8 +274,8 @@ wss.on('connection', (ws) => {
         currentRoom.peers.delete(target.id);
         log('admin/kick', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target.id, target_user_id: target.userId, reason: payload.reason });
         send(target.ws, 'room/kicked', { peer_id: target.id, user_id: target.userId, reason: payload.reason || 'Removed by room admin' });
+        broadcast(currentRoom, 'room/peer_left', { peer_id: target.id, room: roomSnapshot(currentRoom) });
         try { target.ws.close(); } catch (_error) {}
-        broadcastSnapshot(currentRoom, 'room/peer_left', { peer_id: target.id, user_id: target.userId });
         if (currentRoom.peers.size === 0) rooms.delete(currentRoom.id);
         return;
       }
