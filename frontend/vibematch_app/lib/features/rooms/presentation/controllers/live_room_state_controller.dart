@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import '../widgets/room_theme.dart';
 import '../widgets/vibesync_room_module.dart';
@@ -13,7 +14,12 @@ class LiveRoomStateController extends ChangeNotifier {
   })  : _roomName = initialRoomName,
         _roomId = initialRoomId,
         _privacyMode = privacyModeFromTitle(initialModeTitle),
-        _inboxUnreadCount = initialInboxUnreadCount;
+        _inboxUnreadCount = initialInboxUnreadCount {
+    LiveRoomMediaSignalingService.instance.configureRoom(
+      roomId: _roomId,
+      roomName: _roomName,
+    );
+  }
 
   String _roomName;
   String _roomId;
@@ -49,6 +55,10 @@ class LiveRoomStateController extends ChangeNotifier {
     final nextValue = value.trim();
     if (nextValue.isEmpty || nextValue == _roomName) return;
     _roomName = nextValue;
+    LiveRoomMediaSignalingService.instance.configureRoom(
+      roomId: _roomId,
+      roomName: _roomName,
+    );
     notifyListeners();
   }
 
@@ -56,6 +66,10 @@ class LiveRoomStateController extends ChangeNotifier {
     final nextValue = value.trim();
     if (nextValue.isEmpty || nextValue == _roomId) return;
     _roomId = nextValue;
+    LiveRoomMediaSignalingService.instance.configureRoom(
+      roomId: _roomId,
+      roomName: _roomName,
+    );
     notifyListeners();
   }
 
