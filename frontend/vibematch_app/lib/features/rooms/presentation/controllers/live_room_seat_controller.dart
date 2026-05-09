@@ -22,8 +22,12 @@ class LiveRoomSeatController {
 
   List<SeatUser> get roomUsers => seats.where((seat) => seat.user != null).map((seat) => seat.user!).toList();
 
-  bool get _currentUserIsOwner => _isOwner(currentUser);
-  bool get _currentUserIsAdminOrOwner => _isOwner(currentUser) || currentUser.isRoomAdmin;
+  bool get _currentUserIsOwner => _roomPower(currentUser) >= 100;
+  bool get _currentUserIsAdminOrOwner => _roomPower(currentUser) >= 90;
+
+  bool canModerateTarget(SeatUser target) => _canModerateTarget(target);
+  bool canSetOrRemoveAdminFor(SeatUser target) => _currentUserIsOwner && target.id != currentUser.id && _roomPower(target) < 100;
+  int roomPowerFor(SeatUser user) => _roomPower(user);
 
   void dispose() {
     LiveRoomMediaSignalingService.instance.roomSnapshot.removeListener(_applyLatestMediaSnapshot);
@@ -128,31 +132,30 @@ class LiveRoomSeatController {
 
   bool _isFounderId(String userId) => userId == 'user_6922022' || userId == 'founder_owner';
 
-  bool _isOwner(SeatUser user) {
+  int _roomPower(SeatUser user) {
     final role = user.roleLabel.toLowerCase();
-    return user.isHost || _isFounderId(user.id) || role.contains('owner') || role.contains('channel host') || role.contains('host');
+    final isOwner = user.isHost || _isFounderId(user.id) || role.contains('owner') || role.contains('channel host') || role == 'host';
+    if (isOwner) return 100;
+    final isAdmin = user.isRoomAdmin || role.contains('admin') || role.contains('administrator');
+    if (isAdmin) return 90;
+    return 0;
   }
 
-  bool _isAdmin(SeatUser user) {
-    final role = user.roleLabel.toLowerCase();
-    return user.isRoomAdmin || role.contains('admin') || role.contains('administrator');
-  }
+  bool _isOwner(SeatUser user) => _roomPower(user) >= 100;
+  bool _isAdmin(SeatUser user) => _roomPower(user) >= 90 && _roomPower(user) < 100;
 
-  bool _canAdminMuteTarget(SeatUser target) {
-    if (!_currentUserIsAdminOrOwner) return false;
+  bool _canModerateTarget(SeatUser target) {
+    final viewerPower = _roomPower(currentUser);
+    final targetPower = _roomPower(target);
     if (target.id == currentUser.id) return false;
-    if (_isOwner(target)) return false;
-    if (!_currentUserIsOwner && _isAdmin(target)) return false;
-    return true;
+    if (targetPower >= 100) return false;
+    if (viewerPower >= 100) return targetPower < 100;
+    if (viewerPower >= 90) return targetPower < 90;
+    return false;
   }
 
-  bool _canRemoveTarget(SeatUser target) {
-    if (!_currentUserIsAdminOrOwner) return false;
-    if (target.id == currentUser.id) return false;
-    if (_isOwner(target)) return false;
-    if (!_currentUserIsOwner && _isAdmin(target)) return false;
-    return true;
-  }
+  bool _canAdminMuteTarget(SeatUser target) => _canModerateTarget(target);
+  bool _canRemoveTarget(SeatUser target) => _canModerateTarget(target);
 
   void changeLayout(String nextLayoutId) {
     final existingUsers = roomUsers;
@@ -340,7 +343,11 @@ class LiveRoomSeatController {
     final index = seats.indexWhere((seat) => seat.user?.id == userId);
     if (index < 0) return;
     final user = seats[index].user!;
-    if (user.adminMuted && userId == currentUser.id) {
+    if (user.id != currentUser.id) {
+      onToast('You can only mute your own mic');
+      return;
+    }
+    if (user.adminMuted) {
       seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: true));
       micMuted = true;
       LiveRoomMediaSignalingService.instance.setMicEnabled(false);
@@ -350,7 +357,8 @@ class LiveRoomSeatController {
     }
     final nextMuted = !user.selfMuted;
     seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: nextMuted));
-    if (userId == currentUser.id) micMuted = nextMuted;
+    micMuted = nextMuted;
+    LiveRoomMediaSignalingService.instance.setMicEnabled(!nextMuted);
     onChanged();
   }
 
@@ -369,29 +377,30 @@ class LiveRoomSeatController {
   }
 
   void setUserAsAdmin(String userId) {
-    if (!_currentUserIsOwner) {
+    final target = roomUsers.firstWhereOrNull((user) => user.id == userId);
+    if (!_currentUserIsOwner || target == null || !canSetOrRemoveAdminFor(target)) {
       onToast('Only the room owner can set admins');
       return;
     }
-    if (userId == currentUser.id) return;
     for (var i = 0; i < seats.length; i++) {
       final user = seats[i].user;
-      if (user?.id == userId && !_isOwner(user!)) {
-        seats[i] = seats[i].copyWith(user: user.copyWith(isRoomAdmin: true, roleLabel: 'Administrator'));
+      if (user?.id == userId) {
+        seats[i] = seats[i].copyWith(user: user!.copyWith(isRoomAdmin: true, roleLabel: 'Administrator'));
       }
     }
     onChanged();
   }
 
   void removeUserAsAdmin(String userId) {
-    if (!_currentUserIsOwner) {
+    final target = roomUsers.firstWhereOrNull((user) => user.id == userId);
+    if (!_currentUserIsOwner || target == null || !canSetOrRemoveAdminFor(target)) {
       onToast('Only the room owner can remove admins');
       return;
     }
     for (var i = 0; i < seats.length; i++) {
       final user = seats[i].user;
-      if (user?.id == userId && !_isOwner(user!)) {
-        seats[i] = seats[i].copyWith(user: user.copyWith(isRoomAdmin: false, roleLabel: 'Member'));
+      if (user?.id == userId) {
+        seats[i] = seats[i].copyWith(user: user!.copyWith(isRoomAdmin: false, roleLabel: 'Member'));
       }
     }
     onChanged();
