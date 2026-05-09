@@ -241,6 +241,29 @@ wss.on('connection', (ws) => {
         return;
       }
 
+      if (type === 'seat_invite/send') {
+        const target = findPeerByUserId(currentRoom, payload.target_user_id);
+        const seatIndex = normalizeSeatIndex(payload.seat_index);
+        if (!target) throw new Error('Target user not found for seat invite');
+        if (seatIndex == null) throw new Error('seat_index is required');
+        if (target.id === currentPeer.id || target.userId === currentPeer.userId) throw new Error('Cannot invite yourself');
+        if (target.seatIndex != null) throw new Error('Target user is already seated');
+        if (currentRoom.lockedSeatIndexes.has(seatIndex)) throw new Error(`Seat ${seatIndex + 1} is locked`);
+        log('seat_invite/send', { room_id: currentRoom.id, from_peer_id: currentPeer.id, target_peer_id: target.id, seat_index: seatIndex });
+        send(target.ws, 'seat_invite/received', {
+          invite_id: randomUUID(),
+          room_id: currentRoom.id,
+          seat_index: seatIndex,
+          inviter_peer_id: currentPeer.id,
+          inviter_user_id: currentPeer.userId,
+          inviter_name: currentPeer.displayName,
+          target_user_id: target.userId,
+          created_at: new Date().toISOString(),
+        });
+        send(ws, 'seat_invite/sent', { target_user_id: target.userId, seat_index: seatIndex });
+        return;
+      }
+
       if (type === 'seat/take') {
         const seatIndex = payload.seat_index;
         if (currentRoom.lockedSeatIndexes.has(Number(seatIndex))) {
