@@ -20,6 +20,8 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
     user_id: int
     public_user_id: int
+    username: str | None = None
+    display_name: str | None = None
     roles: list[str]
     primary_role: str
     primary_role_badge: RoleBadgeResponse | None = None
