@@ -29,7 +29,9 @@ class LiveRoomSeatController {
   void initialize(String initialLayoutId) {
     layoutId = initialLayoutId;
     seats = buildSeatsForLayout(layoutId);
+    _applyLatestMediaSnapshot();
     LiveRoomMediaSignalingService.instance.joinRoom(currentUser: currentUser);
+    Future<void>.microtask(_applyLatestMediaSnapshot);
   }
 
   List<RoomSeat> buildSeatsForLayout(String targetLayoutId) {
