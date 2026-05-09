@@ -15,6 +15,7 @@ from app.models.economy import (
     GamePool,
     GamePoolType,
     GameRound,
+    GiftTransaction,
     RubyWithdrawRequest,
     UserWallet,
     WalletLedger,
@@ -161,6 +162,69 @@ def preview_gift_economy(coin_value: int, quantity: int, room_id: int | None, re
     total = coin_value * quantity
     rubies = total * RUBY_EARNING_BASIS_POINTS // 10000
     return {"total_coin_value": total, "receiver_ruby_amount": rubies, "platform_share_coin_value": total - rubies, "send_exp_amount": total, "receive_exp_amount": total, "room_exp_amount": total if room_id else 0, "love_score_amount": total if relationship_id or is_relationship_gift else 0, "rule": "100 received coins = 30 rubies. Coins spend; rubies earn/withdraw. Pool coins are inventory only."}
+
+
+def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, coin_value: int, quantity: int, room_id: int | None, relationship_id: int | None, is_relationship_gift: bool) -> dict[str, int | str]:
+    if sender.id == receiver_user_id:
+        raise HTTPException(status_code=400, detail="Sender and receiver cannot be the same user")
+
+    receiver = db.query(User).filter(User.id == receiver_user_id).first()
+    if not receiver:
+        raise HTTPException(status_code=404, detail="Receiver not found")
+
+    total_coin_value = coin_value * quantity
+    receiver_ruby_amount = total_coin_value * RUBY_EARNING_BASIS_POINTS // 10000
+    platform_share_coin_value = total_coin_value - receiver_ruby_amount
+    room_exp_amount = total_coin_value if room_id else 0
+    love_score_amount = total_coin_value if relationship_id or is_relationship_gift else 0
+
+    sender_wallet = get_or_create_wallet(db, sender.id)
+    receiver_wallet = get_or_create_wallet(db, receiver_user_id)
+
+    gift_tx = GiftTransaction(
+        sender_user_id=sender.id,
+        receiver_user_id=receiver_user_id,
+        room_id=room_id,
+        gift_id=gift_id,
+        coin_value=coin_value,
+        quantity=quantity,
+        total_coin_value=total_coin_value,
+        receiver_ruby_amount=receiver_ruby_amount,
+        platform_share_coin_value=platform_share_coin_value,
+        agency_share_coin_value=0,
+        room_exp_amount=room_exp_amount,
+        send_exp_amount=total_coin_value,
+        receive_exp_amount=total_coin_value,
+        relationship_id=relationship_id,
+        love_score_amount=love_score_amount,
+    )
+    db.add(gift_tx)
+    db.flush()
+
+    _debit_wallet(db, sender_wallet, EconomyCurrency.COIN, total_coin_value, "GIFT_SEND", str(gift_tx.id), sender.id, f"Sent gift {gift_id}")
+    _credit_wallet(db, receiver_wallet, EconomyCurrency.RUBY, receiver_ruby_amount, "GIFT_RECEIVE_RUBY", str(gift_tx.id), sender.id, f"Received gift {gift_id}")
+    receiver_wallet.lifetime_coins_received_as_gifts += total_coin_value
+
+    db.commit()
+    db.refresh(gift_tx)
+    db.refresh(sender_wallet)
+    db.refresh(receiver_wallet)
+
+    return {
+        "gift_transaction_id": gift_tx.id,
+        "sender_user_id": sender.id,
+        "receiver_user_id": receiver_user_id,
+        "total_coin_value": total_coin_value,
+        "receiver_ruby_amount": receiver_ruby_amount,
+        "platform_share_coin_value": platform_share_coin_value,
+        "send_exp_amount": total_coin_value,
+        "receive_exp_amount": total_coin_value,
+        "room_exp_amount": room_exp_amount,
+        "love_score_amount": love_score_amount,
+        "sender_coin_balance": sender_wallet.coin_balance,
+        "receiver_ruby_balance": receiver_wallet.ruby_balance,
+        "rule": "Gift send committed. Sender coins debited; receiver rubies credited at 30%.",
+    }
 
 
 def convert_rubies_to_coins(db: Session, user: User, ruby_amount: int) -> UserWallet:
