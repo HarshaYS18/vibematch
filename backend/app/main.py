@@ -1,13 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, auth, inbox, inbox_ws, moderation, users
+from app.api.routes import admin, auth, economy, economy_admin, inbox, inbox_ws, moderation, users
 from app.api.routes.rooms import rooms
 from app.database import Base, engine
 from app.models import (
     AdminLog,
     AuthIdentity,
+    CoinPoolLedger,
+    CoinSaleOrder,
+    CoinSupplyPool,
     DeviceBan,
+    GamePool,
+    GamePoolLedger,
+    GameRound,
+    GameRoundPlayer,
+    GiftTransaction,
     InboxBackupJob,
     InboxBackupSetting,
     InboxConversation,
@@ -17,10 +25,13 @@ from app.models import (
     InboxParticipant,
     InboxReport,
     Room,
+    RubyWithdrawRequest,
     SpecialPermission,
     User,
     UserBan,
     UserRole,
+    UserWallet,
+    WalletLedger,
 )
 
 
@@ -55,3 +66,5 @@ app.include_router(moderation.router)
 app.include_router(rooms.router)
 app.include_router(inbox.router)
 app.include_router(inbox_ws.router)
+app.include_router(economy.router)
+app.include_router(economy_admin.router)
