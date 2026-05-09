@@ -36,21 +36,7 @@ class LiveRoomSeatController {
 
   List<RoomSeat> buildSeatsForLayout(String targetLayoutId) {
     final spec = SeatLayoutSpec.parse(targetLayoutId);
-    final builtSeats = List<RoomSeat>.generate(spec.totalSeats, (index) => RoomSeat(index: index));
-    for (var i = 0; i < mockRoomUsers.length && i < builtSeats.length; i++) {
-      final mockUser = mockRoomUsers[i];
-      builtSeats[i] = RoomSeat(index: i, user: _mapMockUser(mockUser));
-    }
-    if (builtSeats.isNotEmpty && !builtSeats.any((seat) => seat.user?.id == currentUser.id)) {
-      builtSeats[0] = RoomSeat(index: 0, user: currentUser);
-    }
-    return builtSeats;
-  }
-
-  SeatUser _mapMockUser(SeatUser mockUser) {
-    if (mockUser.id == currentUser.id) return currentUser;
-    if (mockUser.id == 'founder_owner' && currentUser.id != 'founder_owner') return currentUser;
-    return mockUser;
+    return List<RoomSeat>.generate(spec.totalSeats, (index) => RoomSeat(index: index));
   }
 
   void _applyLatestMediaSnapshot() {
@@ -94,9 +80,6 @@ class LiveRoomSeatController {
   SeatUser _findKnownSeatUser(String userId) {
     final existing = roomUsers.firstWhereOrNull((user) => user.id == userId);
     if (existing != null) return existing;
-
-    final mock = [...mockRoomUsers, ...mockInviteUsers].firstWhereOrNull((user) => user.id == userId);
-    if (mock != null) return mock;
 
     return SeatUser(
       id: userId,
