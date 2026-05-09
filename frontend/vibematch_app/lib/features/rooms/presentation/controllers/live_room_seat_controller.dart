@@ -1,9 +1,13 @@
+import 'package:flutter/material.dart';
+
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 
 class LiveRoomSeatController {
   LiveRoomSeatController({required SeatUser currentUser, required this.onChanged, required this.onToast})
-      : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser);
+      : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser) {
+    LiveRoomMediaSignalingService.instance.roomSnapshot.addListener(_applyLatestMediaSnapshot);
+  }
 
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
@@ -17,6 +21,10 @@ class LiveRoomSeatController {
   final Map<String, DateTime> _seatApplyCooldownUntil = <String, DateTime>{};
 
   List<SeatUser> get roomUsers => seats.where((seat) => seat.user != null).map((seat) => seat.user!).toList();
+
+  void dispose() {
+    LiveRoomMediaSignalingService.instance.roomSnapshot.removeListener(_applyLatestMediaSnapshot);
+  }
 
   void initialize(String initialLayoutId) {
     layoutId = initialLayoutId;
@@ -41,6 +49,60 @@ class LiveRoomSeatController {
     if (mockUser.id == currentUser.id) return currentUser;
     if (mockUser.id == 'founder_owner' && currentUser.id != 'founder_owner') return currentUser;
     return mockUser;
+  }
+
+  void _applyLatestMediaSnapshot() {
+    final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
+    if (snapshot == null || seats.isEmpty) return;
+
+    final nextSeats = List<RoomSeat>.generate(seats.length, (index) => RoomSeat(index: index, locked: seats[index].locked));
+    final usedSeatIndexes = <int>{};
+
+    for (final peer in snapshot.peers) {
+      final seatIndex = peer.seatIndex;
+      if (seatIndex == null || seatIndex < 0 || seatIndex >= nextSeats.length) continue;
+      if (usedSeatIndexes.contains(seatIndex)) continue;
+
+      final isLocalUser = peer.userId == currentUser.id;
+      final existingUser = _findKnownSeatUser(peer.userId);
+      final seatUser = (isLocalUser ? currentUser : existingUser).copyWith(selfMuted: !peer.micEnabled);
+      nextSeats[seatIndex] = nextSeats[seatIndex].copyWith(user: seatUser, locked: false);
+      usedSeatIndexes.add(seatIndex);
+    }
+
+    seats = nextSeats;
+    final localSeat = seats.firstWhereOrNull((seat) => seat.user?.id == currentUser.id);
+    micMuted = localSeat?.user?.selfMuted ?? micMuted;
+    onChanged();
+  }
+
+  SeatUser _findKnownSeatUser(String userId) {
+    final existing = roomUsers.firstWhereOrNull((user) => user.id == userId);
+    if (existing != null) return existing;
+
+    final mock = [...mockRoomUsers, ...mockInviteUsers].firstWhereOrNull((user) => user.id == userId);
+    if (mock != null) return mock;
+
+    return SeatUser(
+      id: userId,
+      name: _displayNameForUserId(userId),
+      roleLabel: 'Member',
+      familyName: '',
+      relationshipText: '',
+      vipLevel: 1,
+      sendingLevel: 1,
+      receivingLevel: 1,
+      sentExp: 0,
+      receivedExp: 0,
+      medals: const [],
+      avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+    );
+  }
+
+  String _displayNameForUserId(String userId) {
+    if (userId == 'user_6922022') return 'Founder Owner';
+    if (userId.startsWith('user_6418')) return 'Google Tester';
+    return userId.replaceFirst('user_', 'User ');
   }
 
   void changeLayout(String nextLayoutId) {
@@ -227,3 +289,12 @@ class LiveRoomSeatController {
 
 typedef VoidCallbackLike = void Function();
 typedef ValueChangedLike<T> = void Function(T value);
+
+extension _FirstWhereOrNull<T> on Iterable<T> {
+  T? firstWhereOrNull(bool Function(T item) test) {
+    for (final item in this) {
+      if (test(item)) return item;
+    }
+    return null;
+  }
+}
