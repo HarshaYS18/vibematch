@@ -46,7 +46,7 @@ class ControlCockpitOverview extends StatelessWidget {
               child: Column(
                 children: [
                   _BentoTile(
-                    height: 116,
+                    height: 118,
                     title: 'Officials',
                     value: '$activeRoles',
                     subtitle: 'assign / remove roles',
@@ -56,7 +56,7 @@ class ControlCockpitOverview extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   _BentoTile(
-                    height: 96,
+                    height: 102,
                     title: 'Powers',
                     value: '$activePowers',
                     subtitle: 'category grants',
@@ -73,7 +73,7 @@ class ControlCockpitOverview extends StatelessWidget {
               child: Column(
                 children: [
                   _BentoTile(
-                    height: 78,
+                    height: 88,
                     title: 'Reviews',
                     value: '$pendingReviews',
                     subtitle: 'mapped tasks',
@@ -83,7 +83,7 @@ class ControlCockpitOverview extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   _BentoTile(
-                    height: 78,
+                    height: 88,
                     title: 'Stealth',
                     value: state.globalInvisible ? 'ON' : 'OFF',
                     subtitle: 'hidden presence',
@@ -93,10 +93,10 @@ class ControlCockpitOverview extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   _BentoTile(
-                    height: 46,
+                    height: 44,
                     title: 'Logs',
                     value: '${state.logs.length}',
-                    subtitle: 'audit stream',
+                    subtitle: 'audit',
                     icon: Icons.receipt_long_rounded,
                     accent: SuperPowerDesign.rose,
                     onTap: null,
@@ -235,7 +235,7 @@ class _BentoTile extends StatelessWidget {
       child: Container(
         height: height,
         width: double.infinity,
-        padding: EdgeInsets.all(compact ? 9 : 12),
+        padding: EdgeInsets.all(compact ? 8 : 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
           gradient: LinearGradient(
@@ -248,16 +248,16 @@ class _BentoTile extends StatelessWidget {
         child: compact
             ? Row(
                 children: [
-                  Icon(icon, color: accent, size: 17),
-                  const SizedBox(width: 7),
-                  Text(value, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
+                  Icon(icon, color: accent, size: 15),
+                  const SizedBox(width: 6),
+                  Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
                   const SizedBox(width: 5),
                   Expanded(
                     child: Text(
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 10.5, fontWeight: FontWeight.w800),
+                      style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 10, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -265,11 +265,16 @@ class _BentoTile extends StatelessWidget {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [Icon(icon, color: accent, size: 20), const Spacer(), if (onTap != null) Icon(Icons.north_east_rounded, color: accent, size: 15)]),
+                  Row(children: [Icon(icon, color: accent, size: 18), const Spacer(), if (onTap != null) Icon(Icons.north_east_rounded, color: accent, size: 14)]),
                   const Spacer(),
-                  Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.7)),
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent, fontSize: 11.5, fontWeight: FontWeight.w900)),
-                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 10.2, fontWeight: FontWeight.w700)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value, maxLines: 1, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.7)),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent, fontSize: 10.8, fontWeight: FontWeight.w900)),
+                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.muted, fontSize: 9.2, fontWeight: FontWeight.w700)),
                 ],
               ),
       ),
