@@ -1,17 +1,22 @@
 from datetime import datetime
 from uuid import uuid4
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.inbox import InboxConversation, InboxConversationType, InboxMessage, InboxMessageStatus, InboxMessageType, InboxParticipant, InboxReport, InboxReportStatus
 from app.models.user import User
 
 DEFAULT_COLORS = ["#6D5DF6", "#E84C72"]
-TEAM_PUBLIC_ID = "team_official"
+TEAM_PUBLIC_ID_PREFIX = "team_official"
 
 
 def _public_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:20]}"
+
+
+def _team_public_id(user: User) -> str:
+    return f"{TEAM_PUBLIC_ID_PREFIX}_{user.id}"
 
 
 def _time_label(value: datetime | None) -> str:
@@ -47,14 +52,66 @@ def participant_user_ids(conversation: InboxConversation) -> list[int]:
 
 
 def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
-    conversation = db.query(InboxConversation).join(InboxParticipant).filter(InboxConversation.public_id == TEAM_PUBLIC_ID, InboxParticipant.user_id == user.id).first()
+    user_team_public_id = _team_public_id(user)
+
+    conversation = (
+        db.query(InboxConversation)
+        .join(InboxParticipant)
+        .filter(
+            InboxConversation.conversation_type == InboxConversationType.OFFICIAL.value,
+            InboxConversation.is_official.is_(True),
+            InboxParticipant.user_id == user.id,
+        )
+        .first()
+    )
     if conversation:
         return conversation
-    conversation = InboxConversation(public_id=TEAM_PUBLIC_ID, title="Vibe Match Team", avatar_text="VM", conversation_type=InboxConversationType.OFFICIAL.value, is_official=True, metadata_json={"colors": ["#251538", "#C99A3B"]})
+
+    conversation = db.query(InboxConversation).filter(InboxConversation.public_id == user_team_public_id).first()
+    if conversation:
+        participant = db.query(InboxParticipant).filter(InboxParticipant.conversation_id == conversation.id, InboxParticipant.user_id == user.id).first()
+        if participant is None:
+            db.add(InboxParticipant(conversation_id=conversation.id, user_id=user.id))
+            db.commit()
+            db.refresh(conversation)
+        return conversation
+
+    conversation = InboxConversation(
+        public_id=user_team_public_id,
+        title="Vibe Match Team",
+        avatar_text="VM",
+        conversation_type=InboxConversationType.OFFICIAL.value,
+        is_official=True,
+        metadata_json={"colors": ["#251538", "#C99A3B"]},
+    )
     db.add(conversation)
-    db.flush()
+
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(InboxConversation).filter(InboxConversation.public_id == user_team_public_id).first()
+        if existing:
+            participant = db.query(InboxParticipant).filter(InboxParticipant.conversation_id == existing.id, InboxParticipant.user_id == user.id).first()
+            if participant is None:
+                db.add(InboxParticipant(conversation_id=existing.id, user_id=user.id))
+                db.commit()
+                db.refresh(existing)
+            return existing
+        raise
+
     db.add(InboxParticipant(conversation_id=conversation.id, user_id=user.id))
-    db.add(InboxMessage(public_id=_public_id("msg"), conversation_id=conversation.id, sender_user_id=None, sender_name="Vibe Match Team", message_type=InboxMessageType.SYSTEM.value, text="Welcome to Vibe Match Team. Official safety, account, report, and system updates appear here.", status=InboxMessageStatus.READ.value))
+    db.add(
+        InboxMessage(
+            public_id=_public_id("msg"),
+            conversation_id=conversation.id,
+            sender_user_id=None,
+            sender_name="Vibe Match Team",
+            message_type=InboxMessageType.SYSTEM.value,
+            text="Welcome to Vibe Match Team. Official safety, account, report, and system updates appear here.",
+            status=InboxMessageStatus.READ.value,
+        )
+    )
     db.commit()
     db.refresh(conversation)
     return conversation
@@ -136,7 +193,7 @@ def update_message(db: Session, conversation: InboxConversation, message_public_
 
 
 def delete_message(db: Session, conversation: InboxConversation, message_public_id: str) -> bool:
-    message = db.query(InboxMessage).filter(InboxMessage.public_id == message_public_id, InboxMessage.conversation_id == conversation.id).first()
+    message = db.query(InboxMessage).filter(InboxMessage.public_id == message_public_id, message.conversation_id == conversation.id).first()
     if not message:
         return False
     db.delete(message)
