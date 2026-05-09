@@ -28,21 +28,14 @@ class LiveRoomModerationController {
   }) {
     if (!canManageRoom) return false;
     if (target.id == currentUser.id) return false;
-    if (_isFounderOwner(target)) return false;
 
-    if (_isOwnerLevel(target)) {
-      return _isFounderOwner(currentUser) || _isOwnerLevel(currentUser) || _isMonitorTeam(currentUser);
-    }
+    final viewerPower = _roomPower(currentUser);
+    final targetPower = _roomPower(target);
 
-    if (_isMonitorTeam(target)) {
-      return _isFounderOwner(currentUser) || _isOwnerLevel(currentUser) || _isMonitorTeam(currentUser);
-    }
-
-    if (target.isRoomAdmin || target.isHost) {
-      return _isFounderOwner(currentUser) || _isOwnerLevel(currentUser) || _isMonitorTeam(currentUser);
-    }
-
-    return currentUser.isHost || currentUser.isRoomAdmin || _isMonitorTeam(currentUser);
+    if (targetPower >= 100) return false;
+    if (viewerPower >= 100) return targetPower < 100;
+    if (viewerPower >= 90) return targetPower < 90;
+    return false;
   }
 
   Future<LiveRoomModerationResult> kickOutUser({
@@ -79,20 +72,23 @@ class LiveRoomModerationController {
     }
   }
 
-  bool _isFounderOwner(SeatUser user) {
+  int _roomPower(SeatUser user) {
     final id = user.id.toLowerCase();
     final role = user.roleLabel.toLowerCase();
-    return id == 'founder_owner' || role.contains('founder owner') || role.contains('super owner');
-  }
+    final isOwner = user.isHost ||
+        id == 'user_6922022' ||
+        id == 'founder_owner' ||
+        role.contains('founder owner') ||
+        role.contains('super owner') ||
+        role.contains('owner') ||
+        role.contains('channel host') ||
+        role == 'host';
+    if (isOwner) return 100;
 
-  bool _isOwnerLevel(SeatUser user) {
-    final role = user.roleLabel.toLowerCase();
-    return user.isHost || role.contains('owner') || role.contains('channel host');
-  }
+    final isAdmin = user.isRoomAdmin || role.contains('admin') || role.contains('administrator');
+    if (isAdmin) return 90;
 
-  bool _isMonitorTeam(SeatUser user) {
-    final role = user.roleLabel.toLowerCase();
-    return role.contains('monitor') || role.contains('moderator');
+    return 0;
   }
 
   void dispose() {
