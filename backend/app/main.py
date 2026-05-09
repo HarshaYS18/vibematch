@@ -15,6 +15,7 @@ from app.api.routes import (
     mvp_operations,
     mvp_room_modes,
     mvp_social,
+    role_badges,
     users,
 )
 from app.api.routes.rooms import rooms
@@ -77,6 +78,7 @@ def health():
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(role_badges.router)
 app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(rooms.router)
