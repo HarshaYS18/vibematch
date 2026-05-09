@@ -286,6 +286,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (snapshot == null) return;
     roomSnapshot.value = LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
+      lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
         final matchesUser = peer.userId == targetUserId || peer.peerId == targetUserId;
         if (!matchesUser) return peer;
@@ -303,6 +304,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     return LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
+      lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
         final matchesPeer = targetPeerId != null && targetPeerId.isNotEmpty && peer.peerId == targetPeerId;
         final matchesUser = targetUserId != null && targetUserId.isNotEmpty && peer.userId == targetUserId;
@@ -326,15 +328,18 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 }
 
 class LiveMediaRoomSnapshot {
-  const LiveMediaRoomSnapshot({required this.roomId, required this.peers});
+  const LiveMediaRoomSnapshot({required this.roomId, required this.peers, this.lockedSeatIndexes = const <int>{}});
 
   final String roomId;
   final List<LiveMediaPeerSnapshot> peers;
+  final Set<int> lockedSeatIndexes;
 
   factory LiveMediaRoomSnapshot.fromJson(Map<String, dynamic> json) {
     final rawPeers = json['peers'];
     final peers = rawPeers is List ? rawPeers.whereType<Map<String, dynamic>>().map(LiveMediaPeerSnapshot.fromJson).toList() : <LiveMediaPeerSnapshot>[];
-    return LiveMediaRoomSnapshot(roomId: json['room_id']?.toString() ?? '', peers: peers);
+    final rawLockedSeats = json['locked_seat_indexes'] ?? json['lockedSeatIndexes'];
+    final lockedSeatIndexes = rawLockedSeats is List ? rawLockedSeats.map((item) => int.tryParse(item.toString())).whereType<int>().toSet() : <int>{};
+    return LiveMediaRoomSnapshot(roomId: json['room_id']?.toString() ?? '', peers: peers, lockedSeatIndexes: lockedSeatIndexes);
   }
 }
 
