@@ -83,8 +83,10 @@ function safeCallback(callback, payload) {
 }
 
 function emitSeatsUpdated(io, roomId, room, extra = {}) {
-  const payload = { ...extra, seats: getSeatSnapshot(room) };
+  const seats = getSeatSnapshot(room);
+  const payload = { ...extra, seats };
   io.to(roomId).emit('seatsUpdated', payload);
+  console.log(`[seatsUpdated] room=${roomId} occupied=${seats.filter((seat) => seat.peerId).length}/${seats.length}`);
   return payload;
 }
 
@@ -141,6 +143,7 @@ function registerSocketHandlers(io) {
 
         const seat = takeSeat(room, String(peerId), Number(seatNo));
         const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        console.log(`[takeSeat] room=${roomId} peer=${peerId} seatNo=${seatNo}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[takeSeat] error', error);
@@ -159,6 +162,7 @@ function registerSocketHandlers(io) {
 
         const seat = leaveSeat(room, String(peerId));
         const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        console.log(`[leaveSeat] room=${roomId} peer=${peerId}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[leaveSeat] error', error);
@@ -177,6 +181,7 @@ function registerSocketHandlers(io) {
 
         const seat = forceLeaveSeat(room, String(targetPeerId));
         const payload = emitSeatsUpdated(io, roomId, room, { seat, targetPeerId: String(targetPeerId) });
+        console.log(`[adminSeatLeave] room=${roomId} targetPeer=${targetPeerId}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[adminSeatLeave] error', error);
@@ -192,6 +197,7 @@ function registerSocketHandlers(io) {
 
         const seat = lockSeat(room, Number(seatNo));
         const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        console.log(`[adminSeatLock] room=${roomId} seatNo=${seatNo}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[adminSeatLock] error', error);
@@ -207,6 +213,7 @@ function registerSocketHandlers(io) {
 
         const seat = unlockSeat(room, Number(seatNo));
         const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        console.log(`[adminSeatUnlock] room=${roomId} seatNo=${seatNo}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[adminSeatUnlock] error', error);
@@ -225,6 +232,7 @@ function registerSocketHandlers(io) {
 
         const seat = forceLeaveAndLockSeat(room, Number(seatNo), String(targetPeerId));
         const payload = emitSeatsUpdated(io, roomId, room, { seat, targetPeerId: String(targetPeerId) });
+        console.log(`[adminSeatLeaveLock] room=${roomId} seatNo=${seatNo} targetPeer=${targetPeerId}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[adminSeatLeaveLock] error', error);
@@ -245,6 +253,7 @@ function registerSocketHandlers(io) {
         const updatedRoom = removePeer(roomId, targetPeerIdString);
         io.to(roomId).emit('peerKicked', { peerId: targetPeerIdString, reason: reason || 'Removed by room admin' });
         if (updatedRoom) emitSeatsUpdated(io, roomId, updatedRoom, { targetPeerId: targetPeerIdString });
+        console.log(`[adminKick] room=${roomId} targetPeer=${targetPeerIdString}`);
         safeCallback(callback, { ok: true, targetPeerId: targetPeerIdString });
       } catch (error) {
         console.error('[adminKick] error', error);
@@ -264,6 +273,7 @@ function registerSocketHandlers(io) {
 
         const { transport, params } = await createWebRtcTransport(room.router);
         peer.transports.set(transport.id, transport);
+        console.log(`[createWebRtcTransport] room=${roomId} peer=${peerId} direction=${direction} transport=${transport.id}`);
         safeCallback(callback, { ok: true, params });
       } catch (error) {
         console.error('[createWebRtcTransport] error', error);
@@ -284,6 +294,7 @@ function registerSocketHandlers(io) {
         if (!transport) throw new Error('transport not found');
 
         await transport.connect({ dtlsParameters });
+        console.log(`[connectTransport] room=${roomId} peer=${peerId} transport=${transportId}`);
         safeCallback(callback, { ok: true });
       } catch (error) {
         console.error('[connectTransport] error', error);
@@ -354,6 +365,7 @@ function registerSocketHandlers(io) {
           socket.emit('producerClosed', { producerId });
         });
 
+        console.log(`[consume] room=${roomId} peer=${peerId} producer=${producerId} consumer=${consumer.id}`);
         safeCallback(callback, {
           ok: true,
           params: {
@@ -380,6 +392,7 @@ function registerSocketHandlers(io) {
 
         const seat = setSelfMuted(room, String(peerId), Boolean(muted));
         const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        console.log(`[setSelfMuted] room=${roomId} peer=${peerId} muted=${Boolean(muted)}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[setSelfMuted] error', error);
@@ -398,6 +411,7 @@ function registerSocketHandlers(io) {
 
         const seat = setAdminMuted(room, String(targetPeerId), Boolean(muted));
         const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        console.log(`[setAdminMuted] room=${roomId} targetPeer=${targetPeerId} muted=${Boolean(muted)}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
         console.error('[setAdminMuted] error', error);
