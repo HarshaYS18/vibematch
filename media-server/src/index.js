@@ -30,6 +30,7 @@ function getOrCreateRoom(roomId) {
       id,
       peers: new Map(),
       lockedSeatIndexes: new Set(),
+      kickedUsers: new Map(),
       createdAt: new Date().toISOString(),
     };
     rooms.set(id, room);
@@ -37,10 +38,13 @@ function getOrCreateRoom(roomId) {
   }
 
   if (!room.lockedSeatIndexes) room.lockedSeatIndexes = new Set();
+  if (!room.kickedUsers) room.kickedUsers = new Map();
+  cleanupExpiredKickouts(room);
   return room;
 }
 
 function roomSnapshot(room) {
+  cleanupExpiredKickouts(room);
   return {
     room_id: room.id,
     created_at: room.createdAt,
@@ -102,6 +106,39 @@ function broadcastRoomSnapshot(room, type, payload = {}) {
   broadcast(room, type, { ...payload, room: roomSnapshot(room) });
 }
 
+function cleanupExpiredKickouts(room) {
+  if (!room?.kickedUsers) return;
+  const now = Date.now();
+  for (const [userId, entry] of room.kickedUsers.entries()) {
+    if (entry.untilMs !== null && entry.untilMs <= now) room.kickedUsers.delete(userId);
+  }
+}
+
+function kickoutDurationMs(payload = {}) {
+  if (payload.duration_ms != null) {
+    const parsed = Number(payload.duration_ms);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  if (payload.duration_seconds != null) {
+    const parsed = Number(payload.duration_seconds);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed * 1000;
+  }
+  if (typeof payload.duration === 'string') {
+    if (payload.duration === '1h') return 60 * 60 * 1000;
+    if (payload.duration === '1d') return 24 * 60 * 60 * 1000;
+    if (payload.duration === 'forever') return null;
+  }
+  return 60 * 60 * 1000;
+}
+
+function roomKickoutStatus(room, userId) {
+  cleanupExpiredKickouts(room);
+  const entry = room.kickedUsers?.get(String(userId));
+  if (!entry) return null;
+  const remainingMs = entry.untilMs === null ? null : Math.max(0, entry.untilMs - Date.now());
+  return { ...entry, remainingMs };
+}
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'vibematch-media-server', rooms: rooms.size });
 });
@@ -150,9 +187,24 @@ wss.on('connection', (ws) => {
     try {
       if (type === 'room/join') {
         const room = getOrCreateRoom(payload.room_id);
+        const userId = String(payload.user_id || 'guest');
+        const kickout = roomKickoutStatus(room, userId);
+        if (kickout) {
+          log('room/join_blocked', { room_id: room.id, user_id: userId, remaining_ms: kickout.remainingMs, reason: kickout.reason });
+          send(ws, 'room/join_blocked', {
+            room_id: room.id,
+            user_id: userId,
+            reason: kickout.reason || 'You were removed from this room.',
+            kicked_until: kickout.untilMs === null ? null : new Date(kickout.untilMs).toISOString(),
+            remaining_ms: kickout.remainingMs,
+          });
+          try { ws.close(); } catch (_error) {}
+          return;
+        }
+
         const peer = {
           id: payload.peer_id || randomUUID(),
-          userId: String(payload.user_id || 'guest'),
+          userId,
           displayName: String(payload.display_name || 'Vibe User'),
           seatIndex: payload.seat_index ?? null,
           micEnabled: false,
@@ -212,7 +264,14 @@ wss.on('connection', (ws) => {
       }
 
       if (type === 'mic/set_enabled') {
-        currentPeer.micEnabled = Boolean(payload.enabled) && currentPeer.seatIndex != null && currentPeer.adminMuted !== true;
+        const requestedEnabled = Boolean(payload.enabled);
+        if (requestedEnabled && currentPeer.adminMuted === true) {
+          currentPeer.micEnabled = false;
+          log('mic/blocked_admin_muted', { room_id: currentRoom.id, peer_id: currentPeer.id, user_id: currentPeer.userId });
+          broadcast(currentRoom, 'admin_mute/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, admin_muted: true, mic_enabled: false, room: roomSnapshot(currentRoom) });
+          return;
+        }
+        currentPeer.micEnabled = requestedEnabled && currentPeer.seatIndex != null;
         log('mic/set_enabled', { room_id: currentRoom.id, peer_id: currentPeer.id, mic_enabled: currentPeer.micEnabled });
         broadcast(currentRoom, 'mic/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, mic_enabled: currentPeer.micEnabled, room: roomSnapshot(currentRoom) });
         return;
@@ -271,10 +330,19 @@ wss.on('connection', (ws) => {
       if (type === 'admin/kick') {
         const target = findPeerByUserId(currentRoom, payload.target_user_id);
         if (!target) throw new Error('Target user not found for kick');
+        const durationMs = kickoutDurationMs(payload);
+        const untilMs = durationMs === null ? null : Date.now() + durationMs;
+        currentRoom.kickedUsers.set(target.userId, {
+          untilMs,
+          reason: payload.reason || 'Removed by room admin',
+          kickedAt: Date.now(),
+          kickedByPeerId: currentPeer.id,
+        });
+        clearPeerSeat(target);
         currentRoom.peers.delete(target.id);
-        log('admin/kick', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target.id, target_user_id: target.userId, reason: payload.reason });
-        send(target.ws, 'room/kicked', { peer_id: target.id, user_id: target.userId, reason: payload.reason || 'Removed by room admin' });
-        broadcast(currentRoom, 'room/peer_left', { peer_id: target.id, room: roomSnapshot(currentRoom) });
+        log('admin/kick', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target.id, target_user_id: target.userId, reason: payload.reason, kicked_until: untilMs === null ? null : new Date(untilMs).toISOString() });
+        send(target.ws, 'room/kicked', { peer_id: target.id, user_id: target.userId, reason: payload.reason || 'Removed by room admin', kicked_until: untilMs === null ? null : new Date(untilMs).toISOString(), duration_ms: durationMs });
+        broadcast(currentRoom, 'room/peer_left', { peer_id: target.id, user_id: target.userId, room: roomSnapshot(currentRoom) });
         try { target.ws.close(); } catch (_error) {}
         if (currentRoom.peers.size === 0) rooms.delete(currentRoom.id);
         return;
