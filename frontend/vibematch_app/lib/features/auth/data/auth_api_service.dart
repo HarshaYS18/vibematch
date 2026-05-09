@@ -16,15 +16,12 @@ class AuthApiService {
 
   Future<String> getCurrentDeviceId() async {
     final existingDeviceId = _cachedDeviceId;
-
     if (existingDeviceId != null && existingDeviceId.trim().isNotEmpty) {
       return existingDeviceId;
     }
 
-    final generatedDeviceId =
-        'vm-dev-${DateTime.now().millisecondsSinceEpoch.toString()}';
+    final generatedDeviceId = 'vm-dev-${DateTime.now().millisecondsSinceEpoch.toString()}';
     _cachedDeviceId = generatedDeviceId;
-
     return generatedDeviceId;
   }
 
@@ -34,39 +31,32 @@ class AuthApiService {
     String? displayName,
     String? deviceId,
   }) async {
-    final loginUri = Uri.parse(VmApiConfig.endpoint('/auth/dev-login'));
+    _cachedAccessToken = null;
+    _cachedUser = null;
 
-    final safeEmail = email.trim();
+    final loginUri = Uri.parse(VmApiConfig.endpoint('/auth/dev-login'));
+    final safeEmail = email.trim().toLowerCase();
     final safeUsername = username?.trim();
     final safeDisplayName = displayName?.trim();
     final safeDeviceId = deviceId?.trim();
-    final resolvedDeviceId = safeDeviceId == null || safeDeviceId.isEmpty
-        ? await getCurrentDeviceId()
-        : safeDeviceId;
+    final resolvedDeviceId = safeDeviceId == null || safeDeviceId.isEmpty ? await getCurrentDeviceId() : safeDeviceId;
 
     final loginResponse = await http.post(
       loginUri,
-      headers: const {
-        'Content-Type': 'application/json',
-      },
+      headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'email': safeEmail,
-        if (safeUsername != null && safeUsername.isNotEmpty)
-          'username': safeUsername,
-        if (safeDisplayName != null && safeDisplayName.isNotEmpty)
-          'display_name': safeDisplayName,
+        if (safeUsername != null && safeUsername.isNotEmpty) 'username': safeUsername,
+        if (safeDisplayName != null && safeDisplayName.isNotEmpty) 'display_name': safeDisplayName,
         'device_id': resolvedDeviceId,
       }),
     );
 
     if (loginResponse.statusCode < 200 || loginResponse.statusCode >= 300) {
-      throw Exception(
-        'Login failed (${loginResponse.statusCode}): ${loginResponse.body}',
-      );
+      throw Exception('Login failed (${loginResponse.statusCode}): ${loginResponse.body}');
     }
 
     final decoded = jsonDecode(loginResponse.body) as Map<String, dynamic>;
-
     final accessToken = decoded['access_token'] as String?;
     final tokenType = decoded['token_type'] as String? ?? 'bearer';
 
@@ -77,50 +67,29 @@ class AuthApiService {
     _cachedAccessToken = accessToken;
     _cachedDeviceId = resolvedDeviceId;
 
-    CurrentUser user;
-
-    final userJson = decoded['user'];
-    if (userJson is Map<String, dynamic>) {
-      user = CurrentUser.fromJson(userJson);
-    } else {
-      user = await getCurrentUser(accessToken: accessToken);
-    }
-
+    final user = await getCurrentUser(accessToken: accessToken, forceRefresh: true);
     _cachedUser = user;
 
-    return AuthLoginResult(
-      accessToken: accessToken,
-      tokenType: tokenType,
-      user: user,
-    );
+    return AuthLoginResult(accessToken: accessToken, tokenType: tokenType, user: user);
   }
 
-  Future<CurrentUser> getCurrentUser({
-    String? accessToken,
-  }) async {
+  Future<CurrentUser> getCurrentUser({String? accessToken, bool forceRefresh = false}) async {
     final token = accessToken ?? _cachedAccessToken;
 
     if (token == null || token.trim().isEmpty) {
-      if (_cachedUser != null) {
-        return _cachedUser!;
-      }
-
+      if (!forceRefresh && _cachedUser != null) return _cachedUser!;
       throw Exception('No access token available. Please login again.');
     }
 
-    final uri = Uri.parse(VmApiConfig.endpoint('/users/me'));
+    if (!forceRefresh && accessToken == null && _cachedUser != null) {
+      return _cachedUser!;
+    }
 
-    final response = await http.get(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
-    );
+    final uri = Uri.parse(VmApiConfig.endpoint('/users/me'));
+    final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(
-        'Failed to load current user (${response.statusCode}): ${response.body}',
-      );
+      throw Exception('Failed to load current user (${response.statusCode}): ${response.body}');
     }
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -128,7 +97,6 @@ class AuthApiService {
 
     _cachedAccessToken = token;
     _cachedUser = user;
-
     return user;
   }
 
@@ -143,11 +111,7 @@ class AuthApiService {
 }
 
 class AuthLoginResult {
-  const AuthLoginResult({
-    required this.accessToken,
-    required this.tokenType,
-    required this.user,
-  });
+  const AuthLoginResult({required this.accessToken, required this.tokenType, required this.user});
 
   final String accessToken;
   final String tokenType;
