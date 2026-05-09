@@ -265,7 +265,6 @@ class LiveRoomSeatController {
     LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: index);
     if (wasCurrentUserSeat) {
       LiveRoomMediaSignalingService.instance.leaveSeat();
-      LiveRoomMediaSignalingService.instance.setMicEnabled(false);
     }
     onChanged();
   }
@@ -434,7 +433,6 @@ class LiveRoomSeatController {
       micMuted = true;
       selectedSeatIndex = null;
       LiveRoomMediaSignalingService.instance.leaveSeat();
-      LiveRoomMediaSignalingService.instance.setMicEnabled(false);
       onChanged();
       return;
     }
