@@ -25,7 +25,8 @@ class ControlCenterStore {
         coinAuthorityBalance: int.tryParse(json['coin_authority_balance']?.toString() ?? '') ?? 5000000,
         logs: _decodeLogs(json['logs']),
         powerGrants: _decodePowerGrants(json['power_grants']),
-        reviewItems: _defaultReviewItems(),
+        reviewItems: _decodeReviewItems(json['review_items']),
+        roleAssignments: _decodeRoleAssignments(json['role_assignments']),
       );
     } catch (_) {
       return _defaultState();
@@ -43,6 +44,8 @@ class ControlCenterStore {
       'coin_authority_balance': state.coinAuthorityBalance,
       'logs': state.logs.map((log) => log.toJson()).toList(),
       'power_grants': state.powerGrants.map((grant) => grant.toJson()).toList(),
+      'role_assignments': state.roleAssignments.map((role) => role.toJson()).toList(),
+      'review_items': state.reviewItems.map(_reviewToJson).toList(),
     }));
   }
 
@@ -65,7 +68,7 @@ class ControlCenterStore {
       reason: reason,
       createdAt: now,
     );
-    final next = state.copyWith(logs: <ControlLogEntry>[log, ...state.logs].take(80).toList());
+    final next = state.copyWith(logs: <ControlLogEntry>[log, ...state.logs].take(120).toList());
     await save(next);
     return next;
   }
@@ -81,6 +84,7 @@ class ControlCenterStore {
       logs: _defaultLogs(),
       powerGrants: const <PowerGrantEntry>[],
       reviewItems: _defaultReviewItems(),
+      roleAssignments: _defaultRoleAssignments(),
     );
   }
 
@@ -93,12 +97,65 @@ class ControlCenterStore {
     ];
   }
 
+  static List<RoleAssignmentEntry> _defaultRoleAssignments() {
+    final now = DateTime.now();
+    return <RoleAssignmentEntry>[
+      RoleAssignmentEntry(id: 'ROLE-SEED-1', userId: '6418000101', role: 'monitor', assignedByUserId: '6922022', reason: 'Seed monitor team role', isActive: true, createdAt: now.subtract(const Duration(days: 2))),
+      RoleAssignmentEntry(id: 'ROLE-SEED-2', userId: '6418000112', role: 'cs', assignedByUserId: '6922022', reason: 'Seed CS review role', isActive: true, createdAt: now.subtract(const Duration(days: 5))),
+    ];
+  }
+
   static List<ReviewQueueItem> _defaultReviewItems() {
     final now = DateTime.now();
     return <ReviewQueueItem>[
-      ReviewQueueItem(id: 'REV-1001', type: 'custom_theme', title: 'Custom room background review', userId: '6418000091', roomId: 'VM257808', status: 'Pending', createdAt: now.subtract(const Duration(minutes: 34))),
-      ReviewQueueItem(id: 'REV-1002', type: 'report', title: 'Harassment report escalation', userId: '6418000044', roomId: 'VM100204', status: 'Pending', createdAt: now.subtract(const Duration(hours: 3))),
-      ReviewQueueItem(id: 'REV-1003', type: 'dp_review', title: 'Profile photo safety review', userId: '6418000033', roomId: '-', status: 'Pending', createdAt: now.subtract(const Duration(hours: 7))),
+      ReviewQueueItem(
+        id: 'REV-1001',
+        type: 'custom_theme',
+        title: 'Custom room background review',
+        userId: '6418000091',
+        roomId: 'VM257808',
+        status: 'Pending',
+        createdAt: now.subtract(const Duration(minutes: 34)),
+        mappedOfficialRole: 'monitor',
+        mappedOfficialName: 'Asha Monitor',
+        mappedOfficialUserId: '6418000101',
+        mappedAt: now.subtract(const Duration(minutes: 29)),
+        issueDetails: 'User uploaded a dark room background. Need check for watermark, vulgar content, and brand safety before auto-apply.',
+        priority: 'High',
+        evidenceLabel: 'Image upload + room id + submitter id',
+      ),
+      ReviewQueueItem(
+        id: 'REV-1002',
+        type: 'report',
+        title: 'Harassment report escalation',
+        userId: '6418000044',
+        roomId: 'VM100204',
+        status: 'Pending',
+        createdAt: now.subtract(const Duration(hours: 3)),
+        mappedOfficialRole: 'cs',
+        mappedOfficialName: 'CS Kavya',
+        mappedOfficialUserId: '6418000112',
+        mappedAt: now.subtract(const Duration(hours: 2, minutes: 42)),
+        issueDetails: 'Three users reported repeated abusive mic behavior. CS should verify room logs and escalate to Monitor if confirmed.',
+        priority: 'Urgent',
+        evidenceLabel: 'Report bundle + chatroom id + latest room events',
+      ),
+      ReviewQueueItem(
+        id: 'REV-1003',
+        type: 'dp_review',
+        title: 'Profile photo safety review',
+        userId: '6418000033',
+        roomId: '-',
+        status: 'Pending',
+        createdAt: now.subtract(const Duration(hours: 7)),
+        mappedOfficialRole: 'monitor',
+        mappedOfficialName: 'Ravi Monitor',
+        mappedOfficialUserId: '6418000109',
+        mappedAt: now.subtract(const Duration(hours: 6, minutes: 50)),
+        issueDetails: 'Avatar moderation flagged possible vulgar profile image. Verify manually and decide approve/reject/account warning.',
+        priority: 'Medium',
+        evidenceLabel: 'Avatar snapshot + moderation flag',
+      ),
     ];
   }
 
@@ -111,4 +168,48 @@ class ControlCenterStore {
     if (raw is! List) return const <PowerGrantEntry>[];
     return raw.whereType<Map>().map((item) => PowerGrantEntry.fromJson(Map<String, dynamic>.from(item))).toList();
   }
+
+  static List<RoleAssignmentEntry> _decodeRoleAssignments(dynamic raw) {
+    if (raw is! List) return _defaultRoleAssignments();
+    return raw.whereType<Map>().map((item) => RoleAssignmentEntry.fromJson(Map<String, dynamic>.from(item))).toList();
+  }
+
+  static List<ReviewQueueItem> _decodeReviewItems(dynamic raw) {
+    if (raw is! List) return _defaultReviewItems();
+    return raw.whereType<Map>().map((item) => _reviewFromJson(Map<String, dynamic>.from(item))).toList();
+  }
+
+  static Map<String, dynamic> _reviewToJson(ReviewQueueItem item) => <String, dynamic>{
+        'id': item.id,
+        'type': item.type,
+        'title': item.title,
+        'user_id': item.userId,
+        'room_id': item.roomId,
+        'status': item.status,
+        'created_at': item.createdAt.toIso8601String(),
+        'mapped_official_role': item.mappedOfficialRole,
+        'mapped_official_name': item.mappedOfficialName,
+        'mapped_official_user_id': item.mappedOfficialUserId,
+        'mapped_at': item.mappedAt.toIso8601String(),
+        'issue_details': item.issueDetails,
+        'priority': item.priority,
+        'evidence_label': item.evidenceLabel,
+      };
+
+  static ReviewQueueItem _reviewFromJson(Map<String, dynamic> json) => ReviewQueueItem(
+        id: json['id']?.toString() ?? '',
+        type: json['type']?.toString() ?? 'review',
+        title: json['title']?.toString() ?? 'Review task',
+        userId: json['user_id']?.toString() ?? '-',
+        roomId: json['room_id']?.toString() ?? '-',
+        status: json['status']?.toString() ?? 'Pending',
+        createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+        mappedOfficialRole: json['mapped_official_role']?.toString() ?? 'monitor',
+        mappedOfficialName: json['mapped_official_name']?.toString() ?? 'Monitor Team',
+        mappedOfficialUserId: json['mapped_official_user_id']?.toString() ?? '-',
+        mappedAt: DateTime.tryParse(json['mapped_at']?.toString() ?? '') ?? DateTime.now(),
+        issueDetails: json['issue_details']?.toString() ?? 'Review details unavailable.',
+        priority: json['priority']?.toString() ?? 'Normal',
+        evidenceLabel: json['evidence_label']?.toString() ?? 'Evidence pending',
+      );
 }
