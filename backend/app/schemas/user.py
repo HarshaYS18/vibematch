@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.role_badge import RoleBadgeResponse
 
@@ -15,7 +15,7 @@ class UserMeResponse(BaseModel):
     roles: list[str]
     primary_role: str
     primary_role_badge: RoleBadgeResponse | None = None
-    role_badges: list[RoleBadgeResponse] = []
+    role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
     is_active: bool
     is_banned: bool
     last_device_id: str | None = None
