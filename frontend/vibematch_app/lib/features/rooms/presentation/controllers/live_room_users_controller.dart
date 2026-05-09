@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart';
+
+import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 
 class LiveRoomUsersController {
@@ -11,19 +14,40 @@ class LiveRoomUsersController {
   }) {
     final users = <SeatUser>[];
     final ids = <String>{};
+    final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
 
     void addUser(SeatUser user) {
       if (isUserRemoved(user.id)) return;
       if (ids.add(user.id)) users.add(user);
     }
 
+    if (snapshot != null) {
+      for (final peer in snapshot.peers) {
+        final existing = seatedUsers.firstWhereOrNull((user) => user.id == peer.userId);
+        addUser(
+          existing ??
+              SeatUser(
+                id: peer.userId,
+                name: peer.displayName,
+                roleLabel: 'Member',
+                familyName: '',
+                relationshipText: '',
+                vipLevel: 1,
+                sendingLevel: 1,
+                receivingLevel: 1,
+                sentExp: 0,
+                receivedExp: 0,
+                medals: const [],
+                avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+                selfMuted: !peer.micEnabled,
+                adminMuted: peer.adminMuted,
+              ),
+        );
+      }
+      return users;
+    }
+
     for (final user in seatedUsers) {
-      addUser(user);
-    }
-    for (final user in fallbackRoomUsers) {
-      addUser(user);
-    }
-    for (final user in inviteUsers) {
       addUser(user);
     }
 
@@ -88,5 +112,14 @@ class LiveRoomUsersController {
         avatarColors: const [],
       ),
     );
+  }
+}
+
+extension _FirstWhereOrNull<T> on Iterable<T> {
+  T? firstWhereOrNull(bool Function(T item) test) {
+    for (final item in this) {
+      if (test(item)) return item;
+    }
+    return null;
   }
 }
