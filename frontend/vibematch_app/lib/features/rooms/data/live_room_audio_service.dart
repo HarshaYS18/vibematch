@@ -34,6 +34,7 @@ class LiveRoomAudioService {
 
   final Set<String> _pendingProducerIds = <String>{};
   final Set<String> _consumingProducerIds = <String>{};
+  final Set<String> _closingRemoteProducerIds = <String>{};
   final Map<String, RemoteProducerInfo> _producerInfoById = <String, RemoteProducerInfo>{};
   final Map<String, dynamic> _remoteConsumersByProducerId = <String, dynamic>{};
   final Map<String, RTCVideoRenderer> _remoteAudioRenderersByProducerId = <String, RTCVideoRenderer>{};
@@ -136,6 +137,7 @@ class LiveRoomAudioService {
     _device = null;
     _pendingProducerIds.clear();
     _producerInfoById.clear();
+    _closingRemoteProducerIds.clear();
     _closeSendTransport();
     _closeRecvTransport();
     final socket = _socket;
@@ -363,7 +365,7 @@ class LiveRoomAudioService {
       final params = Map<String, dynamic>.from(ack['params'] as Map);
       final transport = device.createRecvTransportFromMap(
         params,
-        consumerCallback: (Consumer consumer) {
+        consumerCallback: (Consumer consumer, dynamic _) {
           _attachRemoteConsumer(consumer);
         },
       );
@@ -417,12 +419,27 @@ class LiveRoomAudioService {
       final audioTracks = stream.getAudioTracks();
       if (audioTracks.isEmpty) throw Exception('No local audio track available');
       final audioTrack = audioTracks.first;
-      transport.produce(
-        source: 'mic',
-        stream: stream,
-        track: audioTrack,
-        appData: <String, dynamic>{'mediaTag': 'mic-audio'},
-      );
+      try {
+        final maybeProducer = await transport.produce(
+          source: 'mic',
+          stream: stream,
+          track: audioTrack,
+          appData: <String, dynamic>{'mediaTag': 'mic-audio'},
+        );
+        if (maybeProducer != null) {
+          _audioProducer = maybeProducer;
+          audioPublishing.value = true;
+          _debug('audio publishing started producer=${maybeProducer.id}');
+        }
+      } catch (error, stackTrace) {
+        final message = error.toString();
+        if (message.contains('Null check operator used on a null value')) {
+          _debug('audio produce initial callback warning ignored; waiting for producer callback');
+          return;
+        }
+        _debug('$error\n$stackTrace');
+        rethrow;
+      }
       _debug('audio produce requested');
     } catch (error) {
       _setError('Audio produce failed: $error');
@@ -566,6 +583,8 @@ class LiveRoomAudioService {
   }
 
   Future<void> _closeRemoteConsumer(String producerId) async {
+    if (_closingRemoteProducerIds.contains(producerId)) return;
+    _closingRemoteProducerIds.add(producerId);
     final consumer = _remoteConsumersByProducerId.remove(producerId);
     final renderer = _remoteAudioRenderersByProducerId.remove(producerId);
     _pendingProducerIds.remove(producerId);
@@ -578,7 +597,10 @@ class LiveRoomAudioService {
       await renderer?.dispose();
     } catch (_) {}
     remoteAudioCount.value = _remoteConsumersByProducerId.length;
-    _debug('remote audio consumer closed producer=$producerId');
+    _closingRemoteProducerIds.remove(producerId);
+    if (consumer != null || renderer != null) {
+      _debug('remote audio consumer closed producer=$producerId');
+    }
   }
 
   Future<void> _closeAllRemoteConsumers() async {
