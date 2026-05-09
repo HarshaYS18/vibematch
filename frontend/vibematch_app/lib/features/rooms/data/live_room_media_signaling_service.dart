@@ -131,6 +131,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   void setAdminMute({required String targetUserId, required bool muted}) {
     if (targetUserId.trim().isEmpty) return;
+    _applyAdminMuteToCurrentSnapshot(targetUserId: targetUserId, muted: muted);
     _send('admin_mute/set', {'target_user_id': targetUserId, 'muted': muted});
   }
 
@@ -278,6 +279,19 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     } catch (error) {
       _debug('media received unreadable message: $raw');
     }
+  }
+
+  void _applyAdminMuteToCurrentSnapshot({required String targetUserId, required bool muted}) {
+    final snapshot = roomSnapshot.value;
+    if (snapshot == null) return;
+    roomSnapshot.value = LiveMediaRoomSnapshot(
+      roomId: snapshot.roomId,
+      peers: snapshot.peers.map((peer) {
+        final matchesUser = peer.userId == targetUserId || peer.peerId == targetUserId;
+        if (!matchesUser) return peer;
+        return peer.copyWith(adminMuted: muted, micEnabled: muted ? false : peer.micEnabled);
+      }).toList(),
+    );
   }
 
   LiveMediaRoomSnapshot? _overlayAdminMute(LiveMediaRoomSnapshot? snapshot, Map<String, dynamic> payload) {
