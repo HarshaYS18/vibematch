@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../auth/models/role_badge.dart';
 import '../models/me_page_models.dart';
 import '../models/public_profile_models.dart';
 import 'me_shared_widgets.dart';
+import 'official_role_badge_pill.dart';
 import 'public_profile_shared_widgets.dart';
 
 class MePremiumProfileHero extends StatefulWidget {
@@ -14,6 +16,7 @@ class MePremiumProfileHero extends StatefulWidget {
     required this.publicId,
     required this.role,
     required this.roleTag,
+    required this.roleBadge,
     required this.vipLevel,
     required this.svipLevel,
     required this.vipFrozen,
@@ -40,6 +43,7 @@ class MePremiumProfileHero extends StatefulWidget {
   final String publicId;
   final String role;
   final String? roleTag;
+  final RoleBadge? roleBadge;
   final int vipLevel;
   final int svipLevel;
   final bool vipFrozen;
@@ -72,7 +76,7 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
 
   bool get _showOfficialTick {
     final normalized = widget.role.toLowerCase().trim();
-    return normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
+    return widget.roleBadge?.showVerifiedTick == true || normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
   }
 
   @override
@@ -102,8 +106,11 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
   }
 
   List<Widget> _badgeLineItems() {
+    final badge = widget.roleBadge;
     return [
-      if (widget.roleTag != null)
+      if (badge != null)
+        OfficialRoleBadgePill(badge: badge)
+      else if (widget.roleTag != null)
         MeProfileMiniBadge(
           label: widget.roleTag!,
           icon: widget.roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
@@ -131,6 +138,7 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
 
   @override
   Widget build(BuildContext context) {
+    final badges = _badgeLineItems();
     return Container(
       decoration: publicProfileWhitePanelDecoration(radius: 34),
       clipBehavior: Clip.antiAlias,
@@ -235,9 +243,9 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        for (var index = 0; index < _badgeLineItems().length; index++) ...[
-                          _badgeLineItems()[index],
-                          if (index != _badgeLineItems().length - 1) const SizedBox(width: 8),
+                        for (var index = 0; index < badges.length; index++) ...[
+                          badges[index],
+                          if (index != badges.length - 1) const SizedBox(width: 8),
                         ],
                       ],
                     ),
