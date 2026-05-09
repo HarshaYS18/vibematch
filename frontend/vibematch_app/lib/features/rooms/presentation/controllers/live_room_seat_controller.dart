@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_audio_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 
@@ -34,6 +35,10 @@ class LiveRoomSeatController {
     seats = buildSeatsForLayout(layoutId);
     _applyLatestMediaSnapshot();
     LiveRoomMediaSignalingService.instance.joinRoom(currentUser: currentUser);
+    final roomId = LiveRoomMediaSignalingService.instance.roomId;
+    if (roomId != null && roomId.trim().isNotEmpty) {
+      LiveRoomAudioService.instance.joinRoom(roomId: roomId, currentUser: currentUser);
+    }
     Future<void>.microtask(_applyLatestMediaSnapshot);
   }
 
@@ -184,6 +189,8 @@ class LiveRoomSeatController {
     selectedSeatIndex = null;
     LiveRoomMediaSignalingService.instance.takeSeat(index);
     LiveRoomMediaSignalingService.instance.setMicEnabled(!micMuted);
+    LiveRoomAudioService.instance.takeSeat(index);
+    LiveRoomAudioService.instance.setSelfMuted(micMuted);
     onChanged();
   }
 
@@ -197,10 +204,6 @@ class LiveRoomSeatController {
       onToast('You cannot invite yourself to a seat');
       return false;
     }
-    final oldIndex = seats.indexWhere((seat) => seat.user?.id == invitedUser.id);
-    final userToMove = oldIndex >= 0 ? seats[oldIndex].user! : invitedUser;
-    if (oldIndex >= 0) seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
-    seats[seatIndex] = seats[seatIndex].copyWith(user: userToMove, locked: false);
     selectedSeatIndex = null;
     onChanged();
     return true;
@@ -235,7 +238,11 @@ class LiveRoomSeatController {
     final applicantToMove = oldIndex >= 0 ? seats[oldIndex].user! : applicant;
     if (oldIndex >= 0) seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
     seats[seatIndex] = seats[seatIndex].copyWith(user: applicantToMove, locked: false);
-    if (applicant.id == currentUser.id) LiveRoomMediaSignalingService.instance.takeSeat(seatIndex);
+    if (applicant.id == currentUser.id) {
+      LiveRoomMediaSignalingService.instance.takeSeat(seatIndex);
+      LiveRoomAudioService.instance.takeSeat(seatIndex);
+      LiveRoomAudioService.instance.setSelfMuted(micMuted);
+    }
     if (messageIndex >= 0) messages[messageIndex] = entry.copyWith(message: '${entry.senderName} joined the mic', applicationApproved: true);
     onChanged();
   }
@@ -268,6 +275,8 @@ class LiveRoomSeatController {
     if (wasCurrentUserSeat) {
       LiveRoomMediaSignalingService.instance.leaveSeat();
       LiveRoomMediaSignalingService.instance.setMicEnabled(false);
+      LiveRoomAudioService.instance.leaveSeat();
+      LiveRoomAudioService.instance.setSelfMuted(true);
     }
     onChanged();
   }
@@ -328,6 +337,7 @@ class LiveRoomSeatController {
       micMuted = true;
       if (index >= 0) seats[index] = seats[index].copyWith(user: localUser!.copyWith(selfMuted: true));
       LiveRoomMediaSignalingService.instance.setMicEnabled(false);
+      LiveRoomAudioService.instance.setSelfMuted(true);
       onToast('You are muted by the room admin');
       onChanged();
       return;
@@ -336,6 +346,7 @@ class LiveRoomSeatController {
     micMuted = !micMuted;
     if (index >= 0) seats[index] = seats[index].copyWith(user: seats[index].user!.copyWith(selfMuted: micMuted));
     LiveRoomMediaSignalingService.instance.setMicEnabled(!micMuted && index >= 0);
+    LiveRoomAudioService.instance.setSelfMuted(micMuted || index < 0);
     onChanged();
   }
 
@@ -347,13 +358,17 @@ class LiveRoomSeatController {
       seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: true));
       micMuted = true;
       LiveRoomMediaSignalingService.instance.setMicEnabled(false);
+      LiveRoomAudioService.instance.setSelfMuted(true);
       onToast('You are muted by the room admin');
       onChanged();
       return;
     }
     final nextMuted = !user.selfMuted;
     seats[index] = seats[index].copyWith(user: user.copyWith(selfMuted: nextMuted));
-    if (userId == currentUser.id) micMuted = nextMuted;
+    if (userId == currentUser.id) {
+      micMuted = nextMuted;
+      LiveRoomAudioService.instance.setSelfMuted(nextMuted);
+    }
     onChanged();
   }
 
@@ -419,7 +434,11 @@ class LiveRoomSeatController {
     } else {
       LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: seatIndex);
     }
-    if (isCurrentUserSeat) LiveRoomMediaSignalingService.instance.leaveSeat();
+    if (isCurrentUserSeat) {
+      LiveRoomMediaSignalingService.instance.leaveSeat();
+      LiveRoomAudioService.instance.leaveSeat();
+      LiveRoomAudioService.instance.setSelfMuted(true);
+    }
     onChanged();
   }
 
