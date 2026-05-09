@@ -3,10 +3,10 @@ import '../live_room_models.dart';
 
 class LiveRoomSeatController {
   LiveRoomSeatController({
-    required this.currentUser,
+    required SeatUser currentUser,
     required this.onChanged,
     required this.onToast,
-  });
+  }) : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser);
 
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
@@ -34,7 +34,19 @@ class LiveRoomSeatController {
     final builtSeats = List<RoomSeat>.generate(spec.totalSeats, (index) => RoomSeat(index: index));
 
     for (var i = 0; i < mockRoomUsers.length && i < builtSeats.length; i++) {
-      builtSeats[i] = RoomSeat(index: i, user: mockRoomUsers[i]);
+      final mockUser = mockRoomUsers[i];
+      if (mockUser.id == 'founder_owner' && currentUser.id != 'founder_owner') {
+        builtSeats[i] = RoomSeat(index: i, user: currentUser);
+      } else if (mockUser.id == currentUser.id) {
+        builtSeats[i] = RoomSeat(index: i, user: currentUser);
+      } else {
+        builtSeats[i] = RoomSeat(index: i, user: mockUser.copyWith(isCurrentUser: false));
+      }
+    }
+
+    final alreadyVisible = builtSeats.any((seat) => seat.user?.id == currentUser.id);
+    if (!alreadyVisible && builtSeats.isNotEmpty) {
+      builtSeats[0] = RoomSeat(index: 0, user: currentUser);
     }
 
     return builtSeats;
