@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
+import '../../rooms/data/live_room_media_signaling_service.dart';
 import '../../rooms/presentation/live_room_page.dart';
 
 class CreatePage extends StatefulWidget {
@@ -144,12 +145,12 @@ class _CreatePageState extends State<CreatePage> {
                       text: 'Enter Room',
                       icon: Icons.login_rounded,
                       onTap: () {
+                        LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(widget.currentUser);
                         Navigator.pop(context);
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => LiveRoomPage(
-                              currentUser: widget.currentUser,
                               roomName: roomName,
                               roomId: roomId,
                               language: _selectedLanguage,
