@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../../core/network/vm_media_config.dart';
+import '../../../main.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
 import 'live_room_audio_service.dart';
@@ -218,20 +219,21 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (_showingRoomBlockDialog) return;
     _showingRoomBlockDialog = true;
 
-    Future<void>.delayed(const Duration(milliseconds: 120), () async {
-      final rootContext = WidgetsBinding.instance.rootElement;
-      if (rootContext == null) {
+    Future<void>.delayed(const Duration(milliseconds: 80), () async {
+      final navigator = rootNavigatorKey.currentState;
+      final navContext = rootNavigatorKey.currentContext;
+      if (navigator == null || navContext == null) {
         _showingRoomBlockDialog = false;
         return;
       }
 
-      final navigator = Navigator.of(rootContext, rootNavigator: true);
-      if (navigator.canPop()) {
+      while (navigator.canPop()) {
         navigator.pop();
+        break;
       }
 
       await Future<void>.delayed(const Duration(milliseconds: 220));
-      final dialogContext = WidgetsBinding.instance.rootElement;
+      final dialogContext = rootNavigatorKey.currentContext;
       if (dialogContext == null) {
         _showingRoomBlockDialog = false;
         return;
@@ -239,6 +241,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
       await showDialog<void>(
         context: dialogContext,
+        useRootNavigator: true,
         barrierDismissible: true,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
@@ -246,7 +249,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
           content: Text(block.displayMessage),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
               child: const Text('OK'),
             ),
           ],
