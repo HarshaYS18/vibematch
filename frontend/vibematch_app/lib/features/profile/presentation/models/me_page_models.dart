@@ -139,6 +139,13 @@ List<MeActionItem> buildMeActionItems({
       action: 'Role-based Control Center will open if permitted.',
     ),
     MeActionItem(
+      icon: VMIcons.wallet,
+      title: 'Merchant & Seller Panel',
+      subtitle: 'Supply pools, seller inventory, gaming pool and economy logs',
+      color: Color(0xFFC99A3B),
+      action: 'merchant_seller_panel',
+    ),
+    MeActionItem(
       icon: VMIcons.refresh,
       title: 'Refresh Profile',
       subtitle: 'Reload current user from backend',
