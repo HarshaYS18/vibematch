@@ -41,10 +41,12 @@ class LiveRoomUsersController {
   List<SeatUser> buildSeatInviteUsers({
     required List<SeatUser> allRoomUsers,
     required List<SeatUser> seatedUsers,
-    required String currentUserId,
+    String currentUserId = '',
   }) {
     final seatedIds = seatedUsers.map((user) => user.id).toSet();
-    return allRoomUsers.where((user) => user.id != currentUserId && !seatedIds.contains(user.id)).toList();
+    return allRoomUsers
+        .where((user) => user.id != currentUserId && !seatedIds.contains(user.id))
+        .toList();
   }
 
   SeatUser resolveUserFromChatEntry({
