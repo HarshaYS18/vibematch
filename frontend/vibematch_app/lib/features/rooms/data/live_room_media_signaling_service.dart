@@ -27,6 +27,9 @@ class LiveRoomMediaSignalingService {
   bool get isJoined => _joined;
   String? get roomId => _roomId;
   String? get peerId => _peerId;
+  SeatUser? get activeLoggedInSeatUser => _activeLoggedInSeatUser;
+
+  SeatUser effectiveCurrentUser(SeatUser fallback) => _activeLoggedInSeatUser ?? fallback;
 
   void configureRoom({required String roomId, required String roomName}) {
     _roomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
@@ -50,9 +53,7 @@ class LiveRoomMediaSignalingService {
       sentExp: 0,
       receivedExp: 0,
       medals: const [],
-      avatarColors: isOfficial
-          ? const [Color(0xFFFFC857), Color(0xFFE84C72)]
-          : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      avatarColors: isOfficial ? const [Color(0xFFFFC857), Color(0xFFE84C72)] : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
       isCurrentUser: true,
       isHost: isOfficial,
       isRoomAdmin: isOfficial,
@@ -61,7 +62,7 @@ class LiveRoomMediaSignalingService {
   }
 
   Future<void> joinRoom({required SeatUser currentUser}) async {
-    final effectiveUser = _activeLoggedInSeatUser ?? currentUser;
+    final effectiveUser = effectiveCurrentUser(currentUser);
     _currentUser = effectiveUser;
     final safeRoomId = _roomId ?? 'VM257808';
 
@@ -137,13 +138,7 @@ class LiveRoomMediaSignalingService {
   Map<String, Object?> _joinPayload(SeatUser user, String safeRoomId) {
     final stablePeerId = '${safeRoomId}_${user.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
     _peerId = stablePeerId;
-    return {
-      'room_id': safeRoomId,
-      'peer_id': stablePeerId,
-      'user_id': user.id,
-      'display_name': user.name,
-      'seat_index': _currentSeatIndexFor(user),
-    };
+    return {'room_id': safeRoomId, 'peer_id': stablePeerId, 'user_id': user.id, 'display_name': user.name, 'seat_index': _currentSeatIndexFor(user)};
   }
 
   int? _currentSeatIndexFor(SeatUser user) => null;
