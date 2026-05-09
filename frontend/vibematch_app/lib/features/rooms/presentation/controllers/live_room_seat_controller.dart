@@ -198,6 +198,7 @@ class LiveRoomSeatController {
     final wasCurrentUserSeat = seats[index].user?.id == currentUser.id;
     seats[index] = seats[index].copyWith(locked: true, clearUser: true);
     selectedSeatIndex = null;
+    LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: index);
     if (wasCurrentUserSeat) {
       LiveRoomMediaSignalingService.instance.leaveSeat();
       LiveRoomMediaSignalingService.instance.setMicEnabled(false);
@@ -209,6 +210,7 @@ class LiveRoomSeatController {
     if (index < 0 || index >= seats.length) return;
     seats[index] = seats[index].copyWith(locked: false);
     selectedSeatIndex = null;
+    LiveRoomMediaSignalingService.instance.unlockSeat(seatIndex: index);
     onChanged();
   }
 
@@ -224,6 +226,7 @@ class LiveRoomSeatController {
     }
     if (!removed) return;
     selectedSeatIndex = null;
+    LiveRoomMediaSignalingService.instance.kickUser(targetUserId: userId);
     if (removedCurrentUser) LiveRoomMediaSignalingService.instance.leaveSeat();
     onChanged();
   }
@@ -277,6 +280,11 @@ class LiveRoomSeatController {
     final isCurrentUserSeat = seatedUser?.id == currentUser.id;
     seats[seatIndex] = RoomSeat(index: seatIndex, locked: !isCurrentUserSeat);
     selectedSeatIndex = null;
+    if (seatedUser != null) {
+      LiveRoomMediaSignalingService.instance.leaveAndLockSeat(seatIndex: seatIndex, targetUserId: seatedUser.id);
+    } else {
+      LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: seatIndex);
+    }
     if (isCurrentUserSeat) LiveRoomMediaSignalingService.instance.leaveSeat();
     onChanged();
   }
@@ -287,6 +295,7 @@ class LiveRoomSeatController {
     if (seatedUser == null) return;
     seats[seatIndex] = RoomSeat(index: seatIndex);
     selectedSeatIndex = null;
+    LiveRoomMediaSignalingService.instance.forceLeaveSeat(seatIndex: seatIndex, targetUserId: seatedUser.id);
     if (seatedUser.id == currentUser.id) LiveRoomMediaSignalingService.instance.leaveSeat();
     onChanged();
   }
