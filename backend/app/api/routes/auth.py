@@ -21,7 +21,8 @@ from app.services.audit_log_service import (
 from app.services.ban_service import is_device_banned
 from app.services.identity_service import generate_public_user_id
 from app.services.login_history_service import create_login_history
-from app.services.role_service import assign_role, get_user_roles
+from app.services.role_badge_service import get_primary_role_badge, get_role_badges
+from app.services.role_service import assign_role, get_primary_role, get_user_roles
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -225,7 +226,9 @@ def dev_login(
     db.commit()
     db.refresh(user)
 
-    roles = [role.value for role in get_user_roles(user)]
+    user_roles = get_user_roles(user)
+    roles = [role.value for role in user_roles]
+    primary_role = get_primary_role(user)
 
     create_login_security_log(
         db=db,
@@ -264,4 +267,7 @@ def dev_login(
         user_id=user.id,
         public_user_id=user.public_user_id,
         roles=roles,
+        primary_role=primary_role.value,
+        primary_role_badge=get_primary_role_badge(primary_role),
+        role_badges=get_role_badges(user_roles),
     )
