@@ -100,6 +100,31 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _send('seat/leave', <String, Object?>{});
   }
 
+  void forceLeaveSeat({required int seatIndex, required String targetUserId}) {
+    if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
+    _send('admin/seat_leave', {'seat_index': seatIndex, 'target_user_id': targetUserId});
+  }
+
+  void lockSeat({required int seatIndex}) {
+    if (seatIndex < 0) return;
+    _send('admin/seat_lock', {'seat_index': seatIndex});
+  }
+
+  void unlockSeat({required int seatIndex}) {
+    if (seatIndex < 0) return;
+    _send('admin/seat_unlock', {'seat_index': seatIndex});
+  }
+
+  void leaveAndLockSeat({required int seatIndex, required String targetUserId}) {
+    if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
+    _send('admin/seat_leave_lock', {'seat_index': seatIndex, 'target_user_id': targetUserId});
+  }
+
+  void kickUser({required String targetUserId, String reason = 'Removed by room admin'}) {
+    if (targetUserId.trim().isEmpty) return;
+    _send('admin/kick', {'target_user_id': targetUserId, 'reason': reason});
+  }
+
   void setMicEnabled(bool enabled) {
     _send('mic/set_enabled', {'enabled': enabled});
   }
