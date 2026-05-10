@@ -6,6 +6,7 @@ from app.api.routes import (
     auth,
     economy,
     economy_admin,
+    games,
     inbox,
     inbox_ws,
     internal_test,
@@ -28,8 +29,11 @@ from app.models import (
     CoinSaleOrder,
     CoinSupplyPool,
     DeviceBan,
+    GameBet,
+    GameDefinition,
     GamePool,
     GamePoolLedger,
+    GameRiskAudit,
     GameRound,
     GameRoundPlayer,
     GiftTransaction,
@@ -95,3 +99,4 @@ app.include_router(mvp_room_modes.router)
 app.include_router(internal_test.router)
 app.include_router(economy.router)
 app.include_router(economy_admin.router)
+app.include_router(games.router)
