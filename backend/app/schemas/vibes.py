@@ -33,6 +33,12 @@ class VibeReportCreateRequest(BaseModel):
     details: str | None = Field(default=None, max_length=2000)
 
 
+class VibeReportReviewRequest(BaseModel):
+    status: str = Field(pattern="^(PENDING|UNDER_REVIEW|ACTION_TAKEN|REJECTED|CLOSED)$")
+    note: str | None = Field(default=None, max_length=2000)
+    delete_post: bool = False
+
+
 class VibeCommentResponse(BaseModel):
     id: int
     post_id: int
@@ -84,6 +90,23 @@ class VibeReportResponse(BaseModel):
     reason: str
     status: str
     created_at: datetime
+
+
+class VibeReportQueueItemResponse(BaseModel):
+    id: int
+    post_id: int
+    reporter: VibeAuthorResponse
+    post_author: VibeAuthorResponse
+    post_caption: str
+    post_media_type: str
+    reason: str
+    details: str | None = None
+    status: str
+    created_at: datetime
+
+
+class VibeReportQueueResponse(BaseModel):
+    reports: list[VibeReportQueueItemResponse]
 
 
 class VibeDeleteResponse(BaseModel):
