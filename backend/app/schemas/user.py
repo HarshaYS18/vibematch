@@ -5,6 +5,23 @@ from pydantic import BaseModel, Field
 from app.schemas.role_badge import RoleBadgeResponse
 
 
+class UserVipSummaryResponse(BaseModel):
+    vip_level: int = 0
+    svip_level: int = 0
+    vip_is_active: bool = True
+    svip_is_active: bool = False
+    svip_expires_at: datetime | None = None
+    name_gradient_key: str = "default"
+    name_gradient_colors: list[str] = Field(default_factory=list)
+
+
+class UserWalletSummaryResponse(BaseModel):
+    coin_balance: int = 0
+    ruby_balance: int = 0
+    lifetime_coins_spent: int = 0
+    lifetime_rubies_earned: int = 0
+
+
 class UserMeResponse(BaseModel):
     id: int
     public_user_id: int
@@ -16,6 +33,8 @@ class UserMeResponse(BaseModel):
     primary_role: str
     primary_role_badge: RoleBadgeResponse | None = None
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
+    vip: UserVipSummaryResponse | None = None
+    wallet: UserWalletSummaryResponse | None = None
     is_active: bool
     is_banned: bool
     last_device_id: str | None = None
@@ -26,3 +45,18 @@ class UserMeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PublicUserProfileResponse(BaseModel):
+    public_user_id: int
+    display_custom_id: int | None = None
+    username: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    primary_role: str
+    primary_role_badge: RoleBadgeResponse | None = None
+    role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
+    vip: UserVipSummaryResponse
+    is_online: bool
+    last_seen_at: datetime | None = None
+    created_at: datetime
