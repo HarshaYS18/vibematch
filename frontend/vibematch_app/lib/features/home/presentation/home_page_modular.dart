@@ -90,12 +90,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openMyRoomOrCreate() async {
-    final existingRoom = _controller.myCreatedRoom;
-    if (existingRoom != null) {
-      _enterRoom(existingRoom);
-      return;
-    }
-
     final currentUser = _activeCurrentUser;
     if (currentUser == null) {
       _toast('Login session not ready. Refresh and try again.');
@@ -104,9 +98,7 @@ class _HomePageState extends State<HomePage> {
 
     await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => CreatePage(currentUser: currentUser)));
     if (!mounted) return;
-    _controller.ensureMockCreatedRoom();
-    final createdRoom = _controller.myCreatedRoom;
-    if (createdRoom != null) _enterRoom(createdRoom);
+    await _controller.refreshAfterRoomCreation();
   }
 
   void _openRoom(HomeRoom room) {
@@ -135,7 +127,7 @@ class _HomePageState extends State<HomePage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => HomeLockedRoomSheet(room: room, onWrongPassword: () => _toast('Wrong password. Use 1234 for mock room.'), onPasswordAccepted: () => _enterRoom(room)),
+      builder: (_) => HomeLockedRoomSheet(room: room, onWrongPassword: () => _toast('Wrong password.'), onPasswordAccepted: () => _enterRoom(room)),
     );
   }
 
@@ -177,7 +169,7 @@ class _HomePageState extends State<HomePage> {
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
-              SliverToBoxAdapter(child: HomeHeaderSection(myCreatedRoom: _controller.myCreatedRoom, onMyRoomTap: _openMyRoomOrCreate, onSearchTap: () => VmNavigator.openSearch(context), onNotificationsTap: () => VmNavigator.openNotifications(context))),
+              SliverToBoxAdapter(child: HomeHeaderSection(myCreatedRoom: null, onMyRoomTap: _openMyRoomOrCreate, onSearchTap: () => VmNavigator.openSearch(context), onNotificationsTap: () => VmNavigator.openNotifications(context))),
               SliverToBoxAdapter(child: HomeBannerSection(banners: _controller.banners, selectedIndex: _controller.selectedBannerIndex, canManageHomeBanners: _canManageHomeBanners, onBannerChanged: _controller.selectBanner, onBannerTap: _handleBannerTap, onManageTap: () => VmNavigator.openBannerManager(context))),
               SliverToBoxAdapter(child: HomeFiltersSection(categories: _controller.categories, selectedCategory: _controller.selectedCategory, selectedLanguage: _controller.selectedLanguage, onCategorySelected: _controller.selectCategory, onLanguageTap: _openLanguageSheet, onSeeAllTap: _seeAllRooms)),
               if (_controller.isLoadingRooms)
