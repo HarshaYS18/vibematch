@@ -23,6 +23,16 @@ class VibeCommentCreateRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)
 
 
+class VibeShareCreateRequest(BaseModel):
+    target_public_user_id: int | None = None
+    share_channel: str = Field(default="inbox", max_length=30)
+
+
+class VibeReportCreateRequest(BaseModel):
+    reason: str = Field(min_length=3, max_length=250)
+    details: str | None = Field(default=None, max_length=2000)
+
+
 class VibeCommentResponse(BaseModel):
     id: int
     post_id: int
@@ -43,6 +53,7 @@ class VibePostResponse(BaseModel):
     likes_count: int
     comments_count: int
     shares_count: int = 0
+    reports_count: int = 0
     views_count: int = 0
     liked_by_me: bool = False
     created_at: datetime
@@ -56,6 +67,23 @@ class VibeLikeResponse(BaseModel):
     post_id: int
     liked_by_me: bool
     likes_count: int
+
+
+class VibeShareResponse(BaseModel):
+    id: int
+    post_id: int
+    share_channel: str
+    target_public_user_id: int | None = None
+    shares_count: int
+    created_at: datetime
+
+
+class VibeReportResponse(BaseModel):
+    id: int
+    post_id: int
+    reason: str
+    status: str
+    created_at: datetime
 
 
 class VibeDeleteResponse(BaseModel):
