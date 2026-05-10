@@ -31,6 +31,7 @@ class GameRiskConfig(BaseModel):
     max_single_bet_low: int = 100_000
     max_single_bet_medium: int = 50_000
     max_single_bet_high: int = 10_000
+    force_min_bet_extreme: int = 400
     cooldown_seconds_high_risk: int = 300
     manual_review_score: int = 90
     block_score: int = 120
@@ -94,7 +95,7 @@ class GameBetRequest(BaseModel):
 
 
 class GameBetResponse(BaseModel):
-    bet_id: int
+    bet_id: int | None = None
     round_id: int
     target_id: int
     requested_amount: int
