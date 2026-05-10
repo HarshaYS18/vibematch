@@ -214,8 +214,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
 
   RoomSeat? get _selectedSeat {
     final index = widget.selectedSeatIndex;
-    final canShowMenu = widget.canManageSeats || widget.applyOnlyModeEnabled;
-    if (index == null || !canShowMenu || index < 0 || index >= widget.seats.length) return null;
+    if (index == null || !widget.canManageSeats || index < 0 || index >= widget.seats.length) return null;
     if (_hiddenMenuSeat == index) return null;
     final seat = widget.seats[index];
     return seat.user == null ? seat : null;
@@ -447,15 +446,11 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
 
   @override
   Widget build(BuildContext context) {
-    final actions = widget.locked
-        ? widget.canManageSeats
-            ? [_MenuAction('Unlock', widget.onUnlock)]
-            : <_MenuAction>[]
-        : widget.applyOnlyModeEnabled && !widget.canManageSeats
-            ? [_MenuAction('Apply', widget.onApply)]
-            : [_MenuAction('Invite', widget.onInvite), _MenuAction('Switch', widget.onSwitch), _MenuAction('Lock', widget.onLock)];
+    if (!widget.canManageSeats) return const SizedBox.shrink();
 
-    if (actions.isEmpty) return const SizedBox.shrink();
+    final actions = widget.locked
+        ? [_MenuAction('Unlock', widget.onUnlock)]
+        : [_MenuAction('Invite', widget.onInvite), _MenuAction('Switch', widget.onSwitch), _MenuAction('Lock', widget.onLock)];
 
     return FadeTransition(
       opacity: _opacity,
