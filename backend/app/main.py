@@ -20,6 +20,7 @@ from app.api.routes import (
     role_badges,
     social,
     users,
+    vip_admin,
 )
 from app.api.routes.rooms import rooms
 from app.database import Base, engine
@@ -54,6 +55,7 @@ from app.models import (
     UserBan,
     UserFollow,
     UserRole,
+    UserVipStatus,
     UserWallet,
     WalletLedger,
 )
@@ -102,3 +104,4 @@ app.include_router(economy.router)
 app.include_router(economy_admin.router)
 app.include_router(games.router)
 app.include_router(coin_sales.router)
+app.include_router(vip_admin.router)
