@@ -153,6 +153,13 @@ List<MeActionItem> buildMeActionItems({
       action: 'coin_supply_grant',
     ),
     MeActionItem(
+      icon: Icons.casino_rounded,
+      title: 'Game Backend Test',
+      subtitle: 'Test catalog, rounds, bets, settle flow and loading overlay',
+      color: Color(0xFF8C5CF6),
+      action: 'game_test',
+    ),
+    MeActionItem(
       icon: VMIcons.wallet,
       title: 'Merchant & Seller Panel',
       subtitle: 'Supply pools, seller inventory, gaming pool and economy logs',
