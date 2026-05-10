@@ -120,6 +120,24 @@ class VibesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> shareVibe(VibeItem vibe, {int? targetPublicUserId}) async {
+    final index = _vibes.indexOf(vibe);
+    if (index < 0) return;
+    if (vibe.id.trim().isEmpty) {
+      _vibes[index] = vibe.copyWith(shares: vibe.shares + 1);
+      notifyListeners();
+      return;
+    }
+    final result = await _apiService.shareVibe(vibe.id, targetPublicUserId: targetPublicUserId);
+    _vibes[index] = vibe.copyWith(shares: result.sharesCount);
+    notifyListeners();
+  }
+
+  Future<void> reportVibe(VibeItem vibe, {required String reason, String? details}) async {
+    if (vibe.id.trim().isEmpty) return;
+    await _apiService.reportVibe(vibe.id, reason: reason, details: details);
+  }
+
   void incrementCommentCount(VibeItem vibe) {
     final index = _vibes.indexOf(vibe);
     if (index < 0) return;
