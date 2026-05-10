@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Founder Owner
     FOUNDER_OWNER_PUBLIC_ID: int = 6922022
 
+    # Google Sign-In OAuth client IDs. Comma-separated for web/android/ios clients.
+    GOOGLE_AUTH_CLIENT_IDS: str = ""
+
     # Google Drive backup OAuth
     GOOGLE_DRIVE_CLIENT_ID: str = ""
     GOOGLE_DRIVE_CLIENT_SECRET: str = ""
