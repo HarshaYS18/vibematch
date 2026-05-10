@@ -218,14 +218,14 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                   _ActionRow(
                     icon: lockStatus.isEnabled ? Icons.lock_rounded : Icons.lock_open_rounded,
                     title: lockStatus.isEnabled ? 'Inbox lock active' : 'Set up Inbox lock',
-                    subtitle: lockStatus.isEnabled ? 'Recovery mobile: ${lockStatus.mobileNumber ?? 'linked'}' : 'Link mobile number, verify OTP, and create a private lock.',
+                    subtitle: lockStatus.isEnabled ? 'Mock OTP recovery is enabled for testing.' : 'Generate a mock OTP, verify it, and create a private lock.',
                     onTap: lockStatus.isEnabled ? _openChangeLock : _openLockSetup,
                   ),
                   const Divider(color: Color(0xFFECE2D8)),
                   _ActionRow(
                     icon: Icons.lock_reset_rounded,
                     title: lockStatus.isEnabled ? 'Recover Inbox lock' : 'Recovery setup',
-                    subtitle: lockStatus.recoveryRequested ? 'Recovery request submitted to CS.' : 'Recover by OTP or contact CS for review.',
+                    subtitle: lockStatus.recoveryRequested ? 'Recovery request submitted to CS.' : 'Recover by mock OTP or contact CS for review.',
                     onTap: _openRecovery,
                   ),
                 ],
