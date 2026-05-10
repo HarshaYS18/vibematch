@@ -1,3 +1,4 @@
+import '../../profile/models/vip_wallet_models.dart';
 import 'role_badge.dart';
 
 class CurrentUser {
@@ -11,6 +12,8 @@ class CurrentUser {
   final String primaryRole;
   final RoleBadge? primaryRoleBadge;
   final List<RoleBadge> roleBadges;
+  final UserVipSummary vip;
+  final UserWalletSummary wallet;
   final bool isActive;
   final bool isBanned;
   final String? lastDeviceId;
@@ -30,6 +33,8 @@ class CurrentUser {
     required this.primaryRole,
     required this.primaryRoleBadge,
     required this.roleBadges,
+    required this.vip,
+    required this.wallet,
     required this.isActive,
     required this.isBanned,
     required this.lastDeviceId,
@@ -62,6 +67,8 @@ class CurrentUser {
       primaryRole: primaryRole,
       primaryRoleBadge: primaryBadgeJson is Map<String, dynamic> ? RoleBadge.fromJson(primaryBadgeJson) : RoleBadge.fromRole(primaryRole),
       roleBadges: parsedRoleBadges.isEmpty ? [RoleBadge.fromRole(primaryRole)] : parsedRoleBadges,
+      vip: UserVipSummary.fromJson(json['vip'] is Map<String, dynamic> ? json['vip'] as Map<String, dynamic> : null),
+      wallet: UserWalletSummary.fromJson(json['wallet'] is Map<String, dynamic> ? json['wallet'] as Map<String, dynamic> : null),
       isActive: _boolFromJson(json, keys: const ['is_active', 'isActive'], fallback: true),
       isBanned: _boolFromJson(json, keys: const ['is_banned', 'isBanned'], fallback: false),
       lastDeviceId: _nullableStringFromJson(json, keys: const ['last_device_id', 'lastDeviceId']),
@@ -86,6 +93,8 @@ class CurrentUser {
       primaryRole: 'founder_owner',
       primaryRoleBadge: badge,
       roleBadges: [badge],
+      vip: const UserVipSummary(vipLevel: 50, svipLevel: 10, vipIsActive: true, svipIsActive: true, svipExpiresAt: null, nameGradientKey: 'svip_10_founder_glow', nameGradientColors: ['#FFD700', '#FFFFFF', '#7F00FF', '#00F5FF']),
+      wallet: const UserWalletSummary.empty(),
       isActive: true,
       isBanned: false,
       lastDeviceId: 'mock-founder-device',
@@ -110,6 +119,8 @@ class CurrentUser {
       primaryRole: 'user',
       primaryRoleBadge: badge,
       roleBadges: [badge],
+      vip: const UserVipSummary.empty(),
+      wallet: const UserWalletSummary.empty(),
       isActive: true,
       isBanned: false,
       lastDeviceId: 'mock-user-device',
@@ -131,6 +142,8 @@ class CurrentUser {
     String? primaryRole,
     RoleBadge? primaryRoleBadge,
     List<RoleBadge>? roleBadges,
+    UserVipSummary? vip,
+    UserWalletSummary? wallet,
     bool? isActive,
     bool? isBanned,
     String? lastDeviceId,
@@ -155,6 +168,8 @@ class CurrentUser {
       primaryRole: primaryRole ?? this.primaryRole,
       primaryRoleBadge: primaryRoleBadge ?? this.primaryRoleBadge,
       roleBadges: roleBadges ?? this.roleBadges,
+      vip: vip ?? this.vip,
+      wallet: wallet ?? this.wallet,
       isActive: isActive ?? this.isActive,
       isBanned: isBanned ?? this.isBanned,
       lastDeviceId: clearLastDeviceId ? null : lastDeviceId ?? this.lastDeviceId,
