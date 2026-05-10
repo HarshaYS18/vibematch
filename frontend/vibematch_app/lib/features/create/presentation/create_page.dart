@@ -107,7 +107,7 @@ class _CreatePageState extends State<CreatePage> {
     try {
       final room = await _roomApiService.createRoom(
         name: roomName,
-        subtitle: '${_selectedLanguage} ${_selectedMode.title} room',
+        subtitle: '$_selectedLanguage ${_selectedMode.title} room',
         language: _selectedLanguage,
         mode: _selectedMode.title,
         type: 'Chat',
