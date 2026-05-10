@@ -105,7 +105,7 @@ class _VibesPageState extends State<VibesPage> {
         completedLabel: 'Sent',
         onInvite: (friend) async {
           try {
-            final publicUserId = int.tryParse(friend.publicUserId);
+            final publicUserId = int.tryParse(friend.id);
             await _controller.shareVibe(vibe, targetPublicUserId: publicUserId);
             if (mounted) _showAction('Vibe sent to ${friend.displayName}');
           } catch (error) {
