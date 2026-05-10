@@ -219,6 +219,18 @@ async def create_direct_conversation(request: InboxDirectConversationRequest, db
     return InboxConversationResponse(**_conversation_payload(conversation, current_user))
 
 
+@router.post("/conversations/direct/public/{public_user_id}", response_model=InboxConversationResponse)
+async def create_direct_conversation_by_public_id(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if public_user_id == current_user.public_user_id:
+        raise HTTPException(status_code=400, detail="Cannot create a direct chat with yourself.")
+    target_user = db.query(User).filter(User.public_user_id == public_user_id).first()
+    if not target_user or not target_user.is_active:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    conversation = inbox_service.create_direct_conversation(db, current_user, target_user)
+    await _broadcast_conversation(conversation)
+    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
+
+
 @router.get("/conversations/{conversation_id}", response_model=InboxConversationResponse)
 def get_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
