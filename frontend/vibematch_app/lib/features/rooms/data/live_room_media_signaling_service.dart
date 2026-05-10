@@ -94,6 +94,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final effectiveUser = effectiveCurrentUser(currentUser);
     _currentUser = effectiveUser;
     _shouldStayConnected = true;
+    roomBlock.value = null;
+    _showingRoomBlockDialog = false;
     await _startForegroundServiceIfNeeded();
     await _joinRoomInternal(reason: 'join requested');
   }
@@ -364,11 +366,27 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       final payload = decoded['payload'];
       _debug('media received: $type $payload');
       if (payload is Map<String, dynamic>) {
+        if (type == 'kick_block/removed' || type == 'kick_block/remove_result') {
+          final removed = payload['removed'] == true;
+          final targetUserId = payload['target_user_id']?.toString();
+          final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
+          if (removed && (targetUserId == null || targetUserId == currentUserId)) {
+            roomBlock.value = null;
+            _showingRoomBlockDialog = false;
+            _debug('cleared local room block after kick block removal');
+          }
+          final roomData = payload['room'];
+          if (roomData is Map<String, dynamic>) {
+            roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
+          }
+          return;
+        }
         if (type == 'room/kicked' || type == 'room/join_blocked') {
           unawaited(_disconnectAfterServerRemoval(block: LiveMediaRoomBlock.fromJson(payload, type: type)));
           return;
         }
         if (type == 'room/joined') {
+          roomBlock.value = null;
           _joinAudioAfterMediaJoin();
         }
         if (type == 'seat_invite/received') {
