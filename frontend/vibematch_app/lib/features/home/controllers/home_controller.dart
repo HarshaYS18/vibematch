@@ -92,19 +92,10 @@ class HomeController extends ChangeNotifier {
 
   bool get usingBackendRooms => _backendRooms.isNotEmpty && !hasNetworkError;
 
-  List<HomeRoom> get publicOpenRooms {
-    return rooms.where((room) => room.isPublicOpen || room.isLocked).toList();
-  }
-
-  List<HomeRoom> get followingExceptionRooms {
-    return rooms.where((room) => room.followedFriendsInside.isNotEmpty && !room.isSecretVibe).toList();
-  }
-
   List<HomeRoom> get filteredRooms {
     if (hasNetworkError) return const [];
 
-    final sourceRooms = selectedCategory == 'Following' ? followingExceptionRooms : publicOpenRooms;
-    final filtered = sourceRooms.where((room) {
+    final filtered = rooms.where((room) {
       final categoryMatch = selectedCategory == 'Trending' || selectedCategory == 'Following' || room.type == selectedCategory;
       final languageMatch = selectedLanguage == 'All' || room.language == selectedLanguage;
       return categoryMatch && languageMatch;
@@ -121,7 +112,7 @@ class HomeController extends ChangeNotifier {
 
   Future<void> refreshAfterRoomCreation() async {
     myCreatedRoom = null;
-    await loadTrendingRooms();
+    await loadRooms();
   }
 
   void ensureMockCreatedRoom() {
@@ -129,7 +120,9 @@ class HomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadTrendingRooms({bool silent = false}) async {
+  Future<void> loadTrendingRooms({bool silent = false}) => loadRooms(silent: silent);
+
+  Future<void> loadRooms({bool silent = false}) async {
     if (isLoadingRooms) return;
 
     isLoadingRooms = true;
@@ -137,19 +130,30 @@ class HomeController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final fetchedRooms = await _repository.fetchTrendingRooms(
-        language: selectedLanguage == 'All' ? null : selectedLanguage,
-        category: selectedCategory == 'Trending' || selectedCategory == 'Following'
-            ? null
-            : selectedCategory,
-        limit: 50,
-      );
+      final categoryForBackend = selectedCategory == 'Trending' || selectedCategory == 'Following'
+          ? null
+          : selectedCategory;
+      final languageForBackend = selectedLanguage == 'All' ? null : selectedLanguage;
+
+      final fetchedRooms = selectedCategory == 'Following'
+          ? await _repository.fetchFollowingRooms(
+              language: languageForBackend,
+              category: categoryForBackend,
+              limit: 50,
+            )
+          : await _repository.fetchTrendingRooms(
+              language: languageForBackend,
+              category: categoryForBackend,
+              limit: 50,
+            );
 
       _backendRooms = fetchedRooms;
       loadErrorMessage = null;
     } catch (_) {
       _backendRooms = const [];
-      loadErrorMessage = 'Network error. Please check your connection and try again.';
+      loadErrorMessage = selectedCategory == 'Following'
+          ? 'Network error. Could not load following rooms. Login again or try later.'
+          : 'Network error. Please check your connection and try again.';
     } finally {
       isLoadingRooms = false;
       visibleRoomCount = 6;
@@ -180,14 +184,14 @@ class HomeController extends ChangeNotifier {
     selectedCategory = category;
     visibleRoomCount = 6;
     notifyListeners();
-    loadTrendingRooms(silent: true);
+    loadRooms(silent: true);
   }
 
   void selectLanguage(String language) {
     selectedLanguage = language;
     visibleRoomCount = 6;
     notifyListeners();
-    loadTrendingRooms(silent: true);
+    loadRooms(silent: true);
   }
 
   void seeAllRooms() {
@@ -196,7 +200,7 @@ class HomeController extends ChangeNotifier {
   }
 
   Future<void> retryLoadingRooms() {
-    return loadTrendingRooms();
+    return loadRooms();
   }
 
   @override
