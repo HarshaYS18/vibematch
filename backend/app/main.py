@@ -16,6 +16,7 @@ from app.api.routes import (
     mvp_room_modes,
     mvp_social,
     role_badges,
+    social,
     users,
 )
 from app.api.routes.rooms import rooms
@@ -46,6 +47,7 @@ from app.models import (
     SpecialPermission,
     User,
     UserBan,
+    UserFollow,
     UserRole,
     UserWallet,
     WalletLedger,
@@ -84,6 +86,7 @@ app.include_router(moderation.router)
 app.include_router(rooms.router)
 app.include_router(inbox.router)
 app.include_router(inbox_ws.router)
+app.include_router(social.router)
 app.include_router(mvp_core.router)
 app.include_router(mvp_social.router)
 app.include_router(mvp_economy.router)
