@@ -119,18 +119,13 @@ class HomeController extends ChangeNotifier {
     return rooms.take(visibleRoomCount.clamp(0, rooms.length)).toList();
   }
 
+  Future<void> refreshAfterRoomCreation() async {
+    myCreatedRoom = null;
+    await loadTrendingRooms();
+  }
+
   void ensureMockCreatedRoom() {
-    myCreatedRoom ??= HomeRoom(
-      id: 'VM${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-      name: 'My Vibe Room',
-      subtitle: 'Your created live room',
-      language: selectedLanguage == 'All' ? 'Telugu' : selectedLanguage,
-      mode: 'Open',
-      type: 'Chat',
-      onlineCount: 1,
-      trendingScore: 0,
-      followedFriendsInside: const [],
-    );
+    myCreatedRoom = null;
     notifyListeners();
   }
 
