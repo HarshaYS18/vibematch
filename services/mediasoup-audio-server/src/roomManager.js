@@ -286,7 +286,15 @@ function cleanupStaleRooms(maxIdleMs = config.roomIdleCleanupMs) {
   let closedCount = 0;
 
   for (const room of Array.from(rooms.values())) {
-    if (room.peers.size === 0 || now - room.lastActivityAt.getTime() > maxIdleMs) {
+    const idleTooLong = now - room.lastActivityAt.getTime() > maxIdleMs;
+    const hasPeers = room.peers.size > 0;
+
+    if (hasPeers && idleTooLong) {
+      console.log(`[cleanup] keeping occupied idle room=${room.id} peers=${room.peers.size} idleMs=${now - room.lastActivityAt.getTime()}`);
+      continue;
+    }
+
+    if (!hasPeers && idleTooLong) {
       if (closeRoom(room.id)) closedCount += 1;
     }
   }
