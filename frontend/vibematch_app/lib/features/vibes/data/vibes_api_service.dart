@@ -50,6 +50,44 @@ class VibesApiService {
     );
   }
 
+  Future<VibeShareResult> shareVibe(String postId, {int? targetPublicUserId, String shareChannel = 'inbox'}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/share')),
+      headers: _authHeaders(contentType: true),
+      body: jsonEncode({
+        'target_public_user_id': targetPublicUserId,
+        'share_channel': shareChannel,
+      }),
+    );
+    _throwIfFailed(response, 'share Vibe');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return VibeShareResult(
+      postId: decoded['post_id']?.toString() ?? postId,
+      sharesCount: _int(decoded['shares_count']),
+      shareChannel: decoded['share_channel']?.toString() ?? shareChannel,
+      targetPublicUserId: _nullableInt(decoded['target_public_user_id']),
+    );
+  }
+
+  Future<VibeReportResult> reportVibe(String postId, {required String reason, String? details}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/report')),
+      headers: _authHeaders(contentType: true),
+      body: jsonEncode({
+        'reason': reason,
+        'details': details,
+      }),
+    );
+    _throwIfFailed(response, 'report Vibe');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return VibeReportResult(
+      postId: decoded['post_id']?.toString() ?? postId,
+      reportId: _int(decoded['id']),
+      reason: decoded['reason']?.toString() ?? reason,
+      status: decoded['status']?.toString() ?? 'PENDING',
+    );
+  }
+
   Future<List<VibeComment>> loadComments(String postId, {int limit = 50}) async {
     final response = await http.get(
       Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')).replace(queryParameters: {'limit': '$limit'}),
@@ -98,6 +136,24 @@ class VibeLikeResult {
   final String postId;
   final bool likedByMe;
   final int likesCount;
+}
+
+class VibeShareResult {
+  const VibeShareResult({required this.postId, required this.sharesCount, required this.shareChannel, required this.targetPublicUserId});
+
+  final String postId;
+  final int sharesCount;
+  final String shareChannel;
+  final int? targetPublicUserId;
+}
+
+class VibeReportResult {
+  const VibeReportResult({required this.postId, required this.reportId, required this.reason, required this.status});
+
+  final String postId;
+  final int reportId;
+  final String reason;
+  final String status;
 }
 
 VibeItem _vibeFromJson(Map<String, dynamic> json) {
@@ -175,4 +231,12 @@ int _int(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+int? _nullableInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
 }
