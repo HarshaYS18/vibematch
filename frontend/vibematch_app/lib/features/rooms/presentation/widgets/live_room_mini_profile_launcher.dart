@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../inbox/data/inbox_api_service.dart';
+import '../../../inbox/presentation/inbox_page_modular.dart';
+import '../../../social/data/social_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/room_moderation_repository.dart';
 import '../controllers/live_room_profile_navigator.dart';
@@ -225,21 +228,47 @@ class LiveRoomMiniProfileLauncher {
     });
   }
 
-  static void _openMessageInfo({
+  static Future<void> _openMessageInfo({
     required BuildContext context,
     required SeatUser user,
-  }) {
+  }) async {
     Navigator.pop(context);
 
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
+    final publicUserId = publicUserIdFromRoomUserId(user.id);
+    if (publicUserId == null) {
+      Future<void>.delayed(const Duration(milliseconds: 80), () {
+        if (!context.mounted) return;
+        LiveRoomProfileNavigator.openModulePage(
+          context: context,
+          title: 'Message ${user.name}',
+          subtitle: 'This user does not have a valid public user ID yet.',
+          icon: Icons.chat_bubble_rounded,
+        );
+      });
+      return;
+    }
+
+    try {
+      final followStatus = await const SocialApiService().getFollowStatusByPublicUserId(publicUserId);
+      await InboxApiService().createDirectConversation(targetUserId: followStatus.targetUser.id);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
       if (!context.mounted) return;
-      LiveRoomProfileNavigator.openModulePage(
+      showModalBottomSheet<void>(
         context: context,
-        title: 'Message ${user.name}',
-        subtitle:
-            'Direct message composer for ${user.name} will open here. Stranger-message and mutual-friend rules will connect to Inbox backend later.',
-        icon: Icons.chat_bubble_rounded,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const InboxPage(openPagesInOverlay: true),
       );
-    });
+    } catch (error) {
+      Future<void>.delayed(const Duration(milliseconds: 80), () {
+        if (!context.mounted) return;
+        LiveRoomProfileNavigator.openModulePage(
+          context: context,
+          title: 'Message ${user.name}',
+          subtitle: error.toString().replaceFirst('Exception: ', ''),
+          icon: Icons.chat_bubble_rounded,
+        );
+      });
+    }
   }
 }
