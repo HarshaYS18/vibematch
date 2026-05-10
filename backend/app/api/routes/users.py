@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserMeResponse
+from app.schemas.user import PublicUserProfileResponse, UserMeResponse
+from app.services import profile_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
 
@@ -49,7 +50,7 @@ def get_current_user(
 
 
 @router.get("/me", response_model=UserMeResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     user_roles = get_user_roles(current_user)
     roles = [role.value for role in user_roles]
     primary_role = get_primary_role(current_user)
@@ -65,6 +66,8 @@ def get_me(current_user: User = Depends(get_current_user)):
         primary_role=primary_role.value,
         primary_role_badge=get_primary_role_badge(primary_role),
         role_badges=get_role_badges(user_roles),
+        vip=profile_service.vip_summary(db, current_user),
+        wallet=profile_service.wallet_summary(db, current_user),
         is_active=current_user.is_active,
         is_banned=current_user.is_banned,
         last_device_id=current_user.last_device_id,
@@ -73,3 +76,8 @@ def get_me(current_user: User = Depends(get_current_user)):
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
     )
+
+
+@router.get("/public/{public_user_id}", response_model=PublicUserProfileResponse)
+def get_public_profile(public_user_id: int, db: Session = Depends(get_db)):
+    return PublicUserProfileResponse(**profile_service.public_profile_payload(db, public_user_id))
