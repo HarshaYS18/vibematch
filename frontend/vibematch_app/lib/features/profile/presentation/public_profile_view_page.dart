@@ -6,6 +6,7 @@ import '../../auth/models/current_user.dart';
 import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
 import '../../vip/presentation/vip_program_page.dart';
+import '../data/profile_api_service.dart';
 import '../data/profile_visitor_repository.dart';
 import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
@@ -25,6 +26,7 @@ class PublicProfileViewPage extends StatefulWidget {
     required this.relationshipLabel,
     required this.familyName,
     required this.familyLevel,
+    this.publicUserId,
   });
 
   final CurrentUser user;
@@ -35,6 +37,7 @@ class PublicProfileViewPage extends StatefulWidget {
   final String relationshipLabel;
   final String familyName;
   final int familyLevel;
+  final int? publicUserId;
 
   @override
   State<PublicProfileViewPage> createState() => _PublicProfileViewPageState();
@@ -44,11 +47,15 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   static const int _vibesCount = 18;
 
   final PageController _coverController = PageController();
+  final ProfileApiService _profileApi = const ProfileApiService();
   Timer? _coverTimer;
   int _coverIndex = 0;
   bool _viewerFollowsProfile = false;
   final bool _profileFollowsViewer = true;
   final bool _isBlocked = false;
+  bool _loadingProfile = false;
+  String? _profileError;
+  PublicUserProfile? _backendProfile;
 
   final List<String> _viewerInterests = const ['Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Live Audio'];
   final List<String> _profileInterests = const ['Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Premium UI', 'Live Audio'];
@@ -58,6 +65,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     super.initState();
     _startCoverAutoScroll();
     _recordProfileVisit();
+    unawaited(_loadBackendProfile());
   }
 
   @override
@@ -65,6 +73,25 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     _coverTimer?.cancel();
     _coverController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBackendProfile() async {
+    final publicUserId = widget.publicUserId ?? widget.user.publicUserId;
+    if (publicUserId <= 0) return;
+    setState(() {
+      _loadingProfile = true;
+      _profileError = null;
+    });
+    try {
+      final profile = await _profileApi.getPublicProfile(publicUserId);
+      if (!mounted) return;
+      setState(() => _backendProfile = profile);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _profileError = error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loadingProfile = false);
+    }
   }
 
   void _recordProfileVisit() {
@@ -147,13 +174,29 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     return PublicFollowStatus.none;
   }
 
-  String _displayName() => widget.user.displayName ?? widget.user.username ?? 'Vibe User';
-  String _username() => widget.user.username ?? 'vibe_user';
-  String _publicId() => widget.user.displayCustomId?.toString() ?? widget.user.publicUserId.toString();
+  String _displayName() => _backendProfile?.visibleName ?? widget.user.displayName ?? widget.user.username ?? 'Vibe User';
+  String _username() => _backendProfile?.username ?? widget.user.username ?? 'vibe_user';
+  String _publicId() => _backendProfile?.visibleId ?? widget.user.displayCustomId?.toString() ?? widget.user.publicUserId.toString();
 
-  bool _showOfficialTick() => widget.user.shouldShowOfficialYellowTick;
+  bool _showOfficialTick() => _backendProfile?.primaryRoleBadge?.showVerifiedTick == true || widget.user.shouldShowOfficialYellowTick;
 
-  String? _roleTag() => widget.user.primaryRoleBadge?.badgeLabel ?? MeProfileConstants.roleTagFor(widget.user.primaryRole);
+  String? _roleTag() => _backendProfile?.primaryRoleBadge?.badgeLabel ?? widget.user.primaryRoleBadge?.badgeLabel ?? MeProfileConstants.roleTagFor(widget.user.primaryRole);
+
+  int _vipLevel() => _backendProfile?.vip.vipLevel ?? widget.vipLevel;
+  int _svipLevel() => _backendProfile?.vip.svipLevel ?? widget.svipLevel;
+  String _presenceLabel() {
+    final profile = _backendProfile;
+    if (profile == null) return widget.presenceLabel;
+    if (profile.isOnline) return 'Online';
+    final lastSeen = profile.lastSeenAt;
+    if (lastSeen == null) return 'Offline';
+    final diff = DateTime.now().difference(lastSeen.toLocal());
+    if (diff.inMinutes < 1) return 'last seen just now';
+    if (diff.inMinutes < 60) return 'last seen ${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return 'last seen ${diff.inHours} hour ago';
+    if (diff.inDays < 30) return 'last seen ${diff.inDays} day ago';
+    return 'last seen a month ago';
+  }
 
   int _matchScore() {
     return calculateProfileMatchScore(
@@ -178,17 +221,21 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
+            if (_loadingProfile)
+              const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 3, color: Color(0xFF12C7B7), backgroundColor: Color(0xFFECE2D8)))
+            else if (_profileError != null)
+              SliverToBoxAdapter(child: _PublicProfileBackendError(message: _profileError!, onRetry: _loadBackendProfile)),
             SliverToBoxAdapter(
               child: PublicProfileHeader(
                 displayName: displayName,
                 username: username,
                 publicId: publicId,
                 roleTag: _roleTag(),
-                roleBadge: widget.user.primaryRoleBadge,
+                roleBadge: _backendProfile?.primaryRoleBadge ?? widget.user.primaryRoleBadge,
                 showOfficialTick: _showOfficialTick(),
-                vipLevel: widget.vipLevel,
-                svipLevel: widget.svipLevel,
-                presenceLabel: widget.presenceLabel,
+                vipLevel: _vipLevel(),
+                svipLevel: _svipLevel(),
+                presenceLabel: _presenceLabel(),
                 currentRoomName: widget.currentRoomName,
                 familyName: widget.familyName,
                 familyLevel: widget.familyLevel,
@@ -259,6 +306,28 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PublicProfileBackendError extends StatelessWidget {
+  const _PublicProfileBackendError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))),
+      child: Row(children: [
+        const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19),
+        const SizedBox(width: 9),
+        Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))),
+        TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900))),
+      ]),
     );
   }
 }
