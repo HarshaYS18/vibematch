@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.models.vibe import VibeComment, VibePost, VibeReaction
+from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeShare
 from app.schemas.vibes import (
     VibeAuthorResponse,
     VibeCommentCreateRequest,
@@ -15,6 +15,10 @@ from app.schemas.vibes import (
     VibeLikeResponse,
     VibePostCreateRequest,
     VibePostResponse,
+    VibeReportCreateRequest,
+    VibeReportResponse,
+    VibeShareCreateRequest,
+    VibeShareResponse,
 )
 
 router = APIRouter(prefix="/vibes", tags=["Vibes"])
@@ -43,12 +47,21 @@ def _author_response(user: User) -> VibeAuthorResponse:
     )
 
 
+def _get_visible_post_or_404(db: Session, post_id: int) -> VibePost:
+    post = db.query(VibePost).filter(VibePost.id == post_id, VibePost.is_deleted.is_(False)).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Vibe not found")
+    return post
+
+
 def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostResponse:
     likes_count = db.query(func.count(VibeReaction.id)).filter(VibeReaction.post_id == post.id).scalar() or 0
     comments_count = db.query(func.count(VibeComment.id)).filter(
         VibeComment.post_id == post.id,
         VibeComment.is_deleted.is_(False),
     ).scalar() or 0
+    shares_count = db.query(func.count(VibeShare.id)).filter(VibeShare.post_id == post.id).scalar() or 0
+    reports_count = db.query(func.count(VibeReport.id)).filter(VibeReport.post_id == post.id).scalar() or 0
     liked_by_me = db.query(VibeReaction.id).filter(
         VibeReaction.post_id == post.id,
         VibeReaction.user_id == current_user.id,
@@ -64,6 +77,8 @@ def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostR
         author=_author_response(post.author),
         likes_count=likes_count,
         comments_count=comments_count,
+        shares_count=shares_count,
+        reports_count=reports_count,
         liked_by_me=liked_by_me,
         created_at=post.created_at,
     )
@@ -106,9 +121,7 @@ def toggle_vibe_like(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    post = db.query(VibePost).filter(VibePost.id == post_id, VibePost.is_deleted.is_(False)).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Vibe not found")
+    _get_visible_post_or_404(db, post_id)
     existing = db.query(VibeReaction).filter(VibeReaction.post_id == post_id, VibeReaction.user_id == current_user.id).first()
     liked_by_me = False
     if existing:
@@ -121,6 +134,63 @@ def toggle_vibe_like(
     return VibeLikeResponse(post_id=post_id, liked_by_me=liked_by_me, likes_count=likes_count)
 
 
+@router.post("/{post_id}/share", response_model=VibeShareResponse)
+def share_vibe(
+    post_id: int,
+    payload: VibeShareCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_visible_post_or_404(db, post_id)
+    target_user: User | None = None
+    if payload.target_public_user_id is not None:
+        target_user = db.query(User).filter(User.public_user_id == payload.target_public_user_id).first()
+        if not target_user:
+            raise HTTPException(status_code=404, detail="Share target user not found")
+    share = VibeShare(
+        post_id=post_id,
+        sender_user_id=current_user.id,
+        target_user_id=target_user.id if target_user else None,
+        target_public_user_id=payload.target_public_user_id,
+        share_channel=payload.share_channel.strip() or "inbox",
+    )
+    db.add(share)
+    db.commit()
+    db.refresh(share)
+    shares_count = db.query(func.count(VibeShare.id)).filter(VibeShare.post_id == post_id).scalar() or 0
+    return VibeShareResponse(
+        id=share.id,
+        post_id=post_id,
+        share_channel=share.share_channel,
+        target_public_user_id=share.target_public_user_id,
+        shares_count=shares_count,
+        created_at=share.created_at,
+    )
+
+
+@router.post("/{post_id}/report", response_model=VibeReportResponse)
+def report_vibe(
+    post_id: int,
+    payload: VibeReportCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = _get_visible_post_or_404(db, post_id)
+    if post.author_user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot report your own Vibe")
+    report = VibeReport(
+        post_id=post_id,
+        reporter_user_id=current_user.id,
+        reason=payload.reason.strip(),
+        details=payload.details.strip() if payload.details else None,
+        status="PENDING",
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    return VibeReportResponse(id=report.id, post_id=post_id, reason=report.reason, status=report.status, created_at=report.created_at)
+
+
 @router.post("/{post_id}/comments", response_model=VibeCommentResponse)
 def add_vibe_comment(
     post_id: int,
@@ -128,9 +198,7 @@ def add_vibe_comment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    post = db.query(VibePost).filter(VibePost.id == post_id, VibePost.is_deleted.is_(False)).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Vibe not found")
+    _get_visible_post_or_404(db, post_id)
     comment = VibeComment(post_id=post_id, user_id=current_user.id, text=payload.text.strip())
     db.add(comment)
     db.commit()
@@ -145,9 +213,7 @@ def list_vibe_comments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    post = db.query(VibePost).filter(VibePost.id == post_id, VibePost.is_deleted.is_(False)).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Vibe not found")
+    _get_visible_post_or_404(db, post_id)
     comments = db.query(VibeComment).filter(VibeComment.post_id == post_id, VibeComment.is_deleted.is_(False)).order_by(VibeComment.created_at.asc()).limit(limit).all()
     return [VibeCommentResponse(id=item.id, post_id=post_id, text=item.text, author=_author_response(item.user), created_at=item.created_at) for item in comments]
 
@@ -158,9 +224,7 @@ def delete_vibe(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    post = db.query(VibePost).filter(VibePost.id == post_id, VibePost.is_deleted.is_(False)).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Vibe not found")
+    post = _get_visible_post_or_404(db, post_id)
     if post.author_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the author can delete this Vibe")
     post.is_deleted = True
