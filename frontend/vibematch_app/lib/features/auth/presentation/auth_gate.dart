@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../app/app_shell.dart';
 import '../data/auth_api_service.dart';
@@ -13,6 +14,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   final AuthApiService _authApiService = AuthApiService();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: const ['email', 'profile']);
 
   bool _isCheckingAuth = true;
   bool _isLoading = false;
@@ -67,8 +69,40 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
+  Future<void> _loginWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await _authApiService.logout();
+      await _googleSignIn.signOut();
+      final account = await _googleSignIn.signIn();
+      if (account == null) {
+        if (mounted) setState(() => _error = 'Google login cancelled.');
+        return;
+      }
+
+      final auth = await account.authentication;
+      final idToken = auth.idToken;
+      if (idToken == null || idToken.trim().isEmpty) {
+        throw Exception('Google did not return an ID token. Check Android/Web OAuth client configuration.');
+      }
+
+      final result = await _authApiService.googleLogin(idToken: idToken);
+      final user = await _authApiService.getCurrentUser(accessToken: result.accessToken, forceRefresh: true);
+      if (mounted) setState(() => _currentUser = user);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _logout() async {
     await _authApiService.logout();
+    await _googleSignIn.signOut();
     if (!mounted) return;
     setState(() {
       _currentUser = null;
@@ -89,11 +123,7 @@ class _AuthGateState extends State<AuthGate> {
           username: 'founder',
           displayName: 'Founder Owner',
         ),
-        onGoogleLoginPressed: () => _loginWithDevAccount(
-          email: 'google.tester@vibematch.dev',
-          username: 'google_tester',
-          displayName: 'Google Tester',
-        ),
+        onGoogleLoginPressed: _loginWithGoogle,
       );
     }
 
@@ -318,18 +348,18 @@ class _GoogleLoginButton extends StatelessWidget {
           height: 66,
           padding: const EdgeInsets.symmetric(horizontal: 22),
           decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.72), borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE9DEE8))),
-          child: const Row(
+          child: Row(
             children: [
-              Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 29, fontWeight: FontWeight.w900)),
-              SizedBox(width: 38),
+              const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 29, fontWeight: FontWeight.w900)),
+              const SizedBox(width: 38),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Login with Google', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xFF5B176A), fontSize: 17, fontWeight: FontWeight.w900)),
-                    SizedBox(height: 3),
-                    Text('Internal test: Normal user', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xFF89798F), fontSize: 11, fontWeight: FontWeight.w800)),
+                    const Text('Login with Google', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xFF5B176A), fontSize: 17, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 3),
+                    Text(isLoading ? 'Signing in...' : 'Real Google sign-in', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF89798F), fontSize: 11, fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -368,7 +398,7 @@ class _OrbitLinePainter extends CustomPainter {
       ..moveTo(size.width * 0.19, size.height * 0.24)
       ..cubicTo(size.width * 0.34, size.height * 0.02, size.width * 0.62, size.height * 0.10, size.width * 0.72, size.height * 0.34)
       ..cubicTo(size.width * 0.86, size.height * 0.66, size.width * 0.48, size.height * 0.76, size.width * 0.33, size.height * 0.58)
-      ..cubicTo(size.width * 0.18, size.height * 0.40, size.width * 0.40, size.height * 0.30, size.width * 0.52, size.height * 0.42);
+      ..cubicTo(size.width * 0.18, size.height * 0.40, size.width * 0.30, size.height * 0.30, size.width * 0.52, size.height * 0.42);
     canvas.drawPath(path, paint);
   }
 
