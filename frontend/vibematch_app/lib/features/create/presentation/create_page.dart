@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
 import '../../rooms/data/live_room_media_signaling_service.dart';
+import '../../rooms/data/room_api_service.dart';
 import '../../rooms/presentation/live_room_page.dart';
 
 class CreatePage extends StatefulWidget {
@@ -15,11 +16,13 @@ class CreatePage extends StatefulWidget {
 
 class _CreatePageState extends State<CreatePage> {
   final TextEditingController _roomNameController = TextEditingController(text: 'Late Night Chill');
+  final RoomApiService _roomApiService = const RoomApiService();
 
   String _selectedLanguage = 'Telugu';
   _RoomMode _selectedMode = _RoomMode.open;
   bool _roomImageSelected = false;
   bool _allowScreenshots = true;
+  bool _creatingRoom = false;
 
   final List<String> _languages = const [
     'Telugu',
@@ -49,11 +52,6 @@ class _CreatePageState extends State<CreatePage> {
   void _toast(String message) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message)));
-  }
-
-  String _generateRoomId() {
-    final now = DateTime.now().millisecondsSinceEpoch.toString();
-    return 'VM${now.substring(now.length - 6)}';
   }
 
   void _openLanguageSheet() {
@@ -97,14 +95,34 @@ class _CreatePageState extends State<CreatePage> {
     );
   }
 
-  void _createRoom() {
+  Future<void> _createRoom() async {
     final roomName = _roomNameController.text.trim();
     if (roomName.isEmpty) {
       _toast('Enter a room name');
       return;
     }
+    if (_creatingRoom) return;
 
-    final roomId = _generateRoomId();
+    setState(() => _creatingRoom = true);
+    try {
+      final room = await _roomApiService.createRoom(
+        name: roomName,
+        subtitle: '${_selectedLanguage} ${_selectedMode.title} room',
+        language: _selectedLanguage,
+        mode: _selectedMode.title,
+        type: 'Chat',
+      );
+      if (!mounted) return;
+      _showRoomReadySheet(room);
+    } catch (error) {
+      if (!mounted) return;
+      _toast(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _creatingRoom = false);
+    }
+  }
+
+  void _showRoomReadySheet(RealRoom room) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -129,11 +147,11 @@ class _CreatePageState extends State<CreatePage> {
               const SizedBox(height: 12),
               const Text('Room Ready', style: TextStyle(color: Color(0xFF251538), fontSize: 21, fontWeight: FontWeight.w900)),
               const SizedBox(height: 5),
-              Text(roomName, textAlign: TextAlign.center, style: TextStyle(color: const Color(0xFF251538).withValues(alpha: 0.72), fontSize: 13, fontWeight: FontWeight.w700)),
+              Text(room.name, textAlign: TextAlign.center, style: TextStyle(color: const Color(0xFF251538).withValues(alpha: 0.72), fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
-              _ReadyInfoRow(label: 'Room ID', value: roomId),
-              _ReadyInfoRow(label: 'Mode', value: _selectedMode.title),
-              _ReadyInfoRow(label: 'Language', value: _selectedLanguage),
+              _ReadyInfoRow(label: 'Room ID', value: room.id),
+              _ReadyInfoRow(label: 'Mode', value: room.mode),
+              _ReadyInfoRow(label: 'Language', value: room.language),
               _ReadyInfoRow(label: 'Screenshots', value: _allowScreenshots ? 'Allowed' : 'Denied'),
               const SizedBox(height: 14),
               Row(
@@ -151,15 +169,15 @@ class _CreatePageState extends State<CreatePage> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => LiveRoomPage(
-                              roomName: roomName,
-                              roomId: roomId,
-                              language: _selectedLanguage,
-                              modeTitle: _selectedMode.title,
-                              onlineCount: 1,
+                              roomName: room.name,
+                              roomId: room.id,
+                              language: room.language,
+                              modeTitle: room.mode,
+                              onlineCount: room.onlineCount,
                             ),
                           ),
                         );
-                        _toast(_allowScreenshots ? 'Screenshots allowed for this mock room' : 'Screenshots denied for this mock room');
+                        _toast(_allowScreenshots ? 'Screenshots allowed for this room' : 'Screenshots denied for this room');
                       },
                     ),
                   ),
@@ -202,7 +220,7 @@ class _CreatePageState extends State<CreatePage> {
                 },
               ),
               const SizedBox(height: 8),
-              _PrimaryButton(text: 'Create Room', icon: Icons.add_circle_rounded, onTap: _createRoom),
+              _PrimaryButton(text: _creatingRoom ? 'Creating...' : 'Create Room', icon: Icons.add_circle_rounded, onTap: _createRoom),
             ],
           ),
         ),
@@ -220,7 +238,7 @@ class _CreatePageState extends State<CreatePage> {
           GestureDetector(
             onTap: () {
               setState(() => _roomImageSelected = !_roomImageSelected);
-              _toast(_roomImageSelected ? 'Mock room image selected' : 'Room image removed');
+              _toast(_roomImageSelected ? 'Room image selected locally' : 'Room image removed');
             },
             child: Container(
               width: 82,
@@ -293,7 +311,7 @@ class _CreatePageState extends State<CreatePage> {
         children: [
           Icon(Icons.security_rounded, color: Color(0xFFC99A3B), size: 19),
           SizedBox(width: 10),
-          Expanded(child: Text('Backend later controls locked access, Secret Vibe privacy, member approval, screenshot rules, image chat, guest messages, audit logs, and room moderation hierarchy.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
+          Expanded(child: Text('Room creation is now saved to backend. Next backend pass will persist room settings, media uploads, image approval, and audit logs.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
         ],
       ),
     );
