@@ -383,7 +383,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
           } else {
             roomSnapshot.value = nextSnapshot;
           }
-          _enforceCurrentUserAdminMuteFromSnapshot(roomSnapshot.value);
+          _enforceCurrentUserAudioStateFromSnapshot(roomSnapshot.value);
         } else if (type == 'admin_mute/updated') {
           roomSnapshot.value = _overlayAdminMute(roomSnapshot.value, payload);
           _enforceAdminMutePayloadIfCurrentUser(payload);
@@ -449,18 +449,32 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     return false;
   }
 
-  void _enforceCurrentUserAdminMuteFromSnapshot(LiveMediaRoomSnapshot? snapshot) {
+  void _enforceCurrentUserAudioStateFromSnapshot(LiveMediaRoomSnapshot? snapshot) {
     if (snapshot == null) return;
     final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
     final currentPeerId = _peerId;
+    if (currentUserId == null && currentPeerId == null) return;
+
+    LiveMediaPeerSnapshot? currentPeer;
     for (final peer in snapshot.peers) {
       final matchesUser = currentUserId != null && peer.userId == currentUserId;
       final matchesPeer = currentPeerId != null && peer.peerId == currentPeerId;
-      if ((matchesUser || matchesPeer) && peer.adminMuted) {
-        _debug('admin mute enforced from room snapshot for current user');
-        LiveRoomAudioService.instance.setSelfMuted(true);
-        return;
+      if (matchesUser || matchesPeer) {
+        currentPeer = peer;
+        break;
       }
+    }
+
+    if (currentPeer == null || currentPeer.seatIndex == null) {
+      _debug('current user is no longer seated; forcing local audio leaveSeat');
+      LiveRoomAudioService.instance.leaveSeat();
+      return;
+    }
+
+    if (currentPeer.adminMuted) {
+      _debug('admin mute enforced from room snapshot for current user');
+      LiveRoomAudioService.instance.setSelfMuted(true);
+      return;
     }
   }
 
