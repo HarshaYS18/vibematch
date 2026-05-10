@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.routes.users import get_current_user
 from app.database import get_db
-from app.schemas.rooms.room import RoomTrendingResponse
+from app.models.user import User
+from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomTrendingResponse
 from app.schemas.rooms.room_kickout import (
     RoomKickoutCreateRequest,
     RoomKickoutResponse,
@@ -12,10 +14,19 @@ from app.services.rooms.room_kickout_service import (
     list_active_room_kickouts,
     remove_room_kickout,
 )
-from app.services.rooms.room_service import list_trending_rooms
+from app.services.rooms.room_service import create_room, get_room_by_public_id, list_trending_rooms
 
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
+
+
+@router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
+def create_live_room(
+    payload: RoomCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return create_room(db=db, current_user=current_user, payload=payload)
 
 
 @router.get("/trending", response_model=list[RoomTrendingResponse])
@@ -31,6 +42,17 @@ def get_trending_rooms(
         category=category,
         limit=limit,
     )
+
+
+@router.get("/{room_public_id}", response_model=RoomDetailResponse)
+def get_room_detail(
+    room_public_id: str,
+    db: Session = Depends(get_db),
+):
+    room = get_room_by_public_id(db=db, room_public_id=room_public_id)
+    if room is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    return room
 
 
 @router.post(
