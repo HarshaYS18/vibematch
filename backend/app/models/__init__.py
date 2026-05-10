@@ -49,3 +49,4 @@ from app.models.economy import (
 )
 from app.models.game import GameBet, GameDefinition, GameRiskAudit
 from app.models.vip_status import UserVipStatus
+from app.models.vibe import VibeComment, VibePost, VibeReaction
