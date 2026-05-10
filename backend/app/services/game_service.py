@@ -33,6 +33,8 @@ DEFAULT_RULES = {
     "min_bet": 100,
     "max_bet": 100_000,
     "max_total_bet_per_round": 300_000,
+    "soft_cap_ignore_after_taps": 2,
+    "soft_cap_loading_message": "Bet syncing",
     "platform_fee_basis_points": 500,
     "targets": DEFAULT_TARGETS,
 }
@@ -292,6 +294,12 @@ def evaluate_risk(db: Session, user: User, requested_amount: int, round_obj: Gam
     return {"level": "LOW", "score": score, "action": "ALLOW", "accepted_amount": accepted, "reasons": reasons}
 
 
+def _ignored_tap_response(db: Session, round_obj: GameRound, user: User, target_id: int, amount: int, wallet: UserWallet, message: str) -> dict[str, Any]:
+    audit(db, round_obj.game_key, round_obj.id, user.id, "BET_TAP_IGNORED", "SOFT_CAP", 0, "TAP_IGNORED_COOLDOWN", message, {"requested_amount": amount, "target_id": target_id}, user.id)
+    db.commit()
+    return {"bet_id": None, "round_id": round_obj.id, "target_id": target_id, "requested_amount": amount, "accepted_amount": 0, "wallet_coin_balance": wallet.coin_balance, "risk_level": "SOFT_CAP", "risk_score": 0, "risk_action": "TAP_IGNORED_COOLDOWN", "message": message}
+
+
 def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: int) -> dict[str, Any]:
     round_obj = db.query(GameRound).filter(GameRound.id == round_id).first()
     if not round_obj:
@@ -312,20 +320,30 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     if amount > int(rules.get("max_bet", 100_000)):
         raise HTTPException(status_code=400, detail="Bet is above game maximum")
 
+    wallet = economy_service.get_or_create_wallet(db, user.id)
     existing_total = db.query(func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id, GameBet.user_id == user.id).scalar()
     round_limit = int(rules.get("max_total_bet_per_round", 300_000))
     remaining_round_limit = round_limit - int(existing_total or 0)
+    ignore_after_taps = int(rules.get("soft_cap_ignore_after_taps", 2))
+    soft_cap_taps = db.query(GameRiskAudit).filter(GameRiskAudit.round_id == round_id, GameRiskAudit.user_id == user.id, GameRiskAudit.event_type == "BET_TAP_IGNORED", GameRiskAudit.created_at >= datetime.utcnow() - timedelta(seconds=3)).count()
     if remaining_round_limit < min_bet:
-        raise HTTPException(status_code=400, detail="Round bet limit reached")
-    risk_input_amount = min(amount, remaining_round_limit)
+        if soft_cap_taps >= ignore_after_taps:
+            return _ignored_tap_response(db, round_obj, user, target_id, amount, wallet, str(rules.get("soft_cap_loading_message", "Bet syncing")))
+        remaining_round_limit = min_bet
+        risk_input_amount = min_bet
+    else:
+        risk_input_amount = min(amount, remaining_round_limit)
 
     risk_result = evaluate_risk(db, user, risk_input_amount, round_obj, risk, min_bet=min_bet)
     accepted_amount = int(risk_result["accepted_amount"])
     accepted_amount = min(accepted_amount, remaining_round_limit, amount)
     if accepted_amount < min_bet:
+        if soft_cap_taps >= ignore_after_taps:
+            return _ignored_tap_response(db, round_obj, user, target_id, amount, wallet, str(rules.get("soft_cap_loading_message", "Bet syncing")))
         accepted_amount = min_bet
+        risk_result["level"] = "SOFT_CAP"
+        risk_result["action"] = "ROUND_SOFT_CAP_LIMIT"
 
-    wallet = economy_service.get_or_create_wallet(db, user.id)
     before = wallet.coin_balance
     if before < accepted_amount:
         raise HTTPException(status_code=400, detail="Insufficient coin balance")
