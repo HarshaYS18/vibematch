@@ -14,7 +14,12 @@ from app.services.rooms.room_kickout_service import (
     list_active_room_kickouts,
     remove_room_kickout,
 )
-from app.services.rooms.room_service import create_room, get_room_by_public_id, list_trending_rooms
+from app.services.rooms.room_service import (
+    create_room,
+    get_room_by_public_id,
+    list_following_rooms,
+    list_trending_rooms,
+)
 
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
@@ -38,6 +43,23 @@ def get_trending_rooms(
 ):
     return list_trending_rooms(
         db=db,
+        language=language,
+        category=category,
+        limit=limit,
+    )
+
+
+@router.get("/following", response_model=list[RoomTrendingResponse])
+def get_following_rooms(
+    language: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    limit: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return list_following_rooms(
+        db=db,
+        current_user=current_user,
         language=language,
         category=category,
         limit=limit,
