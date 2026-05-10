@@ -37,6 +37,12 @@ class MintCoinsRequest(BaseModel):
     reason: str = Field(..., min_length=3, max_length=255)
 
 
+class InternalWalletGrantRequest(BaseModel):
+    target_user_id: int
+    coin_amount: int = Field(..., gt=0, le=100_000_000)
+    reason: str = Field(..., min_length=3, max_length=255)
+
+
 class AllocatePoolCoinsRequest(BaseModel):
     source_pool_id: int
     target_pool_type: str
