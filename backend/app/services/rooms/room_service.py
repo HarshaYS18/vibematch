@@ -1,6 +1,7 @@
 import random
 from sqlalchemy.orm import Session
 
+from app.models.follow import UserFollow
 from app.models.room import Room
 from app.models.user import User
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomTrendingResponse
@@ -18,7 +19,7 @@ def generate_room_public_id(db: Session) -> str:
     raise RuntimeError("Could not generate unique room ID")
 
 
-def room_to_trending_response(room: Room) -> RoomTrendingResponse:
+def room_to_trending_response(room: Room, followed_friends_inside: list[str] | None = None) -> RoomTrendingResponse:
     return RoomTrendingResponse(
         id=room.room_public_id,
         name=room.name,
@@ -28,7 +29,7 @@ def room_to_trending_response(room: Room) -> RoomTrendingResponse:
         type=room.room_type,
         online_count=room.online_count,
         trending_score=room.trending_score,
-        followed_friends_inside=[],
+        followed_friends_inside=followed_friends_inside or [],
     )
 
 
@@ -62,7 +63,7 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
         language=payload.language.strip() or "English",
         mode=mode,
         room_type=room_type,
-        online_count=0,
+        online_count=1,
         trending_score=1,
         is_secret=mode == "Secret Vibe",
         is_locked=mode == "Locked",
@@ -88,9 +89,15 @@ def list_trending_rooms(
     category: str | None = None,
     limit: int = 30,
 ) -> list[RoomTrendingResponse]:
-    """Return real public room cards for Home. No mock fallback."""
+    """Return Home trending rooms. Trending intentionally shows Open rooms only."""
 
-    query = db.query(Room).filter(Room.is_active.is_(True), Room.is_secret.is_(False))
+    query = db.query(Room).filter(
+        Room.is_active.is_(True),
+        Room.is_secret.is_(False),
+        Room.is_locked.is_(False),
+        Room.is_members_only.is_(False),
+        Room.mode == "Open",
+    )
 
     if language and language != "All":
         query = query.filter(Room.language == language)
@@ -105,3 +112,39 @@ def list_trending_rooms(
     )
 
     return [room_to_trending_response(room) for room in rooms]
+
+
+def list_following_rooms(
+    db: Session,
+    current_user: User,
+    language: str | None = None,
+    category: str | None = None,
+    limit: int = 30,
+) -> list[RoomTrendingResponse]:
+    """Return rooms owned by followed users. Secret Vibe rooms are never exposed here."""
+
+    followed_rows = db.query(UserFollow.followed_user_id).filter(UserFollow.follower_user_id == current_user.id).all()
+    followed_ids = [row[0] for row in followed_rows]
+    if not followed_ids:
+        return []
+
+    query = db.query(Room).filter(
+        Room.is_active.is_(True),
+        Room.is_secret.is_(False),
+        Room.owner_user_id.in_(followed_ids),
+    )
+
+    if language and language != "All":
+        query = query.filter(Room.language == language)
+
+    if category and category not in {"All", "Trending", "Following"}:
+        query = query.filter(Room.room_type == category)
+
+    rooms = (
+        query.order_by(Room.online_count.desc(), Room.trending_score.desc(), Room.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    followed_users = {user.id: (user.display_name or user.username or str(user.public_user_id)) for user in db.query(User).filter(User.id.in_(followed_ids)).all()}
+    return [room_to_trending_response(room, [followed_users.get(room.owner_user_id, "Friend")]) for room in rooms]
