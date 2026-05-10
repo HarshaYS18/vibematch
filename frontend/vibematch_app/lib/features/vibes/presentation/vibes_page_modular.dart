@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../social/widgets/friends_invite_sheet.dart';
@@ -24,6 +26,7 @@ class _VibesPageState extends State<VibesPage> {
   void initState() {
     super.initState();
     _controller.addListener(_onControllerChanged);
+    unawaited(_controller.loadFeed());
   }
 
   @override
@@ -74,9 +77,13 @@ class _VibesPageState extends State<VibesPage> {
       MaterialPageRoute(
         builder: (_) => CreateVibePageModular(
           canUseMentionAllToday: _controller.canUseMentionAllToday,
-          onPublish: (newVibe) {
-            _controller.publishVibe(newVibe);
-            _showAction('Vibe published locally. Backend API will connect later.');
+          onPublish: (newVibe) async {
+            try {
+              await _controller.publishVibe(newVibe);
+              if (mounted) _showAction('Vibe published.');
+            } catch (error) {
+              if (mounted) _showAction(error.toString().replaceFirst('Exception: ', ''));
+            }
           },
         ),
       ),
@@ -89,7 +96,13 @@ class _VibesPageState extends State<VibesPage> {
         builder: (_) => VibeDetailPageModular(
           vibe: vibe,
           onCommentAdded: () => _controller.incrementCommentCount(vibe),
-          onDeleteVibe: () => _controller.deleteVibe(vibe),
+          onDeleteVibe: () async {
+            try {
+              await _controller.deleteVibe(vibe);
+            } catch (error) {
+              if (mounted) _showAction(error.toString().replaceFirst('Exception: ', ''));
+            }
+          },
         ),
       ),
     );
@@ -131,6 +144,14 @@ class _VibesPageState extends State<VibesPage> {
     );
   }
 
+  Future<void> _toggleLike(VibeItem vibe) async {
+    try {
+      await _controller.toggleLike(vibe);
+    } catch (error) {
+      if (mounted) _showAction(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleVibes = _controller.visibleVibes;
@@ -138,103 +159,116 @@ class _VibesPageState extends State<VibesPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Vibes',
-                        style: TextStyle(
-                          color: Color(0xFF251538),
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.7,
-                        ),
-                      ),
-                    ),
-                    _RoundIconButton(
-                      icon: Icons.settings_rounded,
-                      onTap: _openSettings,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 44,
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _controller.filters.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 9),
-                  itemBuilder: (context, index) {
-                    final filter = _controller.filters[index];
-                    final selected = filter == _controller.selectedFilter;
-
-                    return InkWell(
-                      onTap: () => _controller.selectFilter(filter),
-                      borderRadius: BorderRadius.circular(99),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(horizontal: 15),
-                        decoration: BoxDecoration(
-                          color: selected ? const Color(0xFF251538) : Colors.white,
-                          borderRadius: BorderRadius.circular(99),
-                          border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF251538).withValues(alpha: selected ? 0.10 : 0.04),
-                              blurRadius: 14,
-                              offset: const Offset(0, 7),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            filter,
-                            style: TextStyle(
-                              color: selected ? Colors.white : const Color(0xFF7A6B86),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
+        child: RefreshIndicator(
+          color: const Color(0xFF251538),
+          onRefresh: () => _controller.loadFeed(),
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Vibes',
+                          style: TextStyle(
+                            color: Color(0xFF251538),
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.7,
                           ),
                         ),
                       ),
-                    );
-                  },
+                      _RoundIconButton(
+                        icon: Icons.refresh_rounded,
+                        onTap: () => _controller.loadFeed(),
+                      ),
+                      const SizedBox(width: 9),
+                      _RoundIconButton(
+                        icon: Icons.settings_rounded,
+                        onTap: _openSettings,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (visibleVibes.isEmpty)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _EmptyVibesState(),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 116),
-                sliver: SliverList.separated(
-                  itemCount: visibleVibes.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 14),
-                  itemBuilder: (context, index) {
-                    final vibe = visibleVibes[index];
-                    return VibeCardModular(
-                      vibe: vibe,
-                      onProfileTap: () => _showAction('${vibe.authorName} profile will open.'),
-                      onLikeTap: () => _controller.toggleLike(vibe),
-                      onCommentTap: () => _openVibeDetail(vibe),
-                      onShareTap: () => _openShareSheet(vibe),
-                      onMoreTap: () => _openVibeActions(vibe),
-                    );
-                  },
+              if (_controller.isLoading)
+                const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 3, color: Color(0xFF12C7B7), backgroundColor: Color(0xFFECE2D8))),
+              if (_controller.loadErrorMessage != null)
+                SliverToBoxAdapter(child: _BackendErrorCard(message: _controller.loadErrorMessage!, onRetry: () => _controller.loadFeed())),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 44,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _controller.filters.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 9),
+                    itemBuilder: (context, index) {
+                      final filter = _controller.filters[index];
+                      final selected = filter == _controller.selectedFilter;
+
+                      return InkWell(
+                        onTap: () => _controller.selectFilter(filter),
+                        borderRadius: BorderRadius.circular(99),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 15),
+                          decoration: BoxDecoration(
+                            color: selected ? const Color(0xFF251538) : Colors.white,
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF251538).withValues(alpha: selected ? 0.10 : 0.04),
+                                blurRadius: 14,
+                                offset: const Offset(0, 7),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              filter,
+                              style: TextStyle(
+                                color: selected ? Colors.white : const Color(0xFF7A6B86),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-          ],
+              if (visibleVibes.isEmpty && !_controller.isLoading)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _EmptyVibesState(),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 116),
+                  sliver: SliverList.separated(
+                    itemCount: visibleVibes.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 14),
+                    itemBuilder: (context, index) {
+                      final vibe = visibleVibes[index];
+                      return VibeCardModular(
+                        vibe: vibe,
+                        onProfileTap: () => _showAction('${vibe.authorName} profile will open.'),
+                        onLikeTap: () => _toggleLike(vibe),
+                        onCommentTap: () => _openVibeDetail(vibe),
+                        onShareTap: () => _openShareSheet(vibe),
+                        onMoreTap: () => _openVibeActions(vibe),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -244,6 +278,28 @@ class _VibesPageState extends State<VibesPage> {
         icon: const Icon(Icons.auto_awesome_rounded),
         label: const Text('Create Vibe', style: TextStyle(fontWeight: FontWeight.w900)),
       ),
+    );
+  }
+}
+
+class _BackendErrorCard extends StatelessWidget {
+  const _BackendErrorCard({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))),
+      child: Row(children: [
+        const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19),
+        const SizedBox(width: 9),
+        Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))),
+        TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900))),
+      ]),
     );
   }
 }
