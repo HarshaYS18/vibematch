@@ -10,6 +10,7 @@ import '../../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/presentation/wallet_page.dart';
 import '../control_center/super_power_panel_page.dart';
+import '../control_center/vip_svip_admin_page.dart';
 import '../cover_photos/edit_cover_photos_page.dart';
 import '../edit_profile_page.dart';
 import '../help_center/help_center_page.dart';
@@ -104,7 +105,7 @@ class MePageContent extends StatelessWidget {
   void _openAccountSettings(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => AccountSettingsPage(svipLevel: MeProfileConstants.svipLevel),
+        builder: (_) => AccountSettingsPage(svipLevel: user.vip.svipLevel),
       ),
     );
   }
@@ -131,6 +132,14 @@ class MePageContent extends StatelessWidget {
         builder: (_) => SuperPowerPanelPage(currentRole: user.primaryRole),
       ),
     );
+  }
+
+  void _openVipSvipAdmin(BuildContext context) {
+    if (!user.canSeeOwnerControls) {
+      _showAction(context, 'Only Owner/Super Owner can adjust VIP/SVIP levels.');
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VipSvipAdminPage()));
   }
 
   void _openMerchantSellerPanel(BuildContext context) {
@@ -175,8 +184,8 @@ class MePageContent extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) => PublicProfileViewPage(
           user: user,
-          vipLevel: MeProfileConstants.vipLevel,
-          svipLevel: MeProfileConstants.svipLevel,
+          vipLevel: user.vip.vipLevel,
+          svipLevel: user.vip.svipLevel,
           presenceLabel: MeProfileConstants.lastSeenText,
           currentRoomName: MeProfileConstants.currentRoomName,
           relationshipLabel: MeProfileConstants.relationshipTypeFor(user),
@@ -192,9 +201,9 @@ class MePageContent extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) => VipProgramPage(
           initialTabIndex: initialTabIndex,
-          vipLevel: MeProfileConstants.vipLevel,
-          svipLevel: MeProfileConstants.svipLevel,
-          lifetimeRechargeCoins: MeProfileConstants.diamonds,
+          vipLevel: user.vip.vipLevel,
+          svipLevel: user.vip.svipLevel,
+          lifetimeRechargeCoins: user.wallet.lifetimeCoinsSpent,
           monthlyRechargeCoins: 42000,
         ),
       ),
@@ -253,12 +262,12 @@ class MePageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vipColor = MeProfileConstants.vipMainColor(MeProfileConstants.vipLevel);
-    final vipDark = MeProfileConstants.vipDarkColor(MeProfileConstants.vipLevel);
+    final vipColor = MeProfileConstants.vipMainColor(user.vip.vipLevel);
+    final vipDark = MeProfileConstants.vipDarkColor(user.vip.vipLevel);
     final relationshipType = MeProfileConstants.relationshipTypeFor(user);
     final items = buildMeActionItems(
-      vipLevel: MeProfileConstants.vipLevel,
-      svipLevel: MeProfileConstants.svipLevel,
+      vipLevel: user.vip.vipLevel,
+      svipLevel: user.vip.svipLevel,
       coverPhotoStatus: MeProfileConstants.coverPhotoStatus,
     );
 
@@ -271,13 +280,13 @@ class MePageContent extends StatelessWidget {
           role: user.primaryRole,
           roleTag: MeProfileConstants.roleTagFor(user.primaryRole),
           roleBadge: user.primaryRoleBadge,
-          vipLevel: MeProfileConstants.vipLevel,
-          svipLevel: MeProfileConstants.svipLevel,
-          vipFrozen: MeProfileConstants.vipFrozen,
+          vipLevel: user.vip.vipLevel,
+          svipLevel: user.vip.svipLevel,
+          vipFrozen: !user.vip.vipIsActive,
           vipColor: vipColor,
           vipDark: vipDark,
-          diamonds: MeProfileConstants.formatNumber(MeProfileConstants.diamonds),
-          coins: MeProfileConstants.formatNumber(MeProfileConstants.coins),
+          diamonds: MeProfileConstants.formatNumber(user.wallet.lifetimeCoinsSpent),
+          coins: MeProfileConstants.formatNumber(user.wallet.coinBalance),
           presence: MeProfileConstants.presence,
           lastSeenText: MeProfileConstants.lastSeenText,
           currentRoomName: MeProfileConstants.currentRoomName,
@@ -307,7 +316,7 @@ class MePageContent extends StatelessWidget {
         const SizedBox(height: 18),
         const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
         const SizedBox(height: 12),
-        ...items.map(
+        ...items.where((item) => item.action != 'vip_svip_admin' || user.canSeeOwnerControls).map(
           (item) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: MeAccountCard(
@@ -315,6 +324,8 @@ class MePageContent extends StatelessWidget {
               onTap: () async {
                 if (item.action == 'edit_profile') {
                   _openEditProfile(context);
+                } else if (item.action == 'vip_svip_admin') {
+                  _openVipSvipAdmin(context);
                 } else if (item.action == 'family' || item.title == 'Family') {
                   _openFamily(context);
                 } else if (item.title == 'VIP / SVIP Center' || item.title == 'VIP / SVIP') {
