@@ -73,6 +73,48 @@ class AuthApiService {
     return AuthLoginResult(accessToken: accessToken, tokenType: tokenType, user: user);
   }
 
+  Future<AuthLoginResult> googleLogin({
+    required String idToken,
+    String? deviceId,
+  }) async {
+    _cachedAccessToken = null;
+    _cachedUser = null;
+
+    final safeToken = idToken.trim();
+    if (safeToken.isEmpty) {
+      throw Exception('Google login failed: missing Google ID token.');
+    }
+
+    final safeDeviceId = deviceId?.trim();
+    final resolvedDeviceId = safeDeviceId == null || safeDeviceId.isEmpty ? await getCurrentDeviceId() : safeDeviceId;
+
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/auth/google-login')),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'id_token': safeToken,
+        'device_id': resolvedDeviceId,
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Google login failed (${response.statusCode}): ${response.body}');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final accessToken = decoded['access_token'] as String?;
+    final tokenType = decoded['token_type'] as String? ?? 'bearer';
+    if (accessToken == null || accessToken.trim().isEmpty) {
+      throw Exception('Google login response did not include access_token.');
+    }
+
+    _cachedAccessToken = accessToken;
+    _cachedDeviceId = resolvedDeviceId;
+    final user = await getCurrentUser(accessToken: accessToken, forceRefresh: true);
+    _cachedUser = user;
+    return AuthLoginResult(accessToken: accessToken, tokenType: tokenType, user: user);
+  }
+
   Future<CurrentUser> getCurrentUser({String? accessToken, bool forceRefresh = false}) async {
     final token = accessToken ?? _cachedAccessToken;
 
