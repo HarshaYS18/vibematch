@@ -16,12 +16,17 @@ from app.schemas.vibes import (
     VibePostCreateRequest,
     VibePostResponse,
     VibeReportCreateRequest,
+    VibeReportQueueItemResponse,
+    VibeReportQueueResponse,
     VibeReportResponse,
+    VibeReportReviewRequest,
     VibeShareCreateRequest,
     VibeShareResponse,
 )
 
 router = APIRouter(prefix="/vibes", tags=["Vibes"])
+
+_REVIEW_ROLES = {"founder_owner", "owner", "superadmin", "admin", "monitor", "cs"}
 
 
 def _mentions_to_csv(mentions: list[str]) -> str | None:
@@ -45,6 +50,15 @@ def _author_response(user: User) -> VibeAuthorResponse:
         display_name=user.display_name,
         avatar_url=user.avatar_url,
     )
+
+
+def _role_names(user: User) -> set[str]:
+    return {role.role_name.value if hasattr(role.role_name, "value") else str(role.role_name) for role in getattr(user, "roles", [])}
+
+
+def _require_report_reviewer(current_user: User) -> None:
+    if not (_role_names(current_user) & _REVIEW_ROLES):
+        raise HTTPException(status_code=403, detail="Vibes report review requires CS/Monitor/Admin/Owner permission")
 
 
 def _get_visible_post_or_404(db: Session, post_id: int) -> VibePost:
@@ -84,6 +98,21 @@ def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostR
     )
 
 
+def _report_queue_item(report: VibeReport) -> VibeReportQueueItemResponse:
+    return VibeReportQueueItemResponse(
+        id=report.id,
+        post_id=report.post_id,
+        reporter=_author_response(report.reporter),
+        post_author=_author_response(report.post.author),
+        post_caption=report.post.caption,
+        post_media_type=report.post.media_type,
+        reason=report.reason,
+        details=report.details,
+        status=report.status,
+        created_at=report.created_at,
+    )
+
+
 @router.get("/feed", response_model=VibeFeedResponse)
 def list_vibes_feed(
     limit: int = Query(default=30, ge=1, le=100),
@@ -92,6 +121,41 @@ def list_vibes_feed(
 ):
     posts = db.query(VibePost).filter(VibePost.is_deleted.is_(False)).order_by(VibePost.created_at.desc()).limit(limit).all()
     return VibeFeedResponse(posts=[_post_response(db, post, current_user) for post in posts])
+
+
+@router.get("/reports", response_model=VibeReportQueueResponse)
+def list_vibe_reports(
+    status: str | None = Query(default="PENDING"),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_report_reviewer(current_user)
+    query = db.query(VibeReport).join(VibePost, VibeReport.post_id == VibePost.id)
+    if status and status.upper() != "ALL":
+        query = query.filter(VibeReport.status == status.upper())
+    reports = query.order_by(VibeReport.created_at.desc()).limit(limit).all()
+    return VibeReportQueueResponse(reports=[_report_queue_item(report) for report in reports])
+
+
+@router.post("/reports/{report_id}/review", response_model=VibeReportResponse)
+def review_vibe_report(
+    report_id: int,
+    payload: VibeReportReviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_report_reviewer(current_user)
+    report = db.query(VibeReport).filter(VibeReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Vibe report not found")
+    report.status = payload.status
+    if payload.delete_post:
+        report.post.is_deleted = True
+        report.status = "ACTION_TAKEN"
+    db.commit()
+    db.refresh(report)
+    return VibeReportResponse(id=report.id, post_id=report.post_id, reason=report.reason, status=report.status, created_at=report.created_at)
 
 
 @router.post("", response_model=VibePostResponse)
