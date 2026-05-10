@@ -139,6 +139,13 @@ List<MeActionItem> buildMeActionItems({
       action: 'Role-based Control Center will open if permitted.',
     ),
     MeActionItem(
+      icon: Icons.workspace_premium_rounded,
+      title: 'VIP / SVIP Admin',
+      subtitle: 'Owner control: adjust user VIP/SVIP levels and gradient names',
+      color: Color(0xFF8C5CF6),
+      action: 'vip_svip_admin',
+    ),
+    MeActionItem(
       icon: VMIcons.wallet,
       title: 'Merchant & Seller Panel',
       subtitle: 'Supply pools, seller inventory, gaming pool and economy logs',
