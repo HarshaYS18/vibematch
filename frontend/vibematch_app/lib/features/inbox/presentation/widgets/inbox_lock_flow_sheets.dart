@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+const String kMockInboxLockMobile = 'mock-inbox-lock-user';
+
 class InboxLockSetupSheet extends StatefulWidget {
   const InboxLockSetupSheet({
     super.key,
@@ -15,7 +17,6 @@ class InboxLockSetupSheet extends StatefulWidget {
 }
 
 class _InboxLockSetupSheetState extends State<InboxLockSetupSheet> {
-  final _mobile = TextEditingController();
   final _otp = TextEditingController();
   final _lock = TextEditingController();
   final _confirm = TextEditingController();
@@ -25,7 +26,6 @@ class _InboxLockSetupSheetState extends State<InboxLockSetupSheet> {
 
   @override
   void dispose() {
-    _mobile.dispose();
     _otp.dispose();
     _lock.dispose();
     _confirm.dispose();
@@ -33,20 +33,16 @@ class _InboxLockSetupSheetState extends State<InboxLockSetupSheet> {
   }
 
   Future<void> _sendOtp() async {
-    if (_mobile.text.trim().length < 8) {
-      _toast('Enter a valid mobile number.');
-      return;
-    }
     setState(() => _busy = true);
     try {
-      final otp = await widget.onStartOtp(_mobile.text.trim());
+      final otp = await widget.onStartOtp(kMockInboxLockMobile);
       setState(() {
         _otpSent = true;
         _debugOtp = otp;
       });
-      _toast(otp == null ? 'OTP sent to your mobile number.' : 'OTP sent. Dev OTP: $otp');
-    } catch (error) {
-      _toast('Could not send OTP. Please try again.');
+      _toast(otp == null ? 'Mock OTP generated for Inbox lock.' : 'Mock OTP generated: $otp');
+    } catch (_) {
+      _toast('Could not generate mock OTP. Please try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -54,7 +50,7 @@ class _InboxLockSetupSheetState extends State<InboxLockSetupSheet> {
 
   Future<void> _confirmSetup() async {
     if (_otp.text.trim().isEmpty) {
-      _toast('Enter the OTP.');
+      _toast('Enter the mock OTP.');
       return;
     }
     if (_lock.text.trim().length < 4) {
@@ -67,11 +63,11 @@ class _InboxLockSetupSheetState extends State<InboxLockSetupSheet> {
     }
     setState(() => _busy = true);
     try {
-      await widget.onVerifySetup(_mobile.text.trim(), _otp.text.trim(), _lock.text.trim());
+      await widget.onVerifySetup(kMockInboxLockMobile, _otp.text.trim(), _lock.text.trim());
       if (mounted) Navigator.pop(context);
       _toast('Inbox lock setup completed.');
-    } catch (error) {
-      _toast('Setup failed. Check OTP and try again.');
+    } catch (_) {
+      _toast('Setup failed. Check mock OTP and try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -87,24 +83,24 @@ class _InboxLockSetupSheetState extends State<InboxLockSetupSheet> {
   Widget build(BuildContext context) {
     return _LockSheetScaffold(
       title: 'Set up Inbox Lock',
-      subtitle: 'Link your mobile number, verify OTP, then create your private chat lock.',
+      subtitle: 'Use a mock OTP for testing, then create your private chat lock. No mobile number is required.',
       child: Column(
         children: [
-          _LockField(controller: _mobile, label: 'Mobile number', icon: Icons.phone_rounded, keyboardType: TextInputType.phone, enabled: !_otpSent),
+          const _MockOtpInfoCard(),
           if (_otpSent) ...[
             const SizedBox(height: 10),
-            _LockField(controller: _otp, label: 'OTP', icon: Icons.sms_rounded, keyboardType: TextInputType.number),
+            _LockField(controller: _otp, label: 'Mock OTP', icon: Icons.sms_rounded, keyboardType: TextInputType.number),
             const SizedBox(height: 10),
             _LockField(controller: _lock, label: 'New lock', icon: Icons.lock_rounded, keyboardType: TextInputType.number, obscureText: true),
             const SizedBox(height: 10),
             _LockField(controller: _confirm, label: 'Re-enter new lock', icon: Icons.verified_user_rounded, keyboardType: TextInputType.number, obscureText: true),
             if (_debugOtp != null) ...[
               const SizedBox(height: 8),
-              Text('Dev OTP: $_debugOtp', style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11, fontWeight: FontWeight.w900)),
+              Text('Mock OTP: $_debugOtp', style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11, fontWeight: FontWeight.w900)),
             ],
           ],
           const SizedBox(height: 14),
-          _PrimaryLockButton(label: _otpSent ? 'Confirm setup' : 'Send OTP', busy: _busy, onTap: _otpSent ? _confirmSetup : _sendOtp),
+          _PrimaryLockButton(label: _otpSent ? 'Confirm setup' : 'Generate mock OTP', busy: _busy, onTap: _otpSent ? _confirmSetup : _sendOtp),
         ],
       ),
     );
@@ -167,7 +163,7 @@ class _InboxLockVerifySheetState extends State<InboxLockVerifySheet> {
           _LockField(controller: _lock, label: 'Inbox lock', icon: Icons.lock_rounded, keyboardType: TextInputType.number, obscureText: true),
           const SizedBox(height: 12),
           _PrimaryLockButton(label: 'Unlock', busy: _busy, onTap: _verify),
-          TextButton(onPressed: widget.onRecoverTap, child: const Text('Recover lock', style: TextStyle(fontWeight: FontWeight.w900))),
+          TextButton(onPressed: widget.onRecoverTap, child: const Text('Recover lock with mock OTP', style: TextStyle(fontWeight: FontWeight.w900))),
         ],
       ),
     );
@@ -270,7 +266,6 @@ class InboxLockRecoverySheet extends StatefulWidget {
 }
 
 class _InboxLockRecoverySheetState extends State<InboxLockRecoverySheet> {
-  final _mobile = TextEditingController();
   final _otp = TextEditingController();
   final _newLock = TextEditingController();
   final _confirm = TextEditingController();
@@ -279,14 +274,7 @@ class _InboxLockRecoverySheetState extends State<InboxLockRecoverySheet> {
   String? _debugOtp;
 
   @override
-  void initState() {
-    super.initState();
-    _mobile.text = widget.registeredMobile ?? '';
-  }
-
-  @override
   void dispose() {
-    _mobile.dispose();
     _otp.dispose();
     _newLock.dispose();
     _confirm.dispose();
@@ -296,20 +284,24 @@ class _InboxLockRecoverySheetState extends State<InboxLockRecoverySheet> {
   Future<void> _sendOtp() async {
     setState(() => _busy = true);
     try {
-      final otp = await widget.onStartRecovery(_mobile.text.trim());
+      final otp = await widget.onStartRecovery(widget.registeredMobile?.trim().isNotEmpty == true ? widget.registeredMobile!.trim() : kMockInboxLockMobile);
       setState(() {
         _otpSent = true;
         _debugOtp = otp;
       });
-      _toast(otp == null ? 'Recovery OTP sent.' : 'Recovery OTP sent. Dev OTP: $otp');
+      _toast(otp == null ? 'Mock recovery OTP generated.' : 'Mock recovery OTP: $otp');
     } catch (_) {
-      _toast('Mobile number did not match or OTP failed.');
+      _toast('Could not generate recovery OTP.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _recover() async {
+    if (_otp.text.trim().isEmpty) {
+      _toast('Enter the mock OTP.');
+      return;
+    }
     if (_newLock.text.trim().length < 4) {
       _toast('New lock must be at least 4 digits.');
       return;
@@ -320,11 +312,11 @@ class _InboxLockRecoverySheetState extends State<InboxLockRecoverySheet> {
     }
     setState(() => _busy = true);
     try {
-      await widget.onVerifyRecovery(_mobile.text.trim(), _otp.text.trim(), _newLock.text.trim());
+      await widget.onVerifyRecovery(widget.registeredMobile?.trim().isNotEmpty == true ? widget.registeredMobile!.trim() : kMockInboxLockMobile, _otp.text.trim(), _newLock.text.trim());
       if (mounted) Navigator.pop(context);
       _toast('Inbox lock recovered.');
     } catch (_) {
-      _toast('Recovery failed. Check OTP.');
+      _toast('Recovery failed. Check mock OTP.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -353,25 +345,46 @@ class _InboxLockRecoverySheetState extends State<InboxLockRecoverySheet> {
   Widget build(BuildContext context) {
     return _LockSheetScaffold(
       title: 'Recover Inbox Lock',
-      subtitle: 'Confirm your identity using OTP sent to the registered mobile number. If unavailable, contact CS.',
+      subtitle: 'Use a mock recovery OTP to reset your Inbox lock. No mobile number is required for testing.',
       child: Column(
         children: [
-          _LockField(controller: _mobile, label: 'Registered mobile number', icon: Icons.phone_rounded, keyboardType: TextInputType.phone, enabled: !_otpSent),
+          const _MockOtpInfoCard(),
           if (_otpSent) ...[
             const SizedBox(height: 10),
-            _LockField(controller: _otp, label: 'Recovery OTP', icon: Icons.sms_rounded, keyboardType: TextInputType.number),
+            _LockField(controller: _otp, label: 'Recovery mock OTP', icon: Icons.sms_rounded, keyboardType: TextInputType.number),
             const SizedBox(height: 10),
             _LockField(controller: _newLock, label: 'New lock', icon: Icons.lock_reset_rounded, keyboardType: TextInputType.number, obscureText: true),
             const SizedBox(height: 10),
             _LockField(controller: _confirm, label: 'Re-enter new lock', icon: Icons.verified_rounded, keyboardType: TextInputType.number, obscureText: true),
             if (_debugOtp != null) ...[
               const SizedBox(height: 8),
-              Text('Dev OTP: $_debugOtp', style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11, fontWeight: FontWeight.w900)),
+              Text('Mock OTP: $_debugOtp', style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11, fontWeight: FontWeight.w900)),
             ],
           ],
           const SizedBox(height: 14),
-          _PrimaryLockButton(label: _otpSent ? 'Recover lock' : 'Send recovery OTP', busy: _busy, onTap: _otpSent ? _recover : _sendOtp),
+          _PrimaryLockButton(label: _otpSent ? 'Recover lock' : 'Generate recovery OTP', busy: _busy, onTap: _otpSent ? _recover : _sendOtp),
           TextButton(onPressed: _busy ? null : _requestCs, child: const Text('Contact CS for recovery', style: TextStyle(fontWeight: FontWeight.w900))),
+        ],
+      ),
+    );
+  }
+}
+
+class _MockOtpInfoCard extends StatelessWidget {
+  const _MockOtpInfoCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFFFFF7E8), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.science_rounded, color: Color(0xFFC99A3B), size: 19),
+          SizedBox(width: 9),
+          Expanded(child: Text('Testing mode: OTP is generated inside the app/backend response. Mobile-number setup is removed.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.7, height: 1.3, fontWeight: FontWeight.w800))),
         ],
       ),
     );
