@@ -9,6 +9,7 @@ import '../../../rooms/presentation/live_room_page.dart';
 import '../../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/presentation/wallet_page.dart';
+import '../control_center/coin_supply_grant_page.dart';
 import '../control_center/super_power_panel_page.dart';
 import '../control_center/vip_svip_admin_page.dart';
 import '../cover_photos/edit_cover_photos_page.dart';
@@ -140,6 +141,14 @@ class MePageContent extends StatelessWidget {
       return;
     }
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VipSvipAdminPage()));
+  }
+
+  void _openCoinSupplyGrant(BuildContext context) {
+    if (!user.canSeeOwnerControls) {
+      _showAction(context, 'Only Owner/Super Owner can grant coin supply.');
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage()));
   }
 
   void _openMerchantSellerPanel(BuildContext context) {
@@ -316,7 +325,10 @@ class MePageContent extends StatelessWidget {
         const SizedBox(height: 18),
         const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
         const SizedBox(height: 12),
-        ...items.where((item) => item.action != 'vip_svip_admin' || user.canSeeOwnerControls).map(
+        ...items.where((item) {
+          if (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant') return user.canSeeOwnerControls;
+          return true;
+        }).map(
           (item) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: MeAccountCard(
@@ -326,6 +338,8 @@ class MePageContent extends StatelessWidget {
                   _openEditProfile(context);
                 } else if (item.action == 'vip_svip_admin') {
                   _openVipSvipAdmin(context);
+                } else if (item.action == 'coin_supply_grant') {
+                  _openCoinSupplyGrant(context);
                 } else if (item.action == 'family' || item.title == 'Family') {
                   _openFamily(context);
                 } else if (item.title == 'VIP / SVIP Center' || item.title == 'VIP / SVIP') {
