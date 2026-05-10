@@ -4,6 +4,7 @@ import '../../../auth/models/current_user.dart';
 import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
+import '../../../games/presentation/game_test_page.dart';
 import '../../../rooms/presentation/live_room_models.dart';
 import '../../../rooms/presentation/live_room_page.dart';
 import '../../../rooms/presentation/widgets/followers_followed_page.dart';
@@ -149,6 +150,10 @@ class MePageContent extends StatelessWidget {
       return;
     }
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage()));
+  }
+
+  void _openGameTest(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GameTestPage()));
   }
 
   void _openMerchantSellerPanel(BuildContext context) {
@@ -340,6 +345,8 @@ class MePageContent extends StatelessWidget {
                   _openVipSvipAdmin(context);
                 } else if (item.action == 'coin_supply_grant') {
                   _openCoinSupplyGrant(context);
+                } else if (item.action == 'game_test') {
+                  _openGameTest(context);
                 } else if (item.action == 'family' || item.title == 'Family') {
                   _openFamily(context);
                 } else if (item.title == 'VIP / SVIP Center' || item.title == 'VIP / SVIP') {
