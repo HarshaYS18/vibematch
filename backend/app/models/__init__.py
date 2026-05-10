@@ -47,3 +47,4 @@ from app.models.economy import (
     UserWallet,
     WalletLedger,
 )
+from app.models.game import GameBet, GameDefinition, GameRiskAudit
