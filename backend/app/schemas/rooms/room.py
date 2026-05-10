@@ -1,6 +1,14 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class RoomCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    subtitle: str | None = Field(default=None, max_length=240)
+    language: str = Field(default="English", max_length=40)
+    mode: str = Field(default="Open", max_length=40)
+    type: str = Field(default="Chat", max_length=40)
+
+
 class RoomTrendingResponse(BaseModel):
     id: str = Field(..., description="Human-readable public room ID, for example VM120451.")
     name: str
