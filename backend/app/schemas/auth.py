@@ -10,6 +10,11 @@ class DevLoginRequest(BaseModel):
     device_id: str | None = None
 
 
+class GoogleLoginRequest(BaseModel):
+    id_token: str = Field(..., min_length=20)
+    device_id: str | None = None
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
