@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import (
     admin,
     auth,
+    coin_sales,
     economy,
     economy_admin,
     games,
@@ -100,3 +101,4 @@ app.include_router(internal_test.router)
 app.include_router(economy.router)
 app.include_router(economy_admin.router)
 app.include_router(games.router)
+app.include_router(coin_sales.router)
