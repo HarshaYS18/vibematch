@@ -60,6 +60,8 @@ from app.models import (
     VibeComment,
     VibePost,
     VibeReaction,
+    VibeReport,
+    VibeShare,
     WalletLedger,
 )
 
