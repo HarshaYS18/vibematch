@@ -146,6 +146,13 @@ List<MeActionItem> buildMeActionItems({
       action: 'vip_svip_admin',
     ),
     MeActionItem(
+      icon: Icons.account_balance_rounded,
+      title: 'Grant Coin Supply',
+      subtitle: 'Owner control: grant seller/merchant supply pool coins',
+      color: Color(0xFF12C7B7),
+      action: 'coin_supply_grant',
+    ),
+    MeActionItem(
       icon: VMIcons.wallet,
       title: 'Merchant & Seller Panel',
       subtitle: 'Supply pools, seller inventory, gaming pool and economy logs',
