@@ -154,7 +154,7 @@ class _VipSvipAdminPageState extends State<VipSvipAdminPage> {
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   value: _vipActive,
-                  activeColor: const Color(0xFF12C7B7),
+                  activeThumbColor: const Color(0xFF12C7B7),
                   onChanged: (value) => setState(() => _vipActive = value),
                   title: const Text('VIP active', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
                   subtitle: const Text('Disable only for frozen/review cases.', style: TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)),
@@ -187,7 +187,7 @@ class _VipSvipAdminPageState extends State<VipSvipAdminPage> {
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   value: _svipActive,
-                  activeColor: const Color(0xFF8C5CF6),
+                  activeThumbColor: const Color(0xFF8C5CF6),
                   onChanged: (value) => setState(() => _svipActive = value),
                   title: const Text('SVIP active', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
                   subtitle: const Text('Active SVIP unlocks gradient floating name effect.', style: TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)),
@@ -296,7 +296,7 @@ class _Dropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<T>(
-        value: value,
+        initialValue: value,
         items: values.map((item) => DropdownMenuItem<T>(value: item, child: Text(text(item), style: const TextStyle(fontWeight: FontWeight.w800)))).toList(),
         onChanged: (next) {
           if (next != null) onChanged(next);
