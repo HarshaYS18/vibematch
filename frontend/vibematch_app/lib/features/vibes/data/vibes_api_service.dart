@@ -50,6 +50,26 @@ class VibesApiService {
     );
   }
 
+  Future<List<VibeComment>> loadComments(String postId, {int limit = 50}) async {
+    final response = await http.get(
+      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')).replace(queryParameters: {'limit': '$limit'}),
+      headers: _authHeaders(),
+    );
+    _throwIfFailed(response, 'load Vibe comments');
+    final decoded = jsonDecode(response.body) as List<dynamic>;
+    return decoded.whereType<Map<String, dynamic>>().map(_commentFromJson).toList(growable: false);
+  }
+
+  Future<VibeComment> addComment(String postId, String text) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')),
+      headers: _authHeaders(contentType: true),
+      body: jsonEncode({'text': text.trim()}),
+    );
+    _throwIfFailed(response, 'add Vibe comment');
+    return _commentFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<void> deleteVibe(String postId) async {
     final response = await http.delete(Uri.parse(VmApiConfig.endpoint('/vibes/$postId')), headers: _authHeaders());
     _throwIfFailed(response, 'delete Vibe');
@@ -104,6 +124,17 @@ VibeItem _vibeFromJson(Map<String, dynamic> json) {
     mentions: mentionsRaw is List ? mentionsRaw.map((item) => item.toString()).toList(growable: false) : const <String>[],
     colors: mediaType.colors,
     likedByMe: json['liked_by_me'] == true,
+  );
+}
+
+VibeComment _commentFromJson(Map<String, dynamic> json) {
+  final author = json['author'] is Map<String, dynamic> ? json['author'] as Map<String, dynamic> : <String, dynamic>{};
+  final displayName = _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User';
+  return VibeComment(
+    name: displayName,
+    avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(),
+    text: json['text']?.toString() ?? '',
+    time: _timeAgo(json['created_at']?.toString()),
   );
 }
 
