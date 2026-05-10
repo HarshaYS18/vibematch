@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../control_center_models.dart';
 import 'super_power_design.dart';
@@ -58,7 +58,7 @@ class ControlCockpitOverview extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   _BentoTile(
-                    height: 102,
+                    height: 116,
                     title: 'Powers',
                     value: '$activePowers',
                     subtitle: 'category grants',
@@ -75,7 +75,7 @@ class ControlCockpitOverview extends StatelessWidget {
               child: Column(
                 children: [
                   _BentoTile(
-                    height: 88,
+                    height: 104,
                     title: 'Reviews',
                     value: '$pendingReviews',
                     subtitle: 'mapped tasks',
@@ -85,7 +85,7 @@ class ControlCockpitOverview extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   _StealthToggleTile(
-                    height: 88,
+                    height: 104,
                     enabled: state.globalInvisible,
                     onChanged: onStealthChanged,
                   ),
@@ -469,3 +469,4 @@ class _MiniState extends StatelessWidget {
     );
   }
 }
+

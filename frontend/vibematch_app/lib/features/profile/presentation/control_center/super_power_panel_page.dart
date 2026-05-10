@@ -110,10 +110,23 @@ class _SuperPowerPanelPageState extends State<SuperPowerPanelPage> {
   }
 
   Future<void> _assignCustomId() async {
-    final draft = await ControlUserTextSheet.show(context, title: 'Assign custom ID', label: 'Custom ID');
+    final draft = await ControlCustomIdSheet.show(context);
     if (draft == null) return;
-    await _save((state) => state, action: 'CUSTOM_ID_ASSIGNED', targetUserId: draft.userId, resourceType: 'identity', reason: draft.text);
-    _toast('Custom ID assigned.');
+
+    final action = draft.targetType == 'room'
+        ? 'ROOM_CUSTOM_ID_ASSIGNED'
+        : 'USER_CUSTOM_ID_ASSIGNED';
+
+    await _save(
+      (state) => state,
+      action: action,
+      targetUserId: draft.targetType == 'user' ? draft.targetId : '-',
+      roomId: draft.targetType == 'room' ? draft.targetId : '-',
+      resourceType: '_custom_id',
+      reason: 'custom_id= | validity=',
+    );
+
+    _toast(' custom ID assigned.');
   }
 
   Future<void> _grantPower() async {
@@ -950,6 +963,7 @@ void _loadUserDevices(String userId) {
     );
   }
 }
+
 
 
 
