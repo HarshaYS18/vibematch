@@ -20,6 +20,7 @@ from app.api.routes import (
     role_badges,
     social,
     users,
+    vibes,
     vip_admin,
 )
 from app.api.routes.rooms import rooms
@@ -56,7 +57,9 @@ from app.models import (
     UserFollow,
     UserRole,
     UserVipStatus,
-    UserWallet,
+    VibeComment,
+    VibePost,
+    VibeReaction,
     WalletLedger,
 )
 
@@ -94,6 +97,7 @@ app.include_router(rooms.router)
 app.include_router(inbox.router)
 app.include_router(inbox_ws.router)
 app.include_router(social.router)
+app.include_router(vibes.router)
 app.include_router(mvp_core.router)
 app.include_router(mvp_social.router)
 app.include_router(mvp_economy.router)
