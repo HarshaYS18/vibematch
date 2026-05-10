@@ -12,6 +12,7 @@ import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/presentation/wallet_page.dart';
 import '../control_center/coin_supply_grant_page.dart';
 import '../control_center/super_power_panel_page.dart';
+import '../control_center/vibes_reports_review_page.dart';
 import '../control_center/vip_svip_admin_page.dart';
 import '../cover_photos/edit_cover_photos_page.dart';
 import '../edit_profile_page.dart';
@@ -134,6 +135,14 @@ class MePageContent extends StatelessWidget {
         builder: (_) => SuperPowerPanelPage(currentRole: user.primaryRole),
       ),
     );
+  }
+
+  void _openVibesReportsReview(BuildContext context) {
+    if (!user.canSeeOwnerControls) {
+      _showAction(context, 'Only Owner/Super Owner control users can open Vibes reports review.');
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VibesReportsReviewPage()));
   }
 
   void _openVipSvipAdmin(BuildContext context) {
@@ -331,7 +340,7 @@ class MePageContent extends StatelessWidget {
         const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
         const SizedBox(height: 12),
         ...items.where((item) {
-          if (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant') return user.canSeeOwnerControls;
+          if (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant' || item.action == 'vibes_reports_review') return user.canSeeOwnerControls;
           return true;
         }).map(
           (item) => Padding(
@@ -341,6 +350,8 @@ class MePageContent extends StatelessWidget {
               onTap: () async {
                 if (item.action == 'edit_profile') {
                   _openEditProfile(context);
+                } else if (item.action == 'vibes_reports_review') {
+                  _openVibesReportsReview(context);
                 } else if (item.action == 'vip_svip_admin') {
                   _openVipSvipAdmin(context);
                 } else if (item.action == 'coin_supply_grant') {
