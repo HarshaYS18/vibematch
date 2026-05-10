@@ -44,6 +44,7 @@ DEFAULT_RISK = {
     "max_single_bet_low": 100_000,
     "max_single_bet_medium": 50_000,
     "max_single_bet_high": 10_000,
+    "force_min_bet_extreme": 400,
     "cooldown_seconds_high_risk": 300,
     "manual_review_score": 90,
     "block_score": 120,
@@ -246,7 +247,7 @@ def _user_wallet_net_loss(db: Session, user_id: int, since: datetime) -> int:
     return max(int(debits or 0) - int(credits or 0), 0)
 
 
-def evaluate_risk(db: Session, user: User, requested_amount: int, round_obj: GameRound, risk: dict[str, Any]) -> dict[str, Any]:
+def evaluate_risk(db: Session, user: User, requested_amount: int, round_obj: GameRound, risk: dict[str, Any], min_bet: int = 100) -> dict[str, Any]:
     if not risk.get("enabled", True):
         return {"level": "LOW", "score": 0, "action": "ALLOW", "accepted_amount": requested_amount, "reasons": []}
 
@@ -275,14 +276,19 @@ def evaluate_risk(db: Session, user: User, requested_amount: int, round_obj: Gam
         reasons.append("high_bet_velocity")
 
     if score >= risk.get("block_score", 120):
-        return {"level": "BLOCKED", "score": score, "action": "BLOCK", "accepted_amount": 0, "reasons": reasons}
+        safe_min = max(int(risk.get("force_min_bet_extreme", 400)), int(min_bet))
+        accepted = min(requested_amount, safe_min)
+        return {"level": "EXTREME", "score": score, "action": "FORCE_MIN_LIMIT_AND_REVIEW", "accepted_amount": accepted, "reasons": reasons}
     if score >= risk.get("manual_review_score", 90):
         accepted = min(requested_amount, risk.get("max_single_bet_high", 10_000))
+        accepted = max(min(accepted, requested_amount), min_bet)
         return {"level": "HIGH", "score": score, "action": "LIMIT_AND_REVIEW", "accepted_amount": accepted, "reasons": reasons}
     if score >= 50:
         accepted = min(requested_amount, risk.get("max_single_bet_medium", 50_000))
+        accepted = max(min(accepted, requested_amount), min_bet)
         return {"level": "MEDIUM", "score": score, "action": "LIMIT", "accepted_amount": accepted, "reasons": reasons}
     accepted = min(requested_amount, risk.get("max_single_bet_low", 100_000))
+    accepted = max(min(accepted, requested_amount), min_bet)
     return {"level": "LOW", "score": score, "action": "ALLOW", "accepted_amount": accepted, "reasons": reasons}
 
 
@@ -300,21 +306,24 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     valid_target_ids = {int(item["id"]) for item in targets}
     if target_id not in valid_target_ids:
         raise HTTPException(status_code=400, detail="Invalid game target")
-    if amount < int(rules.get("min_bet", 100)):
+    min_bet = int(rules.get("min_bet", 100))
+    if amount < min_bet:
         raise HTTPException(status_code=400, detail="Bet is below minimum")
     if amount > int(rules.get("max_bet", 100_000)):
         raise HTTPException(status_code=400, detail="Bet is above game maximum")
 
     existing_total = db.query(func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id, GameBet.user_id == user.id).scalar()
-    if int(existing_total or 0) + amount > int(rules.get("max_total_bet_per_round", 300_000)):
+    round_limit = int(rules.get("max_total_bet_per_round", 300_000))
+    remaining_round_limit = round_limit - int(existing_total or 0)
+    if remaining_round_limit < min_bet:
         raise HTTPException(status_code=400, detail="Round bet limit reached")
+    risk_input_amount = min(amount, remaining_round_limit)
 
-    risk_result = evaluate_risk(db, user, amount, round_obj, risk)
+    risk_result = evaluate_risk(db, user, risk_input_amount, round_obj, risk, min_bet=min_bet)
     accepted_amount = int(risk_result["accepted_amount"])
-    if risk_result["action"] == "BLOCK" or accepted_amount <= 0:
-        audit(db, round_obj.game_key, round_obj.id, user.id, "BET_BLOCKED", risk_result["level"], risk_result["score"], risk_result["action"], "Bet blocked by whale/risk controls", {"requested_amount": amount, "reasons": risk_result["reasons"]}, user.id)
-        db.commit()
-        raise HTTPException(status_code=403, detail="Bet blocked by risk controls. Try a smaller amount later.")
+    accepted_amount = min(accepted_amount, remaining_round_limit, amount)
+    if accepted_amount < min_bet:
+        accepted_amount = min_bet
 
     wallet = economy_service.get_or_create_wallet(db, user.id)
     before = wallet.coin_balance
@@ -324,17 +333,18 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     wallet.lifetime_coins_spent += accepted_amount
     db.add(WalletLedger(user_id=user.id, currency_type=EconomyCurrency.COIN.value, direction=EconomyDirection.DEBIT.value, amount=accepted_amount, before_balance=before, after_balance=wallet.coin_balance, source_type="GAME_BET", source_id=str(round_id), created_by_user_id=user.id, reason=f"Bet on {round_obj.game_key}:{target_id}"))
 
-    bet = GameBet(round_id=round_id, user_id=user.id, target_id=target_id, amount=amount, accepted_amount=accepted_amount, risk_level=risk_result["level"], risk_score=risk_result["score"], risk_action=risk_result["action"], metadata_json=_dumps({"reasons": risk_result["reasons"], "config_version": definition.config_version}))
+    bet = GameBet(round_id=round_id, user_id=user.id, target_id=target_id, amount=amount, accepted_amount=accepted_amount, risk_level=risk_result["level"], risk_score=risk_result["score"], risk_action=risk_result["action"], metadata_json=_dumps({"reasons": risk_result["reasons"], "config_version": definition.config_version, "remaining_round_limit_before_bet": remaining_round_limit}))
     db.add(bet)
     round_obj.round_pool_amount += accepted_amount
     platform_fee = accepted_amount * int(rules.get("platform_fee_basis_points", 500)) // 10_000
     round_obj.platform_fee_amount += platform_fee
     round_obj.reward_pool_amount += max(accepted_amount - platform_fee, 0)
-    audit(db, round_obj.game_key, round_obj.id, user.id, "BET_ACCEPTED", risk_result["level"], risk_result["score"], risk_result["action"], "Bet accepted with risk controls", {"requested_amount": amount, "accepted_amount": accepted_amount, "target_id": target_id, "reasons": risk_result["reasons"]}, user.id)
+    audit(db, round_obj.game_key, round_obj.id, user.id, "BET_ACCEPTED", risk_result["level"], risk_result["score"], risk_result["action"], "Bet accepted with safety auto-limit controls", {"requested_amount": amount, "accepted_amount": accepted_amount, "target_id": target_id, "reasons": risk_result["reasons"]}, user.id)
     db.commit()
     db.refresh(bet)
     db.refresh(wallet)
-    return {"bet_id": bet.id, "round_id": round_id, "target_id": target_id, "requested_amount": amount, "accepted_amount": accepted_amount, "wallet_coin_balance": wallet.coin_balance, "risk_level": risk_result["level"], "risk_score": risk_result["score"], "risk_action": risk_result["action"], "message": "Bet accepted" if accepted_amount == amount else "Bet limited by risk controls"}
+    message = "Bet accepted" if accepted_amount == amount else "Bet accepted with safety limit"
+    return {"bet_id": bet.id, "round_id": round_id, "target_id": target_id, "requested_amount": amount, "accepted_amount": accepted_amount, "wallet_coin_balance": wallet.coin_balance, "risk_level": risk_result["level"], "risk_score": risk_result["score"], "risk_action": risk_result["action"], "message": message}
 
 
 def _choose_winner(round_obj: GameRound, targets: list[dict[str, Any]]) -> int:
