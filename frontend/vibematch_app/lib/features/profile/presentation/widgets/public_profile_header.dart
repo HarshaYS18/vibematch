@@ -76,13 +76,16 @@ class PublicProfileHeader extends StatelessWidget {
   final int? followingCount;
 
   List<Widget> _badgeLineItems() {
+    final fallbackRole = roleTag?.trim();
     return [
-      if (roleBadge != null)
+      if (roleBadge != null && roleBadge!.badgeLabel.trim().isNotEmpty)
         OfficialRoleBadgePill(badge: roleBadge!)
-      else if (roleTag != null)
-        PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
-      PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72), onTap: onVipTap),
-      PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6), onTap: onSvipTap),
+      else if (fallbackRole != null && fallbackRole.isNotEmpty)
+        PublicBadge(icon: Icons.workspace_premium_rounded, label: fallbackRole, color: const Color(0xFFFFD36A)),
+      if (vipLevel > 0)
+        PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72), onTap: onVipTap),
+      if (svipLevel > 0)
+        PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6), onTap: onSvipTap),
       if (familyName.trim().isNotEmpty) PublicBadge(icon: Icons.family_restroom_rounded, label: familyName, color: const Color(0xFF12C7B7), onTap: onFamilyTap),
     ];
   }
@@ -156,9 +159,10 @@ class PublicProfileHeader extends StatelessWidget {
                   _PremiumMatchScorePill(score: score),
                 ],
               ]),
-              const SizedBox(height: 10),
-              if (badges.isNotEmpty)
+              if (badges.isNotEmpty) ...[
+                const SizedBox(height: 10),
                 SizedBox(height: 30, child: SingleChildScrollView(scrollDirection: Axis.horizontal, physics: const BouncingScrollPhysics(), child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [for (var index = 0; index < badges.length; index++) ...[badges[index], if (index != badges.length - 1) const SizedBox(width: 8)]]))),
+              ],
               const SizedBox(height: 12),
               _PresenceLine(presenceLabel: presenceLabel, currentRoomName: currentRoomName, onRoomTap: onRoomTap),
               if (showSocialActions) ...[
