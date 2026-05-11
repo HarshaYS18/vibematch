@@ -11,6 +11,8 @@ class NotificationItem {
     required this.vibeTitle,
     required this.timeAgo,
     required this.isUnread,
+    this.targetType,
+    this.targetId,
   });
 
   final String id;
@@ -22,4 +24,6 @@ class NotificationItem {
   final String vibeTitle;
   final String timeAgo;
   final bool isUnread;
+  final String? targetType;
+  final String? targetId;
 }
