@@ -152,6 +152,23 @@ function setAdminMute({ room, payload }) {
   });
 }
 
+function setRoomAdminStatus({ room, peer, payload }) {
+  const target = findPeerByUserId(room, payload.target_user_id);
+  if (!target) throw new Error('Target user not found for room admin update');
+  const isRoomAdmin = payload.is_room_admin === true || payload.isRoomAdmin === true;
+  target.isRoomAdmin = isRoomAdmin;
+  broadcast(room, 'room_admin/updated', {
+    room_id: room.id,
+    actor_user_id: peer.userId,
+    actor_name: peer.displayName,
+    target_user_id: target.userId,
+    target_name: target.displayName,
+    is_room_admin: isRoomAdmin,
+    role_label: isRoomAdmin ? 'Admin' : 'Member',
+    room: roomSnapshot(room),
+  });
+}
+
 function adminSeatLeave({ room, peer, payload }) {
   const target = findPeerByUserId(room, payload.target_user_id);
   if (!target) throw new Error('Target user not found for seat leave');
@@ -278,6 +295,7 @@ module.exports = {
   leaveSeat,
   setMic,
   setAdminMute,
+  setRoomAdminStatus,
   adminSeatLeave,
   setSeatLock,
   adminSeatLeaveLock,
