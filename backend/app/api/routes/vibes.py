@@ -27,7 +27,7 @@ from app.schemas.vibes import (
     VibeShareCreateRequest,
     VibeShareResponse,
 )
-from app.services import inbox_service
+from app.services import notification_service
 
 router = APIRouter(prefix="/vibes", tags=["Vibes"])
 
@@ -202,14 +202,33 @@ def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, me
     if len(post.caption) > 80:
         caption_preview += "..."
 
+    def create_vibe_notification(user: User, *, notification_type: str, title: str, body: str) -> None:
+        notification_service.create_notification(
+            db,
+            recipient=user,
+            actor=current_user,
+            notification_type=notification_type,
+            title=title,
+            body=body,
+            target_type="vibe",
+            target_id=str(post.id),
+            metadata={
+                "post_id": post.id,
+                "author_public_user_id": current_user.public_user_id,
+                "author_name": author_name,
+                "media_type": post.media_type,
+            },
+        )
+
     for user in _resolve_mentioned_users(db, current_user, mentions):
         if user.id in notified_user_ids:
             continue
         notified_user_ids.add(user.id)
-        inbox_service.send_team_system_message(
-            db,
+        create_vibe_notification(
             user,
-            f"{author_name} mentioned you in a Vibe: \"{caption_preview}\". Open Vibes to view and reply.",
+            notification_type="vibe_mention",
+            title=f"{author_name} mentioned you",
+            body=f"Mentioned you in a Vibe: \"{caption_preview}\"",
         )
 
     if uses_mention_all:
@@ -217,10 +236,11 @@ def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, me
             if user.id in notified_user_ids:
                 continue
             notified_user_ids.add(user.id)
-            inbox_service.send_team_system_message(
-                db,
+            create_vibe_notification(
                 user,
-                f"{author_name} mentioned all followers in a new Vibe: \"{caption_preview}\". Open Vibes to view it.",
+                notification_type="vibe_mention_all",
+                title=f"{author_name} posted to followers",
+                body=f"Mentioned all followers in a new Vibe: \"{caption_preview}\"",
             )
 
 
