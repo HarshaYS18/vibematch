@@ -16,9 +16,13 @@ class RoomParticipant(Base):
     room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"), nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    is_member: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    is_room_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     left_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    member_added_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    admin_added_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     room = relationship("Room")
     user = relationship("User")
