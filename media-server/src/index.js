@@ -4,7 +4,8 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const { WebSocketServer } = require('ws');
-const { randomUUID } = require('crypto');
+const { rooms, getOrCreateRoom, roomSnapshot, roomBlockAction } = require('./roomState');
+const handlers = require('./roomHandlers');
 
 const host = process.env.MEDIA_SERVER_HOST || '0.0.0.0';
 const port = Number(process.env.MEDIA_SERVER_PORT || 9000);
@@ -13,130 +14,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const rooms = new Map();
-
 function log(type, payload = {}) {
-  const time = new Date().toISOString();
-  console.log(`[${time}] ${type}`, payload);
-}
-
-function getOrCreateRoom(roomId) {
-  const id = String(roomId || '').trim();
-  if (!id) throw new Error('room_id is required');
-
-  let room = rooms.get(id);
-  if (!room) {
-    room = {
-      id,
-      peers: new Map(),
-      lockedSeatIndexes: new Set(),
-      kickedUsers: new Map(),
-      createdAt: new Date().toISOString(),
-    };
-    rooms.set(id, room);
-    log('room/created', { room_id: id });
-  }
-
-  if (!room.lockedSeatIndexes) room.lockedSeatIndexes = new Set();
-  if (!room.kickedUsers) room.kickedUsers = new Map();
-  cleanupExpiredKickouts(room);
-  return room;
-}
-
-function roomSnapshot(room) {
-  cleanupExpiredKickouts(room);
-  return {
-    room_id: room.id,
-    created_at: room.createdAt,
-    peer_count: room.peers.size,
-    locked_seat_indexes: Array.from(room.lockedSeatIndexes || []),
-    peers: Array.from(room.peers.values()).map((peer) => ({
-      peer_id: peer.id,
-      user_id: peer.userId,
-      display_name: peer.displayName,
-      seat_index: peer.seatIndex,
-      mic_enabled: peer.micEnabled,
-      admin_muted: peer.adminMuted === true,
-      joined_at: peer.joinedAt,
-    })),
-  };
-}
-
-function send(ws, type, payload = {}) {
-  if (ws.readyState !== ws.OPEN) return;
-  ws.send(JSON.stringify({ type, payload }));
-}
-
-function broadcast(room, type, payload = {}, exceptPeerId = null) {
-  for (const peer of room.peers.values()) {
-    if (exceptPeerId != null && peer.id === exceptPeerId) continue;
-    send(peer.ws, type, payload);
-  }
-}
-
-function findPeerByUserId(room, userId) {
-  const targetUserId = String(userId || '').trim();
-  if (!targetUserId) return null;
-  for (const peer of room.peers.values()) {
-    if (peer.userId === targetUserId || peer.id === targetUserId) return peer;
-  }
-  return null;
-}
-
-function normalizeSeatIndex(value) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return parsed;
-}
-
-function clearPeerSeat(peer) {
-  if (!peer) return;
-  peer.seatIndex = null;
-  peer.micEnabled = false;
-  peer.adminMuted = false;
-}
-
-function clearSeatOccupant(room, seatIndex) {
-  for (const peer of room.peers.values()) {
-    if (peer.seatIndex === seatIndex) clearPeerSeat(peer);
-  }
-}
-
-function broadcastRoomSnapshot(room, type, payload = {}) {
-  broadcast(room, type, { ...payload, room: roomSnapshot(room) });
-}
-
-function cleanupExpiredKickouts(room) {
-  if (!room?.kickedUsers) return;
-  const now = Date.now();
-  for (const [userId, entry] of room.kickedUsers.entries()) {
-    if (entry.untilMs !== null && entry.untilMs <= now) room.kickedUsers.delete(userId);
-  }
-}
-
-function kickoutDurationMs(payload = {}) {
-  if (payload.duration_ms != null) {
-    const parsed = Number(payload.duration_ms);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  }
-  if (payload.duration_seconds != null) {
-    const parsed = Number(payload.duration_seconds);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed * 1000;
-  }
-  if (typeof payload.duration === 'string') {
-    if (payload.duration === '1h') return 60 * 60 * 1000;
-    if (payload.duration === '1d') return 24 * 60 * 60 * 1000;
-    if (payload.duration === 'forever') return null;
-  }
-  return 60 * 60 * 1000;
-}
-
-function roomKickoutStatus(room, userId) {
-  cleanupExpiredKickouts(room);
-  const entry = room.kickedUsers?.get(String(userId));
-  if (!entry) return null;
-  const remainingMs = entry.untilMs === null ? null : Math.max(0, entry.untilMs - Date.now());
-  return { ...entry, remainingMs };
+  console.log(`[${new Date().toISOString()}] ${type}`, payload);
 }
 
 app.get('/health', (_req, res) => {
@@ -145,16 +24,13 @@ app.get('/health', (_req, res) => {
 
 app.get('/rooms/:roomId', (req, res) => {
   const room = rooms.get(req.params.roomId);
-  if (!room) {
-    res.status(404).json({ detail: 'Room not found' });
-    return;
-  }
-  res.json(roomSnapshot(room));
+  if (!room) return res.status(404).json({ detail: 'Room not found' });
+  return res.json(roomSnapshot(room));
 });
 
 app.post('/rooms/:roomId', (req, res) => {
   const room = getOrCreateRoom(req.params.roomId);
-  res.json(roomSnapshot(room));
+  return res.json(roomSnapshot(room));
 });
 
 const server = http.createServer(app);
@@ -164,8 +40,26 @@ wss.on('connection', (ws) => {
   let currentRoom = null;
   let currentPeer = null;
 
+  const setSession = (room, peer) => {
+    currentRoom = room;
+    currentPeer = peer;
+  };
+
+  const clearSession = () => {
+    currentRoom = null;
+    currentPeer = null;
+  };
+
+  const requireRoom = () => {
+    if (!currentRoom || !currentPeer) {
+      handlers.send(ws, 'error', { detail: 'Join a room before sending room events.' });
+      return false;
+    }
+    return true;
+  };
+
   log('ws/connected');
-  send(ws, 'media/connected', {
+  handlers.send(ws, 'media/connected', {
     server_time: new Date().toISOString(),
     message: 'Connected to Vibe Match media signaling server.',
   });
@@ -175,251 +69,37 @@ wss.on('connection', (ws) => {
     try {
       message = JSON.parse(raw.toString());
     } catch (_error) {
-      log('ws/error_invalid_json', { raw: raw.toString().slice(0, 200) });
-      send(ws, 'error', { detail: 'Invalid JSON message.' });
+      handlers.send(ws, 'error', { detail: 'Invalid JSON message.' });
       return;
     }
 
-    const type = message.type;
+    const type = String(message.type || 'unknown');
     const payload = message.payload || {};
     log('event/received', { type, payload });
 
     try {
-      if (type === 'room/join') {
-        const room = getOrCreateRoom(payload.room_id);
-        const userId = String(payload.user_id || 'guest');
-        const kickout = roomKickoutStatus(room, userId);
-        if (kickout) {
-          log('room/join_blocked', { room_id: room.id, user_id: userId, remaining_ms: kickout.remainingMs, reason: kickout.reason });
-          send(ws, 'room/join_blocked', {
-            room_id: room.id,
-            user_id: userId,
-            reason: kickout.reason || 'You were removed from this room.',
-            kicked_until: kickout.untilMs === null ? null : new Date(kickout.untilMs).toISOString(),
-            remaining_ms: kickout.remainingMs,
-          });
-          try { ws.close(); } catch (_error) {}
-          return;
-        }
+      if (type === 'room/join') return handlers.joinRoom({ ws, payload, setSession });
+      if (!requireRoom()) return;
 
-        const peer = {
-          id: payload.peer_id || randomUUID(),
-          userId,
-          displayName: String(payload.display_name || 'Vibe User'),
-          seatIndex: payload.seat_index ?? null,
-          micEnabled: false,
-          adminMuted: false,
-          joinedAt: new Date().toISOString(),
-          ws,
-        };
+      if (type === 'room/leave') return handlers.leaveRoom({ ws, room: currentRoom, peer: currentPeer, clearSession });
+      if (type === 'seat_invite/send') return handlers.sendSeatInvite({ ws, room: currentRoom, peer: currentPeer, payload });
+      if (type === 'seat/take') return handlers.takeSeat({ ws, room: currentRoom, peer: currentPeer, payload });
+      if (type === 'seat/leave') return handlers.leaveSeat({ room: currentRoom, peer: currentPeer });
+      if (type === 'mic/set_enabled') return handlers.setMic({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'admin_mute/set') return handlers.setAdminMute({ room: currentRoom, payload });
+      if (type === 'admin/seat_leave') return handlers.adminSeatLeave({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'admin/seat_lock') return handlers.setSeatLock({ room: currentRoom, payload, locked: true });
+      if (type === 'admin/seat_unlock') return handlers.setSeatLock({ room: currentRoom, payload, locked: false });
+      if (type === 'admin/seat_leave_lock') return handlers.adminSeatLeaveLock({ room: currentRoom, peer: currentPeer, payload });
+      if (type === `admin/${roomBlockAction}`) return handlers.adminBlockUser({ room: currentRoom, peer: currentPeer, payload });
+      if (type === `admin/${roomBlockAction}_remove`) return handlers.removeRoomBlock({ ws, room: currentRoom, peer: currentPeer, payload });
+      if (type === 'webrtc/offer' || type === 'webrtc/answer' || type === 'webrtc/ice_candidate') return handlers.relayWebRtc({ ws, room: currentRoom, peer: currentPeer, type, payload });
+      if (type === 'room/chat') return handlers.roomChat({ room: currentRoom, peer: currentPeer, payload });
 
-        currentRoom = room;
-        currentPeer = peer;
-        room.peers.set(peer.id, peer);
-        log('room/joined', { room_id: room.id, peer_id: peer.id, user_id: peer.userId, display_name: peer.displayName, peer_count: room.peers.size });
-
-        send(ws, 'room/joined', { peer_id: peer.id, room: roomSnapshot(room) });
-        broadcast(room, 'room/peer_joined', { peer_id: peer.id, user_id: peer.userId, display_name: peer.displayName, room: roomSnapshot(room) }, peer.id);
-        return;
-      }
-
-      if (!currentRoom || !currentPeer) {
-        send(ws, 'error', { detail: 'Join a room before sending room events.' });
-        return;
-      }
-
-      if (type === 'room/leave') {
-        const room = currentRoom;
-        const peer = currentPeer;
-        room.peers.delete(peer.id);
-        log('room/left', { room_id: room.id, peer_id: peer.id, peer_count: room.peers.size });
-        broadcast(room, 'room/peer_left', { peer_id: peer.id, room: roomSnapshot(room) });
-        send(ws, 'room/left', { peer_id: peer.id });
-        if (room.peers.size === 0) rooms.delete(room.id);
-        currentRoom = null;
-        currentPeer = null;
-        return;
-      }
-
-      if (type === 'seat_invite/send') {
-        const target = findPeerByUserId(currentRoom, payload.target_user_id);
-        const seatIndex = normalizeSeatIndex(payload.seat_index);
-        if (!target) throw new Error('Target user not found for seat invite');
-        if (seatIndex == null) throw new Error('seat_index is required');
-        if (target.id === currentPeer.id || target.userId === currentPeer.userId) throw new Error('Cannot invite yourself');
-        if (target.seatIndex != null) throw new Error('Target user is already seated');
-        if (currentRoom.lockedSeatIndexes.has(seatIndex)) throw new Error(`Seat ${seatIndex + 1} is locked`);
-        log('seat_invite/send', { room_id: currentRoom.id, from_peer_id: currentPeer.id, target_peer_id: target.id, seat_index: seatIndex });
-        send(target.ws, 'seat_invite/received', {
-          invite_id: randomUUID(),
-          room_id: currentRoom.id,
-          seat_index: seatIndex,
-          inviter_peer_id: currentPeer.id,
-          inviter_user_id: currentPeer.userId,
-          inviter_name: currentPeer.displayName,
-          target_user_id: target.userId,
-          created_at: new Date().toISOString(),
-        });
-        send(ws, 'seat_invite/sent', { target_user_id: target.userId, seat_index: seatIndex });
-        return;
-      }
-
-      if (type === 'seat/take') {
-        const seatIndex = payload.seat_index;
-        if (currentRoom.lockedSeatIndexes.has(Number(seatIndex))) {
-          send(ws, 'error', { detail: `Seat ${Number(seatIndex) + 1} is locked.` });
-          return;
-        }
-        currentPeer.seatIndex = seatIndex;
-        currentPeer.adminMuted = false;
-        log('seat/take', { room_id: currentRoom.id, peer_id: currentPeer.id, seat_index: currentPeer.seatIndex });
-        broadcast(currentRoom, 'seat/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, seat_index: currentPeer.seatIndex, room: roomSnapshot(currentRoom) });
-        return;
-      }
-
-      if (type === 'seat/leave') {
-        currentPeer.seatIndex = null;
-        currentPeer.micEnabled = false;
-        currentPeer.adminMuted = false;
-        log('seat/leave', { room_id: currentRoom.id, peer_id: currentPeer.id });
-        broadcast(currentRoom, 'seat/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, seat_index: null, mic_enabled: false, room: roomSnapshot(currentRoom) });
-        return;
-      }
-
-      if (type === 'mic/set_enabled') {
-        const requestedEnabled = Boolean(payload.enabled);
-        if (requestedEnabled && currentPeer.adminMuted === true) {
-          currentPeer.micEnabled = false;
-          log('mic/blocked_admin_muted', { room_id: currentRoom.id, peer_id: currentPeer.id, user_id: currentPeer.userId });
-          broadcast(currentRoom, 'admin_mute/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, admin_muted: true, mic_enabled: false, room: roomSnapshot(currentRoom) });
-          return;
-        }
-        currentPeer.micEnabled = requestedEnabled && currentPeer.seatIndex != null;
-        log('mic/set_enabled', { room_id: currentRoom.id, peer_id: currentPeer.id, mic_enabled: currentPeer.micEnabled });
-        broadcast(currentRoom, 'mic/updated', { peer_id: currentPeer.id, user_id: currentPeer.userId, mic_enabled: currentPeer.micEnabled, room: roomSnapshot(currentRoom) });
-        return;
-      }
-
-      if (type === 'admin_mute/set') {
-        const target = findPeerByUserId(currentRoom, payload.target_user_id);
-        if (!target) throw new Error('Target user not found for admin mute');
-        target.adminMuted = Boolean(payload.muted);
-        if (target.adminMuted) target.micEnabled = false;
-        log('admin_mute/set', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target.id, target_user_id: target.userId, muted: target.adminMuted });
-        broadcast(currentRoom, 'admin_mute/updated', { peer_id: target.id, user_id: target.userId, admin_muted: target.adminMuted, mic_enabled: target.micEnabled, room: roomSnapshot(currentRoom) });
-        return;
-      }
-
-      if (type === 'admin/seat_leave') {
-        const target = findPeerByUserId(currentRoom, payload.target_user_id);
-        if (!target) throw new Error('Target user not found for seat leave');
-        clearPeerSeat(target);
-        log('admin/seat_leave', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target.id, target_user_id: target.userId });
-        broadcast(currentRoom, 'seat/updated', { peer_id: target.id, user_id: target.userId, seat_index: null, mic_enabled: false, room: roomSnapshot(currentRoom) });
-        return;
-      }
-
-      if (type === 'admin/seat_lock') {
-        const seatIndex = normalizeSeatIndex(payload.seat_index);
-        if (seatIndex == null) throw new Error('seat_index is required');
-        clearSeatOccupant(currentRoom, seatIndex);
-        currentRoom.lockedSeatIndexes.add(seatIndex);
-        log('admin/seat_lock', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, seat_index: seatIndex });
-        broadcastRoomSnapshot(currentRoom, 'seat/locked', { seat_index: seatIndex, locked: true });
-        return;
-      }
-
-      if (type === 'admin/seat_unlock') {
-        const seatIndex = normalizeSeatIndex(payload.seat_index);
-        if (seatIndex == null) throw new Error('seat_index is required');
-        currentRoom.lockedSeatIndexes.delete(seatIndex);
-        log('admin/seat_unlock', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, seat_index: seatIndex });
-        broadcastRoomSnapshot(currentRoom, 'seat/locked', { seat_index: seatIndex, locked: false });
-        return;
-      }
-
-      if (type === 'admin/seat_leave_lock') {
-        const seatIndex = normalizeSeatIndex(payload.seat_index);
-        if (seatIndex == null) throw new Error('seat_index is required');
-        const target = findPeerByUserId(currentRoom, payload.target_user_id);
-        if (target) clearPeerSeat(target);
-        clearSeatOccupant(currentRoom, seatIndex);
-        currentRoom.lockedSeatIndexes.add(seatIndex);
-        log('admin/seat_leave_lock', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target?.id, seat_index: seatIndex });
-        broadcastRoomSnapshot(currentRoom, 'seat/locked', { peer_id: target?.id, user_id: target?.userId, seat_index: seatIndex, locked: true });
-        return;
-      }
-
-      if (type === 'admin/kick') {
-        const target = findPeerByUserId(currentRoom, payload.target_user_id);
-        if (!target) throw new Error('Target user not found for kick');
-        const durationMs = kickoutDurationMs(payload);
-        const untilMs = durationMs === null ? null : Date.now() + durationMs;
-        currentRoom.kickedUsers.set(target.userId, {
-          untilMs,
-          reason: payload.reason || 'Removed by room admin',
-          kickedAt: Date.now(),
-          kickedByPeerId: currentPeer.id,
-        });
-        clearPeerSeat(target);
-        currentRoom.peers.delete(target.id);
-        log('admin/kick', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_peer_id: target.id, target_user_id: target.userId, reason: payload.reason, kicked_until: untilMs === null ? null : new Date(untilMs).toISOString() });
-        send(target.ws, 'room/kicked', { peer_id: target.id, user_id: target.userId, reason: payload.reason || 'Removed by room admin', kicked_until: untilMs === null ? null : new Date(untilMs).toISOString(), duration_ms: durationMs });
-        broadcast(currentRoom, 'room/peer_left', { peer_id: target.id, user_id: target.userId, room: roomSnapshot(currentRoom) });
-        try { target.ws.close(); } catch (_error) {}
-        if (currentRoom.peers.size === 0) rooms.delete(currentRoom.id);
-        return;
-      }
-
-      if (type === 'admin/kick_remove') {
-        const targetUserId = String(payload.target_user_id || '').trim();
-        if (!targetUserId) throw new Error('target_user_id is required for kick remove');
-        const existed = currentRoom.kickedUsers.delete(targetUserId);
-        cleanupExpiredKickouts(currentRoom);
-        log('admin/kick_remove', { room_id: currentRoom.id, admin_peer_id: currentPeer.id, target_user_id: targetUserId, removed: existed });
-        broadcast(currentRoom, 'kick_block/removed', {
-          target_user_id: targetUserId,
-          removed: existed,
-          room: roomSnapshot(currentRoom),
-        });
-        send(ws, 'kick_block/remove_result', {
-          target_user_id: targetUserId,
-          removed: existed,
-          room: roomSnapshot(currentRoom),
-        });
-        return;
-      }
-
-      if (type === 'webrtc/offer' || type === 'webrtc/answer' || type === 'webrtc/ice_candidate') {
-        const targetPeerId = payload.target_peer_id;
-        const target = currentRoom.peers.get(targetPeerId);
-        if (!target) {
-          send(ws, 'error', { detail: 'Target peer not found for WebRTC signaling.' });
-          return;
-        }
-        log(type, { room_id: currentRoom.id, from_peer_id: currentPeer.id, target_peer_id: targetPeerId });
-        send(target.ws, type, { ...payload, from_peer_id: currentPeer.id, from_user_id: currentPeer.userId });
-        return;
-      }
-
-      if (type === 'room/chat') {
-        log('room/chat', { room_id: currentRoom.id, peer_id: currentPeer.id, text_length: String(payload.text || '').length });
-        broadcast(currentRoom, 'room/chat', {
-          id: randomUUID(),
-          peer_id: currentPeer.id,
-          user_id: currentPeer.userId,
-          display_name: currentPeer.displayName,
-          text: String(payload.text || '').slice(0, 500),
-          created_at: new Date().toISOString(),
-        });
-        return;
-      }
-
-      log('event/unsupported', { type });
-      send(ws, 'error', { detail: `Unsupported event type: ${type}` });
+      handlers.send(ws, 'error', { detail: `Unsupported event type: ${type}` });
     } catch (error) {
       log('event/error', { type, detail: error.message || 'Unhandled media server error.' });
-      send(ws, 'error', { detail: error.message || 'Unhandled media server error.' });
+      handlers.send(ws, 'error', { detail: error.message || 'Unhandled media server error.' });
     }
   });
 
@@ -428,12 +108,8 @@ wss.on('connection', (ws) => {
       log('ws/closed_without_room');
       return;
     }
-    const room = currentRoom;
-    const peer = currentPeer;
-    room.peers.delete(peer.id);
-    log('ws/closed', { room_id: room.id, peer_id: peer.id, peer_count: room.peers.size });
-    broadcast(room, 'room/peer_left', { peer_id: peer.id, room: roomSnapshot(room) });
-    if (room.peers.size === 0) rooms.delete(room.id);
+    handlers.peerClosed(currentRoom, currentPeer);
+    clearSession();
   });
 });
 
