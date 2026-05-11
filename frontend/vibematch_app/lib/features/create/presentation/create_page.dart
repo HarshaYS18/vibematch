@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
+import '../../media/data/media_upload_service.dart';
 import '../../rooms/data/live_room_media_signaling_service.dart';
 import '../../rooms/data/room_api_service.dart';
 import '../../rooms/presentation/live_room_models.dart';
@@ -18,10 +19,12 @@ class CreatePage extends StatefulWidget {
 class _CreatePageState extends State<CreatePage> {
   final TextEditingController _roomNameController = TextEditingController();
   final RoomApiService _roomApiService = const RoomApiService();
+  final MediaUploadService _mediaUploadService = const MediaUploadService();
 
   String _selectedLanguage = 'Telugu';
   _RoomMode _selectedMode = _RoomMode.open;
-  bool _roomImageSelected = false;
+  String? _roomImageUrl;
+  bool _uploadingRoomImage = false;
   bool _allowScreenshots = true;
   bool _creatingRoom = false;
 
@@ -53,6 +56,24 @@ class _CreatePageState extends State<CreatePage> {
   void _toast(String message) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message)));
+  }
+
+  Future<void> _pickAndUploadRoomImage() async {
+    if (_uploadingRoomImage || _creatingRoom) return;
+    setState(() => _uploadingRoomImage = true);
+    try {
+      final upload = await _mediaUploadService.pickAndUploadRoomAvatar();
+      if (!mounted) return;
+      setState(() => _roomImageUrl = upload.url);
+      _toast('Room image uploaded');
+    } on MediaUploadCancelledException {
+      return;
+    } catch (error) {
+      if (!mounted) return;
+      _toast(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _uploadingRoomImage = false);
+    }
   }
 
   void _openLanguageSheet() {
@@ -112,6 +133,7 @@ class _CreatePageState extends State<CreatePage> {
         language: _selectedLanguage,
         mode: _selectedMode.title,
         type: 'Chat',
+        avatarUrl: _roomImageUrl,
       );
       if (!mounted) return;
       _showRoomReadySheet(room);
@@ -165,12 +187,15 @@ class _CreatePageState extends State<CreatePage> {
               Container(
                 width: 64,
                 height: 64,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(22),
-                  gradient: const LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF8C5CF6), Color(0xFFE84C72)]),
+                  gradient: room.avatarUrl == null || room.avatarUrl!.trim().isEmpty ? const LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF8C5CF6), Color(0xFFE84C72)]) : null,
                   boxShadow: [BoxShadow(color: const Color(0xFF8C5CF6).withValues(alpha: 0.22), blurRadius: 18, offset: const Offset(0, 8))],
                 ),
-                child: const Icon(Icons.graphic_eq_rounded, color: Colors.white, size: 29),
+                child: room.avatarUrl == null || room.avatarUrl!.trim().isEmpty
+                    ? const Icon(Icons.graphic_eq_rounded, color: Colors.white, size: 29)
+                    : Image.network(room.avatarUrl!, fit: BoxFit.cover),
               ),
               const SizedBox(height: 12),
               const Text('Room Ready', style: TextStyle(color: Color(0xFF251538), fontSize: 21, fontWeight: FontWeight.w900)),
@@ -259,6 +284,7 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Widget _buildCreateCard() {
+    final hasImage = _roomImageUrl?.trim().isNotEmpty == true;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       padding: const EdgeInsets.all(14),
@@ -266,19 +292,30 @@ class _CreatePageState extends State<CreatePage> {
       child: Column(
         children: [
           GestureDetector(
-            onTap: () {
-              setState(() => _roomImageSelected = !_roomImageSelected);
-              _toast(_roomImageSelected ? 'Room image selected locally' : 'Room image removed');
-            },
+            onTap: _pickAndUploadRoomImage,
             child: Container(
               width: 82,
               height: 82,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(27), gradient: _roomImageSelected ? const LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF8C5CF6), Color(0xFFE84C72)]) : null, color: _roomImageSelected ? null : const Color(0xFFF4EEE7), border: Border.all(color: const Color(0xFFEDE3D7))),
-              child: Icon(_roomImageSelected ? Icons.image_rounded : Icons.add_photo_alternate_rounded, color: _roomImageSelected ? Colors.white : const Color(0xFF7B6A86), size: 30),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(27), gradient: hasImage ? null : null, color: hasImage ? null : const Color(0xFFF4EEE7), border: Border.all(color: const Color(0xFFEDE3D7))),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (hasImage)
+                    Image.network(_roomImageUrl!, fit: BoxFit.cover)
+                  else
+                    Icon(Icons.add_photo_alternate_rounded, color: const Color(0xFF7B6A86), size: 30),
+                  if (_uploadingRoomImage)
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.28),
+                      child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 7),
-          Text(_roomImageSelected ? 'Room image ready' : 'Tap to add room image', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800)),
+          Text(_uploadingRoomImage ? 'Uploading room image...' : hasImage ? 'Room image ready' : 'Tap to add room image', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800)),
           const SizedBox(height: 13),
           TextField(
             controller: _roomNameController,
