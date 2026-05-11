@@ -18,10 +18,12 @@ function getOrCreateRoom(roomId) {
       peers: new Map(),
       lockedSeatIndexes: new Set(),
       blockedUsers: new Map(),
+      applyOnlyModeEnabled: false,
       createdAt: new Date().toISOString(),
     };
     rooms.set(id, room);
   }
+  if (room.applyOnlyModeEnabled !== true) room.applyOnlyModeEnabled = false;
   cleanupExpiredBlocks(room);
   return room;
 }
@@ -40,6 +42,7 @@ function roomSnapshot(room) {
     created_at: room.createdAt,
     peer_count: room.peers.size,
     locked_seat_indexes: Array.from(room.lockedSeatIndexes),
+    apply_only_mode_enabled: room.applyOnlyModeEnabled === true,
     peers: Array.from(room.peers.values()).map((peer) => ({
       peer_id: peer.id,
       user_id: peer.userId,
