@@ -58,6 +58,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   int? _overlaySeatIndex;
   bool? _overlaySeatLocked;
   bool? _overlayApplyOnly;
+  bool? _overlayCanManage;
   Size? _lastLayoutSize;
   SeatLayoutSpec? _lastSpec;
 
@@ -95,6 +96,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     _overlaySeatIndex = null;
     _overlaySeatLocked = null;
     _overlayApplyOnly = null;
+    _overlayCanManage = null;
   }
 
   void _syncOverlayMenu() {
@@ -112,6 +114,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     if (_overlaySeatIndex == selectedSeat.index &&
         _overlaySeatLocked == selectedSeat.locked &&
         _overlayApplyOnly == widget.applyOnlyModeEnabled &&
+        _overlayCanManage == widget.canManageSeats &&
         _menuEntry != null) {
       _menuEntry!.markNeedsBuild();
       return;
@@ -134,6 +137,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     _overlaySeatIndex = selectedSeat.index;
     _overlaySeatLocked = selectedSeat.locked;
     _overlayApplyOnly = widget.applyOnlyModeEnabled;
+    _overlayCanManage = widget.canManageSeats;
 
     _menuEntry = OverlayEntry(
       builder: (_) => Positioned(
@@ -141,7 +145,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
         top: top,
         width: menuWidth,
         child: _SeatMenu(
-          key: ValueKey('seat-menu-${selectedSeat.index}-${selectedSeat.locked}-${widget.applyOnlyModeEnabled}'),
+          key: ValueKey('seat-menu-${selectedSeat.index}-${selectedSeat.locked}-${widget.applyOnlyModeEnabled}-${widget.canManageSeats}'),
           locked: selectedSeat.locked,
           applyOnlyModeEnabled: widget.applyOnlyModeEnabled,
           canManageSeats: widget.canManageSeats,
@@ -214,10 +218,13 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
 
   RoomSeat? get _selectedSeat {
     final index = widget.selectedSeatIndex;
-    if (index == null || !widget.canManageSeats || index < 0 || index >= widget.seats.length) return null;
+    if (index == null || index < 0 || index >= widget.seats.length) return null;
     if (_hiddenMenuSeat == index) return null;
     final seat = widget.seats[index];
-    return seat.user == null ? seat : null;
+    if (seat.user != null) return null;
+    if (widget.canManageSeats) return seat;
+    if (widget.applyOnlyModeEnabled && !seat.locked) return seat;
+    return null;
   }
 
   Offset _seatOffset(int index, SeatLayoutSpec spec, double width) {
@@ -446,11 +453,15 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.canManageSeats) return const SizedBox.shrink();
+    final actions = widget.canManageSeats
+        ? widget.locked
+            ? [_MenuAction('Unlock', widget.onUnlock)]
+            : [_MenuAction('Invite', widget.onInvite), _MenuAction('Switch', widget.onSwitch), _MenuAction('Lock', widget.onLock)]
+        : widget.applyOnlyModeEnabled && !widget.locked
+            ? [_MenuAction('Apply', widget.onApply)]
+            : <_MenuAction>[];
 
-    final actions = widget.locked
-        ? [_MenuAction('Unlock', widget.onUnlock)]
-        : [_MenuAction('Invite', widget.onInvite), _MenuAction('Switch', widget.onSwitch), _MenuAction('Lock', widget.onLock)];
+    if (actions.isEmpty) return const SizedBox.shrink();
 
     return FadeTransition(
       opacity: _opacity,
