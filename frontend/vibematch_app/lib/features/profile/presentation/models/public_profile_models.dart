@@ -49,112 +49,14 @@ enum PublicFollowStatus {
 }
 
 class PublicCoverPhoto {
-  const PublicCoverPhoto({
-    required this.title,
-    required this.colors,
-    required this.icon,
-  });
-
-  final String title;
-  final List<Color> colors;
-  final IconData icon;
+  const PublicCoverPhoto({required this.imageUrl});
+  final String imageUrl;
 }
 
-class PublicVibeItem {
-  const PublicVibeItem({
-    required this.title,
-    required this.body,
-    required this.timeAgo,
-    required this.mediaType,
-    required this.tag,
-    required this.likes,
-    required this.comments,
-    required this.icon,
-    required this.colors,
-  });
-
-  final String title;
-  final String body;
-  final String timeAgo;
-  final String mediaType;
-  final String tag;
-  final String likes;
-  final String comments;
-  final IconData icon;
-  final List<Color> colors;
+List<PublicCoverPhoto> publicCoverPhotosFromUrls(List<String> urls) {
+  return urls
+      .map((url) => url.trim())
+      .where((url) => url.isNotEmpty)
+      .map((url) => PublicCoverPhoto(imageUrl: url))
+      .toList(growable: false);
 }
-
-const List<PublicCoverPhoto> publicProfileCoverPhotos = [
-  PublicCoverPhoto(
-    title: 'Royal Vibe',
-    colors: [
-      Color(0xFF251538),
-      Color(0xFF6D5DF6),
-      Color(0xFFE84C72),
-    ],
-    icon: VMIcons.sparkle,
-  ),
-  PublicCoverPhoto(
-    title: 'Music Night',
-    colors: [
-      Color(0xFF064D46),
-      Color(0xFF12C7B7),
-      Color(0xFFFFD36A),
-    ],
-    icon: VMIcons.music,
-  ),
-  PublicCoverPhoto(
-    title: 'Family Moment',
-    colors: [
-      Color(0xFF5C102B),
-      Color(0xFFE84C72),
-      Color(0xFFFFC857),
-    ],
-    icon: VMIcons.users,
-  ),
-];
-
-const List<PublicVibeItem> mockPublicVibes = [
-  PublicVibeItem(
-    title: 'Late night room memories',
-    body: 'Good songs, good friends, and a calm room vibe tonight.',
-    timeAgo: '2h ago',
-    mediaType: 'Photo',
-    tag: 'Room',
-    likes: '1.2K',
-    comments: '86',
-    icon: VMIcons.photo,
-    colors: [
-      Color(0xFF12C7B7),
-      Color(0xFF6D5DF6),
-    ],
-  ),
-  PublicVibeItem(
-    title: 'Vibe Sync clip',
-    body: 'The audience matched the beat perfectly in Vibe Sync.',
-    timeAgo: '8h ago',
-    mediaType: 'Video',
-    tag: 'Vibe Sync',
-    likes: '856',
-    comments: '42',
-    icon: VMIcons.play,
-    colors: [
-      Color(0xFFE84C72),
-      Color(0xFFFFD36A),
-    ],
-  ),
-  PublicVibeItem(
-    title: 'Family event ready',
-    body: 'Moon Fam is preparing for the next family event and rewards.',
-    timeAgo: '1d ago',
-    mediaType: 'Photo',
-    tag: 'Family',
-    likes: '642',
-    comments: '31',
-    icon: VMIcons.users,
-    colors: [
-      Color(0xFF6D5DF6),
-      Color(0xFFE84C72),
-    ],
-  ),
-];
