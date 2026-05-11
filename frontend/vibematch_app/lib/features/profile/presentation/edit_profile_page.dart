@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import 'models/edit_profile_models.dart';
 
@@ -14,12 +15,9 @@ class EditProfilePage extends StatefulWidget {
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
-  late final TextEditingController _nameController = TextEditingController(
-    text: widget.user.displayName ?? widget.user.username ?? 'Founder',
-  );
-  final TextEditingController _bioController = TextEditingController(
-    text: 'Building premium live rooms, Vibes, gifts and a trusted social-audio community.',
-  );
+  final AuthApiService _authApi = const AuthApiService();
+  late final TextEditingController _nameController = TextEditingController();
+  late final TextEditingController _bioController = TextEditingController();
 
   ProfileGender _gender = ProfileGender.male;
   FriendGenderPreference _friendGenderPreference = FriendGenderPreference.both;
@@ -27,6 +25,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   MaritalStatus _maritalStatus = MaritalStatus.single;
   String _profession = 'Software Engineer';
   DateTime _dob = DateTime(1998, 6, 18);
+  bool _saving = false;
   final Set<String> _interests = {'Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Live Audio'};
 
   int get _age => _calculateAgeFromDob(_dob);
@@ -50,13 +49,27 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
+    if (_saving) return;
     if (_nameController.text.trim().isEmpty) {
       _toast('Name is required.');
       return;
     }
-    _toast('Profile saved locally. Backend profile update API will connect later.');
-    Navigator.pop(context);
+    setState(() => _saving = true);
+    try {
+      await _authApi.updateProfile(
+        displayName: _nameController.text.trim(),
+        bio: _bioController.text.trim(),
+      );
+      if (!mounted) return;
+      _toast('Profile updated.');
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      _toast(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _openDobPicker() async {
@@ -99,27 +112,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final avatarName = _nameController.text.trim();
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
         child: Column(
           children: [
-            _Header(onBack: () => Navigator.pop(context), onSave: _saveProfile),
+            _Header(onBack: () => Navigator.pop(context), onSave: _saveProfile, saving: _saving),
             Expanded(
               child: ListView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
                 children: [
                   _AvatarCard(
-                    name: _nameController.text.trim().isEmpty ? 'V' : _nameController.text.trim(),
+                    name: avatarName,
                     onAvatarTap: () => _toast('Avatar picker will connect to image picker/backend upload later.'),
                   ),
                   const SizedBox(height: 12),
                   _EditSection(
                     title: 'Basic',
                     children: [
-                      _CompactTextField(label: 'Name', controller: _nameController, maxLength: 30, onChanged: (_) => setState(() {})),
-                      _CompactTextField(label: 'Bio', controller: _bioController, maxLines: 3, maxLength: 120),
+                      _CompactTextField(hint: 'Type name here', controller: _nameController, maxLength: 30, onChanged: (_) => setState(() {})),
+                      _CompactTextField(hint: 'Type bio here', controller: _bioController, maxLines: 3, maxLength: 120),
                       Row(
                         children: [
                           Expanded(child: _ReadOnlyInfoTile(label: 'Age', value: _age.toString(), helper: 'From D.O.B')),
@@ -220,9 +234,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.onBack, required this.onSave});
+  const _Header({required this.onBack, required this.onSave, required this.saving});
   final VoidCallback onBack;
   final VoidCallback onSave;
+  final bool saving;
 
   @override
   Widget build(BuildContext context) {
@@ -231,15 +246,15 @@ class _Header extends StatelessWidget {
       color: Colors.white,
       child: Row(
         children: [
-          IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF251538), size: 28)),
+          IconButton(onPressed: saving ? null : onBack, icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF251538), size: 28)),
           const Expanded(child: Text('Edit Profile', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900))),
           InkWell(
-            onTap: onSave,
+            onTap: saving ? null : onSave,
             borderRadius: BorderRadius.circular(999),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              decoration: BoxDecoration(color: const Color(0xFF251538), borderRadius: BorderRadius.circular(999)),
-              child: const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+              decoration: BoxDecoration(color: const Color(0xFF251538).withValues(alpha: saving ? 0.55 : 1), borderRadius: BorderRadius.circular(999)),
+              child: Text(saving ? 'Saving...' : 'Save', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
             ),
           ),
         ],
@@ -317,8 +332,8 @@ class _EditSection extends StatelessWidget {
 }
 
 class _CompactTextField extends StatelessWidget {
-  const _CompactTextField({required this.label, required this.controller, this.maxLines = 1, this.maxLength, this.keyboardType, this.onChanged});
-  final String label;
+  const _CompactTextField({required this.hint, required this.controller, this.maxLines = 1, this.maxLength, this.keyboardType, this.onChanged});
+  final String hint;
   final TextEditingController controller;
   final int maxLines;
   final int? maxLength;
@@ -335,8 +350,10 @@ class _CompactTextField extends StatelessWidget {
         maxLength: maxLength,
         keyboardType: keyboardType,
         onChanged: onChanged,
+        style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w800),
         decoration: InputDecoration(
-          labelText: label,
+          hintText: hint,
+          hintStyle: const TextStyle(color: Color(0xFF9B8FA3), fontWeight: FontWeight.w700),
           counterText: '',
           filled: true,
           fillColor: const Color(0xFFFAF7F1),
