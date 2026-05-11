@@ -16,16 +16,20 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
   }
 
-  static final LiveRoomMediaSignalingService instance = LiveRoomMediaSignalingService._();
+  static final LiveRoomMediaSignalingService instance =
+      LiveRoomMediaSignalingService._();
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
   Timer? _reconnectTimer;
+
   String? _roomId;
   String? _roomName;
   String? _peerId;
+
   SeatUser? _currentUser;
   SeatUser? _activeLoggedInSeatUser;
+
   bool _connecting = false;
   bool _joined = false;
   bool _shouldStayConnected = false;
@@ -33,9 +37,14 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   bool _foregroundServiceStarted = false;
   bool _showingRoomBlockDialog = false;
 
-  final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot = ValueNotifier<LiveMediaRoomSnapshot?>(null);
-  final ValueNotifier<LiveMediaRoomBlock?> roomBlock = ValueNotifier<LiveMediaRoomBlock?>(null);
-  final ValueNotifier<LiveMediaSeatInvite?> seatInvite = ValueNotifier<LiveMediaSeatInvite?>(null);
+  final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot =
+      ValueNotifier<LiveMediaRoomSnapshot?>(null);
+
+  final ValueNotifier<LiveMediaRoomBlock?> roomBlock =
+      ValueNotifier<LiveMediaRoomBlock?>(null);
+
+  final ValueNotifier<LiveMediaSeatInvite?> seatInvite =
+      ValueNotifier<LiveMediaSeatInvite?>(null);
 
   bool get isConnected => _channel != null;
   bool get isJoined => _joined;
@@ -43,21 +52,29 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   String? get peerId => _peerId;
   SeatUser? get activeLoggedInSeatUser => _activeLoggedInSeatUser;
 
-  SeatUser effectiveCurrentUser(SeatUser fallback) => _activeLoggedInSeatUser ?? fallback;
+  SeatUser effectiveCurrentUser(SeatUser fallback) {
+    return _activeLoggedInSeatUser ?? fallback;
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appInForeground = state == AppLifecycleState.resumed;
     _debug('app lifecycle changed: $state');
+
     if (_appInForeground) {
       _scheduleReconnect(reason: 'app resumed');
     }
   }
 
-  void configureRoom({required String roomId, required String roomName}) {
+  void configureRoom({
+    required String roomId,
+    required String roomName,
+  }) {
     final nextRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
+
     _roomId = nextRoomId;
     _roomName = roomName.trim().isEmpty ? 'Live Room' : roomName.trim();
+
     if (roomSnapshot.value?.roomId != nextRoomId) {
       roomSnapshot.value = null;
       roomBlock.value = null;
@@ -68,6 +85,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void setActiveLoggedInUser(CurrentUser user) {
     final isOfficial = user.canSeeOwnerControls;
     final roleLabel = user.primaryRoleBadge?.badgeLabel ?? user.roleDisplayLabel;
+
     _activeLoggedInSeatUser = SeatUser(
       id: 'user_${user.publicUserId}',
       name: user.displayName ?? user.username ?? 'Vibe User',
@@ -81,13 +99,19 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       receivingLevel: isOfficial ? 44 : 1,
       sentExp: 0,
       receivedExp: 0,
-      medals: const [],
-      avatarColors: isOfficial ? const [Color(0xFFFFC857), Color(0xFFE84C72)] : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      medals: const <String>[],
+      avatarColors: isOfficial
+          ? const <Color>[Color(0xFFFFC857), Color(0xFFE84C72)]
+          : const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
       isCurrentUser: true,
       isHost: isOfficial,
       isRoomAdmin: isOfficial,
     );
-    _debug('active logged-in room identity set: ${_activeLoggedInSeatUser!.id} ${_activeLoggedInSeatUser!.name}');
+
+    _debug(
+      'active logged-in room identity set: '
+      '${_activeLoggedInSeatUser!.id} ${_activeLoggedInSeatUser!.name}',
+    );
   }
 
   void seedActiveRoomSeatUser(SeatUser user) {
@@ -116,47 +140,71 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       selfMuted: user.selfMuted,
       adminMuted: user.adminMuted,
     );
+
     _currentUser = _activeLoggedInSeatUser;
-    _debug('active room identity seeded from presence: ${user.id} ${user.name} host=${user.isHost} admin=${user.isRoomAdmin}');
+
+    _debug(
+      'active room identity seeded from presence: '
+      '${user.id} ${user.name} host=${user.isHost} admin=${user.isRoomAdmin}',
+    );
   }
 
   bool isSeatVacant(int seatIndex) {
     if (seatIndex < 0) return false;
+
     final snapshot = roomSnapshot.value;
     if (snapshot == null) return true;
+
     return !snapshot.peers.any((peer) => peer.seatIndex == seatIndex);
   }
 
   void takeSeatIfVacant(int seatIndex) {
     if (!isSeatVacant(seatIndex)) {
-      _debug('auto seat skipped because seat $seatIndex is occupied');
+      _debug('auto seat skipped because seat $seatIndex is already occupied');
       return;
     }
+
     takeSeat(seatIndex);
   }
 
-  Future<void> joinRoom({required SeatUser currentUser}) async {
+  Future<void> joinRoom({
+    required SeatUser currentUser,
+  }) async {
     final effectiveUser = effectiveCurrentUser(currentUser);
+
     _currentUser = effectiveUser;
     _shouldStayConnected = true;
     roomBlock.value = null;
     _showingRoomBlockDialog = false;
+
     await _startForegroundServiceIfNeeded();
     await _joinRoomInternal(reason: 'join requested');
   }
 
   void takeSeat(int seatIndex) {
     if (seatIndex < 0) return;
+
     seatInvite.value = null;
     LiveRoomAudioService.instance.takeSeat(seatIndex);
-    _send('seat/take', {'seat_index': seatIndex});
+
+    _send('seat/take', <String, Object?>{
+      'seat_index': seatIndex,
+    });
   }
 
-  void sendSeatInvite({required int seatIndex, required String targetUserId}) {
+  void sendSeatInvite({
+    required int seatIndex,
+    required String targetUserId,
+  }) {
     if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
+
     final currentUserId = _activeLoggedInSeatUser?.id ?? _currentUser?.id;
     if (currentUserId != null && targetUserId == currentUserId) return;
-    _send('seat_invite/send', {'seat_index': seatIndex, 'target_user_id': targetUserId});
+
+    _send('seat_invite/send', <String, Object?>{
+      'seat_index': seatIndex,
+      'target_user_id': targetUserId,
+    });
   }
 
   void clearSeatInvite() {
@@ -165,110 +213,187 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   void leaveSeat() {
     LiveRoomAudioService.instance.leaveSeat();
+
     _send('seat/leave', <String, Object?>{});
   }
 
-  void forceLeaveSeat({required int seatIndex, required String targetUserId}) {
+  void forceLeaveSeat({
+    required int seatIndex,
+    required String targetUserId,
+  }) {
     if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
-    _send('admin/seat_leave', {'seat_index': seatIndex, 'target_user_id': targetUserId});
+
+    _send('admin/seat_leave', <String, Object?>{
+      'seat_index': seatIndex,
+      'target_user_id': targetUserId,
+    });
   }
 
-  void lockSeat({required int seatIndex}) {
+  void lockSeat({
+    required int seatIndex,
+  }) {
     if (seatIndex < 0) return;
-    _send('admin/seat_lock', {'seat_index': seatIndex});
+
+    _send('admin/seat_lock', <String, Object?>{
+      'seat_index': seatIndex,
+    });
   }
 
-  void unlockSeat({required int seatIndex}) {
+  void unlockSeat({
+    required int seatIndex,
+  }) {
     if (seatIndex < 0) return;
-    _send('admin/seat_unlock', {'seat_index': seatIndex});
+
+    _send('admin/seat_unlock', <String, Object?>{
+      'seat_index': seatIndex,
+    });
   }
 
-  void leaveAndLockSeat({required int seatIndex, required String targetUserId}) {
+  void leaveAndLockSeat({
+    required int seatIndex,
+    required String targetUserId,
+  }) {
     if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
-    _send('admin/seat_leave_lock', {'seat_index': seatIndex, 'target_user_id': targetUserId});
+
+    _send('admin/seat_leave_lock', <String, Object?>{
+      'seat_index': seatIndex,
+      'target_user_id': targetUserId,
+    });
   }
 
-  void kickUser({required String targetUserId, String reason = 'Removed by room admin', String duration = '1h'}) {
+  void kickUser({
+    required String targetUserId,
+    String reason = 'Removed by room admin',
+    String duration = '1h',
+  }) {
     if (targetUserId.trim().isEmpty) return;
-    _send('admin/kick', {'target_user_id': targetUserId, 'reason': reason, 'duration': duration});
+
+    _send('admin/kick', <String, Object?>{
+      'target_user_id': targetUserId,
+      'reason': reason,
+      'duration': duration,
+    });
   }
 
-  void removeKickBlock({required String targetUserId}) {
+  void removeKickBlock({
+    required String targetUserId,
+  }) {
     if (targetUserId.trim().isEmpty) return;
-    _send('admin/kick_remove', {'target_user_id': targetUserId});
+
+    _send('admin/kick_remove', <String, Object?>{
+      'target_user_id': targetUserId,
+    });
   }
 
   void setMicEnabled(bool enabled) {
     if (enabled && _currentUserIsAdminMuted()) {
       _debug('mic enable blocked because current user is admin-muted');
       LiveRoomAudioService.instance.setSelfMuted(true);
-      _send('mic/set_enabled', {'enabled': false});
+
+      _send('mic/set_enabled', <String, Object?>{
+        'enabled': false,
+      });
       return;
     }
+
     LiveRoomAudioService.instance.setSelfMuted(!enabled);
-    _send('mic/set_enabled', {'enabled': enabled});
+
+    _send('mic/set_enabled', <String, Object?>{
+      'enabled': enabled,
+    });
   }
 
-  void setAdminMute({required String targetUserId, required bool muted}) {
+  void setAdminMute({
+    required String targetUserId,
+    required bool muted,
+  }) {
     if (targetUserId.trim().isEmpty) return;
-    _applyAdminMuteToCurrentSnapshot(targetUserId: targetUserId, muted: muted);
-    _enforceAdminMuteIfCurrentUser(targetUserId: targetUserId, muted: muted);
-    _send('admin_mute/set', {'target_user_id': targetUserId, 'muted': muted});
+
+    _applyAdminMuteToCurrentSnapshot(
+      targetUserId: targetUserId,
+      muted: muted,
+    );
+
+    _enforceAdminMuteIfCurrentUser(
+      targetUserId: targetUserId,
+      muted: muted,
+    );
+
+    _send('admin_mute/set', <String, Object?>{
+      'target_user_id': targetUserId,
+      'muted': muted,
+    });
   }
 
   void sendRoomChat(String text) {
     final safeText = text.trim();
     if (safeText.isEmpty) return;
-    _send('room/chat', {'text': safeText});
+
+    _send('room/chat', <String, Object?>{
+      'text': safeText,
+    });
   }
 
   Future<void> leaveRoom() async {
     _shouldStayConnected = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+
     if (_channel != null && _joined) {
       _send('room/leave', <String, Object?>{});
     }
+
     _joined = false;
     _peerId = null;
     roomSnapshot.value = null;
     roomBlock.value = null;
     seatInvite.value = null;
+
     await LiveRoomAudioService.instance.leaveRoom();
     await _subscription?.cancel();
     _subscription = null;
+
     await _channel?.sink.close();
     _channel = null;
     _connecting = false;
+
     await _stopForegroundServiceIfNeeded();
   }
 
-  Future<void> _disconnectAfterServerRemoval({required LiveMediaRoomBlock block}) async {
+  Future<void> _disconnectAfterServerRemoval({
+    required LiveMediaRoomBlock block,
+  }) async {
     roomBlock.value = block;
     _shouldStayConnected = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+
     _joined = false;
     _peerId = null;
     roomSnapshot.value = null;
     seatInvite.value = null;
+
     await LiveRoomAudioService.instance.leaveRoom();
     await _subscription?.cancel();
     _subscription = null;
+
     await _channel?.sink.close();
     _channel = null;
     _connecting = false;
+
     await _stopForegroundServiceIfNeeded();
     _exitRoomAndShowBlockDialog(block);
   }
 
   void _exitRoomAndShowBlockDialog(LiveMediaRoomBlock block) {
     if (_showingRoomBlockDialog) return;
+
     _showingRoomBlockDialog = true;
 
     Future<void>.delayed(const Duration(milliseconds: 80), () async {
       final navigator = rootNavigatorKey.currentState;
       final navContext = rootNavigatorKey.currentContext;
+
       if (navigator == null || navContext == null) {
         _showingRoomBlockDialog = false;
         return;
@@ -280,6 +405,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       }
 
       await Future<void>.delayed(const Duration(milliseconds: 220));
+
       final dialogContext = rootNavigatorKey.currentContext;
       if (dialogContext == null) {
         _showingRoomBlockDialog = false;
@@ -291,7 +417,9 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         useRootNavigator: true,
         barrierDismissible: true,
         builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
           title: const Text('Room access blocked'),
           content: Text(block.displayMessage),
           actions: [
@@ -302,30 +430,40 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
           ],
         ),
       );
+
       _showingRoomBlockDialog = false;
     });
   }
 
   Future<void> _startForegroundServiceIfNeeded() async {
     if (_foregroundServiceStarted) return;
+
     _foregroundServiceStarted = true;
+
     await LiveRoomForegroundService.start(
       roomName: _roomName ?? 'Live Room',
       roomId: _roomId ?? 'Vibe Match',
     );
+
     _debug('live room foreground service started');
   }
 
   Future<void> _stopForegroundServiceIfNeeded() async {
     if (!_foregroundServiceStarted) return;
+
     _foregroundServiceStarted = false;
+
     await LiveRoomForegroundService.stop();
+
     _debug('live room foreground service stopped');
   }
 
-  Future<void> _joinRoomInternal({required String reason}) async {
+  Future<void> _joinRoomInternal({
+    required String reason,
+  }) async {
     final effectiveUser = _currentUser;
     final safeRoomId = _roomId ?? 'VM257808';
+
     if (effectiveUser == null) return;
 
     if (_joined && _channel != null) {
@@ -334,22 +472,29 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     }
 
     _debug('joining media room: $reason');
+
     await _connect();
+
     if (_channel == null) {
       _scheduleReconnect(reason: 'join failed without channel');
       return;
     }
+
     _send('room/join', _joinPayload(effectiveUser, safeRoomId));
     _joined = true;
   }
 
   Future<void> _connect() async {
     if (_channel != null || _connecting) return;
+
     _connecting = true;
+
     try {
       final wsUrl = Uri.parse(VmMediaConfig.wsUrl);
       final channel = WebSocketChannel.connect(wsUrl);
+
       _channel = channel;
+
       _subscription = channel.stream.listen(
         _handleMessage,
         onError: (Object error) {
@@ -364,6 +509,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         },
         cancelOnError: true,
       );
+
       _debug('media websocket connecting: ${VmMediaConfig.wsUrl}');
     } catch (error) {
       _debug('media websocket connect failed: $error');
@@ -374,28 +520,57 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     }
   }
 
-  void _scheduleReconnect({required String reason}) {
-    if (!_shouldStayConnected || !_appInForeground || _currentUser == null || _roomId == null) return;
+  void _scheduleReconnect({
+    required String reason,
+  }) {
+    if (!_shouldStayConnected ||
+        !_appInForeground ||
+        _currentUser == null ||
+        _roomId == null) {
+      return;
+    }
+
     if (_channel != null || _connecting) return;
+
     _reconnectTimer?.cancel();
+
     _debug('media reconnect scheduled: $reason');
+
     _reconnectTimer = Timer(const Duration(milliseconds: 2500), () {
       _reconnectTimer = null;
+
       if (!_shouldStayConnected || !_appInForeground) return;
-      unawaited(_joinRoomInternal(reason: 'reconnect: $reason').catchError((Object error) {
-        _debug('media reconnect ignored after failure: $error');
-      }));
+
+      unawaited(
+        _joinRoomInternal(reason: 'reconnect: $reason').catchError(
+          (Object error) {
+            _debug('media reconnect ignored after failure: $error');
+          },
+        ),
+      );
     });
   }
 
   Map<String, Object?> _joinPayload(SeatUser user, String safeRoomId) {
-    final stablePeerId = '${safeRoomId}_${user.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\\-]'), '_');
+    final stablePeerId = '${safeRoomId}_${user.id}'.replaceAll(
+      RegExp(r'[^a-zA-Z0-9_\-]'),
+      '_',
+    );
+
     _peerId = stablePeerId;
-    return {'room_id': safeRoomId, 'peer_id': stablePeerId, 'user_id': user.id, 'display_name': user.name, 'seat_index': null};
+
+    return <String, Object?>{
+      'room_id': safeRoomId,
+      'peer_id': stablePeerId,
+      'user_id': user.id,
+      'display_name': user.name,
+      'seat_index': null,
+    };
   }
 
   void _send(String type, Map<String, Object?> payload) {
     final channel = _channel;
+
     if (channel == null) {
       _debug('media send skipped, socket not connected: $type');
       _scheduleReconnect(reason: 'send skipped for $type');
@@ -403,8 +578,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     }
 
     try {
-      final message = jsonEncode({'type': type, 'payload': payload});
+      final message = jsonEncode(<String, Object?>{
+        'type': type,
+        'payload': payload,
+      });
+
       channel.sink.add(message);
+
       _debug('media sent: $type $payload');
     } catch (error) {
       _debug('media send failed for $type: $error');
@@ -418,48 +598,64 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       final decoded = jsonDecode(raw.toString()) as Map<String, dynamic>;
       final type = decoded['type']?.toString() ?? 'unknown';
       final payload = decoded['payload'];
+
       _debug('media received: $type $payload');
-      if (payload is Map<String, dynamic>) {
-        if (type == 'kick_block/removed' || type == 'kick_block/remove_result') {
-          final removed = payload['removed'] == true;
-          final targetUserId = payload['target_user_id']?.toString();
-          final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
-          if (removed && (targetUserId == null || targetUserId == currentUserId)) {
-            roomBlock.value = null;
-            _showingRoomBlockDialog = false;
-            _debug('cleared local room block after kick block removal');
-          }
-          final roomData = payload['room'];
-          if (roomData is Map<String, dynamic>) {
-            roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
-          }
-          return;
-        }
-        if (type == 'room/kicked' || type == 'room/join_blocked') {
-          unawaited(_disconnectAfterServerRemoval(block: LiveMediaRoomBlock.fromJson(payload, type: type)));
-          return;
-        }
-        if (type == 'room/joined') {
+
+      if (payload is! Map<String, dynamic>) return;
+
+      if (type == 'kick_block/removed' || type == 'kick_block/remove_result') {
+        final removed = payload['removed'] == true;
+        final targetUserId = payload['target_user_id']?.toString();
+        final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
+
+        if (removed && (targetUserId == null || targetUserId == currentUserId)) {
           roomBlock.value = null;
-          _joinAudioAfterMediaJoin();
+          _showingRoomBlockDialog = false;
+          _debug('cleared local room block after kick block removal');
         }
-        if (type == 'seat_invite/received') {
-          seatInvite.value = LiveMediaSeatInvite.fromJson(payload);
-          return;
-        }
+
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
-          final nextSnapshot = LiveMediaRoomSnapshot.fromJson(roomData);
-          if (type == 'admin_mute/updated') {
-            roomSnapshot.value = _overlayAdminMute(nextSnapshot, payload);
-          } else {
-            roomSnapshot.value = nextSnapshot;
-          }
-          _enforceCurrentUserAudioStateFromSnapshot(roomSnapshot.value);
-        } else if (type == 'admin_mute/updated') {
-          roomSnapshot.value = _overlayAdminMute(roomSnapshot.value, payload);
-          _enforceAdminMutePayloadIfCurrentUser(payload);
+          roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
         }
+
+        return;
+      }
+
+      if (type == 'room/kicked' || type == 'room/join_blocked') {
+        unawaited(
+          _disconnectAfterServerRemoval(
+            block: LiveMediaRoomBlock.fromJson(payload, type: type),
+          ),
+        );
+        return;
+      }
+
+      if (type == 'room/joined') {
+        roomBlock.value = null;
+        _joinAudioAfterMediaJoin();
+      }
+
+      if (type == 'seat_invite/received') {
+        seatInvite.value = LiveMediaSeatInvite.fromJson(payload);
+        return;
+      }
+
+      final roomData = payload['room'];
+
+      if (roomData is Map<String, dynamic>) {
+        final nextSnapshot = LiveMediaRoomSnapshot.fromJson(roomData);
+
+        if (type == 'admin_mute/updated') {
+          roomSnapshot.value = _overlayAdminMute(nextSnapshot, payload);
+        } else {
+          roomSnapshot.value = nextSnapshot;
+        }
+
+        _enforceCurrentUserAudioStateFromSnapshot(roomSnapshot.value);
+      } else if (type == 'admin_mute/updated') {
+        roomSnapshot.value = _overlayAdminMute(roomSnapshot.value, payload);
+        _enforceAdminMutePayloadIfCurrentUser(payload);
       }
     } catch (error) {
       _debug('media received unreadable message: $raw');
@@ -469,13 +665,24 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void _joinAudioAfterMediaJoin() {
     final roomId = _roomId;
     final user = _currentUser ?? _activeLoggedInSeatUser;
+
     if (roomId == null || user == null) return;
-    unawaited(LiveRoomAudioService.instance.joinRoom(roomId: roomId, currentUser: user));
+
+    unawaited(
+      LiveRoomAudioService.instance.joinRoom(
+        roomId: roomId,
+        currentUser: user,
+      ),
+    );
   }
 
-  void _applyAdminMuteToCurrentSnapshot({required String targetUserId, required bool muted}) {
+  void _applyAdminMuteToCurrentSnapshot({
+    required String targetUserId,
+    required bool muted,
+  }) {
     final snapshot = roomSnapshot.value;
     if (snapshot == null) return;
+
     roomSnapshot.value = LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
       peerCount: snapshot.peerCount,
@@ -483,27 +690,44 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       peers: snapshot.peers.map((peer) {
         final matchesUser = peer.userId == targetUserId || peer.peerId == targetUserId;
         if (!matchesUser) return peer;
-        return peer.copyWith(adminMuted: muted, micEnabled: muted ? false : peer.micEnabled);
+
+        return peer.copyWith(
+          adminMuted: muted,
+          micEnabled: muted ? false : peer.micEnabled,
+        );
       }).toList(),
     );
   }
 
-  LiveMediaRoomSnapshot? _overlayAdminMute(LiveMediaRoomSnapshot? snapshot, Map<String, dynamic> payload) {
+  LiveMediaRoomSnapshot? _overlayAdminMute(
+    LiveMediaRoomSnapshot? snapshot,
+    Map<String, dynamic> payload,
+  ) {
     if (snapshot == null) return null;
+
     final targetPeerId = payload['peer_id']?.toString();
     final targetUserId = payload['user_id']?.toString();
     final muted = payload['admin_muted'] == true || payload['adminMuted'] == true;
-    final micEnabled = payload.containsKey('mic_enabled') ? payload['mic_enabled'] == true : null;
+    final micEnabled = payload.containsKey('mic_enabled')
+        ? payload['mic_enabled'] == true
+        : null;
 
     return LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
       peerCount: snapshot.peerCount,
       lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
-        final matchesPeer = targetPeerId != null && targetPeerId.isNotEmpty && peer.peerId == targetPeerId;
-        final matchesUser = targetUserId != null && targetUserId.isNotEmpty && peer.userId == targetUserId;
+        final matchesPeer =
+            targetPeerId != null && targetPeerId.isNotEmpty && peer.peerId == targetPeerId;
+        final matchesUser =
+            targetUserId != null && targetUserId.isNotEmpty && peer.userId == targetUserId;
+
         if (!matchesPeer && !matchesUser) return peer;
-        return peer.copyWith(adminMuted: muted, micEnabled: micEnabled ?? (muted ? false : peer.micEnabled));
+
+        return peer.copyWith(
+          adminMuted: muted,
+          micEnabled: micEnabled ?? (muted ? false : peer.micEnabled),
+        );
       }).toList(),
     );
   }
@@ -511,26 +735,36 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   bool _currentUserIsAdminMuted() {
     final snapshot = roomSnapshot.value;
     if (snapshot == null) return false;
+
     final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
     final currentPeerId = _peerId;
+
     for (final peer in snapshot.peers) {
       final matchesUser = currentUserId != null && peer.userId == currentUserId;
       final matchesPeer = currentPeerId != null && peer.peerId == currentPeerId;
+
       if ((matchesUser || matchesPeer) && peer.adminMuted) return true;
     }
+
     return false;
   }
 
-  void _enforceCurrentUserAudioStateFromSnapshot(LiveMediaRoomSnapshot? snapshot) {
+  void _enforceCurrentUserAudioStateFromSnapshot(
+    LiveMediaRoomSnapshot? snapshot,
+  ) {
     if (snapshot == null) return;
+
     final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
     final currentPeerId = _peerId;
+
     if (currentUserId == null && currentPeerId == null) return;
 
     LiveMediaPeerSnapshot? currentPeer;
+
     for (final peer in snapshot.peers) {
       final matchesUser = currentUserId != null && peer.userId == currentUserId;
       final matchesPeer = currentPeerId != null && peer.peerId == currentPeerId;
+
       if (matchesUser || matchesPeer) {
         currentPeer = peer;
         break;
@@ -546,7 +780,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (currentPeer.adminMuted) {
       _debug('admin mute enforced from room snapshot for current user');
       LiveRoomAudioService.instance.setSelfMuted(true);
-      return;
     }
   }
 
@@ -554,17 +787,33 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final targetPeerId = payload['peer_id']?.toString();
     final targetUserId = payload['user_id']?.toString();
     final muted = payload['admin_muted'] == true || payload['adminMuted'] == true;
+
     if (!muted) return;
-    _enforceAdminMuteIfCurrentUser(targetUserId: targetUserId, targetPeerId: targetPeerId, muted: muted);
+
+    _enforceAdminMuteIfCurrentUser(
+      targetUserId: targetUserId,
+      targetPeerId: targetPeerId,
+      muted: muted,
+    );
   }
 
-  void _enforceAdminMuteIfCurrentUser({String? targetUserId, String? targetPeerId, required bool muted}) {
+  void _enforceAdminMuteIfCurrentUser({
+    String? targetUserId,
+    String? targetPeerId,
+    required bool muted,
+  }) {
     if (!muted) return;
+
     final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
     final currentPeerId = _peerId;
-    final matchesUser = targetUserId != null && targetUserId.isNotEmpty && currentUserId == targetUserId;
-    final matchesPeer = targetPeerId != null && targetPeerId.isNotEmpty && currentPeerId == targetPeerId;
+
+    final matchesUser =
+        targetUserId != null && targetUserId.isNotEmpty && currentUserId == targetUserId;
+    final matchesPeer =
+        targetPeerId != null && targetPeerId.isNotEmpty && currentPeerId == targetPeerId;
+
     if (!matchesUser && !matchesPeer) return;
+
     _debug('admin mute enforced on current user audio producer');
     LiveRoomAudioService.instance.setSelfMuted(true);
   }
@@ -583,7 +832,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 }
 
 class LiveMediaSeatInvite {
-  const LiveMediaSeatInvite({required this.inviteId, required this.roomId, required this.seatIndex, required this.inviterUserId, required this.inviterName});
+  const LiveMediaSeatInvite({
+    required this.inviteId,
+    required this.roomId,
+    required this.seatIndex,
+    required this.inviterUserId,
+    required this.inviterName,
+  });
 
   final String inviteId;
   final String roomId;
@@ -603,7 +858,12 @@ class LiveMediaSeatInvite {
 }
 
 class LiveMediaRoomBlock {
-  const LiveMediaRoomBlock({required this.type, required this.reason, this.kickedUntil, this.remainingMs});
+  const LiveMediaRoomBlock({
+    required this.type,
+    required this.reason,
+    this.kickedUntil,
+    this.remainingMs,
+  });
 
   final String type;
   final String reason;
@@ -613,35 +873,53 @@ class LiveMediaRoomBlock {
   bool get isKick => type == 'room/kicked' || type == 'room/join_blocked';
 
   String get durationLabel {
-    final ms = remainingMs ?? (kickedUntil == null ? null : kickedUntil!.difference(DateTime.now()).inMilliseconds);
+    final ms = remainingMs ??
+        (kickedUntil == null ? null : kickedUntil!.difference(DateTime.now()).inMilliseconds);
+
     if (ms == null) return 'a permanent duration';
+
     final safeMs = ms < 0 ? 0 : ms;
     final totalMinutes = (safeMs / 60000).ceil();
+
     if (totalMinutes <= 1) return 'less than 1 minute';
     if (totalMinutes < 60) return '$totalMinutes minutes';
+
     final hours = (totalMinutes / 60).ceil();
     if (hours < 24) return '$hours hour${hours == 1 ? '' : 's'}';
+
     final days = (hours / 24).ceil();
     return '$days day${days == 1 ? '' : 's'}';
   }
 
   String get displayMessage {
-    if (isKick) return 'You were kicked out of this room for $durationLabel. You can enter again after the kick duration ends or when a room owner removes the block.';
+    if (isKick) {
+      return 'You were kicked out of this room for $durationLabel. You can enter again after the kick duration ends or when a room owner removes the block.';
+    }
+
     return reason;
   }
 
-  factory LiveMediaRoomBlock.fromJson(Map<String, dynamic> json, {required String type}) {
+  factory LiveMediaRoomBlock.fromJson(
+    Map<String, dynamic> json, {
+    required String type,
+  }) {
     return LiveMediaRoomBlock(
       type: type,
       reason: json['reason']?.toString() ?? 'You cannot enter this room right now.',
       kickedUntil: DateTime.tryParse(json['kicked_until']?.toString() ?? ''),
-      remainingMs: int.tryParse(json['remaining_ms']?.toString() ?? '') ?? int.tryParse(json['duration_ms']?.toString() ?? ''),
+      remainingMs: int.tryParse(json['remaining_ms']?.toString() ?? '') ??
+          int.tryParse(json['duration_ms']?.toString() ?? ''),
     );
   }
 }
 
 class LiveMediaRoomSnapshot {
-  const LiveMediaRoomSnapshot({required this.roomId, required this.peers, int? peerCount, this.lockedSeatIndexes = const <int>{}}) : peerCount = peerCount ?? peers.length;
+  const LiveMediaRoomSnapshot({
+    required this.roomId,
+    required this.peers,
+    int? peerCount,
+    this.lockedSeatIndexes = const <int>{},
+  }) : peerCount = peerCount ?? peers.length;
 
   final String roomId;
   final int peerCount;
@@ -650,16 +928,40 @@ class LiveMediaRoomSnapshot {
 
   factory LiveMediaRoomSnapshot.fromJson(Map<String, dynamic> json) {
     final rawPeers = json['peers'];
-    final peers = rawPeers is List ? rawPeers.whereType<Map<String, dynamic>>().map(LiveMediaPeerSnapshot.fromJson).toList() : <LiveMediaPeerSnapshot>[];
+
+    final peers = rawPeers is List
+        ? rawPeers
+            .whereType<Map<String, dynamic>>()
+            .map(LiveMediaPeerSnapshot.fromJson)
+            .toList()
+        : <LiveMediaPeerSnapshot>[];
+
     final rawLockedSeats = json['locked_seat_indexes'] ?? json['lockedSeatIndexes'];
-    final lockedSeatIndexes = rawLockedSeats is List ? rawLockedSeats.map((item) => int.tryParse(item.toString())).whereType<int>().toSet() : <int>{};
+
+    final lockedSeatIndexes = rawLockedSeats is List
+        ? rawLockedSeats.map((item) => int.tryParse(item.toString())).whereType<int>().toSet()
+        : <int>{};
+
     final parsedPeerCount = int.tryParse(json['peer_count']?.toString() ?? '');
-    return LiveMediaRoomSnapshot(roomId: json['room_id']?.toString() ?? '', peerCount: parsedPeerCount ?? peers.length, peers: peers, lockedSeatIndexes: lockedSeatIndexes);
+
+    return LiveMediaRoomSnapshot(
+      roomId: json['room_id']?.toString() ?? '',
+      peerCount: parsedPeerCount ?? peers.length,
+      peers: peers,
+      lockedSeatIndexes: lockedSeatIndexes,
+    );
   }
 }
 
 class LiveMediaPeerSnapshot {
-  const LiveMediaPeerSnapshot({required this.peerId, required this.userId, required this.displayName, required this.seatIndex, required this.micEnabled, required this.adminMuted});
+  const LiveMediaPeerSnapshot({
+    required this.peerId,
+    required this.userId,
+    required this.displayName,
+    required this.seatIndex,
+    required this.micEnabled,
+    required this.adminMuted,
+  });
 
   final String peerId;
   final String userId;
@@ -668,7 +970,10 @@ class LiveMediaPeerSnapshot {
   final bool micEnabled;
   final bool adminMuted;
 
-  LiveMediaPeerSnapshot copyWith({bool? micEnabled, bool? adminMuted}) {
+  LiveMediaPeerSnapshot copyWith({
+    bool? micEnabled,
+    bool? adminMuted,
+  }) {
     return LiveMediaPeerSnapshot(
       peerId: peerId,
       userId: userId,
@@ -681,11 +986,14 @@ class LiveMediaPeerSnapshot {
 
   factory LiveMediaPeerSnapshot.fromJson(Map<String, dynamic> json) {
     final adminMutedValue = json['admin_muted'] ?? json['adminMuted'];
+
     return LiveMediaPeerSnapshot(
       peerId: json['peer_id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
       displayName: json['display_name']?.toString() ?? 'Vibe User',
-      seatIndex: json['seat_index'] is int ? json['seat_index'] as int : int.tryParse(json['seat_index']?.toString() ?? ''),
+      seatIndex: json['seat_index'] is int
+          ? json['seat_index'] as int
+          : int.tryParse(json['seat_index']?.toString() ?? ''),
       micEnabled: json['mic_enabled'] == true,
       adminMuted: adminMutedValue == true,
     );

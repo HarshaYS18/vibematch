@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_routes.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
+import '../data/live_room_media_signaling_service.dart';
 import '../data/room_moderation_repository.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
@@ -46,11 +47,11 @@ import 'widgets/vibesync_room_module.dart';
 class LiveRoomPage extends StatefulWidget {
   const LiveRoomPage({
     super.key,
-    this.roomName = 'Late Night Chill',
-    this.roomId = 'VM257808',
+    this.roomName = 'Live Room',
+    this.roomId = 'VM000000',
     this.language = 'Telugu',
     this.modeTitle = 'Open',
-    this.onlineCount = 3,
+    this.onlineCount = 1,
   });
 
   final String roomName;
@@ -78,9 +79,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   final LiveRoomVibeSyncController _vibeSyncController = const LiveRoomVibeSyncController();
   final LiveRoomNavigationController _navigationController = const LiveRoomNavigationController();
 
-  final SeatUser _currentUser = mockRoomUsers.first;
   _PendingSeatInvite? _pendingSeatInvite;
   Timer? _seatInviteAutoHideTimer;
+  Timer? _hostSeatOneTimer;
+  Timer? _hostSeatOneRetryTimer;
+
+  SeatUser get _currentUser {
+    return LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser ?? _roomIdentityFallback;
+  }
 
   String get _roomName => _roomStateController.roomName;
   String get _roomId => _roomStateController.roomId;
@@ -98,10 +104,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   List<SeatUser> get _roomUsers => _seatController.roomUsers;
 
   List<SeatUser> get _allRoomUsers {
+    final realUsers = <SeatUser>[
+      ..._roomUsers,
+      if (!_roomUsers.any((user) => user.id == _currentUser.id)) _currentUser,
+    ];
+
     return _usersController.buildAllRoomUsers(
       seatedUsers: _roomUsers,
-      fallbackRoomUsers: mockRoomUsers,
-      inviteUsers: mockInviteUsers,
+      fallbackRoomUsers: realUsers,
+      inviteUsers: const <SeatUser>[],
       isUserRemoved: _moderationController.isLocallyKickedOut,
     );
   }
@@ -120,6 +131,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   @override
   void initState() {
     super.initState();
+    final currentUser = _currentUser;
+
     _messageController = LiveRoomMentionTextController();
     _announcementController = TextEditingController();
     _messageFocusNode = FocusNode();
@@ -128,15 +141,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       initialRoomId: widget.roomId,
       initialModeTitle: widget.modeTitle,
     )..addListener(_onRoomStateChanged);
-    _moderationController = LiveRoomModerationController(currentUser: _currentUser);
+
+    _moderationController = LiveRoomModerationController(currentUser: currentUser);
+
     _roomMessageController = LiveRoomMessageController(
-      currentUser: _currentUser,
+      currentUser: currentUser,
       onChanged: () {
         if (mounted) setState(() {});
       },
     );
+
     _seatController = LiveRoomSeatController(
-      currentUser: _currentUser,
+      currentUser: currentUser,
       onChanged: () {
         if (mounted) setState(() {});
       },
@@ -145,8 +161,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         RoomToast.show(context, message);
       },
     )..initialize('5x2');
+
     _giftController = LiveRoomGiftController(
-      currentUser: _currentUser,
+      currentUser: currentUser,
       onChanged: () {
         if (mounted) setState(() {});
       },
@@ -159,14 +176,19 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         RoomToast.show(context, message);
       },
     );
+
     if (_roomUsers.isNotEmpty) {
       _giftController.selectedReceiverIds.add(_roomUsers.first.id);
     }
+
+    _autoOccupySeatOneForHostOrAdmin();
   }
 
   @override
   void dispose() {
     _seatInviteAutoHideTimer?.cancel();
+    _hostSeatOneTimer?.cancel();
+    _hostSeatOneRetryTimer?.cancel();
     _roomStateController.removeListener(_onRoomStateChanged);
     _messageController.dispose();
     _announcementController.dispose();
@@ -179,6 +201,30 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _onRoomStateChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _autoOccupySeatOneForHostOrAdmin() {
+    if (!_viewerCanManageRoom) return;
+
+    _hostSeatOneTimer?.cancel();
+    _hostSeatOneRetryTimer?.cancel();
+
+    _hostSeatOneTimer = Timer(const Duration(milliseconds: 180), _tryOccupySeatOneForHostOrAdmin);
+    _hostSeatOneRetryTimer = Timer(const Duration(milliseconds: 1200), _tryOccupySeatOneForHostOrAdmin);
+  }
+
+  void _tryOccupySeatOneForHostOrAdmin() {
+    if (!mounted || !_viewerCanManageRoom) return;
+    if (_seatController.seats.isEmpty) return;
+
+    final firstSeat = _seatController.seats.first;
+    if (firstSeat.locked || firstSeat.user != null) {
+      LiveRoomMediaSignalingService.instance.takeSeatIfVacant(0);
+      return;
+    }
+
+    _seatController.occupySeat(0);
+    LiveRoomMediaSignalingService.instance.takeSeatIfVacant(0);
   }
 
   @override
@@ -205,7 +251,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 },
                 onDrag: (details) {
                   dismissRoomSeatActionPill();
-                  _roomStateController.setBubbleOffset(_navigationController.nextBubbleOffset(currentOffset: _bubbleOffset, dragDelta: details.delta, screenSize: MediaQuery.sizeOf(context)));
+                  _roomStateController.setBubbleOffset(
+                    _navigationController.nextBubbleOffset(
+                      currentOffset: _bubbleOffset,
+                      dragDelta: details.delta,
+                      screenSize: MediaQuery.sizeOf(context),
+                    ),
+                  );
                 },
               ),
             ],
@@ -228,7 +280,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         body: Stack(
           children: [
             Positioned.fill(child: RoomBackground(theme: _selectedBackgroundTheme)),
-            Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: _dismissRoomOverlays, child: const SizedBox.expand())),
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _dismissRoomOverlays,
+                child: const SizedBox.expand(),
+              ),
+            ),
             LiveRoomBody(
               roomName: _roomName,
               roomId: _roomId,
@@ -333,14 +391,33 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _openMiniProfile(user, index);
   }
 
-  void _approveSeatApplication(ChatEntry entry) => _seatController.approveSeatApplication(entry: entry, messages: _roomMessageController.messages, allRoomUsers: _allRoomUsers);
-  void _rejectSeatApplication(ChatEntry entry) => _seatController.rejectSeatApplication(entry: entry, messages: _roomMessageController.messages);
-  void _applyForSeat(int index) => _seatController.applyForSeat(index: index, messages: _roomMessageController.messages);
-  void _inviteSeat(int index) { _seatController.clearSelectedSeat(); _openSeatInviteSheet(index); }
+  void _approveSeatApplication(ChatEntry entry) => _seatController.approveSeatApplication(
+        entry: entry,
+        messages: _roomMessageController.messages,
+        allRoomUsers: _allRoomUsers,
+      );
+
+  void _rejectSeatApplication(ChatEntry entry) => _seatController.rejectSeatApplication(
+        entry: entry,
+        messages: _roomMessageController.messages,
+      );
+
+  void _applyForSeat(int index) => _seatController.applyForSeat(
+        index: index,
+        messages: _roomMessageController.messages,
+      );
+
+  void _inviteSeat(int index) {
+    _seatController.clearSelectedSeat();
+    _openSeatInviteSheet(index);
+  }
 
   void _openSeatInviteSheet(int seatIndex) {
     _clearRoomFocus();
-    final inviteUsers = _usersController.buildSeatInviteUsers(allRoomUsers: _allRoomUsers, seatedUsers: _roomUsers);
+    final inviteUsers = _usersController.buildSeatInviteUsers(
+      allRoomUsers: _allRoomUsers,
+      seatedUsers: _roomUsers,
+    );
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       builder: (_) => LiveRoomInviteSheet(
@@ -450,18 +527,63 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     RoomToast.show(context, 'Room invite sent to $friendName\'s Inbox');
   }
 
-  void _dismissRoomOverlays() { dismissRoomSeatActionPill(); _clearRoomFocus(); }
+  void _dismissRoomOverlays() {
+    dismissRoomSeatActionPill();
+    _clearRoomFocus();
+  }
+
   void _insertSystemMessage(String message) => _roomMessageController.insertSystemMessage(message);
-  void _clearRoomFocus() { _messageFocusNode.unfocus(); FocusManager.instance.primaryFocus?.unfocus(); }
-  void _toggleMic() { _clearRoomFocus(); _seatController.toggleMic(); }
-  void _handleJoinRoom() { _clearRoomFocus(); _roomMessageController.requestJoin(); _openInfoSheet('Join request sent', 'Your request to become a member of $_roomName has been sent to the room owner/admins.'); }
+
+  void _clearRoomFocus() {
+    _messageFocusNode.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _toggleMic() {
+    _clearRoomFocus();
+    _seatController.toggleMic();
+  }
+
+  void _handleJoinRoom() {
+    _clearRoomFocus();
+    _roomMessageController.requestJoin();
+    _openInfoSheet(
+      'Join request sent',
+      'Your request to become a member of $_roomName has been sent to the room owner/admins.',
+    );
+  }
 
   void _openRoomUsersSheet() {
-    LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomUsersSheet(users: _roomUsers, onUserTap: (user) { Navigator.pop(context); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openMiniProfileForUser(user); }); }));
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => LiveRoomUsersSheet(
+        users: _allRoomUsers,
+        onUserTap: (user) {
+          Navigator.pop(context);
+          Future<void>.delayed(const Duration(milliseconds: 80), () {
+            if (mounted) _openMiniProfileForUser(user);
+          });
+        },
+      ),
+    );
   }
 
   void _openRoomRankingsSheet() {
-    LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => RoomContributionRankingsSheet(roomName: _roomName, users: _allRoomUsers, onUserTap: (user) { Navigator.pop(context); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openMiniProfileForUser(user); }); }));
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => RoomContributionRankingsSheet(
+        roomName: _roomName,
+        users: _allRoomUsers,
+        onUserTap: (user) {
+          Navigator.pop(context);
+          Future<void>.delayed(const Duration(milliseconds: 80), () {
+            if (mounted) _openMiniProfileForUser(user);
+          });
+        },
+      ),
+    );
   }
 
   void _openRoomLevelPage() {
@@ -469,10 +591,31 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     Navigator.pushNamed(context, VmRoutes.roomLevel);
   }
 
-  void _sendMessage() { final text = _messageController.text.trim(); if (text.isEmpty) return; _roomMessageController.sendMessage(text); _messageController.clear(); }
+  void _sendMessage() {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+    _roomMessageController.sendMessage(text);
+    _messageController.clear();
+  }
 
-  void _openMiniProfileFromChat(ChatEntry entry) { if (entry.senderId == null || entry.senderId == 'system') return; _openMiniProfileForUser(_usersController.resolveUserFromChatEntry(entry: entry, allRoomUsers: _allRoomUsers)); }
-  void _openMiniProfileForUser(SeatUser user) { final liveUser = _allRoomUsers.firstWhere((item) => item.id == user.id, orElse: () => user); final seatIndex = _seatController.seats.indexWhere((seat) => seat.user?.id == liveUser.id); _openMiniProfile(liveUser, seatIndex); }
+  void _openMiniProfileFromChat(ChatEntry entry) {
+    if (entry.senderId == null || entry.senderId == 'system') return;
+    _openMiniProfileForUser(
+      _usersController.resolveUserFromChatEntry(
+        entry: entry,
+        allRoomUsers: _allRoomUsers,
+      ),
+    );
+  }
+
+  void _openMiniProfileForUser(SeatUser user) {
+    final liveUser = _allRoomUsers.firstWhere(
+      (item) => item.id == user.id,
+      orElse: () => user,
+    );
+    final seatIndex = _seatController.seats.indexWhere((seat) => seat.user?.id == liveUser.id);
+    _openMiniProfile(liveUser, seatIndex);
+  }
 
   void _openMiniProfile(SeatUser user, int seatIndex) {
     _clearRoomFocus();
@@ -490,8 +633,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       onSetAdminTap: _setUserAsAdmin,
       onRemoveAdminTap: _removeUserAsAdmin,
       onReportTap: _openReportForUser,
-      onKickOutDurationSelected: _canKickOutUser(user) ? (duration) => _kickOutUser(user: user, duration: duration) : null,
-      onLeaveAndLock: (targetSeatIndex) { Navigator.pop(context); _seatController.leaveAndLockSeat(targetSeatIndex); },
+      onKickOutDurationSelected: _canKickOutUser(user)
+          ? (duration) => _kickOutUser(user: user, duration: duration)
+          : null,
+      onLeaveAndLock: (targetSeatIndex) {
+        Navigator.pop(context);
+        _seatController.leaveAndLockSeat(targetSeatIndex);
+      },
       onLeaveSeatOnly: (targetSeatIndex) {
         Navigator.pop(context);
         final seatedUser = targetSeatIndex >= 0 && targetSeatIndex < _seatController.seats.length
@@ -503,16 +651,43 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           _seatController.leaveSeatOnly(targetSeatIndex);
         }
       },
-      onSelfMuteToggle: (userId) { Navigator.pop(context); _seatController.toggleSelfMute(userId); },
-      onAdminMuteToggle: (userId) { Navigator.pop(context); _seatController.toggleAdminMute(userId); },
-      onGiftTap: (userId) { Navigator.pop(context); setState(() { _giftController.selectedReceiverIds..clear()..add(userId); }); _openGiftPanel(); },
+      onSelfMuteToggle: (userId) {
+        Navigator.pop(context);
+        _seatController.toggleSelfMute(userId);
+      },
+      onAdminMuteToggle: (userId) {
+        Navigator.pop(context);
+        _seatController.toggleAdminMute(userId);
+      },
+      onGiftTap: (userId) {
+        Navigator.pop(context);
+        setState(() {
+          _giftController.selectedReceiverIds
+            ..clear()
+            ..add(userId);
+        });
+        _openGiftPanel();
+      },
     );
   }
 
-  bool _canKickOutUser(SeatUser target) => _moderationController.canKickOutUser(target: target, canManageRoom: _viewerCanManageRoom);
+  bool _canKickOutUser(SeatUser target) {
+    return _moderationController.canKickOutUser(
+      target: target,
+      canManageRoom: _viewerCanManageRoom,
+    );
+  }
 
-  Future<void> _kickOutUser({required SeatUser user, required RoomKickoutDuration duration}) async {
-    final result = await _moderationController.kickOutUser(roomId: _roomId, target: user, duration: duration, canManageRoom: _viewerCanManageRoom);
+  Future<void> _kickOutUser({
+    required SeatUser user,
+    required RoomKickoutDuration duration,
+  }) async {
+    final result = await _moderationController.kickOutUser(
+      roomId: _roomId,
+      target: user,
+      duration: duration,
+      canManageRoom: _viewerCanManageRoom,
+    );
     if (!mounted) return;
     final systemMessage = result.systemMessage;
     if (systemMessage != null) _insertSystemMessage(systemMessage);
@@ -557,6 +732,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       roomName: _roomName,
     );
   }
+
   void _openMessageComposerWithMention() {
     _clearRoomFocus();
     LiveRoomMessageActionsModule.openComposer(
@@ -570,18 +746,42 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 
-  void _setUserAsAdmin(String userId) { Navigator.pop(context); _seatController.setUserAsAdmin(userId); _clearRoomFocus(); }
-  void _removeUserAsAdmin(String userId) { Navigator.pop(context); _seatController.removeUserAsAdmin(userId); _clearRoomFocus(); }
-  void _addRoomAdminFromInfo(SeatUser user) { _seatController.setUserAsAdmin(user.id); _clearRoomFocus(); }
-  void _removeRoomAdminFromInfo(SeatUser user) { _seatController.removeUserAsAdmin(user.id); _clearRoomFocus(); }
-  void _openReportForUser(SeatUser user) { Navigator.pop(context); _openInfoSheet('Report submitted', '${user.name} has been sent to the room safety review queue.'); }
+  void _setUserAsAdmin(String userId) {
+    Navigator.pop(context);
+    _seatController.setUserAsAdmin(userId);
+    _clearRoomFocus();
+  }
+
+  void _removeUserAsAdmin(String userId) {
+    Navigator.pop(context);
+    _seatController.removeUserAsAdmin(userId);
+    _clearRoomFocus();
+  }
+
+  void _addRoomAdminFromInfo(SeatUser user) {
+    _seatController.setUserAsAdmin(user.id);
+    _clearRoomFocus();
+  }
+
+  void _removeRoomAdminFromInfo(SeatUser user) {
+    _seatController.removeUserAsAdmin(user.id);
+    _clearRoomFocus();
+  }
+
+  void _openReportForUser(SeatUser user) {
+    Navigator.pop(context);
+    _openInfoSheet(
+      'Report submitted',
+      '${user.name} has been sent to the room safety review queue.',
+    );
+  }
 
   void _openGiftPanel() {
     _clearRoomFocus();
     LiveRoomGiftActionsModule.openGiftPanel(
       context: context,
       giftController: _giftController,
-      roomUsers: _roomUsers,
+      roomUsers: _allRoomUsers,
     );
   }
 
@@ -592,6 +792,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       roomStateController: _roomStateController,
     );
   }
+
   void _openInboxPageFromSheet(BuildContext sheetContext) {
     LiveRoomInboxActionsModule.openInboxSheetAfterClosingCurrentSheet(
       pageContext: context,
@@ -599,7 +800,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       roomStateController: _roomStateController,
     );
   }
-  void _openEmojiTray() { _clearRoomFocus(); LiveRoomEmojiActionsModule.openEmojiTray(context: context); }
+
+  void _openEmojiTray() {
+    _clearRoomFocus();
+    LiveRoomEmojiActionsModule.openEmojiTray(context: context);
+  }
 
   void _openSettingsSheet() {
     _clearRoomFocus();
@@ -627,31 +832,194 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           RoomToast.show(context, 'Chat cleared for everyone');
         },
         canCloseRoom: _currentUser.isHost,
-        onToggleRoomImages: (value) { _roomStateController.setRoomImagesEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.roomImagesSystemMessage(value)); },
-        onToggleGuestMessages: (value) { _roomStateController.setGuestMessagesEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.guestMessagesSystemMessage(value)); },
-        onToggleApplyOnlyMode: (value) { _roomStateController.setApplyOnlyModeEnabled(value); setSheetState(() {}); _insertSystemMessage(_settingsController.applyOnlyModeSystemMessage(value)); },
+        onToggleRoomImages: (value) {
+          _roomStateController.setRoomImagesEnabled(value);
+          setSheetState(() {});
+          _insertSystemMessage(_settingsController.roomImagesSystemMessage(value));
+        },
+        onToggleGuestMessages: (value) {
+          _roomStateController.setGuestMessagesEnabled(value);
+          setSheetState(() {});
+          _insertSystemMessage(_settingsController.guestMessagesSystemMessage(value));
+        },
+        onToggleApplyOnlyMode: (value) {
+          _roomStateController.setApplyOnlyModeEnabled(value);
+          setSheetState(() {});
+          _insertSystemMessage(_settingsController.applyOnlyModeSystemMessage(value));
+        },
         onCloseRoom: () => _leaveRoomFromSheet(sheetContext),
       ),
     );
   }
 
-  void _openCricketModeFromSettings(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openInfoSheet('Cricket Mode', 'Cricket Mode rules, score controls, start/end match controls, and owner/admin permissions will connect here.'); }); }
-  void _openWatchPartyFromSettings(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openInfoSheet('Watch Party', 'Watch Party settings will open here. YouTube link, play/pause/seek sync, and 10-seat watch layout will connect next.'); }); }
-  void _openVibeSyncSheetFromSettings(BuildContext sheetContext) { Navigator.pop(sheetContext); Future<void>.delayed(const Duration(milliseconds: 80), () { if (mounted) _openVibeSyncSheet(); }); }
+  void _openCricketModeFromSettings(BuildContext sheetContext) {
+    Navigator.pop(sheetContext);
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) {
+        _openInfoSheet(
+          'Cricket Mode',
+          'Cricket Mode rules, score controls, start/end match controls, and owner/admin permissions will connect here.',
+        );
+      }
+    });
+  }
+
+  void _openWatchPartyFromSettings(BuildContext sheetContext) {
+    Navigator.pop(sheetContext);
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) {
+        _openInfoSheet(
+          'Watch Party',
+          'Watch Party settings will open here. YouTube link, play/pause/seek sync, and 10-seat watch layout will connect next.',
+        );
+      }
+    });
+  }
+
+  void _openVibeSyncSheetFromSettings(BuildContext sheetContext) {
+    Navigator.pop(sheetContext);
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) _openVibeSyncSheet();
+    });
+  }
 
   void _openVibeSyncSheet() {
     _clearRoomFocus();
-    LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => VibeSyncControlSheet(state: _vibeSyncState, users: _roomUsers, canManage: _viewerCanManageRoom, onPickFirst: (user) { _roomStateController.setVibeSyncState(_vibeSyncController.pickFirstUser(state: _vibeSyncState, user: user)); }, onPickSecond: (user) { _roomStateController.setVibeSyncState(_vibeSyncController.pickSecondUser(state: _vibeSyncState, user: user)); }, onAnnounce: () { Navigator.pop(context); final announcement = _vibeSyncController.announce(_vibeSyncState); if (announcement == null) return; _roomStateController.setVibeSyncState(announcement.state); _insertSystemMessage(announcement.systemMessage); }, onEnd: () { Navigator.pop(context); _roomStateController.setVibeSyncState(_vibeSyncController.end()); _insertSystemMessage(_vibeSyncController.endSystemMessage()); }));
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => VibeSyncControlSheet(
+        state: _vibeSyncState,
+        users: _roomUsers,
+        canManage: _viewerCanManageRoom,
+        onPickFirst: (user) {
+          _roomStateController.setVibeSyncState(
+            _vibeSyncController.pickFirstUser(state: _vibeSyncState, user: user),
+          );
+        },
+        onPickSecond: (user) {
+          _roomStateController.setVibeSyncState(
+            _vibeSyncController.pickSecondUser(state: _vibeSyncState, user: user),
+          );
+        },
+        onAnnounce: () {
+          Navigator.pop(context);
+          final announcement = _vibeSyncController.announce(_vibeSyncState);
+          if (announcement == null) return;
+          _roomStateController.setVibeSyncState(announcement.state);
+          _insertSystemMessage(announcement.systemMessage);
+        },
+        onEnd: () {
+          Navigator.pop(context);
+          _roomStateController.setVibeSyncState(_vibeSyncController.end());
+          _insertSystemMessage(_vibeSyncController.endSystemMessage());
+        },
+      ),
+    );
   }
 
-  void _clearVibeSyncOverlay() => _roomStateController.setVibeSyncState(_vibeSyncController.clearOverlay(_vibeSyncState));
-  void _openJoinRequestsSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => StatefulBuilder(builder: (context, setSheetState) => LiveRoomJoinRequestsSheet(users: _roomMessageController.joinRequestUsers, onApprove: (user) { _resolveJoinRequest(user, approved: true); setSheetState(() {}); }, onReject: (user) { _resolveJoinRequest(user, approved: false); setSheetState(() {}); }))); }
-  void _resolveJoinRequest(SeatUser user, {required bool approved}) { _roomMessageController.resolveJoinRequest(user: user, approved: approved, roomName: _roomName); RoomToast.show(context, approved ? '${user.name} approved' : '${user.name} rejected'); }
-  void _openPrivacySheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomPrivacySheet(currentMode: _privacyMode, onModeChanged: (mode) { _roomStateController.setPrivacyMode(mode); _insertSystemMessage(_settingsController.privacyModeSystemMessage(mode)); })); }
-  void _openGamesSheet() { _clearRoomFocus(); LiveRoomGamesActionsModule.openGamesSheet(context: context); }
-  void _openSeatLayoutSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomSeatLayoutPickerSheet(selectedLayout: _seatController.layoutId, onSelected: (layout) { _seatController.changeLayout(layout); Navigator.pop(context); })); }
-  void _openBackgroundSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomBackgroundSheet(currentTheme: _selectedBackgroundTheme, onThemeSelected: (theme) { _roomStateController.setSelectedBackgroundTheme(theme); RoomToast.show(context, _settingsController.backgroundAppliedToast(theme)); }, onStoreTap: () => RoomToast.show(context, 'Theme store opened'))); }
-  void _openAnnouncementSheet() { _clearRoomFocus(); LiveRoomSheetController.showTransparentSheet<void>(context: context, isScrollControlled: true, builder: (_) => LiveRoomAnnouncementSheet(controller: _announcementController, onSubmit: (message) { Navigator.pop(context); if (message.isNotEmpty) { _insertSystemMessage(message); _announcementController.clear(); } RoomToast.show(context, 'Announcement saved'); })); }
+  void _clearVibeSyncOverlay() {
+    _roomStateController.setVibeSyncState(_vibeSyncController.clearOverlay(_vibeSyncState));
+  }
+
+  void _openJoinRequestsSheet() {
+    _clearRoomFocus();
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setSheetState) => LiveRoomJoinRequestsSheet(
+          users: _roomMessageController.joinRequestUsers,
+          onApprove: (user) {
+            _resolveJoinRequest(user, approved: true);
+            setSheetState(() {});
+          },
+          onReject: (user) {
+            _resolveJoinRequest(user, approved: false);
+            setSheetState(() {});
+          },
+        ),
+      ),
+    );
+  }
+
+  void _resolveJoinRequest(SeatUser user, {required bool approved}) {
+    _roomMessageController.resolveJoinRequest(
+      user: user,
+      approved: approved,
+      roomName: _roomName,
+    );
+    RoomToast.show(context, approved ? '${user.name} approved' : '${user.name} rejected');
+  }
+
+  void _openPrivacySheet() {
+    _clearRoomFocus();
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => LiveRoomPrivacySheet(
+        currentMode: _privacyMode,
+        onModeChanged: (mode) {
+          _roomStateController.setPrivacyMode(mode);
+          _insertSystemMessage(_settingsController.privacyModeSystemMessage(mode));
+        },
+      ),
+    );
+  }
+
+  void _openGamesSheet() {
+    _clearRoomFocus();
+    LiveRoomGamesActionsModule.openGamesSheet(context: context);
+  }
+
+  void _openSeatLayoutSheet() {
+    _clearRoomFocus();
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (_) => LiveRoomSeatLayoutPickerSheet(
+        selectedLayout: _seatController.layoutId,
+        onSelected: (layout) {
+          _seatController.changeLayout(layout);
+          Navigator.pop(context);
+          _autoOccupySeatOneForHostOrAdmin();
+        },
+      ),
+    );
+  }
+
+  void _openBackgroundSheet() {
+    _clearRoomFocus();
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => LiveRoomBackgroundSheet(
+        currentTheme: _selectedBackgroundTheme,
+        onThemeSelected: (theme) {
+          _roomStateController.setSelectedBackgroundTheme(theme);
+          RoomToast.show(context, _settingsController.backgroundAppliedToast(theme));
+        },
+        onStoreTap: () => RoomToast.show(context, 'Theme store opened'),
+      ),
+    );
+  }
+
+  void _openAnnouncementSheet() {
+    _clearRoomFocus();
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => LiveRoomAnnouncementSheet(
+        controller: _announcementController,
+        onSubmit: (message) {
+          Navigator.pop(context);
+          if (message.isNotEmpty) {
+            _insertSystemMessage(message);
+            _announcementController.clear();
+          }
+          RoomToast.show(context, 'Announcement saved');
+        },
+      ),
+    );
+  }
 
   void _openLeaveSheet() {
     LiveRoomLeaveActionsModule.openLeaveSheet(
@@ -662,7 +1030,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       roomId: _roomId,
       language: widget.language,
       modeTitle: widget.modeTitle,
-      onlineCount: widget.onlineCount,
+      onlineCount: _safeOnlineCount,
       dismissSeatActionPill: dismissRoomSeatActionPill,
       clearFocus: _clearRoomFocus,
       mountedGetter: () => mounted,
@@ -678,8 +1046,32 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       mountedGetter: () => mounted,
     );
   }
-  void _openInfoSheet(String title, String body) { LiveRoomSheetController.showTransparentSheet<void>(context: context, builder: (_) => LiveRoomInfoSheet(title: title, body: body)); }
+
+  void _openInfoSheet(String title, String body) {
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (_) => LiveRoomInfoSheet(title: title, body: body),
+    );
+  }
 }
+
+const SeatUser _roomIdentityFallback = SeatUser(
+  id: 'user_pending',
+  name: 'Vibe User',
+  roleLabel: 'Guest',
+  familyName: '',
+  familyLevel: 'bronze',
+  relationshipText: '',
+  vipLevel: 0,
+  svipLevel: 0,
+  sendingLevel: 1,
+  receivingLevel: 1,
+  sentExp: 0,
+  receivedExp: 0,
+  medals: <String>[],
+  avatarColors: <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+  isCurrentUser: true,
+);
 
 class _PendingSeatInvite {
   const _PendingSeatInvite({
