@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 
 class LiveRoomMessageController {
   LiveRoomMessageController({
-    required this.currentUser,
+    required SeatUser currentUser,
     required this.onChanged,
-  }) {
+  }) : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser) {
     messages = List<ChatEntry>.from(mockChatEntries);
     _activeController = this;
   }
@@ -22,10 +23,7 @@ class LiveRoomMessageController {
 
   late List<ChatEntry> messages;
 
-  final List<SeatUser> joinRequestUsers = <SeatUser>[
-    mockInviteUsers[0],
-    mockInviteUsers[1],
-  ];
+  final List<SeatUser> joinRequestUsers = <SeatUser>[];
 
   void sendMessage(String text) {
     final trimmed = text.trim();
