@@ -59,12 +59,7 @@ class MiniProfileMetaRow extends StatelessWidget {
       spacing: 4,
       runSpacing: 4,
       children: [
-        if (officialRoleBadge != null)
-          OfficialRoleBadgePill(badge: officialRoleBadge, compact: true)
-        else if (_isChannelHost)
-          const MiniProfileMetaPill(icon: Icons.workspace_premium_rounded, label: 'Channel Host', color: RoomColors.gold)
-        else if (_isChannelAdmin)
-          const MiniProfileMetaPill(icon: Icons.admin_panel_settings_rounded, label: 'Admin', color: RoomColors.aqua),
+        if (officialRoleBadge != null) OfficialRoleBadgePill(badge: officialRoleBadge, compact: true),
         if (user.familyName.trim().isNotEmpty)
           MiniProfileFamilyBadge(
             familyName: user.familyName,
