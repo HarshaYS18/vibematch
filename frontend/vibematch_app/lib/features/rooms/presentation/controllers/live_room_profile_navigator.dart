@@ -63,6 +63,7 @@ class LiveRoomProfileNavigator {
       displayName: user.name,
       avatarUrl: null,
       bio: null,
+      coverPhotoUrls: const [],
       dateOfBirth: null,
       gender: null,
       profession: null,
