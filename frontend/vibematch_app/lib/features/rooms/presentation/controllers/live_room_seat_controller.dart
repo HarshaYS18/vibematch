@@ -449,14 +449,22 @@ class LiveRoomSeatController {
       onToast('Only the owner or room admins can approve seat requests');
       return;
     }
+
     final messageIndex = messages.indexOf(entry);
-    if (messageIndex < 0) return;
+    if (messageIndex < 0) {
+      return;
+    }
+
     final latestEntry = messages[messageIndex];
-    if (!latestEntry.isSeatApplication) return;
+    if (!latestEntry.isSeatApplication) {
+      return;
+    }
+
     if (latestEntry.applicationResolved) {
       onToast('This application has already been processed');
       return;
     }
+
     final seatIndex = latestEntry.seatIndex;
     if (seatIndex == null || seatIndex < 0 || seatIndex >= seats.length) {
       messages[messageIndex] = latestEntry.copyWith(
@@ -466,32 +474,65 @@ class LiveRoomSeatController {
       onChanged();
       return;
     }
-    if (seats[seatIndex].user != null || seats[seatIndex].locked) {
+
+    final requestedSeat = seats[seatIndex];
+
+    if (requestedSeat.locked) {
       messages[messageIndex] = latestEntry.copyWith(
         message:
             '${latestEntry.senderName} seat ${seatIndex + 1} request expired',
         applicationExpired: true,
       );
+      onToast('Seat ${seatIndex + 1} is locked');
       onChanged();
       return;
     }
-    final applicant = allRoomUsers.firstWhere(
-      (user) => user.id == latestEntry.senderId,
-      orElse: () => currentUser,
-    );
-    if (applicant.id == currentUser.id ||
-        latestEntry.senderId == currentUser.id) {
-      LiveRoomMediaSignalingService.instance.takeSeat(seatIndex);
-    } else {
-      LiveRoomMediaSignalingService.instance.sendSeatInvite(
-        seatIndex: seatIndex,
-        targetUserId: applicant.id,
+
+    if (requestedSeat.user != null) {
+      messages[messageIndex] = latestEntry.copyWith(
+        message:
+            '${latestEntry.senderName} seat ${seatIndex + 1} request expired',
+        applicationExpired: true,
       );
+      onToast('Seat ${seatIndex + 1} is already occupied');
+      onChanged();
+      return;
     }
+
+    final applicantId = latestEntry.senderId;
+    if (applicantId == null || applicantId.trim().isEmpty) {
+      messages[messageIndex] = latestEntry.copyWith(
+        message: '${latestEntry.senderName} seat request expired',
+        applicationExpired: true,
+      );
+      onChanged();
+      return;
+    }
+
+    final applicant = allRoomUsers.firstWhereOrNull(
+      (user) => user.id == applicantId,
+    );
+
+    if (applicant == null) {
+      messages[messageIndex] = latestEntry.copyWith(
+        message: '${latestEntry.senderName} is no longer in the room',
+        applicationExpired: true,
+      );
+      onToast('${latestEntry.senderName} is no longer in the room');
+      onChanged();
+      return;
+    }
+
+    LiveRoomMediaSignalingService.instance.forceAssignSeat(
+      targetUserId: applicant.id,
+      seatIndex: seatIndex,
+    );
+
     messages[messageIndex] = latestEntry.copyWith(
       message: '${latestEntry.senderName} joined seat ${seatIndex + 1}',
       applicationApproved: true,
     );
+
     onChanged();
   }
 
