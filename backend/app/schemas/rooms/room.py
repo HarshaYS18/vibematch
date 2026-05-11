@@ -48,13 +48,21 @@ class RoomParticipantUserResponse(BaseModel):
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
     vip: UserVipSummaryResponse
     is_owner: bool = False
+    is_member: bool = False
+    is_room_admin: bool = False
     joined_at: datetime
     last_seen_at: datetime
+
+
+class RoomMemberActionRequest(BaseModel):
+    public_user_id: int
 
 
 class RoomJoinResponse(BaseModel):
     room: RoomDetailResponse
     participants: list[RoomParticipantUserResponse] = Field(default_factory=list)
+    joined_user: RoomParticipantUserResponse | None = None
+    should_show_entered_message: bool = False
 
 
 class RoomLeaveResponse(BaseModel):
