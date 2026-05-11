@@ -67,6 +67,18 @@ class ProfileApiService {
 
   void _throwIfFailed(http.Response response, String action) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
+    final body = response.body.trim();
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail']?.toString().trim();
+        if (detail != null && detail.isNotEmpty) {
+          throw Exception(detail);
+        }
+      }
+    } catch (_) {
+      if (body.isNotEmpty && !body.startsWith('{')) throw Exception(body);
+    }
     throw Exception('Failed to $action (${response.statusCode}): ${response.body}');
   }
 }
@@ -134,6 +146,10 @@ class UserRelationship {
     required this.isFollowing,
     required this.followsMe,
     required this.isFriend,
+    required this.blockedByMe,
+    required this.blockedMe,
+    required this.canFollow,
+    required this.followBlockReason,
     required this.followersCount,
     required this.followingCount,
   });
@@ -142,6 +158,10 @@ class UserRelationship {
   final bool isFollowing;
   final bool followsMe;
   final bool isFriend;
+  final bool blockedByMe;
+  final bool blockedMe;
+  final bool canFollow;
+  final String? followBlockReason;
   final int followersCount;
   final int followingCount;
 
@@ -151,6 +171,10 @@ class UserRelationship {
       isFollowing: json['is_following'] == true,
       followsMe: json['follows_me'] == true,
       isFriend: json['is_friend'] == true,
+      blockedByMe: json['blocked_by_me'] == true,
+      blockedMe: json['blocked_me'] == true,
+      canFollow: json['can_follow'] != false,
+      followBlockReason: _nullableText(json['follow_block_reason']),
       followersCount: _int(json['followers_count'], fallback: 0),
       followingCount: _int(json['following_count'], fallback: 0),
     );
