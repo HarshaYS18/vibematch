@@ -52,6 +52,7 @@ class User(Base):
     friend_gender_preference: Mapped[str | None] = mapped_column(String(30), nullable=True)
     friend_marital_preference: Mapped[str | None] = mapped_column(String(30), nullable=True)
     interests: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    cover_photo_urls: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
