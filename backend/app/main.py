@@ -59,6 +59,7 @@ from app.models import (
     SpecialPermission,
     User,
     UserBan,
+    UserBlock,
     UserFollow,
     UserNotification,
     UserRole,
