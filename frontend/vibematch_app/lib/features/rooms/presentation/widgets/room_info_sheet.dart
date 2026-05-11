@@ -40,22 +40,39 @@ class RoomInfoSheet extends StatefulWidget {
 
 class _RoomInfoSheetState extends State<RoomInfoSheet> {
   late final PageController _pageController;
+  late List<SeatUser> _localAdmins;
+  late List<SeatUser> _localAvailableAdminUsers;
   _RoomInfoTab _selectedTab = _RoomInfoTab.roomInfo;
 
-  List<SeatUser> get _admins => _dedupeUsers(widget.admins.where((user) => user.isHost || user.isRoomAdmin));
-  List<SeatUser> get _availableAdminUsers => _dedupeUsers(widget.availableAdminUsers.where((user) => !user.isHost && !user.isRoomAdmin));
-  List<SeatUser> get _members => _dedupeUsers(<SeatUser>[...widget.admins, ...widget.availableAdminUsers]);
+  List<SeatUser> get _admins => _dedupeUsers(_localAdmins.where((user) => user.isHost || user.isRoomAdmin));
+  List<SeatUser> get _availableAdminUsers => _dedupeUsers(_localAvailableAdminUsers.where((user) => !user.isHost && !user.isRoomAdmin));
+  List<SeatUser> get _members => _dedupeUsers(<SeatUser>[..._localAdmins, ..._localAvailableAdminUsers]);
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _selectedTab.index);
+    _syncLocalUsersFromWidget();
+  }
+
+  @override
+  void didUpdateWidget(covariant RoomInfoSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.admins != widget.admins || oldWidget.availableAdminUsers != widget.availableAdminUsers) {
+      _syncLocalUsersFromWidget();
+    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _syncLocalUsersFromWidget() {
+    final combined = _dedupeUsers(<SeatUser>[...widget.admins, ...widget.availableAdminUsers]);
+    _localAdmins = combined.where((user) => user.isHost || user.isRoomAdmin).toList(growable: true);
+    _localAvailableAdminUsers = combined.where((user) => !user.isHost && !user.isRoomAdmin).toList(growable: true);
   }
 
   List<SeatUser> _dedupeUsers(Iterable<SeatUser> source) {
@@ -84,13 +101,25 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
   }
 
   void _addAdmin(SeatUser user) {
-    widget.onAddAdmin(user);
+    final promoted = user.copyWith(isRoomAdmin: true, roleLabel: 'Admin');
+    setState(() {
+      _localAvailableAdminUsers.removeWhere((item) => item.id == user.id);
+      _localAdmins.removeWhere((item) => item.id == user.id);
+      _localAdmins.add(promoted);
+    });
+    widget.onAddAdmin(promoted);
     RoomToast.show(context, '${user.name} is now Admin');
   }
 
   void _removeAdmin(SeatUser user) {
     if (user.isHost) return;
-    widget.onRemoveAdmin(user);
+    final demoted = user.copyWith(isRoomAdmin: false, roleLabel: 'Member');
+    setState(() {
+      _localAdmins.removeWhere((item) => item.id == user.id);
+      _localAvailableAdminUsers.removeWhere((item) => item.id == user.id);
+      _localAvailableAdminUsers.add(demoted);
+    });
+    widget.onRemoveAdmin(demoted);
     RoomToast.show(context, '${user.name} is no longer Admin');
   }
 
@@ -121,13 +150,11 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
         children: [
           const SheetHandle(width: 42),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _RoomInfoTabs(selected: _selectedTab, onChanged: _goToTab)),
-              const SizedBox(width: 8),
-              RoundRoomButton(icon: Icons.close_rounded, onTap: () => Navigator.pop(context), color: RoomColors.plum, background: RoomColors.pearl, size: 34, iconSize: 18),
-            ],
-          ),
+          Row(children: [
+            Expanded(child: _RoomInfoTabs(selected: _selectedTab, onChanged: _goToTab)),
+            const SizedBox(width: 8),
+            RoundRoomButton(icon: Icons.close_rounded, onTap: () => Navigator.pop(context), color: RoomColors.plum, background: RoomColors.pearl, size: 34, iconSize: 18),
+          ]),
           const SizedBox(height: 10),
           Expanded(
             child: PageView(
@@ -164,12 +191,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
             const Text('Choose a real room participant to promote as Admin.', style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             if (availableAdminUsers.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: RoomColors.pearl, borderRadius: BorderRadius.circular(18), border: Border.all(color: RoomColors.softLine)),
-                child: const Text('No eligible users available right now.', style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w800)),
-              )
+              Container(width: double.infinity, padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: RoomColors.pearl, borderRadius: BorderRadius.circular(18), border: Border.all(color: RoomColors.softLine)), child: const Text('No eligible users available right now.', style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w800)))
             else
               Expanded(
                 child: ListView.separated(
@@ -223,12 +245,7 @@ class _TabPill extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: () => onChanged(tab),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: active ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(999), boxShadow: active ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 3))] : null),
-          child: Text(label, style: TextStyle(color: active ? RoomColors.plum : const Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w900)),
-        ),
+        child: AnimatedContainer(duration: const Duration(milliseconds: 160), alignment: Alignment.center, decoration: BoxDecoration(color: active ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(999), boxShadow: active ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 3))] : null), child: Text(label, style: TextStyle(color: active ? RoomColors.plum : const Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w900))),
       ),
     );
   }
@@ -267,11 +284,7 @@ class _AdminsPage extends StatelessWidget {
         Row(children: [const Expanded(child: Text('Admins', style: TextStyle(color: RoomColors.plum, fontSize: 15, fontWeight: FontWeight.w900))), _SmallActionPill(icon: Icons.person_add_alt_1_rounded, label: 'Add Admin', onTap: onOpenAddAdminSheet)]),
         const SizedBox(height: 8),
       ],
-      Expanded(
-        child: admins.isEmpty
-            ? const _EmptyRoomInfoState(message: 'No admins found.')
-            : ListView.separated(physics: const BouncingScrollPhysics(), itemCount: admins.length, separatorBuilder: (context, index) => const SizedBox(height: 7), itemBuilder: (context, index) { final admin = admins[index]; return _AdminTile(user: admin, canManage: canManageAdmins && !admin.isHost, onRemove: () => onRemoveAdmin(admin)); }),
-      ),
+      Expanded(child: admins.isEmpty ? const _EmptyRoomInfoState(message: 'No admins found.') : ListView.separated(physics: const BouncingScrollPhysics(), itemCount: admins.length, separatorBuilder: (context, index) => const SizedBox(height: 7), itemBuilder: (context, index) { final admin = admins[index]; return _AdminTile(user: admin, canManage: canManageAdmins && !admin.isHost, onRemove: () => onRemoveAdmin(admin)); })),
     ]);
   }
 }
