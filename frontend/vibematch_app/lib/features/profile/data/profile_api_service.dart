@@ -18,6 +18,42 @@ class ProfileApiService {
     return authApiService.getCurrentUser(forceRefresh: forceRefresh);
   }
 
+  Future<CurrentUser> updateMyProfile({
+    required String displayName,
+    String? bio,
+    String? avatarUrl,
+    DateTime? dateOfBirth,
+    String? gender,
+    String? profession,
+    String? maritalStatus,
+    String? friendGenderPreference,
+    String? friendMaritalPreference,
+    List<String> interests = const [],
+  }) async {
+    final safeName = displayName.trim();
+    if (safeName.isEmpty) throw Exception('Name is required.');
+    final response = await http.patch(
+      Uri.parse(VmApiConfig.endpoint('/users/me/profile')),
+      headers: _authHeaders(),
+      body: jsonEncode({
+        'display_name': safeName,
+        'bio': bio?.trim() ?? '',
+        if (avatarUrl != null) 'avatar_url': avatarUrl.trim(),
+        'date_of_birth': dateOfBirth == null ? null : _dateOnly(dateOfBirth),
+        'gender': gender,
+        'profession': profession?.trim(),
+        'marital_status': maritalStatus,
+        'friend_gender_preference': friendGenderPreference,
+        'friend_marital_preference': friendMaritalPreference,
+        'interests': interests.map((item) => item.trim()).where((item) => item.isNotEmpty).toList(growable: false),
+      }),
+    );
+    _throwIfFailed(response, 'update profile');
+    final user = CurrentUser.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    AuthUserRealtimeService.instance.publish(user);
+    return user;
+  }
+
   Future<PublicUserProfile> getPublicProfile(int publicUserId) async {
     final response = await http.get(
       Uri.parse(VmApiConfig.endpoint('/users/public/$publicUserId')),
@@ -55,15 +91,9 @@ class ProfileApiService {
   }
 
   Map<String, String> _authHeaders() {
-    final token = authApiService.cachedAccessToken;
-    if (token == null || token.trim().isEmpty) {
-      throw Exception('Please login again.');
-    }
-    return {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+    final access = authApiService.cachedAccessToken;
+    if (access == null || access.trim().isEmpty) throw Exception('Please login again.');
+    return {'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': 'Bearer $access'};
   }
 
   void _throwIfFailed(http.Response response, String action) {
@@ -80,48 +110,26 @@ class ProfileApiService {
     }
     throw Exception('Failed to $action (${response.statusCode})');
   }
+
+  String _dateOnly(DateTime value) => '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }
 
 class ProfileRelationshipRealtimeEvent {
-  const ProfileRelationshipRealtimeEvent({
-    required this.viewerPublicUserId,
-    required this.targetPublicUserId,
-    required this.action,
-  });
-
+  const ProfileRelationshipRealtimeEvent({required this.viewerPublicUserId, required this.targetPublicUserId, required this.action});
   final int viewerPublicUserId;
   final int targetPublicUserId;
   final String action;
-
-  bool touchesProfile(int publicUserId) {
-    return viewerPublicUserId == publicUserId || targetPublicUserId == publicUserId;
-  }
+  bool touchesProfile(int publicUserId) => viewerPublicUserId == publicUserId || targetPublicUserId == publicUserId;
 }
 
 class ProfileRelationshipRealtimeService {
   ProfileRelationshipRealtimeService._();
-
-  static final ProfileRelationshipRealtimeService instance =
-      ProfileRelationshipRealtimeService._();
-
-  final StreamController<ProfileRelationshipRealtimeEvent> _controller =
-      StreamController<ProfileRelationshipRealtimeEvent>.broadcast();
-
+  static final ProfileRelationshipRealtimeService instance = ProfileRelationshipRealtimeService._();
+  final StreamController<ProfileRelationshipRealtimeEvent> _controller = StreamController<ProfileRelationshipRealtimeEvent>.broadcast();
   Stream<ProfileRelationshipRealtimeEvent> get events => _controller.stream;
-
-  void publish({
-    required int viewerPublicUserId,
-    required int targetPublicUserId,
-    required String action,
-  }) {
+  void publish({required int viewerPublicUserId, required int targetPublicUserId, required String action}) {
     if (viewerPublicUserId <= 0 || targetPublicUserId <= 0) return;
-    _controller.add(
-      ProfileRelationshipRealtimeEvent(
-        viewerPublicUserId: viewerPublicUserId,
-        targetPublicUserId: targetPublicUserId,
-        action: action,
-      ),
-    );
+    _controller.add(ProfileRelationshipRealtimeEvent(viewerPublicUserId: viewerPublicUserId, targetPublicUserId: targetPublicUserId, action: action));
   }
 }
 
@@ -132,6 +140,14 @@ class PublicUserProfile {
     required this.username,
     required this.displayName,
     required this.avatarUrl,
+    required this.bio,
+    required this.dateOfBirth,
+    required this.gender,
+    required this.profession,
+    required this.maritalStatus,
+    required this.friendGenderPreference,
+    required this.friendMaritalPreference,
+    required this.interests,
     required this.primaryRole,
     required this.primaryRoleBadge,
     required this.roleBadges,
@@ -147,6 +163,14 @@ class PublicUserProfile {
   final String? username;
   final String? displayName;
   final String? avatarUrl;
+  final String? bio;
+  final DateTime? dateOfBirth;
+  final String? gender;
+  final String? profession;
+  final String? maritalStatus;
+  final String? friendGenderPreference;
+  final String? friendMaritalPreference;
+  final List<String> interests;
   final String primaryRole;
   final RoleBadge? primaryRoleBadge;
   final List<RoleBadge> roleBadges;
@@ -167,6 +191,14 @@ class PublicUserProfile {
       username: _nullableText(json['username']),
       displayName: _nullableText(json['display_name']),
       avatarUrl: _nullableText(json['avatar_url']),
+      bio: _nullableText(json['bio']),
+      dateOfBirth: _date(json['date_of_birth']),
+      gender: _nullableText(json['gender']),
+      profession: _nullableText(json['profession']),
+      maritalStatus: _nullableText(json['marital_status']),
+      friendGenderPreference: _nullableText(json['friend_gender_preference']),
+      friendMaritalPreference: _nullableText(json['friend_marital_preference']),
+      interests: _stringList(json['interests']),
       primaryRole: primaryRole,
       primaryRoleBadge: primaryBadgeJson is Map<String, dynamic> ? RoleBadge.fromJson(primaryBadgeJson) : RoleBadge.fromRole(primaryRole),
       roleBadges: roleBadgesJson is List ? roleBadgesJson.whereType<Map<String, dynamic>>().map(RoleBadge.fromJson).toList(growable: false) : <RoleBadge>[RoleBadge.fromRole(primaryRole)],
@@ -178,24 +210,22 @@ class PublicUserProfile {
     );
   }
 
+  int? get age {
+    final dob = dateOfBirth;
+    if (dob == null) return null;
+    final today = DateTime.now();
+    var computed = today.year - dob.year;
+    final birthdayPassed = today.month > dob.month || (today.month == dob.month && today.day >= dob.day);
+    if (!birthdayPassed) computed--;
+    return computed.clamp(0, 120);
+  }
+
   String get visibleName => displayName ?? username ?? 'Vibe User';
   String get visibleId => displayCustomId?.toString() ?? publicUserId.toString();
 }
 
 class UserRelationship {
-  const UserRelationship({
-    required this.publicUserId,
-    required this.isFollowing,
-    required this.followsMe,
-    required this.isFriend,
-    required this.blockedByMe,
-    required this.blockedMe,
-    required this.canFollow,
-    required this.followBlockReason,
-    required this.followersCount,
-    required this.followingCount,
-  });
-
+  const UserRelationship({required this.publicUserId, required this.isFollowing, required this.followsMe, required this.isFriend, required this.blockedByMe, required this.blockedMe, required this.canFollow, required this.followBlockReason, required this.followersCount, required this.followingCount});
   final int publicUserId;
   final bool isFollowing;
   final bool followsMe;
@@ -206,54 +236,12 @@ class UserRelationship {
   final String? followBlockReason;
   final int followersCount;
   final int followingCount;
-
-  factory UserRelationship.fromJson(Map<String, dynamic> json) {
-    return UserRelationship(
-      publicUserId: _int(json['public_user_id'], fallback: 0),
-      isFollowing: json['is_following'] == true,
-      followsMe: json['follows_me'] == true,
-      isFriend: json['is_friend'] == true,
-      blockedByMe: json['blocked_by_me'] == true,
-      blockedMe: json['blocked_me'] == true,
-      canFollow: json['can_follow'] != false,
-      followBlockReason: _nullableText(json['follow_block_reason']),
-      followersCount: _int(json['followers_count'], fallback: 0),
-      followingCount: _int(json['following_count'], fallback: 0),
-    );
-  }
+  factory UserRelationship.fromJson(Map<String, dynamic> json) => UserRelationship(publicUserId: _int(json['public_user_id'], fallback: 0), isFollowing: json['is_following'] == true, followsMe: json['follows_me'] == true, isFriend: json['is_friend'] == true, blockedByMe: json['blocked_by_me'] == true, blockedMe: json['blocked_me'] == true, canFollow: json['can_follow'] != false, followBlockReason: _nullableText(json['follow_block_reason']), followersCount: _int(json['followers_count'], fallback: 0), followingCount: _int(json['following_count'], fallback: 0));
 }
 
-dynamic _tryDecodeJson(String body) {
-  try {
-    return jsonDecode(body);
-  } catch (_) {
-    return null;
-  }
-}
-
-int _int(dynamic value, {required int fallback}) {
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? fallback;
-  return fallback;
-}
-
-int? _nullableInt(dynamic value) {
-  if (value == null) return null;
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value);
-  return null;
-}
-
-String? _nullableText(dynamic value) {
-  if (value == null) return null;
-  final text = value.toString().trim();
-  return text.isEmpty ? null : text;
-}
-
-DateTime? _date(dynamic value) {
-  if (value is DateTime) return value;
-  if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value);
-  return null;
-}
+dynamic _tryDecodeJson(String body) { try { return jsonDecode(body); } catch (_) { return null; } }
+int _int(dynamic value, {required int fallback}) { if (value is int) return value; if (value is num) return value.toInt(); if (value is String) return int.tryParse(value) ?? fallback; return fallback; }
+int? _nullableInt(dynamic value) { if (value == null) return null; if (value is int) return value; if (value is num) return value.toInt(); if (value is String) return int.tryParse(value); return null; }
+String? _nullableText(dynamic value) { if (value == null) return null; final text = value.toString().trim(); return text.isEmpty ? null : text; }
+List<String> _stringList(dynamic value) => value is List ? value.map((item) => item.toString().trim()).where((item) => item.isNotEmpty).toList(growable: false) : const [];
+DateTime? _date(dynamic value) { if (value is DateTime) return value; if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value); return null; }
