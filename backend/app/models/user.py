@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -45,6 +45,13 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     bio: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    profession: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    marital_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    friend_gender_preference: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    friend_marital_preference: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    interests: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
