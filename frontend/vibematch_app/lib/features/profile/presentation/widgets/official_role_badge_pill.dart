@@ -14,6 +14,9 @@ class OfficialRoleBadgePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final label = compact ? badge.badgeLabel : badge.pillLabel;
+    if (label.trim().isEmpty) return const SizedBox.shrink();
+
     return Container(
       height: compact ? 22 : 28,
       padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 10, vertical: 0),
@@ -36,7 +39,7 @@ class OfficialRoleBadgePill extends StatelessWidget {
           SizedBox(width: compact ? 4 : 6),
           Flexible(
             child: Text(
-              compact ? badge.badgeLabel : badge.pillLabel,
+              label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -48,6 +51,10 @@ class OfficialRoleBadgePill extends StatelessWidget {
               ),
             ),
           ),
+          if (badge.showVerifiedTick) ...[
+            SizedBox(width: compact ? 3 : 5),
+            Icon(Icons.verified_rounded, color: const Color(0xFFFFD36A), size: compact ? 11 : 14),
+          ],
         ],
       ),
     );
