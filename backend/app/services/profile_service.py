@@ -68,6 +68,7 @@ def public_profile_payload(db: Session, public_user_id: int) -> dict:
         "username": user.username,
         "display_name": user.display_name,
         "avatar_url": user.avatar_url,
+        "bio": user.bio,
         "primary_role": primary_role.value,
         "primary_role_badge": role_badge_service.get_primary_role_badge(primary_role),
         "role_badges": role_badge_service.get_role_badges(user_roles),
