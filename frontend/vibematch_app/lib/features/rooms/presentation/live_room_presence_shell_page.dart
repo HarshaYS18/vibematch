@@ -39,6 +39,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   bool _joining = true;
   bool _participantsOpen = false;
   bool _autoSeatAttempted = false;
+  bool _identitySeeded = false;
   String? _presenceError;
 
   int get _onlineCount => _snapshot?.onlineCount ?? widget.initialOnlineCount;
@@ -47,6 +48,9 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   @override
   void initState() {
     super.initState();
+    LiveRoomMediaSignalingService.instance.configureRoom(roomId: widget.roomId, roomName: widget.roomName);
+    final currentUser = widget.currentUser;
+    if (currentUser != null) LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(currentUser);
     unawaited(_joinPresence());
   }
 
@@ -67,9 +71,11 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     try {
       final snapshot = await _presenceRepository.joinRoom(widget.roomId);
       if (!mounted) return;
+      _seedIdentityFromPresence(snapshot);
       setState(() {
         _snapshot = snapshot;
         _joining = false;
+        _identitySeeded = true;
       });
       _showEnteredMessageIfNeeded(snapshot);
       _autoSeatIfAllowed(snapshot);
@@ -78,9 +84,21 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       if (!mounted) return;
       setState(() {
         _joining = false;
+        _identitySeeded = true;
         _presenceError = error.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  void _seedIdentityFromPresence(LiveRoomPresenceSnapshot snapshot) {
+    final currentPublicId = widget.currentUser?.publicUserId.toString();
+    SeatUser? self;
+    if (currentPublicId != null) {
+      self = snapshot.participants.where((user) => user.id == 'user_$currentPublicId').firstOrNull;
+    }
+    self ??= snapshot.joinedUser;
+    if (self == null) return;
+    LiveRoomMediaSignalingService.instance.seedActiveRoomSeatUser(self);
   }
 
   void _showEnteredMessageIfNeeded(LiveRoomPresenceSnapshot snapshot) {
@@ -101,15 +119,20 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     final currentUser = widget.currentUser;
     if (currentUser == null) return;
     final currentPublicId = currentUser.publicUserId.toString();
-    final self = snapshot.participants.where((user) => user.id == 'user_$currentPublicId').cast<SeatUser?>().firstOrNull;
-    final isRoomOwner = self?.isHost == true;
+    final self = snapshot.participants.where((user) => user.id == 'user_$currentPublicId').firstOrNull;
+    final isRoomHostOrAdmin = self?.isHost == true || self?.isRoomAdmin == true;
     final isOfficialOwner = currentUser.canSeeOwnerControls;
-    if (!isRoomOwner && !isOfficialOwner) return;
+    if (!isRoomHostOrAdmin && !isOfficialOwner) return;
 
     _autoSeatAttempted = true;
     final media = LiveRoomMediaSignalingService.instance;
-    unawaited(Future<void>.delayed(const Duration(milliseconds: 450), () {
-      media.takeSeat(0);
+    unawaited(Future<void>.delayed(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      media.takeSeatIfVacant(0);
+    }));
+    unawaited(Future<void>.delayed(const Duration(milliseconds: 1700), () {
+      if (!mounted) return;
+      media.takeSeatIfVacant(0);
     }));
   }
 
@@ -122,6 +145,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     try {
       final snapshot = await _presenceRepository.heartbeat(widget.roomId);
       if (!mounted) return;
+      _seedIdentityFromPresence(snapshot);
       setState(() {
         _snapshot = snapshot;
         _presenceError = null;
@@ -163,9 +187,17 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_identitySeeded && _joining) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF120D1F),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFF12C7B7))),
+      );
+    }
+
     return Stack(
       children: [
         LiveRoomPage(
+          key: ValueKey('live-room-${widget.roomId}-${LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id ?? 'user'}'),
           roomName: widget.roomName,
           roomId: widget.roomId,
           language: widget.language,
@@ -353,5 +385,14 @@ class _ParticipantTile extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+extension _FirstWhereOrNull<T> on Iterable<T> {
+  T? get firstOrNull {
+    for (final item in this) {
+      return item;
+    }
+    return null;
   }
 }
