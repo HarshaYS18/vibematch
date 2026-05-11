@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../auth/models/current_user.dart';
 import '../../rooms/data/live_room_media_signaling_service.dart';
 import '../../rooms/data/room_api_service.dart';
+import '../../rooms/presentation/live_room_models.dart';
 import '../../rooms/presentation/live_room_page.dart';
 
 class CreatePage extends StatefulWidget {
@@ -122,6 +123,33 @@ class _CreatePageState extends State<CreatePage> {
     }
   }
 
+  SeatUser _createdRoomHostSeatUser() {
+    final currentUser = widget.currentUser;
+    final isOfficial = currentUser.canSeeOwnerControls;
+
+    return SeatUser(
+      id: 'user_${currentUser.publicUserId}',
+      name: currentUser.displayName ?? currentUser.username ?? 'Vibe User',
+      roleLabel: 'Channel Host',
+      familyName: '',
+      familyLevel: 'bronze',
+      relationshipText: '',
+      vipLevel: isOfficial ? 32 : 0,
+      svipLevel: isOfficial ? 3 : 0,
+      sendingLevel: isOfficial ? 52 : 1,
+      receivingLevel: isOfficial ? 44 : 1,
+      sentExp: 0,
+      receivedExp: 0,
+      medals: const <String>[],
+      avatarColors: isOfficial
+          ? const <Color>[Color(0xFFFFC857), Color(0xFFE84C72)]
+          : const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      isCurrentUser: true,
+      isHost: true,
+      isRoomAdmin: true,
+    );
+  }
+
   void _showRoomReadySheet(RealRoom room) {
     showModalBottomSheet(
       context: context,
@@ -163,7 +191,9 @@ class _CreatePageState extends State<CreatePage> {
                       text: 'Enter Room',
                       icon: Icons.login_rounded,
                       onTap: () {
-                        LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(widget.currentUser);
+                        final mediaService = LiveRoomMediaSignalingService.instance;
+                        mediaService.configureRoom(roomId: room.id, roomName: room.name);
+                        mediaService.seedActiveRoomSeatUser(_createdRoomHostSeatUser());
                         Navigator.pop(context);
                         Navigator.push(
                           context,
