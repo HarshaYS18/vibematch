@@ -111,7 +111,10 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
         roomName: widget.roomName,
         participants: _participants,
         onlineCount: _onlineCount,
+        joining: _joining,
+        error: _presenceError,
         onRefresh: _heartbeat,
+        onRetryJoin: _joinPresence,
       ),
     );
     _participantsOpen = false;
@@ -129,14 +132,17 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
           onlineCount: _onlineCount,
         ),
         Positioned(
-          top: MediaQuery.paddingOf(context).top + 74,
-          right: 12,
-          child: _PresencePill(
-            onlineCount: _onlineCount,
-            joining: _joining,
-            hasError: _presenceError != null,
-            onTap: _openParticipantsSheet,
-            onRetry: _joinPresence,
+          top: MediaQuery.paddingOf(context).top + 8,
+          right: 70,
+          width: 96,
+          height: 48,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _presenceError == null ? _openParticipantsSheet : _joinPresence,
+              borderRadius: BorderRadius.circular(999),
+              child: const SizedBox.expand(),
+            ),
           ),
         ),
       ],
@@ -144,55 +150,24 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   }
 }
 
-class _PresencePill extends StatelessWidget {
-  const _PresencePill({required this.onlineCount, required this.joining, required this.hasError, required this.onTap, required this.onRetry});
-
-  final int onlineCount;
-  final bool joining;
-  final bool hasError;
-  final VoidCallback onTap;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = hasError ? const Color(0xFFE84C72) : const Color(0xFF12C7B7);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: hasError ? onRetry : onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: const Color(0xFF090714).withValues(alpha: 0.78),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.55)),
-            boxShadow: [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 14, offset: const Offset(0, 6))],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (joining)
-                const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              else
-                Icon(hasError ? Icons.refresh_rounded : Icons.people_alt_rounded, color: color, size: 15),
-              const SizedBox(width: 6),
-              Text(hasError ? 'Retry' : '$onlineCount live', style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _RealParticipantsSheet extends StatelessWidget {
-  const _RealParticipantsSheet({required this.roomName, required this.participants, required this.onlineCount, required this.onRefresh});
+  const _RealParticipantsSheet({
+    required this.roomName,
+    required this.participants,
+    required this.onlineCount,
+    required this.joining,
+    required this.error,
+    required this.onRefresh,
+    required this.onRetryJoin,
+  });
 
   final String roomName;
   final List<SeatUser> participants;
   final int onlineCount;
+  final bool joining;
+  final String? error;
   final Future<void> Function() onRefresh;
+  final Future<void> Function() onRetryJoin;
 
   @override
   Widget build(BuildContext context) {
@@ -209,15 +184,27 @@ class _RealParticipantsSheet extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text(roomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900))),
-              Text('$onlineCount online', style: const TextStyle(color: Color(0xFF12C7B7), fontSize: 12, fontWeight: FontWeight.w900)),
-              IconButton(onPressed: () => unawaited(onRefresh()), icon: const Icon(Icons.refresh_rounded, color: Colors.white70)),
+              if (joining)
+                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF12C7B7)))
+              else
+                Text('$onlineCount online', style: const TextStyle(color: Color(0xFF12C7B7), fontSize: 12, fontWeight: FontWeight.w900)),
+              IconButton(onPressed: () => error == null ? unawaited(onRefresh()) : unawaited(onRetryJoin()), icon: Icon(error == null ? Icons.refresh_rounded : Icons.sync_problem_rounded, color: Colors.white70)),
             ],
           ),
+          if (error != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFFE84C72).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE84C72).withValues(alpha: 0.28))),
+              child: Text(error!, style: const TextStyle(color: Color(0xFFFFB4C4), fontSize: 12, fontWeight: FontWeight.w800)),
+            ),
+          ],
           const SizedBox(height: 8),
           if (participants.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 28),
-              child: Text('No active users yet. Pull refresh after another user joins.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+              child: Text('No active users yet. Refresh after another user joins.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
             )
           else
             Flexible(
