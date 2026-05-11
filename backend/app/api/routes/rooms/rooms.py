@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomParticipantsResponse, RoomTrendingResponse
+from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomMemberActionRequest, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
 from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_service import (
@@ -16,6 +16,8 @@ from app.services.rooms.room_service import (
     list_following_rooms,
     list_room_participants,
     list_trending_rooms,
+    set_room_admin,
+    set_room_member,
 )
 
 
@@ -75,6 +77,26 @@ def get_live_room_participants(room_public_id: str, db: Session = Depends(get_db
     if participants is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found or not accessible")
     return participants
+
+
+@router.post("/{room_public_id}/members", response_model=RoomParticipantUserResponse)
+def add_room_member(room_public_id: str, payload: RoomMemberActionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return set_room_member(db=db, room_public_id=room_public_id, current_user=current_user, target_public_user_id=payload.public_user_id, is_member=True)
+
+
+@router.delete("/{room_public_id}/members/{public_user_id}", response_model=RoomParticipantUserResponse)
+def remove_room_member(room_public_id: str, public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return set_room_member(db=db, room_public_id=room_public_id, current_user=current_user, target_public_user_id=public_user_id, is_member=False)
+
+
+@router.post("/{room_public_id}/admins", response_model=RoomParticipantUserResponse)
+def add_room_admin(room_public_id: str, payload: RoomMemberActionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return set_room_admin(db=db, room_public_id=room_public_id, current_user=current_user, target_public_user_id=payload.public_user_id, is_admin=True)
+
+
+@router.delete("/{room_public_id}/admins/{public_user_id}", response_model=RoomParticipantUserResponse)
+def remove_room_admin(room_public_id: str, public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return set_room_admin(db=db, room_public_id=room_public_id, current_user=current_user, target_public_user_id=public_user_id, is_admin=False)
 
 
 @router.post("/{room_public_id}/kickouts", response_model=RoomKickoutResponse)
