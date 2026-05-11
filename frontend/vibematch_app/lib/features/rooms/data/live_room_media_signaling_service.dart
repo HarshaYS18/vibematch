@@ -1,4 +1,5 @@
 import 'live_room_system_event_bus.dart';
+import 'live_room_settings_event_bus.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -304,6 +305,12 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
+  void setRoomApplyOnlyMode(bool enabled) {
+    _send('room_settings/apply_mode', <String, Object?>{
+      'apply_only_mode_enabled': enabled,
+    });
+  }
+
   void sendRoomChat(String text) {
     final safeText = text.trim();
     if (safeText.isEmpty) return;
@@ -597,6 +604,19 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
             isRoomAdmin: isRoomAdmin,
           );
         }
+
+        final roomData = payload['room'];
+        if (roomData is Map<String, dynamic>) {
+          roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
+          _enforceCurrentUserAudioStateFromSnapshot(roomSnapshot.value);
+        }
+
+        return;
+      }
+      if (type == 'room_settings/updated') {
+        LiveRoomSettingsEventBus.publish(
+          LiveRoomSettingsEvent.fromJson(payload),
+        );
 
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
