@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../media/data/media_upload_service.dart';
 import '../controllers/live_room_message_controller.dart';
@@ -17,9 +16,7 @@ import 'room_theme.dart';
 
 final ValueNotifier<int> roomChatClearSignal = ValueNotifier<int>(0);
 
-void clearRoomChatHistory() {
-  roomChatClearSignal.value++;
-}
+void clearRoomChatHistory() => roomChatClearSignal.value++;
 
 class RoomChatFeed extends StatefulWidget {
   const RoomChatFeed({
@@ -45,10 +42,10 @@ class RoomChatFeed extends StatefulWidget {
 
 class _RoomChatFeedState extends State<RoomChatFeed> {
   late final ScrollController _scrollController;
-  Timer? _expiryTimer;
-  int _lastMessageCount = 0;
+  Timer? _ticker;
   int _clearedMessageCount = 0;
-  final ValueNotifier<int> _expiryTicker = ValueNotifier<int>(0);
+  int _lastMessageCount = 0;
+  int _tick = 0;
 
   @override
   void initState() {
@@ -57,23 +54,15 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
     _lastMessageCount = widget.messages.length;
     roomChatClearSignal.addListener(_handleClearChat);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(jump: true));
-    _startExpiryTicker();
-  }
-
-  void _startExpiryTicker() {
-    _expiryTimer?.cancel();
-    _expiryTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      _expiryTicker.value++;
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _tick++);
     });
   }
 
   @override
   void didUpdateWidget(covariant RoomChatFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.messages.length < _clearedMessageCount) {
-      _clearedMessageCount = widget.messages.length;
-    }
+    if (widget.messages.length < _clearedMessageCount) _clearedMessageCount = widget.messages.length;
     if (widget.messages.length != _lastMessageCount) {
       _lastMessageCount = widget.messages.length;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -83,15 +72,13 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
   @override
   void dispose() {
     roomChatClearSignal.removeListener(_handleClearChat);
-    _expiryTimer?.cancel();
-    _expiryTicker.dispose();
+    _ticker?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
 
   void _handleClearChat() {
-    if (!mounted) return;
-    setState(() => _clearedMessageCount = widget.messages.length);
+    if (mounted) setState(() => _clearedMessageCount = widget.messages.length);
   }
 
   void _scrollToBottom({bool jump = false}) {
@@ -106,33 +93,30 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
 
   @override
   Widget build(BuildContext context) {
+    _tick;
     final newMessageCount = (widget.messages.length - _clearedMessageCount).clamp(0, widget.messages.length);
     if (newMessageCount == 0) return const SizedBox.expand();
-    final visibleMessages = widget.messages.take(newMessageCount).toList(growable: false).reversed.toList(growable: false);
 
-    return ValueListenableBuilder<int>(
-      valueListenable: _expiryTicker,
-      builder: (context, _, child) {
-        return ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.only(top: 8, bottom: 10),
-          physics: const BouncingScrollPhysics(),
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          itemCount: visibleMessages.length,
-          itemBuilder: (context, index) {
-            final message = visibleMessages[index];
-            return RoomTextBubbleHost(
-              bubble: null,
-              child: _CompactChatLine(
-                message: message,
-                canManageSeatApplications: widget.canManageSeatApplications,
-                onSenderTap: widget.onSenderTap == null ? null : () => widget.onSenderTap!(message),
-                onMentionTap: widget.onMentionTap,
-                onApproveSeatApplication: () => widget.onApproveSeatApplication(message),
-                onRejectSeatApplication: () => widget.onRejectSeatApplication(message),
-              ),
-            );
-          },
+    final visibleMessages = widget.messages.take(newMessageCount).where((message) => !message.autoDismissed).toList(growable: false).reversed.toList(growable: false);
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.only(top: 8, bottom: 10),
+      physics: const BouncingScrollPhysics(),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      itemCount: visibleMessages.length,
+      itemBuilder: (context, index) {
+        final message = visibleMessages[index];
+        return RoomTextBubbleHost(
+          bubble: null,
+          child: _CompactChatLine(
+            message: message,
+            canManageSeatApplications: widget.canManageSeatApplications,
+            onSenderTap: widget.onSenderTap == null ? null : () => widget.onSenderTap!(message),
+            onMentionTap: widget.onMentionTap,
+            onApproveSeatApplication: () => widget.onApproveSeatApplication(message),
+            onRejectSeatApplication: () => widget.onRejectSeatApplication(message),
+          ),
         );
       },
     );
@@ -140,7 +124,14 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
 }
 
 class _CompactChatLine extends StatelessWidget {
-  const _CompactChatLine({required this.message, required this.canManageSeatApplications, required this.onApproveSeatApplication, required this.onRejectSeatApplication, this.onSenderTap, this.onMentionTap});
+  const _CompactChatLine({
+    required this.message,
+    required this.canManageSeatApplications,
+    required this.onApproveSeatApplication,
+    required this.onRejectSeatApplication,
+    this.onSenderTap,
+    this.onMentionTap,
+  });
 
   final ChatEntry message;
   final bool canManageSeatApplications;
@@ -151,20 +142,9 @@ class _CompactChatLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.isSystemMessage) return Padding(padding: const EdgeInsets.only(bottom: 6), child: _SystemEventLine(message: message));
+
     final showActions = message.isSeatApplication && canManageSeatApplications && !message.applicationResolved;
-    final isSystem = message.senderId == 'system';
-
-    if (isSystem) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: _TransparentUserMessageFlexBox(
-          messageText: message.message,
-          enableMessageActions: false,
-          child: Text(message.message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: RoomColors.gold, fontSize: 14.5, fontWeight: FontWeight.w900, height: 1.15)),
-        ),
-      );
-    }
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -172,19 +152,13 @@ class _CompactChatLine extends StatelessWidget {
         children: [
           Flexible(
             fit: FlexFit.loose,
-            child: _TransparentUserMessageFlexBox(
-              messageText: message.isImageMessage ? (message.imageUrl ?? message.message) : message.message,
-              enableMessageActions: !message.isGift,
+            child: _ChatGlassBox(
               onTap: onSenderTap,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onSenderTap,
-                    child: CircleAvatar(radius: 13.5, backgroundColor: message.isSeatApplication ? RoomColors.aqua : RoomColors.violet, child: Text(avatarLetter(message.senderName), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900))),
-                  ),
+                  CircleAvatar(radius: 13.5, backgroundColor: message.isSeatApplication ? RoomColors.aqua : RoomColors.violet, child: Text(avatarLetter(message.senderName), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900))),
                   const SizedBox(width: 8),
                   Flexible(
                     fit: FlexFit.loose,
@@ -203,7 +177,10 @@ class _CompactChatLine extends StatelessWidget {
                             ..._messageSpans(message, onMentionTap),
                           ]),
                         ),
-                        if (message.isImageMessage) ...[const SizedBox(height: 6), _ChatImagePreview(imageUrl: message.imageUrl!)],
+                        if (message.isImageMessage) ...[
+                          const SizedBox(height: 6),
+                          _ChatImagePreview(imageUrl: message.imageUrl!),
+                        ],
                       ],
                     ),
                   ),
@@ -223,23 +200,73 @@ class _CompactChatLine extends StatelessWidget {
   }
 
   List<TextSpan> _messageSpans(ChatEntry message, ValueChanged<String>? onMentionTap) {
-    final text = message.message;
     final mentionRegex = RegExp(r'@[\w\u00C0-\uFFFF]+');
     final spans = <TextSpan>[];
     var cursor = 0;
-    for (final match in mentionRegex.allMatches(text)) {
-      if (match.start > cursor) spans.add(_normalSpan(text.substring(cursor, match.start), message));
-      final mentionText = text.substring(match.start, match.end);
+    for (final match in mentionRegex.allMatches(message.message)) {
+      if (match.start > cursor) spans.add(_normalSpan(message.message.substring(cursor, match.start), message));
+      final mentionText = message.message.substring(match.start, match.end);
       final mentionName = mentionText.substring(1);
       spans.add(TextSpan(text: mentionText, recognizer: TapGestureRecognizer()..onTap = onMentionTap == null ? null : () => onMentionTap(mentionName), style: const TextStyle(color: RoomColors.aqua, fontSize: 14.2, fontWeight: FontWeight.w900, height: 1.15)));
       cursor = match.end;
     }
-    if (cursor < text.length) spans.add(_normalSpan(text.substring(cursor), message));
+    if (cursor < message.message.length) spans.add(_normalSpan(message.message.substring(cursor), message));
     return spans;
   }
 
   TextSpan _normalSpan(String text, ChatEntry message) {
     return TextSpan(text: text, style: TextStyle(color: message.isGift ? RoomColors.gold : message.isSeatApplication ? RoomColors.aqua : Colors.white.withValues(alpha: 0.90), fontSize: 14.2, height: 1.15, fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w800));
+  }
+}
+
+class _SystemEventLine extends StatelessWidget {
+  const _SystemEventLine({required this.message});
+  final ChatEntry message;
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnter = message.systemEventType == RoomSystemEventType.userEntered;
+    final isRemove = message.systemEventType == RoomSystemEventType.userRemoved;
+    final color = isRemove ? RoomColors.coral : RoomColors.gold;
+
+    return _ChatGlassBox(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isEnter) ...[
+            CircleAvatar(radius: 11.5, backgroundColor: RoomColors.aqua, child: Text(avatarLetter(message.senderName), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+            const SizedBox(width: 7),
+          ],
+          Icon(isRemove ? Icons.person_remove_alt_1_rounded : Icons.login_rounded, color: color, size: 15),
+          const SizedBox(width: 6),
+          Flexible(child: Text(message.message, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 14.2, fontWeight: FontWeight.w900, height: 1.15))),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatGlassBox extends StatelessWidget {
+  const _ChatGlassBox({required this.child, this.onTap});
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.105),
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.34), width: 0.9),
+          boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: 0.045), blurRadius: 10, spreadRadius: 0.5), BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: child,
+      ),
+    );
   }
 }
 
@@ -258,47 +285,6 @@ class _SeatApplicationActionButton extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => GestureDetector(onTap: onTap, child: Container(height: 28, padding: const EdgeInsets.symmetric(horizontal: 9), alignment: Alignment.center, decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(999)), child: Text(label, style: TextStyle(color: foreground, fontSize: 11, fontWeight: FontWeight.w900))));
-}
-
-enum _ChatMessageAction { copy, report }
-
-class _TransparentUserMessageFlexBox extends StatelessWidget {
-  const _TransparentUserMessageFlexBox({required this.child, required this.messageText, this.onTap, this.enableMessageActions = true});
-  final Widget child;
-  final String messageText;
-  final VoidCallback? onTap;
-  final bool enableMessageActions;
-  Future<void> _showMessageActionPill(BuildContext context, Offset globalPosition) async {
-    if (!enableMessageActions) return;
-    FocusManager.instance.primaryFocus?.unfocus();
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final overlaySize = overlay?.size ?? MediaQuery.sizeOf(context);
-    final left = (globalPosition.dx + 16).clamp(8.0, overlaySize.width - 172);
-    final top = (globalPosition.dy - 18).clamp(8.0, overlaySize.height - 72);
-    final selected = await showMenu<_ChatMessageAction>(context: context, color: Colors.white.withValues(alpha: 0.40), elevation: 14, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999), side: BorderSide(color: Colors.white.withValues(alpha: 0.30), width: 0.8)), position: RelativeRect.fromLTRB(left, top, overlaySize.width - left, overlaySize.height - top), items: const [PopupMenuItem<_ChatMessageAction>(value: _ChatMessageAction.copy, height: 36, padding: EdgeInsets.symmetric(horizontal: 14), child: _MessageActionPillItem(icon: Icons.copy_rounded, label: 'Copy', color: RoomColors.aqua)), PopupMenuItem<_ChatMessageAction>(value: _ChatMessageAction.report, height: 36, padding: EdgeInsets.symmetric(horizontal: 14), child: _MessageActionPillItem(icon: Icons.report_gmailerrorred_rounded, label: 'Report', color: RoomColors.coral))]);
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (!context.mounted || selected == null) return;
-    if (selected == _ChatMessageAction.copy) {
-      await Clipboard.setData(ClipboardData(text: messageText));
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Message copied'), behavior: SnackBarBehavior.floating, duration: const Duration(milliseconds: 1100), backgroundColor: const Color(0xFF171024).withValues(alpha: 0.96)));
-      return;
-    }
-    RoomToast.show(context, 'Report message will connect here');
-  }
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(behavior: HitTestBehavior.translucent, onTap: onTap, onLongPressStart: enableMessageActions ? (details) { FocusManager.instance.primaryFocus?.unfocus(); _showMessageActionPill(context, details.globalPosition); } : null, child: Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.105), borderRadius: BorderRadius.circular(7), border: Border.all(color: Colors.white.withValues(alpha: 0.34), width: 0.9), boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: 0.045), blurRadius: 10, spreadRadius: 0.5), BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 8, offset: const Offset(0, 2))]), child: child));
-}
-
-class _MessageActionPillItem extends StatelessWidget {
-  const _MessageActionPillItem({required this.icon, required this.label, required this.color});
-  final IconData icon;
-  final String label;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: color, size: 17), const SizedBox(width: 7), Text(label, style: const TextStyle(color: RoomColors.plum, fontSize: 12.4, fontWeight: FontWeight.w900))]);
 }
 
 class RoomInputDock extends StatelessWidget {
@@ -331,8 +317,7 @@ class RoomInputDock extends StatelessWidget {
     } on MediaUploadCancelledException {
       return;
     } catch (error) {
-      if (!context.mounted) return;
-      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+      if (context.mounted) RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -360,10 +345,7 @@ class RoomInputDock extends StatelessWidget {
               _DockButton(icon: Icons.emoji_emotions_rounded, onTap: () => _runAndHideSeatActions(onEmojiTap), active: true, size: buttonSize, iconSize: iconSize),
               SizedBox(width: gap),
               _DockButton(icon: Icons.chat_bubble_outline_rounded, onTap: () => _openMessageComposer(context), size: buttonSize, iconSize: iconSize),
-              if (showMicButton) ...[
-                SizedBox(width: gap),
-                _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(onMicTap), active: !micMuted, muted: micMuted, size: buttonSize, iconSize: iconSize),
-              ],
+              if (showMicButton) ...[SizedBox(width: gap), _DockButton(icon: micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, onTap: () => _runAndHideSeatActions(onMicTap), active: !micMuted, muted: micMuted, size: buttonSize, iconSize: iconSize)],
               const Spacer(),
               _DockButton(icon: Icons.mail_outline_rounded, onTap: () => _runAndHideSeatActions(onInboxTap), badgeCount: inboxUnreadCount, size: buttonSize, iconSize: iconSize),
               SizedBox(width: gap),
@@ -379,15 +361,15 @@ class RoomInputDock extends StatelessWidget {
 }
 
 class _DockButton extends StatelessWidget {
-  const _DockButton({required this.icon, required this.onTap, this.active = false, this.muted = false, this.gift = false, this.badgeCount = 0, this.size = 36, this.iconSize = 19});
+  const _DockButton({required this.icon, required this.onTap, this.active = false, this.muted = false, this.badgeCount = 0, this.size = 36, this.iconSize = 19});
   final IconData icon;
   final VoidCallback onTap;
   final bool active;
   final bool muted;
-  final bool gift;
   final int badgeCount;
   final double size;
   final double iconSize;
+
   @override
   Widget build(BuildContext context) {
     final iconColor = muted ? RoomColors.coral : active ? RoomColors.aqua : Colors.white;
