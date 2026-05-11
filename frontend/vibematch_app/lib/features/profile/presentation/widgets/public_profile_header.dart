@@ -36,6 +36,9 @@ class PublicProfileHeader extends StatelessWidget {
     required this.onFamilyTap,
     required this.onVipTap,
     required this.onSvipTap,
+    this.showSocialActions = true,
+    this.followersCount,
+    this.followingCount,
   });
 
   final String displayName;
@@ -66,6 +69,9 @@ class PublicProfileHeader extends StatelessWidget {
   final VoidCallback onFamilyTap;
   final VoidCallback onVipTap;
   final VoidCallback onSvipTap;
+  final bool showSocialActions;
+  final int? followersCount;
+  final int? followingCount;
 
   List<Widget> _badgeLineItems() {
     return [
@@ -82,6 +88,8 @@ class PublicProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final badges = _badgeLineItems();
+    final followersText = _compactCount(followersCount ?? 0);
+    final followingText = _compactCount(followingCount ?? 0);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(18, 14, 18, 0),
@@ -196,21 +204,23 @@ class PublicProfileHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _PresenceLine(presenceLabel: presenceLabel, currentRoomName: currentRoomName, onRoomTap: onRoomTap),
+                if (showSocialActions) ...[
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: PublicMainProfileButton(label: followStatus.label, icon: followStatus.icon, filled: true, onTap: onFollowTap)),
+                    const SizedBox(width: 10),
+                    Expanded(child: PublicMainProfileButton(label: 'Message', icon: Icons.chat_bubble_rounded, filled: false, onTap: onMessageTap)),
+                  ]),
+                ],
                 const SizedBox(height: 16),
                 Row(children: [
-                  Expanded(child: PublicMainProfileButton(label: followStatus.label, icon: followStatus.icon, filled: true, onTap: onFollowTap)),
-                  const SizedBox(width: 10),
-                  Expanded(child: PublicMainProfileButton(label: 'Message', icon: Icons.chat_bubble_rounded, filled: false, onTap: onMessageTap)),
-                ]),
-                const SizedBox(height: 16),
-                const Row(children: [
-                  Expanded(child: PublicStat(value: '12.5K', label: 'Followers')),
-                  SizedBox(width: 6),
-                  Expanded(child: PublicStat(value: '864', label: 'Following')),
-                  SizedBox(width: 6),
-                  Expanded(child: PublicStat(value: '42', label: 'Rooms')),
-                  SizedBox(width: 6),
-                  Expanded(child: PublicStat(value: '3.6M', label: 'Received')),
+                  Expanded(child: PublicStat(value: followersText, label: 'Followers')),
+                  const SizedBox(width: 6),
+                  Expanded(child: PublicStat(value: followingText, label: 'Following')),
+                  const SizedBox(width: 6),
+                  const Expanded(child: PublicStat(value: '0', label: 'Rooms')),
+                  const SizedBox(width: 6),
+                  const Expanded(child: PublicStat(value: '0', label: 'Received')),
                 ]),
               ],
             ),
@@ -219,6 +229,12 @@ class PublicProfileHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+String _compactCount(int value) {
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+  return value.toString();
 }
 
 class _PremiumMatchScorePill extends StatelessWidget {
