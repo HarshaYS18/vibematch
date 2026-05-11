@@ -62,32 +62,40 @@ class MiniProfileHeaderRow extends StatelessWidget {
                   )
                 : MiniProfileReportIconButton(onTap: onReportTap),
           ),
-          if (tag.isNotEmpty)
-            Positioned(
-              left: 38,
-              child: _RoomRoleTag(
-                label: tag,
-                gradient: _tagGradient,
-                shadowColor: _tagShadowColor,
-              ),
-            ),
           Positioned.fill(
-            left: 86,
+            left: 42,
             right: isSelf ? 42 : 42,
             child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 190),
-                child: Text(
-                  user.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: RoomColors.plum,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.3,
-                  ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (tag.isNotEmpty) ...[
+                      _RoomRoleTag(
+                        label: tag,
+                        gradient: _tagGradient,
+                        shadowColor: _tagShadowColor,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 190),
+                      child: Text(
+                        user.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: RoomColors.plum,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
