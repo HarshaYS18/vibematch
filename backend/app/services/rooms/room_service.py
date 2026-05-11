@@ -1,7 +1,6 @@
 import random
 from datetime import datetime, timedelta
 
-from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -31,6 +30,22 @@ def _role_values(user: User) -> set[str]:
 
 def _can_create_unlimited_rooms(user: User) -> bool:
     return bool(_role_values(user) & _UNLIMITED_ROOM_ROLES)
+
+
+def _apply_room_payload(room: Room, payload: RoomCreateRequest) -> Room:
+    mode = payload.mode.strip() or "Open"
+    room_type = payload.type.strip() or "Chat"
+    room.name = payload.name.strip()
+    room.subtitle = payload.subtitle.strip() if payload.subtitle else None
+    room.language = payload.language.strip() or "English"
+    room.mode = mode
+    room.room_type = room_type
+    room.is_secret = mode == "Secret Vibe"
+    room.is_locked = mode == "Locked"
+    room.is_members_only = mode == "Members Only"
+    room.is_active = True
+    room.updated_at = datetime.utcnow()
+    return room
 
 
 def generate_room_public_id(db: Session) -> str:
@@ -123,10 +138,11 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
     if not _can_create_unlimited_rooms(current_user):
         existing_room = db.query(Room).filter(Room.owner_user_id == current_user.id).order_by(Room.created_at.asc()).first()
         if existing_room is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Users can create only one chatroom. Your room is {existing_room.room_public_id}.",
-            )
+            _apply_room_payload(existing_room, payload)
+            _refresh_room_online_count(db, existing_room)
+            db.commit()
+            db.refresh(existing_room)
+            return room_to_detail_response(existing_room)
 
     mode = payload.mode.strip() or "Open"
     room_type = payload.type.strip() or "Chat"
