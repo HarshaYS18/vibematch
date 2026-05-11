@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.follow import UserFollow
 from app.models.user import User
-from app.schemas.user import PublicUserProfileResponse, UserMeResponse, UserSearchResponse, UserSearchResultResponse
+from app.schemas.user import PublicUserProfileResponse, UserMeResponse, UserRelationshipResponse, UserSearchResponse, UserSearchResultResponse
 from app.services import profile_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
@@ -51,17 +51,35 @@ def get_current_user(
     return user
 
 
+def _relationship_payload(db: Session, profile_user: User, current_user: User | None) -> UserRelationshipResponse:
+    is_following = False
+    follows_me = False
+    if current_user is not None and current_user.id != profile_user.id:
+        is_following = db.query(UserFollow.id).filter(
+            UserFollow.follower_user_id == current_user.id,
+            UserFollow.followed_user_id == profile_user.id,
+        ).first() is not None
+        follows_me = db.query(UserFollow.id).filter(
+            UserFollow.follower_user_id == profile_user.id,
+            UserFollow.followed_user_id == current_user.id,
+        ).first() is not None
+
+    followers_count = db.query(func.count(UserFollow.id)).filter(UserFollow.followed_user_id == profile_user.id).scalar() or 0
+    following_count = db.query(func.count(UserFollow.id)).filter(UserFollow.follower_user_id == profile_user.id).scalar() or 0
+    return UserRelationshipResponse(
+        public_user_id=profile_user.public_user_id,
+        is_following=is_following,
+        follows_me=follows_me,
+        is_friend=is_following and follows_me,
+        followers_count=followers_count,
+        following_count=following_count,
+    )
+
+
 def _search_result_payload(db: Session, user: User, current_user: User) -> UserSearchResultResponse:
     user_roles = get_user_roles(user)
     primary_role = get_primary_role(user)
-    is_following = db.query(UserFollow.id).filter(
-        UserFollow.follower_user_id == current_user.id,
-        UserFollow.followed_user_id == user.id,
-    ).first() is not None
-    follows_me = db.query(UserFollow.id).filter(
-        UserFollow.follower_user_id == user.id,
-        UserFollow.followed_user_id == current_user.id,
-    ).first() is not None
+    relationship = _relationship_payload(db, user, current_user)
     return UserSearchResultResponse(
         public_user_id=user.public_user_id,
         display_custom_id=user.display_custom_id,
@@ -74,9 +92,9 @@ def _search_result_payload(db: Session, user: User, current_user: User) -> UserS
         vip=profile_service.vip_summary(db, user),
         is_online=False,
         last_seen_at=user.last_seen_at,
-        is_following=is_following,
-        follows_me=follows_me,
-        is_friend=is_following and follows_me,
+        is_following=relationship.is_following,
+        follows_me=relationship.follows_me,
+        is_friend=relationship.is_friend,
     )
 
 
@@ -149,5 +167,44 @@ def search_users(
 
 
 @router.get("/public/{public_user_id}", response_model=PublicUserProfileResponse)
-def get_public_profile(public_user_id: int, db: Session = Depends(get_db)):
-    return PublicUserProfileResponse(**profile_service.public_profile_payload(db, public_user_id))
+def get_public_profile(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    payload = profile_service.public_profile_payload(db, public_user_id)
+    payload["relationship"] = _relationship_payload(db, user, current_user)
+    return PublicUserProfileResponse(**payload)
+
+
+@router.get("/{public_user_id}/relationship", response_model=UserRelationshipResponse)
+def get_user_relationship(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _relationship_payload(db, user, current_user)
+
+
+@router.post("/{public_user_id}/follow", response_model=UserRelationshipResponse)
+def follow_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot follow yourself")
+    existing = db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == user.id).first()
+    if existing is None:
+        db.add(UserFollow(follower_user_id=current_user.id, followed_user_id=user.id))
+        db.commit()
+    return _relationship_payload(db, user, current_user)
+
+
+@router.delete("/{public_user_id}/follow", response_model=UserRelationshipResponse)
+def unfollow_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    existing = db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == user.id).first()
+    if existing is not None:
+        db.delete(existing)
+        db.commit()
+    return _relationship_payload(db, user, current_user)
