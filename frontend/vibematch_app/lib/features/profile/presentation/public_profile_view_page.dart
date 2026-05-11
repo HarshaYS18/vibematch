@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
-import '../../family/models/family_ui_models.dart';
-import '../../family/presentation/family_modular_page.dart';
 import '../../vip/presentation/vip_program_page.dart';
 import '../data/profile_api_service.dart';
 import '../data/profile_visitor_repository.dart';
@@ -13,7 +11,6 @@ import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
 import 'profile_qr/profile_qr_pages.dart';
 import 'widgets/me_profile_constants.dart';
-import 'widgets/public_love_bonds_panel.dart';
 import 'widgets/public_profile_widgets.dart';
 
 class PublicProfileViewPage extends StatefulWidget {
@@ -34,8 +31,6 @@ class PublicProfileViewPage extends StatefulWidget {
 }
 
 class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
-  static const int _vibesCount = 18;
-
   final PageController _coverController = PageController();
   final ProfileApiService _profileApi = const ProfileApiService();
   final AuthApiService _authApi = const AuthApiService();
@@ -55,11 +50,15 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     return viewer != null && targetPublicId > 0 && viewer.publicUserId == targetPublicId;
   }
 
+  List<PublicCoverPhoto> get _coverPhotos {
+    final urls = _backendProfile?.coverPhotoUrls ?? widget.user.coverPhotoUrls;
+    return publicCoverPhotosFromUrls(urls);
+  }
+
   @override
   void initState() {
     super.initState();
     _viewer = _authApi.cachedUser;
-    _startCoverAutoScroll();
     _recordProfileVisit();
     _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen(_onRelationshipRealtimeEvent);
     unawaited(_loadBackendProfile());
@@ -83,7 +82,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
       final viewer = await _profileApi.getMe(forceRefresh: false);
       final profile = await _profileApi.getPublicProfile(publicUserId);
       if (!mounted) return;
-      setState(() { _viewer = viewer; _backendProfile = profile; _relationship = profile.relationship; });
+      setState(() { _viewer = viewer; _backendProfile = profile; _relationship = profile.relationship; _coverIndex = 0; });
+      _startCoverAutoScroll();
     } catch (error) {
       if (!mounted) return;
       setState(() => _profileError = error.toString().replaceFirst('Exception: ', ''));
@@ -126,9 +126,12 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
 
   void _startCoverAutoScroll() {
     _coverTimer?.cancel();
+    final photos = _coverPhotos;
+    if (photos.length < 2) return;
     _coverTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (!mounted || !_coverController.hasClients || publicProfileCoverPhotos.length < 2) return;
-      final nextIndex = (_coverIndex + 1) % publicProfileCoverPhotos.length;
+      final currentPhotos = _coverPhotos;
+      if (!mounted || !_coverController.hasClients || currentPhotos.length < 2) return;
+      final nextIndex = (_coverIndex + 1) % currentPhotos.length;
       _coverController.animateToPage(nextIndex, duration: const Duration(milliseconds: 520), curve: Curves.easeOutCubic);
     });
   }
@@ -170,11 +173,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     }
   }
 
-  void _openFamilyPage() {
-    final familyProfile = FamilyProfileUiModel(id: 'VMF6922', name: widget.familyName, minimumVipLabel: 'VIP 5', memberCount: 128, maxMembers: 200, rankLabel: 'No. 99+', ownerUserId: 'family_owner_01', quarterCarryExp: 1085000, giftCoinsThisQuarter: 1085000, timeMinutesToday: 12240);
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => FamilyModularPage(openCurrentFamily: true, initialFamilyProfile: familyProfile)));
-  }
-
   PublicFollowStatus get _followStatus {
     final relationship = _relationship;
     if (relationship == null) return PublicFollowStatus.none;
@@ -211,16 +209,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     final viewer = _viewer;
     final profile = _backendProfile;
     if (viewer == null || profile == null) return null;
-    return calculateProfileMatchScore(
-      viewerInterests: viewer.interests,
-      profileInterests: profile.interests,
-      viewerGenderPreference: friendGenderPreferenceFromWire(viewer.friendGenderPreference),
-      profileGender: profileGenderFromWire(profile.gender),
-      viewerMaritalPreference: friendMaritalPreferenceFromWire(viewer.friendMaritalPreference),
-      profileMaritalStatus: maritalStatusFromWire(profile.maritalStatus),
-      viewerGender: profileGenderFromWire(viewer.gender),
-      profileGenderPreference: friendGenderPreferenceFromWire(profile.friendGenderPreference),
-    );
+    return calculateProfileMatchScore(viewerInterests: viewer.interests, profileInterests: profile.interests, viewerGenderPreference: friendGenderPreferenceFromWire(viewer.friendGenderPreference), profileGender: profileGenderFromWire(profile.gender), viewerMaritalPreference: friendMaritalPreferenceFromWire(viewer.friendMaritalPreference), profileMaritalStatus: maritalStatusFromWire(profile.maritalStatus), viewerGender: profileGenderFromWire(viewer.gender), profileGenderPreference: friendGenderPreferenceFromWire(profile.friendGenderPreference));
   }
 
   @override
@@ -229,6 +218,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     final username = _username();
     final publicId = _publicId();
     final profile = _backendProfile;
+    final coverPhotos = _coverPhotos;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
@@ -254,9 +244,9 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 currentRoomName: widget.currentRoomName,
                 familyName: widget.familyName,
                 familyLevel: widget.familyLevel,
-                coverPhotos: publicProfileCoverPhotos,
+                coverPhotos: coverPhotos,
                 coverController: _coverController,
-                coverIndex: _coverIndex,
+                coverIndex: _coverIndex.clamp(0, coverPhotos.isEmpty ? 0 : coverPhotos.length - 1),
                 followStatus: _followStatus,
                 matchScore: _matchScore(),
                 showSocialActions: !_isSelfProfile,
@@ -266,44 +256,25 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 onBackTap: () => Navigator.pop(context),
                 onQrTap: _openProfileQrActions,
                 onShareTap: () => _showAction(context, 'Profile share sheet will open.'),
-                onAddCoverTap: () => _showAction(context, 'Add cover photos flow will open. Users can upload multiple covers.'),
+                onAddCoverTap: () => _showAction(context, 'Cover photos can be edited from your own profile.'),
                 onFollowTap: _toggleFollow,
                 onMessageTap: _isSelfProfile ? () {} : () => _showAction(context, 'Message request will open.'),
                 onRoomTap: () => _showAction(context, 'Open ${widget.currentRoomName} if privacy rules allow it.'),
-                onFamilyTap: _openFamilyPage,
+                onFamilyTap: () => _showAction(context, 'Family profile will open when backend family is connected.'),
                 onVipTap: () => _openViewerVipProgram(initialTabIndex: 0),
                 onSvipTap: () => _openViewerVipProgram(initialTabIndex: 1),
               ),
             ),
-            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 0), child: PublicLoveBondsPanel(onVisitorTap: () => _showAction(context, 'Bond details are private and cannot be opened by visitors.')))),
             if (profile != null)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                  child: PublicBioPanel(
-                    bio: profile.bio,
-                    age: profile.age,
-                    gender: displayGenderFromWire(profile.gender),
-                    profession: profile.profession,
-                    maritalStatus: displayMaritalFromWire(profile.maritalStatus),
-                    interests: profile.interests,
-                  ),
+                  child: PublicBioPanel(bio: profile.bio, age: profile.age, gender: displayGenderFromWire(profile.gender), profession: profile.profession, maritalStatus: displayMaritalFromWire(profile.maritalStatus), interests: profile.interests),
                 ),
               ),
             if (widget.familyName.trim().isNotEmpty)
-              SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 0), child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: _openFamilyPage))),
-            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 22, 18, 10), child: Row(children: [Expanded(child: Text('My Vibes ($_vibesCount)', style: const TextStyle(color: Color(0xFF251538), fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -0.4)))]))),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
-              sliver: SliverList.separated(
-                itemCount: mockPublicVibes.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  final vibe = mockPublicVibes[index];
-                  return PublicVibeCard(vibe: vibe, onTap: () => _showAction(context, '${vibe.title} vibe details will open.'), onLikeTap: () => _showAction(context, 'Liked this Vibe locally.'), onCommentTap: () => _showAction(context, 'Comments will open.'), onShareTap: () => _showAction(context, 'Share this Vibe.'));
-                },
-              ),
-            ),
+              SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 28), child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: () => _showAction(context, 'Family profile will open when backend family is connected.')))),
+            const SliverToBoxAdapter(child: SizedBox(height: 28)),
           ],
         ),
       ),
