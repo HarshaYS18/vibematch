@@ -309,7 +309,7 @@ class _ChatImagePreview extends StatelessWidget {
         width: 148,
         height: 108,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (context, error, stackTrace) => Container(
           width: 148,
           height: 84,
           alignment: Alignment.center,
