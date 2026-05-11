@@ -332,6 +332,12 @@ def create_vibe(
     return _post_response(db, post, current_user)
 
 
+@router.get("/{post_id}", response_model=VibePostResponse)
+def get_vibe_detail(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    post = _get_visible_post_or_404(db, post_id)
+    return _post_response(db, post, current_user)
+
+
 @router.post("/{post_id}/like", response_model=VibeLikeResponse)
 def toggle_vibe_like(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _get_visible_post_or_404(db, post_id)
