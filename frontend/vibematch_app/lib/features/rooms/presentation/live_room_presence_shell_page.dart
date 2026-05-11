@@ -224,7 +224,7 @@ class _RealParticipantsSheet extends StatelessWidget {
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: participants.length,
-                separatorBuilder: (_, __) => Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+                separatorBuilder: (context, index) => Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
                 itemBuilder: (context, index) => _ParticipantTile(user: participants[index]),
               ),
             ),
