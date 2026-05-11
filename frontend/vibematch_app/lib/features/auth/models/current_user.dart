@@ -9,6 +9,7 @@ class CurrentUser {
   final String? displayName;
   final String? avatarUrl;
   final String? bio;
+  final List<String> coverPhotoUrls;
   final DateTime? dateOfBirth;
   final String? gender;
   final String? profession;
@@ -38,6 +39,7 @@ class CurrentUser {
     required this.displayName,
     required this.avatarUrl,
     required this.bio,
+    required this.coverPhotoUrls,
     required this.dateOfBirth,
     required this.gender,
     required this.profession,
@@ -78,6 +80,7 @@ class CurrentUser {
       displayName: _nullableStringFromJson(json, keys: const ['display_name', 'displayName']),
       avatarUrl: _nullableStringFromJson(json, keys: const ['avatar_url', 'avatarUrl']),
       bio: _nullableStringFromJson(json, keys: const ['bio']),
+      coverPhotoUrls: _stringListFromJson(json, keys: const ['cover_photo_urls', 'coverPhotoUrls']),
       dateOfBirth: _dateTimeFromJson(json, keys: const ['date_of_birth', 'dateOfBirth']),
       gender: _nullableStringFromJson(json, keys: const ['gender']),
       profession: _nullableStringFromJson(json, keys: const ['profession']),
@@ -112,6 +115,7 @@ class CurrentUser {
       displayName: 'Harsha',
       avatarUrl: null,
       bio: null,
+      coverPhotoUrls: const [],
       dateOfBirth: null,
       gender: null,
       profession: null,
@@ -146,6 +150,7 @@ class CurrentUser {
       displayName: 'Riya Sharma',
       avatarUrl: null,
       bio: null,
+      coverPhotoUrls: const [],
       dateOfBirth: null,
       gender: null,
       profession: null,
@@ -177,6 +182,7 @@ class CurrentUser {
     String? displayName,
     String? avatarUrl,
     String? bio,
+    List<String>? coverPhotoUrls,
     DateTime? dateOfBirth,
     String? gender,
     String? profession,
@@ -200,6 +206,7 @@ class CurrentUser {
     bool clearDisplayCustomId = false,
     bool clearAvatarUrl = false,
     bool clearBio = false,
+    bool clearCoverPhotoUrls = false,
     bool clearDateOfBirth = false,
     bool clearLastDeviceId = false,
     bool clearLastLoginAt = false,
@@ -213,6 +220,7 @@ class CurrentUser {
       displayName: displayName ?? this.displayName,
       avatarUrl: clearAvatarUrl ? null : avatarUrl ?? this.avatarUrl,
       bio: clearBio ? null : bio ?? this.bio,
+      coverPhotoUrls: clearCoverPhotoUrls ? const [] : coverPhotoUrls ?? this.coverPhotoUrls,
       dateOfBirth: clearDateOfBirth ? null : dateOfBirth ?? this.dateOfBirth,
       gender: gender ?? this.gender,
       profession: profession ?? this.profession,
