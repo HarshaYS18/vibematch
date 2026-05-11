@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -68,6 +70,10 @@ from app.models import (
 )
 
 
+STATIC_DIR = Path("static")
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+(STATIC_DIR / "uploads").mkdir(parents=True, exist_ok=True)
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Vibe Match API")
@@ -81,7 +87,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.get("/")
