@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
@@ -48,21 +49,30 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
 
   final PageController _coverController = PageController();
   final ProfileApiService _profileApi = const ProfileApiService();
+  final AuthApiService _authApi = const AuthApiService();
   Timer? _coverTimer;
   int _coverIndex = 0;
-  bool _viewerFollowsProfile = false;
-  final bool _profileFollowsViewer = true;
-  final bool _isBlocked = false;
+  bool _isBlocked = false;
   bool _loadingProfile = false;
+  bool _followBusy = false;
   String? _profileError;
+  CurrentUser? _viewer;
   PublicUserProfile? _backendProfile;
+  UserRelationship? _relationship;
 
   final List<String> _viewerInterests = const ['Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Live Audio'];
   final List<String> _profileInterests = const ['Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Premium UI', 'Live Audio'];
 
+  bool get _isSelfProfile {
+    final viewer = _viewer ?? _authApi.cachedUser;
+    final targetPublicId = _targetPublicUserId();
+    return viewer != null && targetPublicId > 0 && viewer.publicUserId == targetPublicId;
+  }
+
   @override
   void initState() {
     super.initState();
+    _viewer = _authApi.cachedUser;
     _startCoverAutoScroll();
     _recordProfileVisit();
     unawaited(_loadBackendProfile());
@@ -75,17 +85,24 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     super.dispose();
   }
 
+  int _targetPublicUserId() => widget.publicUserId ?? widget.user.publicUserId;
+
   Future<void> _loadBackendProfile() async {
-    final publicUserId = widget.publicUserId ?? widget.user.publicUserId;
+    final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
     setState(() {
       _loadingProfile = true;
       _profileError = null;
     });
     try {
+      final viewer = await _profileApi.getMe(forceRefresh: false);
       final profile = await _profileApi.getPublicProfile(publicUserId);
       if (!mounted) return;
-      setState(() => _backendProfile = profile);
+      setState(() {
+        _viewer = viewer;
+        _backendProfile = profile;
+        _relationship = profile.relationship;
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() => _profileError = error.toString().replaceFirst('Exception: ', ''));
@@ -95,9 +112,12 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 
   void _recordProfileVisit() {
+    final visitor = _authApi.cachedUser;
+    if (visitor == null) return;
+    if (visitor.publicUserId == _targetPublicUserId()) return;
     ProfileVisitorRepository.instance.recordVisit(
       profileOwner: widget.user,
-      visitor: CurrentUser.mockFounderOwner(),
+      visitor: visitor,
     );
   }
 
@@ -134,13 +154,29 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     );
   }
 
-  void _toggleFollow() {
+  Future<void> _toggleFollow() async {
+    if (_isSelfProfile) return;
     if (_isBlocked) {
       showPublicProfileAccessDialog(context);
       return;
     }
-    setState(() => _viewerFollowsProfile = !_viewerFollowsProfile);
-    _showAction(context, _followStatus.message);
+    if (_followBusy) return;
+    final publicUserId = _targetPublicUserId();
+    if (publicUserId <= 0) return;
+
+    setState(() => _followBusy = true);
+    try {
+      final nextRelationship = _relationship?.isFollowing == true
+          ? await _profileApi.unfollowUser(publicUserId)
+          : await _profileApi.followUser(publicUserId);
+      if (!mounted) return;
+      setState(() => _relationship = nextRelationship);
+      _showAction(context, _followStatus.message);
+    } catch (error) {
+      if (mounted) _showAction(context, error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _followBusy = false);
+    }
   }
 
   void _openFamilyPage() {
@@ -168,9 +204,11 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 
   PublicFollowStatus get _followStatus {
-    if (_viewerFollowsProfile && _profileFollowsViewer) return PublicFollowStatus.mutual;
-    if (_viewerFollowsProfile) return PublicFollowStatus.following;
-    if (_profileFollowsViewer) return PublicFollowStatus.followBack;
+    final relationship = _relationship;
+    if (relationship == null) return PublicFollowStatus.none;
+    if (relationship.isFriend) return PublicFollowStatus.mutual;
+    if (relationship.isFollowing) return PublicFollowStatus.following;
+    if (relationship.followsMe) return PublicFollowStatus.followBack;
     return PublicFollowStatus.none;
   }
 
@@ -244,13 +282,16 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 coverIndex: _coverIndex,
                 followStatus: _followStatus,
                 matchScore: _matchScore(),
+                showSocialActions: !_isSelfProfile,
+                followersCount: _relationship?.followersCount,
+                followingCount: _relationship?.followingCount,
                 onCoverChanged: (index) => setState(() => _coverIndex = index),
                 onBackTap: () => Navigator.pop(context),
                 onQrTap: _openProfileQrActions,
                 onShareTap: () => _showAction(context, 'Profile share sheet will open.'),
                 onAddCoverTap: () => _showAction(context, 'Add cover photos flow will open. Users can upload multiple covers.'),
                 onFollowTap: _toggleFollow,
-                onMessageTap: () => _showAction(context, 'Message request will open.'),
+                onMessageTap: _isSelfProfile ? () {} : () => _showAction(context, 'Message request will open.'),
                 onRoomTap: () => _showAction(context, 'Open ${widget.currentRoomName} if privacy rules allow it.'),
                 onFamilyTap: _openFamilyPage,
                 onVipTap: () => _openViewerVipProgram(initialTabIndex: 0),
@@ -267,19 +308,20 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
                 child: PublicBioPanel(
-                  bio: 'Building premium live rooms, Vibes, gifts, games and a trusted social-audio community.',
-                  age: '27',
-                  gender: 'Male',
-                  interests: _profileInterests,
+                  bio: 'Type something about yourself.',
+                  age: '',
+                  gender: '',
+                  interests: const [],
                 ),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: _openFamilyPage),
+            if (widget.familyName.trim().isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                  child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: _openFamilyPage),
+                ),
               ),
-            ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 22, 18, 10),
