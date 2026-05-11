@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/icons/vm_icons.dart';
+import '../features/auth/data/auth_api_service.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/create/presentation/create_page.dart';
 import '../features/home/presentation/home_page_modular.dart';
 import '../features/inbox/presentation/inbox_page_modular.dart';
 import '../features/profile/presentation/me_page.dart';
+import '../features/rooms/data/live_room_media_signaling_service.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page_modular.dart';
@@ -29,10 +33,46 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   VmMainTab _selectedTab = VmMainTab.home;
+  late CurrentUser _syncedUser;
+  StreamSubscription<CurrentUser>? _userSyncSubscription;
 
-  CurrentUser get _activeUser => widget.currentUser;
+  CurrentUser get _activeUser => _syncedUser;
 
   bool get _isTestingAsFounder => _activeUser.canSeeOwnerControls;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncedUser = widget.currentUser;
+    LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(_syncedUser);
+    _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onUserSynced);
+  }
+
+  @override
+  void didUpdateWidget(covariant AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentUser != widget.currentUser) {
+      _onUserSynced(widget.currentUser);
+    }
+  }
+
+  @override
+  void dispose() {
+    _userSyncSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _onUserSynced(CurrentUser user) {
+    LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(user);
+    if (!mounted) return;
+    setState(() => _syncedUser = user);
+  }
+
+  Future<void> _refreshAndSyncUser() async {
+    await widget.onRefreshPressed();
+    final cached = const AuthApiService().cachedUser;
+    if (cached != null) _onUserSynced(cached);
+  }
 
   List<Widget> get _pages {
     final activeUser = _activeUser;
@@ -42,7 +82,7 @@ class _AppShellState extends State<AppShell> {
       const VibesPage(),
       CreatePage(currentUser: activeUser),
       const InboxPage(),
-      MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: widget.onRefreshPressed),
+      MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser),
     ];
   }
 
