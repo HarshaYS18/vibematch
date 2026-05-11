@@ -4,20 +4,17 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomTrendingResponse
-from app.schemas.rooms.room_kickout import (
-    RoomKickoutCreateRequest,
-    RoomKickoutResponse,
-)
-from app.services.rooms.room_kickout_service import (
-    create_room_kickout,
-    list_active_room_kickouts,
-    remove_room_kickout,
-)
+from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomParticipantsResponse, RoomTrendingResponse
+from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
+from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_service import (
     create_room,
     get_room_by_public_id,
+    heartbeat_room,
+    join_room,
+    leave_room,
     list_following_rooms,
+    list_room_participants,
     list_trending_rooms,
 )
 
@@ -26,127 +23,73 @@ router = APIRouter(prefix="/rooms", tags=["Rooms"])
 
 
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
-def create_live_room(
-    payload: RoomCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def create_live_room(payload: RoomCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return create_room(db=db, current_user=current_user, payload=payload)
 
 
 @router.get("/trending", response_model=list[RoomTrendingResponse])
-def get_trending_rooms(
-    language: str | None = Query(default=None),
-    category: str | None = Query(default=None),
-    limit: int = Query(default=30, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
-    return list_trending_rooms(
-        db=db,
-        language=language,
-        category=category,
-        limit=limit,
-    )
+def get_trending_rooms(language: str | None = Query(default=None), category: str | None = Query(default=None), limit: int = Query(default=30, ge=1, le=100), db: Session = Depends(get_db)):
+    return list_trending_rooms(db=db, language=language, category=category, limit=limit)
 
 
 @router.get("/following", response_model=list[RoomTrendingResponse])
-def get_following_rooms(
-    language: str | None = Query(default=None),
-    category: str | None = Query(default=None),
-    limit: int = Query(default=30, ge=1, le=100),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return list_following_rooms(
-        db=db,
-        current_user=current_user,
-        language=language,
-        category=category,
-        limit=limit,
-    )
+def get_following_rooms(language: str | None = Query(default=None), category: str | None = Query(default=None), limit: int = Query(default=30, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return list_following_rooms(db=db, current_user=current_user, language=language, category=category, limit=limit)
 
 
 @router.get("/{room_public_id}", response_model=RoomDetailResponse)
-def get_room_detail(
-    room_public_id: str,
-    db: Session = Depends(get_db),
-):
+def get_room_detail(room_public_id: str, db: Session = Depends(get_db)):
     room = get_room_by_public_id(db=db, room_public_id=room_public_id)
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
     return room
 
 
-@router.post(
-    "/{room_public_id}/kickouts",
-    response_model=RoomKickoutResponse,
-)
-def kickout_room_user(
-    room_public_id: str,
-    payload: RoomKickoutCreateRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Kick a user out of a room and add them to that room's blocked list.
-
-    Durations:
-    - 1h: blocked for 1 hour
-    - 1d: blocked for 1 day
-    - forever: blocked until manually removed later
-
-    Temporary dev contract: actor identity will be connected to auth dependency
-    after room permissions are wired.
-    """
-
-    return create_room_kickout(
-        db=db,
-        room_public_id=room_public_id,
-        payload=payload,
-    )
+@router.post("/{room_public_id}/join", response_model=RoomJoinResponse)
+def join_live_room(room_public_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    joined = join_room(db=db, room_public_id=room_public_id, current_user=current_user)
+    if joined is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found or not accessible")
+    return joined
 
 
-@router.get(
-    "/{room_public_id}/kickouts",
-    response_model=list[RoomKickoutResponse],
-)
-def get_room_blocked_users(
-    room_public_id: str,
-    db: Session = Depends(get_db),
-):
-    """Return active kick-out/blocked-list entries for room settings."""
-
-    return list_active_room_kickouts(
-        db=db,
-        room_public_id=room_public_id,
-    )
+@router.post("/{room_public_id}/heartbeat", response_model=RoomJoinResponse)
+def heartbeat_live_room(room_public_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    joined = heartbeat_room(db=db, room_public_id=room_public_id, current_user=current_user)
+    if joined is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found or not accessible")
+    return joined
 
 
-@router.delete(
-    "/{room_public_id}/kickouts/{kickout_id}",
-    response_model=RoomKickoutResponse,
-)
-def unblock_room_user(
-    room_public_id: str,
-    kickout_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Remove a user from this room's blocked list.
+@router.post("/{room_public_id}/leave", response_model=RoomLeaveResponse)
+def leave_live_room(room_public_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    left = leave_room(db=db, room_public_id=room_public_id, current_user=current_user)
+    if left is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    return left
 
-    Temporary dev contract: permission checks and audit logs will be connected
-    after backend room roles are fully wired.
-    """
 
-    removed = remove_room_kickout(
-        db=db,
-        room_public_id=room_public_id,
-        kickout_id=kickout_id,
-    )
+@router.get("/{room_public_id}/participants", response_model=RoomParticipantsResponse)
+def get_live_room_participants(room_public_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    participants = list_room_participants(db=db, room_public_id=room_public_id, current_user=current_user)
+    if participants is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found or not accessible")
+    return participants
 
+
+@router.post("/{room_public_id}/kickouts", response_model=RoomKickoutResponse)
+def kickout_room_user(room_public_id: str, payload: RoomKickoutCreateRequest, db: Session = Depends(get_db)):
+    return create_room_kickout(db=db, room_public_id=room_public_id, payload=payload)
+
+
+@router.get("/{room_public_id}/kickouts", response_model=list[RoomKickoutResponse])
+def get_room_blocked_users(room_public_id: str, db: Session = Depends(get_db)):
+    return list_active_room_kickouts(db=db, room_public_id=room_public_id)
+
+
+@router.delete("/{room_public_id}/kickouts/{kickout_id}", response_model=RoomKickoutResponse)
+def unblock_room_user(room_public_id: str, kickout_id: int, db: Session = Depends(get_db)):
+    removed = remove_room_kickout(db=db, room_public_id=room_public_id, kickout_id=kickout_id)
     if removed is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Active room blocked-list entry not found.",
-        )
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active room blocked-list entry not found.")
     return removed
