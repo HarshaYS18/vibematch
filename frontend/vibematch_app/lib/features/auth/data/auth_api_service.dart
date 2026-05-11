@@ -161,7 +161,10 @@ class AuthApiService {
 
     final response = await http.patch(
       Uri.parse(VmApiConfig.endpoint('/users/me/profile')),
-      headers: const {'Content-Type': 'application/json'}..addAll({'Authorization': 'Bearer $token'}),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
       body: jsonEncode({
         'display_name': safeName,
         'bio': bio?.trim() ?? '',
