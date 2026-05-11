@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.follow import UserFollow
+from app.models.inbox import InboxMessageType
 from app.models.user import User
 from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeShare
 from app.schemas.vibes import (
@@ -27,7 +28,7 @@ from app.schemas.vibes import (
     VibeShareCreateRequest,
     VibeShareResponse,
 )
-from app.services import notification_service
+from app.services import inbox_service, notification_service
 
 router = APIRouter(prefix="/vibes", tags=["Vibes"])
 
@@ -195,14 +196,28 @@ def _followers_for_mention_all(db: Session, current_user: User) -> list[User]:
     )
 
 
+def _send_direct_mention_inbox_snapshot(db: Session, post: VibePost, sender: User, recipient: User, caption_preview: str) -> None:
+    conversation = inbox_service.create_direct_conversation(db, sender, recipient)
+    text = f"Mentioned you in a Vibe\n\n{caption_preview}\n\nVibe ID: {post.id}"
+    message_type = InboxMessageType.IMAGE.value if post.media_type == "photo" and post.media_url else InboxMessageType.TEXT.value
+    inbox_service.send_message(
+        db=db,
+        conversation=conversation,
+        sender=sender,
+        text=text,
+        message_type=message_type,
+        attachment_url=post.media_url,
+    )
+
+
 def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, mentions: list[str], uses_mention_all: bool) -> None:
     notified_user_ids: set[int] = set()
     author_name = _display_name(current_user)
-    caption_preview = post.caption[:80].strip()
-    if len(post.caption) > 80:
+    caption_preview = post.caption[:160].strip()
+    if len(post.caption) > 160:
         caption_preview += "..."
 
-    def create_vibe_notification(user: User, *, notification_type: str, title: str, body: str) -> None:
+    def create_vibe_notification(user: User, notification_type: str, title: str, body: str) -> None:
         notification_service.create_notification(
             db,
             recipient=user,
@@ -226,10 +241,11 @@ def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, me
         notified_user_ids.add(user.id)
         create_vibe_notification(
             user,
-            notification_type="vibe_mention",
-            title=f"{author_name} mentioned you",
-            body=f"Mentioned you in a Vibe: \"{caption_preview}\"",
+            "vibe_mention",
+            f"{author_name} mentioned you",
+            f"Mentioned you in a Vibe: \"{caption_preview}\"",
         )
+        _send_direct_mention_inbox_snapshot(db, post, current_user, user, caption_preview)
 
     if uses_mention_all:
         for user in _followers_for_mention_all(db, current_user):
@@ -238,9 +254,9 @@ def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, me
             notified_user_ids.add(user.id)
             create_vibe_notification(
                 user,
-                notification_type="vibe_mention_all",
-                title=f"{author_name} posted to followers",
-                body=f"Mentioned all followers in a new Vibe: \"{caption_preview}\"",
+                "vibe_mention_all",
+                f"{author_name} posted to followers",
+                f"Mentioned all followers in a new Vibe: \"{caption_preview}\"",
             )
 
 
@@ -317,11 +333,7 @@ def create_vibe(
 
 
 @router.post("/{post_id}/like", response_model=VibeLikeResponse)
-def toggle_vibe_like(
-    post_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def toggle_vibe_like(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _get_visible_post_or_404(db, post_id)
     existing = db.query(VibeReaction).filter(VibeReaction.post_id == post_id, VibeReaction.user_id == current_user.id).first()
     liked_by_me = False
@@ -336,56 +348,27 @@ def toggle_vibe_like(
 
 
 @router.post("/{post_id}/share", response_model=VibeShareResponse)
-def share_vibe(
-    post_id: int,
-    payload: VibeShareCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def share_vibe(post_id: int, payload: VibeShareCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _get_visible_post_or_404(db, post_id)
     target_user: User | None = None
     if payload.target_public_user_id is not None:
         target_user = db.query(User).filter(User.public_user_id == payload.target_public_user_id).first()
         if not target_user:
             raise HTTPException(status_code=404, detail="Share target user not found")
-    share = VibeShare(
-        post_id=post_id,
-        sender_user_id=current_user.id,
-        target_user_id=target_user.id if target_user else None,
-        target_public_user_id=payload.target_public_user_id,
-        share_channel=payload.share_channel.strip() or "inbox",
-    )
+    share = VibeShare(post_id=post_id, sender_user_id=current_user.id, target_user_id=target_user.id if target_user else None, target_public_user_id=payload.target_public_user_id, share_channel=payload.share_channel.strip() or "inbox")
     db.add(share)
     db.commit()
     db.refresh(share)
     shares_count = db.query(func.count(VibeShare.id)).filter(VibeShare.post_id == post_id).scalar() or 0
-    return VibeShareResponse(
-        id=share.id,
-        post_id=post_id,
-        share_channel=share.share_channel,
-        target_public_user_id=share.target_public_user_id,
-        shares_count=shares_count,
-        created_at=share.created_at,
-    )
+    return VibeShareResponse(id=share.id, post_id=post_id, share_channel=share.share_channel, target_public_user_id=share.target_public_user_id, shares_count=shares_count, created_at=share.created_at)
 
 
 @router.post("/{post_id}/report", response_model=VibeReportResponse)
-def report_vibe(
-    post_id: int,
-    payload: VibeReportCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def report_vibe(post_id: int, payload: VibeReportCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     post = _get_visible_post_or_404(db, post_id)
     if post.author_user_id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot report your own Vibe")
-    report = VibeReport(
-        post_id=post_id,
-        reporter_user_id=current_user.id,
-        reason=payload.reason.strip(),
-        details=payload.details.strip() if payload.details else None,
-        status="PENDING",
-    )
+    report = VibeReport(post_id=post_id, reporter_user_id=current_user.id, reason=payload.reason.strip(), details=payload.details.strip() if payload.details else None, status="PENDING")
     db.add(report)
     db.commit()
     db.refresh(report)
@@ -393,12 +376,7 @@ def report_vibe(
 
 
 @router.post("/{post_id}/comments", response_model=VibeCommentResponse)
-def add_vibe_comment(
-    post_id: int,
-    payload: VibeCommentCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def add_vibe_comment(post_id: int, payload: VibeCommentCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _get_visible_post_or_404(db, post_id)
     comment = VibeComment(post_id=post_id, user_id=current_user.id, text=payload.text.strip())
     db.add(comment)
@@ -408,23 +386,14 @@ def add_vibe_comment(
 
 
 @router.get("/{post_id}/comments", response_model=list[VibeCommentResponse])
-def list_vibe_comments(
-    post_id: int,
-    limit: int = Query(default=50, ge=1, le=100),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def list_vibe_comments(post_id: int, limit: int = Query(default=50, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _get_visible_post_or_404(db, post_id)
     comments = db.query(VibeComment).filter(VibeComment.post_id == post_id, VibeComment.is_deleted.is_(False)).order_by(VibeComment.created_at.asc()).limit(limit).all()
     return [VibeCommentResponse(id=item.id, post_id=post_id, text=item.text, author=_author_response(item.user), created_at=item.created_at) for item in comments]
 
 
 @router.delete("/{post_id}", response_model=VibeDeleteResponse)
-def delete_vibe(
-    post_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def delete_vibe(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     post = _get_visible_post_or_404(db, post_id)
     if post.author_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the author can delete this Vibe")
