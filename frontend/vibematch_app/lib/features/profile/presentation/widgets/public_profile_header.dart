@@ -37,6 +37,7 @@ class PublicProfileHeader extends StatelessWidget {
     required this.onVipTap,
     required this.onSvipTap,
     this.showSocialActions = true,
+    this.showOwnerActions = false,
     this.followersCount,
     this.followingCount,
   });
@@ -70,6 +71,7 @@ class PublicProfileHeader extends StatelessWidget {
   final VoidCallback onVipTap;
   final VoidCallback onSvipTap;
   final bool showSocialActions;
+  final bool showOwnerActions;
   final int? followersCount;
   final int? followingCount;
 
@@ -81,7 +83,7 @@ class PublicProfileHeader extends StatelessWidget {
         PublicBadge(icon: Icons.workspace_premium_rounded, label: roleTag!, color: const Color(0xFFFFD36A)),
       PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72), onTap: onVipTap),
       PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6), onTap: onSvipTap),
-      PublicBadge(icon: Icons.family_restroom_rounded, label: familyName, color: const Color(0xFF12C7B7), onTap: onFamilyTap),
+      if (familyName.trim().isNotEmpty) PublicBadge(icon: Icons.family_restroom_rounded, label: familyName, color: const Color(0xFF12C7B7), onTap: onFamilyTap),
     ];
   }
 
@@ -114,8 +116,10 @@ class PublicProfileHeader extends StatelessWidget {
                 right: 14,
                 top: 14,
                 child: Row(children: [
-                  PublicHeaderIconButton(icon: Icons.add_photo_alternate_rounded, onTap: onAddCoverTap),
-                  const SizedBox(width: 8),
+                  if (showOwnerActions) ...[
+                    PublicHeaderIconButton(icon: Icons.add_photo_alternate_rounded, onTap: onAddCoverTap),
+                    const SizedBox(width: 8),
+                  ],
                   PublicHeaderIconButton(icon: Icons.qr_code_2_rounded, onTap: onQrTap),
                   const SizedBox(width: 8),
                   PublicHeaderIconButton(icon: Icons.ios_share_rounded, onTap: onShareTap),
@@ -186,22 +190,23 @@ class PublicProfileHeader extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                SizedBox(
-                  height: 30,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        for (var index = 0; index < badges.length; index++) ...[
-                          badges[index],
-                          if (index != badges.length - 1) const SizedBox(width: 8),
+                if (badges.isNotEmpty)
+                  SizedBox(
+                    height: 30,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          for (var index = 0; index < badges.length; index++) ...[
+                            badges[index],
+                            if (index != badges.length - 1) const SizedBox(width: 8),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
                 const SizedBox(height: 12),
                 _PresenceLine(presenceLabel: presenceLabel, currentRoomName: currentRoomName, onRoomTap: onRoomTap),
                 if (showSocialActions) ...[
