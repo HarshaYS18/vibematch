@@ -7,10 +7,18 @@ import '../../data/live_room_presence_repository.dart';
 import '../live_room_models.dart';
 
 class LiveRoomSeatController {
-  LiveRoomSeatController({required SeatUser currentUser, required this.onChanged, required this.onToast})
-      : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser) {
-    LiveRoomMediaSignalingService.instance.roomSnapshot.addListener(_applyLatestMediaSnapshot);
-    LiveRoomPresenceRepository.activeParticipants.addListener(_applyLatestPresenceSnapshot);
+  LiveRoomSeatController({
+    required SeatUser currentUser,
+    required this.onChanged,
+    required this.onToast,
+  }) : currentUser = LiveRoomMediaSignalingService.instance
+           .effectiveCurrentUser(currentUser) {
+    LiveRoomMediaSignalingService.instance.roomSnapshot.addListener(
+      _applyLatestMediaSnapshot,
+    );
+    LiveRoomPresenceRepository.activeParticipants.addListener(
+      _applyLatestPresenceSnapshot,
+    );
   }
 
   static const Duration seatApplicationExpiry = Duration(seconds: 20);
@@ -26,21 +34,33 @@ class LiveRoomSeatController {
   List<RoomSeat> seats = <RoomSeat>[];
 
   final Map<String, DateTime> _seatApplyCooldownUntil = <String, DateTime>{};
-  final LiveRoomPresenceRepository _presenceRepository = LiveRoomPresenceRepository();
+  final LiveRoomPresenceRepository _presenceRepository =
+      LiveRoomPresenceRepository();
 
-  List<SeatUser> get roomUsers => seats.where((seat) => seat.user != null).map((seat) => seat.user!).toList();
-  bool get currentUserIsSeated => seats.any((seat) => seat.user?.id == currentUser.id);
+  List<SeatUser> get roomUsers => seats
+      .where((seat) => seat.user != null)
+      .map((seat) => seat.user!)
+      .toList();
+  bool get currentUserIsSeated =>
+      seats.any((seat) => seat.user?.id == currentUser.id);
 
   bool get _currentUserIsOwner => _roomPower(currentUser) >= 100;
   bool get _currentUserIsAdminOrOwner => _roomPower(currentUser) >= 90;
 
   bool canModerateTarget(SeatUser target) => _canModerateTarget(target);
-  bool canSetOrRemoveAdminFor(SeatUser target) => _currentUserIsOwner && target.id != currentUser.id && _roomPower(target) < 100;
+  bool canSetOrRemoveAdminFor(SeatUser target) =>
+      _currentUserIsOwner &&
+      target.id != currentUser.id &&
+      _roomPower(target) < 100;
   int roomPowerFor(SeatUser user) => _roomPower(user);
 
   void dispose() {
-    LiveRoomMediaSignalingService.instance.roomSnapshot.removeListener(_applyLatestMediaSnapshot);
-    LiveRoomPresenceRepository.activeParticipants.removeListener(_applyLatestPresenceSnapshot);
+    LiveRoomMediaSignalingService.instance.roomSnapshot.removeListener(
+      _applyLatestMediaSnapshot,
+    );
+    LiveRoomPresenceRepository.activeParticipants.removeListener(
+      _applyLatestPresenceSnapshot,
+    );
   }
 
   void initialize(String initialLayoutId) {
@@ -54,7 +74,10 @@ class LiveRoomSeatController {
 
   List<RoomSeat> buildSeatsForLayout(String targetLayoutId) {
     final spec = SeatLayoutSpec.parse(targetLayoutId);
-    return List<RoomSeat>.generate(spec.totalSeats, (index) => RoomSeat(index: index));
+    return List<RoomSeat>.generate(
+      spec.totalSeats,
+      (index) => RoomSeat(index: index),
+    );
   }
 
   void _applyLatestPresenceSnapshot() {
@@ -66,10 +89,15 @@ class LiveRoomSeatController {
   }
 
   bool _refreshCurrentUserFromPresence() {
-    final liveUser = LiveRoomPresenceRepository.currentParticipantsForRoom(LiveRoomMediaSignalingService.instance.roomId).firstWhereOrNull((user) => user.id == currentUser.id);
+    final liveUser = LiveRoomPresenceRepository.currentParticipantsForRoom(
+      LiveRoomMediaSignalingService.instance.roomId,
+    ).firstWhereOrNull((user) => user.id == currentUser.id);
     if (liveUser == null) return false;
     final nextUser = _mergePresenceIntoCurrentUser(liveUser);
-    final changed = nextUser.isRoomAdmin != currentUser.isRoomAdmin || nextUser.isHost != currentUser.isHost || nextUser.roleLabel != currentUser.roleLabel;
+    final changed =
+        nextUser.isRoomAdmin != currentUser.isRoomAdmin ||
+        nextUser.isHost != currentUser.isHost ||
+        nextUser.roleLabel != currentUser.roleLabel;
     if (!changed) return false;
     currentUser = nextUser;
     LiveRoomMediaSignalingService.instance.seedActiveRoomSeatUser(nextUser);
@@ -77,7 +105,13 @@ class LiveRoomSeatController {
   }
 
   SeatUser _mergePresenceIntoCurrentUser(SeatUser liveUser) {
-    return currentUser.copyWith(isHost: liveUser.isHost, isRoomAdmin: liveUser.isRoomAdmin, roleLabel: liveUser.roleLabel, vipLevel: liveUser.vipLevel, svipLevel: liveUser.svipLevel);
+    return currentUser.copyWith(
+      isHost: liveUser.isHost,
+      isRoomAdmin: liveUser.isRoomAdmin,
+      roleLabel: liveUser.roleLabel,
+      vipLevel: liveUser.vipLevel,
+      svipLevel: liveUser.svipLevel,
+    );
   }
 
   void _applyLatestMediaSnapshot() {
@@ -85,36 +119,63 @@ class LiveRoomSeatController {
     final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
     if (snapshot == null || seats.isEmpty) return;
 
-    final previousUsers = <String, SeatUser>{for (final user in roomUsers) user.id: user, currentUser.id: currentUser};
-    for (final user in LiveRoomPresenceRepository.currentParticipantsForRoom(LiveRoomMediaSignalingService.instance.roomId)) {
+    final previousUsers = <String, SeatUser>{
+      for (final user in roomUsers) user.id: user,
+      currentUser.id: currentUser,
+    };
+    for (final user in LiveRoomPresenceRepository.currentParticipantsForRoom(
+      LiveRoomMediaSignalingService.instance.roomId,
+    )) {
       previousUsers[user.id] = user;
     }
 
-    final nextSeats = List<RoomSeat>.generate(seats.length, (index) => RoomSeat(index: index, locked: snapshot.lockedSeatIndexes.contains(index)));
+    final nextSeats = List<RoomSeat>.generate(
+      seats.length,
+      (index) => RoomSeat(
+        index: index,
+        locked: snapshot.lockedSeatIndexes.contains(index),
+      ),
+    );
     final usedSeatIndexes = <int>{};
 
     for (final peer in snapshot.peers) {
       final seatIndex = peer.seatIndex;
-      if (seatIndex == null || seatIndex < 0 || seatIndex >= nextSeats.length) continue;
+      if (seatIndex == null || seatIndex < 0 || seatIndex >= nextSeats.length) {
+        continue;
+      }
       if (usedSeatIndexes.contains(seatIndex)) continue;
-      final baseUser = peer.userId == currentUser.id ? currentUser : previousUsers[peer.userId];
+      final baseUser = peer.userId == currentUser.id
+          ? currentUser
+          : previousUsers[peer.userId];
       final seatUser = _seatUserFromPeer(peer: peer, baseUser: baseUser);
-      nextSeats[seatIndex] = nextSeats[seatIndex].copyWith(user: seatUser, locked: snapshot.lockedSeatIndexes.contains(seatIndex));
+      nextSeats[seatIndex] = nextSeats[seatIndex].copyWith(
+        user: seatUser,
+        locked: snapshot.lockedSeatIndexes.contains(seatIndex),
+      );
       usedSeatIndexes.add(seatIndex);
     }
 
     seats = nextSeats;
-    final localSeat = seats.firstWhereOrNull((seat) => seat.user?.id == currentUser.id);
+    final localSeat = seats.firstWhereOrNull(
+      (seat) => seat.user?.id == currentUser.id,
+    );
     micMuted = localSeat?.user?.selfMuted ?? micMuted;
-    if (selectedSeatIndex != null && selectedSeatIndex! >= 0 && selectedSeatIndex! < seats.length) {
+    if (selectedSeatIndex != null &&
+        selectedSeatIndex! >= 0 &&
+        selectedSeatIndex! < seats.length) {
       final selectedSeat = seats[selectedSeatIndex!];
       if (selectedSeat.user != null) selectedSeatIndex = null;
     }
     onChanged();
   }
 
-  SeatUser _seatUserFromPeer({required LiveMediaPeerSnapshot peer, SeatUser? baseUser}) {
-    final displayName = peer.displayName.trim().isNotEmpty ? peer.displayName.trim() : (baseUser?.name ?? _fallbackDisplayNameForUserId(peer.userId));
+  SeatUser _seatUserFromPeer({
+    required LiveMediaPeerSnapshot peer,
+    SeatUser? baseUser,
+  }) {
+    final displayName = peer.displayName.trim().isNotEmpty
+        ? peer.displayName.trim()
+        : (baseUser?.name ?? _fallbackDisplayNameForUserId(peer.userId));
     final isFounder = _isFounderId(peer.userId);
     return SeatUser(
       id: peer.userId,
@@ -130,7 +191,9 @@ class LiveRoomSeatController {
       sentExp: baseUser?.sentExp ?? 0,
       receivedExp: baseUser?.receivedExp ?? 0,
       medals: baseUser?.medals ?? const [],
-      avatarColors: baseUser?.avatarColors ?? const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      avatarColors:
+          baseUser?.avatarColors ??
+          const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
       age: baseUser?.age,
       locationLabel: baseUser?.locationLabel,
       locationVisible: baseUser?.locationVisible ?? true,
@@ -149,13 +212,23 @@ class LiveRoomSeatController {
     return publicId.trim().isEmpty ? 'Vibe User' : 'User $publicId';
   }
 
-  bool _isFounderId(String userId) => userId == 'user_6922022' || userId == 'founder_owner';
+  bool _isFounderId(String userId) =>
+      userId == 'user_6922022' || userId == 'founder_owner';
 
   int _roomPower(SeatUser user) {
     final role = user.roleLabel.toLowerCase();
-    final isOwner = user.isHost || _isFounderId(user.id) || role.contains('owner') || role.contains('channel host') || role == 'host';
+    final isOwner =
+        user.isHost ||
+        _isFounderId(user.id) ||
+        role.contains('owner') ||
+        role.contains('channel host') ||
+        role == 'host';
     if (isOwner) return 100;
-    final isAdmin = user.isRoomAdmin || role == 'admin' || role.contains('admin') || role.contains('administrator');
+    final isAdmin =
+        user.isRoomAdmin ||
+        role == 'admin' ||
+        role.contains('admin') ||
+        role.contains('administrator');
     if (isAdmin) return 90;
     return 0;
   }
@@ -176,7 +249,21 @@ class LiveRoomSeatController {
   SeatUser? _findRoomParticipant(String userId) {
     final seated = roomUsers.firstWhereOrNull((user) => user.id == userId);
     if (seated != null) return seated;
-    return LiveRoomPresenceRepository.currentParticipantsForRoom(LiveRoomMediaSignalingService.instance.roomId).firstWhereOrNull((user) => user.id == userId);
+
+    final presence = LiveRoomPresenceRepository.currentParticipantsForRoom(
+      LiveRoomMediaSignalingService.instance.roomId,
+    ).firstWhereOrNull((user) => user.id == userId);
+    if (presence != null) return presence;
+
+    final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
+    if (snapshot == null) return null;
+
+    final peer = snapshot.peers.firstWhereOrNull(
+      (item) => item.userId == userId || item.peerId == userId,
+    );
+    if (peer == null) return null;
+
+    return _seatUserFromPeer(peer: peer);
   }
 
   int? _publicUserIdFromRoomUserId(String userId) {
@@ -188,18 +275,30 @@ class LiveRoomSeatController {
     LiveRoomPresenceRepository.publishParticipant(user);
     if (user.id == currentUser.id) {
       currentUser = _mergePresenceIntoCurrentUser(user);
-      LiveRoomMediaSignalingService.instance.seedActiveRoomSeatUser(currentUser);
+      LiveRoomMediaSignalingService.instance.seedActiveRoomSeatUser(
+        currentUser,
+      );
     }
     for (var i = 0; i < seats.length; i++) {
       final seated = seats[i].user;
-      if (seated?.id == user.id) seats[i] = seats[i].copyWith(user: user.copyWith(selfMuted: seated!.selfMuted, adminMuted: seated.adminMuted));
+      if (seated?.id == user.id) {
+        seats[i] = seats[i].copyWith(
+          user: user.copyWith(
+            selfMuted: seated!.selfMuted,
+            adminMuted: seated.adminMuted,
+          ),
+        );
+      }
     }
   }
 
   void changeLayout(String nextLayoutId) {
     final existingUsers = roomUsers;
     layoutId = nextLayoutId;
-    seats = List<RoomSeat>.generate(SeatLayoutSpec.parse(nextLayoutId).totalSeats, (index) => RoomSeat(index: index));
+    seats = List<RoomSeat>.generate(
+      SeatLayoutSpec.parse(nextLayoutId).totalSeats,
+      (index) => RoomSeat(index: index),
+    );
     for (var i = 0; i < existingUsers.length && i < seats.length; i++) {
       seats[i] = seats[i].copyWith(user: existingUsers[i]);
     }
@@ -207,24 +306,51 @@ class LiveRoomSeatController {
     onChanged();
   }
 
-  void toggleSelectedSeat(int index) { selectedSeatIndex = selectedSeatIndex == index ? null : index; onChanged(); }
-  void clearSelectedSeat() { selectedSeatIndex = null; onChanged(); }
+  void toggleSelectedSeat(int index) {
+    selectedSeatIndex = selectedSeatIndex == index ? null : index;
+    onChanged();
+  }
+
+  void clearSelectedSeat() {
+    selectedSeatIndex = null;
+    onChanged();
+  }
 
   void occupySeat(int index) {
     if (index < 0 || index >= seats.length) return;
-    if (seats[index].locked) { onToast('This seat is locked'); return; }
+    if (seats[index].locked) {
+      onToast('This seat is locked');
+      return;
+    }
     selectedSeatIndex = null;
     LiveRoomMediaSignalingService.instance.takeSeat(index);
     LiveRoomMediaSignalingService.instance.setMicEnabled(!micMuted);
     onChanged();
   }
 
-  bool inviteUserToSeat({required int seatIndex, required SeatUser invitedUser}) {
-    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can invite users to seats'); return false; }
-    if (seatIndex < 0 || seatIndex >= seats.length || seats[seatIndex].locked || seats[seatIndex].user != null) return false;
-    if (invitedUser.id == currentUser.id) { onToast('You cannot invite yourself to a seat'); return false; }
+  bool inviteUserToSeat({
+    required int seatIndex,
+    required SeatUser invitedUser,
+  }) {
+    if (!_currentUserIsAdminOrOwner) {
+      onToast('Only the owner or room admins can invite users to seats');
+      return false;
+    }
+    if (seatIndex < 0 ||
+        seatIndex >= seats.length ||
+        seats[seatIndex].locked ||
+        seats[seatIndex].user != null) {
+      return false;
+    }
+    if (invitedUser.id == currentUser.id) {
+      onToast('You cannot invite yourself to a seat');
+      return false;
+    }
     selectedSeatIndex = null;
-    LiveRoomMediaSignalingService.instance.sendSeatInvite(seatIndex: seatIndex, targetUserId: invitedUser.id);
+    LiveRoomMediaSignalingService.instance.sendSeatInvite(
+      seatIndex: seatIndex,
+      targetUserId: invitedUser.id,
+    );
     onChanged();
     return true;
   }
@@ -233,10 +359,19 @@ class LiveRoomSeatController {
     var changed = false;
     for (var i = 0; i < messages.length; i++) {
       final entry = messages[i];
-      if (!entry.isSeatApplication || entry.applicationApproved || entry.applicationRejected || entry.applicationExpired) continue;
+      if (!entry.isSeatApplication ||
+          entry.applicationApproved ||
+          entry.applicationRejected ||
+          entry.applicationExpired) {
+        continue;
+      }
       final expiresAt = entry.applicationExpiresAt;
       if (expiresAt == null || DateTime.now().isBefore(expiresAt)) continue;
-      messages[i] = entry.copyWith(message: '${entry.senderName} seat ${entry.seatIndex == null ? '' : entry.seatIndex! + 1} request expired', applicationExpired: true);
+      messages[i] = entry.copyWith(
+        message:
+            '${entry.senderName} seat ${entry.seatIndex == null ? '' : entry.seatIndex! + 1} request expired',
+        applicationExpired: true,
+      );
       changed = true;
     }
     if (changed) onChanged();
@@ -244,75 +379,153 @@ class LiveRoomSeatController {
 
   void applyForSeat({required int index, required List<ChatEntry> messages}) {
     expireSeatApplications(messages);
-    if (_currentUserIsAdminOrOwner) { occupySeat(index); return; }
+    if (_currentUserIsAdminOrOwner) {
+      occupySeat(index);
+      return;
+    }
     if (index < 0 || index >= seats.length) return;
     final seat = seats[index];
-    if (seat.locked) { onToast('This seat is locked'); return; }
-    if (seat.user != null) { onToast('Seat ${index + 1} is already occupied'); return; }
+    if (seat.locked) {
+      onToast('This seat is locked');
+      return;
+    }
+    if (seat.user != null) {
+      onToast('Seat ${index + 1} is already occupied');
+      return;
+    }
 
     final now = DateTime.now();
     final cooldownUntil = _seatApplyCooldownUntil[currentUser.id];
     if (cooldownUntil != null && cooldownUntil.isAfter(now)) {
-      final remaining = cooldownUntil.difference(now).inSeconds.clamp(1, seatApplicationCooldown.inSeconds);
+      final remaining = cooldownUntil
+          .difference(now)
+          .inSeconds
+          .clamp(1, seatApplicationCooldown.inSeconds);
       onToast('Please apply again after $remaining seconds');
       return;
     }
 
-    final alreadyApplied = messages.any((message) => message.isSeatApplication && !message.applicationResolved && message.senderId == currentUser.id);
+    final alreadyApplied = messages.any(
+      (message) =>
+          message.isSeatApplication &&
+          !message.applicationResolved &&
+          message.senderId == currentUser.id,
+    );
     if (alreadyApplied) {
       onToast('You already have a pending seat request');
       return;
     }
 
     selectedSeatIndex = null;
-    messages.insert(0, ChatEntry(senderName: currentUser.name, senderId: currentUser.id, message: 'has applied for seat ${index + 1}', vipLevel: currentUser.vipLevel, sendingLevel: currentUser.sendingLevel, receivingLevel: currentUser.receivingLevel, isSeatApplication: true, seatIndex: index, applicationCreatedAt: now, applicationExpiresAt: now.add(seatApplicationExpiry)));
+    messages.insert(
+      0,
+      ChatEntry(
+        senderName: currentUser.name,
+        senderId: currentUser.id,
+        message: 'has applied for seat ${index + 1}',
+        vipLevel: currentUser.vipLevel,
+        sendingLevel: currentUser.sendingLevel,
+        receivingLevel: currentUser.receivingLevel,
+        isSeatApplication: true,
+        seatIndex: index,
+        applicationCreatedAt: now,
+        applicationExpiresAt: now.add(seatApplicationExpiry),
+      ),
+    );
     onChanged();
   }
 
-  void approveSeatApplication({required ChatEntry entry, required List<ChatEntry> messages, required List<SeatUser> allRoomUsers}) {
-    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can approve seat requests'); return; }
+  void approveSeatApplication({
+    required ChatEntry entry,
+    required List<ChatEntry> messages,
+    required List<SeatUser> allRoomUsers,
+  }) {
+    if (!_currentUserIsAdminOrOwner) {
+      onToast('Only the owner or room admins can approve seat requests');
+      return;
+    }
     final messageIndex = messages.indexOf(entry);
     if (messageIndex < 0) return;
     final latestEntry = messages[messageIndex];
     if (!latestEntry.isSeatApplication) return;
-    if (latestEntry.applicationResolved) { onToast('This application has already been processed'); return; }
+    if (latestEntry.applicationResolved) {
+      onToast('This application has already been processed');
+      return;
+    }
     final seatIndex = latestEntry.seatIndex;
     if (seatIndex == null || seatIndex < 0 || seatIndex >= seats.length) {
-      messages[messageIndex] = latestEntry.copyWith(message: '${latestEntry.senderName} seat request expired', applicationExpired: true);
+      messages[messageIndex] = latestEntry.copyWith(
+        message: '${latestEntry.senderName} seat request expired',
+        applicationExpired: true,
+      );
       onChanged();
       return;
     }
     if (seats[seatIndex].user != null || seats[seatIndex].locked) {
-      messages[messageIndex] = latestEntry.copyWith(message: '${latestEntry.senderName} seat ${seatIndex + 1} request expired', applicationExpired: true);
+      messages[messageIndex] = latestEntry.copyWith(
+        message:
+            '${latestEntry.senderName} seat ${seatIndex + 1} request expired',
+        applicationExpired: true,
+      );
       onChanged();
       return;
     }
-    final applicant = allRoomUsers.firstWhere((user) => user.id == latestEntry.senderId, orElse: () => currentUser);
-    if (applicant.id == currentUser.id || latestEntry.senderId == currentUser.id) {
+    final applicant = allRoomUsers.firstWhere(
+      (user) => user.id == latestEntry.senderId,
+      orElse: () => currentUser,
+    );
+    if (applicant.id == currentUser.id ||
+        latestEntry.senderId == currentUser.id) {
       LiveRoomMediaSignalingService.instance.takeSeat(seatIndex);
     } else {
-      LiveRoomMediaSignalingService.instance.sendSeatInvite(seatIndex: seatIndex, targetUserId: applicant.id);
+      LiveRoomMediaSignalingService.instance.sendSeatInvite(
+        seatIndex: seatIndex,
+        targetUserId: applicant.id,
+      );
     }
-    messages[messageIndex] = latestEntry.copyWith(message: '${latestEntry.senderName} joined seat ${seatIndex + 1}', applicationApproved: true);
+    messages[messageIndex] = latestEntry.copyWith(
+      message: '${latestEntry.senderName} joined seat ${seatIndex + 1}',
+      applicationApproved: true,
+    );
     onChanged();
   }
 
-  void rejectSeatApplication({required ChatEntry entry, required List<ChatEntry> messages}) {
-    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can reject seat requests'); return; }
+  void rejectSeatApplication({
+    required ChatEntry entry,
+    required List<ChatEntry> messages,
+  }) {
+    if (!_currentUserIsAdminOrOwner) {
+      onToast('Only the owner or room admins can reject seat requests');
+      return;
+    }
     final index = messages.indexOf(entry);
     if (index < 0) return;
     final latestEntry = messages[index];
     if (!latestEntry.isSeatApplication) return;
-    if (latestEntry.applicationResolved) { onToast('This application has already been processed'); return; }
-    if (latestEntry.senderId != null) _seatApplyCooldownUntil[latestEntry.senderId!] = DateTime.now().add(seatApplicationCooldown);
-    messages[index] = latestEntry.copyWith(message: '${latestEntry.senderName} seat ${latestEntry.seatIndex == null ? '' : latestEntry.seatIndex! + 1} request rejected', applicationRejected: true);
+    if (latestEntry.applicationResolved) {
+      onToast('This application has already been processed');
+      return;
+    }
+    if (latestEntry.senderId != null) {
+      _seatApplyCooldownUntil[latestEntry.senderId!] = DateTime.now().add(
+        seatApplicationCooldown,
+      );
+    }
+    messages[index] = latestEntry.copyWith(
+      message:
+          '${latestEntry.senderName} seat ${latestEntry.seatIndex == null ? '' : latestEntry.seatIndex! + 1} request rejected',
+      applicationRejected: true,
+    );
     onChanged();
   }
 
   void switchSeat(int index) => occupySeat(index);
 
   void lockSeat(int index) {
-    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can lock seats'); return; }
+    if (!_currentUserIsAdminOrOwner) {
+      onToast('Only the owner or room admins can lock seats');
+      return;
+    }
     if (index < 0 || index >= seats.length) return;
     final wasCurrentUserSeat = seats[index].user?.id == currentUser.id;
     seats[index] = seats[index].copyWith(locked: true, clearUser: true);
@@ -323,7 +536,10 @@ class LiveRoomSeatController {
   }
 
   void unlockSeat(int index) {
-    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can unlock seats'); return; }
+    if (!_currentUserIsAdminOrOwner) {
+      onToast('Only the owner or room admins can unlock seats');
+      return;
+    }
     if (index < 0 || index >= seats.length) return;
     seats[index] = seats[index].copyWith(locked: false);
     selectedSeatIndex = null;
@@ -333,23 +549,36 @@ class LiveRoomSeatController {
 
   void removeUserFromRoom(String userId) {
     final target = _findRoomParticipant(userId);
-    if (target == null || !_canRemoveTarget(target)) { onToast('You cannot remove this user'); return; }
+    if (target == null || !_canRemoveTarget(target)) {
+      onToast('You cannot remove this user');
+      return;
+    }
     selectedSeatIndex = null;
     LiveRoomMediaSignalingService.instance.kickUser(targetUserId: userId);
   }
 
   void kickUserFromRoom({required String userId, required String duration}) {
     final target = _findRoomParticipant(userId);
-    if (target == null || !_canRemoveTarget(target)) { onToast('You cannot kick this user'); return; }
+    if (target == null || !_canRemoveTarget(target)) {
+      onToast('You cannot kick this user');
+      return;
+    }
     selectedSeatIndex = null;
-    LiveRoomMediaSignalingService.instance.kickUser(targetUserId: userId, duration: duration);
+    LiveRoomMediaSignalingService.instance.kickUser(
+      targetUserId: userId,
+      duration: duration,
+    );
   }
 
   void toggleMic() {
     final index = seats.indexWhere((seat) => seat.user?.id == currentUser.id);
     final localUser = index >= 0 ? seats[index].user : null;
     if (localUser == null) return;
-    if (localUser.adminMuted) { LiveRoomMediaSignalingService.instance.setMicEnabled(false); onToast('You are muted by the room admin'); return; }
+    if (localUser.adminMuted) {
+      LiveRoomMediaSignalingService.instance.setMicEnabled(false);
+      onToast('You are muted by the room admin');
+      return;
+    }
     final nextMuted = !localUser.selfMuted;
     LiveRoomMediaSignalingService.instance.setMicEnabled(!nextMuted);
   }
@@ -358,8 +587,15 @@ class LiveRoomSeatController {
     final index = seats.indexWhere((seat) => seat.user?.id == userId);
     if (index < 0) return;
     final user = seats[index].user!;
-    if (user.id != currentUser.id) { onToast('You can only mute your own mic'); return; }
-    if (user.adminMuted) { LiveRoomMediaSignalingService.instance.setMicEnabled(false); onToast('You are muted by the room admin'); return; }
+    if (user.id != currentUser.id) {
+      onToast('You can only mute your own mic');
+      return;
+    }
+    if (user.adminMuted) {
+      LiveRoomMediaSignalingService.instance.setMicEnabled(false);
+      onToast('You are muted by the room admin');
+      return;
+    }
     final nextMuted = !user.selfMuted;
     LiveRoomMediaSignalingService.instance.setMicEnabled(!nextMuted);
   }
@@ -368,54 +604,136 @@ class LiveRoomSeatController {
     final index = seats.indexWhere((seat) => seat.user?.id == userId);
     if (index < 0) return;
     final user = seats[index].user!;
-    if (!_canAdminMuteTarget(user)) { onToast('You cannot mute or unmute this user'); return; }
+    if (!_canAdminMuteTarget(user)) {
+      onToast('You cannot mute or unmute this user');
+      return;
+    }
     final nextMuted = !user.adminMuted;
-    LiveRoomMediaSignalingService.instance.setAdminMute(targetUserId: userId, muted: nextMuted);
+    LiveRoomMediaSignalingService.instance.setAdminMute(
+      targetUserId: userId,
+      muted: nextMuted,
+    );
   }
 
   void setUserAsAdmin(String userId) {
     final target = _findRoomParticipant(userId);
-    if (!_currentUserIsOwner || target == null || !canSetOrRemoveAdminFor(target)) { onToast('Only the room owner can set admins'); return; }
+    if (!_currentUserIsOwner ||
+        target == null ||
+        !canSetOrRemoveAdminFor(target)) {
+      onToast('Only the room owner can set admins');
+      return;
+    }
     final promoted = target.copyWith(isRoomAdmin: true, roleLabel: 'Admin');
     _publishParticipantRole(promoted);
+    LiveRoomMediaSignalingService.instance.setRoomAdminStatus(
+      targetUserId: userId,
+      isRoomAdmin: true,
+    );
     onChanged();
     final publicUserId = _publicUserIdFromRoomUserId(userId);
     final roomId = LiveRoomMediaSignalingService.instance.roomId;
-    if (publicUserId == null || roomId == null || roomId.trim().isEmpty) { onToast('${target.name} is now Admin'); return; }
-    unawaited(_presenceRepository.addRoomAdmin(roomId: roomId, publicUserId: publicUserId).then((serverUser) { _publishParticipantRole(serverUser.copyWith(isRoomAdmin: true, roleLabel: 'Admin')); onChanged(); }).catchError((Object error) { onToast(error.toString().replaceFirst('Exception: ', '')); }));
+    if (publicUserId == null || roomId == null || roomId.trim().isEmpty) {
+      onToast('${target.name} is now Admin');
+      return;
+    }
+    unawaited(
+      _presenceRepository
+          .addRoomAdmin(roomId: roomId, publicUserId: publicUserId)
+          .then((serverUser) {
+            _publishParticipantRole(
+              serverUser.copyWith(isRoomAdmin: true, roleLabel: 'Admin'),
+            );
+            onChanged();
+          })
+          .catchError((Object error) {
+            onToast(error.toString().replaceFirst('Exception: ', ''));
+          }),
+    );
     onToast('${target.name} is now Admin');
   }
 
   void removeUserAsAdmin(String userId) {
     final target = _findRoomParticipant(userId);
-    if (!_currentUserIsOwner || target == null || !canSetOrRemoveAdminFor(target)) { onToast('Only the room owner can remove admins'); return; }
+    if (!_currentUserIsOwner ||
+        target == null ||
+        !canSetOrRemoveAdminFor(target)) {
+      onToast('Only the room owner can remove admins');
+      return;
+    }
     final demoted = target.copyWith(isRoomAdmin: false, roleLabel: 'Member');
     _publishParticipantRole(demoted);
+    LiveRoomMediaSignalingService.instance.setRoomAdminStatus(
+      targetUserId: userId,
+      isRoomAdmin: false,
+    );
     onChanged();
     final publicUserId = _publicUserIdFromRoomUserId(userId);
     final roomId = LiveRoomMediaSignalingService.instance.roomId;
-    if (publicUserId == null || roomId == null || roomId.trim().isEmpty) { onToast('${target.name} is no longer Admin'); return; }
-    unawaited(_presenceRepository.removeRoomAdmin(roomId: roomId, publicUserId: publicUserId).then((serverUser) { _publishParticipantRole(serverUser.copyWith(isRoomAdmin: false, roleLabel: 'Member')); onChanged(); }).catchError((Object error) { onToast(error.toString().replaceFirst('Exception: ', '')); }));
+    if (publicUserId == null || roomId == null || roomId.trim().isEmpty) {
+      onToast('${target.name} is no longer Admin');
+      return;
+    }
+    unawaited(
+      _presenceRepository
+          .removeRoomAdmin(roomId: roomId, publicUserId: publicUserId)
+          .then((serverUser) {
+            _publishParticipantRole(
+              serverUser.copyWith(isRoomAdmin: false, roleLabel: 'Member'),
+            );
+            onChanged();
+          })
+          .catchError((Object error) {
+            onToast(error.toString().replaceFirst('Exception: ', ''));
+          }),
+    );
     onToast('${target.name} is no longer Admin');
   }
 
   void leaveAndLockSeat(int seatIndex) {
     if (seatIndex < 0 || seatIndex >= seats.length) return;
     final seatedUser = seats[seatIndex].user;
-    if (seatedUser != null && seatedUser.id == currentUser.id) { LiveRoomMediaSignalingService.instance.leaveSeat(); return; }
-    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can leave-lock seats'); return; }
-    if (seatedUser != null && !_canRemoveTarget(seatedUser)) { onToast('You cannot leave-lock this user'); return; }
-    if (seatedUser != null) { LiveRoomMediaSignalingService.instance.leaveAndLockSeat(seatIndex: seatIndex, targetUserId: seatedUser.id); } else { LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: seatIndex); }
+    if (seatedUser != null && seatedUser.id == currentUser.id) {
+      LiveRoomMediaSignalingService.instance.leaveSeat();
+      return;
+    }
+    if (!_currentUserIsAdminOrOwner) {
+      onToast('Only the owner or room admins can leave-lock seats');
+      return;
+    }
+    if (seatedUser != null && !_canRemoveTarget(seatedUser)) {
+      onToast('You cannot leave-lock this user');
+      return;
+    }
+    if (seatedUser != null) {
+      LiveRoomMediaSignalingService.instance.leaveAndLockSeat(
+        seatIndex: seatIndex,
+        targetUserId: seatedUser.id,
+      );
+    } else {
+      LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: seatIndex);
+    }
   }
 
   void leaveSeatOnly(int seatIndex) {
     if (seatIndex < 0 || seatIndex >= seats.length) return;
     final seatedUser = seats[seatIndex].user;
     if (seatedUser == null) return;
-    if (seatedUser.id == currentUser.id) { LiveRoomMediaSignalingService.instance.leaveSeat(); return; }
-    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can remove users from seats'); return; }
-    if (!_canRemoveTarget(seatedUser)) { onToast('You cannot remove this user from seat'); return; }
-    LiveRoomMediaSignalingService.instance.forceLeaveSeat(seatIndex: seatIndex, targetUserId: seatedUser.id);
+    if (seatedUser.id == currentUser.id) {
+      LiveRoomMediaSignalingService.instance.leaveSeat();
+      return;
+    }
+    if (!_currentUserIsAdminOrOwner) {
+      onToast('Only the owner or room admins can remove users from seats');
+      return;
+    }
+    if (!_canRemoveTarget(seatedUser)) {
+      onToast('You cannot remove this user from seat');
+      return;
+    }
+    LiveRoomMediaSignalingService.instance.forceLeaveSeat(
+      seatIndex: seatIndex,
+      targetUserId: seatedUser.id,
+    );
   }
 }
 

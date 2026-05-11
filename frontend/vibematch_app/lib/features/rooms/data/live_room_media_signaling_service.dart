@@ -11,6 +11,7 @@ import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
 import 'live_room_audio_service.dart';
 import 'live_room_foreground_service.dart';
+import 'live_room_presence_repository.dart';
 
 class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   LiveRoomMediaSignalingService._() {
@@ -291,6 +292,18 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
+  void setRoomAdminStatus({
+    required String targetUserId,
+    required bool isRoomAdmin,
+  }) {
+    if (targetUserId.trim().isEmpty) return;
+
+    _send('room_admin/set', <String, Object?>{
+      'target_user_id': targetUserId,
+      'is_room_admin': isRoomAdmin,
+    });
+  }
+
   void sendRoomChat(String text) {
     final safeText = text.trim();
     if (safeText.isEmpty) return;
@@ -567,6 +580,29 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
       if (type == 'room/system_event') {
         LiveRoomSystemEventBus.publish(LiveRoomSystemEvent.fromJson(payload));
+
+        return;
+      }
+      if (type == 'room_admin/updated') {
+        final targetUserId = payload['target_user_id']?.toString() ?? '';
+        final targetName = payload['target_name']?.toString() ?? '';
+        final roomId = payload['room_id']?.toString() ?? _roomId ?? '';
+        final isRoomAdmin = payload['is_room_admin'] == true;
+
+        if (targetUserId.isNotEmpty) {
+          LiveRoomPresenceRepository.updateParticipantRoomAdmin(
+            roomId: roomId,
+            userId: targetUserId,
+            displayName: targetName,
+            isRoomAdmin: isRoomAdmin,
+          );
+        }
+
+        final roomData = payload['room'];
+        if (roomData is Map<String, dynamic>) {
+          roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
+          _enforceCurrentUserAudioStateFromSnapshot(roomSnapshot.value);
+        }
 
         return;
       }
