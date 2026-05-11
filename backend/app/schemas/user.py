@@ -60,3 +60,25 @@ class PublicUserProfileResponse(BaseModel):
     is_online: bool
     last_seen_at: datetime | None = None
     created_at: datetime
+
+
+class UserSearchResultResponse(BaseModel):
+    public_user_id: int
+    display_custom_id: int | None = None
+    username: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    primary_role: str
+    primary_role_badge: RoleBadgeResponse | None = None
+    role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
+    vip: UserVipSummaryResponse
+    is_online: bool
+    last_seen_at: datetime | None = None
+    is_following: bool = False
+    follows_me: bool = False
+    is_friend: bool = False
+
+
+class UserSearchResponse(BaseModel):
+    query: str
+    users: list[UserSearchResultResponse] = Field(default_factory=list)
