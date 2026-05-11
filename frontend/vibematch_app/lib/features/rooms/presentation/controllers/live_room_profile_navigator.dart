@@ -4,6 +4,7 @@ import '../../../auth/models/current_user.dart';
 import '../../../auth/models/role_badge.dart';
 import '../../../profile/presentation/public_profile_view_page.dart';
 import '../../../profile/presentation/widgets/me_profile_constants.dart';
+import '../../../social/data/social_api_service.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../live_room_models.dart';
 import '../widgets/experience/experience_level_models.dart';
@@ -21,25 +22,28 @@ class LiveRoomProfileNavigator {
     required RoomPrivacyMode privacyMode,
     required String roomName,
   }) {
+    final publicUserId = publicUserIdFromRoomUserId(user.id);
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PublicProfileViewPage(
           user: seatUserToCurrentUser(user),
+          publicUserId: publicUserId,
           vipLevel: user.vipLevel,
           svipLevel: user.svipLevel,
           presenceLabel: 'online',
           currentRoomName: privacyMode == RoomPrivacyMode.privateVibe ? null : roomName,
           relationshipLabel: user.relationshipText,
           familyName: user.familyName,
-          familyLevel: 12,
+          familyLevel: 0,
         ),
       ),
     );
   }
 
   static CurrentUser seatUserToCurrentUser(SeatUser user) {
-    final isFounder = user.id == 'founder_owner';
+    final publicUserId = publicUserIdFromRoomUserId(user.id) ?? 0;
+    final isFounder = publicUserId == 6922022 || user.id == 'founder_owner';
     final isAdmin = user.isRoomAdmin || user.isHost;
 
     final role = isFounder
@@ -52,8 +56,8 @@ class LiveRoomProfileNavigator {
     final roleBadge = RoleBadge.fromRole(role);
 
     return CurrentUser(
-      id: _mockInternalUserId(user),
-      publicUserId: _mockPublicUserId(user),
+      id: publicUserId > 0 ? publicUserId : user.id.hashCode.abs() % 900000 + 100000,
+      publicUserId: publicUserId > 0 ? publicUserId : 0,
       displayCustomId: isFounder ? 6922022 : null,
       username: user.name.toLowerCase().replaceAll(' ', '_'),
       displayName: user.name,
@@ -70,32 +74,6 @@ class LiveRoomProfileNavigator {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-  }
-
-  static int _mockInternalUserId(SeatUser user) {
-    switch (user.id) {
-      case 'founder_owner':
-        return 1;
-      case 'riya':
-        return 2;
-      case 'arjun':
-        return 3;
-      default:
-        return user.id.hashCode.abs() % 900000 + 100000;
-    }
-  }
-
-  static int _mockPublicUserId(SeatUser user) {
-    switch (user.id) {
-      case 'founder_owner':
-        return 6922022;
-      case 'riya':
-        return 6418001245;
-      case 'arjun':
-        return 6418002480;
-      default:
-        return 6418000000 + (user.id.hashCode.abs() % 999999);
-    }
   }
 
   static void openFollowersPage({required BuildContext context, required SeatUser user, required List<SeatUser> users}) {
