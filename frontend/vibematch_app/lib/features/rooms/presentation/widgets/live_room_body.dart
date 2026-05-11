@@ -28,6 +28,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.messageController,
     required this.messageFocusNode,
     required this.micMuted,
+    required this.showMicButton,
     required this.inboxUnreadCount,
     required this.imagesEnabled,
     required this.onBack,
@@ -76,6 +77,7 @@ class LiveRoomBody extends StatelessWidget {
   final TextEditingController messageController;
   final FocusNode messageFocusNode;
   final bool micMuted;
+  final bool showMicButton;
   final int inboxUnreadCount;
   final bool imagesEnabled;
   final VoidCallback onBack;
@@ -176,6 +178,7 @@ class LiveRoomBody extends StatelessWidget {
                 controller: messageController,
                 focusNode: messageFocusNode,
                 micMuted: micMuted,
+                showMicButton: showMicButton,
                 inboxUnreadCount: inboxUnreadCount,
                 imagesEnabled: imagesEnabled,
                 onInboxTap: onInboxTap,
