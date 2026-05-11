@@ -14,6 +14,7 @@ router = APIRouter(prefix="/media", tags=["Media"])
 UPLOAD_ROOT = Path("static/uploads")
 MAX_AVATAR_BYTES = 10 * 1024 * 1024
 MAX_ROOM_AVATAR_BYTES = 10 * 1024 * 1024
+MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_VIBE_MEDIA_BYTES = 20 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
@@ -98,6 +99,21 @@ async def upload_room_avatar(
         file,
         folder=f"room_avatars/user_{current_user.id}",
         max_size=MAX_ROOM_AVATAR_BYTES,
+        allowed_types=ALLOWED_IMAGE_TYPES,
+        request=request,
+    )
+
+
+@router.post("/chat-image", response_model=MediaUploadResponse)
+async def upload_chat_image(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    return await _save_upload(
+        file,
+        folder=f"chat_images/user_{current_user.id}",
+        max_size=MAX_CHAT_IMAGE_BYTES,
         allowed_types=ALLOWED_IMAGE_TYPES,
         request=request,
     )
