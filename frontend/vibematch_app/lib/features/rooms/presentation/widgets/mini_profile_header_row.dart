@@ -26,11 +26,26 @@ class MiniProfileHeaderRow extends StatelessWidget {
   final VoidCallback onSetAdminTap;
   final VoidCallback onRemoveAdminTap;
 
+  bool get _isChannelHost => user.isHost || user.roleLabel.toLowerCase().contains('channel host');
+  bool get _isChannelAdmin => !_isChannelHost && (user.isRoomAdmin || user.roleLabel.toLowerCase() == 'admin');
+
   String get _roomTag {
-    if (user.isHost || user.roleLabel.toLowerCase().contains('channel host')) return 'Channel Host';
-    if (user.isRoomAdmin || user.roleLabel.toLowerCase() == 'admin') return 'Admin';
+    if (_isChannelHost) return 'Channel Host';
+    if (_isChannelAdmin) return 'Admin';
     return '';
   }
+
+  List<Color> get _tagGradient {
+    if (_isChannelHost) {
+      return const [Color(0xFFFFD166), Color(0xFFC99A3B), Color(0xFFFF8A3D)];
+    }
+    if (_isChannelAdmin) {
+      return const [Color(0xFF12C7B7), Color(0xFF4A9BFF), Color(0xFF6D5DF6)];
+    }
+    return const [RoomColors.aqua, RoomColors.violet];
+  }
+
+  Color get _tagShadowColor => _isChannelHost ? RoomColors.gold : RoomColors.aqua;
 
   @override
   Widget build(BuildContext context) {
@@ -51,55 +66,41 @@ class MiniProfileHeaderRow extends StatelessWidget {
                   )
                 : MiniProfileReportIconButton(onTap: onReportTap),
           ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 46),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (tag.isNotEmpty) ...[
-                    Flexible(
-                      flex: 0,
-                      child: Container(
-                        height: 20,
-                        padding: const EdgeInsets.symmetric(horizontal: 7),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: user.isHost ? RoomColors.gold.withValues(alpha: 0.20) : RoomColors.aqua.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: user.isHost ? RoomColors.gold.withValues(alpha: 0.42) : RoomColors.aqua.withValues(alpha: 0.38)),
-                        ),
-                        child: Text(
-                          tag,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: user.isHost ? RoomColors.gold : RoomColors.aqua,
-                            fontSize: 9.8,
-                            fontWeight: FontWeight.w900,
-                            height: 1,
-                          ),
+          Positioned.fill(
+            left: 42,
+            right: isSelf ? 42 : 42,
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (tag.isNotEmpty) ...[
+                      _RoomRoleTag(
+                        label: tag,
+                        gradient: _tagGradient,
+                        shadowColor: _tagShadowColor,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 190),
+                      child: Text(
+                        user.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: RoomColors.plum,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.3,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
                   ],
-                  Flexible(
-                    child: Text(
-                      user.name,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: RoomColors.plum,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -115,6 +116,54 @@ class MiniProfileHeaderRow extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _RoomRoleTag extends StatelessWidget {
+  const _RoomRoleTag({
+    required this.label,
+    required this.gradient,
+    required this.shadowColor,
+  });
+
+  final String label;
+  final List<Color> gradient;
+  final Color shadowColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradient,
+        ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.62), width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor.withValues(alpha: 0.22),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9.4,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
       ),
     );
   }
