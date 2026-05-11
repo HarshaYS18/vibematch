@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../data/live_room_media_signaling_service.dart';
+import '../../data/live_room_system_event_bus.dart';
 import '../live_room_models.dart';
 
 class LiveRoomMessageController {
@@ -9,9 +10,9 @@ class LiveRoomMessageController {
     required this.onChanged,
   }) : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser) {
     messages = List<ChatEntry>.from(mockChatEntries);
-    _activeController?._detachSnapshotListener();
+    _activeController?._detachSystemEventListener();
     _activeController = this;
-    _attachSnapshotListener();
+    _attachSystemEventListener();
   }
 
   static LiveRoomMessageController? _activeController;
@@ -24,21 +25,14 @@ class LiveRoomMessageController {
     _activeController?.sendImageMessage(imageUrl: imageUrl, contentType: contentType);
   }
 
-  static void recordActiveRoomMemberExit({required String actorName, required String memberUserId, required String memberName}) {
-    _activeController?._recordPendingMemberExit(actorName: actorName, memberUserId: memberUserId, memberName: memberName);
-  }
-
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
 
   late List<ChatEntry> messages;
 
   final List<SeatUser> joinRequestUsers = <SeatUser>[];
-  final Set<String> _knownRoomUserIds = <String>{};
-  final Map<String, String> _knownRoomNamesById = <String, String>{};
-  final Map<String, _PendingMemberExitEvent> _pendingMemberExits = <String, _PendingMemberExitEvent>{};
-  VoidCallbackLike? _snapshotListener;
-  bool _snapshotSeeded = false;
+  final Set<String> _handledSystemEventIds = <String>{};
+  VoidCallbackLike? _systemEventListener;
 
   void sendMessage(String text) {
     final trimmed = text.trim();
@@ -68,7 +62,7 @@ class LiveRoomMessageController {
   void insertUserRemovedSystemEvent({required String actorName, required String targetName}) {
     final actor = actorName.trim().isEmpty ? 'Room admin' : actorName.trim();
     final member = targetName.trim().isEmpty ? 'user' : targetName.trim();
-    messages.insert(0, ChatEntry(senderName: 'System', senderId: 'system', message: '$actor has rem' 'oved $member from the group', systemEventType: RoomSystemEventType.userRemoved));
+    messages.insert(0, ChatEntry(senderName: 'System', senderId: 'system', message: '$actor has removed $member from the group', systemEventType: RoomSystemEventType.userRemoved));
     onChanged();
   }
 
@@ -97,53 +91,34 @@ class LiveRoomMessageController {
     onChanged();
   }
 
-  void _recordPendingMemberExit({required String actorName, required String memberUserId, required String memberName}) {
-    final memberId = memberUserId.trim();
-    if (memberId.isEmpty) return;
-    _pendingMemberExits[memberId] = _PendingMemberExitEvent(actorName: actorName.trim().isEmpty ? currentUser.name : actorName.trim(), memberName: memberName.trim().isEmpty ? (_knownRoomNamesById[memberId] ?? 'user') : memberName.trim(), createdAt: DateTime.now());
+  void _attachSystemEventListener() {
+    _systemEventListener = _handleLatestMediaSystemEvent;
+    LiveRoomSystemEventBus.latestEvent.addListener(_systemEventListener!);
   }
 
-  void _attachSnapshotListener() {
-    _snapshotListener = _syncSystemEventsFromRoomSnapshot;
-    LiveRoomMediaSignalingService.instance.roomSnapshot.addListener(_snapshotListener!);
-  }
-
-  void _detachSnapshotListener() {
-    final listener = _snapshotListener;
+  void _detachSystemEventListener() {
+    final listener = _systemEventListener;
     if (listener == null) return;
-    LiveRoomMediaSignalingService.instance.roomSnapshot.removeListener(listener);
-    _snapshotListener = null;
+    LiveRoomSystemEventBus.latestEvent.removeListener(listener);
+    _systemEventListener = null;
   }
 
-  void _syncSystemEventsFromRoomSnapshot() {
-    final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
-    if (snapshot == null) return;
-    final nextIds = <String>{};
-    final nextNamesById = <String, String>{};
-    for (final peer in snapshot.peers) {
-      final id = peer.userId.trim();
-      if (id.isEmpty) continue;
-      nextIds.add(id);
-      nextNamesById[id] = peer.displayName.trim().isEmpty ? 'User' : peer.displayName.trim();
-    }
-    _pruneStalePendingMemberExits();
-    if (!_snapshotSeeded) {
-      _knownRoomUserIds..clear()..addAll(nextIds);
-      _knownRoomNamesById..clear()..addAll(nextNamesById);
-      _snapshotSeeded = true;
+  void _handleLatestMediaSystemEvent() {
+    final event = LiveRoomSystemEventBus.latestEvent.value;
+    if (event == null || _handledSystemEventIds.contains(event.id)) return;
+    _handledSystemEventIds.add(event.id);
+
+    if (event.isUserEntered) {
+      if (event.targetUserId == currentUser.id || event.actorUserId == currentUser.id) return;
+      final name = event.targetName.trim().isNotEmpty ? event.targetName : event.actorName;
+      _insertUserEnteredByName(name);
       return;
     }
-    for (final id in nextIds) {
-      if (_knownRoomUserIds.contains(id) || id == currentUser.id) continue;
-      _insertUserEnteredByName(nextNamesById[id] ?? 'User');
+
+    if (event.isUserRemoved) {
+      if (event.targetUserId == currentUser.id) return;
+      insertUserRemovedSystemEvent(actorName: event.actorName, targetName: event.targetName);
     }
-    for (final id in _knownRoomUserIds) {
-      if (nextIds.contains(id) || id == currentUser.id) continue;
-      final pending = _pendingMemberExits.remove(id);
-      insertUserRemovedSystemEvent(actorName: pending?.actorName ?? 'Room admin', targetName: pending?.memberName ?? _knownRoomNamesById[id] ?? 'user');
-    }
-    _knownRoomUserIds..clear()..addAll(nextIds);
-    _knownRoomNamesById..clear()..addAll(nextNamesById);
   }
 
   void _insertUserEnteredByName(String rawName) {
@@ -152,11 +127,6 @@ class LiveRoomMessageController {
     messages.insert(0, entry);
     onChanged();
     _scheduleAutoDismiss(entry);
-  }
-
-  void _pruneStalePendingMemberExits() {
-    final cutoff = DateTime.now().subtract(const Duration(seconds: 20));
-    _pendingMemberExits.removeWhere((key, value) => value.createdAt.isBefore(cutoff));
   }
 
   void _scheduleAutoDismiss(ChatEntry entry) {
@@ -168,13 +138,6 @@ class LiveRoomMessageController {
       if (removed) onChanged();
     });
   }
-}
-
-class _PendingMemberExitEvent {
-  const _PendingMemberExitEvent({required this.actorName, required this.memberName, required this.createdAt});
-  final String actorName;
-  final String memberName;
-  final DateTime createdAt;
 }
 
 typedef VoidCallbackLike = void Function();
