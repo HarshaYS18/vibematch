@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
 enum GiftCategory { classic, lucky, event, svip, premium, baggage }
 enum RoomUserGender { male, female, undisclosed }
+enum RoomSystemEventType { none, userEntered, userRemoved }
 
 extension RoomPrivacyModeX on RoomPrivacyMode {
   String get label {
@@ -203,7 +204,28 @@ class RoomSeat {
 }
 
 class ChatEntry {
-  ChatEntry({required this.senderName, required this.message, this.senderId, this.vipLevel = 0, this.sendingLevel = 0, this.receivingLevel = 0, this.isGift = false, this.isSeatApplication = false, this.seatIndex, this.applicationCreatedAt, this.applicationExpiresAt, this.applicationApproved = false, this.applicationRejected = false, this.applicationExpired = false, this.giftAssetPath, this.imageUrl, this.imageContentType});
+  ChatEntry({
+    required this.senderName,
+    required this.message,
+    this.senderId,
+    this.vipLevel = 0,
+    this.sendingLevel = 0,
+    this.receivingLevel = 0,
+    this.isGift = false,
+    this.isSeatApplication = false,
+    this.seatIndex,
+    this.applicationCreatedAt,
+    this.applicationExpiresAt,
+    this.applicationApproved = false,
+    this.applicationRejected = false,
+    this.applicationExpired = false,
+    this.systemEventType = RoomSystemEventType.none,
+    this.autoDismissAt,
+    this.giftAssetPath,
+    this.imageUrl,
+    this.imageContentType,
+  });
+
   final String senderName;
   final String message;
   final String? senderId;
@@ -218,13 +240,49 @@ class ChatEntry {
   final bool applicationApproved;
   final bool applicationRejected;
   final bool applicationExpired;
+  final RoomSystemEventType systemEventType;
+  final DateTime? autoDismissAt;
   final String? giftAssetPath;
   final String? imageUrl;
   final String? imageContentType;
+
+  bool get isSystemMessage => senderId == 'system' || systemEventType != RoomSystemEventType.none;
+  bool get shouldAutoDismiss => autoDismissAt != null;
+  bool get autoDismissed => autoDismissAt != null && DateTime.now().isAfter(autoDismissAt!);
   bool get applicationTimedOut => applicationExpired || (applicationExpiresAt != null && DateTime.now().isAfter(applicationExpiresAt!));
   bool get applicationResolved => applicationApproved || applicationRejected || applicationTimedOut;
   bool get isImageMessage => imageUrl?.trim().isNotEmpty ?? false;
-  ChatEntry copyWith({String? message, bool? applicationApproved, bool? applicationRejected, bool? applicationExpired, String? imageUrl, String? imageContentType}) => ChatEntry(senderName: senderName, message: message ?? this.message, senderId: senderId, vipLevel: vipLevel, sendingLevel: sendingLevel, receivingLevel: receivingLevel, isGift: isGift, isSeatApplication: isSeatApplication, seatIndex: seatIndex, applicationCreatedAt: applicationCreatedAt, applicationExpiresAt: applicationExpiresAt, applicationApproved: applicationApproved ?? this.applicationApproved, applicationRejected: applicationRejected ?? this.applicationRejected, applicationExpired: applicationExpired ?? this.applicationExpired, giftAssetPath: giftAssetPath, imageUrl: imageUrl ?? this.imageUrl, imageContentType: imageContentType ?? this.imageContentType);
+
+  ChatEntry copyWith({
+    String? message,
+    bool? applicationApproved,
+    bool? applicationRejected,
+    bool? applicationExpired,
+    RoomSystemEventType? systemEventType,
+    DateTime? autoDismissAt,
+    String? imageUrl,
+    String? imageContentType,
+  }) => ChatEntry(
+        senderName: senderName,
+        message: message ?? this.message,
+        senderId: senderId,
+        vipLevel: vipLevel,
+        sendingLevel: sendingLevel,
+        receivingLevel: receivingLevel,
+        isGift: isGift,
+        isSeatApplication: isSeatApplication,
+        seatIndex: seatIndex,
+        applicationCreatedAt: applicationCreatedAt,
+        applicationExpiresAt: applicationExpiresAt,
+        applicationApproved: applicationApproved ?? this.applicationApproved,
+        applicationRejected: applicationRejected ?? this.applicationRejected,
+        applicationExpired: applicationExpired ?? this.applicationExpired,
+        systemEventType: systemEventType ?? this.systemEventType,
+        autoDismissAt: autoDismissAt ?? this.autoDismissAt,
+        giftAssetPath: giftAssetPath,
+        imageUrl: imageUrl ?? this.imageUrl,
+        imageContentType: imageContentType ?? this.imageContentType,
+      );
 }
 
 class GiftItem {
