@@ -26,6 +26,34 @@ class LiveRoomPresenceRepository {
     return _int(response['online_count']);
   }
 
+  Future<SeatUser> addRoomMember({required String roomId, required int publicUserId}) async {
+    final response = await _apiClient.postMap(
+      '/rooms/$roomId/members',
+      headers: _jsonHeaders(),
+      body: {'public_user_id': publicUserId},
+    );
+    return LiveRoomPresenceSnapshot.participantToSeatUser(response);
+  }
+
+  Future<SeatUser> removeRoomMember({required String roomId, required int publicUserId}) async {
+    final response = await _apiClient.deleteMap('/rooms/$roomId/members/$publicUserId', headers: _headers());
+    return LiveRoomPresenceSnapshot.participantToSeatUser(response);
+  }
+
+  Future<SeatUser> addRoomAdmin({required String roomId, required int publicUserId}) async {
+    final response = await _apiClient.postMap(
+      '/rooms/$roomId/admins',
+      headers: _jsonHeaders(),
+      body: {'public_user_id': publicUserId},
+    );
+    return LiveRoomPresenceSnapshot.participantToSeatUser(response);
+  }
+
+  Future<SeatUser> removeRoomAdmin({required String roomId, required int publicUserId}) async {
+    final response = await _apiClient.deleteMap('/rooms/$roomId/admins/$publicUserId', headers: _headers());
+    return LiveRoomPresenceSnapshot.participantToSeatUser(response);
+  }
+
   Future<LiveRoomPresenceSnapshot> _postSnapshot(String path) async {
     final response = await _apiClient.postMap(path, headers: _headers());
     return LiveRoomPresenceSnapshot.fromJoinJson(response);
@@ -35,6 +63,10 @@ class LiveRoomPresenceRepository {
     final token = _authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) throw Exception('Please login again before entering rooms.');
     return {'Authorization': 'Bearer $token'};
+  }
+
+  Map<String, String> _jsonHeaders() {
+    return {..._headers(), 'Content-Type': 'application/json'};
   }
 
   void close() => _apiClient.close();
@@ -62,7 +94,7 @@ class LiveRoomPresenceSnapshot {
       roomId: room['id']?.toString() ?? '',
       onlineCount: _int(room['online_count']),
       participants: _participants(json['participants']),
-      joinedUser: joinedRaw is Map<String, dynamic> ? _participantToSeatUser(joinedRaw) : null,
+      joinedUser: joinedRaw is Map<String, dynamic> ? participantToSeatUser(joinedRaw) : null,
       shouldShowEnteredMessage: json['should_show_entered_message'] == true,
     );
   }
@@ -77,10 +109,10 @@ class LiveRoomPresenceSnapshot {
 
   static List<SeatUser> _participants(dynamic raw) {
     if (raw is! List) return const [];
-    return raw.whereType<Map<String, dynamic>>().map(_participantToSeatUser).toList(growable: false);
+    return raw.whereType<Map<String, dynamic>>().map(participantToSeatUser).toList(growable: false);
   }
 
-  static SeatUser _participantToSeatUser(Map<String, dynamic> json) {
+  static SeatUser participantToSeatUser(Map<String, dynamic> json) {
     final publicUserId = json['public_user_id']?.toString() ?? '';
     final displayName = _text(json['display_name']) ?? _text(json['username']) ?? (publicUserId.isEmpty ? 'Vibe User' : 'User $publicUserId');
     final vip = json['vip'] is Map<String, dynamic> ? json['vip'] as Map<String, dynamic> : <String, dynamic>{};
