@@ -22,6 +22,7 @@ class ProfileApiService {
     required String displayName,
     String? bio,
     String? avatarUrl,
+    List<String> coverPhotoUrls = const [],
     DateTime? dateOfBirth,
     String? gender,
     String? profession,
@@ -39,6 +40,7 @@ class ProfileApiService {
         'display_name': safeName,
         'bio': bio?.trim() ?? '',
         if (avatarUrl != null) 'avatar_url': avatarUrl.trim(),
+        'cover_photo_urls': coverPhotoUrls.map((item) => item.trim()).where((item) => item.isNotEmpty).toList(growable: false),
         'date_of_birth': dateOfBirth == null ? null : _dateOnly(dateOfBirth),
         'gender': gender,
         'profession': profession?.trim(),
@@ -54,38 +56,43 @@ class ProfileApiService {
     return user;
   }
 
-  Future<PublicUserProfile> getPublicProfile(int publicUserId) async {
-    final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/users/public/$publicUserId')),
-      headers: _authHeaders(),
+  Future<CurrentUser> updateCoverPhotoUrls(List<String> coverPhotoUrls) async {
+    final current = await getMe(forceRefresh: false);
+    return updateMyProfile(
+      displayName: current.displayName ?? current.username ?? 'Vibe User',
+      bio: current.bio,
+      avatarUrl: current.avatarUrl,
+      coverPhotoUrls: coverPhotoUrls,
+      dateOfBirth: current.dateOfBirth,
+      gender: current.gender,
+      profession: current.profession,
+      maritalStatus: current.maritalStatus,
+      friendGenderPreference: current.friendGenderPreference,
+      friendMaritalPreference: current.friendMaritalPreference,
+      interests: current.interests,
     );
+  }
+
+  Future<PublicUserProfile> getPublicProfile(int publicUserId) async {
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/users/public/$publicUserId')), headers: _authHeaders());
     _throwIfFailed(response, 'load public profile');
     return PublicUserProfile.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<UserRelationship> getRelationship(int publicUserId) async {
-    final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/relationship')),
-      headers: _authHeaders(),
-    );
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/relationship')), headers: _authHeaders());
     _throwIfFailed(response, 'load relationship');
     return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<UserRelationship> followUser(int publicUserId) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')),
-      headers: _authHeaders(),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')), headers: _authHeaders());
     _throwIfFailed(response, 'follow user');
     return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<UserRelationship> unfollowUser(int publicUserId) async {
-    final response = await http.delete(
-      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')),
-      headers: _authHeaders(),
-    );
+    final response = await http.delete(Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')), headers: _authHeaders());
     _throwIfFailed(response, 'unfollow user');
     return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -141,6 +148,7 @@ class PublicUserProfile {
     required this.displayName,
     required this.avatarUrl,
     required this.bio,
+    required this.coverPhotoUrls,
     required this.dateOfBirth,
     required this.gender,
     required this.profession,
@@ -164,6 +172,7 @@ class PublicUserProfile {
   final String? displayName;
   final String? avatarUrl;
   final String? bio;
+  final List<String> coverPhotoUrls;
   final DateTime? dateOfBirth;
   final String? gender;
   final String? profession;
@@ -192,6 +201,7 @@ class PublicUserProfile {
       displayName: _nullableText(json['display_name']),
       avatarUrl: _nullableText(json['avatar_url']),
       bio: _nullableText(json['bio']),
+      coverPhotoUrls: _stringList(json['cover_photo_urls']),
       dateOfBirth: _date(json['date_of_birth']),
       gender: _nullableText(json['gender']),
       profession: _nullableText(json['profession']),
