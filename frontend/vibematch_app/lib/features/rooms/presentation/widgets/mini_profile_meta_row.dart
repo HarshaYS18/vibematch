@@ -84,7 +84,7 @@ class MiniProfileMetaRow extends StatelessWidget {
             familyLevel: user.familyLevel,
             onTap: onFamilyTap,
           ),
-        MiniProfileGenderAgePill(user: user),
+        if (user.age != null) MiniProfileGenderAgePill(user: user),
       ],
     );
   }
@@ -97,10 +97,11 @@ class MiniProfileGenderAgePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = user.age == null ? 'Age hidden' : '${user.age}';
+    final age = user.age;
+    if (age == null) return const SizedBox.shrink();
     return MiniProfileMetaPill(
       icon: user.gender.icon,
-      label: label,
+      label: '$age',
       color: user.gender.color,
     );
   }
