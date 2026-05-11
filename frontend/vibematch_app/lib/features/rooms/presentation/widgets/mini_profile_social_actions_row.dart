@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../live_room_models.dart';
 import 'room_theme.dart';
 
 enum MiniProfileSocialRelation {
@@ -51,43 +50,32 @@ extension MiniProfileSocialRelationX on MiniProfileSocialRelation {
   }
 }
 
-MiniProfileSocialRelation miniProfileMockRelationForUser(SeatUser user) {
-  switch (user.id) {
-    case 'riya':
-      return MiniProfileSocialRelation.friends;
-    case 'arjun':
-      return MiniProfileSocialRelation.following;
-    case 'meera':
-      return MiniProfileSocialRelation.followBack;
-    default:
-      return MiniProfileSocialRelation.follow;
-  }
-}
-
 class MiniProfileSocialActionsRow extends StatelessWidget {
   const MiniProfileSocialActionsRow({
     super.key,
     required this.relation,
+    required this.relationBusy,
     required this.onRelationTap,
     required this.onMessageTap,
   });
 
   final MiniProfileSocialRelation relation;
+  final bool relationBusy;
   final VoidCallback onRelationTap;
   final VoidCallback onMessageTap;
 
   @override
   Widget build(BuildContext context) {
+    final relationLabel = relationBusy ? 'Please wait' : relation.label;
     return Row(
       children: [
         Expanded(
           child: _MiniProfileSocialButton(
-            icon: relation.icon,
-            label: relation.label,
+            icon: relationBusy ? Icons.sync_rounded : relation.icon,
+            label: relationLabel,
             color: relation.color,
-            filled: relation == MiniProfileSocialRelation.follow ||
-                relation == MiniProfileSocialRelation.followBack,
-            onTap: onRelationTap,
+            filled: relation == MiniProfileSocialRelation.follow || relation == MiniProfileSocialRelation.followBack,
+            onTap: relationBusy ? null : onRelationTap,
           ),
         ),
         const SizedBox(width: 8),
@@ -118,10 +106,11 @@ class _MiniProfileSocialButton extends StatelessWidget {
   final String label;
   final Color color;
   final bool filled;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
     final background = filled ? color : Colors.white;
     final foreground = filled ? Colors.white : color;
     final borderColor = filled ? color.withValues(alpha: 0.58) : color.withValues(alpha: 0.20);
@@ -129,42 +118,45 @@ class _MiniProfileSocialButton extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
-      child: Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: borderColor, width: 0.9),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: filled ? 0.14 : 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: foreground, size: 15.5),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: foreground,
-                  fontSize: 11.6,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                  letterSpacing: -0.05,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.68,
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: borderColor, width: 0.9),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: filled ? 0.14 : 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: foreground, size: 15.5),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 11.6,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                    letterSpacing: -0.05,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
