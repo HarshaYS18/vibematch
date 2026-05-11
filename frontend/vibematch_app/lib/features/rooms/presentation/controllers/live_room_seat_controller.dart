@@ -291,7 +291,7 @@ class LiveRoomSeatController {
   void setUserAsAdmin(String userId) {
     final target = _findRoomParticipant(userId);
     if (!_currentUserIsOwner || target == null || !canSetOrRemoveAdminFor(target)) { onToast('Only the room owner can set admins'); return; }
-    _publishParticipantRole(target.copyWith(isRoomAdmin: true, roleLabel: 'Administrator'));
+    _publishParticipantRole(target.copyWith(isRoomAdmin: true, roleLabel: 'Admin'));
     onToast('${target.name} is now a room admin');
     onChanged();
   }
