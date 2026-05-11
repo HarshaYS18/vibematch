@@ -33,7 +33,9 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
 class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   final LiveRoomPresenceRepository _presenceRepository = LiveRoomPresenceRepository();
   Timer? _heartbeatTimer;
+  Timer? _enteredMessageTimer;
   LiveRoomPresenceSnapshot? _snapshot;
+  SeatUser? _enteredUser;
   bool _joining = true;
   bool _participantsOpen = false;
   bool _autoSeatAttempted = false;
@@ -51,6 +53,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   @override
   void dispose() {
     _heartbeatTimer?.cancel();
+    _enteredMessageTimer?.cancel();
     unawaited(_presenceRepository.leaveRoom(widget.roomId).catchError((_) => 0));
     _presenceRepository.close();
     super.dispose();
@@ -68,6 +71,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
         _snapshot = snapshot;
         _joining = false;
       });
+      _showEnteredMessageIfNeeded(snapshot);
       _autoSeatIfAllowed(snapshot);
       _startHeartbeat();
     } catch (error) {
@@ -77,6 +81,19 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
         _presenceError = error.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  void _showEnteredMessageIfNeeded(LiveRoomPresenceSnapshot snapshot) {
+    final joinedUser = snapshot.joinedUser;
+    if (!snapshot.shouldShowEnteredMessage || joinedUser == null) return;
+    final currentPublicId = widget.currentUser?.publicUserId.toString();
+    if (currentPublicId != null && joinedUser.id == 'user_$currentPublicId') return;
+    _enteredMessageTimer?.cancel();
+    setState(() => _enteredUser = joinedUser);
+    _enteredMessageTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      setState(() => _enteredUser = null);
+    });
   }
 
   void _autoSeatIfAllowed(LiveRoomPresenceSnapshot snapshot) {
@@ -169,7 +186,60 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
             ),
           ),
         ),
+        if (_enteredUser != null)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 66,
+            left: 18,
+            right: 18,
+            child: _RoomEnteredSystemToast(user: _enteredUser!),
+          ),
       ],
+    );
+  }
+}
+
+class _RoomEnteredSystemToast extends StatelessWidget {
+  const _RoomEnteredSystemToast({required this.user});
+
+  final SeatUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        child: Container(
+          key: ValueKey(user.id),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFF120D1F).withValues(alpha: 0.88),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.24), blurRadius: 18, offset: const Offset(0, 8))],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
+                child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  '${user.name} entered the room',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
