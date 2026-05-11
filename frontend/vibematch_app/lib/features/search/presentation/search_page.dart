@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/app_routes.dart';
 import '../../../core/navigation/vm_navigator.dart';
-import '../../vibes/data/vibes_mock_data.dart';
-import '../../vibes/models/vibe_models.dart';
-import '../../vibes/presentation/pages/vibe_detail_page_modular.dart';
 import '../application/search_controller.dart';
 import '../models/search_result_item.dart';
 import '../models/search_result_type.dart';
@@ -74,7 +70,7 @@ class _SearchPageState extends State<SearchPage> {
         _openRoomResult(item);
         return;
       case SearchResultType.vibe:
-        _openVibeResult(item);
+        _toast('Vibe search will appear after backend Vibe search endpoint is added.');
         return;
     }
   }
@@ -99,58 +95,16 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  void _openVibeResult(SearchResultItem item) {
-    final vibe = _resolveVibe(item);
-
-    Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        settings: RouteSettings(
-          name: VmRoutes.vibeDetail,
-          arguments: vibe,
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF251538),
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
         ),
-        builder: (_) => VibeDetailPageModular(vibe: vibe),
-      ),
-    );
-  }
-
-  VibeItem _resolveVibe(SearchResultItem item) {
-    final byId = VibesMockData.vibes.where((vibe) => vibe.id == item.vibeId);
-    if (byId.isNotEmpty) return byId.first;
-
-    final byTitle = VibesMockData.vibes.where((vibe) {
-      return vibe.caption.toLowerCase().contains(item.title.toLowerCase()) ||
-          item.title.toLowerCase().contains(vibe.caption.toLowerCase());
-    });
-    if (byTitle.isNotEmpty) return byTitle.first;
-
-    return VibeItem(
-      id: item.vibeId ?? 'search_vibe_result',
-      authorName: item.vibeAuthorName ?? item.title,
-      authorId: item.vibeAuthorId ?? item.userId ?? 'unknown',
-      avatarText: (item.vibeAuthorName ?? item.title).trim().isEmpty
-          ? 'V'
-          : (item.vibeAuthorName ?? item.title).trim().characters.first.toUpperCase(),
-      timeAgo: 'Now',
-      mediaType: _inferMediaType(item),
-      caption: item.title,
-      tag: item.tag,
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      views: 0,
-      isFollowing: false,
-      usesMentionAll: false,
-      mentions: const [],
-      colors: [item.color, const Color(0xFF251538)],
-    );
-  }
-
-  VibeMediaType _inferMediaType(SearchResultItem item) {
-    final text = '${item.title} ${item.subtitle} ${item.keywords.join(' ')}'.toLowerCase();
-    if (text.contains('video')) return VibeMediaType.video;
-    if (text.contains('text')) return VibeMediaType.text;
-    return VibeMediaType.photo;
+      );
   }
 
   @override
@@ -179,10 +133,8 @@ class _SearchPageState extends State<SearchPage> {
               ),
             Expanded(
               child: hasQuery
-                  ? SearchResultsView(
-                      query: _searchController.query,
-                      results: _searchController.visibleResults,
-                      selectedCategory: _searchController.selectedCategory,
+                  ? _ProductionSearchResults(
+                      controller: _searchController,
                       onResultTap: _openResult,
                     )
                   : SearchDiscoverView(
@@ -197,6 +149,50 @@ class _SearchPageState extends State<SearchPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProductionSearchResults extends StatelessWidget {
+  const _ProductionSearchResults({required this.controller, required this.onResultTap});
+
+  final VibeSearchController controller;
+  final ValueChanged<SearchResultItem> onResultTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (controller.isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF251538)));
+    }
+
+    final error = controller.errorMessage;
+    if (error != null) {
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE8C77C))),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 34),
+              const SizedBox(height: 10),
+              const Text('Search failed', style: TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text(error, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              FilledButton(onPressed: () => controller.retry(), child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SearchResultsView(
+      query: controller.query,
+      results: controller.visibleResults,
+      selectedCategory: controller.selectedCategory,
+      onResultTap: onResultTap,
     );
   }
 }
