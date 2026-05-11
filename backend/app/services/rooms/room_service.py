@@ -1,5 +1,7 @@
 import random
 from datetime import datetime, timedelta
+
+from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -13,10 +15,22 @@ from app.services.role_badge_service import get_primary_role_badge, get_role_bad
 from app.services.role_service import get_primary_role, get_user_roles
 
 _ACTIVE_PARTICIPANT_WINDOW = timedelta(minutes=2)
+_UNLIMITED_ROOM_ROLES = {"founder_owner", "owner"}
 
 
 def _room_public_id_exists(db: Session, room_public_id: str) -> bool:
     return db.query(Room.id).filter(Room.room_public_id == room_public_id).first() is not None
+
+
+def _role_values(user: User) -> set[str]:
+    values: set[str] = set()
+    for role in get_user_roles(user):
+        values.add(role.value if hasattr(role, "value") else str(role))
+    return values
+
+
+def _can_create_unlimited_rooms(user: User) -> bool:
+    return bool(_role_values(user) & _UNLIMITED_ROOM_ROLES)
 
 
 def generate_room_public_id(db: Session) -> str:
@@ -106,6 +120,14 @@ def active_participants(db: Session, room: Room) -> list[RoomParticipant]:
 
 
 def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> RoomDetailResponse:
+    if not _can_create_unlimited_rooms(current_user):
+        existing_room = db.query(Room).filter(Room.owner_user_id == current_user.id).order_by(Room.created_at.asc()).first()
+        if existing_room is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Users can create only one chatroom. Your room is {existing_room.room_public_id}.",
+            )
+
     mode = payload.mode.strip() or "Open"
     room_type = payload.type.strip() or "Chat"
     room = Room(
@@ -202,11 +224,11 @@ def list_room_participants(db: Session, room_public_id: str, current_user: User)
 
 
 def list_trending_rooms(db: Session, language: str | None = None, category: str | None = None, limit: int = 30) -> list[RoomTrendingResponse]:
-    """Return Home trending rooms. Trending intentionally shows Open rooms only."""
+    """Return Home trending rooms. Trending intentionally shows active Open rooms with audience only."""
 
     stale_rooms = db.query(Room).filter(Room.is_active.is_(True)).all()
     for room in stale_rooms:
-      _refresh_room_online_count(db, room)
+        _refresh_room_online_count(db, room)
     db.commit()
 
     query = db.query(Room).filter(
@@ -215,6 +237,7 @@ def list_trending_rooms(db: Session, language: str | None = None, category: str 
         Room.is_locked.is_(False),
         Room.is_members_only.is_(False),
         Room.mode == "Open",
+        Room.online_count > 0,
     )
 
     if language and language != "All":
@@ -223,7 +246,7 @@ def list_trending_rooms(db: Session, language: str | None = None, category: str 
     if category and category not in {"All", "Trending", "Following"}:
         query = query.filter(Room.room_type == category)
 
-    rooms = query.order_by(Room.trending_score.desc(), Room.online_count.desc(), Room.created_at.desc()).limit(limit).all()
+    rooms = query.order_by(Room.online_count.desc(), Room.trending_score.desc(), Room.created_at.desc()).limit(limit).all()
     return [room_to_trending_response(room) for room in rooms]
 
 
@@ -236,7 +259,7 @@ def list_following_rooms(db: Session, current_user: User, language: str | None =
         return []
 
     for room in db.query(Room).filter(Room.is_active.is_(True), Room.owner_user_id.in_(followed_ids)).all():
-      _refresh_room_online_count(db, room)
+        _refresh_room_online_count(db, room)
     db.commit()
 
     query = db.query(Room).filter(
