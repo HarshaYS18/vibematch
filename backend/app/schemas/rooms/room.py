@@ -1,4 +1,8 @@
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.role_badge import RoleBadgeResponse
+from app.schemas.user import UserVipSummaryResponse
 
 
 class RoomCreateRequest(BaseModel):
@@ -29,3 +33,35 @@ class RoomDetailResponse(RoomTrendingResponse):
     is_members_only: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RoomParticipantUserResponse(BaseModel):
+    public_user_id: int
+    display_custom_id: int | None = None
+    username: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    primary_role: str
+    primary_role_badge: RoleBadgeResponse | None = None
+    role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
+    vip: UserVipSummaryResponse
+    is_owner: bool = False
+    joined_at: datetime
+    last_seen_at: datetime
+
+
+class RoomJoinResponse(BaseModel):
+    room: RoomDetailResponse
+    participants: list[RoomParticipantUserResponse] = Field(default_factory=list)
+
+
+class RoomLeaveResponse(BaseModel):
+    room_id: str
+    online_count: int
+    left: bool
+
+
+class RoomParticipantsResponse(BaseModel):
+    room_id: str
+    online_count: int
+    participants: list[RoomParticipantUserResponse] = Field(default_factory=list)
