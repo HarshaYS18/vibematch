@@ -106,7 +106,7 @@ class LiveRoomSeatController {
       age: baseUser?.age,
       locationLabel: baseUser?.locationLabel,
       locationVisible: baseUser?.locationVisible ?? true,
-      gender: baseUser?.gender,
+      gender: baseUser?.gender ?? RoomUserGender.undisclosed,
       isCurrentUser: peer.userId == currentUser.id,
       isHost: baseUser?.isHost ?? isFounder,
       isRoomAdmin: baseUser?.isRoomAdmin ?? isFounder,
