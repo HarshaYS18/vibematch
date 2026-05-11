@@ -75,7 +75,7 @@ class RoomTopBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 7),
-        Row(children: [const SizedBox(width: 2), _TrophyButton(onTap: openRankings), const SizedBox(width: 7), _RoomLevelBadge(level: roomLevel, onTap: onRoomLevelTap), const SizedBox(width: 7), _OnlineButton(count: onlineCount, onTap: onUsersTap)]),
+        Row(children: [const SizedBox(width: 2), _TrophyButton(onTap: openRankings), const SizedBox(width: 7), _RoomLevelBadge(level: roomLevel, onTap: onRoomLevelTap)]),
       ],
     );
   }
@@ -155,12 +155,4 @@ class _TrophyButton extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: Container(width: 31, height: 31, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [RoomColors.gold.withValues(alpha: 0.96), RoomColors.coral.withValues(alpha: 0.84)]), border: Border.all(color: Colors.white.withValues(alpha: 0.24)), boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.20), blurRadius: 14, offset: const Offset(0, 5))]), child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 16))));
-}
-
-class _OnlineButton extends StatelessWidget {
-  const _OnlineButton({required this.count, required this.onTap});
-  final int count;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => Material(color: Colors.transparent, borderRadius: BorderRadius.circular(999), child: InkWell(borderRadius: BorderRadius.circular(999), onTap: onTap, child: Container(height: 31, padding: const EdgeInsets.symmetric(horizontal: 9), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.32), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white.withValues(alpha: 0.11))), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.groups_rounded, color: RoomColors.aqua, size: 13), const SizedBox(width: 4), Text('$count', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))]))));
 }
