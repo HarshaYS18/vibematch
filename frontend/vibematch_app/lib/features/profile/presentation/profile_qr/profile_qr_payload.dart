@@ -72,6 +72,7 @@ class ProfileQrPayload {
       displayName: displayName,
       avatarUrl: avatarUrl,
       bio: null,
+      coverPhotoUrls: const [],
       dateOfBirth: null,
       gender: null,
       profession: null,
