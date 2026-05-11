@@ -16,6 +16,7 @@ class RoomApiService {
     required String mode,
     String type = 'Chat',
     String? subtitle,
+    String? avatarUrl,
   }) async {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -31,6 +32,7 @@ class RoomApiService {
       body: jsonEncode({
         'name': name.trim(),
         'subtitle': subtitle?.trim(),
+        'avatar_url': avatarUrl?.trim(),
         'language': language.trim(),
         'mode': mode.trim(),
         'type': type.trim(),
@@ -100,6 +102,7 @@ class RealRoom {
     required this.onlineCount,
     required this.trendingScore,
     this.subtitle,
+    this.avatarUrl,
     this.followedFriendsInside = const <String>[],
     this.ownerUserId,
     this.isActive = true,
@@ -111,6 +114,7 @@ class RealRoom {
   final String id;
   final String name;
   final String? subtitle;
+  final String? avatarUrl;
   final String language;
   final String mode;
   final String type;
@@ -129,6 +133,7 @@ class RealRoom {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Live Room',
       subtitle: json['subtitle']?.toString(),
+      avatarUrl: json['avatar_url']?.toString(),
       language: json['language']?.toString() ?? 'English',
       mode: json['mode']?.toString() ?? 'Open',
       type: json['type']?.toString() ?? 'Chat',
