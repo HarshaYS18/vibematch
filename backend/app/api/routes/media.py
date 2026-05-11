@@ -12,6 +12,7 @@ router = APIRouter(prefix="/media", tags=["Media"])
 
 UPLOAD_ROOT = Path("static/uploads")
 MAX_AVATAR_BYTES = 10 * 1024 * 1024
+MAX_PROFILE_COVER_BYTES = 10 * 1024 * 1024
 MAX_ROOM_AVATAR_BYTES = 10 * 1024 * 1024
 MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_VIBE_MEDIA_BYTES = 20 * 1024 * 1024
@@ -97,60 +98,25 @@ async def _save_upload(file: UploadFile, *, folder: str, max_size: int, allowed_
 
 
 @router.post("/avatar", response_model=MediaUploadResponse)
-async def upload_avatar(
-    request: Request,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-):
-    return await _save_upload(
-        file,
-        folder=f"avatars/user_{current_user.id}",
-        max_size=MAX_AVATAR_BYTES,
-        allowed_types=ALLOWED_IMAGE_TYPES,
-        request=request,
-    )
+async def upload_avatar(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    return await _save_upload(file, folder=f"avatars/user_{current_user.id}", max_size=MAX_AVATAR_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
+
+
+@router.post("/profile-cover", response_model=MediaUploadResponse)
+async def upload_profile_cover(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    return await _save_upload(file, folder=f"profile_covers/user_{current_user.id}", max_size=MAX_PROFILE_COVER_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
 
 
 @router.post("/room-avatar", response_model=MediaUploadResponse)
-async def upload_room_avatar(
-    request: Request,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-):
-    return await _save_upload(
-        file,
-        folder=f"room_avatars/user_{current_user.id}",
-        max_size=MAX_ROOM_AVATAR_BYTES,
-        allowed_types=ALLOWED_IMAGE_TYPES,
-        request=request,
-    )
+async def upload_room_avatar(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    return await _save_upload(file, folder=f"room_avatars/user_{current_user.id}", max_size=MAX_ROOM_AVATAR_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
 
 
 @router.post("/chat-image", response_model=MediaUploadResponse)
-async def upload_chat_image(
-    request: Request,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-):
-    return await _save_upload(
-        file,
-        folder=f"chat_images/user_{current_user.id}",
-        max_size=MAX_CHAT_IMAGE_BYTES,
-        allowed_types=ALLOWED_IMAGE_TYPES,
-        request=request,
-    )
+async def upload_chat_image(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    return await _save_upload(file, folder=f"chat_images/user_{current_user.id}", max_size=MAX_CHAT_IMAGE_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
 
 
 @router.post("/vibes", response_model=MediaUploadResponse)
-async def upload_vibe_media(
-    request: Request,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-):
-    return await _save_upload(
-        file,
-        folder=f"vibes/user_{current_user.id}",
-        max_size=MAX_VIBE_MEDIA_BYTES,
-        allowed_types=ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES,
-        request=request,
-    )
+async def upload_vibe_media(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    return await _save_upload(file, folder=f"vibes/user_{current_user.id}", max_size=MAX_VIBE_MEDIA_BYTES, allowed_types=ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES, request=request)
