@@ -8,6 +8,7 @@ class CurrentUser {
   final String? username;
   final String? displayName;
   final String? avatarUrl;
+  final String? bio;
   final List<String> roles;
   final String primaryRole;
   final RoleBadge? primaryRoleBadge;
@@ -29,6 +30,7 @@ class CurrentUser {
     required this.username,
     required this.displayName,
     required this.avatarUrl,
+    required this.bio,
     required this.roles,
     required this.primaryRole,
     required this.primaryRoleBadge,
@@ -63,6 +65,7 @@ class CurrentUser {
       username: _nullableStringFromJson(json, keys: const ['username']),
       displayName: _nullableStringFromJson(json, keys: const ['display_name', 'displayName']),
       avatarUrl: _nullableStringFromJson(json, keys: const ['avatar_url', 'avatarUrl']),
+      bio: _nullableStringFromJson(json, keys: const ['bio']),
       roles: parsedRoles.isEmpty ? <String>['user'] : parsedRoles,
       primaryRole: primaryRole,
       primaryRoleBadge: primaryBadgeJson is Map<String, dynamic> ? RoleBadge.fromJson(primaryBadgeJson) : RoleBadge.fromRole(primaryRole),
@@ -89,6 +92,7 @@ class CurrentUser {
       username: 'founder',
       displayName: 'Harsha',
       avatarUrl: null,
+      bio: null,
       roles: const ['founder_owner', 'owner', 'superadmin', 'admin', 'monitor', 'cs', 'user'],
       primaryRole: 'founder_owner',
       primaryRoleBadge: badge,
@@ -115,6 +119,7 @@ class CurrentUser {
       username: 'riya_vibes',
       displayName: 'Riya Sharma',
       avatarUrl: null,
+      bio: null,
       roles: const ['user'],
       primaryRole: 'user',
       primaryRoleBadge: badge,
@@ -138,6 +143,7 @@ class CurrentUser {
     String? username,
     String? displayName,
     String? avatarUrl,
+    String? bio,
     List<String>? roles,
     String? primaryRole,
     RoleBadge? primaryRoleBadge,
@@ -153,6 +159,7 @@ class CurrentUser {
     DateTime? updatedAt,
     bool clearDisplayCustomId = false,
     bool clearAvatarUrl = false,
+    bool clearBio = false,
     bool clearLastDeviceId = false,
     bool clearLastLoginAt = false,
     bool clearLastSeenAt = false,
@@ -164,6 +171,7 @@ class CurrentUser {
       username: username ?? this.username,
       displayName: displayName ?? this.displayName,
       avatarUrl: clearAvatarUrl ? null : avatarUrl ?? this.avatarUrl,
+      bio: clearBio ? null : bio ?? this.bio,
       roles: roles ?? this.roles,
       primaryRole: primaryRole ?? this.primaryRole,
       primaryRoleBadge: primaryRoleBadge ?? this.primaryRoleBadge,
