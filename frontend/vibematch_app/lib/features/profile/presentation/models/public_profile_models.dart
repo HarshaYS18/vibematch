@@ -17,7 +17,7 @@ enum PublicFollowStatus {
       case PublicFollowStatus.followBack:
         return 'Follow Back';
       case PublicFollowStatus.mutual:
-        return 'Mutual';
+        return 'Friends';
     }
   }
 
@@ -41,9 +41,9 @@ enum PublicFollowStatus {
       case PublicFollowStatus.following:
         return 'You are now following this profile.';
       case PublicFollowStatus.followBack:
-        return 'This user follows you. Tap Follow Back to become mutual.';
+        return 'This user follows you. Tap Follow Back to become friends.';
       case PublicFollowStatus.mutual:
-        return 'You both follow each other now.';
+        return 'You both follow each other now. You are friends.';
     }
   }
 }
