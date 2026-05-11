@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../app/app_shell.dart';
 import '../data/auth_api_service.dart';
+import '../data/google_sign_in_config.dart';
 import '../models/current_user.dart';
 
 class AuthGate extends StatefulWidget {
@@ -14,7 +15,11 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   final AuthApiService _authApiService = AuthApiService();
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: const ['email', 'profile']);
+  late final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: GoogleSignInConfig.clientId,
+    serverClientId: GoogleSignInConfig.serverClientId,
+    scopes: const ['email', 'profile'],
+  );
 
   bool _isCheckingAuth = true;
   bool _isLoading = false;
@@ -87,14 +92,21 @@ class _AuthGateState extends State<AuthGate> {
       final auth = await account.authentication;
       final idToken = auth.idToken;
       if (idToken == null || idToken.trim().isEmpty) {
-        throw Exception('Google did not return an ID token. Check Android/Web OAuth client configuration.');
+        throw Exception('Google did not return an ID token. ${GoogleSignInConfig.setupHint}');
       }
 
       final result = await _authApiService.googleLogin(idToken: idToken);
       final user = await _authApiService.getCurrentUser(accessToken: result.accessToken, forceRefresh: true);
       if (mounted) setState(() => _currentUser = user);
+    } on GoogleSignInAccount catch (error) {
+      if (mounted) setState(() => _error = 'Google login failed: $error');
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      final message = error.toString();
+      final lower = message.toLowerCase();
+      final helpfulMessage = lower.contains('api exception: 10') || lower.contains('sign_in_failed')
+          ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
+          : message;
+      if (mounted) setState(() => _error = helpfulMessage);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
