@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
+import '../../media/data/media_upload_service.dart';
 import 'models/edit_profile_models.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -16,6 +17,7 @@ class EditProfilePage extends StatefulWidget {
 
 class _EditProfilePageState extends State<EditProfilePage> {
   final AuthApiService _authApi = const AuthApiService();
+  final MediaUploadService _mediaUploadService = const MediaUploadService();
   late final TextEditingController _nameController = TextEditingController();
   late final TextEditingController _bioController = TextEditingController();
 
@@ -26,9 +28,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String _profession = 'Software Engineer';
   DateTime _dob = DateTime(1998, 6, 18);
   bool _saving = false;
+  bool _uploadingAvatar = false;
+  String? _avatarUrl;
   final Set<String> _interests = {'Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Live Audio'};
 
   int get _age => _calculateAgeFromDob(_dob);
+
+  @override
+  void initState() {
+    super.initState();
+    _avatarUrl = widget.user.avatarUrl;
+  }
 
   @override
   void dispose() {
@@ -49,6 +59,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
   }
 
+  Future<void> _pickAndUploadAvatar() async {
+    if (_uploadingAvatar || _saving) return;
+    setState(() => _uploadingAvatar = true);
+    try {
+      final upload = await _mediaUploadService.pickAndUploadAvatar();
+      if (!mounted) return;
+      setState(() => _avatarUrl = upload.url);
+      _toast('Profile image uploaded. Tap Save to apply.');
+    } on MediaUploadCancelledException {
+      return;
+    } catch (error) {
+      if (!mounted) return;
+      _toast(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
   Future<void> _saveProfile() async {
     if (_saving) return;
     if (_nameController.text.trim().isEmpty) {
@@ -60,6 +88,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       await _authApi.updateProfile(
         displayName: _nameController.text.trim(),
         bio: _bioController.text.trim(),
+        avatarUrl: _avatarUrl,
       );
       if (!mounted) return;
       _toast('Profile updated.');
@@ -126,7 +155,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 children: [
                   _AvatarCard(
                     name: avatarName,
-                    onAvatarTap: () => _toast('Avatar picker will connect to image picker/backend upload later.'),
+                    avatarUrl: _avatarUrl,
+                    uploading: _uploadingAvatar,
+                    onAvatarTap: _pickAndUploadAvatar,
                   ),
                   const SizedBox(height: 12),
                   _EditSection(
@@ -264,28 +295,41 @@ class _Header extends StatelessWidget {
 }
 
 class _AvatarCard extends StatelessWidget {
-  const _AvatarCard({required this.name, required this.onAvatarTap});
+  const _AvatarCard({required this.name, required this.avatarUrl, required this.uploading, required this.onAvatarTap});
   final String name;
+  final String? avatarUrl;
+  final bool uploading;
   final VoidCallback onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
     final letter = name.trim().isEmpty ? 'V' : name.trim()[0].toUpperCase();
+    final imageUrl = avatarUrl?.trim();
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: _panelDecoration(),
       child: Row(
         children: [
           InkWell(
-            onTap: onAvatarTap,
+            onTap: uploading ? null : onAvatarTap,
             borderRadius: BorderRadius.circular(999),
             child: Stack(
               children: [
                 CircleAvatar(
                   radius: 37,
                   backgroundColor: const Color(0xFF6D5DF6),
-                  child: Text(letter, style: const TextStyle(color: Colors.white, fontSize: 29, fontWeight: FontWeight.w900)),
+                  backgroundImage: imageUrl == null || imageUrl.isEmpty ? null : NetworkImage(imageUrl),
+                  child: imageUrl == null || imageUrl.isEmpty
+                      ? Text(letter, style: const TextStyle(color: Colors.white, fontSize: 29, fontWeight: FontWeight.w900))
+                      : null,
                 ),
+                if (uploading)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.26), shape: BoxShape.circle),
+                      child: const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))),
+                    ),
+                  ),
                 Positioned(
                   right: 0,
                   bottom: 0,
@@ -295,8 +339,8 @@ class _AvatarCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 13),
-          const Expanded(
-            child: Text('Compact public profile data. Match score updates per viewer using preferences and common interests.', style: TextStyle(color: Color(0xFF7B6A86), height: 1.28, fontSize: 12.5, fontWeight: FontWeight.w700)),
+          Expanded(
+            child: Text(uploading ? 'Uploading profile image...' : 'Tap avatar to upload a profile image. Tap Save to sync profile changes across the app.', style: const TextStyle(color: Color(0xFF7B6A86), height: 1.28, fontSize: 12.5, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
