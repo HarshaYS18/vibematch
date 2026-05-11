@@ -51,8 +51,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   final ProfileApiService _profileApi = const ProfileApiService();
   final AuthApiService _authApi = const AuthApiService();
   Timer? _coverTimer;
+  StreamSubscription<ProfileRelationshipRealtimeEvent>? _relationshipRealtimeSub;
   int _coverIndex = 0;
-  bool _isBlocked = false;
   bool _loadingProfile = false;
   bool _followBusy = false;
   String? _profileError;
@@ -75,12 +75,14 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     _viewer = _authApi.cachedUser;
     _startCoverAutoScroll();
     _recordProfileVisit();
+    _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen(_onRelationshipRealtimeEvent);
     unawaited(_loadBackendProfile());
   }
 
   @override
   void dispose() {
     _coverTimer?.cancel();
+    _relationshipRealtimeSub?.cancel();
     _coverController.dispose();
     super.dispose();
   }
@@ -111,6 +113,37 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     }
   }
 
+  Future<void> _refreshRelationshipOnly() async {
+    final publicUserId = _targetPublicUserId();
+    if (publicUserId <= 0 || _isSelfProfile) return;
+    try {
+      final nextRelationship = await _profileApi.getRelationship(publicUserId);
+      if (!mounted) return;
+      setState(() => _relationship = nextRelationship);
+    } catch (_) {
+      // Relationship realtime refresh is best-effort. Manual retry still uses full profile load.
+    }
+  }
+
+  void _onRelationshipRealtimeEvent(ProfileRelationshipRealtimeEvent event) {
+    final viewerPublicUserId = (_viewer ?? _authApi.cachedUser)?.publicUserId;
+    final targetPublicUserId = _targetPublicUserId();
+    if (viewerPublicUserId == null || viewerPublicUserId <= 0) return;
+    if (!event.touchesProfile(targetPublicUserId) && !event.touchesProfile(viewerPublicUserId)) return;
+    unawaited(_refreshRelationshipOnly());
+  }
+
+  void _publishRelationshipRealtime(String action) {
+    final viewerPublicUserId = (_viewer ?? _authApi.cachedUser)?.publicUserId;
+    final targetPublicUserId = _targetPublicUserId();
+    if (viewerPublicUserId == null) return;
+    ProfileRelationshipRealtimeService.instance.publish(
+      viewerPublicUserId: viewerPublicUserId,
+      targetPublicUserId: targetPublicUserId,
+      action: action,
+    );
+  }
+
   void _recordProfileVisit() {
     final visitor = _authApi.cachedUser;
     if (visitor == null) return;
@@ -136,6 +169,14 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
       ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
   }
 
+  void _showFollowBlockedPopup([String? message]) {
+    showPublicProfileAccessDialog(
+      context,
+      title: 'Follow not allowed',
+      message: message?.trim().isNotEmpty == true ? message!.trim() : '${_displayName()} doesn\'t allow you to follow them.',
+    );
+  }
+
   void _openProfileQrActions() {
     ProfileQrActionsSheet.show(context, user: widget.user, title: '${_displayName()} QR');
   }
@@ -156,24 +197,34 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
 
   Future<void> _toggleFollow() async {
     if (_isSelfProfile) return;
-    if (_isBlocked) {
-      showPublicProfileAccessDialog(context);
-      return;
-    }
     if (_followBusy) return;
     final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
 
+    final relationship = _relationship;
+    if (relationship != null && !relationship.canFollow && relationship.isFollowing != true) {
+      _showFollowBlockedPopup(relationship.followBlockReason);
+      return;
+    }
+
     setState(() => _followBusy = true);
     try {
-      final nextRelationship = _relationship?.isFollowing == true
+      final wasFollowing = _relationship?.isFollowing == true;
+      final nextRelationship = wasFollowing
           ? await _profileApi.unfollowUser(publicUserId)
           : await _profileApi.followUser(publicUserId);
       if (!mounted) return;
       setState(() => _relationship = nextRelationship);
+      _publishRelationshipRealtime(wasFollowing ? 'unfollow' : 'follow');
       _showAction(context, _followStatus.message);
     } catch (error) {
-      if (mounted) _showAction(context, error.toString().replaceFirst('Exception: ', ''));
+      if (!mounted) return;
+      final message = error.toString().replaceFirst('Exception: ', '');
+      if (message.toLowerCase().contains('allow') || message.toLowerCase().contains('block')) {
+        _showFollowBlockedPopup(message);
+      } else {
+        _showAction(context, message);
+      }
     } finally {
       if (mounted) setState(() => _followBusy = false);
     }
