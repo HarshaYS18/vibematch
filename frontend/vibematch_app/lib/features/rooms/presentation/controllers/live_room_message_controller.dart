@@ -18,6 +18,13 @@ class LiveRoomMessageController {
     _activeController?.clearChatForEveryone();
   }
 
+  static void sendActiveRoomImageMessage({
+    required String imageUrl,
+    required String contentType,
+  }) {
+    _activeController?.sendImageMessage(imageUrl: imageUrl, contentType: contentType);
+  }
+
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
 
@@ -38,6 +45,30 @@ class LiveRoomMessageController {
         vipLevel: currentUser.vipLevel,
         sendingLevel: currentUser.sendingLevel,
         receivingLevel: currentUser.receivingLevel,
+      ),
+    );
+
+    onChanged();
+  }
+
+  void sendImageMessage({
+    required String imageUrl,
+    required String contentType,
+  }) {
+    final safeUrl = imageUrl.trim();
+    if (safeUrl.isEmpty) return;
+
+    messages.insert(
+      0,
+      ChatEntry(
+        senderName: currentUser.name,
+        senderId: currentUser.id,
+        message: 'sent an image',
+        vipLevel: currentUser.vipLevel,
+        sendingLevel: currentUser.sendingLevel,
+        receivingLevel: currentUser.receivingLevel,
+        imageUrl: safeUrl,
+        imageContentType: contentType.trim().isEmpty ? 'image/jpeg' : contentType.trim(),
       ),
     );
 
