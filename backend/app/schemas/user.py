@@ -47,6 +47,15 @@ class UserMeResponse(BaseModel):
         from_attributes = True
 
 
+class UserRelationshipResponse(BaseModel):
+    public_user_id: int
+    is_following: bool = False
+    follows_me: bool = False
+    is_friend: bool = False
+    followers_count: int = 0
+    following_count: int = 0
+
+
 class PublicUserProfileResponse(BaseModel):
     public_user_id: int
     display_custom_id: int | None = None
@@ -60,6 +69,7 @@ class PublicUserProfileResponse(BaseModel):
     is_online: bool
     last_seen_at: datetime | None = None
     created_at: datetime
+    relationship: UserRelationshipResponse | None = None
 
 
 class UserSearchResultResponse(BaseModel):
