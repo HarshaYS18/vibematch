@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/live_room_media_signaling_service.dart';
+import '../../data/live_room_settings_event_bus.dart';
 import '../live_room_models.dart';
 import '../widgets/room_theme.dart';
 import '../widgets/vibesync_room_module.dart';
@@ -19,6 +20,7 @@ class LiveRoomStateController extends ChangeNotifier {
       roomId: _roomId,
       roomName: _roomName,
     );
+    LiveRoomSettingsEventBus.latestEvent.addListener(_handleRealtimeSettingsEvent);
   }
 
   String _roomName;
@@ -50,6 +52,21 @@ class LiveRoomStateController extends ChangeNotifier {
   VibeSyncRoomState get vibeSyncState => _vibeSyncState;
   Offset get bubbleOffset => _bubbleOffset;
   RoomBackgroundTheme get selectedBackgroundTheme => _selectedBackgroundTheme;
+
+  @override
+  void dispose() {
+    LiveRoomSettingsEventBus.latestEvent.removeListener(_handleRealtimeSettingsEvent);
+    super.dispose();
+  }
+
+  void _handleRealtimeSettingsEvent() {
+    final event = LiveRoomSettingsEventBus.latestEvent.value;
+    if (event == null) return;
+    if (event.roomId.trim().isNotEmpty && event.roomId != _roomId) return;
+    if (event.applyOnlyModeEnabled == _applyOnlyModeEnabled) return;
+    _applyOnlyModeEnabled = event.applyOnlyModeEnabled;
+    notifyListeners();
+  }
 
   void renameRoom(String value) {
     final nextValue = value.trim();
@@ -94,6 +111,7 @@ class LiveRoomStateController extends ChangeNotifier {
   void setApplyOnlyModeEnabled(bool value) {
     if (value == _applyOnlyModeEnabled) return;
     _applyOnlyModeEnabled = value;
+    LiveRoomMediaSignalingService.instance.setRoomApplyOnlyMode(value);
     notifyListeners();
   }
 
