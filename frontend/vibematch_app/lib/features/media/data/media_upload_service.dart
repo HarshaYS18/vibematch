@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/vm_api_config.dart';
@@ -70,7 +69,6 @@ class MediaUploadService {
           'file',
           bytes,
           filename: filename,
-          contentType: MediaType.parse(_contentTypeForFilename(filename)),
         ),
       );
 
@@ -88,14 +86,6 @@ class MediaUploadService {
     if (trimmed.isEmpty) return 'vibematch_image.jpg';
     final safe = trimmed.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     return safe.contains('.') ? safe : '$safe.jpg';
-  }
-
-  String _contentTypeForFilename(String filename) {
-    final lower = filename.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    return 'image/jpeg';
   }
 
   String _errorMessage(http.Response response, {required String fallback}) {
