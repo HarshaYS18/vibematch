@@ -1,4 +1,3 @@
-import os
 import re
 from pathlib import Path
 from uuid import uuid4
@@ -18,6 +17,7 @@ MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_VIBE_MEDIA_BYTES = 20 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
+GENERIC_MULTIPART_TYPES = {"", "application/octet-stream", "text/plain"}
 
 
 class MediaUploadResponse(BaseModel):
@@ -25,6 +25,28 @@ class MediaUploadResponse(BaseModel):
     media_type: str
     content_type: str
     size_bytes: int
+
+
+def _content_type_from_filename(filename: str) -> str | None:
+    suffix = Path(filename or "").suffix.lower()
+    return {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mov": "video/quicktime",
+    }.get(suffix)
+
+
+def _resolve_content_type(file: UploadFile) -> str:
+    raw = (file.content_type or "").lower().strip()
+    inferred = _content_type_from_filename(file.filename or "")
+    if raw in GENERIC_MULTIPART_TYPES and inferred:
+        return inferred
+    return raw
 
 
 def _safe_extension(filename: str, content_type: str) -> str:
@@ -48,7 +70,7 @@ def _absolute_url(request: Request, path: str) -> str:
 
 
 async def _save_upload(file: UploadFile, *, folder: str, max_size: int, allowed_types: set[str], request: Request) -> MediaUploadResponse:
-    content_type = (file.content_type or "").lower().strip()
+    content_type = _resolve_content_type(file)
     if content_type not in allowed_types:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {content_type or 'unknown'}")
 
