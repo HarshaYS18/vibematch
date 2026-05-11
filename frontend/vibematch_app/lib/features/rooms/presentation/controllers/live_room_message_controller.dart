@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 
@@ -74,6 +76,10 @@ class LiveRoomMessageController {
   }
 
   void insertSystemMessage(String message) {
+    insertPersistentSystemMessage(message);
+  }
+
+  void insertPersistentSystemMessage(String message) {
     final trimmed = message.trim();
     if (trimmed.isEmpty) return;
 
@@ -89,14 +95,47 @@ class LiveRoomMessageController {
     onChanged();
   }
 
+  void insertUserEnteredSystemEvent(SeatUser user) {
+    final name = user.name.trim().isEmpty ? 'User' : user.name.trim();
+    final entry = ChatEntry(
+      senderName: name,
+      senderId: 'system',
+      message: '$name Entered the Room',
+      systemEventType: RoomSystemEventType.userEntered,
+      autoDismissAt: DateTime.now().add(const Duration(seconds: 5)),
+    );
+    messages.insert(0, entry);
+    onChanged();
+    _scheduleAutoDismiss(entry);
+  }
+
+  void insertUserRemovedSystemEvent({
+    required String actorName,
+    required String targetName,
+  }) {
+    final actor = actorName.trim().isEmpty ? 'Admin' : actorName.trim();
+    final target = targetName.trim().isEmpty ? 'user' : targetName.trim();
+    messages.insert(
+      0,
+      ChatEntry(
+        senderName: 'System',
+        senderId: 'system',
+        message: '$actor has removed $target from the group',
+        systemEventType: RoomSystemEventType.userRemoved,
+      ),
+    );
+    onChanged();
+  }
+
   void insertEntry(ChatEntry entry) {
     messages.insert(0, entry);
+    if (entry.shouldAutoDismiss) _scheduleAutoDismiss(entry);
     onChanged();
   }
 
   void clearChatForEveryone() {
     messages.clear();
-    insertSystemMessage('Chat cleared for everyone by ${currentUser.name}');
+    insertPersistentSystemMessage('Chat cleared for everyone by ${currentUser.name}');
   }
 
   void requestJoin() {
@@ -132,6 +171,16 @@ class LiveRoomMessageController {
     );
 
     onChanged();
+  }
+
+  void _scheduleAutoDismiss(ChatEntry entry) {
+    final dismissAt = entry.autoDismissAt;
+    if (dismissAt == null) return;
+    final delay = dismissAt.difference(DateTime.now());
+    Timer(delay.isNegative ? Duration.zero : delay, () {
+      final removed = messages.remove(entry);
+      if (removed) onChanged();
+    });
   }
 }
 
