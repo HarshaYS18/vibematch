@@ -75,8 +75,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       familyName: '',
       familyLevel: 'bronze',
       relationshipText: '',
-      vipLevel: isOfficial ? 32 : 1,
-      svipLevel: isOfficial ? 3 : 0,
+      vipLevel: isOfficial ? 32 : user.vip.vipLevel,
+      svipLevel: isOfficial ? 3 : user.vip.svipLevel,
       sendingLevel: isOfficial ? 52 : 1,
       receivingLevel: isOfficial ? 44 : 1,
       sentExp: 0,
@@ -88,6 +88,51 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       isRoomAdmin: isOfficial,
     );
     _debug('active logged-in room identity set: ${_activeLoggedInSeatUser!.id} ${_activeLoggedInSeatUser!.name}');
+  }
+
+  void seedActiveRoomSeatUser(SeatUser user) {
+    _activeLoggedInSeatUser = SeatUser(
+      id: user.id,
+      name: user.name,
+      roleLabel: user.roleLabel,
+      familyName: user.familyName,
+      familyLevel: user.familyLevel,
+      relationshipText: user.relationshipText,
+      vipLevel: user.vipLevel,
+      svipLevel: user.svipLevel,
+      sendingLevel: user.sendingLevel,
+      receivingLevel: user.receivingLevel,
+      sentExp: user.sentExp,
+      receivedExp: user.receivedExp,
+      medals: user.medals,
+      avatarColors: user.avatarColors,
+      age: user.age,
+      locationLabel: user.locationLabel,
+      locationVisible: user.locationVisible,
+      gender: user.gender,
+      isCurrentUser: true,
+      isHost: user.isHost,
+      isRoomAdmin: user.isRoomAdmin,
+      selfMuted: user.selfMuted,
+      adminMuted: user.adminMuted,
+    );
+    _currentUser = _activeLoggedInSeatUser;
+    _debug('active room identity seeded from presence: ${user.id} ${user.name} host=${user.isHost} admin=${user.isRoomAdmin}');
+  }
+
+  bool isSeatVacant(int seatIndex) {
+    if (seatIndex < 0) return false;
+    final snapshot = roomSnapshot.value;
+    if (snapshot == null) return true;
+    return !snapshot.peers.any((peer) => peer.seatIndex == seatIndex);
+  }
+
+  void takeSeatIfVacant(int seatIndex) {
+    if (!isSeatVacant(seatIndex)) {
+      _debug('auto seat skipped because seat $seatIndex is occupied');
+      return;
+    }
+    takeSeat(seatIndex);
   }
 
   Future<void> joinRoom({required SeatUser currentUser}) async {
