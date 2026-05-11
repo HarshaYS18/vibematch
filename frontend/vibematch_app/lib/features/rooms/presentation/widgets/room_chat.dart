@@ -2,6 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../media/data/media_upload_service.dart';
+import '../controllers/live_room_message_controller.dart';
 import '../live_room_models.dart';
 import '../modules/live_room_games_module.dart';
 import '../modules/live_room_gift_module.dart';
@@ -167,12 +169,12 @@ class _CompactChatLine extends StatelessWidget {
           Flexible(
             fit: FlexFit.loose,
             child: _TransparentUserMessageFlexBox(
-              messageText: message.message,
+              messageText: message.isImageMessage ? (message.imageUrl ?? message.message) : message.message,
               enableMessageActions: !message.isGift,
               onTap: onSenderTap,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -186,18 +188,28 @@ class _CompactChatLine extends StatelessWidget {
                   const SizedBox(width: 8),
                   Flexible(
                     fit: FlexFit.loose,
-                    child: RichText(
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        children: [
-                          WidgetSpan(alignment: PlaceholderAlignment.middle, child: ChatVipBadge(level: message.vipLevel, showWhenZero: true)),
-                          const TextSpan(text: '  '),
-                          TextSpan(text: message.senderName, recognizer: TapGestureRecognizer()..onTap = onSenderTap, style: const TextStyle(color: Colors.white, fontSize: 14.8, fontWeight: FontWeight.w900, height: 1.15)),
-                          const TextSpan(text: '\n '),
-                          ..._messageSpans(message, onMentionTap),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RichText(
+                          maxLines: message.isImageMessage ? 1 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            children: [
+                              WidgetSpan(alignment: PlaceholderAlignment.middle, child: ChatVipBadge(level: message.vipLevel, showWhenZero: true)),
+                              const TextSpan(text: '  '),
+                              TextSpan(text: message.senderName, recognizer: TapGestureRecognizer()..onTap = onSenderTap, style: const TextStyle(color: Colors.white, fontSize: 14.8, fontWeight: FontWeight.w900, height: 1.15)),
+                              const TextSpan(text: '\n '),
+                              ..._messageSpans(message, onMentionTap),
+                            ],
+                          ),
+                        ),
+                        if (message.isImageMessage) ...[
+                          const SizedBox(height: 6),
+                          _ChatImagePreview(imageUrl: message.imageUrl!),
                         ],
-                      ),
+                      ],
                     ),
                   ),
                 ],
@@ -278,6 +290,36 @@ class _CompactChatLine extends StatelessWidget {
         fontSize: 14.2,
         height: 1.15,
         fontWeight: message.isGift || message.isSeatApplication ? FontWeight.w900 : FontWeight.w800,
+      ),
+    );
+  }
+}
+
+class _ChatImagePreview extends StatelessWidget {
+  const _ChatImagePreview({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Image.network(
+        imageUrl,
+        width: 148,
+        height: 108,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          width: 148,
+          height: 84,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+          ),
+          child: const Icon(Icons.broken_image_rounded, color: Colors.white70, size: 22),
+        ),
       ),
     );
   }
@@ -411,6 +453,29 @@ class RoomInputDock extends StatelessWidget {
     action();
   }
 
+  Future<void> _pickAndSendImage(BuildContext context) async {
+    if (!imagesEnabled) {
+      RoomToast.show(context, 'Image messages are disabled in this room');
+      return;
+    }
+    dismissRoomSeatActionPill();
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      RoomToast.show(context, 'Uploading image...');
+      final upload = await const MediaUploadService().pickAndUploadChatImage();
+      LiveRoomMessageController.sendActiveRoomImageMessage(
+        imageUrl: upload.url,
+        contentType: upload.contentType,
+      );
+      if (context.mounted) RoomToast.show(context, 'Image sent');
+    } on MediaUploadCancelledException {
+      return;
+    } catch (error) {
+      if (!context.mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
   void _openMessageComposer(BuildContext context) {
     dismissRoomSeatActionPill();
 
@@ -424,9 +489,7 @@ class RoomInputDock extends StatelessWidget {
         focusNode: focusNode,
         imagesEnabled: imagesEnabled,
         onSendText: onSendTap,
-        onImageTap: () {
-          RoomToast.show(context, 'Image message picker will connect here');
-        },
+        onImageTap: () => _pickAndSendImage(context),
         onSendFloatingText: onSendTap,
       ),
     );
