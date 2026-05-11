@@ -50,6 +50,23 @@ def _apply_room_payload(room: Room, payload: RoomCreateRequest) -> Room:
     return room
 
 
+def _upsert_active_participant(db: Session, room: Room, user: User) -> RoomParticipant:
+    now = datetime.utcnow()
+    participant = db.query(RoomParticipant).filter(
+        RoomParticipant.room_id == room.id,
+        RoomParticipant.user_id == user.id,
+    ).first()
+    if participant is None:
+        participant = RoomParticipant(room_id=room.id, user_id=user.id, is_active=True, joined_at=now, last_seen_at=now)
+        db.add(participant)
+    else:
+        participant.is_active = True
+        participant.last_seen_at = now
+        participant.left_at = None
+    user.last_seen_at = now
+    return participant
+
+
 def generate_room_public_id(db: Session) -> str:
     for _ in range(20):
         room_public_id = f"VM{random.randint(100000, 999999)}"
@@ -143,6 +160,7 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
         existing_room = db.query(Room).filter(Room.owner_user_id == current_user.id).order_by(Room.created_at.asc()).first()
         if existing_room is not None:
             _apply_room_payload(existing_room, payload)
+            _upsert_active_participant(db, existing_room, current_user)
             _refresh_room_online_count(db, existing_room)
             db.commit()
             db.refresh(existing_room)
@@ -167,6 +185,9 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
         is_active=True,
     )
     db.add(room)
+    db.flush()
+    _upsert_active_participant(db, room, current_user)
+    _refresh_room_online_count(db, room)
     db.commit()
     db.refresh(room)
     return room_to_detail_response(room)
@@ -193,19 +214,7 @@ def join_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinR
     if room.is_secret and room.owner_user_id != current_user.id:
         return None
 
-    now = datetime.utcnow()
-    participant = db.query(RoomParticipant).filter(
-        RoomParticipant.room_id == room.id,
-        RoomParticipant.user_id == current_user.id,
-    ).first()
-    if participant is None:
-        participant = RoomParticipant(room_id=room.id, user_id=current_user.id, is_active=True, joined_at=now, last_seen_at=now)
-        db.add(participant)
-    else:
-        participant.is_active = True
-        participant.last_seen_at = now
-        participant.left_at = None
-    current_user.last_seen_at = now
+    _upsert_active_participant(db, room, current_user)
     _refresh_room_online_count(db, room)
     db.commit()
     db.refresh(room)
