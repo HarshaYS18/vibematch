@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
     admin,
@@ -11,6 +12,7 @@ from app.api.routes import (
     inbox,
     inbox_ws,
     internal_test,
+    media,
     moderation,
     mvp_core,
     mvp_economy,
@@ -79,6 +81,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/")
 def root():
@@ -100,6 +104,7 @@ app.include_router(inbox.router)
 app.include_router(inbox_ws.router)
 app.include_router(social.router)
 app.include_router(vibes.router)
+app.include_router(media.router)
 app.include_router(mvp_core.router)
 app.include_router(mvp_social.router)
 app.include_router(mvp_economy.router)
