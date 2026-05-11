@@ -39,6 +39,7 @@ class VibeItem {
     required this.usesMentionAll,
     required this.mentions,
     required this.colors,
+    this.mediaUrl,
     this.likedByMe = false,
   });
 
@@ -58,12 +59,16 @@ class VibeItem {
   final bool usesMentionAll;
   final List<String> mentions;
   final List<Color> colors;
+  final String? mediaUrl;
   final bool likedByMe;
+
+  bool get hasMediaUrl => mediaUrl != null && mediaUrl!.trim().isNotEmpty;
 
   VibeItem copyWith({
     int? likes,
     int? comments,
     int? shares,
+    String? mediaUrl,
     bool? likedByMe,
   }) {
     return VibeItem(
@@ -83,6 +88,7 @@ class VibeItem {
       usesMentionAll: usesMentionAll,
       mentions: mentions,
       colors: colors,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
       likedByMe: likedByMe ?? this.likedByMe,
     );
   }
