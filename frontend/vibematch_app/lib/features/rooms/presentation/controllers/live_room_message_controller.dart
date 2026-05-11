@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 
@@ -79,7 +77,16 @@ class LiveRoomMessageController {
     final trimmed = message.trim();
     if (trimmed.isEmpty) return;
 
-    _insertAutoClearSystemMessage(trimmed);
+    messages.insert(
+      0,
+      ChatEntry(
+        senderName: 'System',
+        senderId: 'system',
+        message: trimmed,
+      ),
+    );
+
+    onChanged();
   }
 
   void insertEntry(ChatEntry entry) {
@@ -89,7 +96,7 @@ class LiveRoomMessageController {
 
   void clearChatForEveryone() {
     messages.clear();
-    _insertAutoClearSystemMessage('Chat cleared for everyone by ${currentUser.name}');
+    insertSystemMessage('Chat cleared for everyone by ${currentUser.name}');
   }
 
   void requestJoin() {
@@ -125,22 +132,6 @@ class LiveRoomMessageController {
     );
 
     onChanged();
-  }
-
-  void _insertAutoClearSystemMessage(String message) {
-    final entry = ChatEntry(
-      senderName: 'System',
-      senderId: 'system',
-      message: message,
-    );
-
-    messages.insert(0, entry);
-    onChanged();
-
-    Timer(const Duration(seconds: 5), () {
-      final removed = messages.remove(entry);
-      if (removed) onChanged();
-    });
   }
 }
 
