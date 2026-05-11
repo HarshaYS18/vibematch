@@ -376,13 +376,13 @@ class LiveRoomSeatController {
   }
 
   void leaveAndLockSeat(int seatIndex) {
-    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can leave-lock seats'); return; }
     if (seatIndex < 0 || seatIndex >= seats.length) return;
     final seatedUser = seats[seatIndex].user;
     if (seatedUser != null && seatedUser.id == currentUser.id) {
       LiveRoomMediaSignalingService.instance.leaveSeat();
       return;
     }
+    if (!_currentUserIsAdminOrOwner) { onToast('Only the owner or room admins can leave-lock seats'); return; }
     if (seatedUser != null && !_canRemoveTarget(seatedUser)) { onToast('You cannot leave-lock this user'); return; }
     if (seatedUser != null) {
       LiveRoomMediaSignalingService.instance.leaveAndLockSeat(seatIndex: seatIndex, targetUserId: seatedUser.id);
