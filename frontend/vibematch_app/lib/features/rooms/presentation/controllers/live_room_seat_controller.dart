@@ -432,6 +432,11 @@ class LiveRoomSeatController {
         applicationExpiresAt: now.add(seatApplicationExpiry),
       ),
     );
+
+    LiveRoomMediaSignalingService.instance.sendSeatApplicationRequest(
+      seatIndex: index,
+    );
+
     onChanged();
   }
 
