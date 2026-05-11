@@ -22,39 +22,25 @@ _ALLOWED_MARITAL = {"single", "married", "committed", "divorced"}
 _ALLOWED_MARITAL_PREFS = {"any", "single", "married", "committed", "divorced"}
 
 
-def get_current_user(
-    authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> User:
+def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> User:
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
-
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid Authorization header")
-
     token = authorization.replace("Bearer ", "").strip()
-
     payload = decode_access_token(token)
-
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-
     user_id = payload.get("sub")
-
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token subject")
-
     user = db.query(User).filter(User.id == int(user_id)).first()
-
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-
     if user.is_banned:
         raise HTTPException(status_code=403, detail="User is banned")
-
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User is inactive")
-
     return user
 
 
@@ -63,6 +49,22 @@ def _clean_optional(value: str | None) -> str | None:
         return None
     text = value.strip()
     return text or None
+
+
+def _clean_url_list(values: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in values:
+        item = raw.strip()
+        if not item or item in seen:
+            continue
+        if len(item) > 500:
+            raise HTTPException(status_code=400, detail="Cover photo URL is too long")
+        seen.add(item)
+        cleaned.append(item)
+    if len(cleaned) > 6:
+        raise HTTPException(status_code=400, detail="Maximum 6 cover photos allowed")
+    return cleaned
 
 
 def _clean_enum(value: str | None, allowed: set[str], field_name: str) -> str | None:
@@ -96,7 +98,6 @@ def _user_me_response(db: Session, current_user: User) -> UserMeResponse:
     user_roles = get_user_roles(current_user)
     roles = [role.value for role in user_roles]
     primary_role = get_primary_role(current_user)
-
     return UserMeResponse(
         id=current_user.id,
         public_user_id=current_user.public_user_id,
@@ -105,6 +106,7 @@ def _user_me_response(db: Session, current_user: User) -> UserMeResponse:
         display_name=current_user.display_name,
         avatar_url=current_user.avatar_url,
         bio=current_user.bio,
+        cover_photo_urls=current_user.cover_photo_urls or [],
         date_of_birth=current_user.date_of_birth,
         gender=current_user.gender,
         profession=current_user.profession,
@@ -129,10 +131,7 @@ def _user_me_response(db: Session, current_user: User) -> UserMeResponse:
 
 
 def _is_blocked(db: Session, blocker_id: int, blocked_id: int) -> bool:
-    return db.query(UserBlock.id).filter(
-        UserBlock.blocker_user_id == blocker_id,
-        UserBlock.blocked_user_id == blocked_id,
-    ).first() is not None
+    return db.query(UserBlock.id).filter(UserBlock.blocker_user_id == blocker_id, UserBlock.blocked_user_id == blocked_id).first() is not None
 
 
 def _relationship_payload(db: Session, profile_user: User, current_user: User | None) -> UserRelationshipResponse:
@@ -142,7 +141,6 @@ def _relationship_payload(db: Session, profile_user: User, current_user: User | 
     blocked_me = False
     can_follow = True
     follow_block_reason = None
-
     if current_user is not None and current_user.id != profile_user.id:
         is_following = db.query(UserFollow.id).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == profile_user.id).first() is not None
         follows_me = db.query(UserFollow.id).filter(UserFollow.follower_user_id == profile_user.id, UserFollow.followed_user_id == current_user.id).first() is not None
@@ -153,7 +151,6 @@ def _relationship_payload(db: Session, profile_user: User, current_user: User | 
             follow_block_reason = "Unblock this user before following them."
         elif blocked_me:
             follow_block_reason = f"{profile_user.display_name or profile_user.username or 'This user'} doesn't allow you to follow them."
-
     followers_count = db.query(func.count(UserFollow.id)).filter(UserFollow.followed_user_id == profile_user.id).scalar() or 0
     following_count = db.query(func.count(UserFollow.id)).filter(UserFollow.follower_user_id == profile_user.id).scalar() or 0
     return UserRelationshipResponse(public_user_id=profile_user.public_user_id, is_following=is_following, follows_me=follows_me, is_friend=is_following and follows_me, blocked_by_me=blocked_by_me, blocked_me=blocked_me, can_follow=can_follow, follow_block_reason=follow_block_reason, followers_count=followers_count, following_count=following_count)
@@ -182,6 +179,7 @@ def update_my_profile(payload: UserProfileUpdateRequest, db: Session = Depends(g
         current_user.bio = _clean_optional(payload.bio)
     if payload.avatar_url is not None:
         current_user.avatar_url = _clean_optional(payload.avatar_url)
+    current_user.cover_photo_urls = _clean_url_list(payload.cover_photo_urls)
     current_user.date_of_birth = payload.date_of_birth
     current_user.gender = _clean_enum(payload.gender, _ALLOWED_GENDERS, "gender")
     current_user.profession = _clean_optional(payload.profession)
@@ -200,15 +198,12 @@ def search_users(q: str = Query(min_length=1, max_length=80), limit: int = Query
     query = q.strip()
     if not query:
         return UserSearchResponse(query=q, users=[])
-
     clean = query.lstrip("@").strip()
     public_id = int(clean) if clean.isdigit() else None
     like = f"%{clean}%"
-
     filters = [User.username.ilike(like), User.display_name.ilike(like), User.official_handle.ilike(like), User.official_handle.ilike(f"@{clean}")]
     if public_id is not None:
         filters.extend([User.public_user_id == public_id, User.display_custom_id == public_id])
-
     users = db.query(User).filter(User.is_active.is_(True), User.is_banned.is_(False), User.id != current_user.id, or_(*filters)).order_by(User.last_login_at.desc().nullslast(), User.created_at.desc()).limit(limit).all()
     return UserSearchResponse(query=query, users=[_search_result_payload(db, user, current_user) for user in users])
 
