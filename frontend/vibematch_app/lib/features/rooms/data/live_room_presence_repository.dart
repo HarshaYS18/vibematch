@@ -13,8 +13,17 @@ class LiveRoomPresenceRepository {
   final AuthApiService _authApiService;
 
   static final ValueNotifier<List<SeatUser>> activeParticipants = ValueNotifier<List<SeatUser>>(const <SeatUser>[]);
+  static String? _activeRoomId;
 
+  static String? get currentRoomId => _activeRoomId;
   static List<SeatUser> get currentParticipants => activeParticipants.value;
+
+  static List<SeatUser> currentParticipantsForRoom(String? roomId) {
+    final cleanRoomId = roomId?.trim();
+    if (cleanRoomId == null || cleanRoomId.isEmpty) return const <SeatUser>[];
+    if (_activeRoomId != cleanRoomId) return const <SeatUser>[];
+    return activeParticipants.value;
+  }
 
   static SeatUser? userByRoomUserId(String userId) {
     for (final user in activeParticipants.value) {
@@ -23,7 +32,18 @@ class LiveRoomPresenceRepository {
     return null;
   }
 
-  static void publishParticipants(List<SeatUser> participants) {
+  static void clearIfRoomChanged(String roomId) {
+    final cleanRoomId = roomId.trim();
+    if (cleanRoomId.isEmpty) return;
+    if (_activeRoomId == cleanRoomId) return;
+    _activeRoomId = cleanRoomId;
+    activeParticipants.value = const <SeatUser>[];
+  }
+
+  static void publishParticipants(List<SeatUser> participants, {String? roomId}) {
+    final cleanRoomId = roomId?.trim();
+    if (cleanRoomId != null && cleanRoomId.isNotEmpty) _activeRoomId = cleanRoomId;
+
     final deduped = <SeatUser>[];
     final ids = <String>{};
     for (final user in participants) {
@@ -54,7 +74,7 @@ class LiveRoomPresenceRepository {
   Future<LiveRoomPresenceSnapshot> fetchParticipants(String roomId) async {
     final response = await _apiClient.getMap('/rooms/$roomId/participants', headers: _headers());
     final snapshot = LiveRoomPresenceSnapshot.fromJson(response);
-    publishParticipants(snapshot.participants);
+    publishParticipants(snapshot.participants, roomId: snapshot.roomId.isEmpty ? roomId : snapshot.roomId);
     return snapshot;
   }
 
@@ -70,6 +90,7 @@ class LiveRoomPresenceRepository {
       body: {'public_user_id': publicUserId},
     );
     final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
+    _activeRoomId = roomId;
     publishParticipant(user);
     return user;
   }
@@ -77,6 +98,7 @@ class LiveRoomPresenceRepository {
   Future<SeatUser> removeRoomMember({required String roomId, required int publicUserId}) async {
     final response = await _apiClient.deleteMap('/rooms/$roomId/members/$publicUserId', headers: _headers());
     final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
+    _activeRoomId = roomId;
     publishParticipant(user);
     return user;
   }
@@ -88,6 +110,7 @@ class LiveRoomPresenceRepository {
       body: {'public_user_id': publicUserId},
     );
     final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
+    _activeRoomId = roomId;
     publishParticipant(user);
     return user;
   }
@@ -95,6 +118,7 @@ class LiveRoomPresenceRepository {
   Future<SeatUser> removeRoomAdmin({required String roomId, required int publicUserId}) async {
     final response = await _apiClient.deleteMap('/rooms/$roomId/admins/$publicUserId', headers: _headers());
     final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
+    _activeRoomId = roomId;
     publishParticipant(user);
     return user;
   }
@@ -102,7 +126,7 @@ class LiveRoomPresenceRepository {
   Future<LiveRoomPresenceSnapshot> _postSnapshot(String path) async {
     final response = await _apiClient.postMap(path, headers: _headers());
     final snapshot = LiveRoomPresenceSnapshot.fromJoinJson(response);
-    publishParticipants(snapshot.participants);
+    publishParticipants(snapshot.participants, roomId: snapshot.roomId);
     return snapshot;
   }
 
