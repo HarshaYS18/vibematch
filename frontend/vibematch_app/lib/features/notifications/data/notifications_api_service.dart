@@ -22,8 +22,8 @@ class NotificationsApiService {
     );
 
     final rawItems = response['notifications'];
-    final items = rawItems is List
-        ? rawItems.whereType<Map<String, dynamic>>().map(NotificationItem.fromBackendJson).toList(growable: false)
+    final List<NotificationItem> items = rawItems is List
+        ? rawItems.whereType<Map<String, dynamic>>().map(_notificationItemFromBackendJson).toList(growable: false)
         : const <NotificationItem>[];
 
     return NotificationsLoadResult(
@@ -60,34 +60,25 @@ class NotificationsLoadResult {
   final List<NotificationItem> items;
 }
 
-int _int(dynamic value) {
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
-}
-
-extension BackendNotificationItemMapper on NotificationItem {
-  static NotificationItem fromBackendJson(Map<String, dynamic> json) {
-    final type = _typeFromBackend(json['type']?.toString());
-    final metadata = json['metadata'] is Map<String, dynamic> ? json['metadata'] as Map<String, dynamic> : <String, dynamic>{};
-    final authorName = metadata['author_name']?.toString() ?? 'Someone';
-    final createdAt = DateTime.tryParse(json['created_at']?.toString() ?? '');
-    final body = json['body']?.toString() ?? '';
-    return NotificationItem(
-      id: json['id']?.toString() ?? '',
-      type: type,
-      senderName: authorName,
-      targetName: '',
-      title: json['title']?.toString() ?? 'Notification',
-      body: body,
-      vibeTitle: _targetTitle(type, body, json['target_id']?.toString()),
-      timeAgo: _timeAgo(createdAt),
-      isUnread: json['is_read'] != true,
-      targetType: json['target_type']?.toString(),
-      targetId: json['target_id']?.toString(),
-    );
-  }
+NotificationItem _notificationItemFromBackendJson(Map<String, dynamic> json) {
+  final type = _typeFromBackend(json['type']?.toString());
+  final metadata = json['metadata'] is Map<String, dynamic> ? json['metadata'] as Map<String, dynamic> : <String, dynamic>{};
+  final authorName = metadata['author_name']?.toString() ?? 'Someone';
+  final createdAt = DateTime.tryParse(json['created_at']?.toString() ?? '');
+  final body = json['body']?.toString() ?? '';
+  return NotificationItem(
+    id: json['id']?.toString() ?? '',
+    type: type,
+    senderName: authorName,
+    targetName: '',
+    title: json['title']?.toString() ?? 'Notification',
+    body: body,
+    vibeTitle: _targetTitle(type, body, json['target_id']?.toString()),
+    timeAgo: _timeAgo(createdAt),
+    isUnread: json['is_read'] != true,
+    targetType: json['target_type']?.toString(),
+    targetId: json['target_id']?.toString(),
+  );
 }
 
 NotificationType _typeFromBackend(String? raw) {
@@ -117,4 +108,11 @@ String _timeAgo(DateTime? createdAt) {
   if (diff.inHours < 24) return '${diff.inHours}h';
   if (diff.inDays < 7) return '${diff.inDays}d';
   return '${(diff.inDays / 7).floor()}w';
+}
+
+int _int(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
 }
