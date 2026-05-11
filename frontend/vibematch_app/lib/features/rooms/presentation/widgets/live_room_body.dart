@@ -114,32 +114,27 @@ class LiveRoomBody extends StatelessWidget {
         children: [
           Column(
             children: [
-              ValueListenableBuilder<LiveMediaRoomSnapshot?>(
-                valueListenable: media.roomSnapshot,
-                builder: (context, snapshot, _) {
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                    child: RoomTopBar(
-                      roomName: roomName,
-                      roomId: roomId,
-                      privacyMode: privacyMode,
-                      onlineCount: snapshot?.peerCount ?? onlineCount,
-                      canManageAdmins: canManageSeats,
-                      admins: admins,
-                      availableAdminUsers: availableAdminUsers,
-                      onAddAdmin: onAddAdmin,
-                      onRemoveAdmin: onRemoveAdmin,
-                      onBack: onBack,
-                      onJoinTap: onJoinTap,
-                      onShare: onShare,
-                      onAnnouncement: onAnnouncement,
-                      onSettings: onSettings,
-                      onUsersTap: onUsersTap,
-                      onRoomRankingsTap: onRoomRankingsTap,
-                      onRoomLevelTap: onRoomLevelTap,
-                    ),
-                  );
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                child: RoomTopBar(
+                  roomName: roomName,
+                  roomId: roomId,
+                  privacyMode: privacyMode,
+                  onlineCount: onlineCount,
+                  canManageAdmins: canManageSeats,
+                  admins: admins,
+                  availableAdminUsers: availableAdminUsers,
+                  onAddAdmin: onAddAdmin,
+                  onRemoveAdmin: onRemoveAdmin,
+                  onBack: onBack,
+                  onJoinTap: onJoinTap,
+                  onShare: onShare,
+                  onAnnouncement: onAnnouncement,
+                  onSettings: onSettings,
+                  onUsersTap: onUsersTap,
+                  onRoomRankingsTap: onRoomRankingsTap,
+                  onRoomLevelTap: onRoomLevelTap,
+                ),
               ),
               const SizedBox(height: 22),
               Padding(
@@ -194,7 +189,7 @@ class LiveRoomBody extends StatelessWidget {
           ),
           ValueListenableBuilder<LiveMediaSeatInvite?>(
             valueListenable: media.seatInvite,
-            builder: (context, invite, _) {
+            builder: (context, invite, child) {
               if (invite == null || invite.seatIndex < 0) return const SizedBox.shrink();
               final currentUser = media.activeLoggedInSeatUser;
               if (currentUser == null) return const SizedBox.shrink();
