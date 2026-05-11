@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -68,18 +69,59 @@ class ProfileApiService {
   void _throwIfFailed(http.Response response, String action) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
     final body = response.body.trim();
-    try {
-      final decoded = jsonDecode(body);
+    if (body.isNotEmpty) {
+      final decoded = _tryDecodeJson(body);
       if (decoded is Map<String, dynamic>) {
         final detail = decoded['detail']?.toString().trim();
-        if (detail != null && detail.isNotEmpty) {
-          throw Exception(detail);
-        }
+        if (detail != null && detail.isNotEmpty) throw Exception(detail);
+      } else {
+        throw Exception(body);
       }
-    } catch (_) {
-      if (body.isNotEmpty && !body.startsWith('{')) throw Exception(body);
     }
-    throw Exception('Failed to $action (${response.statusCode}): ${response.body}');
+    throw Exception('Failed to $action (${response.statusCode})');
+  }
+}
+
+class ProfileRelationshipRealtimeEvent {
+  const ProfileRelationshipRealtimeEvent({
+    required this.viewerPublicUserId,
+    required this.targetPublicUserId,
+    required this.action,
+  });
+
+  final int viewerPublicUserId;
+  final int targetPublicUserId;
+  final String action;
+
+  bool touchesProfile(int publicUserId) {
+    return viewerPublicUserId == publicUserId || targetPublicUserId == publicUserId;
+  }
+}
+
+class ProfileRelationshipRealtimeService {
+  ProfileRelationshipRealtimeService._();
+
+  static final ProfileRelationshipRealtimeService instance =
+      ProfileRelationshipRealtimeService._();
+
+  final StreamController<ProfileRelationshipRealtimeEvent> _controller =
+      StreamController<ProfileRelationshipRealtimeEvent>.broadcast();
+
+  Stream<ProfileRelationshipRealtimeEvent> get events => _controller.stream;
+
+  void publish({
+    required int viewerPublicUserId,
+    required int targetPublicUserId,
+    required String action,
+  }) {
+    if (viewerPublicUserId <= 0 || targetPublicUserId <= 0) return;
+    _controller.add(
+      ProfileRelationshipRealtimeEvent(
+        viewerPublicUserId: viewerPublicUserId,
+        targetPublicUserId: targetPublicUserId,
+        action: action,
+      ),
+    );
   }
 }
 
@@ -178,6 +220,14 @@ class UserRelationship {
       followersCount: _int(json['followers_count'], fallback: 0),
       followingCount: _int(json['following_count'], fallback: 0),
     );
+  }
+}
+
+dynamic _tryDecodeJson(String body) {
+  try {
+    return jsonDecode(body);
+  } catch (_) {
+    return null;
   }
 }
 
