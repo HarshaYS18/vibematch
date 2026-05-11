@@ -15,8 +15,9 @@ class LiveRoomUsersController {
   }) {
     final users = <SeatUser>[];
     final ids = <String>{};
-    final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
-    final presenceUsers = LiveRoomPresenceRepository.currentParticipants;
+    final media = LiveRoomMediaSignalingService.instance;
+    final snapshot = media.roomSnapshot.value;
+    final presenceUsers = LiveRoomPresenceRepository.currentParticipantsForRoom(media.roomId);
 
     void addUser(SeatUser user) {
       if (user.id.trim().isEmpty) return;
@@ -24,15 +25,10 @@ class LiveRoomUsersController {
       if (ids.add(user.id)) users.add(user);
     }
 
-    // Presence participants are the backend source of truth for all audience members,
-    // room host/admin/member labels, and online list. This prevents the old broad/member
-    // sheets from falling back to mock-only users or seated-only users.
     for (final user in presenceUsers) {
       addUser(user);
     }
 
-    // Seats contain real-time mic/seat state from the media socket. Merge them after
-    // presence so the same public user keeps backend role labels when possible.
     for (final user in seatedUsers) {
       final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(user.id);
       addUser(_mergeSeatWithPresence(seatUser: user, presenceUser: presenceUser));
@@ -42,12 +38,7 @@ class LiveRoomUsersController {
       for (final peer in snapshot.peers) {
         final existingSeatUser = seatedUsers.firstWhereOrNull((user) => user.id == peer.userId);
         final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(peer.userId);
-        addUser(
-          _seatUserFromPeer(
-            peer: peer,
-            baseUser: existingSeatUser ?? presenceUser,
-          ),
-        );
+        addUser(_seatUserFromPeer(peer: peer, baseUser: existingSeatUser ?? presenceUser));
       }
     }
 
@@ -77,9 +68,7 @@ class LiveRoomUsersController {
     String currentUserId = '',
   }) {
     final seatedIds = seatedUsers.map((user) => user.id).toSet();
-    return allRoomUsers
-        .where((user) => user.id != currentUserId && !seatedIds.contains(user.id))
-        .toList();
+    return allRoomUsers.where((user) => user.id != currentUserId && !seatedIds.contains(user.id)).toList();
   }
 
   SeatUser resolveUserFromChatEntry({
@@ -88,38 +77,12 @@ class LiveRoomUsersController {
   }) {
     final senderId = entry.senderId;
     if (senderId == null) {
-      return SeatUser(
-        id: 'unknown_sender',
-        name: entry.senderName,
-        roleLabel: 'Member',
-        familyName: '',
-        relationshipText: '',
-        vipLevel: entry.vipLevel,
-        sendingLevel: entry.sendingLevel,
-        receivingLevel: entry.receivingLevel,
-        sentExp: 0,
-        receivedExp: 0,
-        medals: const [],
-        avatarColors: const [],
-      );
+      return SeatUser(id: 'unknown_sender', name: entry.senderName, roleLabel: 'Member', familyName: '', relationshipText: '', vipLevel: entry.vipLevel, sendingLevel: entry.sendingLevel, receivingLevel: entry.receivingLevel, sentExp: 0, receivedExp: 0, medals: const [], avatarColors: const []);
     }
 
     return allRoomUsers.firstWhere(
       (item) => item.id == senderId,
-      orElse: () => SeatUser(
-        id: senderId,
-        name: entry.senderName,
-        roleLabel: 'Member',
-        familyName: '',
-        relationshipText: '',
-        vipLevel: entry.vipLevel,
-        sendingLevel: entry.sendingLevel,
-        receivingLevel: entry.receivingLevel,
-        sentExp: 0,
-        receivedExp: 0,
-        medals: const [],
-        avatarColors: const [],
-      ),
+      orElse: () => SeatUser(id: senderId, name: entry.senderName, roleLabel: 'Member', familyName: '', relationshipText: '', vipLevel: entry.vipLevel, sendingLevel: entry.sendingLevel, receivingLevel: entry.receivingLevel, sentExp: 0, receivedExp: 0, medals: const [], avatarColors: const []),
     );
   }
 
