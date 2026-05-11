@@ -44,6 +44,7 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(50), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    bio: Mapped[str | None] = mapped_column(String(240), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
