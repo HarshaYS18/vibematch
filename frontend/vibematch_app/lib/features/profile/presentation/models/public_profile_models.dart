@@ -53,6 +53,10 @@ class PublicCoverPhoto {
   final String imageUrl;
 }
 
+const List<PublicCoverPhoto> publicProfileCoverPhotos = <PublicCoverPhoto>[
+  PublicCoverPhoto(imageUrl: ''),
+];
+
 List<PublicCoverPhoto> publicCoverPhotosFromUrls(List<String> urls) {
   return urls
       .map((url) => url.trim())
