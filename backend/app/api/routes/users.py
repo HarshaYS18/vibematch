@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.database import get_db
-from app.models.follow import UserFollow
+from app.models.follow import UserBlock, UserFollow
 from app.models.user import User
 from app.schemas.user import PublicUserProfileResponse, UserMeResponse, UserRelationshipResponse, UserSearchResponse, UserSearchResultResponse
 from app.services import profile_service
@@ -51,9 +51,21 @@ def get_current_user(
     return user
 
 
+def _is_blocked(db: Session, blocker_id: int, blocked_id: int) -> bool:
+    return db.query(UserBlock.id).filter(
+        UserBlock.blocker_user_id == blocker_id,
+        UserBlock.blocked_user_id == blocked_id,
+    ).first() is not None
+
+
 def _relationship_payload(db: Session, profile_user: User, current_user: User | None) -> UserRelationshipResponse:
     is_following = False
     follows_me = False
+    blocked_by_me = False
+    blocked_me = False
+    can_follow = True
+    follow_block_reason = None
+
     if current_user is not None and current_user.id != profile_user.id:
         is_following = db.query(UserFollow.id).filter(
             UserFollow.follower_user_id == current_user.id,
@@ -63,6 +75,13 @@ def _relationship_payload(db: Session, profile_user: User, current_user: User | 
             UserFollow.follower_user_id == profile_user.id,
             UserFollow.followed_user_id == current_user.id,
         ).first() is not None
+        blocked_by_me = _is_blocked(db, current_user.id, profile_user.id)
+        blocked_me = _is_blocked(db, profile_user.id, current_user.id)
+        can_follow = not blocked_by_me and not blocked_me
+        if blocked_by_me:
+            follow_block_reason = "Unblock this user before following them."
+        elif blocked_me:
+            follow_block_reason = f"{profile_user.display_name or profile_user.username or 'This user'} doesn't allow you to follow them."
 
     followers_count = db.query(func.count(UserFollow.id)).filter(UserFollow.followed_user_id == profile_user.id).scalar() or 0
     following_count = db.query(func.count(UserFollow.id)).filter(UserFollow.follower_user_id == profile_user.id).scalar() or 0
@@ -71,6 +90,10 @@ def _relationship_payload(db: Session, profile_user: User, current_user: User | 
         is_following=is_following,
         follows_me=follows_me,
         is_friend=is_following and follows_me,
+        blocked_by_me=blocked_by_me,
+        blocked_me=blocked_me,
+        can_follow=can_follow,
+        follow_block_reason=follow_block_reason,
         followers_count=followers_count,
         following_count=following_count,
     )
@@ -95,6 +118,9 @@ def _search_result_payload(db: Session, user: User, current_user: User) -> UserS
         is_following=relationship.is_following,
         follows_me=relationship.follows_me,
         is_friend=relationship.is_friend,
+        blocked_by_me=relationship.blocked_by_me,
+        blocked_me=relationship.blocked_me,
+        can_follow=relationship.can_follow,
     )
 
 
@@ -191,6 +217,11 @@ def follow_user(public_user_id: int, db: Session = Depends(get_db), current_user
         raise HTTPException(status_code=404, detail="User not found")
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot follow yourself")
+
+    relationship = _relationship_payload(db, user, current_user)
+    if not relationship.can_follow:
+        raise HTTPException(status_code=403, detail=relationship.follow_block_reason or "This user doesn't allow you to follow them.")
+
     existing = db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == user.id).first()
     if existing is None:
         db.add(UserFollow(follower_user_id=current_user.id, followed_user_id=user.id))
@@ -204,6 +235,40 @@ def unfollow_user(public_user_id: int, db: Session = Depends(get_db), current_us
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     existing = db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == user.id).first()
+    if existing is not None:
+        db.delete(existing)
+        db.commit()
+    return _relationship_payload(db, user, current_user)
+
+
+@router.post("/{public_user_id}/block", response_model=UserRelationshipResponse)
+def block_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot block yourself")
+
+    existing = db.query(UserBlock).filter(UserBlock.blocker_user_id == current_user.id, UserBlock.blocked_user_id == user.id).first()
+    if existing is None:
+        db.add(UserBlock(blocker_user_id=current_user.id, blocked_user_id=user.id))
+
+    db.query(UserFollow).filter(
+        or_(
+            (UserFollow.follower_user_id == current_user.id) & (UserFollow.followed_user_id == user.id),
+            (UserFollow.follower_user_id == user.id) & (UserFollow.followed_user_id == current_user.id),
+        )
+    ).delete(synchronize_session=False)
+    db.commit()
+    return _relationship_payload(db, user, current_user)
+
+
+@router.delete("/{public_user_id}/block", response_model=UserRelationshipResponse)
+def unblock_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    existing = db.query(UserBlock).filter(UserBlock.blocker_user_id == current_user.id, UserBlock.blocked_user_id == user.id).first()
     if existing is not None:
         db.delete(existing)
         db.commit()
