@@ -8,16 +8,58 @@ class PublicBioPanel extends StatelessWidget {
     required this.bio,
     required this.age,
     required this.gender,
+    required this.profession,
+    required this.maritalStatus,
     required this.interests,
   });
 
-  final String bio;
-  final String age;
-  final String gender;
+  final String? bio;
+  final int? age;
+  final String? gender;
+  final String? profession;
+  final String? maritalStatus;
   final List<String> interests;
+
+  bool get _hasAnyContent {
+    return bio?.trim().isNotEmpty == true ||
+        age != null ||
+        gender?.trim().isNotEmpty == true ||
+        profession?.trim().isNotEmpty == true ||
+        maritalStatus?.trim().isNotEmpty == true ||
+        interests.isNotEmpty;
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasAnyContent) return const SizedBox.shrink();
+
+    final statusChips = <Widget>[
+      if (age != null)
+        PublicTinyStatusChip(
+          icon: Icons.cake_rounded,
+          label: '${age!} yrs',
+          color: const Color(0xFFE84C72),
+        ),
+      if (gender?.trim().isNotEmpty == true)
+        PublicTinyStatusChip(
+          icon: Icons.person_rounded,
+          label: gender!.trim(),
+          color: const Color(0xFF6D5DF6),
+        ),
+      if (profession?.trim().isNotEmpty == true)
+        PublicTinyStatusChip(
+          icon: Icons.work_rounded,
+          label: profession!.trim(),
+          color: const Color(0xFF12C7B7),
+        ),
+      if (maritalStatus?.trim().isNotEmpty == true)
+        PublicTinyStatusChip(
+          icon: Icons.favorite_rounded,
+          label: maritalStatus!.trim(),
+          color: const Color(0xFFE84C72),
+        ),
+    ];
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: publicProfileWhitePanelDecoration(),
@@ -32,71 +74,62 @@ class PublicBioPanel extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            bio,
-            style: const TextStyle(
-              color: Color(0xFF5E5363),
-              fontSize: 13.5,
-              height: 1.45,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              PublicTinyStatusChip(
-                icon: Icons.cake_rounded,
-                label: '$age yrs',
-                color: const Color(0xFFE84C72),
+          if (bio?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: 10),
+            Text(
+              bio!.trim(),
+              style: const TextStyle(
+                color: Color(0xFF5E5363),
+                fontSize: 13.5,
+                height: 1.45,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(width: 10),
-              PublicTinyStatusChip(
-                icon: Icons.person_rounded,
-                label: gender,
-                color: const Color(0xFF6D5DF6),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Interests',
-            style: TextStyle(
-              color: Color(0xFF251538),
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
             ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: interests
-                .map(
-                  (interest) => Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF12C7B7).withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(99),
-                      border: Border.all(
-                        color: const Color(0xFF12C7B7).withValues(alpha: 0.20),
+          ],
+          if (statusChips.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: statusChips,
+            ),
+          ],
+          if (interests.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'Interests',
+              style: TextStyle(
+                color: Color(0xFF251538),
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: interests
+                  .map(
+                    (interest) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF12C7B7).withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(color: const Color(0xFF12C7B7).withValues(alpha: 0.20)),
+                      ),
+                      child: Text(
+                        interest,
+                        style: const TextStyle(
+                          color: Color(0xFF251538),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      interest,
-                      style: const TextStyle(
-                        color: Color(0xFF251538),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
+                  )
+                  .toList(),
+            ),
+          ],
         ],
       ),
     );
