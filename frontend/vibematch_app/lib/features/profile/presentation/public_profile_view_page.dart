@@ -17,18 +17,7 @@ import 'widgets/public_love_bonds_panel.dart';
 import 'widgets/public_profile_widgets.dart';
 
 class PublicProfileViewPage extends StatefulWidget {
-  const PublicProfileViewPage({
-    super.key,
-    required this.user,
-    required this.vipLevel,
-    required this.svipLevel,
-    required this.presenceLabel,
-    required this.currentRoomName,
-    required this.relationshipLabel,
-    required this.familyName,
-    required this.familyLevel,
-    this.publicUserId,
-  });
+  const PublicProfileViewPage({super.key, required this.user, required this.vipLevel, required this.svipLevel, required this.presenceLabel, required this.currentRoomName, required this.relationshipLabel, required this.familyName, required this.familyLevel, this.publicUserId});
 
   final CurrentUser user;
   final int vipLevel;
@@ -60,9 +49,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   PublicUserProfile? _backendProfile;
   UserRelationship? _relationship;
 
-  final List<String> _viewerInterests = const ['Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Live Audio'];
-  final List<String> _profileInterests = const ['Music Rooms', 'Gaming', 'Tech', 'Fitness', 'Premium UI', 'Live Audio'];
-
   bool get _isSelfProfile {
     final viewer = _viewer ?? _authApi.cachedUser;
     final targetPublicId = _targetPublicUserId();
@@ -92,19 +78,12 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   Future<void> _loadBackendProfile() async {
     final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
-    setState(() {
-      _loadingProfile = true;
-      _profileError = null;
-    });
+    setState(() { _loadingProfile = true; _profileError = null; });
     try {
       final viewer = await _profileApi.getMe(forceRefresh: false);
       final profile = await _profileApi.getPublicProfile(publicUserId);
       if (!mounted) return;
-      setState(() {
-        _viewer = viewer;
-        _backendProfile = profile;
-        _relationship = profile.relationship;
-      });
+      setState(() { _viewer = viewer; _backendProfile = profile; _relationship = profile.relationship; });
     } catch (error) {
       if (!mounted) return;
       setState(() => _profileError = error.toString().replaceFirst('Exception: ', ''));
@@ -120,9 +99,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
       final nextRelationship = await _profileApi.getRelationship(publicUserId);
       if (!mounted) return;
       setState(() => _relationship = nextRelationship);
-    } catch (_) {
-      // Relationship realtime refresh is best-effort. Manual retry still uses full profile load.
-    }
+    } catch (_) {}
   }
 
   void _onRelationshipRealtimeEvent(ProfileRelationshipRealtimeEvent event) {
@@ -137,21 +114,14 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     final viewerPublicUserId = (_viewer ?? _authApi.cachedUser)?.publicUserId;
     final targetPublicUserId = _targetPublicUserId();
     if (viewerPublicUserId == null) return;
-    ProfileRelationshipRealtimeService.instance.publish(
-      viewerPublicUserId: viewerPublicUserId,
-      targetPublicUserId: targetPublicUserId,
-      action: action,
-    );
+    ProfileRelationshipRealtimeService.instance.publish(viewerPublicUserId: viewerPublicUserId, targetPublicUserId: targetPublicUserId, action: action);
   }
 
   void _recordProfileVisit() {
     final visitor = _authApi.cachedUser;
     if (visitor == null) return;
     if (visitor.publicUserId == _targetPublicUserId()) return;
-    ProfileVisitorRepository.instance.recordVisit(
-      profileOwner: widget.user,
-      visitor: visitor,
-    );
+    ProfileVisitorRepository.instance.recordVisit(profileOwner: widget.user, visitor: visitor);
   }
 
   void _startCoverAutoScroll() {
@@ -164,55 +134,29 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 
   void _showAction(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
+    ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
   }
 
   void _showFollowBlockedPopup([String? message]) {
-    showPublicProfileAccessDialog(
-      context,
-      title: 'Follow not allowed',
-      message: message?.trim().isNotEmpty == true ? message!.trim() : '${_displayName()} doesn\'t allow you to follow them.',
-    );
+    showPublicProfileAccessDialog(context, title: 'Follow not allowed', message: message?.trim().isNotEmpty == true ? message!.trim() : '${_displayName()} doesn\'t allow you to follow them.');
   }
 
-  void _openProfileQrActions() {
-    ProfileQrActionsSheet.show(context, user: widget.user, title: '${_displayName()} QR');
-  }
+  void _openProfileQrActions() => ProfileQrActionsSheet.show(context, user: widget.user, title: '${_displayName()} QR');
 
   void _openViewerVipProgram({required int initialTabIndex}) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VipProgramPage(
-          initialTabIndex: initialTabIndex,
-          vipLevel: MeProfileConstants.vipLevel,
-          svipLevel: MeProfileConstants.svipLevel,
-          lifetimeRechargeCoins: MeProfileConstants.diamonds,
-          monthlyRechargeCoins: 42000,
-        ),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => VipProgramPage(initialTabIndex: initialTabIndex, vipLevel: MeProfileConstants.vipLevel, svipLevel: MeProfileConstants.svipLevel, lifetimeRechargeCoins: MeProfileConstants.diamonds, monthlyRechargeCoins: 42000)));
   }
 
   Future<void> _toggleFollow() async {
-    if (_isSelfProfile) return;
-    if (_followBusy) return;
+    if (_isSelfProfile || _followBusy) return;
     final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
-
     final relationship = _relationship;
-    if (relationship != null && !relationship.canFollow && relationship.isFollowing != true) {
-      _showFollowBlockedPopup(relationship.followBlockReason);
-      return;
-    }
-
+    if (relationship != null && !relationship.canFollow && relationship.isFollowing != true) { _showFollowBlockedPopup(relationship.followBlockReason); return; }
     setState(() => _followBusy = true);
     try {
       final wasFollowing = _relationship?.isFollowing == true;
-      final nextRelationship = wasFollowing
-          ? await _profileApi.unfollowUser(publicUserId)
-          : await _profileApi.followUser(publicUserId);
+      final nextRelationship = wasFollowing ? await _profileApi.unfollowUser(publicUserId) : await _profileApi.followUser(publicUserId);
       if (!mounted) return;
       setState(() => _relationship = nextRelationship);
       _publishRelationshipRealtime(wasFollowing ? 'unfollow' : 'follow');
@@ -220,38 +164,15 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     } catch (error) {
       if (!mounted) return;
       final message = error.toString().replaceFirst('Exception: ', '');
-      if (message.toLowerCase().contains('allow') || message.toLowerCase().contains('block')) {
-        _showFollowBlockedPopup(message);
-      } else {
-        _showAction(context, message);
-      }
+      if (message.toLowerCase().contains('allow') || message.toLowerCase().contains('block')) { _showFollowBlockedPopup(message); } else { _showAction(context, message); }
     } finally {
       if (mounted) setState(() => _followBusy = false);
     }
   }
 
   void _openFamilyPage() {
-    final familyProfile = FamilyProfileUiModel(
-      id: 'VMF6922',
-      name: widget.familyName,
-      minimumVipLabel: 'VIP 5',
-      memberCount: 128,
-      maxMembers: 200,
-      rankLabel: 'No. 99+',
-      ownerUserId: 'family_owner_01',
-      quarterCarryExp: 1085000,
-      giftCoinsThisQuarter: 1085000,
-      timeMinutesToday: 12240,
-    );
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => FamilyModularPage(
-          openCurrentFamily: true,
-          initialFamilyProfile: familyProfile,
-        ),
-      ),
-    );
+    final familyProfile = FamilyProfileUiModel(id: 'VMF6922', name: widget.familyName, minimumVipLabel: 'VIP 5', memberCount: 128, maxMembers: 200, rankLabel: 'No. 99+', ownerUserId: 'family_owner_01', quarterCarryExp: 1085000, giftCoinsThisQuarter: 1085000, timeMinutesToday: 12240);
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => FamilyModularPage(openCurrentFamily: true, initialFamilyProfile: familyProfile)));
   }
 
   PublicFollowStatus get _followStatus {
@@ -264,15 +185,13 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 
   String _displayName() => _backendProfile?.visibleName ?? widget.user.displayName ?? widget.user.username ?? 'Vibe User';
-  String _username() => _backendProfile?.username ?? widget.user.username ?? 'vibe_user';
+  String _username() => _backendProfile?.username ?? widget.user.username ?? '';
   String _publicId() => _backendProfile?.visibleId ?? widget.user.displayCustomId?.toString() ?? widget.user.publicUserId.toString();
-
   bool _showOfficialTick() => _backendProfile?.primaryRoleBadge?.showVerifiedTick == true || widget.user.shouldShowOfficialYellowTick;
-
   String? _roleTag() => _backendProfile?.primaryRoleBadge?.badgeLabel ?? widget.user.primaryRoleBadge?.badgeLabel ?? MeProfileConstants.roleTagFor(widget.user.primaryRole);
-
   int _vipLevel() => _backendProfile?.vip.vipLevel ?? widget.vipLevel;
   int _svipLevel() => _backendProfile?.vip.svipLevel ?? widget.svipLevel;
+
   String _presenceLabel() {
     final profile = _backendProfile;
     if (profile == null) return widget.presenceLabel;
@@ -287,14 +206,20 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     return 'last seen a month ago';
   }
 
-  int _matchScore() {
+  int? _matchScore() {
+    if (_isSelfProfile) return null;
+    final viewer = _viewer;
+    final profile = _backendProfile;
+    if (viewer == null || profile == null) return null;
     return calculateProfileMatchScore(
-      viewerInterests: _viewerInterests,
-      profileInterests: _profileInterests,
-      viewerGenderPreference: FriendGenderPreference.both,
-      profileGender: ProfileGender.male,
-      viewerMaritalPreference: FriendMaritalPreference.any,
-      profileMaritalStatus: MaritalStatus.single,
+      viewerInterests: viewer.interests,
+      profileInterests: profile.interests,
+      viewerGenderPreference: friendGenderPreferenceFromWire(viewer.friendGenderPreference),
+      profileGender: profileGenderFromWire(profile.gender),
+      viewerMaritalPreference: friendMaritalPreferenceFromWire(viewer.friendMaritalPreference),
+      profileMaritalStatus: maritalStatusFromWire(profile.maritalStatus),
+      viewerGender: profileGenderFromWire(viewer.gender),
+      profileGenderPreference: friendGenderPreferenceFromWire(profile.friendGenderPreference),
     );
   }
 
@@ -303,6 +228,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     final displayName = _displayName();
     final username = _username();
     final publicId = _publicId();
+    final profile = _backendProfile;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
@@ -349,36 +275,24 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 onSvipTap: () => _openViewerVipProgram(initialTabIndex: 1),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                child: PublicLoveBondsPanel(onVisitorTap: () => _showAction(context, 'Bond details are private and cannot be opened by visitors.')),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                child: PublicBioPanel(
-                  bio: 'Type something about yourself.',
-                  age: '',
-                  gender: '',
-                  interests: const [],
-                ),
-              ),
-            ),
-            if (widget.familyName.trim().isNotEmpty)
+            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 0), child: PublicLoveBondsPanel(onVisitorTap: () => _showAction(context, 'Bond details are private and cannot be opened by visitors.')))),
+            if (profile != null)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                  child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: _openFamilyPage),
+                  child: PublicBioPanel(
+                    bio: profile.bio,
+                    age: profile.age,
+                    gender: displayGenderFromWire(profile.gender),
+                    profession: profile.profession,
+                    maritalStatus: displayMaritalFromWire(profile.maritalStatus),
+                    interests: profile.interests,
+                  ),
                 ),
               ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 10),
-                child: Row(children: [Expanded(child: Text('My Vibes ($_vibesCount)', style: const TextStyle(color: Color(0xFF251538), fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -0.4)))]),
-              ),
-            ),
+            if (widget.familyName.trim().isNotEmpty)
+              SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 0), child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: _openFamilyPage))),
+            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 22, 18, 10), child: Row(children: [Expanded(child: Text('My Vibes ($_vibesCount)', style: const TextStyle(color: Color(0xFF251538), fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -0.4)))]))),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
               sliver: SliverList.separated(
@@ -386,13 +300,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 separatorBuilder: (context, index) => const SizedBox(height: 14),
                 itemBuilder: (context, index) {
                   final vibe = mockPublicVibes[index];
-                  return PublicVibeCard(
-                    vibe: vibe,
-                    onTap: () => _showAction(context, '${vibe.title} vibe details will open.'),
-                    onLikeTap: () => _showAction(context, 'Liked this Vibe locally.'),
-                    onCommentTap: () => _showAction(context, 'Comments will open.'),
-                    onShareTap: () => _showAction(context, 'Share this Vibe.'),
-                  );
+                  return PublicVibeCard(vibe: vibe, onTap: () => _showAction(context, '${vibe.title} vibe details will open.'), onLikeTap: () => _showAction(context, 'Liked this Vibe locally.'), onCommentTap: () => _showAction(context, 'Comments will open.'), onShareTap: () => _showAction(context, 'Share this Vibe.'));
                 },
               ),
             ),
@@ -405,22 +313,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
 
 class _PublicProfileBackendError extends StatelessWidget {
   const _PublicProfileBackendError({required this.message, required this.onRetry});
-
   final String message;
   final VoidCallback onRetry;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(18, 8, 18, 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))),
-      child: Row(children: [
-        const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19),
-        const SizedBox(width: 9),
-        Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))),
-        TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900))),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) => Container(margin: const EdgeInsets.fromLTRB(18, 8, 18, 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))), child: Row(children: [const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19), const SizedBox(width: 9), Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))), TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900)))]));
 }
