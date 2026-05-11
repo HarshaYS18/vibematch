@@ -28,7 +28,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.messageController,
     required this.messageFocusNode,
     required this.micMuted,
-    required this.showMicButton,
+    this.showMicButton,
     required this.inboxUnreadCount,
     required this.imagesEnabled,
     required this.onBack,
@@ -77,7 +77,7 @@ class LiveRoomBody extends StatelessWidget {
   final TextEditingController messageController;
   final FocusNode messageFocusNode;
   final bool micMuted;
-  final bool showMicButton;
+  final bool? showMicButton;
   final int inboxUnreadCount;
   final bool imagesEnabled;
   final VoidCallback onBack;
@@ -107,9 +107,27 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
 
+  int get _effectiveOnlineCount {
+    final ids = <String>{};
+    for (final user in admins) {
+      if (user.id.trim().isNotEmpty) ids.add(user.id);
+    }
+    for (final user in availableAdminUsers) {
+      if (user.id.trim().isNotEmpty) ids.add(user.id);
+    }
+    return ids.length > onlineCount ? ids.length : onlineCount;
+  }
+
+  bool get _derivedShowMicButton {
+    final activeUser = LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser;
+    if (activeUser == null) return false;
+    return seats.any((seat) => seat.user?.id == activeUser.id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = LiveRoomMediaSignalingService.instance;
+    final shouldShowMicButton = showMicButton ?? _derivedShowMicButton;
 
     return SafeArea(
       child: Stack(
@@ -122,7 +140,7 @@ class LiveRoomBody extends StatelessWidget {
                   roomName: roomName,
                   roomId: roomId,
                   privacyMode: privacyMode,
-                  onlineCount: onlineCount,
+                  onlineCount: _effectiveOnlineCount,
                   canManageAdmins: canManageSeats,
                   admins: admins,
                   availableAdminUsers: availableAdminUsers,
@@ -178,7 +196,7 @@ class LiveRoomBody extends StatelessWidget {
                 controller: messageController,
                 focusNode: messageFocusNode,
                 micMuted: micMuted,
-                showMicButton: showMicButton,
+                showMicButton: shouldShowMicButton,
                 inboxUnreadCount: inboxUnreadCount,
                 imagesEnabled: imagesEnabled,
                 onInboxTap: onInboxTap,
