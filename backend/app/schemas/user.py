@@ -22,6 +22,12 @@ class UserWalletSummaryResponse(BaseModel):
     lifetime_rubies_earned: int = 0
 
 
+class UserProfileUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=80)
+    bio: str | None = Field(default=None, max_length=240)
+    avatar_url: str | None = Field(default=None, max_length=500)
+
+
 class UserMeResponse(BaseModel):
     id: int
     public_user_id: int
@@ -29,6 +35,7 @@ class UserMeResponse(BaseModel):
     username: str | None = None
     display_name: str | None = None
     avatar_url: str | None = None
+    bio: str | None = None
     roles: list[str]
     primary_role: str
     primary_role_badge: RoleBadgeResponse | None = None
@@ -66,6 +73,7 @@ class PublicUserProfileResponse(BaseModel):
     username: str | None = None
     display_name: str | None = None
     avatar_url: str | None = None
+    bio: str | None = None
     primary_role: str
     primary_role_badge: RoleBadgeResponse | None = None
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
