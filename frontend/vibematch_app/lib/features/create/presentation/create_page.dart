@@ -16,7 +16,7 @@ class CreatePage extends StatefulWidget {
 }
 
 class _CreatePageState extends State<CreatePage> {
-  final TextEditingController _roomNameController = TextEditingController(text: 'Late Night Chill');
+  final TextEditingController _roomNameController = TextEditingController();
   final RoomApiService _roomApiService = const RoomApiService();
 
   String _selectedLanguage = 'Telugu';
@@ -284,8 +284,8 @@ class _CreatePageState extends State<CreatePage> {
             controller: _roomNameController,
             style: const TextStyle(color: Color(0xFF251538), fontSize: 14.5, fontWeight: FontWeight.w800),
             decoration: InputDecoration(
-              labelText: 'Room name',
-              labelStyle: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700),
+              hintText: 'Type channel name here',
+              hintStyle: const TextStyle(color: Color(0xFF9B8FA3), fontSize: 12.5, fontWeight: FontWeight.w700),
               prefixIcon: const Icon(Icons.graphic_eq_rounded, color: Color(0xFF12C7B7), size: 19),
               filled: true,
               fillColor: const Color(0xFFFAF7F1),
@@ -341,7 +341,7 @@ class _CreatePageState extends State<CreatePage> {
         children: [
           Icon(Icons.security_rounded, color: Color(0xFFC99A3B), size: 19),
           SizedBox(width: 10),
-          Expanded(child: Text('Room creation is now saved to backend. Next backend pass will persist room settings, media uploads, image approval, and audit logs.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
+          Expanded(child: Text('Room creation is now saved to backend. Locked, Members Only, and Secret Vibe modes are enforced by backend access rules.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
         ],
       ),
     );
