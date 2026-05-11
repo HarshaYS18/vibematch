@@ -21,10 +21,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late final TextEditingController _nameController = TextEditingController(text: widget.user.displayName ?? widget.user.username ?? '');
   late final TextEditingController _bioController = TextEditingController(text: widget.user.bio ?? '');
 
-  late ProfileGender _gender = profileGenderFromWire(widget.user.gender);
-  late FriendGenderPreference _friendGenderPreference = friendGenderPreferenceFromWire(widget.user.friendGenderPreference);
-  late FriendMaritalPreference _friendMaritalPreference = friendMaritalPreferenceFromWire(widget.user.friendMaritalPreference);
-  late MaritalStatus _maritalStatus = maritalStatusFromWire(widget.user.maritalStatus);
+  late ProfileGender _gender = profileGenderForEdit(widget.user.gender);
+  late FriendGenderPreference _friendGenderPreference = friendGenderPreferenceForEdit(widget.user.friendGenderPreference);
+  late FriendMaritalPreference _friendMaritalPreference = friendMaritalPreferenceForEdit(widget.user.friendMaritalPreference);
+  late MaritalStatus _maritalStatus = maritalStatusForEdit(widget.user.maritalStatus);
   late String _profession = widget.user.profession ?? '';
   DateTime? _dob;
   bool _saving = false;
