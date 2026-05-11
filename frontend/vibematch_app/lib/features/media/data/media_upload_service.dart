@@ -58,9 +58,18 @@ class MediaUploadService {
       throw Exception('Please login again before uploading media.');
     }
 
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) throw Exception('Selected image is empty.');
+
     final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpointPath)))
       ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: _safeFilename(file.name),
+        ),
+      );
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
@@ -69,6 +78,13 @@ class MediaUploadService {
     }
 
     return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  String _safeFilename(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 'vibematch_image.jpg';
+    final safe = trimmed.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return safe.contains('.') ? safe : '$safe.jpg';
   }
 
   String _errorMessage(http.Response response, {required String fallback}) {
