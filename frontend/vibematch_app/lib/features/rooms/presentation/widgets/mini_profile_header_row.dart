@@ -26,8 +26,15 @@ class MiniProfileHeaderRow extends StatelessWidget {
   final VoidCallback onSetAdminTap;
   final VoidCallback onRemoveAdminTap;
 
+  String get _roomTag {
+    if (user.isHost || user.roleLabel.toLowerCase().contains('channel host')) return 'Channel Host';
+    if (user.isRoomAdmin || user.roleLabel.toLowerCase() == 'admin') return 'Admin';
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tag = _roomTag;
     return SizedBox(
       height: 32,
       child: Stack(
@@ -47,17 +54,52 @@ class MiniProfileHeaderRow extends StatelessWidget {
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 46),
-              child: Text(
-                user.name,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: RoomColors.plum,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.3,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (tag.isNotEmpty) ...[
+                    Flexible(
+                      flex: 0,
+                      child: Container(
+                        height: 20,
+                        padding: const EdgeInsets.symmetric(horizontal: 7),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: user.isHost ? RoomColors.gold.withValues(alpha: 0.20) : RoomColors.aqua.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: user.isHost ? RoomColors.gold.withValues(alpha: 0.42) : RoomColors.aqua.withValues(alpha: 0.38)),
+                        ),
+                        child: Text(
+                          tag,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: user.isHost ? RoomColors.gold : RoomColors.aqua,
+                            fontSize: 9.8,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(
+                    child: Text(
+                      user.name,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: RoomColors.plum,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
