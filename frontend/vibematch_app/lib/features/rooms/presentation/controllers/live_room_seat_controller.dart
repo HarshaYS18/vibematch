@@ -310,7 +310,11 @@ class LiveRoomSeatController {
     final seatedUser = seats[seatIndex].user;
     if (seatedUser != null && seatedUser.id == currentUser.id) { LiveRoomMediaSignalingService.instance.leaveSeat(); LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: seatIndex); return; }
     if (seatedUser != null && !_canRemoveTarget(seatedUser)) { onToast('You cannot leave-lock this user'); return; }
-    if (seatedUser != null) LiveRoomMediaSignalingService.instance.leaveAndLockSeat(seatIndex: seatIndex, targetUserId: seatedUser.id); else LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: seatIndex);
+    if (seatedUser != null) {
+      LiveRoomMediaSignalingService.instance.leaveAndLockSeat(seatIndex: seatIndex, targetUserId: seatedUser.id);
+    } else {
+      LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: seatIndex);
+    }
   }
 
   void leaveSeatOnly(int seatIndex) {
