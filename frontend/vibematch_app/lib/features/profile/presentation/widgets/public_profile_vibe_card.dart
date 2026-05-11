@@ -138,6 +138,39 @@ class PublicVibeCard extends StatelessWidget {
   }
 }
 
+class PublicCoverPatternPainter extends CustomPainter {
+  const PublicCoverPatternPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final softPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.12)
+      ..style = PaintingStyle.fill;
+    final linePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.10)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    canvas.drawCircle(Offset(size.width * 0.18, size.height * 0.22), 42, softPaint);
+    canvas.drawCircle(Offset(size.width * 0.86, size.height * 0.78), 58, softPaint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.55, -18, 110, 72),
+        const Radius.circular(28),
+      ),
+      softPaint,
+    );
+
+    for (var i = 0; i < 5; i++) {
+      final y = 18.0 + (i * 27.0);
+      canvas.drawLine(Offset(18, y), Offset(size.width - 18, y + 22), linePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _VibeActionButton extends StatelessWidget {
   const _VibeActionButton({
     required this.icon,
