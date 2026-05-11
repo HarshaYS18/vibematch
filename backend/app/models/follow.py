@@ -19,3 +19,18 @@ class UserFollow(Base):
 
     follower = relationship("User", foreign_keys=[follower_user_id])
     followed = relationship("User", foreign_keys=[followed_user_id])
+
+
+class UserBlock(Base):
+    __tablename__ = "user_blocks"
+    __table_args__ = (
+        UniqueConstraint("blocker_user_id", "blocked_user_id", name="uq_user_block_pair"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    blocker_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    blocked_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    blocker = relationship("User", foreign_keys=[blocker_user_id])
+    blocked = relationship("User", foreign_keys=[blocked_user_id])
