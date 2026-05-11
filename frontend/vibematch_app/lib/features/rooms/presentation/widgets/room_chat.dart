@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,6 +45,7 @@ class RoomChatFeed extends StatefulWidget {
 
 class _RoomChatFeedState extends State<RoomChatFeed> {
   late final ScrollController _scrollController;
+  Timer? _expiryTimer;
   int _lastMessageCount = 0;
   int _clearedMessageCount = 0;
   final ValueNotifier<int> _expiryTicker = ValueNotifier<int>(0);
@@ -58,11 +61,10 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
   }
 
   void _startExpiryTicker() {
-    Future<void>.doWhile(() async {
-      await Future<void>.delayed(const Duration(seconds: 1));
-      if (!mounted) return false;
+    _expiryTimer?.cancel();
+    _expiryTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
       _expiryTicker.value++;
-      return true;
     });
   }
 
@@ -81,6 +83,7 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
   @override
   void dispose() {
     roomChatClearSignal.removeListener(_handleClearChat);
+    _expiryTimer?.cancel();
     _expiryTicker.dispose();
     _scrollController.dispose();
     super.dispose();
