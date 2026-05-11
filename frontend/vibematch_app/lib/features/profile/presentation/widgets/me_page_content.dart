@@ -14,6 +14,7 @@ import '../cover_photos/edit_cover_photos_page.dart';
 import '../edit_profile_page.dart';
 import '../help_center/help_center_page.dart';
 import '../love_bonds/love_bonds_page.dart';
+import '../models/me_page_models.dart';
 import '../profile_qr/profile_qr_pages.dart';
 import '../profile_rooms_page.dart';
 import '../profile_visitors_page.dart';
