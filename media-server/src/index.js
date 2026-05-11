@@ -87,6 +87,7 @@ wss.on('connection', (ws) => {
       if (type === 'seat/leave') return handlers.leaveSeat({ room: currentRoom, peer: currentPeer });
       if (type === 'mic/set_enabled') return handlers.setMic({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'admin_mute/set') return handlers.setAdminMute({ room: currentRoom, payload });
+      if (type === 'room_admin/set') return handlers.setRoomAdminStatus({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'admin/seat_leave') return handlers.adminSeatLeave({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'admin/seat_lock') return handlers.setSeatLock({ room: currentRoom, payload, locked: true });
       if (type === 'admin/seat_unlock') return handlers.setSeatLock({ room: currentRoom, payload, locked: false });
