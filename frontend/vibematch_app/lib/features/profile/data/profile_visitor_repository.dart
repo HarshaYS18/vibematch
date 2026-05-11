@@ -107,6 +107,7 @@ class ProfileVisitorRepository {
       username: username,
       displayName: displayName,
       avatarUrl: null,
+      bio: null,
       roles: const ['user'],
       primaryRole: 'user',
       primaryRoleBadge: roleBadge,
