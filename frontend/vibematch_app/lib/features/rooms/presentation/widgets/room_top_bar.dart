@@ -61,8 +61,14 @@ class RoomTopBar extends StatelessWidget {
           children: [
             RoundRoomButton(icon: Icons.arrow_back_rounded, onTap: onBack, size: 31, iconSize: 18, background: Colors.black.withValues(alpha: 0.26)),
             const SizedBox(width: 7),
-            Expanded(
-              child: _RoomNamePill(roomName: roomName, privacyMode: privacyMode, onInfoTap: () => _openRoomInfo(context), onJoinTap: onJoinTap, showJoinButton: !canManageAdmins),
+            Flexible(
+              fit: FlexFit.loose,
+              child: IntrinsicWidth(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 126, maxWidth: 218),
+                  child: _RoomNamePill(roomName: roomName, privacyMode: privacyMode, onInfoTap: () => _openRoomInfo(context), onJoinTap: onJoinTap, showJoinButton: !canManageAdmins),
+                ),
+              ),
             ),
             const SizedBox(width: 7),
             RoundRoomButton(icon: Icons.send_rounded, onTap: onShare, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
@@ -75,7 +81,7 @@ class RoomTopBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 7),
-        Row(children: [const SizedBox(width: 2), _TrophyButton(onTap: openRankings), const SizedBox(width: 7), _RoomLevelBadge(level: roomLevel, onTap: onRoomLevelTap)]),
+        Row(children: [const SizedBox(width: 2), _TrophyButton(onTap: openRankings), const SizedBox(width: 7), _RoomLevelBadge(level: roomLevel, onTap: onRoomLevelTap), const SizedBox(width: 7), _OnlineButton(count: onlineCount, onTap: onUsersTap)]),
       ],
     );
   }
@@ -118,7 +124,7 @@ class _RoomNamePill extends StatelessWidget {
               onTap: onInfoTap,
               child: Padding(
                 padding: const EdgeInsets.only(left: 9, right: 4),
-                child: Row(children: [_PrivacyIcon(mode: privacyMode), const SizedBox(width: 6), Expanded(child: Text(_cleanRoomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10.8, fontWeight: FontWeight.w900, letterSpacing: 0.02, height: 1))), const SizedBox(width: 5), Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.72), size: 15)]),
+                child: Row(children: [_PrivacyIcon(mode: privacyMode), const SizedBox(width: 6), Flexible(child: Text(_cleanRoomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10.8, fontWeight: FontWeight.w900, letterSpacing: 0.02, height: 1))), const SizedBox(width: 5), Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.72), size: 15)]),
               ),
             ),
           ),
@@ -155,4 +161,12 @@ class _TrophyButton extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: Container(width: 31, height: 31, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [RoomColors.gold.withValues(alpha: 0.96), RoomColors.coral.withValues(alpha: 0.84)]), border: Border.all(color: Colors.white.withValues(alpha: 0.24)), boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.20), blurRadius: 14, offset: const Offset(0, 5))]), child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 16))));
+}
+
+class _OnlineButton extends StatelessWidget {
+  const _OnlineButton({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Material(color: Colors.transparent, borderRadius: BorderRadius.circular(999), child: InkWell(borderRadius: BorderRadius.circular(999), onTap: onTap, child: Container(height: 31, padding: const EdgeInsets.symmetric(horizontal: 9), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.32), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white.withValues(alpha: 0.11))), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.groups_rounded, color: RoomColors.aqua, size: 13), const SizedBox(width: 4), Text('$count', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))]))));
 }
