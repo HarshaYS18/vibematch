@@ -21,6 +21,7 @@ from app.api.routes import (
     mvp_operations,
     mvp_room_modes,
     mvp_social,
+    notifications,
     role_badges,
     social,
     users,
@@ -59,6 +60,7 @@ from app.models import (
     User,
     UserBan,
     UserFollow,
+    UserNotification,
     UserRole,
     UserVipStatus,
     VibeComment,
@@ -110,6 +112,7 @@ app.include_router(inbox.router)
 app.include_router(inbox_ws.router)
 app.include_router(social.router)
 app.include_router(vibes.router)
+app.include_router(notifications.router)
 app.include_router(media.router)
 app.include_router(mvp_core.router)
 app.include_router(mvp_social.router)
