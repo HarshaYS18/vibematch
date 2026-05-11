@@ -71,6 +71,7 @@ class ProfileQrPayload {
       username: username,
       displayName: displayName,
       avatarUrl: avatarUrl,
+      bio: null,
       roles: <String>[role],
       primaryRole: role,
       primaryRoleBadge: roleBadge,
