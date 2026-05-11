@@ -1,9 +1,13 @@
+from datetime import datetime, timedelta
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
+from app.models.follow import UserFollow
 from app.models.user import User
 from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeShare
 from app.schemas.vibes import (
@@ -23,14 +27,21 @@ from app.schemas.vibes import (
     VibeShareCreateRequest,
     VibeShareResponse,
 )
+from app.services import inbox_service
 
 router = APIRouter(prefix="/vibes", tags=["Vibes"])
 
 _REVIEW_ROLES = {"founder_owner", "owner", "superadmin", "admin", "monitor", "cs"}
+_MENTION_ALL_DAILY_LIMIT = 2
+_MENTION_TOKEN_RE = re.compile(r"^@?(?P<token>[A-Za-z0-9_\.\-]{2,80})$")
 
 
 def _mentions_to_csv(mentions: list[str]) -> str | None:
-    cleaned = [item.strip()[:80] for item in mentions if item.strip()]
+    cleaned: list[str] = []
+    for item in mentions:
+        normalized = _normalize_mention(item)
+        if normalized and normalized not in cleaned:
+            cleaned.append(normalized)
     if not cleaned:
         return None
     return ",".join(cleaned[:50])
@@ -40,6 +51,23 @@ def _csv_to_mentions(raw: str | None) -> list[str]:
     if not raw:
         return []
     return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _normalize_mention(raw: str) -> str | None:
+    value = (raw or "").strip()
+    if not value:
+        return None
+    match = _MENTION_TOKEN_RE.match(value)
+    if not match:
+        return None
+    token = match.group("token").strip()
+    if token.lower() == "all":
+        return "all"
+    return token
+
+
+def _display_name(user: User) -> str:
+    return user.display_name or user.username or f"User {user.public_user_id}"
 
 
 def _author_response(user: User) -> VibeAuthorResponse:
@@ -113,6 +141,89 @@ def _report_queue_item(report: VibeReport) -> VibeReportQueueItemResponse:
     )
 
 
+def _check_mention_all_limit(db: Session, current_user: User) -> None:
+    since = datetime.utcnow() - timedelta(days=1)
+    used_count = db.query(func.count(VibePost.id)).filter(
+        VibePost.author_user_id == current_user.id,
+        VibePost.uses_mention_all.is_(True),
+        VibePost.is_deleted.is_(False),
+        VibePost.created_at >= since,
+    ).scalar() or 0
+    if used_count >= _MENTION_ALL_DAILY_LIMIT:
+        raise HTTPException(status_code=429, detail=f"@all is limited to {_MENTION_ALL_DAILY_LIMIT} Vibes per 24 hours")
+
+
+def _resolve_mentioned_users(db: Session, current_user: User, mentions: list[str]) -> list[User]:
+    normalized: list[str] = []
+    for mention in mentions:
+        token = _normalize_mention(mention)
+        if token and token != "all" and token.lower() not in [item.lower() for item in normalized]:
+            normalized.append(token)
+    if not normalized:
+        return []
+
+    users: list[User] = []
+    seen_ids: set[int] = set()
+    for token in normalized[:50]:
+        query = db.query(User).filter(User.is_active.is_(True), User.is_banned.is_(False))
+        public_id = int(token) if token.isdigit() else None
+        user = query.filter(
+            (User.username.ilike(token))
+            | (User.display_name.ilike(token))
+            | (User.official_handle.ilike(token))
+            | (User.official_handle.ilike(f"@{token}"))
+            | (User.public_user_id == public_id if public_id is not None else False)
+        ).first()
+        if user and user.id != current_user.id and user.id not in seen_ids:
+            seen_ids.add(user.id)
+            users.append(user)
+    return users
+
+
+def _followers_for_mention_all(db: Session, current_user: User) -> list[User]:
+    return (
+        db.query(User)
+        .join(UserFollow, UserFollow.follower_user_id == User.id)
+        .filter(
+            UserFollow.followed_user_id == current_user.id,
+            User.is_active.is_(True),
+            User.is_banned.is_(False),
+            User.id != current_user.id,
+        )
+        .limit(1000)
+        .all()
+    )
+
+
+def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, mentions: list[str], uses_mention_all: bool) -> None:
+    notified_user_ids: set[int] = set()
+    author_name = _display_name(current_user)
+    caption_preview = post.caption[:80].strip()
+    if len(post.caption) > 80:
+        caption_preview += "..."
+
+    for user in _resolve_mentioned_users(db, current_user, mentions):
+        if user.id in notified_user_ids:
+            continue
+        notified_user_ids.add(user.id)
+        inbox_service.send_team_system_message(
+            db,
+            user,
+            f"{author_name} mentioned you in a Vibe: \"{caption_preview}\". Open Vibes to view and reply.",
+        )
+
+    if uses_mention_all:
+        for user in _followers_for_mention_all(db, current_user):
+            if user.id in notified_user_ids:
+                continue
+            notified_user_ids.add(user.id)
+            inbox_service.send_team_system_message(
+                db,
+                user,
+                f"{author_name} mentioned all followers in a new Vibe: \"{caption_preview}\". Open Vibes to view it.",
+            )
+
+
 @router.get("/feed", response_model=VibeFeedResponse)
 def list_vibes_feed(
     limit: int = Query(default=30, ge=1, le=100),
@@ -164,17 +275,23 @@ def create_vibe(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if payload.uses_mention_all:
+        _check_mention_all_limit(db, current_user)
+
+    normalized_mentions = [mention for mention in (_normalize_mention(item) for item in payload.mentions) if mention and mention != "all"]
     post = VibePost(
         author_user_id=current_user.id,
         caption=payload.caption.strip(),
         media_type=payload.media_type,
         media_url=payload.media_url.strip() if payload.media_url else None,
         tag=payload.tag.strip() if payload.tag else None,
-        mentions_csv=_mentions_to_csv(payload.mentions),
+        mentions_csv=_mentions_to_csv(normalized_mentions),
         uses_mention_all=payload.uses_mention_all,
     )
     db.add(post)
     db.commit()
+    db.refresh(post)
+    _send_vibe_notifications(db, post, current_user, normalized_mentions, payload.uses_mention_all)
     db.refresh(post)
     return _post_response(db, post, current_user)
 
