@@ -22,6 +22,12 @@ class VibesApiService {
     return posts.whereType<Map<String, dynamic>>().map(_vibeFromJson).toList(growable: false);
   }
 
+  Future<VibeItem> getVibe(String postId) async {
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/vibes/$postId')), headers: _authHeaders());
+    _throwIfFailed(response, 'load Vibe detail');
+    return _vibeFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<VibeItem> createVibe(VibeItem vibe) async {
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/vibes')),
