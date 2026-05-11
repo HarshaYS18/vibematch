@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -6,7 +8,7 @@ from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.follow import UserBlock, UserFollow
 from app.models.user import User
-from app.schemas.user import PublicUserProfileResponse, UserMeResponse, UserRelationshipResponse, UserSearchResponse, UserSearchResultResponse
+from app.schemas.user import PublicUserProfileResponse, UserMeResponse, UserProfileUpdateRequest, UserRelationshipResponse, UserSearchResponse, UserSearchResultResponse
 from app.services import profile_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
@@ -49,6 +51,35 @@ def get_current_user(
         raise HTTPException(status_code=403, detail="User is inactive")
 
     return user
+
+
+def _user_me_response(db: Session, current_user: User) -> UserMeResponse:
+    user_roles = get_user_roles(current_user)
+    roles = [role.value for role in user_roles]
+    primary_role = get_primary_role(current_user)
+
+    return UserMeResponse(
+        id=current_user.id,
+        public_user_id=current_user.public_user_id,
+        display_custom_id=current_user.display_custom_id,
+        username=current_user.username,
+        display_name=current_user.display_name,
+        avatar_url=current_user.avatar_url,
+        bio=current_user.bio,
+        roles=roles,
+        primary_role=primary_role.value,
+        primary_role_badge=get_primary_role_badge(primary_role),
+        role_badges=get_role_badges(user_roles),
+        vip=profile_service.vip_summary(db, current_user),
+        wallet=profile_service.wallet_summary(db, current_user),
+        is_active=current_user.is_active,
+        is_banned=current_user.is_banned,
+        last_device_id=current_user.last_device_id,
+        last_login_at=current_user.last_login_at,
+        last_seen_at=current_user.last_seen_at,
+        created_at=current_user.created_at,
+        updated_at=current_user.updated_at,
+    )
 
 
 def _is_blocked(db: Session, blocker_id: int, blocked_id: int) -> bool:
@@ -126,31 +157,26 @@ def _search_result_payload(db: Session, user: User, current_user: User) -> UserS
 
 @router.get("/me", response_model=UserMeResponse)
 def get_me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    user_roles = get_user_roles(current_user)
-    roles = [role.value for role in user_roles]
-    primary_role = get_primary_role(current_user)
+    return _user_me_response(db, current_user)
 
-    return UserMeResponse(
-        id=current_user.id,
-        public_user_id=current_user.public_user_id,
-        display_custom_id=current_user.display_custom_id,
-        username=current_user.username,
-        display_name=current_user.display_name,
-        avatar_url=current_user.avatar_url,
-        roles=roles,
-        primary_role=primary_role.value,
-        primary_role_badge=get_primary_role_badge(primary_role),
-        role_badges=get_role_badges(user_roles),
-        vip=profile_service.vip_summary(db, current_user),
-        wallet=profile_service.wallet_summary(db, current_user),
-        is_active=current_user.is_active,
-        is_banned=current_user.is_banned,
-        last_device_id=current_user.last_device_id,
-        last_login_at=current_user.last_login_at,
-        last_seen_at=current_user.last_seen_at,
-        created_at=current_user.created_at,
-        updated_at=current_user.updated_at,
-    )
+
+@router.patch("/me/profile", response_model=UserMeResponse)
+def update_my_profile(payload: UserProfileUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if payload.display_name is not None:
+        safe_name = payload.display_name.strip()
+        if not safe_name:
+            raise HTTPException(status_code=400, detail="Name is required")
+        current_user.display_name = safe_name
+    if payload.bio is not None:
+        safe_bio = payload.bio.strip()
+        current_user.bio = safe_bio or None
+    if payload.avatar_url is not None:
+        safe_avatar_url = payload.avatar_url.strip()
+        current_user.avatar_url = safe_avatar_url or None
+    current_user.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(current_user)
+    return _user_me_response(db, current_user)
 
 
 @router.get("/search", response_model=UserSearchResponse)
