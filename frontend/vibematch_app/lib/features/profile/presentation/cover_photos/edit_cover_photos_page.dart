@@ -1,23 +1,28 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
-import '../models/public_profile_models.dart';
+import '../../../media/data/media_upload_service.dart';
+import '../../data/profile_api_service.dart';
 
 class EditCoverPhotosPage extends StatefulWidget {
-  const EditCoverPhotosPage({super.key});
+  const EditCoverPhotosPage({super.key, required this.initialCoverPhotoUrls});
+
+  final List<String> initialCoverPhotoUrls;
 
   @override
   State<EditCoverPhotosPage> createState() => _EditCoverPhotosPageState();
 }
 
 class _EditCoverPhotosPageState extends State<EditCoverPhotosPage> {
-  final ImagePicker _imagePicker = ImagePicker();
-  late final List<_CoverPhotoDraft> _coverPhotos = publicProfileCoverPhotos
-      .map((photo) => _CoverPhotoDraft.fromPublicCover(photo))
+  final MediaUploadService _mediaUploadService = const MediaUploadService();
+  final ProfileApiService _profileApiService = const ProfileApiService();
+
+  late final List<String> _coverPhotoUrls = widget.initialCoverPhotoUrls
+      .map((url) => url.trim())
+      .where((url) => url.isNotEmpty)
       .toList(growable: true);
-  bool _isPicking = false;
+
+  bool _isUploading = false;
+  bool _isSaving = false;
 
   void _toast(String message) {
     ScaffoldMessenger.of(context)
@@ -32,55 +37,62 @@ class _EditCoverPhotosPageState extends State<EditCoverPhotosPage> {
   }
 
   Future<void> _addCoverPhoto() async {
-    if (_isPicking) return;
-    setState(() => _isPicking = true);
+    if (_isUploading || _isSaving) return;
+    if (_coverPhotoUrls.length >= 6) {
+      _toast('Maximum 6 cover photos allowed.');
+      return;
+    }
 
+    setState(() => _isUploading = true);
     try {
-      final picked = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 88);
-      if (picked == null) return;
-
-      final bytes = await picked.readAsBytes();
+      final upload = await _mediaUploadService.pickAndUploadProfileCover();
       if (!mounted) return;
-
-      setState(() {
-        _coverPhotos.add(
-          _CoverPhotoDraft.fromBytes(
-            title: picked.name.trim().isEmpty ? 'New Cover ${_coverPhotos.length + 1}' : picked.name.trim(),
-            bytes: bytes,
-          ),
-        );
-      });
-      _toast('Cover photo added locally. Save to confirm.');
-    } catch (_) {
-      if (mounted) _toast('Could not add cover photo.');
+      setState(() => _coverPhotoUrls.add(upload.url));
+      _toast('Cover uploaded. Tap Save to apply.');
+    } on MediaUploadCancelledException {
+      return;
+    } catch (error) {
+      if (!mounted) return;
+      _toast(error.toString().replaceFirst('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _isPicking = false);
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
   void _deleteCoverPhoto(int index) {
-    if (_coverPhotos.length <= 1) {
-      _toast('At least one cover photo is required.');
-      return;
-    }
-
-    setState(() => _coverPhotos.removeAt(index));
-    _toast('Cover photo removed locally. Save to confirm.');
+    setState(() => _coverPhotoUrls.removeAt(index));
+    _toast('Cover removed. Tap Save to apply.');
   }
 
-  void _saveCoverPhotos() {
-    _toast('Cover photos saved locally. Backend cover photo API will connect later.');
-    Navigator.pop(context);
+  Future<void> _saveCoverPhotos() async {
+    if (_isSaving || _isUploading) return;
+    setState(() => _isSaving = true);
+    try {
+      await _profileApiService.updateCoverPhotoUrls(_coverPhotoUrls);
+      if (!mounted) return;
+      _toast('Cover photos saved.');
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      _toast(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final itemCount = _coverPhotoUrls.length + 1;
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
         child: Column(
           children: [
-            _CoverEditorHeader(onBack: () => Navigator.pop(context), onSave: _saveCoverPhotos),
+            _CoverEditorHeader(
+              onBack: () => Navigator.pop(context),
+              onSave: _saveCoverPhotos,
+              saving: _isSaving,
+            ),
             Expanded(
               child: GridView.builder(
                 physics: const BouncingScrollPhysics(),
@@ -91,14 +103,13 @@ class _EditCoverPhotosPageState extends State<EditCoverPhotosPage> {
                   crossAxisSpacing: 12,
                   childAspectRatio: 0.82,
                 ),
-                itemCount: _coverPhotos.length + 1,
+                itemCount: itemCount,
                 itemBuilder: (context, index) {
-                  if (index == _coverPhotos.length) {
-                    return _AddCoverPhotoCard(isPicking: _isPicking, onTap: _addCoverPhoto);
+                  if (index == _coverPhotoUrls.length) {
+                    return _AddCoverPhotoCard(isUploading: _isUploading, onTap: _addCoverPhoto);
                   }
-
                   return _CoverPhotoTile(
-                    cover: _coverPhotos[index],
+                    imageUrl: _coverPhotoUrls[index],
                     onDelete: () => _deleteCoverPhoto(index),
                   );
                 },
@@ -111,42 +122,12 @@ class _EditCoverPhotosPageState extends State<EditCoverPhotosPage> {
   }
 }
 
-class _CoverPhotoDraft {
-  const _CoverPhotoDraft({
-    required this.title,
-    required this.colors,
-    required this.icon,
-    this.bytes,
-  });
-
-  final String title;
-  final List<Color> colors;
-  final IconData icon;
-  final Uint8List? bytes;
-
-  factory _CoverPhotoDraft.fromPublicCover(PublicCoverPhoto photo) {
-    return _CoverPhotoDraft(
-      title: photo.title,
-      colors: photo.colors,
-      icon: photo.icon,
-    );
-  }
-
-  factory _CoverPhotoDraft.fromBytes({required String title, required Uint8List bytes}) {
-    return _CoverPhotoDraft(
-      title: title,
-      bytes: bytes,
-      icon: Icons.image_rounded,
-      colors: const [Color(0xFF251538), Color(0xFF6D5DF6), Color(0xFFE84C72)],
-    );
-  }
-}
-
 class _CoverEditorHeader extends StatelessWidget {
-  const _CoverEditorHeader({required this.onBack, required this.onSave});
+  const _CoverEditorHeader({required this.onBack, required this.onSave, required this.saving});
 
   final VoidCallback onBack;
   final VoidCallback onSave;
+  final bool saving;
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +136,7 @@ class _CoverEditorHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 16, 12),
       child: Row(
         children: [
-          IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF251538), size: 28)),
+          IconButton(onPressed: saving ? null : onBack, icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF251538), size: 28)),
           const Expanded(
             child: Text(
               'Edit Cover Photos',
@@ -165,12 +146,12 @@ class _CoverEditorHeader extends StatelessWidget {
             ),
           ),
           InkWell(
-            onTap: onSave,
+            onTap: saving ? null : onSave,
             borderRadius: BorderRadius.circular(999),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              decoration: BoxDecoration(color: const Color(0xFF251538), borderRadius: BorderRadius.circular(999)),
-              child: const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+              decoration: BoxDecoration(color: const Color(0xFF251538).withValues(alpha: saving ? 0.55 : 1), borderRadius: BorderRadius.circular(999)),
+              child: Text(saving ? 'Saving...' : 'Save', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
             ),
           ),
         ],
@@ -180,34 +161,28 @@ class _CoverEditorHeader extends StatelessWidget {
 }
 
 class _CoverPhotoTile extends StatelessWidget {
-  const _CoverPhotoTile({required this.cover, required this.onDelete});
+  const _CoverPhotoTile({required this.imageUrl, required this.onDelete});
 
-  final _CoverPhotoDraft cover;
+  final String imageUrl;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final bytes = cover.bytes;
-
     return Container(
       decoration: _coverCardDecoration(),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (bytes == null)
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: cover.colors,
-                ),
-              ),
-              child: Center(child: Icon(cover.icon, color: Colors.white.withValues(alpha: 0.88), size: 42)),
-            )
-          else
-            Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
+          Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: const Color(0xFF251538),
+              alignment: Alignment.center,
+              child: const Icon(Icons.broken_image_rounded, color: Colors.white70, size: 34),
+            ),
+          ),
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -233,17 +208,6 @@ class _CoverPhotoTile extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: 12,
-            child: Text(
-              cover.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w900, height: 1.15),
-            ),
-          ),
         ],
       ),
     );
@@ -251,15 +215,15 @@ class _CoverPhotoTile extends StatelessWidget {
 }
 
 class _AddCoverPhotoCard extends StatelessWidget {
-  const _AddCoverPhotoCard({required this.isPicking, required this.onTap});
+  const _AddCoverPhotoCard({required this.isUploading, required this.onTap});
 
-  final bool isPicking;
+  final bool isUploading;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: isPicking ? null : onTap,
+      onTap: isUploading ? null : onTap,
       borderRadius: BorderRadius.circular(26),
       child: Container(
         decoration: BoxDecoration(
@@ -275,27 +239,16 @@ class _AddCoverPhotoCard extends StatelessWidget {
               width: 58,
               height: 58,
               decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)])),
-              child: isPicking
-                  ? const Padding(
-                      padding: EdgeInsets.all(17),
-                      child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                    )
+              child: isUploading
+                  ? const Padding(padding: EdgeInsets.all(17), child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
                   : const Icon(Icons.add_rounded, color: Colors.white, size: 34),
             ),
             const SizedBox(height: 12),
-            Text(
-              isPicking ? 'Opening gallery...' : 'Add cover photo',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900),
-            ),
+            Text(isUploading ? 'Uploading...' : 'Add cover photo', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900)),
             const SizedBox(height: 5),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 14),
-              child: Text(
-                'Pick an image from your gallery.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.25),
-              ),
+              child: Text('Upload a profile cover image.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.25)),
             ),
           ],
         ),
