@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 
 enum LuckyPacketPhase { countdown, claim, results }
@@ -89,11 +90,11 @@ class LuckyPacketRoomBus {
 
 class LiveRoomGiftController {
   LiveRoomGiftController({
-    required this.currentUser,
+    required SeatUser currentUser,
     required this.onChanged,
     required this.onFinalGiftMessage,
     required this.onToast,
-  });
+  }) : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser);
 
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
