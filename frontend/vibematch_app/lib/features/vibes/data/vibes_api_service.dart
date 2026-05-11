@@ -29,7 +29,7 @@ class VibesApiService {
       body: jsonEncode({
         'caption': vibe.caption,
         'media_type': _mediaTypeToApi(vibe.mediaType),
-        'media_url': null,
+        'media_url': vibe.mediaUrl,
         'tag': vibe.tag,
         'mentions': vibe.mentions,
         'uses_mention_all': vibe.usesMentionAll,
@@ -179,6 +179,7 @@ VibeItem _vibeFromJson(Map<String, dynamic> json) {
     usesMentionAll: json['uses_mention_all'] == true,
     mentions: mentionsRaw is List ? mentionsRaw.map((item) => item.toString()).toList(growable: false) : const <String>[],
     colors: mediaType.colors,
+    mediaUrl: _text(json['media_url']),
     likedByMe: json['liked_by_me'] == true,
   );
 }
