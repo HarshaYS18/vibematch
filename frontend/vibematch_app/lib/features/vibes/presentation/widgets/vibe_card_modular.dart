@@ -29,8 +29,7 @@ class VibeCardModular extends StatelessWidget {
       final mention = rawMention.trim();
       if (mention.isEmpty) continue;
       final token = mention.startsWith('@') ? mention : '@$mention';
-      if (!caption.toLowerCase().contains(token.toLowerCase()) &&
-          !mentionTokens.any((item) => item.toLowerCase() == token.toLowerCase())) {
+      if (!caption.toLowerCase().contains(token.toLowerCase()) && !mentionTokens.any((item) => item.toLowerCase() == token.toLowerCase())) {
         mentionTokens.add(token);
       }
     }
@@ -150,16 +149,79 @@ class VibeCardModular extends StatelessWidget {
 class _VibeMediaPreview extends StatelessWidget {
   const _VibeMediaPreview({required this.vibe});
   final VibeItem vibe;
+
   @override
   Widget build(BuildContext context) {
     final isVideo = vibe.mediaType == VibeMediaType.video;
+    final mediaUrl = vibe.mediaUrl?.trim();
+
     return Container(
       height: 190,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: vibe.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(26),
         boxShadow: [BoxShadow(color: vibe.colors.first.withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9))],
       ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (mediaUrl != null && mediaUrl.isNotEmpty && !isVideo)
+            Image.network(
+              mediaUrl,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) => progress == null ? child : _MediaLoading(colors: vibe.colors),
+              errorBuilder: (context, error, stackTrace) => _MediaFallback(vibe: vibe),
+            )
+          else
+            _MediaFallback(vibe: vibe),
+          if (isVideo)
+            Center(
+              child: Container(
+                height: 62,
+                width: 62,
+                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.35), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.50))),
+                child: const Icon(VMIcons.play, color: Colors.white, size: 42),
+              ),
+            ),
+          if (mediaUrl != null && mediaUrl.isNotEmpty)
+            Positioned(
+              left: 10,
+              bottom: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.42), borderRadius: BorderRadius.circular(999)),
+                child: Text(isVideo ? 'Uploaded video' : 'Uploaded photo', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MediaLoading extends StatelessWidget {
+  const _MediaLoading({required this.colors});
+  final List<Color> colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
+      child: const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.6)),
+    );
+  }
+}
+
+class _MediaFallback extends StatelessWidget {
+  const _MediaFallback({required this.vibe});
+  final VibeItem vibe;
+
+  @override
+  Widget build(BuildContext context) {
+    final isVideo = vibe.mediaType == VibeMediaType.video;
+    return Container(
+      decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
       child: Center(
         child: Container(
           height: 62,
