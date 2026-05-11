@@ -317,6 +317,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
           _resetConnectionState();
           _scheduleReconnect(reason: 'socket closed');
         },
+        cancelOnError: true,
       );
       _debug('media websocket connecting: ${VmMediaConfig.wsUrl}');
     } catch (error) {
@@ -333,10 +334,12 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (_channel != null || _connecting) return;
     _reconnectTimer?.cancel();
     _debug('media reconnect scheduled: $reason');
-    _reconnectTimer = Timer(const Duration(milliseconds: 900), () {
+    _reconnectTimer = Timer(const Duration(milliseconds: 2500), () {
       _reconnectTimer = null;
       if (!_shouldStayConnected || !_appInForeground) return;
-      unawaited(_joinRoomInternal(reason: 'reconnect: $reason'));
+      unawaited(_joinRoomInternal(reason: 'reconnect: $reason').catchError((Object error) {
+        _debug('media reconnect ignored after failure: $error');
+      }));
     });
   }
 
@@ -354,9 +357,15 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       return;
     }
 
-    final message = jsonEncode({'type': type, 'payload': payload});
-    channel.sink.add(message);
-    _debug('media sent: $type $payload');
+    try {
+      final message = jsonEncode({'type': type, 'payload': payload});
+      channel.sink.add(message);
+      _debug('media sent: $type $payload');
+    } catch (error) {
+      _debug('media send failed for $type: $error');
+      _resetConnectionState();
+      _scheduleReconnect(reason: 'send failed for $type');
+    }
   }
 
   void _handleMessage(dynamic raw) {
