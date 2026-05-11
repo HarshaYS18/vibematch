@@ -84,11 +84,7 @@ class LiveRoomPresenceRepository {
   }
 
   Future<SeatUser> addRoomMember({required String roomId, required int publicUserId}) async {
-    final response = await _apiClient.postMap(
-      '/rooms/$roomId/members',
-      headers: _jsonHeaders(),
-      body: {'public_user_id': publicUserId},
-    );
+    final response = await _apiClient.postMap('/rooms/$roomId/members', headers: _jsonHeaders(), body: {'public_user_id': publicUserId});
     final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
     _activeRoomId = roomId;
     publishParticipant(user);
@@ -104,11 +100,7 @@ class LiveRoomPresenceRepository {
   }
 
   Future<SeatUser> addRoomAdmin({required String roomId, required int publicUserId}) async {
-    final response = await _apiClient.postMap(
-      '/rooms/$roomId/admins',
-      headers: _jsonHeaders(),
-      body: {'public_user_id': publicUserId},
-    );
+    final response = await _apiClient.postMap('/rooms/$roomId/admins', headers: _jsonHeaders(), body: {'public_user_id': publicUserId});
     final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
     _activeRoomId = roomId;
     publishParticipant(user);
@@ -136,21 +128,12 @@ class LiveRoomPresenceRepository {
     return {'Authorization': 'Bearer $token'};
   }
 
-  Map<String, String> _jsonHeaders() {
-    return {..._headers(), 'Content-Type': 'application/json'};
-  }
-
+  Map<String, String> _jsonHeaders() => {..._headers(), 'Content-Type': 'application/json'};
   void close() => _apiClient.close();
 }
 
 class LiveRoomPresenceSnapshot {
-  const LiveRoomPresenceSnapshot({
-    required this.roomId,
-    required this.onlineCount,
-    required this.participants,
-    this.joinedUser,
-    this.shouldShowEnteredMessage = false,
-  });
+  const LiveRoomPresenceSnapshot({required this.roomId, required this.onlineCount, required this.participants, this.joinedUser, this.shouldShowEnteredMessage = false});
 
   final String roomId;
   final int onlineCount;
@@ -171,11 +154,7 @@ class LiveRoomPresenceSnapshot {
   }
 
   factory LiveRoomPresenceSnapshot.fromJson(Map<String, dynamic> json) {
-    return LiveRoomPresenceSnapshot(
-      roomId: json['room_id']?.toString() ?? '',
-      onlineCount: _int(json['online_count']),
-      participants: _participants(json['participants']),
-    );
+    return LiveRoomPresenceSnapshot(roomId: json['room_id']?.toString() ?? '', onlineCount: _int(json['online_count']), participants: _participants(json['participants']));
   }
 
   static List<SeatUser> _participants(dynamic raw) {
@@ -199,7 +178,7 @@ class LiveRoomPresenceSnapshot {
       roleLabel: isOwner
           ? 'Channel Host'
           : isRoomAdmin
-              ? 'Administrator'
+              ? 'Admin'
               : isMember
                   ? 'Member'
                   : _roleLabel(role),
@@ -222,11 +201,12 @@ class LiveRoomPresenceSnapshot {
 
 String _roleLabel(String role) {
   final normalized = role.toLowerCase();
-  if (normalized.contains('founder') || normalized.contains('owner')) return 'Official';
-  if (normalized.contains('admin')) return 'Administrator';
-  if (normalized.contains('monitor')) return 'Monitor';
-  if (normalized.contains('cs')) return 'CS';
-  return 'Guest';
+  if (normalized.contains('founder') || normalized == 'owner' || normalized.contains('super_owner')) return 'Official';
+  if (normalized.contains('superadmin') || normalized.contains('super_admin')) return 'Executive';
+  if (normalized == 'admin') return 'Associate';
+  if (normalized.contains('agency_owner') || normalized == 'bd') return 'Agency';
+  if (normalized == 'host' || normalized == 'agency_member') return 'Host';
+  return '';
 }
 
 List<Color> _avatarColors(String seed) {
