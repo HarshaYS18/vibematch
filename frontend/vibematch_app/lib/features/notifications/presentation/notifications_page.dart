@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../vibes/data/vibes_api_service.dart';
+import '../../vibes/presentation/pages/vibe_detail_backend_page.dart';
 import '../data/notifications_api_service.dart';
 import '../models/notification_item.dart';
 import '../models/notification_type.dart';
@@ -15,9 +17,11 @@ class NotificationsPage extends StatefulWidget {
 
 class _NotificationsPageState extends State<NotificationsPage> {
   final NotificationsApiService _api = NotificationsApiService();
+  final VibesApiService _vibesApi = const VibesApiService();
   NotificationType? _selectedType;
   List<NotificationItem> _items = const <NotificationItem>[];
   bool _loading = true;
+  bool _openingTarget = false;
   String? _error;
 
   List<NotificationItem> get _visibleItems {
@@ -75,6 +79,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _openNotification(NotificationItem item) async {
+    if (_openingTarget) return;
     if (item.isUnread) {
       unawaited(_api.markRead(item.id));
       setState(() {
@@ -97,8 +102,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
       });
     }
 
-    if (item.targetType == 'vibe' && item.targetId != null) {
-      _toast('Opening exact Vibe detail will connect after Vibe detail-by-id API is added.');
+    if (item.targetType == 'vibe' && item.targetId != null && item.targetId!.trim().isNotEmpty) {
+      setState(() => _openingTarget = true);
+      try {
+        final vibe = await _vibesApi.getVibe(item.targetId!);
+        if (!mounted) return;
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(builder: (_) => VibeDetailBackendPage(vibe: vibe)),
+        );
+      } catch (error) {
+        if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+      } finally {
+        if (mounted) setState(() => _openingTarget = false);
+      }
       return;
     }
     _toast('Notification opened.');
@@ -117,38 +134,49 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _NotificationsHeader(onBackTap: () => Navigator.pop(context), onMarkAllRead: _items.any((item) => item.isUnread) ? _markAllRead : null),
-            _NotificationTypeBar(
-              selectedType: _selectedType,
-              countFor: _countFor,
-              onChanged: (type) => setState(() => _selectedType = type),
+            Column(
+              children: [
+                _NotificationsHeader(onBackTap: () => Navigator.pop(context), onMarkAllRead: _items.any((item) => item.isUnread) ? _markAllRead : null),
+                _NotificationTypeBar(
+                  selectedType: _selectedType,
+                  countFor: _countFor,
+                  onChanged: (type) => setState(() => _selectedType = type),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadNotifications,
+                    color: const Color(0xFF251538),
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator(color: Color(0xFF251538)))
+                        : _error != null
+                            ? _NotificationsErrorState(message: _error!, onRetry: _loadNotifications)
+                            : visibleItems.isEmpty
+                                ? const _EmptyNotificationsState()
+                                : ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+                                    itemCount: visibleItems.length,
+                                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                                    itemBuilder: (context, index) {
+                                      final item = visibleItems[index];
+                                      return _NotificationTile(
+                                        item: item,
+                                        onTap: () => unawaited(_openNotification(item)),
+                                      );
+                                    },
+                                  ),
+                  ),
+                ),
+              ],
             ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadNotifications,
-                color: const Color(0xFF251538),
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator(color: Color(0xFF251538)))
-                    : _error != null
-                        ? _NotificationsErrorState(message: _error!, onRetry: _loadNotifications)
-                        : visibleItems.isEmpty
-                            ? const _EmptyNotificationsState()
-                            : ListView.separated(
-                                padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
-                                itemCount: visibleItems.length,
-                                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  final item = visibleItems[index];
-                                  return _NotificationTile(
-                                    item: item,
-                                    onTap: () => unawaited(_openNotification(item)),
-                                  );
-                                },
-                              ),
+            if (_openingTarget)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  child: const Center(child: CircularProgressIndicator(color: Color(0xFF251538))),
+                ),
               ),
-            ),
           ],
         ),
       ),
