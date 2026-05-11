@@ -37,8 +37,19 @@ def _can_manage_room(room: Room, user: User) -> bool:
     return room.owner_user_id == user.id or bool(_role_values(user) & _UNLIMITED_ROOM_ROLES)
 
 
+def _normalize_mode(value: str | None) -> str:
+    raw = (value or "Open").strip().lower()
+    if raw in {"locked", "lock"}:
+        return "Locked"
+    if raw in {"members only", "member only", "members_only", "member"}:
+        return "Members Only"
+    if raw in {"secret vibe", "private vibe", "secret", "private_vibe"}:
+        return "Secret Vibe"
+    return "Open"
+
+
 def _apply_room_payload(room: Room, payload: RoomCreateRequest) -> Room:
-    mode = payload.mode.strip() or "Open"
+    mode = _normalize_mode(payload.mode)
     room_type = payload.type.strip() or "Chat"
     room.name = payload.name.strip()
     room.subtitle = payload.subtitle.strip() if payload.subtitle else None
@@ -75,6 +86,36 @@ def _upsert_active_participant(db: Session, room: Room, user: User) -> RoomParti
         participant.admin_added_at = participant.admin_added_at or now
     user.last_seen_at = now
     return participant
+
+
+def _existing_participant(db: Session, room: Room, user: User) -> RoomParticipant | None:
+    return db.query(RoomParticipant).filter(
+        RoomParticipant.room_id == room.id,
+        RoomParticipant.user_id == user.id,
+    ).first()
+
+
+def _can_enter_room(db: Session, room: Room, user: User) -> bool:
+    if _can_manage_room(room, user):
+        return True
+    participant = _existing_participant(db, room, user)
+    if room.is_secret:
+        return participant is not None and (participant.is_member or participant.is_room_admin)
+    if room.is_members_only:
+        return participant is not None and (participant.is_member or participant.is_room_admin)
+    if room.is_locked:
+        return participant is not None and (participant.is_member or participant.is_room_admin)
+    return True
+
+
+def _room_access_denied_message(room: Room) -> str:
+    if room.is_secret:
+        return "This Secret Vibe room is invite-only."
+    if room.is_members_only:
+        return "This room is members-only. Ask the channel host/admin for approval."
+    if room.is_locked:
+        return "This room is locked. Enter with a valid invite or room access approval."
+    return "Room not found or not accessible"
 
 
 def _get_room_or_404(db: Session, room_public_id: str) -> Room:
@@ -192,7 +233,7 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
             db.refresh(existing_room)
             return room_to_detail_response(existing_room)
 
-    mode = payload.mode.strip() or "Open"
+    mode = _normalize_mode(payload.mode)
     room_type = payload.type.strip() or "Chat"
     room = Room(
         room_public_id=generate_room_public_id(db),
@@ -237,8 +278,8 @@ def join_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinR
     room = get_room_model_by_public_id(db, room_public_id)
     if not room:
         return None
-    if room.is_secret and room.owner_user_id != current_user.id:
-        return None
+    if not _can_enter_room(db, room, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_room_access_denied_message(room))
 
     previous = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == current_user.id).first()
     was_active = previous.is_active if previous is not None else False
@@ -282,8 +323,8 @@ def list_room_participants(db: Session, room_public_id: str, current_user: User)
     room = get_room_model_by_public_id(db, room_public_id)
     if not room:
         return None
-    if room.is_secret and room.owner_user_id != current_user.id:
-        return None
+    if not _can_enter_room(db, room, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_room_access_denied_message(room))
     participants = active_participants(db, room)
     db.commit()
     db.refresh(room)
