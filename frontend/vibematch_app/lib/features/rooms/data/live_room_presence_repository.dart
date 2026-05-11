@@ -41,18 +41,29 @@ class LiveRoomPresenceRepository {
 }
 
 class LiveRoomPresenceSnapshot {
-  const LiveRoomPresenceSnapshot({required this.roomId, required this.onlineCount, required this.participants});
+  const LiveRoomPresenceSnapshot({
+    required this.roomId,
+    required this.onlineCount,
+    required this.participants,
+    this.joinedUser,
+    this.shouldShowEnteredMessage = false,
+  });
 
   final String roomId;
   final int onlineCount;
   final List<SeatUser> participants;
+  final SeatUser? joinedUser;
+  final bool shouldShowEnteredMessage;
 
   factory LiveRoomPresenceSnapshot.fromJoinJson(Map<String, dynamic> json) {
     final room = json['room'] is Map<String, dynamic> ? json['room'] as Map<String, dynamic> : <String, dynamic>{};
+    final joinedRaw = json['joined_user'];
     return LiveRoomPresenceSnapshot(
       roomId: room['id']?.toString() ?? '',
       onlineCount: _int(room['online_count']),
       participants: _participants(json['participants']),
+      joinedUser: joinedRaw is Map<String, dynamic> ? _participantToSeatUser(joinedRaw) : null,
+      shouldShowEnteredMessage: json['should_show_entered_message'] == true,
     );
   }
 
@@ -76,11 +87,19 @@ class LiveRoomPresenceSnapshot {
     final svipLevel = _int(vip['svip_level']);
     final vipLevel = _int(vip['vip_level']);
     final isOwner = json['is_owner'] == true;
+    final isRoomAdmin = json['is_room_admin'] == true;
+    final isMember = json['is_member'] == true;
     final role = _text(json['primary_role']) ?? 'user';
     return SeatUser(
       id: 'user_$publicUserId',
       name: displayName,
-      roleLabel: isOwner ? 'Channel Host' : _roleLabel(role),
+      roleLabel: isOwner
+          ? 'Channel Host'
+          : isRoomAdmin
+              ? 'Administrator'
+              : isMember
+                  ? 'Member'
+                  : _roleLabel(role),
       familyName: '',
       familyLevel: 'bronze',
       relationshipText: '',
@@ -93,7 +112,7 @@ class LiveRoomPresenceSnapshot {
       medals: const [],
       avatarColors: _avatarColors(publicUserId),
       isHost: isOwner,
-      isRoomAdmin: isOwner,
+      isRoomAdmin: isRoomAdmin || isOwner,
     );
   }
 }
@@ -104,7 +123,7 @@ String _roleLabel(String role) {
   if (normalized.contains('admin')) return 'Administrator';
   if (normalized.contains('monitor')) return 'Monitor';
   if (normalized.contains('cs')) return 'CS';
-  return 'Member';
+  return 'Guest';
 }
 
 List<Color> _avatarColors(String seed) {
