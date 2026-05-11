@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -59,16 +58,9 @@ class MediaUploadService {
       throw Exception('Please login again before uploading media.');
     }
 
-    final mimeType = _mimeTypeForPath(file.path);
     final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpointPath)))
       ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(
-        await http.MultipartFile.fromPath(
-          'file',
-          file.path,
-          contentType: mimeType == null ? null : _MediaType.parse(mimeType),
-        ),
-      );
+      ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
@@ -77,15 +69,6 @@ class MediaUploadService {
     }
 
     return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
-  }
-
-  String? _mimeTypeForPath(String path) {
-    final lower = path.toLowerCase();
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    return null;
   }
 
   String _errorMessage(http.Response response, {required String fallback}) {
@@ -132,27 +115,4 @@ class MediaUploadCancelledException implements Exception {
 
   @override
   String toString() => 'Image selection cancelled.';
-}
-
-class _MediaType implements http.MultipartFile {
-  _MediaType._();
-
-  static dynamic parse(String value) {
-    final parts = value.split('/');
-    if (parts.length != 2) return null;
-    return _SimpleMediaType(parts.first, parts.last);
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _SimpleMediaType {
-  const _SimpleMediaType(this.type, this.subtype);
-
-  final String type;
-  final String subtype;
-
-  @override
-  String toString() => '$type/$subtype';
 }
