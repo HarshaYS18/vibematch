@@ -18,11 +18,56 @@ class ProfileApiService {
   }
 
   Future<PublicUserProfile> getPublicProfile(int publicUserId) async {
-    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/users/public/$publicUserId')));
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Failed to load public profile (${response.statusCode}): ${response.body}');
-    }
+    final response = await http.get(
+      Uri.parse(VmApiConfig.endpoint('/users/public/$publicUserId')),
+      headers: _authHeaders(),
+    );
+    _throwIfFailed(response, 'load public profile');
     return PublicUserProfile.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<UserRelationship> getRelationship(int publicUserId) async {
+    final response = await http.get(
+      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/relationship')),
+      headers: _authHeaders(),
+    );
+    _throwIfFailed(response, 'load relationship');
+    return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<UserRelationship> followUser(int publicUserId) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')),
+      headers: _authHeaders(),
+    );
+    _throwIfFailed(response, 'follow user');
+    return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<UserRelationship> unfollowUser(int publicUserId) async {
+    final response = await http.delete(
+      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')),
+      headers: _authHeaders(),
+    );
+    _throwIfFailed(response, 'unfollow user');
+    return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Map<String, String> _authHeaders() {
+    final token = authApiService.cachedAccessToken;
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Please login again.');
+    }
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  void _throwIfFailed(http.Response response, String action) {
+    if (response.statusCode >= 200 && response.statusCode < 300) return;
+    throw Exception('Failed to $action (${response.statusCode}): ${response.body}');
   }
 }
 
@@ -40,6 +85,7 @@ class PublicUserProfile {
     required this.isOnline,
     required this.lastSeenAt,
     required this.createdAt,
+    required this.relationship,
   });
 
   final int publicUserId;
@@ -54,11 +100,13 @@ class PublicUserProfile {
   final bool isOnline;
   final DateTime? lastSeenAt;
   final DateTime createdAt;
+  final UserRelationship? relationship;
 
   factory PublicUserProfile.fromJson(Map<String, dynamic> json) {
     final primaryRole = json['primary_role']?.toString() ?? 'user';
     final primaryBadgeJson = json['primary_role_badge'];
     final roleBadgesJson = json['role_badges'];
+    final relationshipJson = json['relationship'];
     return PublicUserProfile(
       publicUserId: _int(json['public_user_id'], fallback: 0),
       displayCustomId: _nullableInt(json['display_custom_id']),
@@ -72,11 +120,41 @@ class PublicUserProfile {
       isOnline: json['is_online'] == true,
       lastSeenAt: _date(json['last_seen_at']),
       createdAt: _date(json['created_at']) ?? DateTime.now(),
+      relationship: relationshipJson is Map<String, dynamic> ? UserRelationship.fromJson(relationshipJson) : null,
     );
   }
 
   String get visibleName => displayName ?? username ?? 'Vibe User';
   String get visibleId => displayCustomId?.toString() ?? publicUserId.toString();
+}
+
+class UserRelationship {
+  const UserRelationship({
+    required this.publicUserId,
+    required this.isFollowing,
+    required this.followsMe,
+    required this.isFriend,
+    required this.followersCount,
+    required this.followingCount,
+  });
+
+  final int publicUserId;
+  final bool isFollowing;
+  final bool followsMe;
+  final bool isFriend;
+  final int followersCount;
+  final int followingCount;
+
+  factory UserRelationship.fromJson(Map<String, dynamic> json) {
+    return UserRelationship(
+      publicUserId: _int(json['public_user_id'], fallback: 0),
+      isFollowing: json['is_following'] == true,
+      followsMe: json['follows_me'] == true,
+      isFriend: json['is_friend'] == true,
+      followersCount: _int(json['followers_count'], fallback: 0),
+      followingCount: _int(json['following_count'], fallback: 0),
+    );
+  }
 }
 
 int _int(dynamic value, {required int fallback}) {
