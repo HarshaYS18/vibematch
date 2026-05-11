@@ -74,10 +74,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final LiveRoomMessageController _roomMessageController;
   late final LiveRoomModerationController _moderationController;
 
-  final LiveRoomUsersController _usersController = const LiveRoomUsersController();
-  final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
-  final LiveRoomVibeSyncController _vibeSyncController = const LiveRoomVibeSyncController();
-  final LiveRoomNavigationController _navigationController = const LiveRoomNavigationController();
+  final LiveRoomUsersController _usersController =
+      const LiveRoomUsersController();
+  final LiveRoomSettingsController _settingsController =
+      const LiveRoomSettingsController();
+  final LiveRoomVibeSyncController _vibeSyncController =
+      const LiveRoomVibeSyncController();
+  final LiveRoomNavigationController _navigationController =
+      const LiveRoomNavigationController();
 
   _PendingSeatInvite? _pendingSeatInvite;
   Timer? _seatInviteAutoHideTimer;
@@ -85,7 +89,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   Timer? _hostSeatOneRetryTimer;
 
   SeatUser get _currentUser {
-    return LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser ?? _roomIdentityFallback;
+    return LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser ??
+        _roomIdentityFallback;
   }
 
   String get _roomName => _roomStateController.roomName;
@@ -99,7 +104,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   int get _inboxUnreadCount => _roomStateController.inboxUnreadCount;
   VibeSyncRoomState get _vibeSyncState => _roomStateController.vibeSyncState;
   Offset get _bubbleOffset => _roomStateController.bubbleOffset;
-  RoomBackgroundTheme get _selectedBackgroundTheme => _roomStateController.selectedBackgroundTheme;
+  RoomBackgroundTheme get _selectedBackgroundTheme =>
+      _roomStateController.selectedBackgroundTheme;
 
   List<SeatUser> get _roomUsers => _seatController.roomUsers;
 
@@ -117,9 +123,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 
-  List<SeatUser> get _roomAdmins => _usersController.buildRoomAdmins(_allRoomUsers);
-  List<SeatUser> get _availableAdminUsers => _usersController.buildAvailableAdminUsers(_allRoomUsers);
-  bool get _viewerCanManageRoom => _currentUser.isHost || _currentUser.isRoomAdmin;
+  List<SeatUser> get _roomAdmins =>
+      _usersController.buildRoomAdmins(_allRoomUsers);
+  List<SeatUser> get _availableAdminUsers =>
+      _usersController.buildAvailableAdminUsers(_allRoomUsers);
+  bool get _viewerCanManageRoom =>
+      _currentUser.isHost || _currentUser.isRoomAdmin;
 
   int get _safeOnlineCount {
     return _moderationController.safeOnlineCount(
@@ -142,7 +151,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       initialModeTitle: widget.modeTitle,
     )..addListener(_onRoomStateChanged);
 
-    _moderationController = LiveRoomModerationController(currentUser: currentUser);
+    _moderationController = LiveRoomModerationController(
+      currentUser: currentUser,
+    );
 
     _roomMessageController = LiveRoomMessageController(
       currentUser: currentUser,
@@ -209,8 +220,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _hostSeatOneTimer?.cancel();
     _hostSeatOneRetryTimer?.cancel();
 
-    _hostSeatOneTimer = Timer(const Duration(milliseconds: 180), _tryOccupySeatOneForHostOrAdmin);
-    _hostSeatOneRetryTimer = Timer(const Duration(milliseconds: 1200), _tryOccupySeatOneForHostOrAdmin);
+    _hostSeatOneTimer = Timer(
+      const Duration(milliseconds: 180),
+      _tryOccupySeatOneForHostOrAdmin,
+    );
+    _hostSeatOneRetryTimer = Timer(
+      const Duration(milliseconds: 1200),
+      _tryOccupySeatOneForHostOrAdmin,
+    );
   }
 
   void _tryOccupySeatOneForHostOrAdmin() {
@@ -233,7 +250,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       return PopScope<void>(
         canPop: _allowRoomPop,
         onPopInvokedWithResult: (didPop, result) {
-          if (_navigationController.shouldBlockBackAction(allowRoomPop: _allowRoomPop, didPop: didPop)) {
+          if (_navigationController.shouldBlockBackAction(
+            allowRoomPop: _allowRoomPop,
+            didPop: didPop,
+          )) {
             dismissRoomSeatActionPill();
             _openLeaveSheet();
           }
@@ -242,7 +262,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           backgroundColor: Colors.transparent,
           body: Stack(
             children: [
-              Positioned.fill(child: RoomBackground(theme: _selectedBackgroundTheme)),
+              Positioned.fill(
+                child: RoomBackground(theme: _selectedBackgroundTheme),
+              ),
               LiveRoomMinimizedBubble(
                 offset: _bubbleOffset,
                 onRestore: () {
@@ -269,7 +291,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     return PopScope<void>(
       canPop: _allowRoomPop,
       onPopInvokedWithResult: (didPop, result) {
-        if (_navigationController.shouldBlockBackAction(allowRoomPop: _allowRoomPop, didPop: didPop)) {
+        if (_navigationController.shouldBlockBackAction(
+          allowRoomPop: _allowRoomPop,
+          didPop: didPop,
+        )) {
           dismissRoomSeatActionPill();
           _openLeaveSheet();
         }
@@ -279,7 +304,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         backgroundColor: RoomColors.deep,
         body: Stack(
           children: [
-            Positioned.fill(child: RoomBackground(theme: _selectedBackgroundTheme)),
+            Positioned.fill(
+              child: RoomBackground(theme: _selectedBackgroundTheme),
+            ),
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
@@ -335,7 +362,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onGamesTap: _openGamesSheet,
               onGiftTap: _openGiftPanel,
             ),
-            VibeSyncRoomOverlay(state: _vibeSyncState, onDismiss: _clearVibeSyncOverlay),
+            VibeSyncRoomOverlay(
+              state: _vibeSyncState,
+              onDismiss: _clearVibeSyncOverlay,
+            ),
             LiveRoomGiftOverlay(
               slides: _giftController.giftSlides,
               activeComboSlide: _giftController.activeComboSlide,
@@ -375,14 +405,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     if (seat.user == null && !_viewerCanManageRoom) {
       if (_applyOnlyModeEnabled) {
-        _seatController.toggleSelectedSeat(index);
+        _applyForSeat(index);
       } else {
         _seatController.occupySeat(index);
       }
       return;
     }
 
-    if (seat.user == null && _viewerCanManageRoom) _seatController.toggleSelectedSeat(index);
+    if (seat.user == null && _viewerCanManageRoom) {
+      _seatController.toggleSelectedSeat(index);
+    }
   }
 
   void _onUserTap(int index) {
@@ -391,21 +423,23 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _openMiniProfile(user, index);
   }
 
-  void _approveSeatApplication(ChatEntry entry) => _seatController.approveSeatApplication(
+  void _approveSeatApplication(ChatEntry entry) =>
+      _seatController.approveSeatApplication(
         entry: entry,
         messages: _roomMessageController.messages,
         allRoomUsers: _allRoomUsers,
       );
 
-  void _rejectSeatApplication(ChatEntry entry) => _seatController.rejectSeatApplication(
+  void _rejectSeatApplication(ChatEntry entry) =>
+      _seatController.rejectSeatApplication(
         entry: entry,
         messages: _roomMessageController.messages,
       );
 
   void _applyForSeat(int index) => _seatController.applyForSeat(
-        index: index,
-        messages: _roomMessageController.messages,
-      );
+    index: index,
+    messages: _roomMessageController.messages,
+  );
 
   void _inviteSeat(int index) {
     _seatController.clearSelectedSeat();
@@ -423,10 +457,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       builder: (_) => LiveRoomInviteSheet(
         seatIndex: seatIndex,
         users: inviteUsers,
-        onInvite: (user) => _sendSeatInvite(
-          seatIndex: seatIndex,
-          invitedUser: user,
-        ),
+        onInvite: (user) =>
+            _sendSeatInvite(seatIndex: seatIndex, invitedUser: user),
       ),
     );
   }
@@ -479,7 +511,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       _pendingSeatInvite = null;
     });
 
-    RoomToast.show(context, '${invite.invitedUser.name} rejected the seat invite');
+    RoomToast.show(
+      context,
+      '${invite.invitedUser.name} rejected the seat invite',
+    );
   }
 
   void _acceptSeatInvite() {
@@ -532,7 +567,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _clearRoomFocus();
   }
 
-  void _insertSystemMessage(String message) => _roomMessageController.insertSystemMessage(message);
+  void _insertSystemMessage(String message) =>
+      _roomMessageController.insertSystemMessage(message);
 
   void _clearRoomFocus() {
     _messageFocusNode.unfocus();
@@ -613,7 +649,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       (item) => item.id == user.id,
       orElse: () => user,
     );
-    final seatIndex = _seatController.seats.indexWhere((seat) => seat.user?.id == liveUser.id);
+    final seatIndex = _seatController.seats.indexWhere(
+      (seat) => seat.user?.id == liveUser.id,
+    );
     _openMiniProfile(liveUser, seatIndex);
   }
 
@@ -642,7 +680,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       },
       onLeaveSeatOnly: (targetSeatIndex) {
         Navigator.pop(context);
-        final seatedUser = targetSeatIndex >= 0 && targetSeatIndex < _seatController.seats.length
+        final seatedUser =
+            targetSeatIndex >= 0 &&
+                targetSeatIndex < _seatController.seats.length
             ? _seatController.seats[targetSeatIndex].user
             : null;
         if (seatedUser?.id == _currentUser.id) {
@@ -692,7 +732,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final systemMessage = result.systemMessage;
     if (systemMessage != null) _insertSystemMessage(systemMessage);
     final removedUserId = result.removedUserId;
-    if (removedUserId != null) _seatController.removeUserFromRoom(removedUserId);
+    if (removedUserId != null) {
+      _seatController.removeUserFromRoom(removedUserId);
+    }
     final toastMessage = result.toastMessage;
     if (toastMessage != null) RoomToast.show(context, toastMessage);
   }
@@ -741,7 +783,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       focusNode: _messageFocusNode,
       imagesEnabled: _roomImagesEnabled,
       onSendText: _sendMessage,
-      onImageTap: () => RoomToast.show(context, 'Image message picker will connect here'),
+      onImageTap: () =>
+          RoomToast.show(context, 'Image message picker will connect here'),
       onSendFloatingText: _sendMessage,
     );
   }
@@ -835,17 +878,23 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onToggleRoomImages: (value) {
           _roomStateController.setRoomImagesEnabled(value);
           setSheetState(() {});
-          _insertSystemMessage(_settingsController.roomImagesSystemMessage(value));
+          _insertSystemMessage(
+            _settingsController.roomImagesSystemMessage(value),
+          );
         },
         onToggleGuestMessages: (value) {
           _roomStateController.setGuestMessagesEnabled(value);
           setSheetState(() {});
-          _insertSystemMessage(_settingsController.guestMessagesSystemMessage(value));
+          _insertSystemMessage(
+            _settingsController.guestMessagesSystemMessage(value),
+          );
         },
         onToggleApplyOnlyMode: (value) {
           _roomStateController.setApplyOnlyModeEnabled(value);
           setSheetState(() {});
-          _insertSystemMessage(_settingsController.applyOnlyModeSystemMessage(value));
+          _insertSystemMessage(
+            _settingsController.applyOnlyModeSystemMessage(value),
+          );
         },
         onCloseRoom: () => _leaveRoomFromSheet(sheetContext),
       ),
@@ -894,12 +943,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         canManage: _viewerCanManageRoom,
         onPickFirst: (user) {
           _roomStateController.setVibeSyncState(
-            _vibeSyncController.pickFirstUser(state: _vibeSyncState, user: user),
+            _vibeSyncController.pickFirstUser(
+              state: _vibeSyncState,
+              user: user,
+            ),
           );
         },
         onPickSecond: (user) {
           _roomStateController.setVibeSyncState(
-            _vibeSyncController.pickSecondUser(state: _vibeSyncState, user: user),
+            _vibeSyncController.pickSecondUser(
+              state: _vibeSyncState,
+              user: user,
+            ),
           );
         },
         onAnnounce: () {
@@ -919,7 +974,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _clearVibeSyncOverlay() {
-    _roomStateController.setVibeSyncState(_vibeSyncController.clearOverlay(_vibeSyncState));
+    _roomStateController.setVibeSyncState(
+      _vibeSyncController.clearOverlay(_vibeSyncState),
+    );
   }
 
   void _openJoinRequestsSheet() {
@@ -948,7 +1005,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       approved: approved,
       roomName: _roomName,
     );
-    RoomToast.show(context, approved ? '${user.name} approved' : '${user.name} rejected');
+    RoomToast.show(
+      context,
+      approved ? '${user.name} approved' : '${user.name} rejected',
+    );
   }
 
   void _openPrivacySheet() {
@@ -960,7 +1020,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         currentMode: _privacyMode,
         onModeChanged: (mode) {
           _roomStateController.setPrivacyMode(mode);
-          _insertSystemMessage(_settingsController.privacyModeSystemMessage(mode));
+          _insertSystemMessage(
+            _settingsController.privacyModeSystemMessage(mode),
+          );
         },
       ),
     );
@@ -995,7 +1057,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         currentTheme: _selectedBackgroundTheme,
         onThemeSelected: (theme) {
           _roomStateController.setSelectedBackgroundTheme(theme);
-          RoomToast.show(context, _settingsController.backgroundAppliedToast(theme));
+          RoomToast.show(
+            context,
+            _settingsController.backgroundAppliedToast(theme),
+          );
         },
         onStoreTap: () => RoomToast.show(context, 'Theme store opened'),
       ),
