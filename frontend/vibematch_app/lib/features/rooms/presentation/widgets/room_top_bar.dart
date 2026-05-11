@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../social/widgets/friends_invite_sheet.dart';
 import '../live_room_models.dart';
 import 'room_contribution_rankings_sheet.dart';
 import 'room_info_sheet.dart';
@@ -63,16 +62,10 @@ class RoomTopBar extends StatelessWidget {
             RoundRoomButton(icon: Icons.arrow_back_rounded, onTap: onBack, size: 31, iconSize: 18, background: Colors.black.withValues(alpha: 0.26)),
             const SizedBox(width: 7),
             Expanded(
-              child: _RoomNamePill(
-                roomName: roomName,
-                privacyMode: privacyMode,
-                onInfoTap: () => _openRoomInfo(context),
-                onJoinTap: onJoinTap,
-                showJoinButton: !canManageAdmins,
-              ),
+              child: _RoomNamePill(roomName: roomName, privacyMode: privacyMode, onInfoTap: () => _openRoomInfo(context), onJoinTap: onJoinTap, showJoinButton: !canManageAdmins),
             ),
             const SizedBox(width: 7),
-            RoundRoomButton(icon: Icons.send_rounded, onTap: () => _openRoomInviteOverlay(context), size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
+            RoundRoomButton(icon: Icons.send_rounded, onTap: onShare, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
             const SizedBox(width: 6),
             RoundRoomButton(icon: Icons.campaign_rounded, onTap: onAnnouncement, size: 30, iconSize: 15, background: Colors.black.withValues(alpha: 0.22)),
             if (canManageAdmins) ...[
@@ -82,28 +75,8 @@ class RoomTopBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 7),
-        Row(
-          children: [
-            const SizedBox(width: 2),
-            _TrophyButton(onTap: openRankings),
-            const SizedBox(width: 7),
-            _RoomLevelBadge(level: roomLevel, onTap: onRoomLevelTap),
-            const SizedBox(width: 7),
-            _OnlineButton(count: onlineCount, onTap: onUsersTap),
-          ],
-        ),
+        Row(children: [const SizedBox(width: 2), _TrophyButton(onTap: openRankings), const SizedBox(width: 7), _RoomLevelBadge(level: roomLevel, onTap: onRoomLevelTap), const SizedBox(width: 7), _OnlineButton(count: onlineCount, onTap: onUsersTap)]),
       ],
-    );
-  }
-
-  void _openRoomInviteOverlay(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: false,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.18),
-      builder: (_) => FriendsInviteSheet(title: 'Invite friends to $roomName', actionLabel: 'Invite', completedLabel: 'Invited', onInvite: (_) {}),
     );
   }
 
@@ -112,84 +85,49 @@ class RoomTopBar extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RoomInfoSheet(
-        roomName: roomName,
-        roomId: roomId,
-        language: language,
-        privacyMode: privacyMode,
-        canManageAdmins: canManageAdmins,
-        admins: admins,
-        availableAdminUsers: availableAdminUsers,
-        onAddAdmin: onAddAdmin,
-        onRemoveAdmin: onRemoveAdmin,
-      ),
+      builder: (_) => RoomInfoSheet(roomName: roomName, roomId: roomId, language: language, privacyMode: privacyMode, canManageAdmins: canManageAdmins, admins: admins, availableAdminUsers: availableAdminUsers, onAddAdmin: onAddAdmin, onRemoveAdmin: onRemoveAdmin),
     );
   }
 
   void _openDefaultRoomRankings(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => RoomContributionRankingsSheet(roomName: roomName, users: const <SeatUser>[]),
-    );
+    showModalBottomSheet<void>(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => RoomContributionRankingsSheet(roomName: roomName, users: const <SeatUser>[]));
   }
 }
 
 class _RoomNamePill extends StatelessWidget {
   const _RoomNamePill({required this.roomName, required this.privacyMode, required this.onInfoTap, required this.onJoinTap, required this.showJoinButton});
-
   final String roomName;
   final RoomPrivacyMode privacyMode;
   final VoidCallback onInfoTap;
   final VoidCallback onJoinTap;
   final bool showJoinButton;
-
-  String get _cleanRoomName {
-    final trimmed = roomName.trim();
-    if (trimmed.isEmpty) return 'Room';
-    return trimmed;
-  }
+  String get _cleanRoomName => roomName.trim().isEmpty ? 'Room' : roomName.trim();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 31,
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), color: Colors.black.withValues(alpha: 0.36), border: Border.all(color: Colors.white.withValues(alpha: 0.12)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 14, offset: const Offset(0, 7))]),
-      child: Row(
-        children: [
-          Expanded(
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
-              child: InkWell(
-                borderRadius: BorderRadius.horizontal(left: const Radius.circular(999), right: Radius.circular(showJoinButton ? 0 : 999)),
-                onTap: onInfoTap,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 9, right: 4),
-                  child: Row(
-                    children: [
-                      _PrivacyIcon(mode: privacyMode),
-                      const SizedBox(width: 6),
-                      Expanded(child: Text(_cleanRoomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10.8, fontWeight: FontWeight.w900, letterSpacing: 0.02, height: 1))),
-                      const SizedBox(width: 5),
-                      Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.72), size: 15),
-                    ],
-                  ),
-                ),
+      child: Row(children: [
+        Expanded(
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
+            child: InkWell(
+              borderRadius: BorderRadius.horizontal(left: const Radius.circular(999), right: Radius.circular(showJoinButton ? 0 : 999)),
+              onTap: onInfoTap,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 9, right: 4),
+                child: Row(children: [_PrivacyIcon(mode: privacyMode), const SizedBox(width: 6), Expanded(child: Text(_cleanRoomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10.8, fontWeight: FontWeight.w900, letterSpacing: 0.02, height: 1))), const SizedBox(width: 5), Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.72), size: 15)]),
               ),
             ),
           ),
-          if (showJoinButton) ...[
-            Container(width: 1, height: 18, color: Colors.white.withValues(alpha: 0.13)),
-            Material(
-              color: Colors.transparent,
-              shape: const CircleBorder(),
-              child: InkWell(customBorder: const CircleBorder(), onTap: onJoinTap, child: const SizedBox(width: 32, height: 31, child: Center(child: Icon(Icons.add_rounded, color: RoomColors.aqua, size: 20)))),
-            ),
-          ],
+        ),
+        if (showJoinButton) ...[
+          Container(width: 1, height: 18, color: Colors.white.withValues(alpha: 0.13)),
+          Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onJoinTap, child: const SizedBox(width: 32, height: 31, child: Center(child: Icon(Icons.add_rounded, color: RoomColors.aqua, size: 20))))),
         ],
-      ),
+      ]),
     );
   }
 }
