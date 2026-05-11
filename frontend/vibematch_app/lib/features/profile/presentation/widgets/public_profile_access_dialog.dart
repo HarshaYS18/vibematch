@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
-void showPublicProfileAccessDialog(BuildContext context) {
+void showPublicProfileAccessDialog(
+  BuildContext context, {
+  String title = 'Profile blocked',
+  String message = 'Unblock this user before following or messaging them.',
+}) {
   showDialog<void>(
     context: context,
     builder: (context) {
@@ -10,9 +14,9 @@ void showPublicProfileAccessDialog(BuildContext context) {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Colors.white.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: const Color(0xFFECE2D8)),
+            border: Border.all(color: const Color(0xFFECE2D8).withValues(alpha: 0.82)),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF251538).withValues(alpha: 0.18),
@@ -50,20 +54,20 @@ void showPublicProfileAccessDialog(BuildContext context) {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
-                'Profile blocked',
+              Text(
+                title,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Color(0xFF251538),
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Unblock this user before following or messaging them.',
+              Text(
+                message,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Color(0xFF8C7B8F),
                   fontSize: 13,
                   height: 1.35,
