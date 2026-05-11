@@ -20,6 +20,7 @@ class LiveRoomRoutes {
         language: args.language,
         modeTitle: args.modeTitle,
         initialOnlineCount: args.onlineCount,
+        currentUser: currentUser,
       ),
     );
   }
