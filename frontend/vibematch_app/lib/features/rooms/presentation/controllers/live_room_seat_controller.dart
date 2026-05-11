@@ -50,6 +50,11 @@ class LiveRoomSeatController {
     final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
     if (snapshot == null || seats.isEmpty) return;
 
+    final previousUsers = <String, SeatUser>{
+      for (final user in roomUsers) user.id: user,
+      currentUser.id: currentUser,
+    };
+
     final nextSeats = List<RoomSeat>.generate(
       seats.length,
       (index) => RoomSeat(index: index, locked: snapshot.lockedSeatIndexes.contains(index)),
@@ -61,12 +66,8 @@ class LiveRoomSeatController {
       if (seatIndex == null || seatIndex < 0 || seatIndex >= nextSeats.length) continue;
       if (usedSeatIndexes.contains(seatIndex)) continue;
 
-      final isLocalUser = peer.userId == currentUser.id;
-      final existingUser = _findKnownSeatUser(peer.userId);
-      final seatUser = (isLocalUser ? currentUser : existingUser).copyWith(
-        selfMuted: !peer.micEnabled,
-        adminMuted: peer.adminMuted,
-      );
+      final baseUser = peer.userId == currentUser.id ? currentUser : previousUsers[peer.userId];
+      final seatUser = _seatUserFromPeer(peer: peer, baseUser: baseUser);
       nextSeats[seatIndex] = nextSeats[seatIndex].copyWith(
         user: seatUser,
         locked: snapshot.lockedSeatIndexes.contains(seatIndex),
@@ -84,50 +85,40 @@ class LiveRoomSeatController {
     onChanged();
   }
 
-  SeatUser _findKnownSeatUser(String userId) {
-    final existing = roomUsers.firstWhereOrNull((user) => user.id == userId);
-    if (existing != null) return existing;
-
-    if (_isFounderId(userId)) {
-      return const SeatUser(
-        id: 'user_6922022',
-        name: 'Founder Owner',
-        roleLabel: 'Channel Host',
-        familyName: '',
-        relationshipText: '',
-        vipLevel: 32,
-        svipLevel: 3,
-        sendingLevel: 52,
-        receivingLevel: 44,
-        sentExp: 0,
-        receivedExp: 0,
-        medals: [],
-        avatarColors: [Color(0xFFFFC857), Color(0xFFE84C72)],
-        isHost: true,
-        isRoomAdmin: true,
-      );
-    }
-
+  SeatUser _seatUserFromPeer({required LiveMediaPeerSnapshot peer, SeatUser? baseUser}) {
+    final displayName = peer.displayName.trim().isNotEmpty ? peer.displayName.trim() : (baseUser?.name ?? _fallbackDisplayNameForUserId(peer.userId));
+    final isFounder = _isFounderId(peer.userId);
     return SeatUser(
-      id: userId,
-      name: _displayNameForUserId(userId),
-      roleLabel: 'Member',
-      familyName: '',
-      relationshipText: '',
-      vipLevel: 1,
-      sendingLevel: 1,
-      receivingLevel: 1,
-      sentExp: 0,
-      receivedExp: 0,
-      medals: const [],
-      avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      id: peer.userId,
+      name: displayName,
+      roleLabel: baseUser?.roleLabel ?? (isFounder ? 'Channel Host' : 'Member'),
+      familyName: baseUser?.familyName ?? '',
+      familyLevel: baseUser?.familyLevel ?? 'bronze',
+      relationshipText: baseUser?.relationshipText ?? '',
+      vipLevel: baseUser?.vipLevel ?? (isFounder ? 32 : 0),
+      svipLevel: baseUser?.svipLevel ?? (isFounder ? 3 : 0),
+      sendingLevel: baseUser?.sendingLevel ?? 1,
+      receivingLevel: baseUser?.receivingLevel ?? 1,
+      sentExp: baseUser?.sentExp ?? 0,
+      receivedExp: baseUser?.receivedExp ?? 0,
+      medals: baseUser?.medals ?? const [],
+      avatarColors: baseUser?.avatarColors ?? const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      age: baseUser?.age,
+      locationLabel: baseUser?.locationLabel,
+      locationVisible: baseUser?.locationVisible ?? true,
+      gender: baseUser?.gender,
+      isCurrentUser: peer.userId == currentUser.id,
+      isHost: baseUser?.isHost ?? isFounder,
+      isRoomAdmin: baseUser?.isRoomAdmin ?? isFounder,
+      selfMuted: !peer.micEnabled,
+      adminMuted: peer.adminMuted,
     );
   }
 
-  String _displayNameForUserId(String userId) {
+  String _fallbackDisplayNameForUserId(String userId) {
     if (_isFounderId(userId)) return 'Founder Owner';
-    if (userId.startsWith('user_6418')) return 'Google Tester';
-    return userId.replaceFirst('user_', 'User ');
+    final publicId = userId.startsWith('user_') ? userId.substring(5) : userId;
+    return publicId.trim().isEmpty ? 'Vibe User' : 'User $publicId';
   }
 
   bool _isFounderId(String userId) => userId == 'user_6922022' || userId == 'founder_owner';
@@ -177,10 +168,10 @@ class LiveRoomSeatController {
 
   void occupySeat(int index) {
     if (index < 0 || index >= seats.length) return;
-    final oldIndex = seats.indexWhere((seat) => seat.user?.id == currentUser.id);
-    final userToMove = oldIndex >= 0 ? seats[oldIndex].user! : currentUser.copyWith(selfMuted: micMuted);
-    if (oldIndex >= 0) seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
-    seats[index] = seats[index].copyWith(user: userToMove.copyWith(selfMuted: micMuted || userToMove.selfMuted), locked: false);
+    if (seats[index].locked) {
+      onToast('This seat is locked');
+      return;
+    }
     selectedSeatIndex = null;
     LiveRoomMediaSignalingService.instance.takeSeat(index);
     LiveRoomMediaSignalingService.instance.setMicEnabled(!micMuted);
@@ -227,10 +218,6 @@ class LiveRoomSeatController {
       return;
     }
     final applicant = allRoomUsers.firstWhere((user) => user.id == entry.senderId, orElse: () => currentUser);
-    final oldIndex = seats.indexWhere((seat) => seat.user?.id == applicant.id);
-    final applicantToMove = oldIndex >= 0 ? seats[oldIndex].user! : applicant;
-    if (oldIndex >= 0) seats[oldIndex] = seats[oldIndex].copyWith(clearUser: true);
-    seats[seatIndex] = seats[seatIndex].copyWith(user: applicantToMove, locked: false);
     if (applicant.id == currentUser.id) {
       LiveRoomMediaSignalingService.instance.takeSeat(seatIndex);
     }
