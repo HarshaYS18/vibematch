@@ -1,3 +1,4 @@
+import 'live_room_system_event_bus.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -66,10 +67,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     }
   }
 
-  void configureRoom({
-    required String roomId,
-    required String roomName,
-  }) {
+  void configureRoom({required String roomId, required String roomName}) {
     final nextRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
 
     _roomId = nextRoomId;
@@ -84,7 +82,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   void setActiveLoggedInUser(CurrentUser user) {
     final isOfficial = user.canSeeOwnerControls;
-    final roleLabel = user.primaryRoleBadge?.badgeLabel ?? user.roleDisplayLabel;
+    final roleLabel =
+        user.primaryRoleBadge?.badgeLabel ?? user.roleDisplayLabel;
 
     _activeLoggedInSeatUser = SeatUser(
       id: 'user_${user.publicUserId}',
@@ -167,9 +166,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     takeSeat(seatIndex);
   }
 
-  Future<void> joinRoom({
-    required SeatUser currentUser,
-  }) async {
+  Future<void> joinRoom({required SeatUser currentUser}) async {
     final effectiveUser = effectiveCurrentUser(currentUser);
 
     _currentUser = effectiveUser;
@@ -187,15 +184,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     seatInvite.value = null;
     LiveRoomAudioService.instance.takeSeat(seatIndex);
 
-    _send('seat/take', <String, Object?>{
-      'seat_index': seatIndex,
-    });
+    _send('seat/take', <String, Object?>{'seat_index': seatIndex});
   }
 
-  void sendSeatInvite({
-    required int seatIndex,
-    required String targetUserId,
-  }) {
+  void sendSeatInvite({required int seatIndex, required String targetUserId}) {
     if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
 
     final currentUserId = _activeLoggedInSeatUser?.id ?? _currentUser?.id;
@@ -217,10 +209,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _send('seat/leave', <String, Object?>{});
   }
 
-  void forceLeaveSeat({
-    required int seatIndex,
-    required String targetUserId,
-  }) {
+  void forceLeaveSeat({required int seatIndex, required String targetUserId}) {
     if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
 
     _send('admin/seat_leave', <String, Object?>{
@@ -229,24 +218,16 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
-  void lockSeat({
-    required int seatIndex,
-  }) {
+  void lockSeat({required int seatIndex}) {
     if (seatIndex < 0) return;
 
-    _send('admin/seat_lock', <String, Object?>{
-      'seat_index': seatIndex,
-    });
+    _send('admin/seat_lock', <String, Object?>{'seat_index': seatIndex});
   }
 
-  void unlockSeat({
-    required int seatIndex,
-  }) {
+  void unlockSeat({required int seatIndex}) {
     if (seatIndex < 0) return;
 
-    _send('admin/seat_unlock', <String, Object?>{
-      'seat_index': seatIndex,
-    });
+    _send('admin/seat_unlock', <String, Object?>{'seat_index': seatIndex});
   }
 
   void leaveAndLockSeat({
@@ -275,9 +256,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
-  void removeKickBlock({
-    required String targetUserId,
-  }) {
+  void removeKickBlock({required String targetUserId}) {
     if (targetUserId.trim().isEmpty) return;
 
     _send('admin/kick_remove', <String, Object?>{
@@ -290,34 +269,21 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       _debug('mic enable blocked because current user is admin-muted');
       LiveRoomAudioService.instance.setSelfMuted(true);
 
-      _send('mic/set_enabled', <String, Object?>{
-        'enabled': false,
-      });
+      _send('mic/set_enabled', <String, Object?>{'enabled': false});
       return;
     }
 
     LiveRoomAudioService.instance.setSelfMuted(!enabled);
 
-    _send('mic/set_enabled', <String, Object?>{
-      'enabled': enabled,
-    });
+    _send('mic/set_enabled', <String, Object?>{'enabled': enabled});
   }
 
-  void setAdminMute({
-    required String targetUserId,
-    required bool muted,
-  }) {
+  void setAdminMute({required String targetUserId, required bool muted}) {
     if (targetUserId.trim().isEmpty) return;
 
-    _applyAdminMuteToCurrentSnapshot(
-      targetUserId: targetUserId,
-      muted: muted,
-    );
+    _applyAdminMuteToCurrentSnapshot(targetUserId: targetUserId, muted: muted);
 
-    _enforceAdminMuteIfCurrentUser(
-      targetUserId: targetUserId,
-      muted: muted,
-    );
+    _enforceAdminMuteIfCurrentUser(targetUserId: targetUserId, muted: muted);
 
     _send('admin_mute/set', <String, Object?>{
       'target_user_id': targetUserId,
@@ -329,9 +295,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final safeText = text.trim();
     if (safeText.isEmpty) return;
 
-    _send('room/chat', <String, Object?>{
-      'text': safeText,
-    });
+    _send('room/chat', <String, Object?>{'text': safeText});
   }
 
   Future<void> leaveRoom() async {
@@ -458,16 +422,16 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _debug('live room foreground service stopped');
   }
 
-  Future<void> _joinRoomInternal({
-    required String reason,
-  }) async {
+  Future<void> _joinRoomInternal({required String reason}) async {
     final effectiveUser = _currentUser;
     final safeRoomId = _roomId ?? 'VM257808';
 
     if (effectiveUser == null) return;
 
     if (_joined && _channel != null) {
-      _debug('media room already joined; preserving active session for $reason');
+      _debug(
+        'media room already joined; preserving active session for $reason',
+      );
       return;
     }
 
@@ -520,9 +484,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     }
   }
 
-  void _scheduleReconnect({
-    required String reason,
-  }) {
+  void _scheduleReconnect({required String reason}) {
     if (!_shouldStayConnected ||
         !_appInForeground ||
         _currentUser == null ||
@@ -542,11 +504,11 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       if (!_shouldStayConnected || !_appInForeground) return;
 
       unawaited(
-        _joinRoomInternal(reason: 'reconnect: $reason').catchError(
-          (Object error) {
-            _debug('media reconnect ignored after failure: $error');
-          },
-        ),
+        _joinRoomInternal(reason: 'reconnect: $reason').catchError((
+          Object error,
+        ) {
+          _debug('media reconnect ignored after failure: $error');
+        }),
       );
     });
   }
@@ -603,12 +565,19 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
       if (payload is! Map<String, dynamic>) return;
 
+      if (type == 'room/system_event') {
+        LiveRoomSystemEventBus.publish(LiveRoomSystemEvent.fromJson(payload));
+
+        return;
+      }
+
       if (type == 'kick_block/removed' || type == 'kick_block/remove_result') {
         final removed = payload['removed'] == true;
         final targetUserId = payload['target_user_id']?.toString();
         final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
 
-        if (removed && (targetUserId == null || targetUserId == currentUserId)) {
+        if (removed &&
+            (targetUserId == null || targetUserId == currentUserId)) {
           roomBlock.value = null;
           _showingRoomBlockDialog = false;
           _debug('cleared local room block after kick block removal');
@@ -669,10 +638,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (roomId == null || user == null) return;
 
     unawaited(
-      LiveRoomAudioService.instance.joinRoom(
-        roomId: roomId,
-        currentUser: user,
-      ),
+      LiveRoomAudioService.instance.joinRoom(roomId: roomId, currentUser: user),
     );
   }
 
@@ -688,7 +654,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       peerCount: snapshot.peerCount,
       lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
-        final matchesUser = peer.userId == targetUserId || peer.peerId == targetUserId;
+        final matchesUser =
+            peer.userId == targetUserId || peer.peerId == targetUserId;
         if (!matchesUser) return peer;
 
         return peer.copyWith(
@@ -707,7 +674,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     final targetPeerId = payload['peer_id']?.toString();
     final targetUserId = payload['user_id']?.toString();
-    final muted = payload['admin_muted'] == true || payload['adminMuted'] == true;
+    final muted =
+        payload['admin_muted'] == true || payload['adminMuted'] == true;
     final micEnabled = payload.containsKey('mic_enabled')
         ? payload['mic_enabled'] == true
         : null;
@@ -718,9 +686,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
         final matchesPeer =
-            targetPeerId != null && targetPeerId.isNotEmpty && peer.peerId == targetPeerId;
+            targetPeerId != null &&
+            targetPeerId.isNotEmpty &&
+            peer.peerId == targetPeerId;
         final matchesUser =
-            targetUserId != null && targetUserId.isNotEmpty && peer.userId == targetUserId;
+            targetUserId != null &&
+            targetUserId.isNotEmpty &&
+            peer.userId == targetUserId;
 
         if (!matchesPeer && !matchesUser) return peer;
 
@@ -786,7 +758,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void _enforceAdminMutePayloadIfCurrentUser(Map<String, dynamic> payload) {
     final targetPeerId = payload['peer_id']?.toString();
     final targetUserId = payload['user_id']?.toString();
-    final muted = payload['admin_muted'] == true || payload['adminMuted'] == true;
+    final muted =
+        payload['admin_muted'] == true || payload['adminMuted'] == true;
 
     if (!muted) return;
 
@@ -808,9 +781,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final currentPeerId = _peerId;
 
     final matchesUser =
-        targetUserId != null && targetUserId.isNotEmpty && currentUserId == targetUserId;
+        targetUserId != null &&
+        targetUserId.isNotEmpty &&
+        currentUserId == targetUserId;
     final matchesPeer =
-        targetPeerId != null && targetPeerId.isNotEmpty && currentPeerId == targetPeerId;
+        targetPeerId != null &&
+        targetPeerId.isNotEmpty &&
+        currentPeerId == targetPeerId;
 
     if (!matchesUser && !matchesPeer) return;
 
@@ -873,8 +850,11 @@ class LiveMediaRoomBlock {
   bool get isKick => type == 'room/kicked' || type == 'room/join_blocked';
 
   String get durationLabel {
-    final ms = remainingMs ??
-        (kickedUntil == null ? null : kickedUntil!.difference(DateTime.now()).inMilliseconds);
+    final ms =
+        remainingMs ??
+        (kickedUntil == null
+            ? null
+            : kickedUntil!.difference(DateTime.now()).inMilliseconds);
 
     if (ms == null) return 'a permanent duration';
 
@@ -905,9 +885,11 @@ class LiveMediaRoomBlock {
   }) {
     return LiveMediaRoomBlock(
       type: type,
-      reason: json['reason']?.toString() ?? 'You cannot enter this room right now.',
+      reason:
+          json['reason']?.toString() ?? 'You cannot enter this room right now.',
       kickedUntil: DateTime.tryParse(json['kicked_until']?.toString() ?? ''),
-      remainingMs: int.tryParse(json['remaining_ms']?.toString() ?? '') ??
+      remainingMs:
+          int.tryParse(json['remaining_ms']?.toString() ?? '') ??
           int.tryParse(json['duration_ms']?.toString() ?? ''),
     );
   }
@@ -931,15 +913,19 @@ class LiveMediaRoomSnapshot {
 
     final peers = rawPeers is List
         ? rawPeers
-            .whereType<Map<String, dynamic>>()
-            .map(LiveMediaPeerSnapshot.fromJson)
-            .toList()
+              .whereType<Map<String, dynamic>>()
+              .map(LiveMediaPeerSnapshot.fromJson)
+              .toList()
         : <LiveMediaPeerSnapshot>[];
 
-    final rawLockedSeats = json['locked_seat_indexes'] ?? json['lockedSeatIndexes'];
+    final rawLockedSeats =
+        json['locked_seat_indexes'] ?? json['lockedSeatIndexes'];
 
     final lockedSeatIndexes = rawLockedSeats is List
-        ? rawLockedSeats.map((item) => int.tryParse(item.toString())).whereType<int>().toSet()
+        ? rawLockedSeats
+              .map((item) => int.tryParse(item.toString()))
+              .whereType<int>()
+              .toSet()
         : <int>{};
 
     final parsedPeerCount = int.tryParse(json['peer_count']?.toString() ?? '');
@@ -970,10 +956,7 @@ class LiveMediaPeerSnapshot {
   final bool micEnabled;
   final bool adminMuted;
 
-  LiveMediaPeerSnapshot copyWith({
-    bool? micEnabled,
-    bool? adminMuted,
-  }) {
+  LiveMediaPeerSnapshot copyWith({bool? micEnabled, bool? adminMuted}) {
     return LiveMediaPeerSnapshot(
       peerId: peerId,
       userId: userId,
