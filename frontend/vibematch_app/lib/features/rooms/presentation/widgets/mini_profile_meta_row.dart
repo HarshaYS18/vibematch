@@ -25,11 +25,7 @@ class MiniProfileMetaRow extends StatelessWidget {
 
   bool get _isChannelAdmin {
     final label = _normalizedRoleLabel;
-    return !_isChannelHost &&
-        (user.isRoomAdmin ||
-            label == 'channel admin' ||
-            label == 'room admin' ||
-            label == 'administrator');
+    return !_isChannelHost && (user.isRoomAdmin || label == 'admin' || label == 'channel admin' || label == 'room admin' || label == 'administrator');
   }
 
   RoleBadge? get _officialRoleBadge {
@@ -38,25 +34,18 @@ class MiniProfileMetaRow extends StatelessWidget {
 
     if (_isChannelAdmin || _isChannelHost) return null;
 
-    if (id == 'founder_owner' || id == 'super_owner' || id == 'user_6922022') {
-      return RoleBadge.fromRole('founder_owner');
-    }
+    if (id == 'founder_owner' || id == 'super_owner' || id == 'user_6922022') return RoleBadge.fromRole('founder_owner');
     if (id == 'owner') return RoleBadge.fromRole('owner');
     if (id == 'superadmin' || id == 'super_admin') return RoleBadge.fromRole('superadmin');
     if (id == 'admin') return RoleBadge.fromRole('admin');
-    if (id == 'coin_seller') return RoleBadge.fromRole('coin_seller');
-    if (id == 'merchant' || id == 'reseller') return RoleBadge.fromRole('merchant');
     if (id == 'agency_owner') return RoleBadge.fromRole('agency_owner');
-    if (id == 'agency_member') return RoleBadge.fromRole('agency_member');
+    if (id == 'agency_member' || id == 'host') return RoleBadge.fromRole('host');
 
-    if (label.contains('super owner') || label.contains('founder')) return RoleBadge.fromRole('founder_owner');
-    if (label == 'owner' || label == 'app owner' || label.contains('owner official')) return RoleBadge.fromRole('owner');
-    if (label.contains('super admin') || label.contains('superadmin')) return RoleBadge.fromRole('superadmin');
-    if (label == 'app admin' || label == 'official admin' || label.contains('admin official')) return RoleBadge.fromRole('admin');
-    if (label.contains('coin seller')) return RoleBadge.fromRole('coin_seller');
-    if (label.contains('merchant') || label.contains('reseller')) return RoleBadge.fromRole('merchant');
-    if (label.contains('agency owner')) return RoleBadge.fromRole('agency_owner');
-    if (label.contains('agency member')) return RoleBadge.fromRole('agency_member');
+    if (label == 'official' || label.contains('super owner') || label.contains('founder') || label == 'owner') return RoleBadge.fromRole('owner');
+    if (label == 'executive' || label.contains('super admin') || label.contains('superadmin')) return RoleBadge.fromRole('superadmin');
+    if (label == 'associate' || label == 'app admin' || label == 'official admin') return RoleBadge.fromRole('admin');
+    if (label == 'agency' || label.contains('agency owner')) return RoleBadge.fromRole('agency_owner');
+    if (label == 'host' || label.contains('agency host')) return RoleBadge.fromRole('host');
 
     return null;
   }
@@ -75,9 +64,7 @@ class MiniProfileMetaRow extends StatelessWidget {
         else if (_isChannelHost)
           const MiniProfileMetaPill(icon: Icons.workspace_premium_rounded, label: 'Channel Host', color: RoomColors.gold)
         else if (_isChannelAdmin)
-          const MiniProfileMetaPill(icon: Icons.admin_panel_settings_rounded, label: 'Channel Admin', color: RoomColors.aqua)
-        else if (user.roleLabel.isNotEmpty && _normalizedRoleLabel != 'member')
-          MiniProfileMetaPill(icon: Icons.shield_rounded, label: user.roleLabel),
+          const MiniProfileMetaPill(icon: Icons.admin_panel_settings_rounded, label: 'Admin', color: RoomColors.aqua),
         if (user.familyName.trim().isNotEmpty)
           MiniProfileFamilyBadge(
             familyName: user.familyName,
