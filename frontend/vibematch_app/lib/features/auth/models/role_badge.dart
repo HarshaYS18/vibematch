@@ -47,27 +47,14 @@ class RoleBadge {
     switch (role.trim().toLowerCase()) {
       case 'founder_owner':
       case 'super_owner':
-        return const RoleBadge(
-          role: 'founder_owner',
-          displayTitle: 'Super Owner',
-          badgeLabel: 'Head Official',
-          pillLabel: 'Super Owner · Head Official',
-          group: 'official',
-          priority: 100,
-          icon: 'workspace_premium',
-          backgroundColor: Color(0xFF2A1600),
-          textColor: Color(0xFFFFD36A),
-          borderColor: Color(0xFFF4B63D),
-          showVerifiedTick: true,
-        );
       case 'owner':
         return const RoleBadge(
           role: 'owner',
-          displayTitle: 'Owner',
+          displayTitle: 'Official',
           badgeLabel: 'Official',
-          pillLabel: 'Owner · Official',
+          pillLabel: 'Official',
           group: 'official',
-          priority: 90,
+          priority: 100,
           icon: 'verified',
           backgroundColor: Color(0xFF24133A),
           textColor: Color(0xFFFFD36A),
@@ -75,11 +62,12 @@ class RoleBadge {
           showVerifiedTick: true,
         );
       case 'superadmin':
+      case 'super_admin':
         return const RoleBadge(
           role: 'superadmin',
-          displayTitle: 'Super Admin',
-          badgeLabel: 'Admin Official Lv1',
-          pillLabel: 'Super Admin · Admin Official Lv1',
+          displayTitle: 'Executive',
+          badgeLabel: 'Executive',
+          pillLabel: 'Executive',
           group: 'admin_official',
           priority: 80,
           icon: 'admin_panel_settings',
@@ -91,15 +79,45 @@ class RoleBadge {
       case 'admin':
         return const RoleBadge(
           role: 'admin',
-          displayTitle: 'Admin',
-          badgeLabel: 'Admin Official Lv2',
-          pillLabel: 'Admin · Admin Official Lv2',
+          displayTitle: 'Associate',
+          badgeLabel: 'Associate',
+          pillLabel: 'Associate',
           group: 'admin_official',
           priority: 70,
           icon: 'shield',
           backgroundColor: Color(0xFF1B2630),
           textColor: Color(0xFFAEE9D8),
           borderColor: Color(0xFF12C7B7),
+          showVerifiedTick: false,
+        );
+      case 'agency_owner':
+      case 'bd':
+        return const RoleBadge(
+          role: 'agency_owner',
+          displayTitle: 'Agency',
+          badgeLabel: 'Agency',
+          pillLabel: 'Agency',
+          group: 'agency',
+          priority: 50,
+          icon: 'groups',
+          backgroundColor: Color(0xFF112B25),
+          textColor: Color(0xFF9EF2D3),
+          borderColor: Color(0xFF12C7B7),
+          showVerifiedTick: false,
+        );
+      case 'agency_member':
+      case 'host':
+        return const RoleBadge(
+          role: 'agency_member',
+          displayTitle: 'Host',
+          badgeLabel: 'Host',
+          pillLabel: 'Host',
+          group: 'agency',
+          priority: 30,
+          icon: 'mic_external_on',
+          backgroundColor: Color(0xFF191B2F),
+          textColor: Color(0xFFAAB6FF),
+          borderColor: Color(0xFF6D5DF6),
           showVerifiedTick: false,
         );
       case 'coin_seller':
@@ -131,42 +149,12 @@ class RoleBadge {
           borderColor: Color(0xFF8C5CF6),
           showVerifiedTick: false,
         );
-      case 'agency_owner':
-      case 'bd':
-        return const RoleBadge(
-          role: 'agency_owner',
-          displayTitle: 'Agency Owner',
-          badgeLabel: 'Agency Official',
-          pillLabel: 'Agency Owner · Agency Official',
-          group: 'agency',
-          priority: 50,
-          icon: 'groups',
-          backgroundColor: Color(0xFF112B25),
-          textColor: Color(0xFF9EF2D3),
-          borderColor: Color(0xFF12C7B7),
-          showVerifiedTick: false,
-        );
-      case 'agency_member':
-      case 'host':
-        return const RoleBadge(
-          role: 'agency_member',
-          displayTitle: 'Agency Member',
-          badgeLabel: 'Host',
-          pillLabel: 'Agency Member · Host',
-          group: 'agency',
-          priority: 30,
-          icon: 'mic_external_on',
-          backgroundColor: Color(0xFF191B2F),
-          textColor: Color(0xFFAAB6FF),
-          borderColor: Color(0xFF6D5DF6),
-          showVerifiedTick: false,
-        );
       default:
         return const RoleBadge(
           role: 'user',
           displayTitle: 'User',
-          badgeLabel: 'Member',
-          pillLabel: 'Member',
+          badgeLabel: '',
+          pillLabel: '',
           group: 'user',
           priority: 0,
           icon: 'person',
