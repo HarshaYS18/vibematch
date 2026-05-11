@@ -13,7 +13,7 @@ from app.models.login_history import (
     LoginHistoryStatus,
     LoginHistoryFailureReason,
 )
-from app.models.follow import UserFollow
+from app.models.follow import UserBlock, UserFollow
 from app.models.notification import UserNotification
 from app.models.inbox import (
     InboxConversation,
