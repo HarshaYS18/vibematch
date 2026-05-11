@@ -37,6 +37,12 @@ class MediaUploadService {
     return uploadImage(file: file, endpointPath: '/media/avatar');
   }
 
+  Future<MediaUploadResult> pickAndUploadProfileCover() async {
+    final file = await pickImage(maxWidth: 1800, maxHeight: 900, imageQuality: 90);
+    if (file == null) throw const MediaUploadCancelledException();
+    return uploadImage(file: file, endpointPath: '/media/profile-cover');
+  }
+
   Future<MediaUploadResult> pickAndUploadRoomAvatar() async {
     final file = await pickImage(maxWidth: 1400, maxHeight: 1400, imageQuality: 90);
     if (file == null) throw const MediaUploadCancelledException();
@@ -64,13 +70,7 @@ class MediaUploadService {
     final filename = _safeFilename(file.name);
     final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpointPath)))
       ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: filename,
-        ),
-      );
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
@@ -105,18 +105,11 @@ class MediaUploadService {
 }
 
 class MediaUploadResult {
-  const MediaUploadResult({
-    required this.url,
-    required this.mediaType,
-    required this.contentType,
-    required this.sizeBytes,
-  });
-
+  const MediaUploadResult({required this.url, required this.mediaType, required this.contentType, required this.sizeBytes});
   final String url;
   final String mediaType;
   final String contentType;
   final int sizeBytes;
-
   factory MediaUploadResult.fromJson(Map<String, dynamic> json) {
     return MediaUploadResult(
       url: json['url']?.toString() ?? '',
@@ -129,7 +122,6 @@ class MediaUploadResult {
 
 class MediaUploadCancelledException implements Exception {
   const MediaUploadCancelledException();
-
   @override
   String toString() => 'Image selection cancelled.';
 }
