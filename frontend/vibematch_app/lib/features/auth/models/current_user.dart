@@ -9,6 +9,13 @@ class CurrentUser {
   final String? displayName;
   final String? avatarUrl;
   final String? bio;
+  final DateTime? dateOfBirth;
+  final String? gender;
+  final String? profession;
+  final String? maritalStatus;
+  final String? friendGenderPreference;
+  final String? friendMaritalPreference;
+  final List<String> interests;
   final List<String> roles;
   final String primaryRole;
   final RoleBadge? primaryRoleBadge;
@@ -31,6 +38,13 @@ class CurrentUser {
     required this.displayName,
     required this.avatarUrl,
     required this.bio,
+    required this.dateOfBirth,
+    required this.gender,
+    required this.profession,
+    required this.maritalStatus,
+    required this.friendGenderPreference,
+    required this.friendMaritalPreference,
+    required this.interests,
     required this.roles,
     required this.primaryRole,
     required this.primaryRoleBadge,
@@ -54,9 +68,7 @@ class CurrentUser {
     final primaryRole = primaryRoleValue == null || primaryRoleValue.toString().trim().isEmpty ? parsedRoles.first : primaryRoleValue.toString();
     final primaryBadgeJson = json['primary_role_badge'] ?? json['primaryRoleBadge'];
     final roleBadgesJson = json['role_badges'] ?? json['roleBadges'];
-    final parsedRoleBadges = roleBadgesJson is List
-        ? roleBadgesJson.whereType<Map<String, dynamic>>().map(RoleBadge.fromJson).toList()
-        : <RoleBadge>[];
+    final parsedRoleBadges = roleBadgesJson is List ? roleBadgesJson.whereType<Map<String, dynamic>>().map(RoleBadge.fromJson).toList() : <RoleBadge>[];
 
     return CurrentUser(
       id: _intFromJson(json, keys: const ['id', 'user_id'], fallback: 0),
@@ -66,6 +78,13 @@ class CurrentUser {
       displayName: _nullableStringFromJson(json, keys: const ['display_name', 'displayName']),
       avatarUrl: _nullableStringFromJson(json, keys: const ['avatar_url', 'avatarUrl']),
       bio: _nullableStringFromJson(json, keys: const ['bio']),
+      dateOfBirth: _dateTimeFromJson(json, keys: const ['date_of_birth', 'dateOfBirth']),
+      gender: _nullableStringFromJson(json, keys: const ['gender']),
+      profession: _nullableStringFromJson(json, keys: const ['profession']),
+      maritalStatus: _nullableStringFromJson(json, keys: const ['marital_status', 'maritalStatus']),
+      friendGenderPreference: _nullableStringFromJson(json, keys: const ['friend_gender_preference', 'friendGenderPreference']),
+      friendMaritalPreference: _nullableStringFromJson(json, keys: const ['friend_marital_preference', 'friendMaritalPreference']),
+      interests: _stringListFromJson(json, keys: const ['interests']),
       roles: parsedRoles.isEmpty ? <String>['user'] : parsedRoles,
       primaryRole: primaryRole,
       primaryRoleBadge: primaryBadgeJson is Map<String, dynamic> ? RoleBadge.fromJson(primaryBadgeJson) : RoleBadge.fromRole(primaryRole),
@@ -93,6 +112,13 @@ class CurrentUser {
       displayName: 'Harsha',
       avatarUrl: null,
       bio: null,
+      dateOfBirth: null,
+      gender: null,
+      profession: null,
+      maritalStatus: null,
+      friendGenderPreference: null,
+      friendMaritalPreference: null,
+      interests: const [],
       roles: const ['founder_owner', 'owner', 'superadmin', 'admin', 'monitor', 'cs', 'user'],
       primaryRole: 'founder_owner',
       primaryRoleBadge: badge,
@@ -120,6 +146,13 @@ class CurrentUser {
       displayName: 'Riya Sharma',
       avatarUrl: null,
       bio: null,
+      dateOfBirth: null,
+      gender: null,
+      profession: null,
+      maritalStatus: null,
+      friendGenderPreference: null,
+      friendMaritalPreference: null,
+      interests: const [],
       roles: const ['user'],
       primaryRole: 'user',
       primaryRoleBadge: badge,
@@ -144,6 +177,13 @@ class CurrentUser {
     String? displayName,
     String? avatarUrl,
     String? bio,
+    DateTime? dateOfBirth,
+    String? gender,
+    String? profession,
+    String? maritalStatus,
+    String? friendGenderPreference,
+    String? friendMaritalPreference,
+    List<String>? interests,
     List<String>? roles,
     String? primaryRole,
     RoleBadge? primaryRoleBadge,
@@ -160,6 +200,7 @@ class CurrentUser {
     bool clearDisplayCustomId = false,
     bool clearAvatarUrl = false,
     bool clearBio = false,
+    bool clearDateOfBirth = false,
     bool clearLastDeviceId = false,
     bool clearLastLoginAt = false,
     bool clearLastSeenAt = false,
@@ -172,6 +213,13 @@ class CurrentUser {
       displayName: displayName ?? this.displayName,
       avatarUrl: clearAvatarUrl ? null : avatarUrl ?? this.avatarUrl,
       bio: clearBio ? null : bio ?? this.bio,
+      dateOfBirth: clearDateOfBirth ? null : dateOfBirth ?? this.dateOfBirth,
+      gender: gender ?? this.gender,
+      profession: profession ?? this.profession,
+      maritalStatus: maritalStatus ?? this.maritalStatus,
+      friendGenderPreference: friendGenderPreference ?? this.friendGenderPreference,
+      friendMaritalPreference: friendMaritalPreference ?? this.friendMaritalPreference,
+      interests: interests ?? this.interests,
       roles: roles ?? this.roles,
       primaryRole: primaryRole ?? this.primaryRole,
       primaryRoleBadge: primaryRoleBadge ?? this.primaryRoleBadge,
@@ -236,6 +284,14 @@ class CurrentUser {
     return null;
   }
 
+  static List<String> _stringListFromJson(Map<String, dynamic> json, {required List<String> keys}) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is List) return value.map((item) => item.toString().trim()).where((item) => item.isNotEmpty).toList(growable: false);
+    }
+    return const [];
+  }
+
   static DateTime? _dateTimeFromJson(Map<String, dynamic> json, {required List<String> keys}) {
     for (final key in keys) {
       final value = json[key];
@@ -244,6 +300,16 @@ class CurrentUser {
       if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value);
     }
     return null;
+  }
+
+  int? get age {
+    final dob = dateOfBirth;
+    if (dob == null) return null;
+    final today = DateTime.now();
+    var computed = today.year - dob.year;
+    final birthdayPassed = today.month > dob.month || (today.month == dob.month && today.day >= dob.day);
+    if (!birthdayPassed) computed--;
+    return computed.clamp(0, 120);
   }
 
   String get visibleId => displayCustomId?.toString() ?? publicUserId.toString();
