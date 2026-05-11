@@ -9,6 +9,7 @@ import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
 import 'live_room_mini_profile_sheet.dart';
 import 'mini_profile_report_sheet.dart';
+import 'mini_profile_social_actions_row.dart';
 import 'rankings/room_rankings_models.dart';
 import 'rankings/room_rankings_sheet.dart';
 import 'room_kickout_duration_sheet.dart';
@@ -42,6 +43,7 @@ class LiveRoomMiniProfileLauncher {
     final targetPower = _roomPower(user);
     final canModerateTarget = user.id != effectiveCurrentUser.id && targetPower < 100 && ((viewerPower >= 100 && targetPower < 100) || (viewerPower >= 90 && targetPower < 90));
     final canShowKickOut = canModerateTarget;
+    final initialRelation = _relationFromUserIds(currentUserId: effectiveCurrentUser.id, targetUserId: user.id);
 
     showModalBottomSheet<void>(
       context: context,
@@ -51,6 +53,7 @@ class LiveRoomMiniProfileLauncher {
         user: user,
         currentUser: effectiveCurrentUser,
         canModerate: canModerateTarget,
+        initialRelation: initialRelation,
         onAvatarTap: () {
           Navigator.pop(context);
           LiveRoomProfileNavigator.openExistingPublicProfile(
@@ -123,13 +126,7 @@ class LiveRoomMiniProfileLauncher {
         onSelfMuteToggle: () => onSelfMuteToggle(user.id),
         onAdminMuteToggle: () => onAdminMuteToggle(user.id),
         onGiftTap: () => onGiftTap(user.id),
-        onSocialRelationTap: () => _openRankingsSheet(
-          context: context,
-          roomId: roomId,
-          roomName: roomName,
-          users: allRoomUsers,
-          initialCategory: RoomRankingCategory.relation,
-        ),
+        onSocialRelationTap: () => _toggleFollowFromMiniProfile(context: context, user: user),
         onMessageTap: () => _openMessageInfo(context: context, user: user),
         onKickOutTap: canShowKickOut && onKickOutDurationSelected != null
             ? () => _openKickOutDurationSheet(
@@ -140,6 +137,45 @@ class LiveRoomMiniProfileLauncher {
             : null,
       ),
     );
+  }
+
+  static MiniProfileSocialRelation _relationFromUserIds({required String currentUserId, required String targetUserId}) {
+    if (currentUserId == targetUserId) return MiniProfileSocialRelation.following;
+    return MiniProfileSocialRelation.follow;
+  }
+
+  static Future<MiniProfileSocialRelation> _toggleFollowFromMiniProfile({required BuildContext context, required SeatUser user}) async {
+    final publicUserId = publicUserIdFromRoomUserId(user.id);
+    if (publicUserId == null) {
+      _showMiniToast(context, 'This user does not have a valid public user ID yet.');
+      return MiniProfileSocialRelation.follow;
+    }
+
+    try {
+      final service = const SocialApiService();
+      final current = await service.getFollowStatusByPublicUserId(publicUserId);
+      final next = current.isFollowing ? await service.unfollowByPublicUserId(publicUserId) : await service.followByPublicUserId(publicUserId);
+      final relation = _relationFromFollowStatus(next);
+      _showMiniToast(context, next.isFriends ? 'You are friends now.' : next.isFollowing ? 'You are now following ${user.name}.' : 'Unfollowed ${user.name}.');
+      return relation;
+    } catch (error) {
+      _showMiniToast(context, error.toString().replaceFirst('Exception: ', ''));
+      return MiniProfileSocialRelation.follow;
+    }
+  }
+
+  static MiniProfileSocialRelation _relationFromFollowStatus(FollowStatus status) {
+    if (status.isFriends) return MiniProfileSocialRelation.friends;
+    if (status.isFollowing) return MiniProfileSocialRelation.following;
+    if (status.isFollowedBy) return MiniProfileSocialRelation.followBack;
+    return MiniProfileSocialRelation.follow;
+  }
+
+  static void _showMiniToast(BuildContext context, String message) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
   }
 
   static int _roomPower(SeatUser user) {
