@@ -15,6 +15,8 @@ class UserMiniProfileSheet extends StatelessWidget {
     required this.user,
     required this.currentUser,
     required this.canModerate,
+    required this.relation,
+    required this.relationBusy,
     required this.onAvatarTap,
     required this.onVipTap,
     required this.onSvipTap,
@@ -42,6 +44,8 @@ class UserMiniProfileSheet extends StatelessWidget {
   final SeatUser user;
   final SeatUser currentUser;
   final bool canModerate;
+  final MiniProfileSocialRelation relation;
+  final bool relationBusy;
   final VoidCallback onAvatarTap;
   final VoidCallback onVipTap;
   final VoidCallback onSvipTap;
@@ -122,7 +126,8 @@ class UserMiniProfileSheet extends StatelessWidget {
                 if (!_isSelf) ...[
                   const SizedBox(height: 9),
                   MiniProfileSocialActionsRow(
-                    relation: miniProfileMockRelationForUser(user),
+                    relation: relation,
+                    relationBusy: relationBusy,
                     onRelationTap: onSocialRelationTap,
                     onMessageTap: onMessageTap,
                   ),
