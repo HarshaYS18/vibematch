@@ -353,7 +353,7 @@ class _UserTile extends StatelessWidget {
         Container(width: 38, height: 38, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)), child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900))),
         const SizedBox(width: 9),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: RoomColors.plum, fontSize: 13, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(color: Color(0xFF82758E), fontSize: 10.5, fontWeight: FontWeight.w800))])),
-        if (trailing != null) trailing!,
+        ?trailing,
       ]),
     );
   }
