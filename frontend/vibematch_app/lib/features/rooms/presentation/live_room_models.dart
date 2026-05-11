@@ -203,7 +203,7 @@ class RoomSeat {
 }
 
 class ChatEntry {
-  const ChatEntry({required this.senderName, required this.message, this.senderId, this.vipLevel = 0, this.sendingLevel = 0, this.receivingLevel = 0, this.isGift = false, this.isSeatApplication = false, this.seatIndex, this.applicationApproved = false, this.applicationRejected = false, this.giftAssetPath, this.imageUrl, this.imageContentType});
+  ChatEntry({required this.senderName, required this.message, this.senderId, this.vipLevel = 0, this.sendingLevel = 0, this.receivingLevel = 0, this.isGift = false, this.isSeatApplication = false, this.seatIndex, this.applicationCreatedAt, this.applicationExpiresAt, this.applicationApproved = false, this.applicationRejected = false, this.applicationExpired = false, this.giftAssetPath, this.imageUrl, this.imageContentType});
   final String senderName;
   final String message;
   final String? senderId;
@@ -213,14 +213,18 @@ class ChatEntry {
   final bool isGift;
   final bool isSeatApplication;
   final int? seatIndex;
+  final DateTime? applicationCreatedAt;
+  final DateTime? applicationExpiresAt;
   final bool applicationApproved;
   final bool applicationRejected;
+  final bool applicationExpired;
   final String? giftAssetPath;
   final String? imageUrl;
   final String? imageContentType;
-  bool get applicationResolved => applicationApproved || applicationRejected;
+  bool get applicationTimedOut => applicationExpired || (applicationExpiresAt != null && DateTime.now().isAfter(applicationExpiresAt!));
+  bool get applicationResolved => applicationApproved || applicationRejected || applicationTimedOut;
   bool get isImageMessage => imageUrl?.trim().isNotEmpty ?? false;
-  ChatEntry copyWith({String? message, bool? applicationApproved, bool? applicationRejected, String? imageUrl, String? imageContentType}) => ChatEntry(senderName: senderName, message: message ?? this.message, senderId: senderId, vipLevel: vipLevel, sendingLevel: sendingLevel, receivingLevel: receivingLevel, isGift: isGift, isSeatApplication: isSeatApplication, seatIndex: seatIndex, applicationApproved: applicationApproved ?? this.applicationApproved, applicationRejected: applicationRejected ?? this.applicationRejected, giftAssetPath: giftAssetPath, imageUrl: imageUrl ?? this.imageUrl, imageContentType: imageContentType ?? this.imageContentType);
+  ChatEntry copyWith({String? message, bool? applicationApproved, bool? applicationRejected, bool? applicationExpired, String? imageUrl, String? imageContentType}) => ChatEntry(senderName: senderName, message: message ?? this.message, senderId: senderId, vipLevel: vipLevel, sendingLevel: sendingLevel, receivingLevel: receivingLevel, isGift: isGift, isSeatApplication: isSeatApplication, seatIndex: seatIndex, applicationCreatedAt: applicationCreatedAt, applicationExpiresAt: applicationExpiresAt, applicationApproved: applicationApproved ?? this.applicationApproved, applicationRejected: applicationRejected ?? this.applicationRejected, applicationExpired: applicationExpired ?? this.applicationExpired, giftAssetPath: giftAssetPath, imageUrl: imageUrl ?? this.imageUrl, imageContentType: imageContentType ?? this.imageContentType);
 }
 
 class GiftItem {
@@ -295,9 +299,9 @@ RoomPrivacyMode privacyModeFromTitle(String title) {
   return RoomPrivacyMode.open;
 }
 
-const List<SeatUser> mockRoomUsers = [];
-const List<SeatUser> mockInviteUsers = [];
-const List<ChatEntry> mockChatEntries = [];
+final List<SeatUser> mockRoomUsers = <SeatUser>[];
+final List<SeatUser> mockInviteUsers = <SeatUser>[];
+final List<ChatEntry> mockChatEntries = <ChatEntry>[];
 
 const List<GiftItem> mockGiftItems = [
   GiftItem(id: 'love_bomb', name: 'Love Bomb', category: GiftCategory.classic, coins: 1, icon: Icons.favorite_rounded, chatSymbol: '❤️', assetPath: 'assets/images/gifts/love_bomb.png', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
