@@ -1,44 +1,98 @@
 import 'package:flutter/material.dart';
 
 enum ProfileGender {
-  male('Male'),
-  female('Female'),
-  other('Other'),
-  preferNotToSay('Prefer not to say');
+  male('Male', 'male'),
+  female('Female', 'female'),
+  other('Other', 'other'),
+  preferNotToSay('Prefer not to say', 'prefer_not_to_say');
 
-  const ProfileGender(this.label);
+  const ProfileGender(this.label, this.wireValue);
   final String label;
+  final String wireValue;
 }
 
 enum FriendGenderPreference {
-  male('Male'),
-  female('Female'),
-  both('Both');
+  male('Male', 'male'),
+  female('Female', 'female'),
+  both('Both', 'both');
 
-  const FriendGenderPreference(this.label);
+  const FriendGenderPreference(this.label, this.wireValue);
   final String label;
+  final String wireValue;
 }
 
 enum MaritalStatus {
-  single('Single'),
-  married('Married'),
-  committed('Committed'),
-  divorced('Divorced');
+  single('Single', 'single'),
+  married('Married', 'married'),
+  committed('Committed', 'committed'),
+  divorced('Divorced', 'divorced');
 
-  const MaritalStatus(this.label);
+  const MaritalStatus(this.label, this.wireValue);
   final String label;
+  final String wireValue;
 }
 
 enum FriendMaritalPreference {
-  any('Any status'),
-  single('Single'),
-  married('Married'),
-  committed('Committed'),
-  divorced('Divorced');
+  any('Any status', 'any'),
+  single('Single', 'single'),
+  married('Married', 'married'),
+  committed('Committed', 'committed'),
+  divorced('Divorced', 'divorced');
 
-  const FriendMaritalPreference(this.label);
+  const FriendMaritalPreference(this.label, this.wireValue);
   final String label;
+  final String wireValue;
 }
+
+ProfileGender profileGenderFromWire(String? value) {
+  final normalized = _normalizeWire(value);
+  return ProfileGender.values.firstWhere(
+    (item) => item.wireValue == normalized,
+    orElse: () => ProfileGender.preferNotToSay,
+  );
+}
+
+FriendGenderPreference friendGenderPreferenceFromWire(String? value) {
+  final normalized = _normalizeWire(value);
+  return FriendGenderPreference.values.firstWhere(
+    (item) => item.wireValue == normalized,
+    orElse: () => FriendGenderPreference.both,
+  );
+}
+
+MaritalStatus maritalStatusFromWire(String? value) {
+  final normalized = _normalizeWire(value);
+  return MaritalStatus.values.firstWhere(
+    (item) => item.wireValue == normalized,
+    orElse: () => MaritalStatus.single,
+  );
+}
+
+FriendMaritalPreference friendMaritalPreferenceFromWire(String? value) {
+  final normalized = _normalizeWire(value);
+  return FriendMaritalPreference.values.firstWhere(
+    (item) => item.wireValue == normalized,
+    orElse: () => FriendMaritalPreference.any,
+  );
+}
+
+String? displayGenderFromWire(String? value) {
+  final normalized = _normalizeWire(value);
+  for (final item in ProfileGender.values) {
+    if (item.wireValue == normalized) return item.label;
+  }
+  return null;
+}
+
+String? displayMaritalFromWire(String? value) {
+  final normalized = _normalizeWire(value);
+  for (final item in MaritalStatus.values) {
+    if (item.wireValue == normalized) return item.label;
+  }
+  return null;
+}
+
+String _normalizeWire(String? value) => value?.trim().toLowerCase().replaceAll(' ', '_').replaceAll('-', '_') ?? '';
 
 class InterestCategory {
   const InterestCategory({required this.name, required this.icon, required this.interests});
@@ -74,40 +128,43 @@ const List<ProfessionOption> profileProfessionOptions = [
   ProfessionOption('Other', Icons.work_outline_rounded),
 ];
 
-int calculateProfileMatchScore({
+int? calculateProfileMatchScore({
   required List<String> viewerInterests,
   required List<String> profileInterests,
-  required FriendGenderPreference viewerGenderPreference,
-  required ProfileGender profileGender,
-  required FriendMaritalPreference viewerMaritalPreference,
-  required MaritalStatus profileMaritalStatus,
-  ProfileGender? viewerGender,
-  FriendGenderPreference? profileGenderPreference,
+  required FriendGenderPreference? viewerGenderPreference,
+  required ProfileGender? profileGender,
+  required FriendMaritalPreference? viewerMaritalPreference,
+  required MaritalStatus? profileMaritalStatus,
+  required ProfileGender? viewerGender,
+  required FriendGenderPreference? profileGenderPreference,
 }) {
-  final viewerSet = viewerInterests.map((item) => item.toLowerCase()).toSet();
-  final profileSet = profileInterests.map((item) => item.toLowerCase()).toSet();
-  final commonCount = viewerSet.intersection(profileSet).length;
-  final interestBase = profileSet.isEmpty ? 0 : ((commonCount / profileSet.length.clamp(1, 99)) * 70).round();
-  final viewerAcceptsProfile = _genderPreferenceAccepts(
-    preference: viewerGenderPreference,
-    gender: profileGender,
-  );
-  final profileAcceptsViewer = viewerGender == null || profileGenderPreference == null
-      ? true
-      : _genderPreferenceAccepts(
-          preference: profileGenderPreference,
-          gender: viewerGender,
-        );
-  final genderMatch = viewerAcceptsProfile && profileAcceptsViewer;
-  final maritalMatch = viewerMaritalPreference == FriendMaritalPreference.any || viewerMaritalPreference.label == profileMaritalStatus.label;
-  return (interestBase + (genderMatch ? 15 : 0) + (maritalMatch ? 15 : 0)).clamp(0, 100);
+  if (viewerGenderPreference == null || profileGender == null || viewerGender == null || profileGenderPreference == null) {
+    return null;
+  }
+
+  final viewerAcceptsProfile = _genderPreferenceAccepts(preference: viewerGenderPreference, gender: profileGender);
+  final profileAcceptsViewer = _genderPreferenceAccepts(preference: profileGenderPreference, gender: viewerGender);
+  if (!viewerAcceptsProfile || !profileAcceptsViewer) return 0;
+
+  var score = 35;
+
+  final viewerSet = viewerInterests.map((item) => item.trim().toLowerCase()).where((item) => item.isNotEmpty).toSet();
+  final profileSet = profileInterests.map((item) => item.trim().toLowerCase()).where((item) => item.isNotEmpty).toSet();
+  if (viewerSet.isNotEmpty && profileSet.isNotEmpty) {
+    final commonCount = viewerSet.intersection(profileSet).length;
+    final maxCount = viewerSet.length > profileSet.length ? viewerSet.length : profileSet.length;
+    score += ((commonCount / maxCount.clamp(1, 99)) * 45).round();
+  }
+
+  if (viewerMaritalPreference == null || viewerMaritalPreference == FriendMaritalPreference.any || profileMaritalStatus == null || viewerMaritalPreference.wireValue == profileMaritalStatus.wireValue) {
+    score += 20;
+  }
+
+  return score.clamp(0, 100);
 }
 
-bool _genderPreferenceAccepts({
-  required FriendGenderPreference preference,
-  required ProfileGender gender,
-}) {
-  return preference == FriendGenderPreference.both ||
-      (preference == FriendGenderPreference.male && gender == ProfileGender.male) ||
+bool _genderPreferenceAccepts({required FriendGenderPreference preference, required ProfileGender gender}) {
+  if (preference == FriendGenderPreference.both) return true;
+  return (preference == FriendGenderPreference.male && gender == ProfileGender.male) ||
       (preference == FriendGenderPreference.female && gender == ProfileGender.female);
 }
