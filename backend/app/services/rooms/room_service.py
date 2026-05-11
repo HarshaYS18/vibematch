@@ -1,6 +1,7 @@
 import random
 from datetime import datetime, timedelta
 
+from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -30,6 +31,10 @@ def _role_values(user: User) -> set[str]:
 
 def _can_create_unlimited_rooms(user: User) -> bool:
     return bool(_role_values(user) & _UNLIMITED_ROOM_ROLES)
+
+
+def _can_manage_room(room: Room, user: User) -> bool:
+    return room.owner_user_id == user.id or bool(_role_values(user) & _UNLIMITED_ROOM_ROLES)
 
 
 def _apply_room_payload(room: Room, payload: RoomCreateRequest) -> Room:
@@ -63,8 +68,27 @@ def _upsert_active_participant(db: Session, room: Room, user: User) -> RoomParti
         participant.is_active = True
         participant.last_seen_at = now
         participant.left_at = None
+    if room.owner_user_id == user.id:
+        participant.is_member = True
+        participant.is_room_admin = True
+        participant.member_added_at = participant.member_added_at or now
+        participant.admin_added_at = participant.admin_added_at or now
     user.last_seen_at = now
     return participant
+
+
+def _get_room_or_404(db: Session, room_public_id: str) -> Room:
+    room = get_room_model_by_public_id(db, room_public_id)
+    if not room:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    return room
+
+
+def _get_user_or_404(db: Session, public_user_id: int) -> User:
+    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
 
 
 def generate_room_public_id(db: Session) -> str:
@@ -142,6 +166,8 @@ def participant_to_response(db: Session, participant: RoomParticipant, room: Roo
         role_badges=get_role_badges(user_roles),
         vip=profile_service.vip_summary(db, user),
         is_owner=room.owner_user_id == user.id,
+        is_member=participant.is_member,
+        is_room_admin=participant.is_room_admin or room.owner_user_id == user.id,
         joined_at=participant.joined_at,
         last_seen_at=participant.last_seen_at,
     )
@@ -214,17 +240,28 @@ def join_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinR
     if room.is_secret and room.owner_user_id != current_user.id:
         return None
 
-    _upsert_active_participant(db, room, current_user)
+    previous = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == current_user.id).first()
+    was_active = previous.is_active if previous is not None else False
+    participant = _upsert_active_participant(db, room, current_user)
     _refresh_room_online_count(db, room)
     db.commit()
     db.refresh(room)
+    db.refresh(participant)
     participants = active_participants(db, room)
     db.commit()
-    return RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants])
+    return RoomJoinResponse(
+        room=room_to_detail_response(room),
+        participants=[participant_to_response(db, item, room) for item in participants],
+        joined_user=participant_to_response(db, participant, room),
+        should_show_entered_message=not was_active,
+    )
 
 
 def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinResponse | None:
-    return join_room(db, room_public_id, current_user)
+    joined = join_room(db, room_public_id, current_user)
+    if joined is not None:
+        joined.should_show_entered_message = False
+    return joined
 
 
 def leave_room(db: Session, room_public_id: str, current_user: User) -> RoomLeaveResponse | None:
@@ -251,6 +288,47 @@ def list_room_participants(db: Session, room_public_id: str, current_user: User)
     db.commit()
     db.refresh(room)
     return RoomParticipantsResponse(room_id=room.room_public_id, online_count=room.online_count, participants=[participant_to_response(db, item, room) for item in participants])
+
+
+def set_room_member(db: Session, room_public_id: str, current_user: User, target_public_user_id: int, is_member: bool) -> RoomParticipantUserResponse:
+    room = _get_room_or_404(db, room_public_id)
+    if not _can_manage_room(room, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host or Owner can manage room members")
+    target = _get_user_or_404(db, target_public_user_id)
+    participant = _upsert_active_participant(db, room, target)
+    now = datetime.utcnow()
+    participant.is_member = is_member or room.owner_user_id == target.id
+    if not participant.is_member and participant.is_room_admin:
+        participant.is_room_admin = False
+    if participant.is_member:
+        participant.member_added_at = participant.member_added_at or now
+    _refresh_room_online_count(db, room)
+    db.commit()
+    db.refresh(participant)
+    return participant_to_response(db, participant, room)
+
+
+def set_room_admin(db: Session, room_public_id: str, current_user: User, target_public_user_id: int, is_admin: bool) -> RoomParticipantUserResponse:
+    room = _get_room_or_404(db, room_public_id)
+    if not _can_manage_room(room, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host or Owner can manage room admins")
+    target = _get_user_or_404(db, target_public_user_id)
+    participant = _upsert_active_participant(db, room, target)
+    now = datetime.utcnow()
+    if room.owner_user_id == target.id:
+        participant.is_member = True
+        participant.is_room_admin = True
+    else:
+        participant.is_member = True if is_admin else participant.is_member
+        participant.is_room_admin = is_admin
+    if participant.is_member:
+        participant.member_added_at = participant.member_added_at or now
+    if participant.is_room_admin:
+        participant.admin_added_at = participant.admin_added_at or now
+    _refresh_room_online_count(db, room)
+    db.commit()
+    db.refresh(participant)
+    return participant_to_response(db, participant, room)
 
 
 def list_trending_rooms(db: Session, language: str | None = None, category: str | None = None, limit: int = 30) -> list[RoomTrendingResponse]:
