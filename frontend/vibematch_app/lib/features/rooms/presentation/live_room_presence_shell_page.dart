@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../auth/models/current_user.dart';
+import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_presence_repository.dart';
 import 'live_room_models.dart';
 import 'live_room_page.dart';
@@ -14,6 +16,7 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
     required this.language,
     required this.modeTitle,
     required this.initialOnlineCount,
+    this.currentUser,
   });
 
   final String roomName;
@@ -21,6 +24,7 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
   final String language;
   final String modeTitle;
   final int initialOnlineCount;
+  final CurrentUser? currentUser;
 
   @override
   State<LiveRoomPresenceShellPage> createState() => _LiveRoomPresenceShellPageState();
@@ -32,6 +36,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   LiveRoomPresenceSnapshot? _snapshot;
   bool _joining = true;
   bool _participantsOpen = false;
+  bool _autoSeatAttempted = false;
   String? _presenceError;
 
   int get _onlineCount => _snapshot?.onlineCount ?? widget.initialOnlineCount;
@@ -63,6 +68,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
         _snapshot = snapshot;
         _joining = false;
       });
+      _autoSeatIfAllowed(snapshot);
       _startHeartbeat();
     } catch (error) {
       if (!mounted) return;
@@ -71,6 +77,23 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
         _presenceError = error.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  void _autoSeatIfAllowed(LiveRoomPresenceSnapshot snapshot) {
+    if (_autoSeatAttempted) return;
+    final currentUser = widget.currentUser;
+    if (currentUser == null) return;
+    final currentPublicId = currentUser.publicUserId.toString();
+    final self = snapshot.participants.where((user) => user.id == 'user_$currentPublicId').cast<SeatUser?>().firstOrNull;
+    final isRoomOwner = self?.isHost == true;
+    final isOfficialOwner = currentUser.canSeeOwnerControls;
+    if (!isRoomOwner && !isOfficialOwner) return;
+
+    _autoSeatAttempted = true;
+    final media = LiveRoomMediaSignalingService.instance;
+    unawaited(Future<void>.delayed(const Duration(milliseconds: 450), () {
+      media.takeSeat(0);
+    }));
   }
 
   void _startHeartbeat() {
@@ -86,6 +109,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
         _snapshot = snapshot;
         _presenceError = null;
       });
+      _autoSeatIfAllowed(snapshot);
     } catch (error) {
       if (!mounted) return;
       setState(() => _presenceError = error.toString().replaceFirst('Exception: ', ''));
