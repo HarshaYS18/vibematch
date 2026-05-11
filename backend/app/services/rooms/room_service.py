@@ -37,6 +37,8 @@ def _apply_room_payload(room: Room, payload: RoomCreateRequest) -> Room:
     room_type = payload.type.strip() or "Chat"
     room.name = payload.name.strip()
     room.subtitle = payload.subtitle.strip() if payload.subtitle else None
+    if payload.avatar_url and payload.avatar_url.strip():
+        room.avatar_url = payload.avatar_url.strip()
     room.language = payload.language.strip() or "English"
     room.mode = mode
     room.room_type = room_type
@@ -78,6 +80,7 @@ def room_to_trending_response(room: Room, followed_friends_inside: list[str] | N
         id=room.room_public_id,
         name=room.name,
         subtitle=room.subtitle,
+        avatar_url=room.avatar_url,
         language=room.language,
         mode=room.mode,
         type=room.room_type,
@@ -92,6 +95,7 @@ def room_to_detail_response(room: Room) -> RoomDetailResponse:
         id=room.room_public_id,
         name=room.name,
         subtitle=room.subtitle,
+        avatar_url=room.avatar_url,
         language=room.language,
         mode=room.mode,
         type=room.room_type,
@@ -151,6 +155,7 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
         owner_user_id=current_user.id,
         name=payload.name.strip(),
         subtitle=payload.subtitle.strip() if payload.subtitle else None,
+        avatar_url=payload.avatar_url.strip() if payload.avatar_url else None,
         language=payload.language.strip() or "English",
         mode=mode,
         room_type=room_type,
