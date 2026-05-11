@@ -52,6 +52,10 @@ class UserRelationshipResponse(BaseModel):
     is_following: bool = False
     follows_me: bool = False
     is_friend: bool = False
+    blocked_by_me: bool = False
+    blocked_me: bool = False
+    can_follow: bool = True
+    follow_block_reason: str | None = None
     followers_count: int = 0
     following_count: int = 0
 
@@ -87,6 +91,9 @@ class UserSearchResultResponse(BaseModel):
     is_following: bool = False
     follows_me: bool = False
     is_friend: bool = False
+    blocked_by_me: bool = False
+    blocked_me: bool = False
+    can_follow: bool = True
 
 
 class UserSearchResponse(BaseModel):
