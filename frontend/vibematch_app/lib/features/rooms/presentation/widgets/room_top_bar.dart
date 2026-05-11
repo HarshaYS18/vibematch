@@ -61,9 +61,9 @@ class RoomTopBar extends StatelessWidget {
           children: [
             RoundRoomButton(icon: Icons.arrow_back_rounded, onTap: onBack, size: 31, iconSize: 18, background: Colors.black.withValues(alpha: 0.26)),
             const SizedBox(width: 7),
-            Flexible(
-              fit: FlexFit.loose,
-              child: IntrinsicWidth(
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minWidth: 126, maxWidth: 218),
                   child: _RoomNamePill(roomName: roomName, privacyMode: privacyMode, onInfoTap: () => _openRoomInfo(context), onJoinTap: onJoinTap, showJoinButton: !canManageAdmins),
