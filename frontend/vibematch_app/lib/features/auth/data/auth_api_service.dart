@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -69,6 +70,7 @@ class AuthApiService {
 
     final user = await getCurrentUser(accessToken: accessToken, forceRefresh: true);
     _cachedUser = user;
+    AuthUserRealtimeService.instance.publish(user);
 
     return AuthLoginResult(accessToken: accessToken, tokenType: tokenType, user: user);
   }
@@ -112,6 +114,7 @@ class AuthApiService {
     _cachedDeviceId = resolvedDeviceId;
     final user = await getCurrentUser(accessToken: accessToken, forceRefresh: true);
     _cachedUser = user;
+    AuthUserRealtimeService.instance.publish(user);
     return AuthLoginResult(accessToken: accessToken, tokenType: tokenType, user: user);
   }
 
@@ -139,6 +142,40 @@ class AuthApiService {
 
     _cachedAccessToken = token;
     _cachedUser = user;
+    AuthUserRealtimeService.instance.publish(user);
+    return user;
+  }
+
+  Future<CurrentUser> updateProfile({
+    required String displayName,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    final token = _cachedAccessToken;
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('No access token available. Please login again.');
+    }
+
+    final safeName = displayName.trim();
+    if (safeName.isEmpty) throw Exception('Name is required.');
+
+    final response = await http.patch(
+      Uri.parse(VmApiConfig.endpoint('/users/me/profile')),
+      headers: const {'Content-Type': 'application/json'}..addAll({'Authorization': 'Bearer $token'}),
+      body: jsonEncode({
+        'display_name': safeName,
+        'bio': bio?.trim() ?? '',
+        if (avatarUrl != null) 'avatar_url': avatarUrl.trim(),
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_errorMessage(response, fallback: 'Failed to update profile'));
+    }
+
+    final user = CurrentUser.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    _cachedUser = user;
+    AuthUserRealtimeService.instance.publish(user);
     return user;
   }
 
@@ -150,6 +187,35 @@ class AuthApiService {
   String? get cachedAccessToken => _cachedAccessToken;
 
   CurrentUser? get cachedUser => _cachedUser;
+
+  String _errorMessage(http.Response response, {required String fallback}) {
+    final body = response.body.trim();
+    if (body.isEmpty) return '$fallback (${response.statusCode})';
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail']?.toString().trim();
+        if (detail != null && detail.isNotEmpty) return detail;
+      }
+    } catch (_) {
+      return body;
+    }
+    return '$fallback (${response.statusCode})';
+  }
+}
+
+class AuthUserRealtimeService {
+  AuthUserRealtimeService._();
+
+  static final AuthUserRealtimeService instance = AuthUserRealtimeService._();
+
+  final StreamController<CurrentUser> _controller = StreamController<CurrentUser>.broadcast();
+
+  Stream<CurrentUser> get users => _controller.stream;
+
+  void publish(CurrentUser user) {
+    _controller.add(user);
+  }
 }
 
 class AuthLoginResult {
