@@ -215,6 +215,8 @@ class ChatEntry {
     this.applicationApproved = false,
     this.applicationRejected = false,
     this.giftAssetPath,
+    this.imageUrl,
+    this.imageContentType,
   });
 
   final String senderName;
@@ -229,13 +231,18 @@ class ChatEntry {
   final bool applicationApproved;
   final bool applicationRejected;
   final String? giftAssetPath;
+  final String? imageUrl;
+  final String? imageContentType;
 
   bool get applicationResolved => applicationApproved || applicationRejected;
+  bool get isImageMessage => imageUrl?.trim().isNotEmpty ?? false;
 
   ChatEntry copyWith({
     String? message,
     bool? applicationApproved,
     bool? applicationRejected,
+    String? imageUrl,
+    String? imageContentType,
   }) {
     return ChatEntry(
       senderName: senderName,
@@ -250,6 +257,8 @@ class ChatEntry {
       applicationApproved: applicationApproved ?? this.applicationApproved,
       applicationRejected: applicationRejected ?? this.applicationRejected,
       giftAssetPath: giftAssetPath,
+      imageUrl: imageUrl ?? this.imageUrl,
+      imageContentType: imageContentType ?? this.imageContentType,
     );
   }
 }
