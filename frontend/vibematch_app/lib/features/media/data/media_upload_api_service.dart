@@ -15,6 +15,10 @@ class MediaUploadApiService {
     return _upload(endpoint: '/media/avatar', file: file);
   }
 
+  Future<MediaUploadResult> uploadRoomAvatar(File file) {
+    return _upload(endpoint: '/media/room-avatar', file: file);
+  }
+
   Future<MediaUploadResult> uploadVibeMedia(File file) {
     return _upload(endpoint: '/media/vibes', file: file);
   }
