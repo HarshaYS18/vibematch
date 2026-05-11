@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../auth/data/auth_api_service.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
 import '../controllers/vibes_controller.dart';
 import '../models/vibe_models.dart';
@@ -18,9 +19,10 @@ class VibesPage extends StatefulWidget {
 }
 
 class _VibesPageState extends State<VibesPage> {
-  static const String _mockCurrentUserId = '6922022';
-
+  final AuthApiService _authApiService = const AuthApiService();
   final VibesController _controller = VibesController();
+
+  String? get _currentUserPublicId => _authApiService.cachedUser?.publicUserId.toString();
 
   @override
   void initState() {
@@ -46,7 +48,10 @@ class _VibesPageState extends State<VibesPage> {
       ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
   }
 
-  bool _isSelfVibe(VibeItem vibe) => vibe.authorId == _mockCurrentUserId;
+  bool _isSelfVibe(VibeItem vibe) {
+    final currentUserPublicId = _currentUserPublicId;
+    return currentUserPublicId != null && currentUserPublicId == vibe.authorId;
+  }
 
   void _openSettings() {
     Navigator.push(
