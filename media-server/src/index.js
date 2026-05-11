@@ -84,6 +84,8 @@ wss.on('connection', (ws) => {
       if (type === 'room/leave') return handlers.leaveRoom({ ws, room: currentRoom, peer: currentPeer, clearSession });
       if (type === 'room_settings/apply_mode') return handlers.setRoomApplyMode({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'seat_invite/send') return handlers.sendSeatInvite({ ws, room: currentRoom, peer: currentPeer, payload });
+      if (type === 'seat_application/request') return handlers.requestSeatApplication({ ws, room: currentRoom, peer: currentPeer, payload });
+      if (type === 'admin/seat_assign') return handlers.adminAssignSeat({ room: currentRoom, payload });
       if (type === 'seat/take') return handlers.takeSeat({ ws, room: currentRoom, peer: currentPeer, payload });
       if (type === 'seat/leave') return handlers.leaveSeat({ room: currentRoom, peer: currentPeer });
       if (type === 'mic/set_enabled') return handlers.setMic({ room: currentRoom, peer: currentPeer, payload });

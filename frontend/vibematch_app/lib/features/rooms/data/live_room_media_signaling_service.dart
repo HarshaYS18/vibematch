@@ -1,5 +1,6 @@
 import 'live_room_system_event_bus.dart';
 import 'live_room_settings_event_bus.dart';
+import 'live_room_seat_application_event_bus.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -311,6 +312,21 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
+  void sendSeatApplicationRequest({required int seatIndex}) {
+    if (seatIndex < 0) return;
+    _send('seat_application/request', <String, Object?>{
+      'seat_index': seatIndex,
+    });
+  }
+
+  void forceAssignSeat({required String targetUserId, required int seatIndex}) {
+    if (targetUserId.trim().isEmpty || seatIndex < 0) return;
+    _send('admin/seat_assign', <String, Object?>{
+      'target_user_id': targetUserId,
+      'seat_index': seatIndex,
+    });
+  }
+
   void sendRoomChat(String text) {
     final safeText = text.trim();
     if (safeText.isEmpty) return;
@@ -613,6 +629,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
         return;
       }
+      if (type == 'seat_application/received') {
+        LiveRoomSeatApplicationEventBus.publish(
+          LiveRoomSeatApplicationEvent.fromJson(payload),
+        );
+        return;
+      }
+
       if (type == 'room_settings/updated') {
         LiveRoomSettingsEventBus.publish(
           LiveRoomSettingsEvent.fromJson(payload),

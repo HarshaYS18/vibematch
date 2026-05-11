@@ -111,6 +111,58 @@ function sendSeatInvite({ ws, room, peer, payload }) {
   send(ws, 'seat_invite/sent', { target_user_id: target.userId, seat_index: seatIndex });
 }
 
+
+function requestSeatApplication({ ws, room, peer, payload }) {
+  const seatIndex = seatIndexFrom(payload.seat_index);
+  if (seatIndex == null) throw new Error('seat_index is required');
+  if (room.lockedSeatIndexes.has(seatIndex)) {
+    send(ws, 'error', { detail: `Seat ${seatIndex + 1} is locked.` });
+    return;
+  }
+  for (const item of room.peers.values()) {
+    if (item.seatIndex === seatIndex) {
+      send(ws, 'error', { detail: `Seat ${seatIndex + 1} is already occupied.` });
+      return;
+    }
+  }
+
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + 20000);
+
+  broadcast(room, 'seat_application/received', {
+    id: randomUUID(),
+    room_id: room.id,
+    applicant_user_id: peer.userId,
+    applicant_name: peer.displayName,
+    seat_index: seatIndex,
+    created_at: createdAt.toISOString(),
+    expires_at: expiresAt.toISOString(),
+  });
+}
+
+function adminAssignSeat({ room, payload }) {
+  const seatIndex = seatIndexFrom(payload.seat_index);
+  if (seatIndex == null) throw new Error('seat_index is required');
+
+  const target = findPeerByUserId(room, payload.target_user_id);
+  if (!target) throw new Error('Target user not found for seat assign');
+
+  if (room.lockedSeatIndexes.has(seatIndex)) {
+    throw new Error(`Seat ${seatIndex + 1} is locked`);
+  }
+
+  clearSeatOccupant(room, seatIndex);
+  target.seatIndex = seatIndex;
+  target.adminMuted = false;
+
+  broadcast(room, 'seat/updated', {
+    peer_id: target.id,
+    user_id: target.userId,
+    seat_index: seatIndex,
+    room: roomSnapshot(room),
+  });
+}
+
 function takeSeat({ ws, room, peer, payload }) {
   const seatIndex = seatIndexFrom(payload.seat_index);
   if (seatIndex == null) throw new Error('seat_index is required');
@@ -309,6 +361,8 @@ module.exports = {
   leaveRoom,
   setRoomApplyMode,
   sendSeatInvite,
+  requestSeatApplication,
+  adminAssignSeat,
   takeSeat,
   leaveSeat,
   setMic,
