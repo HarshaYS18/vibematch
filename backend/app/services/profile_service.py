@@ -69,6 +69,7 @@ def public_profile_payload(db: Session, public_user_id: int) -> dict:
         "display_name": user.display_name,
         "avatar_url": user.avatar_url,
         "bio": user.bio,
+        "cover_photo_urls": user.cover_photo_urls or [],
         "date_of_birth": user.date_of_birth,
         "gender": user.gender,
         "profession": user.profession,
