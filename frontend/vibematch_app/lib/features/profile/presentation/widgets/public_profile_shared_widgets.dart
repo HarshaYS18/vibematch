@@ -27,69 +27,28 @@ class PublicCoverPhotoView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: cover.colors,
-        ),
+    return Image.network(
+      cover.imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: const Color(0xFF251538),
+        alignment: Alignment.center,
+        child: const Icon(Icons.broken_image_rounded, color: Colors.white70, size: 34),
       ),
-      child: Stack(
-        children: [
-          const Positioned.fill(child: CustomPaint(painter: PublicCoverPatternPainter())),
-          Positioned(
-            right: 24,
-            bottom: 24,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
-              ),
-              child: Row(
-                children: [
-                  Icon(cover.icon, color: Colors.white, size: 18),
-                  const SizedBox(width: 7),
-                  Text(
-                    cover.title,
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
-                  ),
-                ],
-              ),
-            ),
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          color: const Color(0xFF251538),
+          alignment: Alignment.center,
+          child: const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
-}
-
-class PublicCoverPatternPainter extends CustomPainter {
-  const PublicCoverPatternPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (var i = -size.height; i < size.width; i += 18) {
-      canvas.drawLine(Offset(i.toDouble(), size.height), Offset(i + size.height, 0), paint);
-    }
-
-    final circlePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawCircle(Offset(size.width * 0.82, size.height * 0.25), 46, circlePaint);
-    canvas.drawCircle(Offset(size.width * 0.16, size.height * 0.76), 28, circlePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant PublicCoverPatternPainter oldDelegate) => false;
 }
 
 class PublicHeaderIconButton extends StatelessWidget {
@@ -106,11 +65,7 @@ class PublicHeaderIconButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
-        child: SizedBox(
-          width: 38,
-          height: 38,
-          child: Icon(icon, color: Colors.white, size: 21),
-        ),
+        child: SizedBox(width: 38, height: 38, child: Icon(icon, color: Colors.white, size: 21)),
       ),
     );
   }
@@ -158,26 +113,23 @@ class PublicBadge extends StatelessWidget {
 
   String get _familyTier => 'bronze';
 
-  bool get _isFamilyBadge {
-    return icon == Icons.family_restroom_rounded || label.toLowerCase().contains('fam');
-  }
+  bool get _isFamilyBadge => icon == Icons.family_restroom_rounded || label.toLowerCase().contains('fam');
 
   @override
   Widget build(BuildContext context) {
     final vipLevel = _levelForPrefix('VIP');
     if (vipLevel != null) {
+      if (vipLevel <= 0) return const SizedBox.shrink();
       return InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(99),
-        child: SizedBox(
-          height: 28,
-          child: Center(child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true)),
-        ),
+        child: SizedBox(height: 28, child: Center(child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: false))),
       );
     }
 
     final svipLevel = _levelForPrefix('SVIP');
     if (svipLevel != null) {
+      if (svipLevel <= 0) return const SizedBox.shrink();
       return SizedBox(
         height: 28,
         child: Center(
@@ -189,7 +141,7 @@ class PublicBadge extends StatelessWidget {
             border: const Color(0xFFD7AA45),
             textColor: const Color(0xFFFFE2A1),
             shineColor: const Color(0xFFFFF1B8),
-            active: svipLevel > 0,
+            active: true,
             onTap: onTap ?? () {},
           ),
         ),
@@ -197,6 +149,7 @@ class PublicBadge extends StatelessWidget {
     }
 
     if (_isFamilyBadge) {
+      if (label.trim().isEmpty) return const SizedBox.shrink();
       return MiniProfileFamilyBadge(
         familyName: label,
         familyLevel: _familyTier,
@@ -207,22 +160,16 @@ class PublicBadge extends StatelessWidget {
       );
     }
 
+    if (label.trim().isEmpty) return const SizedBox.shrink();
     final badge = Container(
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900)),
-        ],
-      ),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withValues(alpha: 0.28))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: color, size: 14),
+        const SizedBox(width: 5),
+        Text(label, style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900)),
+      ]),
     );
 
     if (onTap == null) return badge;
@@ -250,14 +197,11 @@ class PublicMainProfileButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         padding: const EdgeInsets.symmetric(vertical: 13),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 18, color: filled ? Colors.white : const Color(0xFF251538)),
-          const SizedBox(width: 7),
-          Text(label, style: TextStyle(color: filled ? Colors.white : const Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
-        ],
-      ),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(icon, size: 18, color: filled ? Colors.white : const Color(0xFF251538)),
+        const SizedBox(width: 7),
+        Text(label, style: TextStyle(color: filled ? Colors.white : const Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
+      ]),
     );
   }
 }
@@ -272,18 +216,12 @@ class PublicStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAF7F1),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFECE2D8)),
-      ),
-      child: Column(
-        children: [
-          Text(value, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 10, fontWeight: FontWeight.w800)),
-        ],
-      ),
+      decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFECE2D8))),
+      child: Column(children: [
+        Text(value, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 2),
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 10, fontWeight: FontWeight.w800)),
+      ]),
     );
   }
 }
