@@ -77,6 +77,19 @@ function leaveRoom({ ws, room, peer, clearSession }) {
   clearSession();
 }
 
+function setRoomApplyMode({ room, peer, payload }) {
+  room.applyOnlyModeEnabled = payload.apply_only_mode_enabled === true || payload.applyOnlyModeEnabled === true || payload.enabled === true;
+  broadcast(room, 'room_settings/updated', {
+    id: randomUUID(),
+    room_id: room.id,
+    actor_user_id: peer.userId,
+    actor_name: peer.displayName,
+    apply_only_mode_enabled: room.applyOnlyModeEnabled,
+    room: roomSnapshot(room),
+    created_at: new Date().toISOString(),
+  });
+}
+
 function sendSeatInvite({ ws, room, peer, payload }) {
   const target = findPeerByUserId(room, payload.target_user_id);
   const seatIndex = seatIndexFrom(payload.seat_index);
@@ -103,6 +116,10 @@ function takeSeat({ ws, room, peer, payload }) {
   if (seatIndex == null) throw new Error('seat_index is required');
   if (room.lockedSeatIndexes.has(seatIndex)) {
     send(ws, 'error', { detail: `Seat ${seatIndex + 1} is locked.` });
+    return;
+  }
+  if (room.applyOnlyModeEnabled === true && peer.isRoomAdmin !== true && peer.isHost !== true) {
+    send(ws, 'error', { detail: 'Apply Mode is enabled. Please apply for a seat.' });
     return;
   }
   peer.seatIndex = seatIndex;
@@ -290,6 +307,7 @@ module.exports = {
   send,
   joinRoom,
   leaveRoom,
+  setRoomApplyMode,
   sendSeatInvite,
   takeSeat,
   leaveSeat,
