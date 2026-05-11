@@ -62,6 +62,7 @@ class LiveRoomProfileNavigator {
       username: user.name.toLowerCase().replaceAll(' ', '_'),
       displayName: user.name,
       avatarUrl: null,
+      bio: null,
       roles: [role],
       primaryRole: role,
       primaryRoleBadge: roleBadge,
