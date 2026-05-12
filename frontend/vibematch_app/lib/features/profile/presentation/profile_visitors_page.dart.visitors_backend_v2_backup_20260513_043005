@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../data/profile_api_service.dart';
+import '../data/profile_visitor_repository.dart';
 
 class ProfileVisitorsPage extends StatefulWidget {
   const ProfileVisitorsPage({
@@ -15,19 +15,8 @@ class ProfileVisitorsPage extends StatefulWidget {
 }
 
 class _ProfileVisitorsPageState extends State<ProfileVisitorsPage> {
-  final ProfileApiService _profileApi = const ProfileApiService();
-  late Future<List<ProfileVisitorDto>> _visitorsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _visitorsFuture = _profileApi.listMyProfileVisitors();
-  }
-
-  Future<void> _refreshVisitors() async {
-    final nextFuture = _profileApi.listMyProfileVisitors();
-    setState(() => _visitorsFuture = nextFuture);
-    await nextFuture;
+  List<ProfileVisitorRecord> get _visitors {
+    return ProfileVisitorRepository.instance.visitorsForUser(widget.profileOwnerUserId);
   }
 
   void _showAction(String message) {
@@ -47,97 +36,66 @@ class _ProfileVisitorsPageState extends State<ProfileVisitorsPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
-        child: FutureBuilder<List<ProfileVisitorDto>>(
-          future: _visitorsFuture,
-          builder: (context, snapshot) {
-            final visitors = snapshot.data ?? const <ProfileVisitorDto>[];
-
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                  child: Row(
-                    children: [
-                      _RoundButton(
-                        icon: Icons.arrow_back_rounded,
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Visitors',
-                              style: TextStyle(
-                                color: Color(0xFF251538),
-                                fontSize: 23,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'People who opened your public profile',
-                              style: TextStyle(
-                                color: Color(0xFF7B6A86),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      _CountPill(count: visitors.length),
-                    ],
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Row(
+                children: [
+                  _RoundButton(
+                    icon: Icons.arrow_back_rounded,
+                    onTap: () => Navigator.pop(context),
                   ),
-                ),
-                Expanded(
-                  child: _buildVisitorsBody(snapshot, visitors),
-                ),
-              ],
-            );
-          },
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Visitors',
+                          style: TextStyle(
+                            color: Color(0xFF251538),
+                            fontSize: 23,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'People who opened your public profile',
+                          style: TextStyle(
+                            color: Color(0xFF7B6A86),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _CountPill(count: _visitors.length),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _visitors.isEmpty
+                  ? const _EmptyVisitors()
+                  : ListView.separated(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
+                      itemCount: _visitors.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final visitor = _visitors[index];
+                        return _VisitorCard(
+                          visitor: visitor,
+                          onProfileTap: () => _showAction('${visitor.displayName} public profile will open.'),
+                          onMessageTap: () => _showAction('Message ${visitor.displayName} will open.'),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildVisitorsBody(
-    AsyncSnapshot<List<ProfileVisitorDto>> snapshot,
-    List<ProfileVisitorDto> visitors,
-  ) {
-    if (snapshot.connectionState == ConnectionState.waiting && visitors.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF251538)),
-      );
-    }
-
-    if (snapshot.hasError && visitors.isEmpty) {
-      return _VisitorsError(
-        message: snapshot.error.toString().replaceFirst('Exception: ', ''),
-        onRetry: _refreshVisitors,
-      );
-    }
-
-    if (visitors.isEmpty) return const _EmptyVisitors();
-
-    return RefreshIndicator(
-      color: const Color(0xFF251538),
-      onRefresh: _refreshVisitors,
-      child: ListView.separated(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
-        itemCount: visitors.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 10),
-        itemBuilder: (context, index) {
-          final visitor = visitors[index];
-          return _VisitorCard(
-            visitor: visitor,
-            onProfileTap: () => _showAction('${visitor.displayName} public profile will open.'),
-            onMessageTap: () => _showAction('Message ${visitor.displayName} will open.'),
-          );
-        },
       ),
     );
   }
@@ -150,7 +108,7 @@ class _VisitorCard extends StatelessWidget {
     required this.onMessageTap,
   });
 
-  final ProfileVisitorDto visitor;
+  final ProfileVisitorRecord visitor;
   final VoidCallback onProfileTap;
   final VoidCallback onMessageTap;
 
@@ -246,53 +204,6 @@ class _VisitorCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _VisitorsError extends StatelessWidget {
-  const _VisitorsError({
-    required this.message,
-    required this.onRetry,
-  });
-
-  final String message;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFECE2D8)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded, color: Color(0xFFE84C72), size: 42),
-            const SizedBox(height: 10),
-            const Text(
-              'Could not load visitors',
-              style: TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.35),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900)),
-            ),
-          ],
         ),
       ),
     );

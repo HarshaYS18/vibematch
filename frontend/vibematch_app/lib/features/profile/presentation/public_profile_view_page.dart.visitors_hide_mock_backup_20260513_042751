@@ -10,6 +10,7 @@ import '../../vip/presentation/vip_program_page.dart';
 import '../data/profile_api_service.dart';
 import '../data/love_bond_realtime_service.dart';
 import '../data/profile_rooms_repository.dart';
+import '../data/profile_visitor_repository.dart';
 import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
 import 'profile_qr/profile_qr_pages.dart';
@@ -35,6 +36,8 @@ class PublicProfileViewPage extends StatefulWidget {
 }
 
 class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
+  static const int _vibesCount = 18;
+
   final PageController _coverController = PageController();
   final ProfileApiService _profileApi = const ProfileApiService();
   final AuthApiService _authApi = const AuthApiService();
@@ -47,12 +50,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   CurrentUser? _viewer;
   PublicUserProfile? _backendProfile;
   UserRelationship? _relationship;
-  FamilySummaryDto? _familySummary;
-  List<ProfileVibeDto> _profileVibes = const <ProfileVibeDto>[];
-  bool _loadingFamily = false;
-  bool _loadingVibes = false;
-  String? _familyError;
-  String? _vibesError;
 
   bool get _isSelfProfile {
     final viewer = _viewer ?? _authApi.cachedUser;
@@ -69,7 +66,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen(_onRelationshipRealtimeEvent);
     unawaited(_loadBackendProfile());
     unawaited(_syncPublicLoveBonds());
-    unawaited(_loadRealFamilyAndVibes());
   }
 
   @override
@@ -92,54 +88,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
       );
     } catch (_) {
       // Keep current local state if backend is temporarily unavailable.
-    }
-  }
-  Future<void> _loadRealFamilyAndVibes() async {
-    final publicUserId = _targetPublicUserId();
-    if (publicUserId <= 0) return;
-
-    setState(() {
-      _loadingFamily = true;
-      _loadingVibes = true;
-      _familyError = null;
-      _vibesError = null;
-    });
-
-    await Future.wait<void>([
-      _loadPublicFamily(publicUserId),
-      _loadPublicVibes(publicUserId),
-    ]);
-  }
-
-  Future<void> _loadPublicFamily(int publicUserId) async {
-    try {
-      final family = await _profileApi.getPublicFamily(publicUserId);
-      if (!mounted) return;
-      setState(() {
-        _familySummary = family;
-        _familyError = null;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _familyError = error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _loadingFamily = false);
-    }
-  }
-
-  Future<void> _loadPublicVibes(int publicUserId) async {
-    try {
-      final vibes = await _profileApi.listPublicUserVibes(publicUserId);
-      if (!mounted) return;
-      setState(() {
-        _profileVibes = vibes;
-        _vibesError = null;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _vibesError = error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _loadingVibes = false);
     }
   }
   Future<void> _loadBackendProfile() async {
@@ -185,7 +133,10 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 
   void _recordProfileVisit() {
-    // Backend records profile visits when getPublicProfile() is loaded.
+    final visitor = _authApi.cachedUser;
+    if (visitor == null) return;
+    if (visitor.publicUserId == _targetPublicUserId()) return;
+    ProfileVisitorRepository.instance.recordVisit(profileOwner: widget.user, visitor: visitor);
   }
 
   void _startCoverAutoScroll() {
@@ -245,33 +196,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 
   void _openFamilyPage() {
-    final family = _familySummary;
-    if (family == null || !family.shouldShow) {
-      _showAction(context, 'This user is not in a family yet.');
-      return;
-    }
-
-    final familyProfile = FamilyProfileUiModel(
-      id: family.safeId,
-      name: family.safeName,
-      minimumVipLabel: 'VIP 0',
-      memberCount: family.memberCount,
-      maxMembers: family.memberCount > 0 ? family.memberCount : 1,
-      rankLabel: 'Family Lv. ${family.level}',
-      ownerUserId: family.ownerPublicUserId?.toString() ?? '',
-      quarterCarryExp: family.totalExp,
-      giftCoinsThisQuarter: family.totalExp,
-      timeMinutesToday: 0,
-    );
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => FamilyModularPage(
-          openCurrentFamily: true,
-          initialFamilyProfile: familyProfile,
-        ),
-      ),
-    );
+    final familyProfile = FamilyProfileUiModel(id: 'VMF6922', name: widget.familyName, minimumVipLabel: 'VIP 5', memberCount: 128, maxMembers: 200, rankLabel: 'No. 99+', ownerUserId: 'family_owner_01', quarterCarryExp: 1085000, giftCoinsThisQuarter: 1085000, timeMinutesToday: 12240);
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => FamilyModularPage(openCurrentFamily: true, initialFamilyProfile: familyProfile)));
   }
 
   PublicFollowStatus get _followStatus {
@@ -390,76 +316,20 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                   ),
                 ),
               ),
-            if (_loadingFamily)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(18, 16, 18, 0),
-                  child: LinearProgressIndicator(minHeight: 3, color: Color(0xFF12C7B7), backgroundColor: Color(0xFFECE2D8)),
-                ),
-              )
-            else if (_familySummary?.shouldShow == true)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                  child: PublicFamilyPanel(
-                    familyName: _familySummary!.safeName,
-                    familyLevel: _familySummary!.level,
-                    onTap: _openFamilyPage,
-                  ),
-                ),
-              )
-            else if (_familyError != null)
-              SliverToBoxAdapter(
-                child: _PublicProfileBackendError(message: _familyError!, onRetry: () => _loadPublicFamily(_targetPublicUserId())),
-              ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'My Vibes (${_profileVibes.length})',
-                        style: const TextStyle(color: Color(0xFF251538), fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -0.4),
-                      ),
-                    ),
-                  ],
-                ),
+            if (widget.familyName.trim().isNotEmpty)
+              SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 0), child: PublicFamilyPanel(familyName: widget.familyName, familyLevel: widget.familyLevel, onTap: _openFamilyPage))),
+            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 22, 18, 10), child: Row(children: [Expanded(child: Text('My Vibes ($_vibesCount)', style: const TextStyle(color: Color(0xFF251538), fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -0.4)))]))),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
+              sliver: SliverList.separated(
+                itemCount: mockPublicVibes.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 14),
+                itemBuilder: (context, index) {
+                  final vibe = mockPublicVibes[index];
+                  return PublicVibeCard(vibe: vibe, onTap: () => _showAction(context, '${vibe.title} vibe details will open.'), onLikeTap: () => _showAction(context, 'Liked this Vibe locally.'), onCommentTap: () => _showAction(context, 'Comments will open.'), onShareTap: () => _showAction(context, 'Share this Vibe.'));
+                },
               ),
             ),
-            if (_loadingVibes)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(18, 0, 18, 28),
-                  child: LinearProgressIndicator(minHeight: 3, color: Color(0xFF6D5DF6), backgroundColor: Color(0xFFECE2D8)),
-                ),
-              )
-            else if (_vibesError != null)
-              SliverToBoxAdapter(
-                child: _PublicProfileBackendError(message: _vibesError!, onRetry: () => _loadPublicVibes(_targetPublicUserId())),
-              )
-            else if (_profileVibes.isEmpty)
-              const SliverToBoxAdapter(
-                child: _PublicVibesEmptyState(),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
-                sliver: SliverList.separated(
-                  itemCount: _profileVibes.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 14),
-                  itemBuilder: (context, index) {
-                    final vibe = _publicVibeItemFromDto(_profileVibes[index]);
-                    return PublicVibeCard(
-                      vibe: vibe,
-                      onTap: () => _showAction(context, 'Vibe details will open.'),
-                      onLikeTap: () => _showAction(context, 'Like action will sync with Vibes backend soon.'),
-                      onCommentTap: () => _showAction(context, 'Comments will open.'),
-                      onShareTap: () => _showAction(context, 'Share this Vibe.'),
-                    );
-                  },
-                ),
-              ),
           ],
         ),
       ),
@@ -467,65 +337,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 }
 
-PublicVibeItem _publicVibeItemFromDto(ProfileVibeDto dto) {
-  final mediaType = dto.mediaType.trim().toLowerCase();
-  final icon = switch (mediaType) {
-    'photo' => Icons.photo_rounded,
-    'video' => Icons.play_circle_fill_rounded,
-    _ => Icons.notes_rounded,
-  };
-
-  final colors = switch (mediaType) {
-    'photo' => const <Color>[Color(0xFF6D5DF6), Color(0xFFE84C72)],
-    'video' => const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-    _ => const <Color>[Color(0xFF251538), Color(0xFFC99A3B)],
-  };
-
-  return PublicVibeItem(
-    title: dto.title,
-    mediaType: mediaType.isEmpty ? 'text' : mediaType,
-    timeAgo: dto.timeAgo,
-    body: dto.caption.trim().isEmpty ? 'Shared a Vibe.' : dto.caption.trim(),
-    likes: dto.likesLabel,
-    comments: dto.commentsLabel,
-    icon: icon,
-    colors: colors,
-  );
-}
-
-class _PublicVibesEmptyState extends StatelessWidget {
-  const _PublicVibesEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(18, 0, 18, 28),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFECE2D8)),
-      ),
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.auto_awesome_rounded, color: Color(0xFF6D5DF6), size: 34),
-          SizedBox(height: 8),
-          Text(
-            'No Vibes yet',
-            style: TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900),
-          ),
-          SizedBox(height: 5),
-          Text(
-            'When this user posts real Vibes, they will appear here.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.35),
-          ),
-        ],
-      ),
-    );
-  }
-}
 class _PublicProfileBackendError extends StatelessWidget {
   const _PublicProfileBackendError({required this.message, required this.onRetry});
   final String message;
@@ -533,10 +344,6 @@ class _PublicProfileBackendError extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(margin: const EdgeInsets.fromLTRB(18, 8, 18, 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))), child: Row(children: [const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19), const SizedBox(width: 9), Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))), TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900)))]));
 }
-
-
-
-
 
 
 

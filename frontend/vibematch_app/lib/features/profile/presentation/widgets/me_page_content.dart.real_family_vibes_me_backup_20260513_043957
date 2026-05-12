@@ -11,7 +11,6 @@ import '../../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/presentation/wallet_page.dart';
 import '../../data/love_bond_realtime_service.dart';
-import '../../data/profile_api_service.dart';
 import '../control_center/coin_supply_grant_page.dart';
 import '../control_center/super_power_panel_page.dart';
 import '../control_center/vibes_reports_review_page.dart';
@@ -30,6 +29,7 @@ import '../public_profile_view_page.dart';
 import '../settings/account_settings_page.dart';
 import '../store/store_page.dart';
 import 'me_account_widgets.dart';
+import 'me_family_details_sheet.dart';
 import 'me_profile_constants.dart';
 import 'me_profile_hero.dart';
 import 'me_session_sheet.dart';
@@ -46,7 +46,29 @@ class MePageContent extends StatelessWidget {
   final CurrentUser user;
   final Future<void> Function() onLogoutPressed;
   final Future<void> Function() onRefreshPressed;
-SeatUser get _viewerSeatUser {
+
+  static const String _familyId = 'VMF6922';
+  static const String _familyRank = 'No. 99+';
+  static const String _familyRole = 'Member';
+  static const int _familyMembers = 128;
+  static const int _familyTotalExp = 1085000;
+
+  FamilyProfileUiModel get _currentFamilyProfile {
+    return const FamilyProfileUiModel(
+      id: _familyId,
+      name: MeProfileConstants.familyName,
+      minimumVipLabel: 'VIP 5',
+      memberCount: _familyMembers,
+      maxMembers: 200,
+      rankLabel: _familyRank,
+      ownerUserId: 'family_owner_01',
+      quarterCarryExp: _familyTotalExp,
+      giftCoinsThisQuarter: _familyTotalExp,
+      timeMinutesToday: 12240,
+    );
+  }
+
+  SeatUser get _viewerSeatUser {
     return mockRoomUsers.firstWhere(
       (item) => item.isCurrentUser,
       orElse: () => mockRoomUsers.isNotEmpty ? mockRoomUsers.first : _fallbackSeatUser,
@@ -178,6 +200,35 @@ SeatUser get _viewerSeatUser {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FamilyModularPage()));
   }
 
+  void _openCurrentFamily(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FamilyModularPage(
+          openCurrentFamily: true,
+          initialFamilyProfile: _currentFamilyProfile,
+        ),
+      ),
+    );
+  }
+
+  void _openFamilyDetails(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MeFamilyDetailsSheet(
+        familyName: MeProfileConstants.familyName,
+        familyLevel: MeProfileConstants.familyLevel,
+        familyId: _familyId,
+        rankLabel: _familyRank,
+        memberRole: _familyRole,
+        memberCount: _familyMembers,
+        totalExp: _familyTotalExp,
+        onOpenFamily: () => _openCurrentFamily(context),
+      ),
+    );
+  }
+
   void _openProfile(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -274,10 +325,25 @@ SeatUser get _viewerSeatUser {
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 116),
       children: [
         _MeLoveBondBackendSyncGate(user: user),
-        _MeRealFamilyHero(
-          user: user,
+        MePremiumProfileHero(
+          displayName: MeProfileConstants.displayNameFor(user),
+          publicId: user.publicUserId.toString(),
+          role: user.primaryRole,
+          roleTag: MeProfileConstants.roleTagFor(user.primaryRole),
+          roleBadge: user.primaryRoleBadge,
+          vipLevel: user.vip.vipLevel,
+          svipLevel: user.vip.svipLevel,
+          vipFrozen: !user.vip.vipIsActive,
           vipColor: vipColor,
           vipDark: vipDark,
+          diamonds: MeProfileConstants.formatNumber(user.wallet.lifetimeCoinsSpent),
+          coins: MeProfileConstants.formatNumber(user.wallet.coinBalance),
+          presence: MeProfileConstants.presence,
+          lastSeenText: MeProfileConstants.lastSeenText,
+          currentRoomName: MeProfileConstants.currentRoomName,
+          familyName: MeProfileConstants.familyName,
+          familyLevel: MeProfileConstants.familyLevel,
+          onFamilyTap: () => _openFamilyDetails(context),
           onAvatarTap: () => _openProfile(context),
           onQrTap: () => _openProfileQrActions(context),
           onEditCoverPhotosTap: () => _openEditCoverPhotos(context),
@@ -285,7 +351,6 @@ SeatUser get _viewerSeatUser {
           onVipTap: () => _openVipProgram(context),
           onSvipTap: () => _openVipProgram(context, initialTabIndex: 1),
           onRoomTap: () => _openCurrentRoom(context),
-          onNoFamilyTap: () => _showAction(context, 'You are not in a family yet.'),
         ),
         const SizedBox(height: 14),
         MeStatsRow(
@@ -361,365 +426,6 @@ SeatUser get _viewerSeatUser {
 
 
 
-class _MeRealFamilyHero extends StatefulWidget {
-  const _MeRealFamilyHero({
-    required this.user,
-    required this.vipColor,
-    required this.vipDark,
-    required this.onAvatarTap,
-    required this.onQrTap,
-    required this.onEditCoverPhotosTap,
-    required this.onWalletTap,
-    required this.onVipTap,
-    required this.onSvipTap,
-    required this.onRoomTap,
-    required this.onNoFamilyTap,
-  });
-
-  final CurrentUser user;
-  final Color vipColor;
-  final Color vipDark;
-  final VoidCallback onAvatarTap;
-  final VoidCallback onQrTap;
-  final VoidCallback onEditCoverPhotosTap;
-  final VoidCallback onWalletTap;
-  final VoidCallback onVipTap;
-  final VoidCallback onSvipTap;
-  final VoidCallback onRoomTap;
-  final VoidCallback onNoFamilyTap;
-
-  @override
-  State<_MeRealFamilyHero> createState() => _MeRealFamilyHeroState();
-}
-
-class _MeRealFamilyHeroState extends State<_MeRealFamilyHero> {
-  final ProfileApiService _profileApi = const ProfileApiService();
-  FamilySummaryDto? _family;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFamily();
-  }
-
-  @override
-  void didUpdateWidget(covariant _MeRealFamilyHero oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.user.publicUserId != widget.user.publicUserId) {
-      _loadFamily();
-    }
-  }
-
-  Future<void> _loadFamily() async {
-    setState(() => _loading = true);
-    try {
-      final family = await _profileApi.getMyFamily();
-      if (!mounted) return;
-      setState(() => _family = family);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _family = FamilySummaryDto.empty());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _openRealFamily() {
-    final family = _family;
-    if (family == null || !family.shouldShow) {
-      widget.onNoFamilyTap();
-      return;
-    }
-
-    final familyProfile = FamilyProfileUiModel(
-      id: family.safeId,
-      name: family.safeName,
-      minimumVipLabel: 'VIP 0',
-      memberCount: family.memberCount,
-      maxMembers: family.memberCount > 0 ? family.memberCount : 1,
-      rankLabel: 'Family Lv. ${family.level}',
-      ownerUserId: family.ownerPublicUserId?.toString() ?? '',
-      quarterCarryExp: family.totalExp,
-      giftCoinsThisQuarter: family.totalExp,
-      timeMinutesToday: 0,
-    );
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => FamilyModularPage(
-          openCurrentFamily: true,
-          initialFamilyProfile: familyProfile,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final family = _family;
-    final hasFamily = family != null && family.shouldShow;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        MePremiumProfileHero(
-          displayName: MeProfileConstants.displayNameFor(widget.user),
-          publicId: widget.user.publicUserId.toString(),
-          role: widget.user.primaryRole,
-          roleTag: MeProfileConstants.roleTagFor(widget.user.primaryRole),
-          roleBadge: widget.user.primaryRoleBadge,
-          vipLevel: widget.user.vip.vipLevel,
-          svipLevel: widget.user.vip.svipLevel,
-          vipFrozen: !widget.user.vip.vipIsActive,
-          vipColor: widget.vipColor,
-          vipDark: widget.vipDark,
-          diamonds: MeProfileConstants.formatNumber(widget.user.wallet.lifetimeCoinsSpent),
-          coins: MeProfileConstants.formatNumber(widget.user.wallet.coinBalance),
-          presence: MeProfileConstants.presence,
-          lastSeenText: MeProfileConstants.lastSeenText,
-          currentRoomName: MeProfileConstants.currentRoomName,
-          familyName: hasFamily ? family.safeName : '',
-          familyLevel: hasFamily ? family.level : 0,
-          onFamilyTap: _openRealFamily,
-          onAvatarTap: widget.onAvatarTap,
-          onQrTap: widget.onQrTap,
-          onEditCoverPhotosTap: widget.onEditCoverPhotosTap,
-          onWalletTap: widget.onWalletTap,
-          onVipTap: widget.onVipTap,
-          onSvipTap: widget.onSvipTap,
-          onRoomTap: widget.onRoomTap,
-        ),
-        if (_loading)
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: LinearProgressIndicator(
-              minHeight: 3,
-              color: Color(0xFF12C7B7),
-              backgroundColor: Color(0xFFECE2D8),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _MeRealVibesSection extends StatefulWidget {
-  const _MeRealVibesSection();
-
-  @override
-  State<_MeRealVibesSection> createState() => _MeRealVibesSectionState();
-}
-
-class _MeRealVibesSectionState extends State<_MeRealVibesSection> {
-  final ProfileApiService _profileApi = const ProfileApiService();
-  late Future<List<ProfileVibeDto>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _profileApi.listMyVibes();
-  }
-
-  Future<void> _refresh() async {
-    final nextFuture = _profileApi.listMyVibes();
-    setState(() => _future = nextFuture);
-    await nextFuture;
-  }
-
-  BoxDecoration _panelDecoration() {
-    return BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.97),
-      borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: const Color(0xFFECE2D8)),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFF251538).withValues(alpha: 0.045),
-          blurRadius: 22,
-          offset: const Offset(0, 10),
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<ProfileVibeDto>>(
-      future: _future,
-      builder: (context, snapshot) {
-        final vibes = snapshot.data ?? const <ProfileVibeDto>[];
-
-        return Container(
-          padding: const EdgeInsets.all(15),
-          decoration: _panelDecoration(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'My Vibes',
-                      style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                  Text(
-                    '${vibes.length}',
-                    style: const TextStyle(color: Color(0xFFE84C72), fontSize: 12, fontWeight: FontWeight.w900),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 13),
-              if (snapshot.connectionState == ConnectionState.waiting && vibes.isEmpty)
-                const LinearProgressIndicator(minHeight: 3, color: Color(0xFF6D5DF6), backgroundColor: Color(0xFFECE2D8))
-              else if (snapshot.hasError && vibes.isEmpty)
-                _MeVibesMessage(
-                  icon: Icons.wifi_off_rounded,
-                  title: 'Could not load Vibes',
-                  body: snapshot.error.toString().replaceFirst('Exception: ', ''),
-                  onTap: _refresh,
-                )
-              else if (vibes.isEmpty)
-                const _MeVibesMessage(
-                  icon: Icons.auto_awesome_rounded,
-                  title: 'No Vibes yet',
-                  body: 'When you post real Vibes, they will appear here.',
-                )
-              else
-                Column(
-                  children: [
-                    for (var index = 0; index < vibes.take(3).length; index++) ...[
-                      _MeRealVibeCard(vibe: vibes[index]),
-                      if (index != vibes.take(3).length - 1) const SizedBox(height: 10),
-                    ],
-                  ],
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MeRealVibeCard extends StatelessWidget {
-  const _MeRealVibeCard({required this.vibe});
-
-  final ProfileVibeDto vibe;
-
-  @override
-  Widget build(BuildContext context) {
-    final mediaType = vibe.mediaType.trim().toLowerCase();
-    final icon = switch (mediaType) {
-      'photo' => Icons.photo_rounded,
-      'video' => Icons.play_circle_fill_rounded,
-      _ => Icons.notes_rounded,
-    };
-
-    final colors = switch (mediaType) {
-      'photo' => const <Color>[Color(0xFF6D5DF6), Color(0xFFE84C72)],
-      'video' => const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-      _ => const <Color>[Color(0xFF251538), Color(0xFFC99A3B)],
-    };
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAF7F1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFECE2D8)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: colors),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  vibe.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  vibe.caption.trim().isEmpty ? 'Shared a Vibe.' : vibe.caption.trim(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12, fontWeight: FontWeight.w700, height: 1.25),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Text(vibe.timeAgo, style: const TextStyle(color: Color(0xFF12A99E), fontSize: 10.5, fontWeight: FontWeight.w900)),
-                    const SizedBox(width: 9),
-                    Text('❤ ${vibe.likesLabel}', style: const TextStyle(color: Color(0xFFE84C72), fontSize: 10.5, fontWeight: FontWeight.w900)),
-                    const SizedBox(width: 9),
-                    Text('💬 ${vibe.commentsLabel}', style: const TextStyle(color: Color(0xFF6D5DF6), fontSize: 10.5, fontWeight: FontWeight.w900)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MeVibesMessage extends StatelessWidget {
-  const _MeVibesMessage({
-    required this.icon,
-    required this.title,
-    required this.body,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-  final Future<void> Function()? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap == null ? null : () => onTap!.call(),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFAF7F1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFECE2D8)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: const Color(0xFF6D5DF6), size: 30),
-            const SizedBox(height: 8),
-            Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 15, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12, fontWeight: FontWeight.w700, height: 1.3),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 class _MeLoveBondBackendSyncGate extends StatefulWidget {
   const _MeLoveBondBackendSyncGate({required this.user});
 
@@ -767,5 +473,3 @@ class _MeLoveBondBackendSyncGateState extends State<_MeLoveBondBackendSyncGate> 
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
-
-

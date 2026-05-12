@@ -61,7 +61,6 @@ from app.models import (
     LoveBondInventory,
     LoveBondRequest,
     MvpFeatureState,
-    ProfileVisit,
     Room,
     RubyWithdrawRequest,
     SpecialPermission,
@@ -137,7 +136,6 @@ app.include_router(economy_admin.router)
 app.include_router(games.router)
 app.include_router(coin_sales.router)
 app.include_router(vip_admin.router)
-
 
 
 
