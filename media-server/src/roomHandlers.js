@@ -70,6 +70,9 @@ function joinRoom({ ws, payload, setSession }) {
       active: true,
       cricket_state: room.cricketState,
       setup: room.cricketState.setup,
+      background_theme_id: room.cricketState.backgroundThemeId || 'cricket_floodlight_arena',
+      actor_user_id: room.cricketState.controllerUserId || '',
+      actor_name: room.cricketState.controllerName || 'Cricket Mode',
       room: roomSnapshot(room),
     });
   }
@@ -520,6 +523,14 @@ function roomCricketStart({ room, peer, payload }) {
   if (!canControlRoom(peer)) throw new Error('Only host/admin can start Cricket Mode.');
 
   const setup = payload.setup || payload;
+  const backgroundThemeId = String(
+    payload.background_theme_id ||
+    payload.backgroundThemeId ||
+    setup.background_theme_id ||
+    setup.backgroundThemeId ||
+    'cricket_floodlight_arena'
+  );
+
   room.cricketState = {
     active: true,
     action: 'start',
@@ -527,6 +538,7 @@ function roomCricketStart({ room, peer, payload }) {
     controllerUserId: peer.userId,
     controllerName: peer.displayName,
     setup,
+    backgroundThemeId,
     updatedAt: new Date().toISOString(),
   };
 
@@ -536,11 +548,14 @@ function roomCricketStart({ room, peer, payload }) {
     active: true,
     cricket_state: room.cricketState,
     setup,
+    background_theme_id: backgroundThemeId,
+    actor_user_id: peer.userId,
+    actor_name: peer.displayName,
     room: roomSnapshot(room),
   });
 }
 
-function roomCricketEnd({ room, peer }) {
+function roomCricketEnd({ room, peer, payload = {} }) {
   if (!canControlRoom(peer)) throw new Error('Only host/admin can end Cricket Mode.');
 
   room.cricketState = {
@@ -558,6 +573,9 @@ function roomCricketEnd({ room, peer }) {
     active: false,
     cricket_state: room.cricketState,
     setup: null,
+    background_theme_id: payload.background_theme_id || payload.backgroundThemeId || 'default_pearl',
+    actor_user_id: peer.userId,
+    actor_name: peer.displayName,
     room: roomSnapshot(room),
   });
 }

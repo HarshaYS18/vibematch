@@ -349,6 +349,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _send('room_cricket/start', <String, Object?>{
       'room_id': setup.roomId,
       'setup': setup.toJson(),
+      'background_theme_id': cricketFloodlightArenaBackgroundTheme.id,
     });
   }
 
@@ -358,6 +359,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     _send('room_cricket/end', <String, Object?>{
       'room_id': safeRoomId,
+      'background_theme_id': defaultRoomBackgroundTheme.id,
     });
   }
 
@@ -729,13 +731,44 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
         if (active && rawSetup is Map<String, dynamic>) {
           final setup = CricketQuickMatchSetup.fromJson(rawSetup);
+          final safeRoomId = roomId.isEmpty ? setup.roomId : roomId;
           CricketRoomModeSignal.activateWithSetup(
-            roomId: roomId.isEmpty ? setup.roomId : roomId,
+            roomId: safeRoomId,
             setup: setup,
           );
           activeRoomBackgroundTheme.value = cricketFloodlightArenaBackgroundTheme;
+          LiveRoomSettingsEventBus.publish(
+            LiveRoomSettingsEvent(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              roomId: safeRoomId,
+              applyOnlyModeEnabled: false,
+              roomImagesEnabled: true,
+              guestMessagesEnabled: true,
+              actorUserId: payload['actor_user_id']?.toString() ?? '',
+              actorName: payload['actor_name']?.toString() ?? 'Cricket Mode',
+              backgroundThemeId:
+                  payload['background_theme_id']?.toString() ??
+                  cricketFloodlightArenaBackgroundTheme.id,
+            ),
+          );
         } else {
-          CricketRoomModeSignal.deactivate(roomId);
+          final safeRoomId = roomId;
+          CricketRoomModeSignal.deactivate(safeRoomId);
+          activeRoomBackgroundTheme.value = defaultRoomBackgroundTheme;
+          LiveRoomSettingsEventBus.publish(
+            LiveRoomSettingsEvent(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              roomId: safeRoomId,
+              applyOnlyModeEnabled: false,
+              roomImagesEnabled: true,
+              guestMessagesEnabled: true,
+              actorUserId: payload['actor_user_id']?.toString() ?? '',
+              actorName: payload['actor_name']?.toString() ?? 'Cricket Mode',
+              backgroundThemeId:
+                  payload['background_theme_id']?.toString() ??
+                  defaultRoomBackgroundTheme.id,
+            ),
+          );
         }
 
         return;

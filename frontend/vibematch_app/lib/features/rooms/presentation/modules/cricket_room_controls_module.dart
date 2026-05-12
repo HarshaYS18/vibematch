@@ -8,6 +8,7 @@ import '../widgets/room_theme.dart';
 import 'cricket_mode_module.dart';
 import 'cricket_room_mode_module.dart';
 import 'cricket_room_mode_registry.dart';
+import 'cricket_room_mode_signal.dart';
 
 class CricketRoomControlsModule extends StatefulWidget {
   const CricketRoomControlsModule({
@@ -182,8 +183,10 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
           danger: true,
           enabled: widget.canManage,
           onTap: () {
-            LiveRoomMediaSignalingService.instance.endCricketMode(widget.controller.match.roomId);
-            CricketRoomModeRegistry.deactivateRoom(roomId: widget.controller.match.roomId);
+            final roomId = widget.controller.match.roomId;
+            LiveRoomMediaSignalingService.instance.endCricketMode(roomId);
+            CricketRoomModeSignal.deactivate(roomId);
+            CricketRoomModeRegistry.deactivateRoom(roomId: roomId);
             widget.onEndMode();
           },
         ),
