@@ -11,6 +11,7 @@ class HomeRoomDto {
     required this.onlineCount,
     required this.trendingScore,
     required this.followedFriendsInside,
+    this.coverPhotoUrl,
   });
 
   final String id;
@@ -22,18 +23,22 @@ class HomeRoomDto {
   final int onlineCount;
   final int trendingScore;
   final List<String> followedFriendsInside;
+  final String? coverPhotoUrl;
 
   factory HomeRoomDto.fromJson(Map<String, dynamic> json) {
     return HomeRoomDto(
-      id: json['id']?.toString() ?? '',
+      id: json['id']?.toString() ?? json['room_public_id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Vibe Room',
       subtitle: json['subtitle']?.toString() ?? '',
       language: json['language']?.toString() ?? 'Other',
       mode: json['mode']?.toString() ?? 'Open',
-      type: json['type']?.toString() ?? 'Chat',
+      type: json['type']?.toString() ?? json['room_type']?.toString() ?? 'Chat',
       onlineCount: _intFromJson(json['online_count']),
       trendingScore: _intFromJson(json['trending_score']),
       followedFriendsInside: _stringListFromJson(json['followed_friends_inside']),
+      coverPhotoUrl: _nullableStringFromJson(
+        json['cover_photo_url'] ?? json['coverPhotoUrl'] ?? json['avatar_url'],
+      ),
     );
   }
 
@@ -48,6 +53,7 @@ class HomeRoomDto {
       onlineCount: onlineCount,
       trendingScore: trendingScore,
       followedFriendsInside: followedFriendsInside,
+      coverPhotoUrl: coverPhotoUrl,
     );
   }
 
@@ -60,5 +66,11 @@ class HomeRoomDto {
   static List<String> _stringListFromJson(Object? value) {
     if (value is! List) return const [];
     return value.map((item) => item.toString()).toList();
+  }
+
+  static String? _nullableStringFromJson(Object? value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty || text == 'null') return null;
+    return text;
   }
 }
