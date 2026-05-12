@@ -23,6 +23,8 @@ class LiveRoomBody extends StatelessWidget {
     required this.selectedSeatIndex,
     required this.canManageSeats,
     required this.applyOnlyModeEnabled,
+    required this.currentUserIsMember,
+    required this.joinRequestPending,
     required this.admins,
     required this.availableAdminUsers,
     required this.onAddAdmin,
@@ -72,6 +74,8 @@ class LiveRoomBody extends StatelessWidget {
   final int? selectedSeatIndex;
   final bool canManageSeats;
   final bool applyOnlyModeEnabled;
+  final bool currentUserIsMember;
+  final bool joinRequestPending;
   final List<SeatUser> admins;
   final List<SeatUser> availableAdminUsers;
   final ValueChanged<SeatUser> onAddAdmin;
@@ -149,8 +153,7 @@ class LiveRoomBody extends StatelessWidget {
               seats: seats,
               currentUserId: currentUser.id,
             );
-        final effectiveLayoutId =
-            cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
+        final effectiveLayoutId = cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
         return SafeArea(
           child: Stack(
             children: [
@@ -164,6 +167,8 @@ class LiveRoomBody extends StatelessWidget {
                       privacyMode: privacyMode,
                       onlineCount: _effectiveOnlineCount,
                       canManageAdmins: canManageSeats,
+                      currentUserIsMember: currentUserIsMember,
+                      joinRequestPending: joinRequestPending,
                       admins: admins,
                       availableAdminUsers: availableAdminUsers,
                       onAddAdmin: onAddAdmin,
@@ -202,12 +207,7 @@ class LiveRoomBody extends StatelessWidget {
                       behavior: HitTestBehavior.translucent,
                       onTap: onDismissOverlays,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          14,
-                          0,
-                          14,
-                          0,
-                        ),
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
                         child: Column(
                           children: [
                             if (cricketModeActive)
@@ -223,12 +223,9 @@ class LiveRoomBody extends StatelessWidget {
                             Expanded(
                               child: RoomChatFeed(
                                 messages: messages,
-                                canManageSeatApplications:
-                                    canManageSeatApplications,
-                                onApproveSeatApplication:
-                                    onApproveSeatApplication,
-                                onRejectSeatApplication:
-                                    onRejectSeatApplication,
+                                canManageSeatApplications: canManageSeatApplications,
+                                onApproveSeatApplication: onApproveSeatApplication,
+                                onRejectSeatApplication: onRejectSeatApplication,
                                 onSenderTap: onSenderTap,
                                 onMentionTap: onMentionTap,
                               ),
