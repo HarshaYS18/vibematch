@@ -2,8 +2,9 @@ import 'dart:async';
 
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_presence_repository.dart';
-import '../../data/live_room_system_event_bus.dart';
+import '../../data/live_room_restrictions_service.dart';
 import '../../data/live_room_seat_application_event_bus.dart';
+import '../../data/live_room_system_event_bus.dart';
 import '../live_room_models.dart';
 
 class LiveRoomMessageController {
@@ -44,11 +45,25 @@ class LiveRoomMessageController {
   VoidCallbackLike? _systemEventListener;
   VoidCallbackLike? _seatApplicationListener;
 
+  bool get _currentUserCanBypassGuestMessageBlock {
+    return currentUser.isHost || currentUser.isRoomAdmin;
+  }
+
+  bool get _guestMessageAllowed {
+    return LiveRoomRestrictionsService.guestMessagesEnabled ||
+        _currentUserCanBypassGuestMessageBlock;
+  }
+
   void sendMessage(String text) {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
       return;
     }
+
+    if (!_guestMessageAllowed) {
+      return;
+    }
+
     messages.insert(
       0,
       ChatEntry(
@@ -60,6 +75,7 @@ class LiveRoomMessageController {
         receivingLevel: currentUser.receivingLevel,
       ),
     );
+    LiveRoomMediaSignalingService.instance.sendRoomChat(trimmed);
     onChanged();
   }
 
@@ -71,6 +87,15 @@ class LiveRoomMessageController {
     if (safeUrl.isEmpty) {
       return;
     }
+
+    if (!LiveRoomRestrictionsService.roomImagesEnabled) {
+      return;
+    }
+
+    if (!_guestMessageAllowed) {
+      return;
+    }
+
     messages.insert(
       0,
       ChatEntry(
