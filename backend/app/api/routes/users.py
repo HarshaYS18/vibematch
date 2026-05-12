@@ -134,6 +134,14 @@ def _is_blocked(db: Session, blocker_id: int, blocked_id: int) -> bool:
     return db.query(UserBlock.id).filter(UserBlock.blocker_user_id == blocker_id, UserBlock.blocked_user_id == blocked_id).first() is not None
 
 
+def _has_follow(db: Session, follower_id: int, followed_id: int) -> bool:
+    return db.query(UserFollow.id).filter(UserFollow.follower_user_id == follower_id, UserFollow.followed_user_id == followed_id).first() is not None
+
+
+def _display_name(user: User) -> str:
+    return user.display_name or user.username or f"User {user.public_user_id}"
+
+
 def _relationship_payload(db: Session, profile_user: User, current_user: User | None) -> UserRelationshipResponse:
     is_following = False
     follows_me = False
@@ -141,19 +149,34 @@ def _relationship_payload(db: Session, profile_user: User, current_user: User | 
     blocked_me = False
     can_follow = True
     follow_block_reason = None
+
     if current_user is not None and current_user.id != profile_user.id:
-        is_following = db.query(UserFollow.id).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == profile_user.id).first() is not None
-        follows_me = db.query(UserFollow.id).filter(UserFollow.follower_user_id == profile_user.id, UserFollow.followed_user_id == current_user.id).first() is not None
+        is_following = _has_follow(db, current_user.id, profile_user.id)
+        follows_me = _has_follow(db, profile_user.id, current_user.id)
         blocked_by_me = _is_blocked(db, current_user.id, profile_user.id)
         blocked_me = _is_blocked(db, profile_user.id, current_user.id)
-        can_follow = not blocked_by_me and not blocked_me
-        if blocked_by_me:
-            follow_block_reason = "Unblock this user before following them."
-        elif blocked_me:
-            follow_block_reason = f"{profile_user.display_name or profile_user.username or 'This user'} doesn't allow you to follow them."
+
+        # Product rule:
+        # If B blocks A, B may still follow A, but A cannot follow B back.
+        # Therefore only blocked_me prevents the current viewer from following this profile.
+        can_follow = not blocked_me
+        if blocked_me:
+            follow_block_reason = f"{_display_name(profile_user)} doesn't allow you to follow."
+
     followers_count = db.query(func.count(UserFollow.id)).filter(UserFollow.followed_user_id == profile_user.id).scalar() or 0
     following_count = db.query(func.count(UserFollow.id)).filter(UserFollow.follower_user_id == profile_user.id).scalar() or 0
-    return UserRelationshipResponse(public_user_id=profile_user.public_user_id, is_following=is_following, follows_me=follows_me, is_friend=is_following and follows_me, blocked_by_me=blocked_by_me, blocked_me=blocked_me, can_follow=can_follow, follow_block_reason=follow_block_reason, followers_count=followers_count, following_count=following_count)
+    return UserRelationshipResponse(
+        public_user_id=profile_user.public_user_id,
+        is_following=is_following,
+        follows_me=follows_me,
+        is_friend=is_following and follows_me,
+        blocked_by_me=blocked_by_me,
+        blocked_me=blocked_me,
+        can_follow=can_follow,
+        follow_block_reason=follow_block_reason,
+        followers_count=followers_count,
+        following_count=following_count,
+    )
 
 
 def _search_result_payload(db: Session, user: User, current_user: User) -> UserSearchResultResponse:
@@ -161,6 +184,13 @@ def _search_result_payload(db: Session, user: User, current_user: User) -> UserS
     primary_role = get_primary_role(user)
     relationship = _relationship_payload(db, user, current_user)
     return UserSearchResultResponse(public_user_id=user.public_user_id, display_custom_id=user.display_custom_id, username=user.username, display_name=user.display_name, avatar_url=user.avatar_url, primary_role=primary_role.value, primary_role_badge=get_primary_role_badge(primary_role), role_badges=get_role_badges(user_roles), vip=profile_service.vip_summary(db, user), is_online=False, last_seen_at=user.last_seen_at, is_following=relationship.is_following, follows_me=relationship.follows_me, is_friend=relationship.is_friend, blocked_by_me=relationship.blocked_by_me, blocked_me=relationship.blocked_me, can_follow=relationship.can_follow)
+
+
+def _get_public_active_user(db: Session, public_user_id: int) -> User:
+    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 @router.get("/me", response_model=UserMeResponse)
@@ -210,9 +240,7 @@ def search_users(q: str = Query(min_length=1, max_length=80), limit: int = Query
 
 @router.get("/public/{public_user_id}", response_model=PublicUserProfileResponse)
 def get_public_profile(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = _get_public_active_user(db, public_user_id)
     payload = profile_service.public_profile_payload(db, public_user_id)
     payload["relationship"] = _relationship_payload(db, user, current_user)
     return PublicUserProfileResponse(**payload)
@@ -220,22 +248,20 @@ def get_public_profile(public_user_id: int, db: Session = Depends(get_db), curre
 
 @router.get("/{public_user_id}/relationship", response_model=UserRelationshipResponse)
 def get_user_relationship(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = _get_public_active_user(db, public_user_id)
     return _relationship_payload(db, user, current_user)
 
 
 @router.post("/{public_user_id}/follow", response_model=UserRelationshipResponse)
 def follow_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = _get_public_active_user(db, public_user_id)
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot follow yourself")
+
     relationship = _relationship_payload(db, user, current_user)
     if not relationship.can_follow:
-        raise HTTPException(status_code=403, detail=relationship.follow_block_reason or "This user doesn't allow you to follow them.")
+        raise HTTPException(status_code=403, detail=relationship.follow_block_reason or f"{_display_name(user)} doesn't allow you to follow.")
+
     existing = db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == user.id).first()
     if existing is None:
         db.add(UserFollow(follower_user_id=current_user.id, followed_user_id=user.id))
@@ -245,9 +271,7 @@ def follow_user(public_user_id: int, db: Session = Depends(get_db), current_user
 
 @router.delete("/{public_user_id}/follow", response_model=UserRelationshipResponse)
 def unfollow_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = _get_public_active_user(db, public_user_id)
     existing = db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == user.id).first()
     if existing is not None:
         db.delete(existing)
@@ -257,9 +281,7 @@ def unfollow_user(public_user_id: int, db: Session = Depends(get_db), current_us
 
 @router.post("/{public_user_id}/block", response_model=UserRelationshipResponse)
 def block_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = _get_public_active_user(db, public_user_id)
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot block yourself")
     existing = db.query(UserBlock).filter(UserBlock.blocker_user_id == current_user.id, UserBlock.blocked_user_id == user.id).first()
@@ -272,9 +294,7 @@ def block_user(public_user_id: int, db: Session = Depends(get_db), current_user:
 
 @router.delete("/{public_user_id}/block", response_model=UserRelationshipResponse)
 def unblock_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = _get_public_active_user(db, public_user_id)
     existing = db.query(UserBlock).filter(UserBlock.blocker_user_id == current_user.id, UserBlock.blocked_user_id == user.id).first()
     if existing is not None:
         db.delete(existing)
