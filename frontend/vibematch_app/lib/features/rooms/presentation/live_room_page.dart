@@ -20,7 +20,7 @@ import 'controllers/live_room_state_controller.dart';
 import 'controllers/live_room_users_controller.dart';
 import 'controllers/live_room_vibesync_controller.dart';
 import 'live_room_models.dart';
-import 'modules/cricket_mode_module.dart';
+import 'modules/cricket_stumps_flow_module.dart';
 import 'modules/live_room_emoji_actions_module.dart';
 import 'modules/live_room_games_actions_module.dart';
 import 'modules/live_room_gift_actions_module.dart';
@@ -915,7 +915,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (!mounted) return;
 
-      CricketModeModule.open(
+      CricketStumpsFlowModule.open(
         context: context,
         roomId: _roomId,
         roomName: _roomName,
