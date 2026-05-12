@@ -219,7 +219,7 @@ class _HomeRoomCover extends StatelessWidget {
             Image.network(
               room.coverPhotoUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback,
+              errorBuilder: (context, error, stackTrace) => fallback,
               loadingBuilder: (context, child, progress) {
                 if (progress == null) return child;
                 return fallback;
