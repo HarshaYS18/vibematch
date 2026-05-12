@@ -265,7 +265,7 @@ class LiveRoomBody extends StatelessWidget {
                   builder: (context, child) {
                     return CricketRoomControlsModule(
                       controller: cricketController,
-                      canManage: canManageSeats,
+                      canManage: scorerVisible,
                       onEndMode: onDismissOverlays,
                     );
                   },
