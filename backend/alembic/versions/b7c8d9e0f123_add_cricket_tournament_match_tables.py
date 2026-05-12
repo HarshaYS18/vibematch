@@ -7,6 +7,7 @@ Create Date: 2026-05-12 18:30:00.000000
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision = "b7c8d9e0f123"
@@ -15,14 +16,15 @@ branch_labels = None
 depends_on = None
 
 
-cricket_tournament_status = sa.Enum(
+cricket_tournament_status = postgresql.ENUM(
     "ACTIVE",
     "COMPLETED",
     "DELETED",
     name="crickettournamentstatus",
+    create_type=False,
 )
 
-cricket_match_status = sa.Enum(
+cricket_match_status = postgresql.ENUM(
     "SCHEDULED",
     "TOSS_PENDING",
     "LINEUP_PENDING",
@@ -31,12 +33,30 @@ cricket_match_status = sa.Enum(
     "COMPLETED",
     "DELETED",
     name="cricketmatchstatus",
+    create_type=False,
 )
 
 
 def upgrade() -> None:
-    cricket_tournament_status.create(op.get_bind(), checkfirst=True)
-    cricket_match_status.create(op.get_bind(), checkfirst=True)
+    bind = op.get_bind()
+
+    postgresql.ENUM(
+        "ACTIVE",
+        "COMPLETED",
+        "DELETED",
+        name="crickettournamentstatus",
+    ).create(bind, checkfirst=True)
+
+    postgresql.ENUM(
+        "SCHEDULED",
+        "TOSS_PENDING",
+        "LINEUP_PENDING",
+        "LIVE",
+        "INNINGS_BREAK",
+        "COMPLETED",
+        "DELETED",
+        name="cricketmatchstatus",
+    ).create(bind, checkfirst=True)
 
     op.create_table(
         "cricket_tournaments",
@@ -106,5 +126,5 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_cricket_tournaments_id"), table_name="cricket_tournaments")
     op.drop_table("cricket_tournaments")
 
-    cricket_match_status.drop(op.get_bind(), checkfirst=True)
-    cricket_tournament_status.drop(op.get_bind(), checkfirst=True)
+    postgresql.ENUM(name="cricketmatchstatus").drop(op.get_bind(), checkfirst=True)
+    postgresql.ENUM(name="crickettournamentstatus").drop(op.get_bind(), checkfirst=True)
