@@ -43,7 +43,6 @@ class HomeRoomCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(28),
@@ -56,21 +55,22 @@ class HomeRoomCard extends StatelessWidget {
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: Row(
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                _HomeRoomAvatar(room: room, size: 66),
+                _HomeRoomCover(room: room, size: 92),
                 Positioned(
-                  left: -4,
-                  top: -4,
+                  left: 8,
+                  top: 8,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF251538),
+                      color: const Color(0xDD251538),
                       borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.72), width: 1.2),
                     ),
                     child: Text(
                       '#$rank',
@@ -78,77 +78,94 @@ class HomeRoomCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.42),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
+                    ),
+                    child: Icon(_roomTypeIcon, color: Colors.white, size: 13),
+                  ),
+                ),
               ],
             ),
             const SizedBox(width: 13),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          room.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Color(0xFF251538), fontSize: 15.5, fontWeight: FontWeight.w900),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 13, 13, 13),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            room.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFF251538), fontSize: 15.5, fontWeight: FontWeight.w900),
+                          ),
                         ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: _modeColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _modeColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(_modeIcon, color: _modeColor, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                room.mode,
+                                style: TextStyle(color: _modeColor, fontSize: 10, fontWeight: FontWeight.w900),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_modeIcon, color: _modeColor, size: 12),
-                            const SizedBox(width: 4),
-                            Text(
-                              room.mode,
-                              style: TextStyle(color: _modeColor, fontSize: 10, fontWeight: FontWeight.w900),
-                            ),
-                          ],
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      room.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 9),
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 7,
+                      children: [
+                        _HomeRoomMiniPill(icon: VMIcons.language, text: room.language),
+                        _HomeRoomMiniPill(icon: VMIcons.people, text: '${room.onlineCount}'),
+                        _HomeRoomMiniPill(icon: VMIcons.fire, text: '${room.trendingScore}'),
+                        _HomeRoomMiniPill(icon: VMIcons.category, text: room.type),
+                      ],
+                    ),
+                    const SizedBox(height: 9),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            friendsText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 11.5, fontWeight: FontWeight.w800),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    room.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 9),
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
-                    children: [
-                      _HomeRoomMiniPill(icon: VMIcons.language, text: room.language),
-                      _HomeRoomMiniPill(icon: VMIcons.people, text: '${room.onlineCount}'),
-                      _HomeRoomMiniPill(icon: VMIcons.fire, text: '${room.trendingScore}'),
-                      _HomeRoomMiniPill(icon: VMIcons.category, text: room.type),
-                    ],
-                  ),
-                  const SizedBox(height: 9),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          friendsText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 11.5, fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(VMIcons.chevronRight, color: Color(0xFF7B6A86)),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 8),
+                        const Icon(VMIcons.chevronRight, color: Color(0xFF7B6A86)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -156,10 +173,20 @@ class HomeRoomCard extends StatelessWidget {
       ),
     );
   }
+
+  IconData get _roomTypeIcon {
+    return room.type == 'Gaming'
+        ? VMIcons.games
+        : room.type == 'PK'
+            ? VMIcons.bolt
+            : room.type == 'Music'
+                ? VMIcons.music
+                : VMIcons.audioWave;
+  }
 }
 
-class _HomeRoomAvatar extends StatelessWidget {
-  const _HomeRoomAvatar({required this.room, required this.size});
+class _HomeRoomCover extends StatelessWidget {
+  const _HomeRoomCover({required this.room, required this.size});
 
   final HomeRoom room;
   final double size;
@@ -177,32 +204,54 @@ class _HomeRoomAvatar extends StatelessWidget {
       colors = const [Color(0xFF12C7B7), Color(0xFFE84C72)];
     }
 
-    return Container(
+    final fallback = Container(
+      decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
+      child: Icon(_fallbackIcon, color: Colors.white, size: size * 0.34),
+    );
+
+    return SizedBox(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(size * 0.34),
-        gradient: LinearGradient(colors: colors),
-        boxShadow: [
-          BoxShadow(
-            color: colors.first.withValues(alpha: 0.23),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (room.hasCoverPhoto)
+            Image.network(
+              room.coverPhotoUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => fallback,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return fallback;
+              },
+            )
+          else
+            fallback,
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.10),
+                  Colors.black.withValues(alpha: 0.28),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      child: Icon(
-        room.type == 'Gaming'
-            ? VMIcons.games
-            : room.type == 'PK'
-                ? VMIcons.bolt
-                : room.type == 'Music'
-                    ? VMIcons.music
-                    : VMIcons.audioWave,
-        color: Colors.white,
-        size: size * 0.42,
-      ),
     );
+  }
+
+  IconData get _fallbackIcon {
+    return room.type == 'Gaming'
+        ? VMIcons.games
+        : room.type == 'PK'
+            ? VMIcons.bolt
+            : room.type == 'Music'
+                ? VMIcons.music
+                : VMIcons.audioWave;
   }
 }
 
