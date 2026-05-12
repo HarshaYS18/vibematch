@@ -4,6 +4,7 @@ const {
   getOrCreateRoom,
   roomSnapshot,
   createPeer,
+  createDefaultMusicState,
   findPeerByUserId,
   seatIndexFrom,
   clearPeerSeat,
@@ -34,6 +35,10 @@ function broadcastSnapshot(room, type, payload = {}) {
   broadcast(room, type, { ...payload, room: roomSnapshot(room) });
 }
 
+function canControlRoom(peer) {
+  return peer?.isHost === true || peer?.isRoomAdmin === true;
+}
+
 function joinRoom({ ws, payload, setSession }) {
   const room = getOrCreateRoom(payload.room_id);
   const userId = String(payload.user_id || 'guest');
@@ -55,6 +60,9 @@ function joinRoom({ ws, payload, setSession }) {
   setSession(room, peer);
 
   send(ws, 'room/joined', { peer_id: peer.id, room: roomSnapshot(room) });
+  if (room.musicState?.active === true) {
+    send(ws, 'room_music/state', { room_id: room.id, music_state: room.musicState });
+  }
   broadcast(room, 'room/peer_joined', {
     peer_id: peer.id,
     user_id: peer.userId,
@@ -66,6 +74,10 @@ function joinRoom({ ws, payload, setSession }) {
 
 function leaveRoom({ ws, room, peer, clearSession }) {
   room.peers.delete(peer.id);
+  if (room.musicState?.controllerPeerId === peer.id || room.musicState?.producerPeerId === peer.id) {
+    room.musicState = createDefaultMusicState();
+    broadcast(room, 'room_music/state', { room_id: room.id, music_state: room.musicState });
+  }
   broadcast(room, 'room/peer_left', {
     peer_id: peer.id,
     user_id: peer.userId,
@@ -85,6 +97,40 @@ function setRoomApplyMode({ room, peer, payload }) {
     actor_user_id: peer.userId,
     actor_name: peer.displayName,
     apply_only_mode_enabled: room.applyOnlyModeEnabled,
+    room_images_enabled: room.roomImagesEnabled !== false,
+    guest_messages_enabled: room.guestMessagesEnabled !== false,
+    room: roomSnapshot(room),
+    created_at: new Date().toISOString(),
+  });
+}
+
+function setRoomImages({ room, peer, payload }) {
+  if (!canControlRoom(peer)) throw new Error('Only host/admin can change image messages.');
+  room.roomImagesEnabled = payload.enabled === true || payload.room_images_enabled === true || payload.roomImagesEnabled === true;
+  broadcast(room, 'room_settings/updated', {
+    id: randomUUID(),
+    room_id: room.id,
+    actor_user_id: peer.userId,
+    actor_name: peer.displayName,
+    apply_only_mode_enabled: room.applyOnlyModeEnabled === true,
+    room_images_enabled: room.roomImagesEnabled === true,
+    guest_messages_enabled: room.guestMessagesEnabled !== false,
+    room: roomSnapshot(room),
+    created_at: new Date().toISOString(),
+  });
+}
+
+function setGuestMessages({ room, peer, payload }) {
+  if (!canControlRoom(peer)) throw new Error('Only host/admin can change guest messages.');
+  room.guestMessagesEnabled = payload.enabled === true || payload.guest_messages_enabled === true || payload.guestMessagesEnabled === true;
+  broadcast(room, 'room_settings/updated', {
+    id: randomUUID(),
+    room_id: room.id,
+    actor_user_id: peer.userId,
+    actor_name: peer.displayName,
+    apply_only_mode_enabled: room.applyOnlyModeEnabled === true,
+    room_images_enabled: room.roomImagesEnabled !== false,
+    guest_messages_enabled: room.guestMessagesEnabled === true,
     room: roomSnapshot(room),
     created_at: new Date().toISOString(),
   });
@@ -110,7 +156,6 @@ function sendSeatInvite({ ws, room, peer, payload }) {
   });
   send(ws, 'seat_invite/sent', { target_user_id: target.userId, seat_index: seatIndex });
 }
-
 
 function requestSeatApplication({ ws, room, peer, payload }) {
   const seatIndex = seatIndexFrom(payload.seat_index);
@@ -371,6 +416,7 @@ function roomChatClear({ room, peer }) {
 }
 
 function roomChat({ room, peer, payload }) {
+  if (room.guestMessagesEnabled === false && !canControlRoom(peer)) return;
   broadcast(room, 'room/chat', {
     id: randomUUID(),
     peer_id: peer.id,
@@ -381,8 +427,91 @@ function roomChat({ room, peer, payload }) {
   });
 }
 
+function roomMusicControl({ room, peer, payload }) {
+  if (!canControlRoom(peer)) throw new Error('Only host/admin can control room music.');
+  const action = String(payload.action || 'state').trim();
+  const positionMs = Math.max(0, Number(payload.position_ms ?? payload.positionMs ?? 0) || 0);
+  const durationMs = Math.max(0, Number(payload.duration_ms ?? payload.durationMs ?? 0) || 0);
+  const trackTitle = String(payload.track_title ?? payload.trackTitle ?? '').slice(0, 180);
+  const trackId = String(payload.track_id ?? payload.trackId ?? '').slice(0, 120);
+  const producerId = String(payload.producer_id ?? payload.producerId ?? '').slice(0, 160);
+
+  room.musicState = {
+    ...(room.musicState || createDefaultMusicState()),
+    active: action !== 'stop',
+    action,
+    controllerPeerId: peer.id,
+    controllerUserId: peer.userId,
+    controllerName: peer.displayName,
+    trackId,
+    trackTitle,
+    positionMs,
+    durationMs,
+    producerPeerId: peer.id,
+    producerId,
+    mediaTag: 'room-music-audio',
+    updatedAt: new Date().toISOString(),
+  };
+
+  broadcast(room, 'room_music/control', {
+    id: randomUUID(),
+    room_id: room.id,
+    music_state: room.musicState,
+    room: roomSnapshot(room),
+  });
+}
+
+function roomMusicProducerStarted({ room, peer, payload }) {
+  if (!canControlRoom(peer)) throw new Error('Only host/admin can publish room music.');
+  room.musicState = {
+    ...(room.musicState || createDefaultMusicState()),
+    active: true,
+    action: 'producer_started',
+    controllerPeerId: peer.id,
+    controllerUserId: peer.userId,
+    controllerName: peer.displayName,
+    trackId: String(payload.track_id ?? payload.trackId ?? '').slice(0, 120),
+    trackTitle: String(payload.track_title ?? payload.trackTitle ?? '').slice(0, 180),
+    positionMs: Math.max(0, Number(payload.position_ms ?? payload.positionMs ?? 0) || 0),
+    durationMs: Math.max(0, Number(payload.duration_ms ?? payload.durationMs ?? 0) || 0),
+    producerPeerId: peer.id,
+    producerId: String(payload.producer_id ?? payload.producerId ?? '').slice(0, 160),
+    mediaTag: 'room-music-audio',
+    updatedAt: new Date().toISOString(),
+  };
+
+  broadcast(room, 'room_music/producer_started', {
+    id: randomUUID(),
+    room_id: room.id,
+    music_state: room.musicState,
+    room: roomSnapshot(room),
+  });
+}
+
+function roomMusicStop({ room, peer }) {
+  if (!canControlRoom(peer)) throw new Error('Only host/admin can stop room music.');
+  room.musicState = {
+    ...createDefaultMusicState(),
+    action: 'stop',
+    controllerPeerId: peer.id,
+    controllerUserId: peer.userId,
+    controllerName: peer.displayName,
+    updatedAt: new Date().toISOString(),
+  };
+  broadcast(room, 'room_music/control', {
+    id: randomUUID(),
+    room_id: room.id,
+    music_state: room.musicState,
+    room: roomSnapshot(room),
+  });
+}
+
 function peerClosed(room, peer) {
   room.peers.delete(peer.id);
+  if (room.musicState?.controllerPeerId === peer.id || room.musicState?.producerPeerId === peer.id) {
+    room.musicState = createDefaultMusicState();
+    broadcast(room, 'room_music/state', { room_id: room.id, music_state: room.musicState });
+  }
   broadcast(room, 'room/peer_left', {
     peer_id: peer.id,
     user_id: peer.userId,
@@ -397,6 +526,8 @@ module.exports = {
   joinRoom,
   leaveRoom,
   setRoomApplyMode,
+  setRoomImages,
+  setGuestMessages,
   sendSeatInvite,
   requestSeatApplication,
   adminAssignSeat,
@@ -414,5 +545,8 @@ module.exports = {
   roomSystemMessage,
   roomChatClear,
   roomChat,
+  roomMusicControl,
+  roomMusicProducerStarted,
+  roomMusicStop,
   peerClosed,
 };
