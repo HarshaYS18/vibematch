@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/live_room_media_signaling_service.dart';
+import '../../data/live_room_restrictions_service.dart';
 import '../../data/live_room_settings_event_bus.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
@@ -20,6 +21,10 @@ class LiveRoomStateController extends ChangeNotifier {
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: _roomId,
       roomName: _roomName,
+    );
+    LiveRoomRestrictionsService.update(
+      roomImagesEnabled: _roomImagesEnabled,
+      guestMessagesEnabled: _guestMessagesEnabled,
     );
     LiveRoomSettingsEventBus.latestEvent.addListener(
       _handleRealtimeSettingsEvent,
@@ -78,6 +83,16 @@ class LiveRoomStateController extends ChangeNotifier {
       changed = true;
     }
 
+    if (event.roomImagesEnabled != _roomImagesEnabled) {
+      _roomImagesEnabled = event.roomImagesEnabled;
+      changed = true;
+    }
+
+    if (event.guestMessagesEnabled != _guestMessagesEnabled) {
+      _guestMessagesEnabled = event.guestMessagesEnabled;
+      changed = true;
+    }
+
     if (event.backgroundThemeId.trim().isNotEmpty) {
       final nextTheme = _themeFromId(event.backgroundThemeId);
       if (nextTheme != _selectedBackgroundTheme) {
@@ -91,7 +106,13 @@ class LiveRoomStateController extends ChangeNotifier {
       changed = true;
     }
 
-    if (changed) notifyListeners();
+    if (changed) {
+      LiveRoomRestrictionsService.update(
+        roomImagesEnabled: _roomImagesEnabled,
+        guestMessagesEnabled: _guestMessagesEnabled,
+      );
+      notifyListeners();
+    }
   }
 
   void renameRoom(String value) {
@@ -125,12 +146,16 @@ class LiveRoomStateController extends ChangeNotifier {
   void setRoomImagesEnabled(bool value) {
     if (value == _roomImagesEnabled) return;
     _roomImagesEnabled = value;
+    LiveRoomRestrictionsService.update(roomImagesEnabled: value);
+    LiveRoomMediaSignalingService.instance.setRoomImagesEnabled(value);
     notifyListeners();
   }
 
   void setGuestMessagesEnabled(bool value) {
     if (value == _guestMessagesEnabled) return;
     _guestMessagesEnabled = value;
+    LiveRoomRestrictionsService.update(guestMessagesEnabled: value);
+    LiveRoomMediaSignalingService.instance.setGuestMessagesEnabled(value);
     notifyListeners();
   }
 
