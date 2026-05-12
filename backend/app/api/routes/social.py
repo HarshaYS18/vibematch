@@ -35,6 +35,19 @@ def _get_target_user_by_public_id(db: Session, public_user_id: int, current_user
     return target_user
 
 
+def _summary_for_user(db: Session, current_user: User, user: User) -> PublicUserSummary:
+    following = social_service.is_following(db, current_user.id, user.id)
+    followed_by = social_service.is_following(db, user.id, current_user.id)
+    return PublicUserSummary(
+        **social_service.public_user_summary(
+            user,
+            current_user=current_user,
+            is_following_value=following,
+            is_followed_by_value=followed_by,
+        )
+    )
+
+
 @router.get("/users/{target_user_id}/follow-status", response_model=FollowStatusResponse)
 def get_follow_status(
     target_user_id: int,
@@ -101,7 +114,7 @@ def list_following(
     current_user: User = Depends(get_current_user),
 ):
     users = social_service.list_following(db, current_user)
-    return FollowingListResponse(users=[PublicUserSummary(**social_service.public_user_summary(user)) for user in users])
+    return FollowingListResponse(users=[_summary_for_user(db, current_user, user) for user in users])
 
 
 @router.get("/followers", response_model=FollowersListResponse)
@@ -110,7 +123,7 @@ def list_followers(
     current_user: User = Depends(get_current_user),
 ):
     users = social_service.list_followers(db, current_user)
-    return FollowersListResponse(users=[PublicUserSummary(**social_service.public_user_summary(user)) for user in users])
+    return FollowersListResponse(users=[_summary_for_user(db, current_user, user) for user in users])
 
 
 @router.get("/friends", response_model=FriendsListResponse)
@@ -119,4 +132,4 @@ def list_friends(
     current_user: User = Depends(get_current_user),
 ):
     users = social_service.list_friends(db, current_user)
-    return FriendsListResponse(users=[PublicUserSummary(**social_service.public_user_summary(user)) for user in users])
+    return FriendsListResponse(users=[_summary_for_user(db, current_user, user) for user in users])
