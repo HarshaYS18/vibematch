@@ -13,7 +13,7 @@ class CricketRoomRules {
   static const String fixedLayoutId = '5x2';
   static const int totalSeats = 10;
   static const int scorerSeatIndex = 2;
-  static const double scorerOverlayHeightFactor = 0.44;
+  static const double scorerOverlayHeightFactor = 0.30;
 
   static bool isScorerSeat(int seatIndex) => seatIndex == scorerSeatIndex;
 
@@ -779,44 +779,149 @@ class CricketScorerHalfOverlay extends StatefulWidget {
 class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
   bool _resultShown = false;
   bool _pickerOpen = false;
+  bool _minimized = false;
 
   CricketRoomModeController get controller => widget.controller;
 
   @override
   Widget build(BuildContext context) {
+    if (_minimized) {
+      return Align(
+        alignment: Alignment.bottomRight,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 76),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => setState(() => _minimized = false),
+                child: Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF07180D), Color(0xFF0E8F54)],
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFF86FF9D).withValues(alpha: 0.42),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.38),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(
+                        Icons.sports_cricket_rounded,
+                        color: Colors.white,
+                        size: 26,
+                      ),
+                      Positioned(
+                        right: 6,
+                        bottom: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD36A),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'SC',
+                            style: TextStyle(
+                              color: Color(0xFF251538),
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Align(
       alignment: Alignment.bottomCenter,
-      child: FractionallySizedBox(
-        heightFactor: CricketRoomRules.scorerOverlayHeightFactor,
-        widthFactor: 1,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F8F2),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.34),
-                blurRadius: 28,
-                offset: const Offset(0, -10),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+          child: FractionallySizedBox(
+            widthFactor: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xF8F9F8F2),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.75)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.30),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-              child: Column(
-                children: [
-                  const SheetHandle(width: 42),
-                  const SizedBox(height: 8),
-                  _ScorerOverlayHeader(state: controller.match),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: GridView.count(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 1.62,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF0E5A31), Color(0xFF65FF8F)],
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.sports_cricket_rounded,
+                            color: Colors.white,
+                            size: 17,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _ScorerOverlayHeader(state: controller.match),
+                        ),
+                        IconButton(
+                          tooltip: 'Minimize scorer',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => setState(() => _minimized = true),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: RoomColors.plum,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    GridView.count(
+                      crossAxisCount: 6,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 6,
+                      crossAxisSpacing: 6,
+                      childAspectRatio: 1.45,
                       padding: EdgeInsets.zero,
                       children: [
                         for (final run in const [0, 1, 2, 3, 4, 5, 6])
@@ -841,67 +946,68 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
                           ),
                         ),
                         _PremiumScoreButton(
-                          label: '+1 Pen',
+                          label: '+1P',
                           onTap: () => _scorePenalty(context, 1),
                         ),
                         _PremiumScoreButton(
-                          label: '-1 Pen',
+                          label: '-1P',
                           danger: true,
                           onTap: () => _scorePenalty(context, -1),
                         ),
                         _PremiumScoreButton(
-                          label: 'Wicket',
+                          label: 'W',
                           danger: true,
                           onTap: () => _scoreWicket(context),
-                        ),                      ],
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: controller.undo,
-                          icon: const Icon(Icons.undo_rounded, size: 16),
-                          label: const Text(
-                            'Undo',
-                            overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: controller.undo,
+                            icon: const Icon(Icons.undo_rounded, size: 15),
+                            label: const Text(
+                              'Undo',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: controller.togglePowerPlay,
-                          icon: Icon(
-                            controller.powerPlayActive
-                                ? Icons.flash_on_rounded
-                                : Icons.flash_off_rounded,
-                            size: 16,
-                          ),
-                          label: Text(
-                            controller.powerPlayActive ? 'PP x2' : 'Powerplay',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _handleEndInningsTap(context),
-                          icon: const Icon(Icons.flag_rounded, size: 16),
-                          label: Text(
-                            controller.match.status ==
-                                    CricketMatchStatus.inningsBreak
-                                ? '2nd'
-                                : 'End',
-                            overflow: TextOverflow.ellipsis,
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: controller.togglePowerPlay,
+                            icon: Icon(
+                              controller.powerPlayActive
+                                  ? Icons.flash_on_rounded
+                                  : Icons.flash_off_rounded,
+                              size: 15,
+                            ),
+                            label: Text(
+                              controller.powerPlayActive ? 'PP x2' : 'Power',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _handleEndInningsTap(context),
+                            icon: const Icon(Icons.flag_rounded, size: 15),
+                            label: Text(
+                              controller.match.status ==
+                                      CricketMatchStatus.inningsBreak
+                                  ? '2nd'
+                                  : 'End',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1413,16 +1519,16 @@ class _PremiumScoreButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: danger ? RoomColors.coral : Colors.white,
-      borderRadius: BorderRadius.circular(17),
+      borderRadius: BorderRadius.circular(13),
       child: InkWell(
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(13),
         onTap: onTap,
         child: Center(
           child: Text(
             label,
             style: TextStyle(
               color: danger ? Colors.white : RoomColors.plum,
-              fontSize: 15,
+              fontSize: 12,
               fontWeight: FontWeight.w900,
             ),
           ),
