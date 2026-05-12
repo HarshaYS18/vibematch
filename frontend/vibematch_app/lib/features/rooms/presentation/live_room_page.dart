@@ -19,6 +19,7 @@ import 'controllers/live_room_state_controller.dart';
 import 'controllers/live_room_users_controller.dart';
 import 'controllers/live_room_vibesync_controller.dart';
 import 'live_room_models.dart';
+import 'modules/cricket_mode_module.dart';
 import 'modules/live_room_emoji_actions_module.dart';
 import 'modules/live_room_games_actions_module.dart';
 import 'modules/live_room_gift_actions_module.dart';
@@ -905,12 +906,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _openCricketModeFromSettings(BuildContext sheetContext) {
     Navigator.pop(sheetContext);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (mounted) {
-        _openInfoSheet(
-          'Cricket Mode',
-          'Cricket Mode rules, score controls, start/end match controls, and owner/admin permissions will connect here.',
-        );
-      }
+      if (!mounted) return;
+
+      CricketModeModule.open(
+        context: context,
+        roomId: _roomId,
+        roomName: _roomName,
+        canManage: _viewerCanManageRoom,
+        previousBackground: _selectedBackgroundTheme,
+        onBackgroundChanged: _roomStateController.setSelectedBackgroundTheme,
+        onSystemMessage: _insertSystemMessage,
+      );
     });
   }
 
