@@ -15,6 +15,7 @@ class InboxMessageResponse(BaseModel):
     is_starred: bool = False
     is_forwarded: bool = False
     invite_room_name: str | None = None
+    invite_room_id: str | None = None
     created_at: datetime | None = None
 
 
@@ -31,6 +32,7 @@ class InboxConversationResponse(BaseModel):
     colors: list[str] = Field(default_factory=list)
     messages: list[InboxMessageResponse] = Field(default_factory=list)
     current_room_name: str | None = None
+    current_room_id: str | None = None
     is_locked_by_backend: bool = False
     is_blocked: bool = False
     is_muted: bool = False
@@ -46,11 +48,19 @@ class InboxDirectConversationRequest(BaseModel):
     target_user_id: int = Field(gt=0)
 
 
+class InboxRoomInviteRequest(BaseModel):
+    room_name: str = Field(min_length=1, max_length=120)
+    room_public_id: str | None = Field(default=None, max_length=80)
+    room_language: str | None = Field(default=None, max_length=40)
+    mode_title: str | None = Field(default=None, max_length=40)
+
+
 class InboxSendMessageRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     type: str = "text"
     reply_to_text: str | None = None
     invite_room_name: str | None = None
+    invite_room_id: str | None = None
     attachment_url: str | None = None
 
 
