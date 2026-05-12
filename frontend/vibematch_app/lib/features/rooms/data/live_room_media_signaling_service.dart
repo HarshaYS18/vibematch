@@ -312,6 +312,36 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
+
+  void setRoomImagesEnabled(bool enabled) {
+    _send('room_settings/images', <String, Object?>{
+      'enabled': enabled,
+      'room_images_enabled': enabled,
+    });
+  }
+
+  void setGuestMessagesEnabled(bool enabled) {
+    _send('room_settings/guest_messages', <String, Object?>{
+      'enabled': enabled,
+      'guest_messages_enabled': enabled,
+    });
+  }
+
+  void setRoomBackgroundTheme(String backgroundThemeId) {
+    final safeThemeId = backgroundThemeId.trim();
+    if (safeThemeId.isEmpty) return;
+
+    _send('room_settings/background_theme', <String, Object?>{
+      'background_theme_id': safeThemeId,
+    });
+  }
+
+  void setRoomAnnouncement(String announcementText) {
+    _send('room_settings/announcement', <String, Object?>{
+      'announcement_text': announcementText.trim(),
+    });
+  }
+
   void sendSeatApplicationRequest({required int seatIndex}) {
     if (seatIndex < 0) return;
     _send('seat_application/request', <String, Object?>{
