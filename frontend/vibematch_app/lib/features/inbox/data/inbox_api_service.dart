@@ -92,26 +92,19 @@ class InboxApiService {
     if (isLocked != null) body['is_locked'] = isLocked;
     if (isBlocked != null) body['is_blocked'] = isBlocked;
 
-    final response = await http.patch(
-      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/state')),
-      headers: await _headers(),
-      body: jsonEncode(body),
-    );
+    final response = await http.patch(Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/state')), headers: await _headers(), body: jsonEncode(body));
     _throwIfFailed(response, 'update conversation state');
     return conversationFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<InboxMessage> sendMessage({required String conversationId, required String text, String type = 'text', String? replyToText, String? inviteRoomName, String? attachmentUrl}) async {
+  Future<InboxMessage> sendMessage({required String conversationId, required String text, String type = 'text', String? replyToText, String? inviteRoomName, String? inviteRoomId, String? attachmentUrl}) async {
     final body = <String, Object>{'text': text, 'type': type};
     if (replyToText != null) body['reply_to_text'] = replyToText;
     if (inviteRoomName != null) body['invite_room_name'] = inviteRoomName;
+    if (inviteRoomId != null) body['invite_room_id'] = inviteRoomId;
     if (attachmentUrl != null) body['attachment_url'] = attachmentUrl;
 
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages')),
-      headers: await _headers(),
-      body: jsonEncode(body),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages')), headers: await _headers(), body: jsonEncode(body));
     _throwIfFailed(response, 'send message');
     return messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -121,11 +114,7 @@ class InboxApiService {
     if (reaction != null) body['reaction'] = reaction;
     if (isStarred != null) body['is_starred'] = isStarred;
 
-    final response = await http.patch(
-      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages/$messageId')),
-      headers: await _headers(),
-      body: jsonEncode(body),
-    );
+    final response = await http.patch(Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages/$messageId')), headers: await _headers(), body: jsonEncode(body));
     _throwIfFailed(response, 'update message');
     return messageFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -171,11 +160,7 @@ class InboxApiService {
   }
 
   InboxLockStatus lockStatusFromJson(Map<String, dynamic> json) {
-    return InboxLockStatus(
-      isEnabled: json['is_enabled'] == true,
-      mobileNumber: json['mobile_number']?.toString(),
-      recoveryRequested: json['recovery_requested'] == true,
-    );
+    return InboxLockStatus(isEnabled: json['is_enabled'] == true, mobileNumber: json['mobile_number']?.toString(), recoveryRequested: json['recovery_requested'] == true);
   }
 
   InboxConversation conversationFromJson(Map<String, dynamic> json) {
@@ -186,13 +171,15 @@ class InboxApiService {
       subtitle: json['subtitle']?.toString() ?? '',
       time: json['time']?.toString() ?? '',
       avatarText: json['avatar_text']?.toString() ?? 'VM',
+      avatarUrl: _nullableString(json['avatar_url']),
       type: _conversationTypeFromApi(json['type']?.toString()),
       unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
       isOnline: json['is_online'] == true,
       lastSeenText: json['last_seen_text']?.toString() ?? 'offline',
       colors: colors,
       messages: (json['messages'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().map(messageFromJson).toList(),
-      currentRoomName: json['current_room_name']?.toString(),
+      currentRoomName: _nullableString(json['current_room_name']),
+      currentRoomId: _nullableString(json['current_room_id']),
       isLockedByBackend: json['is_locked_by_backend'] == true,
       isBlocked: json['is_blocked'] == true,
       isMuted: json['is_muted'] == true,
@@ -210,11 +197,12 @@ class InboxApiService {
       isMine: json['is_mine'] == true,
       type: _messageTypeFromApi(json['type']?.toString()),
       status: _messageStatusFromApi(json['status']?.toString()),
-      reaction: json['reaction']?.toString(),
-      replyToText: json['reply_to_text']?.toString(),
+      reaction: _nullableString(json['reaction']),
+      replyToText: _nullableString(json['reply_to_text']),
       isStarred: json['is_starred'] == true,
       isForwarded: json['is_forwarded'] == true,
-      inviteRoomName: json['invite_room_name']?.toString(),
+      inviteRoomName: _nullableString(json['invite_room_name']),
+      inviteRoomId: _nullableString(json['invite_room_id']),
     );
   }
 
@@ -228,8 +216,8 @@ class InboxApiService {
       snapshot: (json['snapshot'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().map(messageFromJson).toList(),
       createdAtLabel: json['created_at_label']?.toString() ?? 'Now',
       status: _reportStatusFromApi(json['status']?.toString()),
-      csNote: json['cs_note']?.toString(),
-      monitorAction: json['monitor_action']?.toString(),
+      csNote: _nullableString(json['cs_note']),
+      monitorAction: _nullableString(json['monitor_action']),
     );
   }
 
@@ -249,6 +237,7 @@ class InboxApiService {
       case 'document': return InboxMessageType.document;
       case 'location': return InboxMessageType.location;
       case 'room_invite': return InboxMessageType.roomInvite;
+      case 'relationship_request': return InboxMessageType.relationshipRequest;
       case 'system': return InboxMessageType.system;
       default: return InboxMessageType.text;
     }
@@ -259,6 +248,7 @@ class InboxApiService {
       case 'sent': return InboxMessageStatus.sent;
       case 'delivered': return InboxMessageStatus.delivered;
       case 'failed': return InboxMessageStatus.failed;
+      case 'sending': return InboxMessageStatus.sending;
       default: return InboxMessageStatus.read;
     }
   }
@@ -277,5 +267,10 @@ class InboxApiService {
     if (hex.length == 6) hex = 'FF$hex';
     return Color(int.tryParse(hex, radix: 16) ?? 0xFF6D5DF6);
   }
-}
 
+  String? _nullableString(Object? value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty || text == 'null') return null;
+    return text;
+  }
+}
