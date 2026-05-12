@@ -147,7 +147,6 @@ class LiveRoomStateController extends ChangeNotifier {
     if (value == _roomImagesEnabled) return;
     _roomImagesEnabled = value;
     LiveRoomRestrictionsService.update(roomImagesEnabled: value);
-    LiveRoomMediaSignalingService.instance.setRoomImagesEnabled(value);
     notifyListeners();
   }
 
@@ -155,7 +154,6 @@ class LiveRoomStateController extends ChangeNotifier {
     if (value == _guestMessagesEnabled) return;
     _guestMessagesEnabled = value;
     LiveRoomRestrictionsService.update(guestMessagesEnabled: value);
-    LiveRoomMediaSignalingService.instance.setGuestMessagesEnabled(value);
     notifyListeners();
   }
 
