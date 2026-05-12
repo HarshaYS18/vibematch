@@ -29,7 +29,7 @@ from app.api.routes import (
     vibes,
     vip_admin,
 )
-from app.api.routes.rooms import rooms
+from app.api.routes.rooms import cricket, rooms
 from app.database import Base, engine
 from app.models import (
     AdminLog,
@@ -37,6 +37,8 @@ from app.models import (
     CoinPoolLedger,
     CoinSaleOrder,
     CoinSupplyPool,
+    CricketMatch,
+    CricketTournament,
     DeviceBan,
     GameBet,
     GameDefinition,
@@ -110,6 +112,7 @@ app.include_router(role_badges.router)
 app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(rooms.router)
+app.include_router(cricket.router)
 app.include_router(inbox.router)
 app.include_router(inbox_ws.router)
 app.include_router(social.router)
