@@ -4,6 +4,7 @@ import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import '../modules/cricket_room_mode_module.dart';
 import '../modules/cricket_room_mode_registry.dart';
+import '../modules/cricket_room_mode_signal.dart';
 import 'live_room_seat_invite_notification.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
@@ -130,159 +131,172 @@ class LiveRoomBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = LiveRoomMediaSignalingService.instance;
     final shouldShowMicButton = showMicButton ?? _derivedShowMicButton;
-    final cricketController = CricketRoomModeRegistry.controllerFor(
-      roomId: roomId,
-      roomName: roomName,
-    );
-    final cricketModeActive = cricketController.active;
-    final currentUser = media.activeLoggedInSeatUser;
-    final scorerVisible = cricketModeActive &&
-        currentUser != null &&
-        CricketRoomModeModule.canScore(
-          seats: seats,
-          currentUserId: currentUser.id,
+
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: CricketRoomModeSignal.activeRoomIds,
+      builder: (context, activeRoomIds, child) {
+        final cricketController = CricketRoomModeRegistry.syncRoomModeFromSignal(
+          roomId: roomId,
+          roomName: roomName,
+          currentLayoutId: layoutId,
         );
-    final effectiveLayoutId =
-        cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
-    final scorerOverlayBottomPadding = scorerVisible
-        ? MediaQuery.sizeOf(context).height *
-            CricketRoomRules.scorerOverlayHeightFactor
-        : 0.0;
-    return SafeArea(
-      child: Stack(
-        children: [
-          Column(
+        final cricketModeActive = cricketController.active;
+        final currentUser = media.activeLoggedInSeatUser;
+        final scorerVisible = cricketModeActive &&
+            currentUser != null &&
+            CricketRoomModeModule.canScore(
+              seats: seats,
+              currentUserId: currentUser.id,
+            );
+        final effectiveLayoutId =
+            cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
+        final scorerOverlayBottomPadding = scorerVisible
+            ? MediaQuery.sizeOf(context).height *
+                CricketRoomRules.scorerOverlayHeightFactor
+            : 0.0;
+
+        return SafeArea(
+          child: Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                child: RoomTopBar(
-                  roomName: roomName,
-                  roomId: roomId,
-                  privacyMode: privacyMode,
-                  onlineCount: _effectiveOnlineCount,
-                  canManageAdmins: canManageSeats,
-                  admins: admins,
-                  availableAdminUsers: availableAdminUsers,
-                  onAddAdmin: onAddAdmin,
-                  onRemoveAdmin: onRemoveAdmin,
-                  onBack: onBack,
-                  onJoinTap: onJoinTap,
-                  onShare: onShare,
-                  onAnnouncement: onAnnouncement,
-                  onSettings: onSettings,
-                  onUsersTap: onUsersTap,
-                  onRoomRankingsTap: onRoomRankingsTap,
-                  onRoomLevelTap: onRoomLevelTap,
-                ),
-              ),
-              const SizedBox(height: 22),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: RoomSeatLayout(
-                  seats: seats,
-                  layoutId: effectiveLayoutId,
-                  selectedSeatIndex: selectedSeatIndex,
-                  canManageSeats: canManageSeats,
-                  applyOnlyModeEnabled: applyOnlyModeEnabled,
-                  onSeatTap: onSeatTap,
-                  onUserTap: onUserTap,
-                  onInvite: onInvite,
-                  onSwitch: onSwitch,
-                  onLock: onLock,
-                  onUnlock: onUnlock,
-                  onApply: onApplySeat,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: onDismissOverlays,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      14,
-                      0,
-                      14,
-                      scorerOverlayBottomPadding,
-                    ),
-                    child: Column(
-                      children: [
-                        if (cricketModeActive)
-                          CricketRoomModeModule.fixedScoreboard(
-                            state: cricketController.match,
-                            margin: const EdgeInsets.only(bottom: 8),
-                          ),
-                        Expanded(
-                          child: RoomChatFeed(
-                            messages: messages,
-                            canManageSeatApplications:
-                                canManageSeatApplications,
-                            onApproveSeatApplication:
-                                onApproveSeatApplication,
-                            onRejectSeatApplication:
-                                onRejectSeatApplication,
-                            onSenderTap: onSenderTap,
-                            onMentionTap: onMentionTap,
-                          ),
-                        ),
-                      ],
+              Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    child: RoomTopBar(
+                      roomName: roomName,
+                      roomId: roomId,
+                      privacyMode: privacyMode,
+                      onlineCount: _effectiveOnlineCount,
+                      canManageAdmins: canManageSeats,
+                      admins: admins,
+                      availableAdminUsers: availableAdminUsers,
+                      onAddAdmin: onAddAdmin,
+                      onRemoveAdmin: onRemoveAdmin,
+                      onBack: onBack,
+                      onJoinTap: onJoinTap,
+                      onShare: onShare,
+                      onAnnouncement: onAnnouncement,
+                      onSettings: onSettings,
+                      onUsersTap: onUsersTap,
+                      onRoomRankingsTap: onRoomRankingsTap,
+                      onRoomLevelTap: onRoomLevelTap,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 22),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: RoomSeatLayout(
+                      seats: seats,
+                      layoutId: effectiveLayoutId,
+                      selectedSeatIndex: selectedSeatIndex,
+                      canManageSeats: canManageSeats,
+                      applyOnlyModeEnabled: applyOnlyModeEnabled,
+                      onSeatTap: onSeatTap,
+                      onUserTap: onUserTap,
+                      onInvite: onInvite,
+                      onSwitch: onSwitch,
+                      onLock: onLock,
+                      onUnlock: onUnlock,
+                      onApply: onApplySeat,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: onDismissOverlays,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          14,
+                          0,
+                          14,
+                          scorerOverlayBottomPadding,
+                        ),
+                        child: Column(
+                          children: [
+                            if (cricketModeActive)
+                              AnimatedBuilder(
+                                animation: cricketController,
+                                builder: (context, child) {
+                                  return CricketRoomModeModule.fixedScoreboard(
+                                    state: cricketController.match,
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                  );
+                                },
+                              ),
+                            Expanded(
+                              child: RoomChatFeed(
+                                messages: messages,
+                                canManageSeatApplications:
+                                    canManageSeatApplications,
+                                onApproveSeatApplication:
+                                    onApproveSeatApplication,
+                                onRejectSeatApplication:
+                                    onRejectSeatApplication,
+                                onSenderTap: onSenderTap,
+                                onMentionTap: onMentionTap,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  RoomInputDock(
+                    controller: messageController,
+                    focusNode: messageFocusNode,
+                    micMuted: micMuted,
+                    showMicButton: shouldShowMicButton,
+                    inboxUnreadCount: inboxUnreadCount,
+                    imagesEnabled: imagesEnabled,
+                    onInboxTap: onInboxTap,
+                    onEmojiTap: onEmojiTap,
+                    onSendTap: onSendTap,
+                    onMicTap: onMicTap,
+                    onGamesTap: onGamesTap,
+                    onGiftTap: onGiftTap,
+                  ),
+                ],
               ),
-              RoomInputDock(
-                controller: messageController,
-                focusNode: messageFocusNode,
-                micMuted: micMuted,
-                showMicButton: shouldShowMicButton,
-                inboxUnreadCount: inboxUnreadCount,
-                imagesEnabled: imagesEnabled,
-                onInboxTap: onInboxTap,
-                onEmojiTap: onEmojiTap,
-                onSendTap: onSendTap,
-                onMicTap: onMicTap,
-                onGamesTap: onGamesTap,
-                onGiftTap: onGiftTap,
+              if (cricketModeActive)
+                AnimatedBuilder(
+                  animation: cricketController,
+                  builder: (context, child) {
+                    return CricketRoomModeModule.scorerOverlay(
+                      controller: cricketController,
+                      visibleToCurrentUser: scorerVisible,
+                    );
+                  },
+                ),
+              ValueListenableBuilder<LiveMediaSeatInvite?>(
+                valueListenable: media.seatInvite,
+                builder: (context, invite, child) {
+                  if (invite == null || invite.seatIndex < 0) return const SizedBox.shrink();
+                  final currentUser = media.activeLoggedInSeatUser;
+                  if (currentUser == null) return const SizedBox.shrink();
+                  return Positioned.fill(
+                    child: IgnorePointer(
+                      ignoring: false,
+                      child: Center(
+                        child: LiveRoomSeatInviteNotification(
+                          inviterName: invite.inviterName,
+                          invitedUser: currentUser,
+                          seatIndex: invite.seatIndex,
+                          onReject: media.clearSeatInvite,
+                          onAccept: () {
+                            media.takeSeat(invite.seatIndex);
+                            media.clearSeatInvite();
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
-          if (cricketModeActive)
-            AnimatedBuilder(
-              animation: cricketController,
-              builder: (context, child) {
-                return CricketRoomModeModule.scorerOverlay(
-                  controller: cricketController,
-                  visibleToCurrentUser: scorerVisible,
-                );
-              },
-            ),
-          ValueListenableBuilder<LiveMediaSeatInvite?>(
-            valueListenable: media.seatInvite,
-            builder: (context, invite, child) {
-              if (invite == null || invite.seatIndex < 0) return const SizedBox.shrink();
-              final currentUser = media.activeLoggedInSeatUser;
-              if (currentUser == null) return const SizedBox.shrink();
-              return Positioned.fill(
-                child: IgnorePointer(
-                  ignoring: false,
-                  child: Center(
-                    child: LiveRoomSeatInviteNotification(
-                      inviterName: invite.inviterName,
-                      invitedUser: currentUser,
-                      seatIndex: invite.seatIndex,
-                      onReject: media.clearSeatInvite,
-                      onAccept: () {
-                        media.takeSeat(invite.seatIndex);
-                        media.clearSeatInvite();
-                      },
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
