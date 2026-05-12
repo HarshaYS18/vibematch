@@ -848,7 +848,7 @@ class _CricketMiniBallChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      minWidth: 27,
+      constraints: const BoxConstraints(minWidth: 27),
       height: 27,
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 7),

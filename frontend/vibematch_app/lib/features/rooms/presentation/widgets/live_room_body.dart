@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
+import '../modules/cricket_room_mode_module.dart';
+import '../modules/cricket_room_mode_registry.dart';
 import 'live_room_seat_invite_notification.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
@@ -128,6 +130,33 @@ class LiveRoomBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = LiveRoomMediaSignalingService.instance;
     final shouldShowMicButton = showMicButton ?? _derivedShowMicButton;
+    final currentTheme = activeRoomBackgroundTheme.value;
+    final cricketBackgroundActive =
+        CricketRoomModeRegistry.isCricketBackground(currentTheme);
+    final cricketController = CricketRoomModeRegistry.controllerFor(
+      roomId: roomId,
+      roomName: roomName,
+    );
+    final currentUser = media.activeLoggedInSeatUser;
+    final scorerVisible = cricketBackgroundActive &&
+        currentUser != null &&
+        CricketRoomModeModule.canScore(
+          seats: seats,
+          currentUserId: currentUser.id,
+        );
+    final effectiveLayoutId =
+        cricketBackgroundActive ? CricketRoomRules.fixedLayoutId : layoutId;
+    final scorerOverlayBottomPadding = scorerVisible
+        ? MediaQuery.sizeOf(context).height *
+            CricketRoomRules.scorerOverlayHeightFactor
+        : 0.0;
+
+    if (cricketBackgroundActive && !cricketController.active) {
+      cricketController.startRoomMode(
+        currentLayoutId: effectiveLayoutId,
+        currentBackground: currentTheme,
+      );
+    }
 
     return SafeArea(
       child: Stack(
@@ -161,7 +190,7 @@ class LiveRoomBody extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: RoomSeatLayout(
                   seats: seats,
-                  layoutId: layoutId,
+                  layoutId: effectiveLayoutId,
                   selectedSeatIndex: selectedSeatIndex,
                   canManageSeats: canManageSeats,
                   applyOnlyModeEnabled: applyOnlyModeEnabled,
@@ -180,14 +209,33 @@ class LiveRoomBody extends StatelessWidget {
                   behavior: HitTestBehavior.translucent,
                   onTap: onDismissOverlays,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: RoomChatFeed(
-                      messages: messages,
-                      canManageSeatApplications: canManageSeatApplications,
-                      onApproveSeatApplication: onApproveSeatApplication,
-                      onRejectSeatApplication: onRejectSeatApplication,
-                      onSenderTap: onSenderTap,
-                      onMentionTap: onMentionTap,
+                    padding: EdgeInsets.fromLTRB(
+                      14,
+                      0,
+                      14,
+                      scorerOverlayBottomPadding,
+                    ),
+                    child: Column(
+                      children: [
+                        if (cricketBackgroundActive)
+                          CricketRoomModeModule.fixedScoreboard(
+                            state: cricketController.match,
+                            margin: const EdgeInsets.only(bottom: 8),
+                          ),
+                        Expanded(
+                          child: RoomChatFeed(
+                            messages: messages,
+                            canManageSeatApplications:
+                                canManageSeatApplications,
+                            onApproveSeatApplication:
+                                onApproveSeatApplication,
+                            onRejectSeatApplication:
+                                onRejectSeatApplication,
+                            onSenderTap: onSenderTap,
+                            onMentionTap: onMentionTap,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -208,6 +256,16 @@ class LiveRoomBody extends StatelessWidget {
               ),
             ],
           ),
+          if (cricketBackgroundActive)
+            AnimatedBuilder(
+              animation: cricketController,
+              builder: (context, child) {
+                return CricketRoomModeModule.scorerOverlay(
+                  controller: cricketController,
+                  visibleToCurrentUser: scorerVisible,
+                );
+              },
+            ),
           ValueListenableBuilder<LiveMediaSeatInvite?>(
             valueListenable: media.seatInvite,
             builder: (context, invite, child) {
