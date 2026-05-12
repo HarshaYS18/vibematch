@@ -134,6 +134,8 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
   final _playersPerTeam = TextEditingController(text: '5');
   final _overs = TextEditingController(text: '5');
   final _wickets = TextEditingController(text: '4');
+  final _teamAPlayers = TextEditingController(text: 'Arjun, Dev, Kiran, Manoj, Sai');
+  final _teamBPlayers = TextEditingController(text: 'Ravi, Bala, Surya, Mahesh, Vikram');
 
   int get _playerTarget =>
       math.max(2, int.tryParse(_playersPerTeam.text) ?? 5);
@@ -149,6 +151,8 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     _playersPerTeam.dispose();
     _overs.dispose();
     _wickets.dispose();
+    _teamAPlayers.dispose();
+    _teamBPlayers.dispose();
     super.dispose();
   }
 
@@ -216,6 +220,14 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
         ),
         _Input(label: 'Team A', controller: _quickA),
         _Input(label: 'Team B', controller: _quickB),
+        _Input(
+          label: 'Team A player names comma separated',
+          controller: _teamAPlayers,
+        ),
+        _Input(
+          label: 'Team B player names comma separated',
+          controller: _teamBPlayers,
+        ),
         Row(
           children: [
             Expanded(
@@ -366,8 +378,8 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     setState(() {
       _selectedFixture = StumpsFixture(
         id: 'quick_${DateTime.now().millisecondsSinceEpoch}',
-        teamA: _quickTeam(teamAName, 'qa'),
-        teamB: _quickTeam(teamBName, 'qb'),
+        teamA: _quickTeam(teamAName, 'qa', _teamAPlayers.text),
+        teamB: _quickTeam(teamBName, 'qb', _teamBPlayers.text),
         round: 1,
       );
       _activeMatchId = null;
@@ -380,7 +392,18 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     });
   }
 
-  StumpsTeam _quickTeam(String name, String prefix) {
+  StumpsTeam _quickTeam(String name, String prefix, String rawPlayerNames) {
+    final enteredNames = rawPlayerNames
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+
+    final playerNames = List<String>.generate(_playerTarget, (index) {
+      if (index < enteredNames.length) return enteredNames[index];
+      return '$name P${index + 1}';
+    });
+
     return StumpsTeam(
       id: prefix,
       name: name,
@@ -388,7 +411,7 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
         _playerTarget,
         (index) => StumpsPlayer(
           id: '${prefix}_${index + 1}',
-          name: '$name P${index + 1}',
+          name: playerNames[index],
         ),
       ),
     );

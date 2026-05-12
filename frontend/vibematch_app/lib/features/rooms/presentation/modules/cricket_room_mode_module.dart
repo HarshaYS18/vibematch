@@ -412,7 +412,7 @@ class CricketFixedScoreboard extends StatelessWidget {
 
     return Container(
       margin: margin,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xEE061B0D), Color(0xEE0E5A31)],
@@ -442,7 +442,7 @@ class CricketFixedScoreboard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 15.5,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.3,
                   ),
@@ -467,7 +467,7 @@ class CricketFixedScoreboard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.82),
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -529,7 +529,7 @@ class CricketScorerHalfOverlay extends StatelessWidget {
                       crossAxisCount: 4,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
-                      childAspectRatio: 1.68,
+                      childAspectRatio: 1.45,
                       padding: EdgeInsets.zero,
                       children: [
                         for (final run in const [0, 1, 2, 3, 4, 5, 6])
@@ -568,15 +568,15 @@ class CricketScorerHalfOverlay extends StatelessWidget {
                         child: OutlinedButton.icon(
                           onPressed: controller.undo,
                           icon: const Icon(Icons.undo_rounded, size: 17),
-                          label: const Text('Undo'),
+                          label: const Text('Undo', overflow: TextOverflow.ellipsis),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: controller.endInnings,
+                          onPressed: controller.match.status == CricketMatchStatus.inningsBreak ? controller.startSecondInnings : controller.endInnings,
                           icon: const Icon(Icons.flag_rounded, size: 17),
-                          label: const Text('End innings'),
+                          label: Text(controller.match.status == CricketMatchStatus.inningsBreak ? '2nd innings' : 'End innings', overflow: TextOverflow.ellipsis),
                         ),
                       ),
                     ],
@@ -819,7 +819,7 @@ class _ScorerOverlayHeader extends StatelessWidget {
                 'Scorer Seat • Seat 3',
                 style: TextStyle(
                   color: RoomColors.plum.withValues(alpha: 0.78),
-                  fontSize: 11,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -847,21 +847,35 @@ class _CricketMiniBallChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isBoundary = label == '4' || label == '6';
+    final isWicket = label == 'W';
+
     return Container(
-      constraints: const BoxConstraints(minWidth: 27),
-      height: 27,
+      width: 26,
+      height: 26,
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 7),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
+        color: isWicket
+            ? RoomColors.coral
+            : isBoundary
+                ? const Color(0xFFFFD36A)
+                : Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFF0E5930),
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: Text(
+            label,
+            maxLines: 1,
+            style: TextStyle(
+              color: isWicket ? Colors.white : const Color(0xFF0E5930),
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ),
       ),
     );
@@ -1055,7 +1069,7 @@ class _NumberRuleTile extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900),
             ),
           ),
           IconButton(
