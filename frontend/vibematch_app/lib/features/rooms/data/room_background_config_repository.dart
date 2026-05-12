@@ -73,18 +73,22 @@ class RoomBackgroundConfigRepository {
   List<Color> _parseColorList(Object? value) {
     if (value is! List) return const [];
     return value
-        .map((item) => _parseHexColor(item?.toString(), fallback: null))
+        .map((item) => _parseOptionalHexColor(item?.toString()))
         .whereType<Color>()
         .toList();
   }
 
-  Color? _parseHexColor(String? value, {required Color? fallback}) {
+  Color _parseHexColor(String? value, {required Color fallback}) {
+    return _parseOptionalHexColor(value) ?? fallback;
+  }
+
+  Color? _parseOptionalHexColor(String? value) {
     final raw = value?.trim();
-    if (raw == null || raw.isEmpty) return fallback;
+    if (raw == null || raw.isEmpty) return null;
     final normalized = raw.replaceFirst('#', '');
     final hex = normalized.length == 6 ? 'FF$normalized' : normalized;
     final parsed = int.tryParse(hex, radix: 16);
-    if (parsed == null) return fallback;
+    if (parsed == null) return null;
     return Color(parsed);
   }
 
