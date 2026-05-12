@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
+import '../modules/live_room_music_player_module.dart';
 import 'live_room_blocked_list_sheet.dart';
 import 'room_settings_sheet.dart';
 
@@ -63,6 +64,14 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
     );
   }
 
+  void _openMusicModule(BuildContext context) {
+    Navigator.of(context).pop();
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!context.mounted) return;
+      LiveRoomMusicPlayerModule.open(context, roomId: roomId);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return RoomSettingsSheet(
@@ -94,12 +103,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
             'Room entrance effects, seat effects, and background effects will connect here.',
         icon: Icons.auto_awesome_rounded,
       ),
-      onMusicTap: () => LiveRoomProfileNavigator.openModulePage(
-        context: context,
-        title: 'Music',
-        subtitle: 'Room music controls and playlist will connect here.',
-        icon: Icons.music_note_rounded,
-      ),
+      onMusicTap: () => _openMusicModule(context),
       onToggleRoomImages: onToggleRoomImages,
       onToggleGuestMessages: onToggleGuestMessages,
       onToggleApplyOnlyMode: onToggleApplyOnlyMode,
