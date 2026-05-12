@@ -11,7 +11,7 @@ class FriendsInviteSheet extends StatefulWidget {
     required this.onInvite,
     this.actionLabel = 'Invite',
     this.completedLabel = 'Invited',
-    this.onlineOnly = false,
+    this.onlineOnly = true,
     this.socialApiService = const SocialApiService(),
   });
 
