@@ -83,6 +83,8 @@ wss.on('connection', (ws) => {
 
       if (type === 'room/leave') return handlers.leaveRoom({ ws, room: currentRoom, peer: currentPeer, clearSession });
       if (type === 'room_settings/apply_mode') return handlers.setRoomApplyMode({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'room_settings/images') return handlers.setRoomImages({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'room_settings/guest_messages') return handlers.setGuestMessages({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'seat_invite/send') return handlers.sendSeatInvite({ ws, room: currentRoom, peer: currentPeer, payload });
       if (type === 'seat_application/request') return handlers.requestSeatApplication({ ws, room: currentRoom, peer: currentPeer, payload });
       if (type === 'admin/seat_assign') return handlers.adminAssignSeat({ room: currentRoom, payload });
@@ -101,6 +103,9 @@ wss.on('connection', (ws) => {
       if (type === 'room/system_message') return handlers.roomSystemMessage({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'room/chat_clear') return handlers.roomChatClear({ room: currentRoom, peer: currentPeer });
       if (type === 'room/chat') return handlers.roomChat({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'room_music/control') return handlers.roomMusicControl({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'room_music/producer_started') return handlers.roomMusicProducerStarted({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'room_music/stop') return handlers.roomMusicStop({ room: currentRoom, peer: currentPeer });
 
       handlers.send(ws, 'error', { detail: `Unsupported event type: ${type}` });
     } catch (error) {
