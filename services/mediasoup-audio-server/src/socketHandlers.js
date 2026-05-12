@@ -432,7 +432,7 @@ function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('startRoomMusic', async ({ roomId, peerId, url, title }, callback) => {
+    socket.on('startRoomMusic', async ({ roomId, peerId, url, title, seekMs }, callback) => {
       try {
         requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
         const room = getRoom(roomId);
@@ -445,6 +445,7 @@ function registerSocketHandlers(io) {
           controllerPeerId: String(peerId),
           url,
           title,
+          seekMs,
         });
 
         console.log('[startRoomMusic] ok', {

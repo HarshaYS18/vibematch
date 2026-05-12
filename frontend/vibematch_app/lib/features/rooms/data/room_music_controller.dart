@@ -1,5 +1,6 @@
 ﻿import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/foundation.dart';
@@ -23,6 +24,9 @@ class RoomMusicController {
   String? _roomId;
   bool _loaded = false;
   bool _stoppingBecauseRoomExit = false;
+  Timer? _progressTimer;
+  DateTime? _playStartedAt;
+  int _playStartedPositionMs = 0;
 
   Future<void> attachRoom(String roomId) async {
     final safeRoomId = roomId.trim().isEmpty ? 'VM000000' : roomId.trim();
@@ -42,34 +46,51 @@ class RoomMusicController {
       ...tracks.where((track) => !existingIds.contains(track.id)),
     ];
 
-    state.value = state.value.copyWith(playlist: merged);
+    state.value = state.value.copyWith(
+      playlist: merged,
+      currentIndex: state.value.currentIndex >= 0
+          ? state.value.currentIndex
+          : merged.isEmpty
+              ? -1
+              : 0,
+    );
     await _savePlaylist();
   }
 
   Future<void> removeTrack(String trackId) async {
     final current = state.value;
+    final removingCurrent =
+        current.currentTrack != null && current.currentTrack!.id == trackId;
+
     final nextPlaylist = current.playlist
         .where((track) => track.id != trackId)
         .toList(growable: false);
 
-    var nextIndex = current.currentIndex;
     if (nextPlaylist.isEmpty) {
       await stop();
       state.value = state.value.copyWith(
         playlist: <RoomMusicTrack>[],
         currentIndex: -1,
+        positionMs: 0,
       );
       await _savePlaylist();
       return;
     }
 
+    var nextIndex = current.currentIndex;
     if (nextIndex >= nextPlaylist.length) nextIndex = nextPlaylist.length - 1;
 
     state.value = current.copyWith(
       playlist: nextPlaylist,
       currentIndex: nextIndex,
+      positionMs: removingCurrent ? 0 : current.positionMs,
     );
+
     await _savePlaylist();
+
+    if (removingCurrent && current.isPlaying) {
+      await playIndex(nextIndex);
+    }
   }
 
   Future<void> clearPlaylist() async {
@@ -77,11 +98,12 @@ class RoomMusicController {
     state.value = state.value.copyWith(
       playlist: <RoomMusicTrack>[],
       currentIndex: -1,
+      positionMs: 0,
     );
     await _savePlaylist();
   }
 
-  Future<void> playIndex(int index) async {
+  Future<void> playIndex(int index, {int seekMs = 0}) async {
     final roomId = _roomId;
     if (roomId == null || roomId.trim().isEmpty) return;
 
@@ -89,9 +111,11 @@ class RoomMusicController {
     if (index < 0 || index >= playlist.length) return;
 
     final track = playlist[index];
+    final safeSeekMs = _clampPosition(seekMs, track.durationMs);
 
     state.value = state.value.copyWith(
       currentIndex: index,
+      positionMs: safeSeekMs,
       isUploading: true,
       isOverlayVisible: true,
       isMinimized: false,
@@ -103,6 +127,7 @@ class RoomMusicController {
       final success = await LiveRoomAudioService.instance.startRoomMusic(
         url: uploadedUrl,
         title: track.title,
+        seekMs: safeSeekMs,
       );
 
       if (!success) {
@@ -112,17 +137,21 @@ class RoomMusicController {
         state.value = state.value.copyWith(
           isUploading: false,
           isPlaying: false,
+          isPaused: false,
           lastError: sfuError,
         );
         return;
       }
 
+      _startProgressTimer(fromMs: safeSeekMs);
       state.value = state.value.copyWith(
         currentIndex: index,
+        positionMs: safeSeekMs,
         isUploading: false,
         isPlaying: true,
         isPaused: false,
         isOverlayVisible: true,
+        isMinimized: false,
         clearError: true,
       );
       await _savePlaylist();
@@ -130,6 +159,7 @@ class RoomMusicController {
       state.value = state.value.copyWith(
         isUploading: false,
         isPlaying: false,
+        isPaused: false,
         lastError: error.toString(),
       );
     }
@@ -138,7 +168,7 @@ class RoomMusicController {
   Future<void> playCurrentOrFirst() async {
     if (state.value.playlist.isEmpty) return;
     final index = state.value.currentIndex >= 0 ? state.value.currentIndex : 0;
-    await playIndex(index);
+    await playIndex(index, seekMs: state.value.positionMs);
   }
 
   Future<void> playNext() async {
@@ -154,7 +184,7 @@ class RoomMusicController {
       return;
     }
 
-    await playIndex(nextIndex);
+    await playIndex(nextIndex, seekMs: 0);
   }
 
   Future<void> playPrevious() async {
@@ -162,10 +192,45 @@ class RoomMusicController {
     if (playlist.isEmpty) return;
     final previous =
         state.value.currentIndex <= 0 ? 0 : state.value.currentIndex - 1;
-    await playIndex(previous);
+    await playIndex(previous, seekMs: 0);
+  }
+
+  Future<void> pause() async {
+    if (!state.value.isPlaying) return;
+    _syncProgressPosition();
+    _stopProgressTimer();
+    await LiveRoomAudioService.instance.stopRoomMusic();
+    state.value = state.value.copyWith(
+      isPlaying: false,
+      isPaused: true,
+      isUploading: false,
+      isOverlayVisible: true,
+      isMinimized: false,
+    );
+  }
+
+  Future<void> seekTo(int positionMs) async {
+    final current = state.value.currentTrack;
+    if (current == null) return;
+    final safePosition = _clampPosition(positionMs, current.durationMs);
+
+    state.value = state.value.copyWith(positionMs: safePosition);
+
+    if (state.value.isPlaying) {
+      await playIndex(state.value.currentIndex, seekMs: safePosition);
+    }
+  }
+
+  void previewSeekPosition(int positionMs) {
+    final current = state.value.currentTrack;
+    final durationMs = current?.durationMs ?? 0;
+    state.value = state.value.copyWith(
+      positionMs: _clampPosition(positionMs, durationMs),
+    );
   }
 
   Future<void> stop() async {
+    _stopProgressTimer();
     await LiveRoomAudioService.instance.stopRoomMusic();
     state.value = state.value.copyWith(
       isPlaying: false,
@@ -173,6 +238,7 @@ class RoomMusicController {
       isUploading: false,
       isMinimized: false,
       isOverlayVisible: false,
+      positionMs: 0,
     );
   }
 
@@ -194,7 +260,9 @@ class RoomMusicController {
   }
 
   void minimizeOverlay() {
-    if (!state.value.isPlaying && !state.value.isUploading) {
+    if (!state.value.isPlaying &&
+        !state.value.isUploading &&
+        !state.value.isPaused) {
       state.value = state.value.copyWith(isOverlayVisible: false);
       return;
     }
@@ -203,6 +271,10 @@ class RoomMusicController {
       isOverlayVisible: false,
       isMinimized: true,
     );
+  }
+
+  void setBubbleOffset(Offset offset) {
+    state.value = state.value.copyWith(bubbleOffset: offset);
   }
 
   Future<String> _ensureUploaded(RoomMusicTrack track) async {
@@ -225,27 +297,63 @@ class RoomMusicController {
     return result.url;
   }
 
-
   String _uploadFilenameFor(RoomMusicTrack track) {
     final pathName = track.path.split(RegExp(r'[\\/]')).last.trim();
-    final titleName = track.title.trim().replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final titleName =
+        track.title.trim().replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
 
-    final pathHasAudioExtension = RegExp(
+    final audioExt = RegExp(
       r'\.(mp3|m4a|aac|wav|ogg|opus|webm|flac)$',
       caseSensitive: false,
-    ).hasMatch(pathName);
+    );
 
-    if (pathHasAudioExtension) return pathName;
-
-    final titleHasAudioExtension = RegExp(
-      r'\.(mp3|m4a|aac|wav|ogg|opus|webm|flac)$',
-      caseSensitive: false,
-    ).hasMatch(titleName);
-
-    if (titleHasAudioExtension) return titleName;
+    if (audioExt.hasMatch(pathName)) return pathName;
+    if (audioExt.hasMatch(titleName)) return titleName;
 
     final safeTitle = titleName.isEmpty ? 'vibematch_room_music' : titleName;
     return '$safeTitle.mp3';
+  }
+
+  void _startProgressTimer({required int fromMs}) {
+    _stopProgressTimer();
+    _playStartedAt = DateTime.now();
+    _playStartedPositionMs = fromMs;
+
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      _syncProgressPosition();
+    });
+  }
+
+  void _syncProgressPosition() {
+    final current = state.value.currentTrack;
+    if (current == null || _playStartedAt == null) return;
+
+    final elapsed = DateTime.now().difference(_playStartedAt!).inMilliseconds;
+    final nextPosition = _clampPosition(
+      _playStartedPositionMs + elapsed,
+      current.durationMs,
+    );
+
+    if (current.durationMs > 0 && nextPosition >= current.durationMs - 350) {
+      playNext();
+      return;
+    }
+
+    state.value = state.value.copyWith(positionMs: nextPosition);
+  }
+
+  void _stopProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
+    _playStartedAt = null;
+    _playStartedPositionMs = 0;
+  }
+
+  int _clampPosition(int positionMs, int durationMs) {
+    if (positionMs < 0) return 0;
+    if (durationMs <= 0) return positionMs;
+    if (positionMs > durationMs) return durationMs;
+    return positionMs;
   }
 
   Future<void> _loadPlaylist() async {
@@ -284,47 +392,57 @@ class RoomMusicState {
   const RoomMusicState({
     this.playlist = const <RoomMusicTrack>[],
     this.currentIndex = -1,
+    this.positionMs = 0,
     this.isPlaying = false,
     this.isPaused = false,
     this.isUploading = false,
     this.isOverlayVisible = false,
     this.isMinimized = false,
+    this.bubbleOffset,
     this.lastError,
   });
 
   final List<RoomMusicTrack> playlist;
   final int currentIndex;
+  final int positionMs;
   final bool isPlaying;
   final bool isPaused;
   final bool isUploading;
   final bool isOverlayVisible;
   final bool isMinimized;
+  final Offset? bubbleOffset;
   final String? lastError;
 
   RoomMusicTrack? get currentTrack =>
       currentIndex >= 0 && currentIndex < playlist.length
-      ? playlist[currentIndex]
-      : null;
+          ? playlist[currentIndex]
+          : null;
+
+  int get durationMs => currentTrack?.durationMs ?? 0;
 
   RoomMusicState copyWith({
     List<RoomMusicTrack>? playlist,
     int? currentIndex,
+    int? positionMs,
     bool? isPlaying,
     bool? isPaused,
     bool? isUploading,
     bool? isOverlayVisible,
     bool? isMinimized,
+    Offset? bubbleOffset,
     String? lastError,
     bool clearError = false,
   }) {
     return RoomMusicState(
       playlist: playlist ?? this.playlist,
       currentIndex: currentIndex ?? this.currentIndex,
+      positionMs: positionMs ?? this.positionMs,
       isPlaying: isPlaying ?? this.isPlaying,
       isPaused: isPaused ?? this.isPaused,
       isUploading: isUploading ?? this.isUploading,
       isOverlayVisible: isOverlayVisible ?? this.isOverlayVisible,
       isMinimized: isMinimized ?? this.isMinimized,
+      bubbleOffset: bubbleOffset ?? this.bubbleOffset,
       lastError: clearError ? null : lastError ?? this.lastError,
     );
   }
@@ -360,13 +478,13 @@ class RoomMusicTrack {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'title': title,
-    'path': path,
-    'artist': artist,
-    'duration_ms': durationMs,
-    'uploaded_url': uploadedUrl,
-  };
+        'id': id,
+        'title': title,
+        'path': path,
+        'artist': artist,
+        'duration_ms': durationMs,
+        'uploaded_url': uploadedUrl,
+      };
 
   factory RoomMusicTrack.fromJson(Map<String, dynamic> json) {
     return RoomMusicTrack(

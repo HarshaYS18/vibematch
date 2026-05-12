@@ -126,6 +126,7 @@ class LiveRoomAudioService {
   Future<bool> startRoomMusic({
     required String url,
     required String title,
+    int seekMs = 0,
   }) async {
     final safeUrl = url.trim();
     if (safeUrl.isEmpty) {
@@ -144,6 +145,7 @@ class LiveRoomAudioService {
       'peerId': _peerId,
       'url': safeUrl,
       'title': title.trim().isEmpty ? 'Room music' : title.trim(),
+      'seekMs': seekMs < 0 ? 0 : seekMs,
     });
 
     if (ack['ok'] == true) {

@@ -103,7 +103,7 @@ async function stopRoomMusic(room, io, reason = 'stopped') {
   });
 }
 
-async function startRoomMusic({ room, io, controllerPeerId, url, title }) {
+async function startRoomMusic({ room, io, controllerPeerId, url, title, seekMs = 0 }) {
   const safeUrl = String(url || '').trim();
   if (!safeUrl) throw new Error('Room music URL is required');
 
@@ -120,6 +120,7 @@ async function startRoomMusic({ room, io, controllerPeerId, url, title }) {
 
   const ssrc = randomSsrc();
   const safeTitle = String(title || 'Room music').trim() || 'Room music';
+  const safeSeekSeconds = Math.max(0, Number(seekMs || 0) / 1000);
 
   const producer = await plainTransport.produce({
     kind: 'audio',
@@ -154,6 +155,7 @@ async function startRoomMusic({ room, io, controllerPeerId, url, title }) {
     '-hide_banner',
     '-loglevel',
     process.env.FFMPEG_LOG_LEVEL || 'warning',
+    ...(safeSeekSeconds > 0 ? ['-ss', String(safeSeekSeconds)] : []),
     '-re',
     '-i',
     safeUrl,
@@ -214,6 +216,7 @@ async function startRoomMusic({ room, io, controllerPeerId, url, title }) {
     title: safeTitle,
     url: safeUrl,
     startedAt: new Date().toISOString(),
+    seekMs: Math.floor(safeSeekSeconds * 1000),
   };
 
   room.music = {
