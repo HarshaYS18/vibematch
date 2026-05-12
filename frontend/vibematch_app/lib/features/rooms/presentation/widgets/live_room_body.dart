@@ -7,6 +7,7 @@ import '../modules/cricket_room_mode_registry.dart';
 import 'live_room_seat_invite_notification.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
+import 'room_theme.dart';
 import 'room_top_bar.dart';
 
 class LiveRoomBody extends StatelessWidget {
