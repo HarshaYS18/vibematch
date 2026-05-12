@@ -573,6 +573,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       'peer_id': stablePeerId,
       'user_id': user.id,
       'display_name': user.name,
+      'is_host': user.isHost,
+      'is_room_admin': user.isRoomAdmin || user.isHost,
+      'role_label': user.isHost
+          ? 'Channel Host'
+          : user.isRoomAdmin
+          ? 'Admin'
+          : user.roleLabel,
       'seat_index': null,
     };
   }
@@ -1034,41 +1041,60 @@ class LiveMediaPeerSnapshot {
     required this.peerId,
     required this.userId,
     required this.displayName,
-    required this.seatIndex,
-    required this.micEnabled,
-    required this.adminMuted,
+    this.isHost = false,
+    this.isRoomAdmin = false,
+    this.roleLabel = '',
+    this.seatIndex,
+    this.micEnabled = false,
+    this.adminMuted = false,
   });
 
   final String peerId;
   final String userId;
   final String displayName;
+  final bool isHost;
+  final bool isRoomAdmin;
+  final String roleLabel;
   final int? seatIndex;
   final bool micEnabled;
   final bool adminMuted;
 
-  LiveMediaPeerSnapshot copyWith({bool? micEnabled, bool? adminMuted}) {
-    return LiveMediaPeerSnapshot(
-      peerId: peerId,
-      userId: userId,
-      displayName: displayName,
-      seatIndex: seatIndex,
-      micEnabled: micEnabled ?? this.micEnabled,
-      adminMuted: adminMuted ?? this.adminMuted,
-    );
-  }
-
   factory LiveMediaPeerSnapshot.fromJson(Map<String, dynamic> json) {
-    final adminMutedValue = json['admin_muted'] ?? json['adminMuted'];
-
     return LiveMediaPeerSnapshot(
       peerId: json['peer_id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
       displayName: json['display_name']?.toString() ?? 'Vibe User',
-      seatIndex: json['seat_index'] is int
-          ? json['seat_index'] as int
-          : int.tryParse(json['seat_index']?.toString() ?? ''),
-      micEnabled: json['mic_enabled'] == true,
-      adminMuted: adminMutedValue == true,
+      isHost: json['is_host'] == true || json['isHost'] == true,
+      isRoomAdmin: json['is_room_admin'] == true || json['isRoomAdmin'] == true,
+      roleLabel: json['role_label']?.toString() ?? '',
+      seatIndex: int.tryParse(json['seat_index']?.toString() ?? ''),
+      micEnabled: json['mic_enabled'] == true || json['micEnabled'] == true,
+      adminMuted: json['admin_muted'] == true || json['adminMuted'] == true,
+    );
+  }
+
+  LiveMediaPeerSnapshot copyWith({
+    String? peerId,
+    String? userId,
+    String? displayName,
+    bool? isHost,
+    bool? isRoomAdmin,
+    String? roleLabel,
+    int? seatIndex,
+    bool clearSeatIndex = false,
+    bool? micEnabled,
+    bool? adminMuted,
+  }) {
+    return LiveMediaPeerSnapshot(
+      peerId: peerId ?? this.peerId,
+      userId: userId ?? this.userId,
+      displayName: displayName ?? this.displayName,
+      isHost: isHost ?? this.isHost,
+      isRoomAdmin: isRoomAdmin ?? this.isRoomAdmin,
+      roleLabel: roleLabel ?? this.roleLabel,
+      seatIndex: clearSeatIndex ? null : seatIndex ?? this.seatIndex,
+      micEnabled: micEnabled ?? this.micEnabled,
+      adminMuted: adminMuted ?? this.adminMuted,
     );
   }
 }

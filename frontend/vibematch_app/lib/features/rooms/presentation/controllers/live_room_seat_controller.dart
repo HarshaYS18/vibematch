@@ -180,7 +180,14 @@ class LiveRoomSeatController {
     return SeatUser(
       id: peer.userId,
       name: displayName,
-      roleLabel: baseUser?.roleLabel ?? (isFounder ? 'Channel Host' : 'Member'),
+      roleLabel: peer.isHost
+          ? 'Channel Host'
+          : peer.isRoomAdmin
+          ? 'Admin'
+          : (peer.roleLabel.trim().isNotEmpty
+                ? peer.roleLabel
+                : baseUser?.roleLabel ??
+                      (isFounder ? 'Channel Host' : 'Member')),
       familyName: baseUser?.familyName ?? '',
       familyLevel: baseUser?.familyLevel ?? 'bronze',
       relationshipText: baseUser?.relationshipText ?? '',
@@ -199,8 +206,11 @@ class LiveRoomSeatController {
       locationVisible: baseUser?.locationVisible ?? true,
       gender: baseUser?.gender ?? RoomUserGender.undisclosed,
       isCurrentUser: peer.userId == currentUser.id,
-      isHost: baseUser?.isHost ?? isFounder,
-      isRoomAdmin: baseUser?.isRoomAdmin ?? isFounder,
+      isHost: peer.isHost || (baseUser?.isHost ?? isFounder),
+      isRoomAdmin:
+          peer.isRoomAdmin ||
+          peer.isHost ||
+          (baseUser?.isRoomAdmin ?? isFounder),
       selfMuted: !peer.micEnabled,
       adminMuted: peer.adminMuted,
     );

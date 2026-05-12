@@ -231,6 +231,7 @@ function setRoomAdminStatus({ room, peer, payload }) {
   if (!target) throw new Error('Target user not found for room admin update');
   const isRoomAdmin = payload.is_room_admin === true || payload.isRoomAdmin === true;
   target.isRoomAdmin = isRoomAdmin;
+  target.roleLabel = isRoomAdmin ? 'Admin' : 'Member';
   broadcast(room, 'room_admin/updated', {
     room_id: room.id,
     actor_user_id: peer.userId,
