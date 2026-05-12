@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../widgets/room_theme.dart';
+import 'cricket_mode_module.dart';
 import 'cricket_room_mode_module.dart';
 import 'cricket_room_mode_registry.dart';
 
