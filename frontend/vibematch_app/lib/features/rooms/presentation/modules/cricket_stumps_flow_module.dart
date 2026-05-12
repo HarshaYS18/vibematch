@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../data/cricket_stumps_flow_repository.dart';
 import '../widgets/room_theme.dart';
 import 'cricket_room_mode_signal.dart';
 
@@ -19,8 +20,6 @@ const RoomBackgroundTheme cricketStumpsPitchBackgroundTheme = RoomBackgroundThem
 
 class CricketStumpsFlowModule {
   CricketStumpsFlowModule._();
-
-  static final List<StumpsTournament> savedTournaments = <StumpsTournament>[];
 
   static Future<void> open({
     required BuildContext context,
@@ -59,9 +58,11 @@ class StumpsTournament {
     required this.matchesVsEachTeam,
     required this.allowSamePlayerAcrossTeams,
     required this.fixtures,
+    this.backendId,
   });
 
   final String id;
+  final int? backendId;
   final String name;
   final List<StumpsTeam> teams;
   final int overs;
@@ -71,6 +72,32 @@ class StumpsTournament {
   final int matchesVsEachTeam;
   final bool allowSamePlayerAcrossTeams;
   final List<StumpsFixture> fixtures;
+
+  factory StumpsTournament.fromApi(Map<String, dynamic> json) {
+    final teams = (json['teams'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(StumpsTeam.fromJson)
+        .toList();
+    final teamsById = {for (final team in teams) team.id: team};
+    final fixtures = (json['fixtures'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((fixture) => StumpsFixture.fromJson(fixture, teamsById))
+        .toList();
+    final backendId = _asInt(json['id']);
+    return StumpsTournament(
+      id: backendId?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      backendId: backendId,
+      name: json['name']?.toString() ?? 'Cricket Tournament',
+      teams: teams,
+      overs: _asInt(json['overs_per_innings']) ?? _asInt(json['overs']) ?? 5,
+      wickets: _asInt(json['wickets_per_side']) ?? _asInt(json['wickets']) ?? 4,
+      playersPerTeam: _asInt(json['players_per_team']) ?? 5,
+      matchesPerTeam: _asInt(json['matches_per_team']) ?? 1,
+      matchesVsEachTeam: _asInt(json['matches_vs_each_team']) ?? 1,
+      allowSamePlayerAcrossTeams: json['allow_same_player_across_teams'] == true,
+      fixtures: fixtures,
+    );
+  }
 }
 
 class StumpsTeam {
@@ -78,12 +105,40 @@ class StumpsTeam {
   final String id;
   final String name;
   final List<StumpsPlayer> players;
+
+  factory StumpsTeam.fromJson(Map<String, dynamic> json) {
+    final fallbackName = json['name']?.toString() ?? 'Team';
+    return StumpsTeam(
+      id: json['id']?.toString() ?? fallbackName.toLowerCase().replaceAll(' ', '_'),
+      name: fallbackName,
+      players: (json['players'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(StumpsPlayer.fromJson)
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'players': players.map((player) => player.toJson()).toList(),
+      };
 }
 
 class StumpsPlayer {
   const StumpsPlayer({required this.id, required this.name});
   final String id;
   final String name;
+
+  factory StumpsPlayer.fromJson(Map<String, dynamic> json) {
+    final id = json['id']?.toString() ?? json['public_user_id']?.toString() ?? '';
+    return StumpsPlayer(
+      id: id.isEmpty ? DateTime.now().microsecondsSinceEpoch.toString() : id,
+      name: json['name']?.toString() ?? json['display_name']?.toString() ?? 'Player $id',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
 class StumpsFixture {
@@ -92,6 +147,34 @@ class StumpsFixture {
   final StumpsTeam teamA;
   final StumpsTeam teamB;
   final int round;
+
+  factory StumpsFixture.fromJson(Map<String, dynamic> json, Map<String, StumpsTeam> teamsById) {
+    final teamAJson = json['team_a'];
+    final teamBJson = json['team_b'];
+    final teamAId = json['team_a_id']?.toString();
+    final teamBId = json['team_b_id']?.toString();
+    final teamA = teamAJson is Map<String, dynamic>
+        ? StumpsTeam.fromJson(teamAJson)
+        : teamsById[teamAId] ?? const StumpsTeam(id: 'team_a', name: 'Team A', players: []);
+    final teamB = teamBJson is Map<String, dynamic>
+        ? StumpsTeam.fromJson(teamBJson)
+        : teamsById[teamBId] ?? const StumpsTeam(id: 'team_b', name: 'Team B', players: []);
+    return StumpsFixture(
+      id: json['id']?.toString() ?? 'fx_${DateTime.now().microsecondsSinceEpoch}',
+      teamA: teamA,
+      teamB: teamB,
+      round: _asInt(json['round']) ?? 1,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'round': round,
+        'team_a_id': teamA.id,
+        'team_b_id': teamB.id,
+        'team_a': teamA.toJson(),
+        'team_b': teamB.toJson(),
+      };
 }
 
 enum _FlowStep { home, create, matches, quick, toss, lineups }
@@ -119,6 +202,8 @@ class _StumpsFlowSheet extends StatefulWidget {
 }
 
 class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
+  final CricketStumpsFlowRepository _repository = const CricketStumpsFlowRepository();
+
   _FlowStep _step = _FlowStep.home;
   StumpsTournament? _selectedTournament;
   StumpsFixture? _selectedFixture;
@@ -127,6 +212,11 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
   StumpsPlayer? _striker;
   StumpsPlayer? _nonStriker;
   StumpsPlayer? _bowler;
+  int? _activeMatchId;
+  bool _loading = true;
+  bool _saving = false;
+  String? _errorText;
+  List<StumpsTournament> _tournaments = <StumpsTournament>[];
 
   final _name = TextEditingController(text: 'Vibe Premier Cup');
   final _teamCount = TextEditingController(text: '4');
@@ -152,6 +242,12 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
   int get _matchesVsEachValue => math.max(1, int.tryParse(_matchesVsEach.text) ?? 1);
 
   @override
+  void initState() {
+    super.initState();
+    _loadTournaments();
+  }
+
+  @override
   void dispose() {
     _name.dispose();
     _teamCount.dispose();
@@ -165,6 +261,27 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
     _quickA.dispose();
     _quickB.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadTournaments() async {
+    setState(() {
+      _loading = true;
+      _errorText = null;
+    });
+    try {
+      final rows = await _repository.loadTournaments(widget.roomId);
+      if (!mounted) return;
+      setState(() {
+        _tournaments = rows.map(StumpsTournament.fromApi).toList();
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorText = error.toString();
+      });
+    }
   }
 
   @override
@@ -193,7 +310,7 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
       };
 
   String get _subtitle => switch (_step) {
-        _FlowStep.home => CricketStumpsFlowModule.savedTournaments.isEmpty ? 'Create tournament or start quick match.' : 'Select tournament, create new, or quick match.',
+        _FlowStep.home => _tournaments.isEmpty ? 'Create tournament or start quick match.' : 'Select tournament, create new, or quick match.',
         _FlowStep.create => 'Team count → names → players by ID → rules → randomized fixtures.',
         _FlowStep.matches => 'Choose a fixture and start match.',
         _FlowStep.quick => 'Fast setup without saving tournament.',
@@ -202,6 +319,7 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
       };
 
   Widget _body() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
     return switch (_step) {
       _FlowStep.home => _home(),
       _FlowStep.create => _create(),
@@ -214,12 +332,20 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
 
   Widget _home() {
     return ListView(physics: const BouncingScrollPhysics(), children: [
-      for (final tournament in CricketStumpsFlowModule.savedTournaments)
+      if (_errorText != null) _ErrorCard(message: _errorText!, onRetry: _loadTournaments),
+      for (final tournament in _tournaments)
         _Tile(
           icon: Icons.emoji_events_rounded,
           title: tournament.name,
           subtitle: '${tournament.teams.length} teams • ${tournament.fixtures.length} matches',
           onTap: () => setState(() { _selectedTournament = tournament; _step = _FlowStep.matches; }),
+          trailing: widget.canManage
+              ? IconButton(
+                  tooltip: 'Delete tournament',
+                  icon: const Icon(Icons.delete_outline_rounded, color: RoomColors.coral),
+                  onPressed: () => _deleteTournament(tournament),
+                )
+              : null,
         ),
       _Tile(icon: Icons.add_circle_rounded, title: 'Create New Tournament', subtitle: 'Full guided tournament setup.', onTap: widget.canManage ? () => setState(() => _step = _FlowStep.create) : null),
       _Tile(icon: Icons.flash_on_rounded, title: 'Quick Match', subtitle: 'Two teams, toss, lineup, start scoring.', onTap: widget.canManage ? () => setState(() => _step = _FlowStep.quick) : null),
@@ -245,7 +371,7 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
         FilledButton.icon(onPressed: () => _addPlayer(nextTeamForPlayer), icon: const Icon(Icons.person_add_rounded), label: const Text('Fetch & Add Player')),
       ] else ...[
         _FixturePreview(fixtures: _fixtures()),
-        FilledButton.icon(onPressed: _saveTournament, icon: const Icon(Icons.save_rounded), label: const Text('Save Tournament')),
+        FilledButton.icon(onPressed: _saving ? null : _saveTournament, icon: const Icon(Icons.save_rounded), label: Text(_saving ? 'Saving...' : 'Save Tournament')),
       ],
       const SizedBox(height: 12),
       Wrap(spacing: 7, runSpacing: 7, children: _teamNames.map((team) => Chip(label: Text('$team (${_playersByTeam[team]?.length ?? 0}/$_playerTarget)'))).toList()),
@@ -257,7 +383,7 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
     if (tournament == null) return const SizedBox.shrink();
     return ListView(physics: const BouncingScrollPhysics(), children: [
       for (final fixture in tournament.fixtures)
-        _Tile(icon: Icons.sports_cricket_rounded, title: '${fixture.teamA.name} vs ${fixture.teamB.name}', subtitle: '${tournament.overs} overs • ${tournament.wickets} wickets', onTap: () => setState(() { _selectedFixture = fixture; _step = _FlowStep.toss; })),
+        _Tile(icon: Icons.sports_cricket_rounded, title: '${fixture.teamA.name} vs ${fixture.teamB.name}', subtitle: '${tournament.overs} overs • ${tournament.wickets} wickets', onTap: () => setState(() { _selectedFixture = fixture; _activeMatchId = null; _step = _FlowStep.toss; })),
     ]);
   }
 
@@ -283,7 +409,7 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
       const _Section('Decision'),
       Row(children: [Expanded(child: _Choice(label: 'Bat', selected: _decision == _TossDecision.bat, onTap: () => setState(() => _decision = _TossDecision.bat))), const SizedBox(width: 8), Expanded(child: _Choice(label: 'Ball', selected: _decision == _TossDecision.ball, onTap: () => setState(() => _decision = _TossDecision.ball)))]),
       const Spacer(),
-      FilledButton.icon(onPressed: _tossWinner == null || _decision == null ? null : () => setState(() => _step = _FlowStep.lineups), icon: const Icon(Icons.check_circle_rounded), label: const Text('Confirm Toss')),
+      FilledButton.icon(onPressed: _tossWinner == null || _decision == null || _saving ? null : _confirmToss, icon: const Icon(Icons.check_circle_rounded), label: Text(_saving ? 'Saving toss...' : 'Confirm Toss')),
     ]);
   }
 
@@ -297,7 +423,7 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
       _Picker(title: 'Opening batsman 1', players: batting.players, selected: _striker, onSelected: (player) => setState(() => _striker = player)),
       _Picker(title: 'Opening batsman 2', players: batting.players.where((p) => p.id != _striker?.id).toList(), selected: _nonStriker, onSelected: (player) => setState(() => _nonStriker = player)),
       _Picker(title: 'Opening bowler', players: bowling.players, selected: _bowler, onSelected: (player) => setState(() => _bowler = player)),
-      FilledButton.icon(onPressed: _striker == null || _nonStriker == null || _bowler == null ? null : _startMatch, icon: const Icon(Icons.sports_cricket_rounded), label: const Text('Start Match')),
+      FilledButton.icon(onPressed: _striker == null || _nonStriker == null || _bowler == null || _saving ? null : _startMatch, icon: const Icon(Icons.sports_cricket_rounded), label: Text(_saving ? 'Starting...' : 'Start Match')),
     ]);
   }
 
@@ -332,17 +458,64 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
     return fixtures.take(math.max(1, _matchesPerTeamValue * teams.length ~/ 2)).toList();
   }
 
-  void _saveTournament() {
-    final tournament = StumpsTournament(id: DateTime.now().microsecondsSinceEpoch.toString(), name: _name.text.trim().isEmpty ? 'Cricket Tournament' : _name.text.trim(), teams: _teamNames.map((name) => StumpsTeam(id: name.toLowerCase().replaceAll(' ', '_'), name: name, players: _playersByTeam[name] ?? const <StumpsPlayer>[])).toList(), overs: _oversValue, wickets: _wicketsValue, playersPerTeam: _playerTarget, matchesPerTeam: _matchesPerTeamValue, matchesVsEachTeam: _matchesVsEachValue, allowSamePlayerAcrossTeams: _allowDuplicatePlayers, fixtures: _fixtures());
-    CricketStumpsFlowModule.savedTournaments.add(tournament);
-    setState(() { _step = _FlowStep.home; _selectedTournament = tournament; });
-    RoomToast.show(context, '${tournament.name} saved');
+  Future<void> _saveTournament() async {
+    setState(() => _saving = true);
+    try {
+      final teams = _teamNames.map((name) => StumpsTeam(id: name.toLowerCase().replaceAll(' ', '_'), name: name, players: _playersByTeam[name] ?? const <StumpsPlayer>[])).toList();
+      final fixtures = _fixtures();
+      final response = await _repository.saveTournament(
+        roomId: widget.roomId,
+        name: _name.text.trim().isEmpty ? 'Cricket Tournament' : _name.text.trim(),
+        teamCount: teams.length,
+        playersPerTeam: _playerTarget,
+        overs: _oversValue,
+        wickets: _wicketsValue,
+        matchesPerTeam: _matchesPerTeamValue,
+        matchesVsEachTeam: _matchesVsEachValue,
+        allowSamePlayerAcrossTeams: _allowDuplicatePlayers,
+        teams: teams.map((team) => team.toJson()).toList(),
+        fixtures: fixtures.map((fixture) => fixture.toJson()).toList(),
+      );
+      final tournament = StumpsTournament.fromApi(response);
+      if (!mounted) return;
+      setState(() {
+        _tournaments = [tournament, ..._tournaments.where((item) => item.backendId != tournament.backendId)];
+        _selectedTournament = tournament;
+        _step = _FlowStep.home;
+        _saving = false;
+      });
+      RoomToast.show(context, '${tournament.name} saved');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      RoomToast.show(context, error.toString());
+    }
+  }
+
+  Future<void> _deleteTournament(StumpsTournament tournament) async {
+    final backendId = tournament.backendId;
+    if (backendId == null) return;
+    setState(() => _saving = true);
+    try {
+      await _repository.deleteTournament(roomId: widget.roomId, tournamentId: backendId, reason: 'Deleted from Cricket Mode');
+      if (!mounted) return;
+      setState(() {
+        _tournaments = _tournaments.where((item) => item.backendId != backendId).toList();
+        if (_selectedTournament?.backendId == backendId) _selectedTournament = null;
+        _saving = false;
+      });
+      RoomToast.show(context, '${tournament.name} deleted');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      RoomToast.show(context, error.toString());
+    }
   }
 
   void _makeQuickFixture() {
     final a = _quickTeam(_quickA.text.trim().isEmpty ? 'Team A' : _quickA.text.trim(), 'qa');
     final b = _quickTeam(_quickB.text.trim().isEmpty ? 'Team B' : _quickB.text.trim(), 'qb');
-    setState(() { _selectedFixture = StumpsFixture(id: 'quick_${DateTime.now().millisecondsSinceEpoch}', teamA: a, teamB: b, round: 1); _step = _FlowStep.toss; });
+    setState(() { _selectedFixture = StumpsFixture(id: 'quick_${DateTime.now().millisecondsSinceEpoch}', teamA: a, teamB: b, round: 1); _selectedTournament = null; _activeMatchId = null; _step = _FlowStep.toss; });
   }
 
   StumpsTeam _quickTeam(String name, String prefix) => StumpsTeam(id: prefix, name: name, players: List<StumpsPlayer>.generate(_playerTarget, (i) => StumpsPlayer(id: '${prefix}_${i + 1}', name: '$name P${i + 1}')));
@@ -352,12 +525,68 @@ class _StumpsFlowSheetState extends State<_StumpsFlowSheet> {
     return _tossWinner!.id == fixture.teamA.id ? fixture.teamB : fixture.teamA;
   }
 
-  void _startMatch() {
-    if (!widget.canManage) return;
-    widget.onBackgroundChanged(cricketStumpsPitchBackgroundTheme);
-    CricketRoomModeSignal.activate(widget.roomId);
-    widget.onSystemMessage?.call('${_tossWinner!.name} won the toss and chose to ${_decision == _TossDecision.bat ? 'bat' : 'ball'}. Seat 3 is now the Umpire/scorer seat.');
-    Navigator.pop(context);
+  Future<void> _confirmToss() async {
+    final fixture = _selectedFixture;
+    final tossWinner = _tossWinner;
+    final decision = _decision;
+    if (fixture == null || tossWinner == null || decision == null) return;
+    setState(() => _saving = true);
+    try {
+      final match = await _repository.createMatch(
+        roomId: widget.roomId,
+        tournamentId: _selectedTournament?.backendId,
+        isQuickMatch: _selectedTournament == null,
+        teamA: fixture.teamA.toJson(),
+        teamB: fixture.teamB.toJson(),
+      );
+      final matchId = _asInt(match['id']);
+      if (matchId == null) throw Exception('Cricket match id missing from backend');
+      await _repository.setToss(
+        roomId: widget.roomId,
+        matchId: matchId,
+        tossWinnerTeamId: tossWinner.id,
+        decision: decision.name,
+      );
+      if (!mounted) return;
+      setState(() {
+        _activeMatchId = matchId;
+        _saving = false;
+        _step = _FlowStep.lineups;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      RoomToast.show(context, error.toString());
+    }
+  }
+
+  Future<void> _startMatch() async {
+    final fixture = _selectedFixture;
+    final matchId = _activeMatchId;
+    if (!widget.canManage || fixture == null || matchId == null || _striker == null || _nonStriker == null || _bowler == null) return;
+    final batting = _battingTeam(fixture);
+    final bowling = batting.id == fixture.teamA.id ? fixture.teamB : fixture.teamA;
+    setState(() => _saving = true);
+    try {
+      await _repository.setLineup(
+        roomId: widget.roomId,
+        matchId: matchId,
+        battingTeamId: batting.id,
+        bowlingTeamId: bowling.id,
+        strikerPlayerId: _striker!.id,
+        nonStrikerPlayerId: _nonStriker!.id,
+        bowlerPlayerId: _bowler!.id,
+      );
+      if (!mounted) return;
+      widget.onBackgroundChanged(cricketStumpsPitchBackgroundTheme);
+      CricketRoomModeSignal.activate(widget.roomId);
+      widget.onSystemMessage?.call('${_tossWinner!.name} won the toss and chose to ${_decision == _TossDecision.bat ? 'bat' : 'ball'}. Seat 3 is now the Umpire/scorer seat.');
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      RoomToast.show(context, error.toString());
+    }
   }
 }
 
@@ -373,9 +602,9 @@ class _Section extends StatelessWidget { const _Section(this.text); final String
 class _Pill extends StatelessWidget { const _Pill(this.text); final String text; @override Widget build(BuildContext context) => Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: const Color(0xFFE8FFF0), borderRadius: BorderRadius.circular(999)), child: Text(text, style: const TextStyle(color: Color(0xFF0E8F54), fontWeight: FontWeight.w900))); }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.icon, required this.title, required this.subtitle, this.onTap});
-  final IconData icon; final String title; final String subtitle; final VoidCallback? onTap;
-  @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 9), child: Material(color: Colors.white, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [GradientIconBox(icon: icon, colors: const [Color(0xFF0E8F54), Color(0xFF86FF9D)], size: 42), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: RoomColors.plum, fontWeight: FontWeight.w900)), Text(subtitle, style: const TextStyle(color: Color(0xFF81758C), fontSize: 11, fontWeight: FontWeight.w800))])), const Icon(Icons.chevron_right_rounded)])))));
+  const _Tile({required this.icon, required this.title, required this.subtitle, this.onTap, this.trailing});
+  final IconData icon; final String title; final String subtitle; final VoidCallback? onTap; final Widget? trailing;
+  @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 9), child: Material(color: Colors.white, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [GradientIconBox(icon: icon, colors: const [Color(0xFF0E8F54), Color(0xFF86FF9D)], size: 42), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: RoomColors.plum, fontWeight: FontWeight.w900)), Text(subtitle, style: const TextStyle(color: Color(0xFF81758C), fontSize: 11, fontWeight: FontWeight.w800))])), trailing ?? const Icon(Icons.chevron_right_rounded)])))));
 }
 
 class _Input extends StatelessWidget { const _Input({required this.label, required this.controller, this.number = false}); final String label; final TextEditingController controller; final bool number; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 9), child: TextField(controller: controller, keyboardType: number ? TextInputType.number : TextInputType.text, decoration: InputDecoration(labelText: label, filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)))); }
@@ -384,3 +613,11 @@ class _FixturePreview extends StatelessWidget { const _FixturePreview({required 
 class _MatchCard extends StatelessWidget { const _MatchCard({required this.fixture}); final StumpsFixture fixture; @override Widget build(BuildContext context) => Container(width: double.infinity, padding: const EdgeInsets.all(14), decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF061B0D), Color(0xFF0E5A31)]), borderRadius: BorderRadius.circular(24)), child: Text('${fixture.teamA.name} vs ${fixture.teamB.name}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900))); }
 class _Choice extends StatelessWidget { const _Choice({required this.label, required this.selected, required this.onTap}); final String label; final bool selected; final VoidCallback onTap; @override Widget build(BuildContext context) => Material(color: selected ? const Color(0xFF0E8F54) : Colors.white, borderRadius: BorderRadius.circular(16), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(16), child: Padding(padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8), child: Center(child: Text(label, style: TextStyle(color: selected ? Colors.white : RoomColors.plum, fontWeight: FontWeight.w900)))))); }
 class _Picker extends StatelessWidget { const _Picker({required this.title, required this.players, required this.selected, required this.onSelected}); final String title; final List<StumpsPlayer> players; final StumpsPlayer? selected; final ValueChanged<StumpsPlayer> onSelected; @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_Section(title), const SizedBox(height: 7), Wrap(spacing: 7, runSpacing: 7, children: players.map((p) => ChoiceChip(selected: selected?.id == p.id, label: Text(p.name), onSelected: (_) => onSelected(p))).toList()), const SizedBox(height: 12)]); }
+class _ErrorCard extends StatelessWidget { const _ErrorCard({required this.message, required this.onRetry}); final String message; final VoidCallback onRetry; @override Widget build(BuildContext context) => Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFFFEEF0), borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(Icons.error_outline_rounded, color: RoomColors.coral), const SizedBox(width: 8), Expanded(child: Text(message, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: RoomColors.plum, fontWeight: FontWeight.w800))), TextButton(onPressed: onRetry, child: const Text('Retry'))])); }
+
+int? _asInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
