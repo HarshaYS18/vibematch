@@ -19,13 +19,37 @@ function getOrCreateRoom(roomId) {
       lockedSeatIndexes: new Set(),
       blockedUsers: new Map(),
       applyOnlyModeEnabled: false,
+      roomImagesEnabled: true,
+      guestMessagesEnabled: true,
+      musicState: createDefaultMusicState(),
       createdAt: new Date().toISOString(),
     };
     rooms.set(id, room);
   }
   if (room.applyOnlyModeEnabled !== true) room.applyOnlyModeEnabled = false;
+  if (room.roomImagesEnabled !== false) room.roomImagesEnabled = true;
+  if (room.guestMessagesEnabled !== false) room.guestMessagesEnabled = true;
+  if (!room.musicState) room.musicState = createDefaultMusicState();
   cleanupExpiredBlocks(room);
   return room;
+}
+
+function createDefaultMusicState() {
+  return {
+    active: false,
+    action: 'stop',
+    controllerPeerId: '',
+    controllerUserId: '',
+    controllerName: '',
+    trackId: '',
+    trackTitle: '',
+    positionMs: 0,
+    durationMs: 0,
+    producerPeerId: '',
+    producerId: '',
+    mediaTag: 'room-music-audio',
+    updatedAt: null,
+  };
 }
 
 function cleanupExpiredBlocks(room) {
@@ -43,6 +67,9 @@ function roomSnapshot(room) {
     peer_count: room.peers.size,
     locked_seat_indexes: Array.from(room.lockedSeatIndexes),
     apply_only_mode_enabled: room.applyOnlyModeEnabled === true,
+    room_images_enabled: room.roomImagesEnabled !== false,
+    guest_messages_enabled: room.guestMessagesEnabled !== false,
+    music_state: room.musicState || createDefaultMusicState(),
     peers: Array.from(room.peers.values()).map((peer) => ({
       peer_id: peer.id,
       user_id: peer.userId,
@@ -132,6 +159,7 @@ module.exports = {
   getOrCreateRoom,
   roomSnapshot,
   createPeer,
+  createDefaultMusicState,
   findPeerByUserId,
   seatIndexFrom,
   clearPeerSeat,
