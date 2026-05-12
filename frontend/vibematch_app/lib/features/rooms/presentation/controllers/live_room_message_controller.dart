@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../data/live_room_media_signaling_service.dart';
+import '../../data/live_room_presence_repository.dart';
 import '../../data/live_room_system_event_bus.dart';
 import '../../data/live_room_seat_application_event_bus.dart';
 import '../live_room_models.dart';
@@ -207,12 +208,31 @@ class LiveRoomMessageController {
 
     _handledSystemEventIds.add(event.id);
 
+    final existingPending = messages.any(
+      (message) =>
+          message.isSeatApplication &&
+          !message.applicationResolved &&
+          message.senderId == event.applicantUserId &&
+          message.seatIndex == event.seatIndex,
+    );
+
+    if (existingPending) {
+      return;
+    }
+
+    final applicant = event.applicantUserId == currentUser.id
+        ? currentUser
+        : LiveRoomPresenceRepository.userByRoomUserId(event.applicantUserId);
+
     messages.insert(
       0,
       ChatEntry(
-        senderName: event.applicantName,
+        senderName: applicant?.name ?? event.applicantName,
         senderId: event.applicantUserId,
         message: 'has applied for seat ${event.seatIndex + 1}',
+        vipLevel: applicant?.vipLevel ?? 0,
+        sendingLevel: applicant?.sendingLevel ?? 1,
+        receivingLevel: applicant?.receivingLevel ?? 1,
         isSeatApplication: true,
         seatIndex: event.seatIndex,
         applicationCreatedAt: event.createdAt,
