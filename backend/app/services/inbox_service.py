@@ -142,9 +142,45 @@ def create_direct_conversation(db: Session, current_user: User, target_user: Use
     return conversation
 
 
-def send_message(db: Session, conversation: InboxConversation, sender: User, text: str, message_type: str = InboxMessageType.TEXT.value, reply_to_text: str | None = None, invite_room_name: str | None = None, attachment_url: str | None = None) -> InboxMessage:
-    message = InboxMessage(public_id=_public_id("msg"), conversation_id=conversation.id, sender_user_id=sender.id, sender_name=_display_name(sender), message_type=message_type, text=text.strip(), status=InboxMessageStatus.SENT.value, reply_to_text=reply_to_text, invite_room_name=invite_room_name, attachment_url=attachment_url)
+def send_message(
+    db: Session,
+    conversation: InboxConversation,
+    sender: User,
+    text: str,
+    message_type: str = InboxMessageType.TEXT.value,
+    reply_to_text: str | None = None,
+    invite_room_name: str | None = None,
+    invite_room_id: str | None = None,
+    attachment_url: str | None = None,
+    metadata: dict | None = None,
+) -> InboxMessage:
+    safe_text = text.strip()
+    message_metadata = dict(metadata or {})
+    if message_type == InboxMessageType.ROOM_INVITE.value:
+        if invite_room_name:
+            message_metadata["invite_room_name"] = invite_room_name
+        if invite_room_id:
+            message_metadata["invite_room_id"] = invite_room_id
+        message_metadata["action"] = "join_room"
+
+    message = InboxMessage(
+        public_id=_public_id("msg"),
+        conversation_id=conversation.id,
+        sender_user_id=sender.id,
+        sender_name=_display_name(sender),
+        message_type=message_type,
+        text=safe_text,
+        status=InboxMessageStatus.SENT.value,
+        reply_to_text=reply_to_text,
+        invite_room_name=invite_room_name,
+        attachment_url=attachment_url,
+        metadata_json=message_metadata or None,
+    )
     conversation.updated_at = datetime.utcnow()
+    if message_type == InboxMessageType.ROOM_INVITE.value:
+        conversation.conversation_type = InboxConversationType.ROOM_INVITE.value
+        conversation.current_room_name = invite_room_name
+        conversation.room_public_id = invite_room_id
     db.add(message)
     for participant in conversation.participants:
         if participant.user_id != sender.id:
@@ -152,6 +188,41 @@ def send_message(db: Session, conversation: InboxConversation, sender: User, tex
     db.commit()
     db.refresh(message)
     return message
+
+
+def send_room_invite_message(
+    db: Session,
+    sender: User,
+    target_user: User,
+    room_name: str,
+    room_public_id: str | None = None,
+    room_language: str | None = None,
+    mode_title: str | None = None,
+) -> tuple[InboxConversation, InboxMessage]:
+    conversation = create_direct_conversation(db, sender, target_user)
+    safe_room_name = room_name.strip()
+    inviter_name = _display_name(sender)
+    message_text = f"{inviter_name} invited you to {safe_room_name}."
+    metadata = {
+        "action": "join_room",
+        "room_name": safe_room_name,
+        "room_public_id": room_public_id,
+        "room_language": room_language or "Telugu",
+        "mode_title": mode_title or "Open",
+        "inviter_user_id": sender.id,
+        "inviter_public_user_id": sender.public_user_id,
+    }
+    message = send_message(
+        db=db,
+        conversation=conversation,
+        sender=sender,
+        text=message_text,
+        message_type=InboxMessageType.ROOM_INVITE.value,
+        invite_room_name=safe_room_name,
+        invite_room_id=room_public_id,
+        metadata=metadata,
+    )
+    return conversation, message
 
 
 def send_team_system_message(db: Session, user: User, text: str) -> InboxMessage:
@@ -238,7 +309,24 @@ def apply_monitor_action(db: Session, report: InboxReport, action_label: str) ->
 
 
 def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
-    return {"id": message.public_id, "sender": message.sender_name, "text": message.text, "time": _time_label(message.created_at), "is_mine": current_user is not None and message.sender_user_id == current_user.id, "type": message.message_type, "status": message.status, "reaction": message.reaction, "reply_to_text": message.reply_to_text, "is_starred": message.is_starred, "is_forwarded": message.is_forwarded, "invite_room_name": message.invite_room_name, "created_at": message.created_at.isoformat() if message.created_at else None}
+    metadata = message.metadata_json or {}
+    invite_room_id = metadata.get("invite_room_id") or metadata.get("room_public_id")
+    return {
+        "id": message.public_id,
+        "sender": message.sender_name,
+        "text": message.text,
+        "time": _time_label(message.created_at),
+        "is_mine": current_user is not None and message.sender_user_id == current_user.id,
+        "type": message.message_type,
+        "status": message.status,
+        "reaction": message.reaction,
+        "reply_to_text": message.reply_to_text,
+        "is_starred": message.is_starred,
+        "is_forwarded": message.is_forwarded,
+        "invite_room_name": message.invite_room_name or metadata.get("invite_room_name") or metadata.get("room_name"),
+        "invite_room_id": invite_room_id,
+        "created_at": message.created_at.isoformat() if message.created_at else None,
+    }
 
 
 def conversation_to_dict(conversation: InboxConversation, current_user: User) -> dict:
@@ -246,7 +334,26 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
     messages = list(conversation.messages)
     last_message = messages[-1] if messages else None
     metadata = conversation.metadata_json or {}
-    return {"id": conversation.public_id, "title": conversation.title, "subtitle": last_message.text if last_message else "No messages yet", "time": _time_label(conversation.updated_at), "avatar_text": conversation.avatar_text, "type": conversation.conversation_type, "unread_count": participant.unread_count if participant else 0, "is_online": False, "last_seen_text": "offline", "colors": metadata.get("colors") or DEFAULT_COLORS, "messages": [message_to_dict(message, current_user) for message in messages], "current_room_name": conversation.current_room_name, "is_locked_by_backend": conversation.is_locked, "is_blocked": conversation.is_blocked, "is_muted": conversation.is_muted, "is_pinned": conversation.is_pinned, "is_archived": conversation.is_archived}
+    return {
+        "id": conversation.public_id,
+        "title": conversation.title,
+        "subtitle": last_message.text if last_message else "No messages yet",
+        "time": _time_label(conversation.updated_at),
+        "avatar_text": conversation.avatar_text,
+        "type": conversation.conversation_type,
+        "unread_count": participant.unread_count if participant else 0,
+        "is_online": False,
+        "last_seen_text": "offline",
+        "colors": metadata.get("colors") or DEFAULT_COLORS,
+        "messages": [message_to_dict(message, current_user) for message in messages],
+        "current_room_name": conversation.current_room_name,
+        "current_room_id": conversation.room_public_id,
+        "is_locked_by_backend": conversation.is_locked,
+        "is_blocked": conversation.is_blocked,
+        "is_muted": conversation.is_muted,
+        "is_pinned": conversation.is_pinned,
+        "is_archived": conversation.is_archived,
+    }
 
 
 def report_to_dict(report: InboxReport) -> dict:
