@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_music_signaling_service.dart';
 import '../widgets/room_theme.dart';
 
 class LiveRoomMusicPlayerModule extends StatefulWidget {
@@ -139,13 +140,13 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
 
     if (_isPlaying) {
       await _player.pause();
-      _broadcastMusicControl('pause');
+      unawaited(_broadcastMusicControl('pause'));
       return;
     }
 
     if (_state == PlayerState.paused) {
       await _player.resume();
-      _broadcastMusicControl('resume');
+      unawaited(_broadcastMusicControl('resume'));
       return;
     }
 
@@ -169,7 +170,8 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
       return;
     }
 
-    _broadcastMusicControl('play');
+    unawaited(_broadcastProducerStarted());
+    unawaited(_broadcastMusicControl('play'));
   }
 
   Future<void> _playNext() async {
@@ -187,7 +189,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
   Future<void> _seekTo(double millis) async {
     final next = Duration(milliseconds: millis.round());
     await _player.seek(next);
-    _broadcastMusicControl('seek', positionMs: next.inMilliseconds);
+    unawaited(_broadcastMusicControl('seek', positionMs: next.inMilliseconds));
   }
 
   void _removeTrack(RoomMusicTrack track) {
@@ -208,7 +210,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
 
     if (_tracks.isEmpty) {
       unawaited(_player.stop());
-      _broadcastMusicControl('stop');
+      unawaited(_broadcastMusicControl('stop'));
     }
   }
 
@@ -223,7 +225,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
         _duration = Duration.zero;
       });
       unawaited(_player.stop());
-      _broadcastMusicControl('stop');
+      unawaited(_broadcastMusicControl('stop'));
       return;
     }
 
@@ -253,15 +255,37 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
     });
   }
 
-  void _broadcastMusicControl(String action, {int? positionMs}) {
-    LiveRoomMusicControlBus.publish(
-      LiveRoomMusicControlEvent(
-        roomId: widget.roomId,
-        action: action,
-        trackTitle: _currentTrack?.title ?? '',
-        positionMs: positionMs ?? _position.inMilliseconds,
-        emittedAt: DateTime.now(),
-      ),
+  Future<void> _broadcastProducerStarted() async {
+    final track = _currentTrack;
+    if (track == null) return;
+    await LiveRoomMusicSignalingService.instance.sendProducerStarted(
+      roomId: widget.roomId,
+      trackId: track.id,
+      trackTitle: track.title,
+      positionMs: _position.inMilliseconds,
+      durationMs: _duration.inMilliseconds,
+    );
+  }
+
+  Future<void> _broadcastMusicControl(String action, {int? positionMs}) async {
+    final track = _currentTrack;
+    final event = LiveRoomMusicControlEvent(
+      roomId: widget.roomId,
+      action: action,
+      trackId: track?.id ?? '',
+      trackTitle: track?.title ?? '',
+      positionMs: positionMs ?? _position.inMilliseconds,
+      durationMs: _duration.inMilliseconds,
+      emittedAt: DateTime.now(),
+    );
+    LiveRoomMusicControlBus.publish(event);
+    await LiveRoomMusicSignalingService.instance.sendControl(
+      roomId: event.roomId,
+      action: event.action,
+      trackId: event.trackId,
+      trackTitle: event.trackTitle,
+      positionMs: event.positionMs,
+      durationMs: event.durationMs,
     );
   }
 
@@ -328,7 +352,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
                   title: track?.title ?? 'No song selected',
                   subtitle: track == null
                       ? 'Add songs from this device to start room music'
-                      : 'Music control sync event ready for room broadcast',
+                      : 'Broadcasting controls to the live room',
                   isPlaying: _isPlaying,
                   positionLabel: _formatDuration(_position),
                   durationLabel: _formatDuration(_duration),
@@ -648,14 +672,18 @@ class LiveRoomMusicControlEvent {
   const LiveRoomMusicControlEvent({
     required this.roomId,
     required this.action,
+    required this.trackId,
     required this.trackTitle,
     required this.positionMs,
+    required this.durationMs,
     required this.emittedAt,
   });
 
   final String roomId;
   final String action;
+  final String trackId;
   final String trackTitle;
   final int positionMs;
+  final int durationMs;
   final DateTime emittedAt;
 }
