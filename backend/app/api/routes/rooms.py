@@ -7,10 +7,9 @@ from app.schemas.room_settings import (
 from app.models.room import Room
 from app.database import get_db
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
-
 
 
 def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
@@ -32,6 +31,82 @@ def _room_settings_response(room: Room) -> RoomSettingsResponse:
         announcement_updated_at=room.announcement_updated_at,
         announcement_updated_by_user_id=room.announcement_updated_by_user_id,
     )
+
+
+def _room_discovery_payload(room: Room) -> dict:
+    return {
+        "id": room.room_public_id,
+        "room_public_id": room.room_public_id,
+        "name": room.name,
+        "subtitle": room.subtitle or "",
+        "language": room.language,
+        "mode": room.mode,
+        "type": room.room_type,
+        "room_type": room.room_type,
+        "online_count": room.online_count,
+        "trending_score": room.trending_score,
+        "followed_friends_inside": [],
+        "cover_photo_url": room.cover_photo_url or room.avatar_url,
+        "avatar_url": room.avatar_url,
+    }
+
+
+def _filter_discovery_rooms(
+    db: Session,
+    language: str | None,
+    category: str | None,
+    limit: int,
+    include_locked: bool = False,
+) -> list[Room]:
+    query = db.query(Room).filter(Room.is_active.is_(True), Room.is_secret.is_(False))
+    if not include_locked:
+        query = query.filter(Room.is_locked.is_(False), Room.is_members_only.is_(False))
+    if language and language.strip() and language.strip().lower() != "all":
+        query = query.filter(Room.language == language.strip())
+    if category and category.strip() and category.strip().lower() != "all":
+        query = query.filter(Room.room_type == category.strip())
+    return (
+        query.order_by(Room.trending_score.desc(), Room.online_count.desc(), Room.updated_at.desc())
+        .limit(max(1, min(limit, 100)))
+        .all()
+    )
+
+
+@router.get("/trending")
+def get_trending_rooms(
+    language: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    limit: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    rooms = _filter_discovery_rooms(
+        db=db,
+        language=language,
+        category=category,
+        limit=limit,
+        include_locked=False,
+    )
+    return [_room_discovery_payload(room) for room in rooms]
+
+
+@router.get("/following")
+def get_following_rooms(
+    language: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    limit: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    # TODO: once UserFollow room-presence mapping is fully wired, filter by followed users inside.
+    # For now this endpoint keeps the same production payload shape and allows locked/member rooms
+    # because followed-user discovery is allowed to surface them without exposing Secret Vibe rooms.
+    rooms = _filter_discovery_rooms(
+        db=db,
+        language=language,
+        category=category,
+        limit=limit,
+        include_locked=True,
+    )
+    return [_room_discovery_payload(room) for room in rooms]
 
 
 @router.get("/{room_public_id}/settings", response_model=RoomSettingsResponse)
