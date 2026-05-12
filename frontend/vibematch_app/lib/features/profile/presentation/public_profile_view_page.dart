@@ -138,7 +138,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 
   void _showFollowBlockedPopup([String? message]) {
-    showPublicProfileAccessDialog(context, title: 'Follow not allowed', message: message?.trim().isNotEmpty == true ? message!.trim() : '${_displayName()} doesn\'t allow you to follow them.');
+    showPublicProfileAccessDialog(context, title: 'Follow not allowed', message: message?.trim().isNotEmpty == true ? message!.trim() : '${_displayName()} doesn\'t allow you to follow.');
   }
 
   void _openProfileQrActions() => ProfileQrActionsSheet.show(context, user: widget.user, title: '${_displayName()} QR');
@@ -151,16 +151,31 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     if (_isSelfProfile || _followBusy) return;
     final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
+
     final relationship = _relationship;
-    if (relationship != null && !relationship.canFollow && relationship.isFollowing != true) { _showFollowBlockedPopup(relationship.followBlockReason); return; }
+    final status = _followStatus;
+
+    if (status == PublicFollowStatus.following) {
+      _showAction(context, 'You are already following ${_displayName()}.');
+      return;
+    }
+    if (status == PublicFollowStatus.mutual) {
+      _showAction(context, 'You and ${_displayName()} are already friends.');
+      return;
+    }
+    if (relationship != null && !relationship.canFollow) {
+      _showFollowBlockedPopup(relationship.followBlockReason);
+      return;
+    }
+
     setState(() => _followBusy = true);
     try {
-      final wasFollowing = _relationship?.isFollowing == true;
-      final nextRelationship = wasFollowing ? await _profileApi.unfollowUser(publicUserId) : await _profileApi.followUser(publicUserId);
+      final nextRelationship = await _profileApi.followUser(publicUserId);
       if (!mounted) return;
       setState(() => _relationship = nextRelationship);
-      _publishRelationshipRealtime(wasFollowing ? 'unfollow' : 'follow');
-      _showAction(context, _followStatus.message);
+      _publishRelationshipRealtime(nextRelationship.isFriend ? 'friends' : 'follow');
+      _showAction(context, nextRelationship.isFriend ? 'You both follow each other now. You are friends.' : 'You are now following this profile.');
+      unawaited(_refreshRelationshipOnly());
     } catch (error) {
       if (!mounted) return;
       final message = error.toString().replaceFirst('Exception: ', '');
