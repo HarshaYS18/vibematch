@@ -17,6 +17,7 @@ class RoomApiService {
     String type = 'Chat',
     String? subtitle,
     String? avatarUrl,
+    String? coverPhotoUrl,
   }) async {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -33,6 +34,7 @@ class RoomApiService {
         'name': name.trim(),
         'subtitle': subtitle?.trim(),
         'avatar_url': avatarUrl?.trim(),
+        'cover_photo_url': coverPhotoUrl?.trim() ?? avatarUrl?.trim(),
         'language': language.trim(),
         'mode': mode.trim(),
         'type': type.trim(),
@@ -90,6 +92,50 @@ class RoomApiService {
     }
     return RealRoom.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
+
+  Future<RoomJoinSnapshot> joinRoom(String roomId) async {
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/join')), headers: _authHeaders());
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to join room (${response.statusCode}): ${response.body}');
+    }
+    return RoomJoinSnapshot.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<RoomJoinSnapshot> heartbeatRoom(String roomId) async {
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/heartbeat')), headers: _authHeaders());
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to heartbeat room (${response.statusCode}): ${response.body}');
+    }
+    return RoomJoinSnapshot.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<void> leaveRoom(String roomId) async {
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/leave')), headers: _authHeaders());
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to leave room (${response.statusCode}): ${response.body}');
+    }
+  }
+
+  Future<List<RoomParticipantDto>> listParticipants(String roomId) async {
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/participants')), headers: _authHeaders());
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to load participants (${response.statusCode}): ${response.body}');
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded['participants'] as List<dynamic>? ?? const [];
+    return items.whereType<Map<String, dynamic>>().map(RoomParticipantDto.fromJson).toList(growable: false);
+  }
+
+  Map<String, String> _authHeaders() {
+    final token = authApiService.cachedAccessToken;
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Please login again.');
+    }
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
 }
 
 class RealRoom {
@@ -103,6 +149,7 @@ class RealRoom {
     required this.trendingScore,
     this.subtitle,
     this.avatarUrl,
+    this.coverPhotoUrl,
     this.followedFriendsInside = const <String>[],
     this.ownerUserId,
     this.isActive = true,
@@ -115,6 +162,7 @@ class RealRoom {
   final String name;
   final String? subtitle;
   final String? avatarUrl;
+  final String? coverPhotoUrl;
   final String language;
   final String mode;
   final String type;
@@ -133,7 +181,8 @@ class RealRoom {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Live Room',
       subtitle: json['subtitle']?.toString(),
-      avatarUrl: json['avatar_url']?.toString(),
+      avatarUrl: _nullableString(json['avatar_url']),
+      coverPhotoUrl: _nullableString(json['cover_photo_url'] ?? json['coverPhotoUrl'] ?? json['avatar_url']),
       language: json['language']?.toString() ?? 'English',
       mode: json['mode']?.toString() ?? 'Open',
       type: json['type']?.toString() ?? 'Chat',
@@ -147,4 +196,64 @@ class RealRoom {
       isMembersOnly: json['is_members_only'] == true,
     );
   }
+}
+
+class RoomJoinSnapshot {
+  const RoomJoinSnapshot({required this.room, required this.participants, this.shouldShowEnteredMessage = false});
+
+  final RealRoom room;
+  final List<RoomParticipantDto> participants;
+  final bool shouldShowEnteredMessage;
+
+  factory RoomJoinSnapshot.fromJson(Map<String, dynamic> json) {
+    final participants = json['participants'] as List<dynamic>? ?? const [];
+    return RoomJoinSnapshot(
+      room: RealRoom.fromJson((json['room'] as Map<String, dynamic>?) ?? const <String, dynamic>{}),
+      participants: participants.whereType<Map<String, dynamic>>().map(RoomParticipantDto.fromJson).toList(growable: false),
+      shouldShowEnteredMessage: json['should_show_entered_message'] == true,
+    );
+  }
+}
+
+class RoomParticipantDto {
+  const RoomParticipantDto({
+    required this.publicUserId,
+    required this.displayName,
+    required this.username,
+    required this.avatarUrl,
+    required this.primaryRole,
+    required this.isOwner,
+    required this.isMember,
+    required this.isRoomAdmin,
+  });
+
+  final int publicUserId;
+  final String displayName;
+  final String username;
+  final String? avatarUrl;
+  final String primaryRole;
+  final bool isOwner;
+  final bool isMember;
+  final bool isRoomAdmin;
+
+  factory RoomParticipantDto.fromJson(Map<String, dynamic> json) {
+    final publicId = int.tryParse(json['public_user_id']?.toString() ?? '') ?? 0;
+    final username = _nullableString(json['username']) ?? 'user_$publicId';
+    return RoomParticipantDto(
+      publicUserId: publicId,
+      displayName: _nullableString(json['display_name']) ?? username,
+      username: username,
+      avatarUrl: _nullableString(json['avatar_url']),
+      primaryRole: json['primary_role']?.toString() ?? 'user',
+      isOwner: json['is_owner'] == true,
+      isMember: json['is_member'] == true,
+      isRoomAdmin: json['is_room_admin'] == true,
+    );
+  }
+}
+
+String? _nullableString(Object? value) {
+  final text = value?.toString().trim();
+  if (text == null || text.isEmpty || text == 'null') return null;
+  return text;
 }
