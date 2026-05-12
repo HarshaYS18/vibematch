@@ -7,7 +7,7 @@ import 'cricket_mode_module.dart';
 import 'cricket_room_mode_module.dart';
 import 'cricket_room_mode_registry.dart';
 
-class CricketRoomControlsModule extends StatelessWidget {
+class CricketRoomControlsModule extends StatefulWidget {
   const CricketRoomControlsModule({
     super.key,
     required this.controller,
@@ -20,20 +20,29 @@ class CricketRoomControlsModule extends StatelessWidget {
   final VoidCallback onEndMode;
 
   @override
+  State<CricketRoomControlsModule> createState() => _CricketRoomControlsModuleState();
+}
+
+class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.topRight,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 96, 14, 0),
+        padding: const EdgeInsets.fromLTRB(14, 94, 14, 0),
         child: Material(
           color: Colors.transparent,
-          child: Container(
-            width: 170,
-            padding: const EdgeInsets.all(8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            width: _expanded ? 178 : 54,
+            padding: EdgeInsets.all(_expanded ? 8 : 0),
             decoration: BoxDecoration(
               color: const Color(0xEE07160D),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              borderRadius: BorderRadius.circular(_expanded ? 22 : 999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.30),
@@ -42,97 +51,111 @@ class CricketRoomControlsModule extends StatelessWidget {
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF0E8F54), Color(0xFF86FF9D)],
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.sports_cricket_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Cricket CP',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                _CricketControlButton(
-                  icon: Icons.emoji_events_rounded,
-                  label: 'Tournament',
-                  enabled: canManage,
-                  onTap: () => _openTournamentCreator(context),
-                ),
-                _CricketControlButton(
-                  icon: Icons.table_chart_rounded,
-                  label: 'Points Table',
-                  enabled: true,
-                  onTap: () => _openPointsTable(context),
-                ),
-                _CricketControlButton(
-                  icon: Icons.workspace_premium_rounded,
-                  label: 'Result',
-                  enabled: true,
-                  onTap: () => _openResult(context),
-                ),
-                _CricketControlButton(
-                  icon: Icons.stop_circle_rounded,
-                  label: 'End Mode',
-                  danger: true,
-                  enabled: canManage,
-                  onTap: () {
-                    CricketRoomModeRegistry.deactivateRoom(
-                      roomId: controller.match.roomId,
-                    );
-                    onEndMode();
-                  },
-                ),
-              ],
-            ),
+            child: _expanded ? _expandedPanel(context) : _collapsedPill(),
           ),
         ),
       ),
     );
   }
 
-  Future<void> _openTournamentCreator(BuildContext context) async {
-    final config = await CricketRoomModeModule.openTournamentCreator(
-      context: context,
-      initialConfig: controller.tournament,
+  Widget _collapsedPill() {
+    return InkWell(
+      customBorder: const CircleBorder(),
+      onTap: () => setState(() => _expanded = true),
+      child: Container(
+        width: 54,
+        height: 54,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(colors: [Color(0xFF0E8F54), Color(0xFF86FF9D)]),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            const Icon(Icons.sports_cricket_rounded, color: Colors.white, size: 25),
+            Positioned(
+              right: 6,
+              bottom: 6,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: widget.canManage ? const Color(0xFFFFD36A) : Colors.white38,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xEE07160D), width: 1.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-    if (config == null) return;
-    controller.updateTournament(config);
-    if (!context.mounted) return;
-    RoomToast.show(context, '${config.name} rules saved');
+  }
+
+  Widget _expandedPanel(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [Color(0xFF0E8F54), Color(0xFF86FF9D)]),
+              ),
+              child: const Icon(Icons.sports_cricket_rounded, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                widget.canManage ? 'Umpire CP' : 'Cricket',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
+              ),
+            ),
+            InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => setState(() => _expanded = false),
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _CricketControlButton(
+          icon: Icons.table_chart_rounded,
+          label: 'Points Table',
+          enabled: true,
+          onTap: () => _openPointsTable(context),
+        ),
+        _CricketControlButton(
+          icon: Icons.workspace_premium_rounded,
+          label: 'Result',
+          enabled: true,
+          onTap: () => _openResult(context),
+        ),
+        _CricketControlButton(
+          icon: Icons.stop_circle_rounded,
+          label: 'End Match',
+          danger: true,
+          enabled: widget.canManage,
+          onTap: () {
+            CricketRoomModeRegistry.deactivateRoom(roomId: widget.controller.match.roomId);
+            widget.onEndMode();
+          },
+        ),
+      ],
+    );
   }
 
   void _openPointsTable(BuildContext context) {
-    CricketRoomModeModule.openPointsTable(
-      context: context,
-      rows: _pointsRows(),
-    );
+    CricketRoomModeModule.openPointsTable(context: context, rows: _pointsRows());
   }
 
   void _openResult(BuildContext context) {
@@ -140,16 +163,16 @@ class CricketRoomControlsModule extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => CricketMatchResultSheet(controller: controller),
+      builder: (_) => CricketMatchResultSheet(controller: widget.controller),
     );
   }
 
   List<CricketPointsRow> _pointsRows() {
-    final match = controller.match;
+    final match = widget.controller.match;
     final snapshot = match.snapshot;
-    final teams = controller.tournament.teams.isEmpty
+    final teams = widget.controller.tournament.teams.isEmpty
         ? <String>[match.teamA.name, match.teamB.name]
-        : controller.tournament.teams;
+        : widget.controller.tournament.teams;
     final rows = <CricketPointsRow>[];
 
     for (var index = 0; index < teams.length; index += 1) {
@@ -165,7 +188,7 @@ class CricketRoomControlsModule extends StatelessWidget {
           lost: !isBattingTeam && snapshot.runs > runsFor ? 1 : 0,
           tied: 0,
           noResult: 0,
-          points: isBattingTeam && snapshot.runs > runsAgainst ? controller.tournament.rules.winPoints : 0,
+          points: isBattingTeam && snapshot.runs > runsAgainst ? widget.controller.tournament.rules.winPoints : 0,
           runsFor: runsFor,
           ballsFaced: balls,
           runsAgainst: runsAgainst,
@@ -195,12 +218,7 @@ class CricketMatchResultSheet extends StatelessWidget {
 
     return Container(
       height: MediaQuery.sizeOf(context).height * 0.58,
-      padding: EdgeInsets.fromLTRB(
-        14,
-        8,
-        14,
-        MediaQuery.paddingOf(context).bottom + 12,
-      ),
+      padding: EdgeInsets.fromLTRB(14, 8, 14, MediaQuery.paddingOf(context).bottom + 12),
       decoration: const BoxDecoration(
         color: Color(0xFFF9F8F2),
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -212,28 +230,17 @@ class CricketMatchResultSheet extends StatelessWidget {
           const SizedBox(height: 12),
           const Text(
             'Match Result',
-            style: TextStyle(
-              color: RoomColors.plum,
-              fontSize: 21,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-            ),
+            style: TextStyle(color: RoomColors.plum, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: -0.5),
           ),
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF061B0D), Color(0xFF0E5A31)],
-              ),
+              gradient: const LinearGradient(colors: [Color(0xFF061B0D), Color(0xFF0E5A31)]),
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.16),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 18, offset: const Offset(0, 8)),
               ],
             ),
             child: Column(
@@ -241,51 +248,26 @@ class CricketMatchResultSheet extends StatelessWidget {
               children: [
                 Text(
                   '${match.battingTeam.shortName} ${snapshot.runs}/${snapshot.wickets} (${snapshot.oversText})',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -0.5),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   target == null ? 'First innings in progress' : 'Target $target',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.78),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 12, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   resultText,
-                  style: const TextStyle(
-                    color: Color(0xFFFFD36A),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: const TextStyle(color: Color(0xFFFFD36A), fontSize: 16, fontWeight: FontWeight.w900),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 14),
-          _ResultMetricRow(
-            label: 'Current run rate',
-            value: snapshot.currentRunRate.toStringAsFixed(2),
-          ),
-          _ResultMetricRow(
-            label: 'Required run rate',
-            value: snapshot.requiredRunRate?.toStringAsFixed(2) ?? '--',
-          ),
-          _ResultMetricRow(
-            label: 'Legal balls',
-            value: '${snapshot.legalBalls}',
-          ),
-          _ResultMetricRow(
-            label: 'Recent balls',
-            value: snapshot.recentBalls.isEmpty ? '--' : snapshot.recentBalls.join(' '),
-          ),
+          _ResultMetricRow(label: 'Current run rate', value: snapshot.currentRunRate.toStringAsFixed(2)),
+          _ResultMetricRow(label: 'Required run rate', value: snapshot.requiredRunRate?.toStringAsFixed(2) ?? '--'),
+          _ResultMetricRow(label: 'Legal balls', value: '${snapshot.legalBalls}'),
+          _ResultMetricRow(label: 'Recent balls', value: snapshot.recentBalls.isEmpty ? '--' : snapshot.recentBalls.join(' ')),
         ],
       ),
     );
@@ -320,20 +302,12 @@ class _ResultMetricRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF81758C),
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
+              style: const TextStyle(color: Color(0xFF81758C), fontSize: 12, fontWeight: FontWeight.w800),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: RoomColors.plum,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: RoomColors.plum, fontSize: 12.5, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -363,9 +337,7 @@ class _CricketControlButton extends StatelessWidget {
       child: Opacity(
         opacity: enabled ? 1 : 0.48,
         child: Material(
-          color: danger
-              ? RoomColors.coral.withValues(alpha: 0.88)
-              : Colors.white.withValues(alpha: 0.12),
+          color: danger ? RoomColors.coral.withValues(alpha: 0.88) : Colors.white.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
@@ -381,11 +353,7 @@ class _CricketControlButton extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ],
