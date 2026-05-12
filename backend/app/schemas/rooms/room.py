@@ -9,6 +9,7 @@ class RoomCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     subtitle: str | None = Field(default=None, max_length=240)
     avatar_url: str | None = Field(default=None, max_length=500)
+    cover_photo_url: str | None = Field(default=None, max_length=500)
     language: str = Field(default="English", max_length=40)
     mode: str = Field(default="Open", max_length=40)
     type: str = Field(default="Chat", max_length=40)
@@ -19,6 +20,7 @@ class RoomTrendingResponse(BaseModel):
     name: str
     subtitle: str | None = None
     avatar_url: str | None = None
+    cover_photo_url: str | None = None
     language: str
     mode: str
     type: str
