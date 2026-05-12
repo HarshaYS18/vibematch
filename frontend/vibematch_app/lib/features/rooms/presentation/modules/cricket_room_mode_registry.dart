@@ -1,6 +1,7 @@
 import '../widgets/room_theme.dart';
 import 'cricket_mode_module.dart';
 import 'cricket_room_mode_module.dart';
+import 'cricket_room_mode_signal.dart';
 
 class CricketRoomModeRegistry {
   CricketRoomModeRegistry._();
@@ -12,10 +13,41 @@ class CricketRoomModeRegistry {
     required String roomId,
     required String roomName,
   }) {
+    final safeRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
     return _controllers.putIfAbsent(
-      roomId,
-      () => CricketRoomModeController(roomId: roomId, roomName: roomName),
+      safeRoomId,
+      () => CricketRoomModeController(roomId: safeRoomId, roomName: roomName),
     );
+  }
+
+  static CricketRoomModeController syncRoomModeFromSignal({
+    required String roomId,
+    required String roomName,
+    required String currentLayoutId,
+  }) {
+    final controller = controllerFor(roomId: roomId, roomName: roomName);
+    final shouldBeActive = CricketRoomModeSignal.isActive(roomId);
+
+    if (shouldBeActive && !controller.active) {
+      controller.startRoomMode(
+        currentLayoutId: currentLayoutId,
+        currentBackground: cricketFloodlightArenaBackgroundTheme,
+      );
+    }
+
+    if (!shouldBeActive && controller.active) {
+      controller.endRoomMode();
+    }
+
+    return controller;
+  }
+
+  static void activateRoom({required String roomId}) {
+    CricketRoomModeSignal.activate(roomId);
+  }
+
+  static void deactivateRoom({required String roomId}) {
+    CricketRoomModeSignal.deactivate(roomId);
   }
 
   static bool isCricketBackground(RoomBackgroundTheme theme) {
@@ -27,6 +59,8 @@ class CricketRoomModeRegistry {
   }
 
   static void disposeRoom(String roomId) {
-    _controllers.remove(roomId)?.dispose();
+    final safeRoomId = roomId.trim().isEmpty ? roomId : roomId.trim();
+    _controllers.remove(safeRoomId)?.dispose();
+    CricketRoomModeSignal.deactivate(safeRoomId);
   }
 }
