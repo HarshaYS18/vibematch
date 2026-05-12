@@ -41,6 +41,7 @@ class Room(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     subtitle: Mapped[str | None] = mapped_column(String(240), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    cover_photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     language: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
     mode: Mapped[str] = mapped_column(
         String(40),
