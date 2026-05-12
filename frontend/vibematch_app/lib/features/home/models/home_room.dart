@@ -8,6 +8,7 @@ class HomeRoom {
   final int onlineCount;
   final int trendingScore;
   final List<String> followedFriendsInside;
+  final String? coverPhotoUrl;
 
   const HomeRoom({
     required this.id,
@@ -19,7 +20,13 @@ class HomeRoom {
     required this.onlineCount,
     required this.trendingScore,
     required this.followedFriendsInside,
+    this.coverPhotoUrl,
   });
+
+  bool get hasCoverPhoto {
+    final value = coverPhotoUrl?.trim();
+    return value != null && value.isNotEmpty;
+  }
 
   bool get isPublicOpen {
     return mode.trim().toLowerCase() == 'open' ||
