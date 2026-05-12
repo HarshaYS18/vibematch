@@ -27,6 +27,8 @@ class RoomTopBar extends StatelessWidget {
     this.roomLevel = 12,
     this.language = 'Telugu',
     this.canManageAdmins = true,
+    this.currentUserIsMember = false,
+    this.joinRequestPending = false,
   });
 
   final String roomName;
@@ -48,6 +50,8 @@ class RoomTopBar extends StatelessWidget {
   final int roomLevel;
   final String language;
   final bool canManageAdmins;
+  final bool currentUserIsMember;
+  final bool joinRequestPending;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +70,15 @@ class RoomTopBar extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minWidth: 126, maxWidth: 218),
-                  child: _RoomNamePill(roomName: roomName, privacyMode: privacyMode, onInfoTap: () => _openRoomInfo(context), onJoinTap: onJoinTap, showJoinButton: !canManageAdmins),
+                  child: _RoomNamePill(
+                    roomName: roomName,
+                    privacyMode: privacyMode,
+                    onInfoTap: () => _openRoomInfo(context),
+                    onJoinTap: onJoinTap,
+                    showJoinButton: !canManageAdmins,
+                    currentUserIsMember: currentUserIsMember,
+                    joinRequestPending: joinRequestPending,
+                  ),
                 ),
               ),
             ),
@@ -101,13 +113,29 @@ class RoomTopBar extends StatelessWidget {
 }
 
 class _RoomNamePill extends StatelessWidget {
-  const _RoomNamePill({required this.roomName, required this.privacyMode, required this.onInfoTap, required this.onJoinTap, required this.showJoinButton});
+  const _RoomNamePill({
+    required this.roomName,
+    required this.privacyMode,
+    required this.onInfoTap,
+    required this.onJoinTap,
+    required this.showJoinButton,
+    required this.currentUserIsMember,
+    required this.joinRequestPending,
+  });
+
   final String roomName;
   final RoomPrivacyMode privacyMode;
   final VoidCallback onInfoTap;
   final VoidCallback onJoinTap;
   final bool showJoinButton;
+  final bool currentUserIsMember;
+  final bool joinRequestPending;
+
   String get _cleanRoomName => roomName.trim().isEmpty ? 'Room' : roomName.trim();
+
+  bool get _showMemberIcon => showJoinButton && currentUserIsMember;
+  bool get _showPlusButton => showJoinButton && !currentUserIsMember && !joinRequestPending;
+  bool get _showTrailingSlot => _showMemberIcon || _showPlusButton;
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +148,7 @@ class _RoomNamePill extends StatelessWidget {
             color: Colors.transparent,
             borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
             child: InkWell(
-              borderRadius: BorderRadius.horizontal(left: const Radius.circular(999), right: Radius.circular(showJoinButton ? 0 : 999)),
+              borderRadius: BorderRadius.horizontal(left: const Radius.circular(999), right: Radius.circular(_showTrailingSlot ? 0 : 999)),
               onTap: onInfoTap,
               child: Padding(
                 padding: const EdgeInsets.only(left: 9, right: 4),
@@ -129,9 +157,12 @@ class _RoomNamePill extends StatelessWidget {
             ),
           ),
         ),
-        if (showJoinButton) ...[
+        if (_showTrailingSlot) ...[
           Container(width: 1, height: 18, color: Colors.white.withValues(alpha: 0.13)),
-          Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onJoinTap, child: const SizedBox(width: 32, height: 31, child: Center(child: Icon(Icons.add_rounded, color: RoomColors.aqua, size: 20))))),
+          if (_showMemberIcon)
+            const SizedBox(width: 32, height: 31, child: Center(child: Icon(Icons.verified_user_rounded, color: RoomColors.aqua, size: 17)))
+          else
+            Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onJoinTap, child: const SizedBox(width: 32, height: 31, child: Center(child: Icon(Icons.add_rounded, color: RoomColors.aqua, size: 20))))),
         ],
       ]),
     );
