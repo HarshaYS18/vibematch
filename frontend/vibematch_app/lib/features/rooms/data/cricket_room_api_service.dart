@@ -103,11 +103,10 @@ class CricketRoomApiService {
     Map<String, dynamic>? result,
     List<Map<String, dynamic>>? pointsTable,
   }) async {
-    final response = await _patch('/rooms/$roomId/cricket/matches/$matchId/score', {
-      'score': score,
-      ?'result': result,
-      ?'points_table': pointsTable,
-    });
+    final body = <String, dynamic>{'score': score};
+    if (result != null) body['result'] = result;
+    if (pointsTable != null) body['points_table'] = pointsTable;
+    final response = await _patch('/rooms/$roomId/cricket/matches/$matchId/score', body);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
@@ -118,11 +117,12 @@ class CricketRoomApiService {
     required Map<String, dynamic> result,
     List<Map<String, dynamic>>? pointsTable,
   }) async {
-    final response = await _post('/rooms/$roomId/cricket/matches/$matchId/complete', {
+    final body = <String, dynamic>{
       'score': score,
       'result': result,
-      ?'points_table': pointsTable,
-    });
+    };
+    if (pointsTable != null) body['points_table'] = pointsTable;
+    final response = await _post('/rooms/$roomId/cricket/matches/$matchId/complete', body);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
