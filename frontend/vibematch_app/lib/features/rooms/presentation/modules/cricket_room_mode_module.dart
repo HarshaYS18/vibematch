@@ -665,6 +665,8 @@ Future<void> _showCricketPlayerPicker({
 
   await showModalBottomSheet<void>(
     context: context,
+    isDismissible: false,
+    enableDrag: false,
     backgroundColor: Colors.transparent,
     builder: (_) {
       return Container(
@@ -723,16 +725,19 @@ Set<String> _dismissedPlayerIds(CricketMatchState state) {
 
 List<CricketPlayer> _availableNextBatters(CricketMatchState state) {
   final dismissed = _dismissedPlayerIds(state);
+
+  // After a wicket, the engine may temporarily auto-place the next striker.
+  // The picker must still show that player. So exclude only:
+  // 1) dismissed players
+  // 2) current non-striker
   return state.battingTeam.players
       .where(
         (player) =>
             !dismissed.contains(player.id) &&
-            player.id != state.strikerId &&
             player.id != state.nonStrikerId,
       )
       .toList();
 }
-
 List<CricketPlayer> _availableOpeningBatters(CricketMatchState state) {
   return state.battingTeam.players.toList();
 }
@@ -1013,14 +1018,19 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
     required ValueChanged<CricketPlayer> onSelected,
   }) async {
     if (_pickerOpen) return;
+    if (players.isEmpty) return;
+
     _pickerOpen = true;
-    await _showCricketPlayerPicker(
-      context: context,
-      title: title,
-      players: players,
-      onSelected: onSelected,
-    );
-    _pickerOpen = false;
+    try {
+      await _showCricketPlayerPicker(
+        context: context,
+        title: title,
+        players: players,
+        onSelected: onSelected,
+      );
+    } finally {
+      _pickerOpen = false;
+    }
   }
 
   Future<void> _showResultIfNeeded(BuildContext context) async {
@@ -1043,8 +1053,10 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
     }
 
     await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
+    context: context,
+    isDismissible: false,
+    enableDrag: false,
+    backgroundColor: Colors.transparent,
       builder: (_) {
         return Container(
           padding: EdgeInsets.fromLTRB(
