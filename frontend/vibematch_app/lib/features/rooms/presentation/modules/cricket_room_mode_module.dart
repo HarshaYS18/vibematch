@@ -264,12 +264,14 @@ class CricketRoomModeController extends ChangeNotifier {
   bool _active = false;
   String? _previousLayoutId;
   RoomBackgroundTheme? _previousBackground;
+  bool _powerPlayActive = false;
 
   bool get active => _active;
   String? get previousLayoutId => _previousLayoutId;
   RoomBackgroundTheme? get previousBackground => _previousBackground;
   CricketMatchState get match => scorer.state;
   CricketScoreSnapshot get snapshot => scorer.state.snapshot;
+  bool get powerPlayActive => _powerPlayActive;
 
   void startRoomMode({
     required String currentLayoutId,
@@ -300,7 +302,7 @@ class CricketRoomModeController extends ChangeNotifier {
   }
 
   void addRuns(int runs) {
-    scorer.addRuns(runs);
+    scorer.addRuns(_powerPlayActive ? runs * 2 : runs);
     notifyListeners();
   }
 
@@ -316,6 +318,11 @@ class CricketRoomModeController extends ChangeNotifier {
 
   void addWicket(CricketWicketType type) {
     scorer.addWicket(type);
+    notifyListeners();
+  }
+
+  void togglePowerPlay() {
+    _powerPlayActive = !_powerPlayActive;
     notifyListeners();
   }
 
@@ -505,6 +512,7 @@ String _matchResultText(CricketMatchState state) {
   return '${state.bowlingTeam.name} won by $runsShort runs';
 }
 
+
 class CricketFixedScoreboard extends StatelessWidget {
   const CricketFixedScoreboard({
     super.key,
@@ -540,7 +548,7 @@ class CricketFixedScoreboard extends StatelessWidget {
 
     return Container(
       margin: margin,
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
+      padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xF0061B0D), Color(0xF00E5A31)],
@@ -549,9 +557,9 @@ class CricketFixedScoreboard extends StatelessWidget {
         border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.24),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -566,7 +574,7 @@ class CricketFixedScoreboard extends StatelessWidget {
                 const Icon(
                   Icons.sports_cricket_rounded,
                   color: Color(0xFF86FF9D),
-                  size: 15,
+                  size: 14,
                 ),
                 const SizedBox(width: 5),
                 Expanded(
@@ -580,9 +588,9 @@ class CricketFixedScoreboard extends StatelessWidget {
                       color: resultText.isNotEmpty
                           ? const Color(0xFFFFD36A)
                           : Colors.white,
-                      fontSize: 14.5,
+                      fontSize: 14,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: -0.2,
+                      letterSpacing: -0.25,
                     ),
                   ),
                 ),
@@ -592,131 +600,60 @@ class CricketFixedScoreboard extends StatelessWidget {
                       : 'CRR ${snapshot.currentRunRate.toStringAsFixed(2)}',
                   style: const TextStyle(
                     color: Color(0xFFFFD36A),
-                    fontSize: 9.7,
+                    fontSize: 9.2,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               target == null
-                  ? '${state.battingTeam.name} batting'
-                  : 'Target $target • Need ${math.max(0, target - snapshot.runs)} from $ballsRemaining balls${requiredRate == null ? '' : ' • RRR ${requiredRate.toStringAsFixed(2)}'}',
+                  ? '${striker.name}* ${strikerStats.runs}(${strikerStats.balls})  •  ${nonStriker.name} ${nonStrikerStats.runs}(${nonStrikerStats.balls})'
+                  : 'Need ${math.max(0, target - snapshot.runs)} from $ballsRemaining balls${requiredRate == null ? '' : ' • RRR ${requiredRate.toStringAsFixed(2)}'}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.78),
-                fontSize: 9.6,
+                color: Colors.white.withValues(alpha: 0.86),
+                fontSize: 9.2,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 5),
-            _CompactBatterLine(
-              name: '${striker.name}*',
-              stats: strikerStats,
-            ),
-            const SizedBox(height: 3),
-            _CompactBatterLine(
-              name: nonStriker.name,
-              stats: nonStrikerStats,
-            ),
-            const SizedBox(height: 3),
-            _CompactBowlerLine(
-              name: bowler.name,
-              stats: bowlerStats,
-            ),
-            if (snapshot.recentBalls.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 22,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: snapshot.recentBalls.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 5),
-                  itemBuilder: (context, index) {
-                    return _CricketMiniBallChip(label: snapshot.recentBalls[index]);
-                  },
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Bowl ${bowler.name} ${bowlerStats.oversText}-${bowlerStats.runs}-${bowlerStats.wickets}  ECO ${bowlerStats.economy.toStringAsFixed(1)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      fontSize: 7.8,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                if (snapshot.recentBalls.isNotEmpty)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: snapshot.recentBalls
+                        .map(
+                          (ball) => Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: _CricketMiniBallChip(label: ball),
+                          ),
+                        )
+                        .toList(),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 }
-
-class _CompactBatterLine extends StatelessWidget {
-  const _CompactBatterLine({
-    required this.name,
-    required this.stats,
-  });
-
-  final String name;
-  final _CricketBatterStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: _TinyScoreText(name, strong: true)),
-        _TinyScoreText('${stats.runs}(${stats.balls})'),
-        const SizedBox(width: 8),
-        _TinyScoreText('4s ${stats.fours}'),
-        const SizedBox(width: 8),
-        _TinyScoreText('6s ${stats.sixes}'),
-        const SizedBox(width: 8),
-        _TinyScoreText('SR ${stats.strikeRate.toStringAsFixed(0)}'),
-      ],
-    );
-  }
-}
-
-class _CompactBowlerLine extends StatelessWidget {
-  const _CompactBowlerLine({
-    required this.name,
-    required this.stats,
-  });
-
-  final String name;
-  final _CricketBowlerStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: _TinyScoreText('Bowler $name', strong: true)),
-        _TinyScoreText('${stats.oversText}-${stats.runs}-${stats.wickets}'),
-        const SizedBox(width: 8),
-        _TinyScoreText('ECO ${stats.economy.toStringAsFixed(1)}'),
-      ],
-    );
-  }
-}
-
-class _TinyScoreText extends StatelessWidget {
-  const _TinyScoreText(this.text, {this.strong = false});
-
-  final String text;
-  final bool strong;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        color: strong ? Colors.white : Colors.white.withValues(alpha: 0.84),
-        fontSize: 9.2,
-        fontWeight: strong ? FontWeight.w900 : FontWeight.w800,
-      ),
-    );
-  }
-}
-
 
 Future<void> _showCricketPlayerPicker({
   required BuildContext context,
@@ -874,7 +811,7 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
                       crossAxisCount: 4,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
-                      childAspectRatio: 1.45,
+                      childAspectRatio: 1.62,
                       padding: EdgeInsets.zero,
                       children: [
                         for (final run in const [0, 1, 2, 3, 4, 5, 6])
@@ -911,8 +848,7 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
                           label: 'Wicket',
                           danger: true,
                           onTap: () => _scoreWicket(context),
-                        ),
-                      ],
+                        ),                      ],
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -921,23 +857,39 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: controller.undo,
-                          icon: const Icon(Icons.undo_rounded, size: 17),
+                          icon: const Icon(Icons.undo_rounded, size: 16),
                           label: const Text(
                             'Undo',
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: controller.togglePowerPlay,
+                          icon: Icon(
+                            controller.powerPlayActive
+                                ? Icons.flash_on_rounded
+                                : Icons.flash_off_rounded,
+                            size: 16,
+                          ),
+                          label: Text(
+                            controller.powerPlayActive ? 'PP x2' : 'Powerplay',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () => _handleEndInningsTap(context),
-                          icon: const Icon(Icons.flag_rounded, size: 17),
+                          icon: const Icon(Icons.flag_rounded, size: 16),
                           label: Text(
                             controller.match.status ==
                                     CricketMatchStatus.inningsBreak
-                                ? '2nd innings'
-                                : 'End innings',
+                                ? '2nd'
+                                : 'End',
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -1403,8 +1355,8 @@ class _CricketMiniBallChip extends StatelessWidget {
     final isWicket = label == 'W';
 
     return Container(
-      width: 22,
-      height: 22,
+      width: 18,
+      height: 18,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: isWicket
@@ -1424,7 +1376,7 @@ class _CricketMiniBallChip extends StatelessWidget {
             maxLines: 1,
             style: TextStyle(
               color: isWicket ? Colors.white : const Color(0xFF0E5930),
-              fontSize: 8.8,
+              fontSize: 7.8,
               fontWeight: FontWeight.w900,
             ),
           ),
