@@ -47,6 +47,13 @@ def _avatar_text(title: str) -> str:
     return f"{parts[0][0]}{parts[1][0]}".upper()
 
 
+def _other_participant_user(conversation: InboxConversation, current_user: User) -> User | None:
+    for participant in conversation.participants:
+        if participant.user_id != current_user.id:
+            return participant.user
+    return None
+
+
 def participant_user_ids(conversation: InboxConversation) -> list[int]:
     return [participant.user_id for participant in conversation.participants]
 
@@ -81,7 +88,7 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
         avatar_text="VM",
         conversation_type=InboxConversationType.OFFICIAL.value,
         is_official=True,
-        metadata_json={"colors": ["#251538", "#C99A3B"]},
+        metadata_json={"colors": ["#008069", "#25D366"], "avatar_url": None},
     )
     db.add(conversation)
 
@@ -133,7 +140,13 @@ def create_direct_conversation(db: Session, current_user: User, target_user: Use
             return conversation
 
     title = _display_name(target_user)
-    conversation = InboxConversation(public_id=_public_id("chat"), title=title, avatar_text=_avatar_text(title), conversation_type=InboxConversationType.CHAT.value, metadata_json={"colors": DEFAULT_COLORS})
+    conversation = InboxConversation(
+        public_id=_public_id("chat"),
+        title=title,
+        avatar_text=_avatar_text(title),
+        conversation_type=InboxConversationType.CHAT.value,
+        metadata_json={"colors": DEFAULT_COLORS, "avatar_url": target_user.avatar_url},
+    )
     db.add(conversation)
     db.flush()
     db.add_all([InboxParticipant(conversation_id=conversation.id, user_id=current_user.id), InboxParticipant(conversation_id=conversation.id, user_id=target_user.id)])
@@ -207,6 +220,7 @@ def send_room_invite_message(
         "action": "join_room",
         "room_name": safe_room_name,
         "room_public_id": room_public_id,
+        "invite_room_id": room_public_id,
         "room_language": room_language or "Telugu",
         "mode_title": mode_title or "Open",
         "inviter_user_id": sender.id,
@@ -310,7 +324,7 @@ def apply_monitor_action(db: Session, report: InboxReport, action_label: str) ->
 
 def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
     metadata = message.metadata_json or {}
-    invite_room_id = metadata.get("invite_room_id") or metadata.get("room_public_id")
+    invite_room_id = metadata.get("invite_room_id") or metadata.get("room_public_id") or message.conversation.room_public_id
     return {
         "id": message.public_id,
         "sender": message.sender_name,
@@ -334,12 +348,14 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
     messages = list(conversation.messages)
     last_message = messages[-1] if messages else None
     metadata = conversation.metadata_json or {}
+    other_user = _other_participant_user(conversation, current_user)
     return {
         "id": conversation.public_id,
         "title": conversation.title,
         "subtitle": last_message.text if last_message else "No messages yet",
         "time": _time_label(conversation.updated_at),
         "avatar_text": conversation.avatar_text,
+        "avatar_url": metadata.get("avatar_url") or (other_user.avatar_url if other_user else None),
         "type": conversation.conversation_type,
         "unread_count": participant.unread_count if participant else 0,
         "is_online": False,
@@ -358,4 +374,3 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
 
 def report_to_dict(report: InboxReport) -> dict:
     return {"id": report.public_id, "reported_conversation_id": report.conversation.public_id, "reported_user_name": report.reported_user_name, "reporter_name": _display_name(report.reporter), "reason": report.reason, "snapshot": report.snapshot_json, "created_at_label": _time_label(report.created_at), "status": report.status, "cs_note": report.cs_note, "monitor_action": report.monitor_action}
-
