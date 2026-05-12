@@ -57,6 +57,7 @@ flutter:
     - assets/images/room_backgrounds/chat_room/pearl/
     - assets/images/room_backgrounds/chat_room/locked_room/
     - assets/images/room_backgrounds/chat_room/secret_vibe/
+    - assets/images/room_backgrounds/cricket/default/
     - assets/images/room_backgrounds/vibe_sync/default/
     - assets/images/room_backgrounds/vibe_sync/premium/
     - assets/images/room_backgrounds/vibe_sync/event/
