@@ -55,6 +55,10 @@ def _apply_room_payload(room: Room, payload: RoomCreateRequest) -> Room:
     room.subtitle = payload.subtitle.strip() if payload.subtitle else None
     if payload.avatar_url and payload.avatar_url.strip():
         room.avatar_url = payload.avatar_url.strip()
+    if payload.cover_photo_url and payload.cover_photo_url.strip():
+        room.cover_photo_url = payload.cover_photo_url.strip()
+    elif payload.avatar_url and payload.avatar_url.strip():
+        room.cover_photo_url = payload.avatar_url.strip()
     room.language = payload.language.strip() or "English"
     room.mode = mode
     room.room_type = room_type
@@ -163,6 +167,7 @@ def room_to_trending_response(room: Room, followed_friends_inside: list[str] | N
         name=room.name,
         subtitle=room.subtitle,
         avatar_url=room.avatar_url,
+        cover_photo_url=room.cover_photo_url or room.avatar_url,
         language=room.language,
         mode=room.mode,
         type=room.room_type,
@@ -178,6 +183,7 @@ def room_to_detail_response(room: Room) -> RoomDetailResponse:
         name=room.name,
         subtitle=room.subtitle,
         avatar_url=room.avatar_url,
+        cover_photo_url=room.cover_photo_url or room.avatar_url,
         language=room.language,
         mode=room.mode,
         type=room.room_type,
@@ -235,12 +241,15 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
 
     mode = _normalize_mode(payload.mode)
     room_type = payload.type.strip() or "Chat"
+    avatar_url = payload.avatar_url.strip() if payload.avatar_url else None
+    cover_photo_url = payload.cover_photo_url.strip() if payload.cover_photo_url else avatar_url
     room = Room(
         room_public_id=generate_room_public_id(db),
         owner_user_id=current_user.id,
         name=payload.name.strip(),
         subtitle=payload.subtitle.strip() if payload.subtitle else None,
-        avatar_url=payload.avatar_url.strip() if payload.avatar_url else None,
+        avatar_url=avatar_url,
+        cover_photo_url=cover_photo_url,
         language=payload.language.strip() or "English",
         mode=mode,
         room_type=room_type,
