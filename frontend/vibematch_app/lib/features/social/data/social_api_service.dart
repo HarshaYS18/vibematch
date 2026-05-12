@@ -47,6 +47,26 @@ class SocialApiService {
     return mapped;
   }
 
+  Future<void> sendRoomInvite({
+    required int targetPublicUserId,
+    required String roomName,
+    String? roomPublicId,
+    String? roomLanguage,
+    String? modeTitle,
+  }) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/direct/public/$targetPublicUserId/room-invite')),
+      headers: _headers(),
+      body: jsonEncode({
+        'room_name': roomName,
+        if (roomPublicId != null && roomPublicId.trim().isNotEmpty) 'room_public_id': roomPublicId.trim(),
+        if (roomLanguage != null && roomLanguage.trim().isNotEmpty) 'room_language': roomLanguage.trim(),
+        if (modeTitle != null && modeTitle.trim().isNotEmpty) 'mode_title': modeTitle.trim(),
+      }),
+    );
+    _throwIfFailed(response);
+  }
+
   Future<List<SocialUser>> listFollowingUsers() => _listSocialUsers('/social/following');
 
   Future<List<SocialUser>> listFollowerUsers() => _listSocialUsers('/social/followers');
