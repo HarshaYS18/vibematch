@@ -32,6 +32,7 @@ from app.schemas.inbox import (
     InboxReportDecisionRequest,
     InboxReportTaskListResponse,
     InboxReportTaskResponse,
+    InboxRoomInviteRequest,
     InboxSendMessageRequest,
 )
 from app.services import inbox_backup_service, inbox_lock_service, inbox_service, role_service
@@ -231,6 +232,29 @@ async def create_direct_conversation_by_public_id(public_user_id: int, db: Sessi
     return InboxConversationResponse(**_conversation_payload(conversation, current_user))
 
 
+@router.post("/conversations/direct/public/{public_user_id}/room-invite", response_model=InboxMessageResponse)
+async def send_room_invite_by_public_id(public_user_id: int, request: InboxRoomInviteRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if public_user_id == current_user.public_user_id:
+        raise HTTPException(status_code=400, detail="Cannot invite yourself to a room.")
+    target_user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True)).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    conversation, message = inbox_service.send_room_invite_message(
+        db=db,
+        sender=current_user,
+        target_user=target_user,
+        room_name=request.room_name,
+        room_public_id=request.room_public_id,
+        room_language=request.room_language,
+        mode_title=request.mode_title,
+    )
+    target_payload = inbox_service.message_to_dict(message, target_user)
+    sender_payload = inbox_service.message_to_dict(message, current_user)
+    await _broadcast_message(conversation, target_payload)
+    await _broadcast_conversation(conversation)
+    return InboxMessageResponse(**sender_payload)
+
+
 @router.get("/conversations/{conversation_id}", response_model=InboxConversationResponse)
 def get_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
@@ -248,7 +272,7 @@ async def send_message(conversation_id: str, request: InboxSendMessageRequest, d
         raise HTTPException(status_code=403, detail="Conversation is blocked")
     if conversation.is_official:
         raise HTTPException(status_code=403, detail="Official team chat is read-only")
-    message = inbox_service.send_message(db=db, conversation=conversation, sender=current_user, text=request.text, message_type=request.type, reply_to_text=request.reply_to_text, invite_room_name=request.invite_room_name, attachment_url=request.attachment_url)
+    message = inbox_service.send_message(db=db, conversation=conversation, sender=current_user, text=request.text, message_type=request.type, reply_to_text=request.reply_to_text, invite_room_name=request.invite_room_name, invite_room_id=request.invite_room_id, attachment_url=request.attachment_url)
     payload = inbox_service.message_to_dict(message, current_user)
     await _broadcast_message(conversation, payload)
     await _broadcast_conversation(conversation)
