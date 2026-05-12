@@ -871,28 +871,28 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onWatchPartyTap: () => _openWatchPartyFromSettings(sheetContext),
         onCricketModeTap: () => _openCricketModeFromSettings(sheetContext),
         onClearChatTap: () {
-          LiveRoomMessageController.clearActiveRoomChatForEveryone();
-          RoomToast.show(context, 'Chat cleared for everyone');
+          LiveRoomMediaSignalingService.instance.broadcastChatCleared();
+          RoomToast.show(context, 'Chat clear broadcasted');
         },
         canCloseRoom: _currentUser.isHost,
         onToggleRoomImages: (value) {
           _roomStateController.setRoomImagesEnabled(value);
           setSheetState(() {});
-          _insertSystemMessage(
+          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
             _settingsController.roomImagesSystemMessage(value),
           );
         },
         onToggleGuestMessages: (value) {
           _roomStateController.setGuestMessagesEnabled(value);
           setSheetState(() {});
-          _insertSystemMessage(
+          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
             _settingsController.guestMessagesSystemMessage(value),
           );
         },
         onToggleApplyOnlyMode: (value) {
           _roomStateController.setApplyOnlyModeEnabled(value);
           setSheetState(() {});
-          _insertSystemMessage(
+          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
             _settingsController.applyOnlyModeSystemMessage(value),
           );
         },

@@ -98,6 +98,8 @@ wss.on('connection', (ws) => {
       if (type === `admin/${roomBlockAction}`) return handlers.adminBlockUser({ room: currentRoom, peer: currentPeer, payload });
       if (type === `admin/${roomBlockAction}_remove`) return handlers.removeRoomBlock({ ws, room: currentRoom, peer: currentPeer, payload });
       if (type === 'webrtc/offer' || type === 'webrtc/answer' || type === 'webrtc/ice_candidate') return handlers.relayWebRtc({ ws, room: currentRoom, peer: currentPeer, type, payload });
+      if (type === 'room/system_message') return handlers.roomSystemMessage({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'room/chat_clear') return handlers.roomChatClear({ room: currentRoom, peer: currentPeer });
       if (type === 'room/chat') return handlers.roomChat({ room: currentRoom, peer: currentPeer, payload });
 
       handlers.send(ws, 'error', { detail: `Unsupported event type: ${type}` });

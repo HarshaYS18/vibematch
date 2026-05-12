@@ -327,6 +327,17 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
+  void broadcastRoomSystemMessage(String message) {
+    final safeMessage = message.trim();
+    if (safeMessage.isEmpty) return;
+
+    _send('room/system_message', <String, Object?>{'message': safeMessage});
+  }
+
+  void broadcastChatCleared() {
+    _send('room/chat_clear', <String, Object?>{});
+  }
+
   void sendRoomChat(String text) {
     final safeText = text.trim();
     if (safeText.isEmpty) return;

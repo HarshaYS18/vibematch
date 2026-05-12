@@ -262,6 +262,21 @@ class LiveRoomMessageController {
       return;
     }
 
+    if (event.isChatCleared) {
+      messages.clear();
+      insertPersistentSystemMessage(
+        event.message.trim().isEmpty
+            ? 'Chat cleared for everyone'
+            : event.message.trim(),
+      );
+      return;
+    }
+
+    if (event.isRoomSystemMessage) {
+      insertPersistentSystemMessage(event.message);
+      return;
+    }
+
     if (event.isUserRemoved) {
       if (event.targetUserId == currentUser.id) {
         return;

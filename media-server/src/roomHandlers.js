@@ -338,6 +338,37 @@ function relayWebRtc({ ws, room, peer, type, payload }) {
   send(target.ws, type, { ...payload, from_peer_id: peer.id, from_user_id: peer.userId });
 }
 
+function roomSystemMessage({ room, peer, payload }) {
+  const message = String(payload.message || '').trim();
+  if (!message) return;
+
+  broadcast(room, 'room/system_event', {
+    id: randomUUID(),
+    event_type: 'room_system_message',
+    room_id: room.id,
+    actor_user_id: peer.userId,
+    actor_name: peer.displayName,
+    target_user_id: '',
+    target_name: '',
+    message,
+    created_at: new Date().toISOString(),
+  });
+}
+
+function roomChatClear({ room, peer }) {
+  broadcast(room, 'room/system_event', {
+    id: randomUUID(),
+    event_type: 'chat_cleared',
+    room_id: room.id,
+    actor_user_id: peer.userId,
+    actor_name: peer.displayName,
+    target_user_id: '',
+    target_name: '',
+    message: `Chat cleared for everyone by ${peer.displayName}`,
+    created_at: new Date().toISOString(),
+  });
+}
+
 function roomChat({ room, peer, payload }) {
   broadcast(room, 'room/chat', {
     id: randomUUID(),
@@ -379,6 +410,8 @@ module.exports = {
   adminBlockUser,
   removeRoomBlock,
   relayWebRtc,
+  roomSystemMessage,
+  roomChatClear,
   roomChat,
   peerClosed,
 };

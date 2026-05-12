@@ -3,7 +3,8 @@ import 'package:flutter/foundation.dart';
 class LiveRoomSystemEventBus {
   LiveRoomSystemEventBus._();
 
-  static final ValueNotifier<LiveRoomSystemEvent?> latestEvent = ValueNotifier<LiveRoomSystemEvent?>(null);
+  static final ValueNotifier<LiveRoomSystemEvent?> latestEvent =
+      ValueNotifier<LiveRoomSystemEvent?>(null);
 
   static void publish(LiveRoomSystemEvent event) {
     latestEvent.value = event;
@@ -20,6 +21,7 @@ class LiveRoomSystemEvent {
     required this.targetUserId,
     required this.targetName,
     required this.createdAt,
+    this.message = '',
     this.autoDismissSeconds,
   });
 
@@ -30,24 +32,34 @@ class LiveRoomSystemEvent {
   final String actorName;
   final String targetUserId;
   final String targetName;
+  final String message;
   final DateTime createdAt;
   final int? autoDismissSeconds;
 
   bool get isUserEntered => type == 'user_entered';
   bool get isUserRemoved => type == 'user_removed';
+  bool get isRoomSystemMessage => type == 'room_system_message';
+  bool get isChatCleared => type == 'chat_cleared';
 
   factory LiveRoomSystemEvent.fromJson(Map<String, dynamic> json) {
     final rawAutoDismiss = json['auto_dismiss_seconds'];
     return LiveRoomSystemEvent(
-      id: json['id']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      id:
+          json['id']?.toString() ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
       type: json['event_type']?.toString() ?? json['type']?.toString() ?? '',
       roomId: json['room_id']?.toString() ?? '',
       actorUserId: json['actor_user_id']?.toString() ?? '',
       actorName: json['actor_name']?.toString() ?? '',
       targetUserId: json['target_user_id']?.toString() ?? '',
       targetName: json['target_name']?.toString() ?? '',
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
-      autoDismissSeconds: rawAutoDismiss == null ? null : int.tryParse(rawAutoDismiss.toString()),
+      message: json['message']?.toString() ?? '',
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      autoDismissSeconds: rawAutoDismiss == null
+          ? null
+          : int.tryParse(rawAutoDismiss.toString()),
     );
   }
 }
