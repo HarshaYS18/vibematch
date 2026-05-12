@@ -42,11 +42,33 @@ class InboxSocketService {
         cancelOnError: true,
       );
 
-      channel.sink.add(jsonEncode({'event': 'ping'}));
+      sendRaw({'event': 'ping'});
     } catch (_) {
       disconnect();
     } finally {
       _connecting = false;
+    }
+  }
+
+  void sendTypingStart(String conversationId) {
+    sendRaw({'event': 'typing_start', 'conversation_id': conversationId});
+  }
+
+  void sendTypingStop(String conversationId) {
+    sendRaw({'event': 'typing_stop', 'conversation_id': conversationId});
+  }
+
+  void markRead(String conversationId) {
+    sendRaw({'event': 'mark_read', 'conversation_id': conversationId});
+  }
+
+  void sendRaw(Map<String, dynamic> payload) {
+    final channel = _channel;
+    if (channel == null) return;
+    try {
+      channel.sink.add(jsonEncode(payload));
+    } catch (_) {
+      disconnect();
     }
   }
 
