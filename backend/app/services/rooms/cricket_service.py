@@ -1,0 +1,338 @@
+from datetime import datetime
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.models.cricket import (
+    CricketMatch,
+    CricketMatchStatus,
+    CricketTournament,
+    CricketTournamentStatus,
+)
+from app.models.user import User
+from app.schemas.rooms.cricket import (
+    CricketBallEventRequest,
+    CricketMatchCreateRequest,
+    CricketMatchLineupRequest,
+    CricketMatchScorePatchRequest,
+    CricketMatchTossRequest,
+    CricketTournamentCreateRequest,
+    CricketTournamentUpdateRequest,
+)
+from app.services.rooms.room_service import get_room_by_public_id
+
+
+def _require_room(db: Session, room_public_id: str):
+    room = get_room_by_public_id(db=db, room_public_id=room_public_id)
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found",
+        )
+    return room
+
+
+def _tournament_payload(tournament: CricketTournament) -> dict:
+    return {
+        "id": tournament.id,
+        "room_public_id": tournament.room_public_id,
+        "created_by_user_id": tournament.created_by_user_id,
+        "name": tournament.name,
+        "status": tournament.status,
+        "team_count": tournament.team_count,
+        "players_per_team": tournament.players_per_team,
+        "overs_per_innings": tournament.overs_per_innings,
+        "wickets_per_side": tournament.wickets_per_side,
+        "matches_per_team": tournament.matches_per_team,
+        "matches_vs_each_team": tournament.matches_vs_each_team,
+        "allow_same_player_across_teams": tournament.allow_same_player_across_teams,
+        "rules": tournament.rules_json or {},
+        "teams": tournament.teams_json or [],
+        "fixtures": tournament.fixtures_json or [],
+        "points_table": tournament.points_table_json or [],
+        "created_at": tournament.created_at,
+        "updated_at": tournament.updated_at,
+    }
+
+
+def _match_payload(match: CricketMatch) -> dict:
+    return {
+        "id": match.id,
+        "tournament_id": match.tournament_id,
+        "room_public_id": match.room_public_id,
+        "created_by_user_id": match.created_by_user_id,
+        "status": match.status,
+        "match_type": match.match_type,
+        "team_a": match.team_a_json or {},
+        "team_b": match.team_b_json or {},
+        "toss": match.toss_json or {},
+        "lineup": match.lineup_json or {},
+        "score": match.score_json or {},
+        "ball_events": match.ball_events_json or [],
+        "result": match.result_json or {},
+        "created_at": match.created_at,
+        "updated_at": match.updated_at,
+    }
+
+
+def create_tournament(
+    *,
+    db: Session,
+    room_public_id: str,
+    current_user: User,
+    payload: CricketTournamentCreateRequest,
+) -> dict:
+    _require_room(db, room_public_id)
+    tournament = CricketTournament(
+        room_public_id=room_public_id,
+        created_by_user_id=current_user.id,
+        name=payload.name.strip(),
+        team_count=payload.team_count,
+        players_per_team=payload.players_per_team,
+        overs_per_innings=payload.overs_per_innings,
+        wickets_per_side=payload.wickets_per_side,
+        matches_per_team=payload.matches_per_team,
+        matches_vs_each_team=payload.matches_vs_each_team,
+        allow_same_player_across_teams=payload.allow_same_player_across_teams,
+        rules_json=payload.rules,
+        teams_json=payload.teams,
+        fixtures_json=payload.fixtures,
+        points_table_json=[],
+    )
+    db.add(tournament)
+    db.commit()
+    db.refresh(tournament)
+    return _tournament_payload(tournament)
+
+
+def list_tournaments(*, db: Session, room_public_id: str) -> list[dict]:
+    _require_room(db, room_public_id)
+    tournaments = (
+        db.query(CricketTournament)
+        .filter(
+            CricketTournament.room_public_id == room_public_id,
+            CricketTournament.status != CricketTournamentStatus.DELETED,
+        )
+        .order_by(CricketTournament.created_at.desc())
+        .all()
+    )
+    return [_tournament_payload(tournament) for tournament in tournaments]
+
+
+def get_tournament(*, db: Session, room_public_id: str, tournament_id: int) -> dict:
+    tournament = (
+        db.query(CricketTournament)
+        .filter(
+            CricketTournament.id == tournament_id,
+            CricketTournament.room_public_id == room_public_id,
+            CricketTournament.status != CricketTournamentStatus.DELETED,
+        )
+        .first()
+    )
+    if tournament is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
+    return _tournament_payload(tournament)
+
+
+def update_tournament(
+    *,
+    db: Session,
+    room_public_id: str,
+    tournament_id: int,
+    payload: CricketTournamentUpdateRequest,
+) -> dict:
+    tournament = (
+        db.query(CricketTournament)
+        .filter(
+            CricketTournament.id == tournament_id,
+            CricketTournament.room_public_id == room_public_id,
+            CricketTournament.status != CricketTournamentStatus.DELETED,
+        )
+        .first()
+    )
+    if tournament is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
+    if payload.name is not None:
+        tournament.name = payload.name.strip()
+    if payload.rules is not None:
+        tournament.rules_json = payload.rules
+    if payload.teams is not None:
+        tournament.teams_json = payload.teams
+        tournament.team_count = len(payload.teams)
+    if payload.fixtures is not None:
+        tournament.fixtures_json = payload.fixtures
+    if payload.points_table is not None:
+        tournament.points_table_json = payload.points_table
+    tournament.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(tournament)
+    return _tournament_payload(tournament)
+
+
+def delete_tournament(
+    *,
+    db: Session,
+    room_public_id: str,
+    tournament_id: int,
+    reason: str | None = None,
+) -> dict:
+    tournament = (
+        db.query(CricketTournament)
+        .filter(
+            CricketTournament.id == tournament_id,
+            CricketTournament.room_public_id == room_public_id,
+            CricketTournament.status != CricketTournamentStatus.DELETED,
+        )
+        .first()
+    )
+    if tournament is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
+    tournament.status = CricketTournamentStatus.DELETED
+    tournament.deleted_at = datetime.utcnow()
+    tournament.deleted_reason = reason
+    tournament.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(tournament)
+    return {
+        "id": tournament.id,
+        "room_public_id": tournament.room_public_id,
+        "status": tournament.status,
+        "deleted_reason": tournament.deleted_reason,
+        "deleted_at": tournament.deleted_at,
+    }
+
+
+def create_match(
+    *,
+    db: Session,
+    room_public_id: str,
+    current_user: User,
+    payload: CricketMatchCreateRequest,
+) -> dict:
+    _require_room(db, room_public_id)
+    if payload.tournament_id is not None:
+        get_tournament(db=db, room_public_id=room_public_id, tournament_id=payload.tournament_id)
+    match = CricketMatch(
+        tournament_id=payload.tournament_id,
+        room_public_id=room_public_id,
+        created_by_user_id=current_user.id,
+        match_type=payload.match_type,
+        team_a_json=payload.team_a,
+        team_b_json=payload.team_b,
+        status=CricketMatchStatus.TOSS_PENDING,
+    )
+    db.add(match)
+    db.commit()
+    db.refresh(match)
+    return _match_payload(match)
+
+
+def get_match(*, db: Session, room_public_id: str, match_id: int) -> dict:
+    match = (
+        db.query(CricketMatch)
+        .filter(
+            CricketMatch.id == match_id,
+            CricketMatch.room_public_id == room_public_id,
+            CricketMatch.status != CricketMatchStatus.DELETED,
+        )
+        .first()
+    )
+    if match is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cricket match not found")
+    return _match_payload(match)
+
+
+def update_match_toss(
+    *, db: Session, room_public_id: str, match_id: int, payload: CricketMatchTossRequest
+) -> dict:
+    match = _match_entity(db=db, room_public_id=room_public_id, match_id=match_id)
+    match.toss_json = {
+        "winner_team_id": payload.toss_winner_team_id,
+        "decision": "ball" if payload.decision == "bowl" else payload.decision,
+        "confirmed_at": datetime.utcnow().isoformat(),
+    }
+    match.status = CricketMatchStatus.LINEUP_PENDING
+    match.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(match)
+    return _match_payload(match)
+
+
+def update_match_lineup(
+    *, db: Session, room_public_id: str, match_id: int, payload: CricketMatchLineupRequest
+) -> dict:
+    match = _match_entity(db=db, room_public_id=room_public_id, match_id=match_id)
+    match.lineup_json = payload.model_dump()
+    match.status = CricketMatchStatus.LIVE
+    match.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(match)
+    return _match_payload(match)
+
+
+def append_ball_event(
+    *, db: Session, room_public_id: str, match_id: int, payload: CricketBallEventRequest
+) -> dict:
+    match = _match_entity(db=db, room_public_id=room_public_id, match_id=match_id)
+    events = list(match.ball_events_json or [])
+    event = payload.model_dump()
+    event["sequence"] = payload.sequence or len(events) + 1
+    event["created_at"] = datetime.utcnow().isoformat()
+    events.append(event)
+    match.ball_events_json = events
+    match.status = CricketMatchStatus.LIVE
+    match.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(match)
+    return _match_payload(match)
+
+
+def patch_match_score(
+    *, db: Session, room_public_id: str, match_id: int, payload: CricketMatchScorePatchRequest
+) -> dict:
+    match = _match_entity(db=db, room_public_id=room_public_id, match_id=match_id)
+    match.score_json = payload.score
+    if payload.result is not None:
+        match.result_json = payload.result
+    if payload.points_table is not None and match.tournament_id is not None:
+        tournament = db.query(CricketTournament).filter(CricketTournament.id == match.tournament_id).first()
+        if tournament is not None:
+            tournament.points_table_json = payload.points_table
+            tournament.updated_at = datetime.utcnow()
+    match.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(match)
+    return _match_payload(match)
+
+
+def complete_match(
+    *, db: Session, room_public_id: str, match_id: int, payload: CricketMatchScorePatchRequest
+) -> dict:
+    match = _match_entity(db=db, room_public_id=room_public_id, match_id=match_id)
+    match.score_json = payload.score
+    match.result_json = payload.result or {}
+    match.status = CricketMatchStatus.COMPLETED
+    if payload.points_table is not None and match.tournament_id is not None:
+        tournament = db.query(CricketTournament).filter(CricketTournament.id == match.tournament_id).first()
+        if tournament is not None:
+            tournament.points_table_json = payload.points_table
+            tournament.updated_at = datetime.utcnow()
+    match.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(match)
+    return _match_payload(match)
+
+
+def _match_entity(*, db: Session, room_public_id: str, match_id: int) -> CricketMatch:
+    match = (
+        db.query(CricketMatch)
+        .filter(
+            CricketMatch.id == match_id,
+            CricketMatch.room_public_id == room_public_id,
+            CricketMatch.status != CricketMatchStatus.DELETED,
+        )
+        .first()
+    )
+    if match is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cricket match not found")
+    return match
