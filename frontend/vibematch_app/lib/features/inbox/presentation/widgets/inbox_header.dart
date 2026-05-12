@@ -20,28 +20,29 @@ class InboxHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+    return Container(
+      color: const Color(0xFF008069),
+      padding: const EdgeInsets.fromLTRB(18, 12, 12, 10),
       child: Row(
         children: [
           const Expanded(
             child: Text(
-              'Inbox',
+              'Chats',
               style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF251538),
-                letterSpacing: -0.6,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.35,
               ),
             ),
           ),
           _HeaderButton(icon: Icons.search_rounded, onTap: onSearchTap),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           _HeaderBadgeButton(icon: Icons.assignment_rounded, count: reportTaskCount, onTap: onReportTasksTap),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           _HeaderBadgeButton(icon: Icons.lock_rounded, count: lockedCount, onTap: onLockTap),
-          const SizedBox(width: 8),
-          _HeaderButton(icon: Icons.settings_rounded, onTap: onSettingsTap),
+          const SizedBox(width: 4),
+          _HeaderButton(icon: Icons.more_vert_rounded, onTap: onSettingsTap),
         ],
       ),
     );
@@ -63,21 +64,20 @@ class _HeaderBadgeButton extends StatelessWidget {
         _HeaderButton(icon: icon, onTap: onTap),
         if (count > 0)
           Positioned(
-            right: -2,
-            top: -3,
+            right: 0,
+            top: 0,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: const Color(0xFFE84C72),
+                color: const Color(0xFF25D366),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white, width: 1.5),
+                border: Border.all(color: const Color(0xFF008069), width: 1.4),
               ),
-              child: Text(
-                '$count',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
+              child: Center(
+                child: Text(
+                  count > 99 ? '99+' : '$count',
+                  style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900),
                 ),
               ),
             ),
@@ -97,23 +97,11 @@ class _HeaderButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
+      customBorder: const CircleBorder(),
+      child: SizedBox(
         width: 38,
         height: 38,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: const Color(0xFFECE2D8)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF251538).withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Icon(icon, color: const Color(0xFF4A2A63), size: 19),
+        child: Icon(icon, color: Colors.white, size: 22),
       ),
     );
   }
