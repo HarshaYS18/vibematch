@@ -417,6 +417,21 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     );
   }
 
+  CricketQuickMatchTeamSetup _toSignalTeam(StumpsTeam team) {
+    return CricketQuickMatchTeamSetup(
+      id: team.id,
+      name: team.name,
+      players: team.players
+          .map(
+            (player) => CricketQuickMatchPlayerSetup(
+              id: player.id,
+              name: player.name,
+            ),
+          )
+          .toList(),
+    );
+  }
+
   StumpsTeam _battingTeam(StumpsFixture fixture) {
     if (_decision == _TossDecision.bat) return _tossWinner!;
     return _tossWinner!.id == fixture.teamA.id ? fixture.teamB : fixture.teamA;
@@ -505,7 +520,22 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
 
       if (!mounted) return;
       widget.onBackgroundChanged(cricketStumpsPitchBackgroundTheme);
-      CricketRoomModeSignal.activate(widget.roomId);
+      CricketRoomModeSignal.activateWithSetup(
+        roomId: widget.roomId,
+        setup: CricketQuickMatchSetup(
+          roomId: widget.roomId,
+          roomName: widget.roomName,
+          teamA: _toSignalTeam(fixture.teamA),
+          teamB: _toSignalTeam(fixture.teamB),
+          overs: _oversValue,
+          wickets: _wicketsValue,
+          battingTeamId: batting.id,
+          bowlingTeamId: bowling.id,
+          strikerId: _striker!.id,
+          nonStrikerId: _nonStriker!.id,
+          bowlerId: _bowler!.id,
+        ),
+      );
       widget.onSystemMessage?.call(
         '${_tossWinner!.name} won the toss and chose to ${_decision == _TossDecision.bat ? 'bat' : 'ball'}. Seat 3 is now the Umpire/scorer seat.',
       );

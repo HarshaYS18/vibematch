@@ -27,11 +27,13 @@ class CricketRoomModeRegistry {
   }) {
     final controller = controllerFor(roomId: roomId, roomName: roomName);
     final shouldBeActive = CricketRoomModeSignal.isActive(roomId);
+    final setup = CricketRoomModeSignal.setupFor(roomId);
 
     if (shouldBeActive && !controller.active) {
       controller.startRoomMode(
         currentLayoutId: currentLayoutId,
         currentBackground: cricketFloodlightArenaBackgroundTheme,
+        setup: setup,
       );
     }
 

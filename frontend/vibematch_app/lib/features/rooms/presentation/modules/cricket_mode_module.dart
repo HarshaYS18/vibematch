@@ -263,6 +263,52 @@ class CricketScoringEngine {
     );
   }
 
+  static CricketMatchState fromQuickSetup(CricketQuickMatchSetup setup) {
+    CricketTeam convertTeam(CricketQuickMatchTeamSetup team) {
+      final shortName = team.name
+          .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
+          .toUpperCase()
+          .padRight(3, 'X')
+          .substring(0, 3);
+      return CricketTeam(
+        id: team.id,
+        name: team.name,
+        shortName: shortName,
+        players: List<CricketPlayer>.generate(
+          team.players.length,
+          (index) => CricketPlayer(
+            id: team.players[index].id,
+            name: team.players[index].name,
+            teamId: team.id,
+            battingOrder: index + 1,
+          ),
+        ),
+      );
+    }
+
+    final teamA = convertTeam(setup.teamA);
+    final teamB = convertTeam(setup.teamB);
+
+    return CricketMatchState(
+      roomId: setup.roomId,
+      roomName: setup.roomName,
+      teamA: teamA,
+      teamB: teamB,
+      oversLimit: setup.overs,
+      ballsPerOver: 6,
+      totalWickets: setup.wickets,
+      status: CricketMatchStatus.live,
+      innings: 1,
+      battingTeamId: setup.battingTeamId,
+      bowlingTeamId: setup.bowlingTeamId,
+      strikerId: setup.strikerId,
+      nonStrikerId: setup.nonStrikerId,
+      bowlerId: setup.bowlerId,
+      nextBatterIndex: 2,
+      events: const [],
+    );
+  }
+
   static CricketScoreSnapshot snapshot(CricketMatchState state) {
     final inningsEvents = state.inningsEvents;
     final runs = inningsEvents.fold<int>(0, (sum, event) => sum + event.totalRuns);
@@ -281,7 +327,7 @@ class CricketScoringEngine {
       oversText: '${legalBalls ~/ state.ballsPerOver}.${legalBalls % state.ballsPerOver}',
       currentRunRate: currentRunRate,
       requiredRunRate: required,
-      recentBalls: inningsEvents.reversed.take(8).map((event) => event.chip).toList().reversed.toList(),
+      recentBalls: inningsEvents.reversed.take(6).map((event) => event.chip).toList().reversed.toList(),
     );
   }
 
@@ -290,9 +336,29 @@ class CricketScoringEngine {
   }
 
   static CricketMatchState addExtra(CricketMatchState state, CricketExtraType type, int runs) {
-    final isLegal = type == CricketExtraType.bye || type == CricketExtraType.legBye || type == CricketExtraType.penalty;
-    final extras = type == CricketExtraType.wide || type == CricketExtraType.noBall ? math.max(1, runs) : runs;
-    return _appendBall(state, runsBat: type == CricketExtraType.noBall ? math.max(0, runs - 1) : 0, extrasRuns: extras, extraType: type, isLegalBall: isLegal);
+    final isLegal = type == CricketExtraType.bye ||
+        type == CricketExtraType.legBye ||
+        type == CricketExtraType.penalty;
+    final extras = type == CricketExtraType.wide || type == CricketExtraType.noBall
+        ? math.max(1, runs)
+        : runs;
+    return _appendBall(
+      state,
+      runsBat: 0,
+      extrasRuns: extras,
+      extraType: type,
+      isLegalBall: isLegal,
+    );
+  }
+
+  static CricketMatchState addNoBallRuns(CricketMatchState state, int batRuns) {
+    return _appendBall(
+      state,
+      runsBat: math.max(0, batRuns),
+      extrasRuns: 1,
+      extraType: CricketExtraType.noBall,
+      isLegalBall: false,
+    );
   }
 
   static CricketMatchState addWicket(CricketMatchState state, CricketWicketType type) {
@@ -395,7 +461,12 @@ class CricketScoringEngine {
     final allOut = snap.wickets >= state.totalWickets;
     final oversDone = snap.legalBalls >= state.oversLimit * state.ballsPerOver;
     final targetReached = state.targetRuns != null && snap.runs >= state.targetRuns!;
-    if (allOut || oversDone || targetReached) next = endInnings(next);
+    if (allOut || oversDone || targetReached) {
+      if (next.innings == 1) {
+        return startSecondInnings(endInnings(next));
+      }
+      return next.copyWith(status: CricketMatchStatus.completed);
+    }
     return next;
   }
 
@@ -445,15 +516,31 @@ class CricketScoringEngine {
 
 class CricketModeController extends ChangeNotifier {
   CricketModeController({required String roomId, required String roomName})
-      : _state = CricketScoringEngine.demo(roomId: roomId, roomName: roomName);
+      : _roomId = roomId,
+        _roomName = roomName,
+        _state = CricketScoringEngine.demo(roomId: roomId, roomName: roomName);
+
+  final String _roomId;
+  final String _roomName;
 
   CricketMatchState _state;
   CricketMatchState get state => _state;
+
+  void resetDemo() {
+    _state = CricketScoringEngine.demo(roomId: _roomId, roomName: _roomName);
+    notifyListeners();
+  }
+
+  void loadQuickMatch(CricketQuickMatchSetup setup) {
+    _state = CricketScoringEngine.fromQuickSetup(setup);
+    notifyListeners();
+  }
   bool get isActive => _state.status == CricketMatchStatus.live || _state.status == CricketMatchStatus.inningsBreak;
 
   void startMatch() => _set(_state.copyWith(status: CricketMatchStatus.live));
   void addRuns(int runs) => _set(CricketScoringEngine.addRuns(_state, runs));
   void addExtra(CricketExtraType type, int runs) => _set(CricketScoringEngine.addExtra(_state, type, runs));
+  void addNoBallRuns(int runs) => _set(CricketScoringEngine.addNoBallRuns(_state, runs));
   void addWicket(CricketWicketType type) => _set(CricketScoringEngine.addWicket(_state, type));
   void undo() => _set(CricketScoringEngine.undoLastBall(_state));
   void endInnings() => _set(CricketScoringEngine.endInnings(_state));
@@ -702,7 +789,7 @@ class _SetupPanel extends StatelessWidget {
                   onTap: () => onSelected(theme),
                   child: Container(
                     height: 72,
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
                     decoration: BoxDecoration(gradient: LinearGradient(colors: theme.fallbackColors), borderRadius: BorderRadius.circular(18), border: Border.all(color: active ? theme.accent : Colors.transparent, width: 2)),
                     child: Align(alignment: Alignment.bottomLeft, child: Text(theme.name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900))),
                   ),
