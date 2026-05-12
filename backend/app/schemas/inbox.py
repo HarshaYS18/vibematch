@@ -25,6 +25,7 @@ class InboxConversationResponse(BaseModel):
     subtitle: str
     time: str
     avatar_text: str
+    avatar_url: str | None = None
     type: str
     unread_count: int = 0
     is_online: bool = False
