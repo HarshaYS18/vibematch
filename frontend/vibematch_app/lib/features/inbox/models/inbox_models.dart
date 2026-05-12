@@ -186,6 +186,7 @@ class InboxConversation {
     required this.colors,
     required this.messages,
     this.currentRoomName,
+    this.currentRoomId,
     this.isLockedByBackend = false,
     this.isBlocked = false,
     this.isMuted = false,
@@ -205,6 +206,7 @@ class InboxConversation {
   final List<Color> colors;
   final List<InboxMessage> messages;
   final String? currentRoomName;
+  final String? currentRoomId;
   final bool isLockedByBackend;
   final bool isBlocked;
   final bool isMuted;
@@ -221,6 +223,8 @@ class InboxConversation {
     String? time,
     int? unreadCount,
     List<InboxMessage>? messages,
+    String? currentRoomName,
+    String? currentRoomId,
     bool? isLockedByBackend,
     bool? isBlocked,
     bool? isMuted,
@@ -239,7 +243,8 @@ class InboxConversation {
       lastSeenText: lastSeenText,
       colors: colors,
       messages: messages ?? this.messages,
-      currentRoomName: currentRoomName,
+      currentRoomName: currentRoomName ?? this.currentRoomName,
+      currentRoomId: currentRoomId ?? this.currentRoomId,
       isLockedByBackend: isLockedByBackend ?? this.isLockedByBackend,
       isBlocked: isBlocked ?? this.isBlocked,
       isMuted: isMuted ?? this.isMuted,
@@ -263,6 +268,7 @@ class InboxMessage {
     this.isStarred = false,
     this.isForwarded = false,
     this.inviteRoomName,
+    this.inviteRoomId,
   });
 
   final String? id;
@@ -277,8 +283,9 @@ class InboxMessage {
   final bool isStarred;
   final bool isForwarded;
   final String? inviteRoomName;
+  final String? inviteRoomId;
 
-  bool get isInvite => inviteRoomName != null || type == InboxMessageType.roomInvite;
+  bool get isInvite => inviteRoomName != null || inviteRoomId != null || type == InboxMessageType.roomInvite;
 
   InboxMessage copyWith({
     String? id,
@@ -295,6 +302,7 @@ class InboxMessage {
     bool? isStarred,
     bool? isForwarded,
     String? inviteRoomName,
+    String? inviteRoomId,
   }) {
     return InboxMessage(
       id: id ?? this.id,
@@ -309,6 +317,7 @@ class InboxMessage {
       isStarred: isStarred ?? this.isStarred,
       isForwarded: isForwarded ?? this.isForwarded,
       inviteRoomName: inviteRoomName ?? this.inviteRoomName,
+      inviteRoomId: inviteRoomId ?? this.inviteRoomId,
     );
   }
 }
