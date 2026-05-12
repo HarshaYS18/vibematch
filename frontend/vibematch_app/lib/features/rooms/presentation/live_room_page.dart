@@ -192,6 +192,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       _giftController.selectedReceiverIds.add(_roomUsers.first.id);
     }
 
+    unawaited(_roomStateController.loadPersistedRoomSettings());
     _autoOccupySeatOneForHostOrAdmin();
   }
 
@@ -1042,6 +1043,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onSelected: (layout) {
           _seatController.changeLayout(layout);
           Navigator.pop(context);
+          unawaited(_roomStateController.loadPersistedRoomSettings());
           _autoOccupySeatOneForHostOrAdmin();
         },
       ),

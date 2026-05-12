@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_settings_event_bus.dart';
+import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
 import '../widgets/room_theme.dart';
 import '../widgets/vibesync_room_module.dart';
@@ -12,15 +13,17 @@ class LiveRoomStateController extends ChangeNotifier {
     required String initialRoomId,
     required String initialModeTitle,
     int initialInboxUnreadCount = 4,
-  })  : _roomName = initialRoomName,
-        _roomId = initialRoomId,
-        _privacyMode = privacyModeFromTitle(initialModeTitle),
-        _inboxUnreadCount = initialInboxUnreadCount {
+  }) : _roomName = initialRoomName,
+       _roomId = initialRoomId,
+       _privacyMode = privacyModeFromTitle(initialModeTitle),
+       _inboxUnreadCount = initialInboxUnreadCount {
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: _roomId,
       roomName: _roomName,
     );
-    LiveRoomSettingsEventBus.latestEvent.addListener(_handleRealtimeSettingsEvent);
+    LiveRoomSettingsEventBus.latestEvent.addListener(
+      _handleRealtimeSettingsEvent,
+    );
   }
 
   String _roomName;
@@ -36,7 +39,9 @@ class LiveRoomStateController extends ChangeNotifier {
   int _inboxUnreadCount;
   VibeSyncRoomState _vibeSyncState = VibeSyncRoomState.inactive;
   Offset _bubbleOffset = const Offset(24, 120);
+  final RoomSettingsRepository _settingsRepository = RoomSettingsRepository();
   RoomBackgroundTheme _selectedBackgroundTheme = defaultRoomBackgroundTheme;
+  String _announcementText = '';
 
   String get roomName => _roomName;
   String get roomId => _roomId;
@@ -52,10 +57,13 @@ class LiveRoomStateController extends ChangeNotifier {
   VibeSyncRoomState get vibeSyncState => _vibeSyncState;
   Offset get bubbleOffset => _bubbleOffset;
   RoomBackgroundTheme get selectedBackgroundTheme => _selectedBackgroundTheme;
+  String get announcementText => _announcementText;
 
   @override
   void dispose() {
-    LiveRoomSettingsEventBus.latestEvent.removeListener(_handleRealtimeSettingsEvent);
+    LiveRoomSettingsEventBus.latestEvent.removeListener(
+      _handleRealtimeSettingsEvent,
+    );
     super.dispose();
   }
 
@@ -63,9 +71,27 @@ class LiveRoomStateController extends ChangeNotifier {
     final event = LiveRoomSettingsEventBus.latestEvent.value;
     if (event == null) return;
     if (event.roomId.trim().isNotEmpty && event.roomId != _roomId) return;
-    if (event.applyOnlyModeEnabled == _applyOnlyModeEnabled) return;
-    _applyOnlyModeEnabled = event.applyOnlyModeEnabled;
-    notifyListeners();
+    var changed = false;
+
+    if (event.applyOnlyModeEnabled != _applyOnlyModeEnabled) {
+      _applyOnlyModeEnabled = event.applyOnlyModeEnabled;
+      changed = true;
+    }
+
+    if (event.backgroundThemeId.trim().isNotEmpty) {
+      final nextTheme = _themeFromId(event.backgroundThemeId);
+      if (nextTheme != _selectedBackgroundTheme) {
+        _selectedBackgroundTheme = nextTheme;
+        changed = true;
+      }
+    }
+
+    if (event.announcementText != _announcementText) {
+      _announcementText = event.announcementText;
+      changed = true;
+    }
+
+    if (changed) notifyListeners();
   }
 
   void renameRoom(String value) {
@@ -158,10 +184,7 @@ class LiveRoomStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void moveBubble({
-    required Offset delta,
-    required Size screenSize,
-  }) {
+  void moveBubble({required Offset delta, required Size screenSize}) {
     _bubbleOffset = Offset(
       (_bubbleOffset.dx + delta.dx).clamp(8.0, screenSize.width - 86),
       (_bubbleOffset.dy + delta.dy).clamp(40.0, screenSize.height - 120),
@@ -170,9 +193,7 @@ class LiveRoomStateController extends ChangeNotifier {
   }
 
   void setSelectedBackgroundTheme(RoomBackgroundTheme value) {
-    if (value == _selectedBackgroundTheme) return;
-    _selectedBackgroundTheme = value;
-    notifyListeners();
+    setRoomBackgroundTheme(value);
   }
 
   void setVibeSyncState(VibeSyncRoomState value) {
@@ -186,6 +207,85 @@ class LiveRoomStateController extends ChangeNotifier {
     if (nextState == _vibeSyncState) return;
     _vibeSyncState = nextState;
     notifyListeners();
+  }
+
+  Future<void> loadPersistedRoomSettings() async {
+    try {
+      final settings = await _settingsRepository.fetchRoomSettings(_roomId);
+      var changed = false;
+
+      final theme = _themeFromId(settings.backgroundThemeId);
+      if (theme != _selectedBackgroundTheme) {
+        _selectedBackgroundTheme = theme;
+        changed = true;
+      }
+
+      final announcement = settings.announcementText ?? '';
+      if (announcement != _announcementText) {
+        _announcementText = announcement;
+        changed = true;
+      }
+
+      if (changed) notifyListeners();
+    } catch (_) {
+      // Room settings are non-critical for room entry.
+    }
+  }
+
+  RoomBackgroundTheme _themeFromId(String themeId) {
+    final cleanId = themeId.trim();
+    if (cleanId.isEmpty) return _selectedBackgroundTheme;
+    return ownedRoomBackgroundThemes.firstWhere(
+      (theme) => theme.id == cleanId,
+      orElse: () => _selectedBackgroundTheme,
+    );
+  }
+
+  void setRoomBackgroundTheme(RoomBackgroundTheme value) {
+    if (value == _selectedBackgroundTheme) return;
+    _selectedBackgroundTheme = value;
+    notifyListeners();
+
+    _settingsRepository
+        .updateBackground(roomPublicId: _roomId, backgroundThemeId: value.id)
+        .then((settings) {
+          final theme = _themeFromId(settings.backgroundThemeId);
+          if (theme != _selectedBackgroundTheme) {
+            _selectedBackgroundTheme = theme;
+            notifyListeners();
+          }
+          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
+            settings.backgroundThemeId,
+          );
+        })
+        .catchError((_) {
+          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
+            value.id,
+          );
+        });
+  }
+
+  void setRoomAnnouncement(String value) {
+    final nextValue = value.trim();
+    if (nextValue == _announcementText) return;
+    _announcementText = nextValue;
+    notifyListeners();
+
+    _settingsRepository
+        .updateAnnouncement(roomPublicId: _roomId, announcementText: nextValue)
+        .then((settings) {
+          final announcement = settings.announcementText ?? '';
+          if (announcement != _announcementText) {
+            _announcementText = announcement;
+            notifyListeners();
+          }
+          LiveRoomMediaSignalingService.instance.setRoomAnnouncement(
+            announcement,
+          );
+        })
+        .catchError((_) {
+          LiveRoomMediaSignalingService.instance.setRoomAnnouncement(nextValue);
+        });
   }
 
   void resetForLeaveFlow() {

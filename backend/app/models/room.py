@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -62,6 +62,17 @@ class Room(Base):
     is_secret: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_members_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # Persistent room customization/state.
+    background_theme_id: Mapped[str] = mapped_column(
+        String(80),
+        nullable=False,
+        default="default",
+        server_default="default",
+    )
+    announcement_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    announcement_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    announcement_updated_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

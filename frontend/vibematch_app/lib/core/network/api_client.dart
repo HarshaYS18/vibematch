@@ -6,11 +6,9 @@ import '../constants/app_constants.dart';
 import 'api_exception.dart';
 
 class ApiClient {
-  ApiClient({
-    String? baseUrl,
-    http.Client? httpClient,
-  })  : _baseUrlOverride = baseUrl,
-        _httpClient = httpClient ?? http.Client();
+  ApiClient({String? baseUrl, http.Client? httpClient})
+    : _baseUrlOverride = baseUrl,
+      _httpClient = httpClient ?? http.Client();
 
   final String? _baseUrlOverride;
   final http.Client _httpClient;
@@ -48,10 +46,7 @@ class ApiClient {
     final response = await _httpClient
         .get(
           _buildUri(path, queryParameters: queryParameters),
-          headers: {
-            'Accept': 'application/json',
-            ...headers,
-          },
+          headers: {'Accept': 'application/json', ...headers},
         )
         .timeout(AppConstants.receiveTimeout);
 
@@ -74,10 +69,7 @@ class ApiClient {
     final response = await _httpClient
         .get(
           _buildUri(path, queryParameters: queryParameters),
-          headers: {
-            'Accept': 'application/json',
-            ...headers,
-          },
+          headers: {'Accept': 'application/json', ...headers},
         )
         .timeout(AppConstants.receiveTimeout);
 
@@ -100,6 +92,35 @@ class ApiClient {
   }) async {
     final response = await _httpClient
         .post(
+          _buildUri(path, queryParameters: queryParameters),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            ...headers,
+          },
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(AppConstants.receiveTimeout);
+
+    final decodedBody = _decodeResponseBody(response);
+
+    if (decodedBody is Map<String, dynamic>) return decodedBody;
+
+    throw ApiException(
+      message: 'Expected a JSON object response',
+      statusCode: response.statusCode,
+      body: decodedBody,
+    );
+  }
+
+  Future<Map<String, dynamic>> patchMap(
+    String path, {
+    Map<String, String?> queryParameters = const {},
+    Map<String, String> headers = const {},
+    Object? body,
+  }) async {
+    final response = await _httpClient
+        .patch(
           _buildUri(path, queryParameters: queryParameters),
           headers: {
             'Accept': 'application/json',
@@ -155,7 +176,9 @@ class ApiClient {
   }
 
   Object? _decodeResponseBody(http.Response response) {
-    final decodedBody = response.body.isEmpty ? null : jsonDecode(response.body);
+    final decodedBody = response.body.isEmpty
+        ? null
+        : jsonDecode(response.body);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(
