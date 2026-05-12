@@ -28,7 +28,18 @@ class FriendsInviteSheet extends StatefulWidget {
 
 class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
   final Set<String> _completedIds = <String>{};
+  final Set<String> _sendingIds = <String>{};
   late Future<List<SocialUser>> _friendsFuture;
+
+  String get _roomName {
+    const prefix = 'Invite friends to ';
+    final title = widget.title.trim();
+    if (title.startsWith(prefix)) {
+      final parsed = title.substring(prefix.length).trim();
+      if (parsed.isNotEmpty) return parsed;
+    }
+    return title.isEmpty ? 'this room' : title;
+  }
 
   @override
   void initState() {
@@ -65,9 +76,37 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
     });
   }
 
-  void _completeAction(SocialUser user) {
-    setState(() => _completedIds.add(user.id));
-    widget.onInvite(user);
+  Future<void> _completeAction(SocialUser user) async {
+    if (_sendingIds.contains(user.id) || _completedIds.contains(user.id)) return;
+    setState(() => _sendingIds.add(user.id));
+
+    try {
+      final publicUserId = user.publicUserId ?? int.tryParse(user.id);
+      if (publicUserId != null && publicUserId > 0) {
+        await widget.socialApiService.sendRoomInvite(
+          targetPublicUserId: publicUserId,
+          roomName: _roomName,
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _sendingIds.remove(user.id);
+        _completedIds.add(user.id);
+      });
+      widget.onInvite(user);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _sendingIds.remove(user.id));
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF251538),
+            content: Text('Invite failed: $error', style: const TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        );
+    }
   }
 
   @override
@@ -181,6 +220,7 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
 
   Widget _friendRow(SocialUser user) {
     final completed = _completedIds.contains(user.id);
+    final sending = _sendingIds.contains(user.id);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -259,8 +299,10 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
             ),
           ),
           TextButton(
-            onPressed: completed ? null : () => _completeAction(user),
-            child: Text(completed ? widget.completedLabel : widget.actionLabel),
+            onPressed: completed || sending ? null : () => _completeAction(user),
+            child: sending
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(completed ? widget.completedLabel : widget.actionLabel),
           ),
         ],
       ),
