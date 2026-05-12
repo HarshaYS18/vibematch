@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/social_api_service.dart';
 import '../data/social_mock_data.dart';
 import '../models/social_user.dart';
 
@@ -10,12 +11,16 @@ class FriendsInviteSheet extends StatefulWidget {
     required this.onInvite,
     this.actionLabel = 'Invite',
     this.completedLabel = 'Invited',
+    this.onlineOnly = false,
+    this.socialApiService = const SocialApiService(),
   });
 
   final String title;
   final ValueChanged<SocialUser> onInvite;
   final String actionLabel;
   final String completedLabel;
+  final bool onlineOnly;
+  final SocialApiService socialApiService;
 
   @override
   State<FriendsInviteSheet> createState() => _FriendsInviteSheetState();
@@ -23,9 +28,28 @@ class FriendsInviteSheet extends StatefulWidget {
 
 class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
   final Set<String> _completedIds = <String>{};
+  late Future<List<SocialUser>> _friendsFuture;
 
-  List<SocialUser> get _friends {
-    final friends = [...SocialMockData.friends];
+  @override
+  void initState() {
+    super.initState();
+    _friendsFuture = _loadFriends();
+  }
+
+  Future<List<SocialUser>> _loadFriends() async {
+    try {
+      final users = await widget.socialApiService.listFriendUsers(onlineOnly: widget.onlineOnly);
+      return _sortedFriends(users);
+    } catch (_) {
+      final fallback = widget.onlineOnly
+          ? SocialMockData.friends.where((user) => user.isOnline).toList(growable: false)
+          : SocialMockData.friends;
+      return _sortedFriends(fallback);
+    }
+  }
+
+  List<SocialUser> _sortedFriends(List<SocialUser> users) {
+    final friends = [...users];
     friends.sort((a, b) {
       if (a.isOnline != b.isOnline) return a.isOnline ? -1 : 1;
       final idCompare = a.id.compareTo(b.id);
@@ -35,6 +59,12 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
     return friends;
   }
 
+  void _refreshFriends() {
+    setState(() {
+      _friendsFuture = _loadFriends();
+    });
+  }
+
   void _completeAction(SocialUser user) {
     setState(() => _completedIds.add(user.id));
     widget.onInvite(user);
@@ -42,9 +72,6 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final online = _friends.where((user) => user.isOnline).toList();
-    final offline = _friends.where((user) => !user.isOnline).toList();
-
     return FractionallySizedBox(
       heightFactor: 0.40,
       alignment: Alignment.bottomCenter,
@@ -54,75 +81,99 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0D5CB),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
+        child: FutureBuilder<List<SocialUser>>(
+          future: _friendsFuture,
+          builder: (context, snapshot) {
+            final friends = snapshot.data ?? const <SocialUser>[];
+            final online = friends.where((user) => user.isOnline).toList();
+            final offline = friends.where((user) => !user.isOnline).toList();
+            final loading = snapshot.connectionState == ConnectionState.waiting;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    widget.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF251538),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0D5CB),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                 ),
-                Text(
-                  '${_friends.length} friends',
-                  style: const TextStyle(
-                    color: Color(0xFF7B6A86),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  if (online.isNotEmpty) ...[
-                    const _SectionLabel('Online'),
-                    ...online.map(_friendRow),
-                    const SizedBox(height: 8),
-                  ],
-                  if (offline.isNotEmpty) ...[
-                    const _SectionLabel('Friends'),
-                    ...offline.map(_friendRow),
-                  ],
-                  if (_friends.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 22),
-                      child: Center(
-                        child: Text(
-                          'No friends available right now.',
-                          style: TextStyle(
-                            color: Color(0xFF7B6A86),
-                            fontWeight: FontWeight.w800,
-                          ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF251538),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                ],
-              ),
-            ),
-          ],
+                    IconButton(
+                      tooltip: 'Refresh friends',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: loading ? null : _refreshFriends,
+                      icon: loading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF7B6A86)),
+                    ),
+                    Text(
+                      widget.onlineOnly ? '${friends.length} online' : '${friends.length} friends',
+                      style: const TextStyle(
+                        color: Color(0xFF7B6A86),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: ListView(
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      if (online.isNotEmpty) ...[
+                        const _SectionLabel('Online now'),
+                        ...online.map(_friendRow),
+                        const SizedBox(height: 8),
+                      ],
+                      if (!widget.onlineOnly && offline.isNotEmpty) ...[
+                        const _SectionLabel('Friends'),
+                        ...offline.map(_friendRow),
+                      ],
+                      if (!loading && friends.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 22),
+                          child: Center(
+                            child: Text(
+                              widget.onlineOnly
+                                  ? 'No friends are online right now.'
+                                  : 'No friends available right now.',
+                              style: const TextStyle(
+                                color: Color(0xFF7B6A86),
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -146,10 +197,24 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
                   gradient: LinearGradient(colors: user.colors),
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: Text(
-                  user.avatarText,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                ),
+                child: user.avatarUrl == null
+                    ? Text(
+                        user.avatarText,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.network(
+                          user.avatarUrl!,
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Text(
+                            user.avatarText,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
               ),
               if (user.isOnline)
                 Positioned(
@@ -183,7 +248,7 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
                   ),
                 ),
                 Text(
-                  '@${user.username}',
+                  user.isOnline ? '@${user.username} · online' : '@${user.username}',
                   style: const TextStyle(
                     color: Color(0xFF7B6A86),
                     fontSize: 11,
