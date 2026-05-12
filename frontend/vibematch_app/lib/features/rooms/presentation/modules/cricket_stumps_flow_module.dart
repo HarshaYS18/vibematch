@@ -215,8 +215,7 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
       };
 
   String get _subtitle => switch (_step) {
-        _FlowStep.quick =>
-          'No tournament. Set two teams and start a live room match.',
+        _FlowStep.quick => '',
         _FlowStep.toss => 'Choose toss winner and bat/ball decision.',
         _FlowStep.lineups =>
           'Pick two opening batsmen and one opening bowler.',
@@ -234,11 +233,6 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     return ListView(
       physics: const BouncingScrollPhysics(),
       children: [
-        const _InfoCard(
-          title: 'Quick Match Only',
-          message:
-              'Tournament creation and tournament list are removed. This starts one live cricket match in the room.',
-        ),
         _Input(label: 'Team A', controller: _quickA),
         _Input(label: 'Team B', controller: _quickB),
         Row(
@@ -615,11 +609,12 @@ class _Header extends StatelessWidget {
                       color: RoomColors.plum,
                       fontSize: 21,
                       fontWeight: FontWeight.w900)),
-              Text(subtitle,
-                  style: const TextStyle(
-                      color: Color(0xFF7B7088),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800)),
+              if (subtitle.trim().isNotEmpty)
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: Color(0xFF7B7088),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800)),
             ],
           ),
         ),
@@ -660,93 +655,6 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.title, required this.message});
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8FFF0),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.flash_on_rounded, color: Color(0xFF0E8F54)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        color: RoomColors.plum,
-                        fontWeight: FontWeight.w900)),
-                const SizedBox(height: 3),
-                Text(message,
-                    style: const TextStyle(
-                        color: Color(0xFF81758C),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-
-class _NumberDropdown extends StatelessWidget {
-  const _NumberDropdown({
-    required this.label,
-    required this.value,
-    required this.max,
-    required this.onChanged,
-  });
-
-  final String label;
-  final int value;
-  final int max;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: DropdownButtonFormField<int>(
-        initialValue: value.clamp(1, max),
-        decoration: InputDecoration(
-          labelText: label,
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-        ),
-        items: List<DropdownMenuItem<int>>.generate(
-          max,
-          (index) {
-            final number = index + 1;
-            return DropdownMenuItem<int>(
-              value: number,
-              child: Text('$number'),
-            );
-          },
-        ),
-        onChanged: (value) {
-          if (value != null) onChanged(value);
-        },
-      ),
-    );
-  }
-}
 
 class _PlayerNameList extends StatelessWidget {
   const _PlayerNameList({
@@ -813,6 +721,55 @@ class _PlayerNameList extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+
+class _NumberDropdown extends StatelessWidget {
+  const _NumberDropdown({
+    required this.label,
+    required this.value,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final safeValue = value.clamp(1, max).toInt();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: DropdownButtonFormField<int>(
+        initialValue: safeValue,
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        items: List<DropdownMenuItem<int>>.generate(
+          max,
+          (index) {
+            final number = index + 1;
+            return DropdownMenuItem<int>(
+              value: number,
+              child: Text('$number'),
+            );
+          },
+        ),
+        onChanged: (selected) {
+          if (selected != null) onChanged(selected);
+        },
       ),
     );
   }

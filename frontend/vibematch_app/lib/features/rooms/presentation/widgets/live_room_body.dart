@@ -151,11 +151,6 @@ class LiveRoomBody extends StatelessWidget {
             );
         final effectiveLayoutId =
             cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
-        final scorerOverlayBottomPadding = scorerVisible
-            ? MediaQuery.sizeOf(context).height *
-                CricketRoomRules.scorerOverlayHeightFactor
-            : 0.0;
-
         return SafeArea(
           child: Stack(
             children: [
@@ -207,11 +202,11 @@ class LiveRoomBody extends StatelessWidget {
                       behavior: HitTestBehavior.translucent,
                       onTap: onDismissOverlays,
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(
+                        padding: const EdgeInsets.fromLTRB(
                           14,
                           0,
                           14,
-                          scorerOverlayBottomPadding,
+                          0,
                         ),
                         child: Column(
                           children: [
