@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
+import '../modules/cricket_room_controls_module.dart';
 import '../modules/cricket_room_mode_module.dart';
 import '../modules/cricket_room_mode_registry.dart';
 import '../modules/cricket_room_mode_signal.dart';
@@ -258,6 +259,17 @@ class LiveRoomBody extends StatelessWidget {
                   ),
                 ],
               ),
+              if (cricketModeActive)
+                AnimatedBuilder(
+                  animation: cricketController,
+                  builder: (context, child) {
+                    return CricketRoomControlsModule(
+                      controller: cricketController,
+                      canManage: canManageSeats,
+                      onEndMode: onDismissOverlays,
+                    );
+                  },
+                ),
               if (cricketModeActive)
                 AnimatedBuilder(
                   animation: cricketController,
