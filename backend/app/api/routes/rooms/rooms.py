@@ -5,7 +5,9 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomMemberActionRequest, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
+from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
+from app.services.rooms.room_background_service import list_room_backgrounds
 from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_service import (
     create_room,
@@ -37,6 +39,11 @@ def get_trending_rooms(language: str | None = Query(default=None), category: str
 @router.get("/following", response_model=list[RoomTrendingResponse])
 def get_following_rooms(language: str | None = Query(default=None), category: str | None = Query(default=None), limit: int = Query(default=30, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return list_following_rooms(db=db, current_user=current_user, language=language, category=category, limit=limit)
+
+
+@router.get("/backgrounds", response_model=list[RoomBackgroundConfigResponse])
+def get_room_backgrounds(mode: str = Query(default="chat_room")):
+    return list_room_backgrounds(mode=mode)
 
 
 @router.get("/{room_public_id}", response_model=RoomDetailResponse)
