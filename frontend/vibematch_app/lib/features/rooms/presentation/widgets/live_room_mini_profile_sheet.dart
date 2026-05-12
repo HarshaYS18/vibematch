@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../profile/data/profile_api_service.dart';
+import '../../../social/data/social_api_service.dart';
 import '../live_room_models.dart';
 import 'mini_profile_social_actions_row.dart';
 import 'room_profile_sheet.dart';
@@ -70,6 +74,46 @@ class LiveRoomMiniProfileSheet extends StatefulWidget {
 class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
   late MiniProfileSocialRelation _relation = widget.initialRelation;
   bool _relationBusy = false;
+  StreamSubscription<ProfileRelationshipRealtimeEvent>? _relationshipRealtimeSub;
+
+  int? get _targetPublicUserId => publicUserIdFromRoomUserId(widget.user.id);
+  int? get _viewerPublicUserId => publicUserIdFromRoomUserId(widget.currentUser.id);
+
+  @override
+  void initState() {
+    super.initState();
+    _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen(_onRelationshipRealtimeEvent);
+    unawaited(_refreshRelationFromBackend(showBusy: true));
+  }
+
+  @override
+  void dispose() {
+    _relationshipRealtimeSub?.cancel();
+    super.dispose();
+  }
+
+  void _onRelationshipRealtimeEvent(ProfileRelationshipRealtimeEvent event) {
+    final targetPublicUserId = _targetPublicUserId;
+    final viewerPublicUserId = _viewerPublicUserId;
+    if (targetPublicUserId == null || viewerPublicUserId == null) return;
+    if (!event.touchesProfile(targetPublicUserId) && !event.touchesProfile(viewerPublicUserId)) return;
+    unawaited(_refreshRelationFromBackend());
+  }
+
+  Future<void> _refreshRelationFromBackend({bool showBusy = false}) async {
+    final publicUserId = _targetPublicUserId;
+    if (publicUserId == null || publicUserId <= 0) return;
+    if (showBusy && mounted) setState(() => _relationBusy = true);
+    try {
+      final status = await const SocialApiService().getFollowStatusByPublicUserId(publicUserId);
+      if (!mounted) return;
+      setState(() => _relation = _relationFromFollowStatus(status));
+    } catch (_) {
+      // Keep the current local relation if backend is temporarily unavailable.
+    } finally {
+      if (showBusy && mounted) setState(() => _relationBusy = false);
+    }
+  }
 
   Future<void> _handleRelationTap() async {
     if (_relationBusy) return;
@@ -78,9 +122,17 @@ class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
       final next = await widget.onSocialRelationTap();
       if (!mounted) return;
       setState(() => _relation = next);
+      unawaited(_refreshRelationFromBackend());
     } finally {
       if (mounted) setState(() => _relationBusy = false);
     }
+  }
+
+  MiniProfileSocialRelation _relationFromFollowStatus(FollowStatus status) {
+    if (status.isFriends) return MiniProfileSocialRelation.friends;
+    if (status.isFollowing) return MiniProfileSocialRelation.following;
+    if (status.isFollowedBy) return MiniProfileSocialRelation.followBack;
+    return MiniProfileSocialRelation.follow;
   }
 
   @override
