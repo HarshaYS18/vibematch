@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../live_room_models.dart';
 import '../widgets/room_theme.dart';
 import 'cricket_mode_module.dart';
+import 'cricket_room_mode_signal.dart';
 
 class CricketRoomRules {
   const CricketRoomRules._();
@@ -273,11 +274,17 @@ class CricketRoomModeController extends ChangeNotifier {
   void startRoomMode({
     required String currentLayoutId,
     required RoomBackgroundTheme currentBackground,
+    CricketQuickMatchSetup? setup,
   }) {
     _previousLayoutId ??= currentLayoutId;
     _previousBackground ??= currentBackground;
     _active = true;
-    scorer.startMatch();
+    if (setup != null) {
+      scorer.loadQuickMatch(setup);
+    } else {
+      scorer.resetDemo();
+      scorer.startMatch();
+    }
     notifyListeners();
   }
 
