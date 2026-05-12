@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -32,25 +32,41 @@ class MediaUploadService {
   }
 
   Future<MediaUploadResult> pickAndUploadAvatar() async {
-    final file = await pickImage(maxWidth: 1200, maxHeight: 1200, imageQuality: 90);
+    final file = await pickImage(
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 90,
+    );
     if (file == null) throw const MediaUploadCancelledException();
     return uploadImage(file: file, endpointPath: '/media/avatar');
   }
 
   Future<MediaUploadResult> pickAndUploadProfileCover() async {
-    final file = await pickImage(maxWidth: 1800, maxHeight: 900, imageQuality: 90);
+    final file = await pickImage(
+      maxWidth: 1800,
+      maxHeight: 900,
+      imageQuality: 90,
+    );
     if (file == null) throw const MediaUploadCancelledException();
     return uploadImage(file: file, endpointPath: '/media/profile-cover');
   }
 
   Future<MediaUploadResult> pickAndUploadRoomAvatar() async {
-    final file = await pickImage(maxWidth: 1400, maxHeight: 1400, imageQuality: 90);
+    final file = await pickImage(
+      maxWidth: 1400,
+      maxHeight: 1400,
+      imageQuality: 90,
+    );
     if (file == null) throw const MediaUploadCancelledException();
     return uploadImage(file: file, endpointPath: '/media/room-avatar');
   }
 
   Future<MediaUploadResult> pickAndUploadChatImage() async {
-    final file = await pickImage(maxWidth: 1800, maxHeight: 1800, imageQuality: 88);
+    final file = await pickImage(
+      maxWidth: 1800,
+      maxHeight: 1800,
+      imageQuality: 88,
+    );
     if (file == null) throw const MediaUploadCancelledException();
     return uploadImage(file: file, endpointPath: '/media/chat-image');
   }
@@ -59,33 +75,78 @@ class MediaUploadService {
     required XFile file,
     required String endpointPath,
   }) async {
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) throw Exception('Selected image is empty.');
+
+    return _uploadBytes(
+      bytes: bytes,
+      filename: _safeImageFilename(file.name),
+      endpointPath: endpointPath,
+      failedMessage: 'Failed to upload image',
+    );
+  }
+
+  Future<MediaUploadResult> uploadRoomMusicBytes({
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    if (bytes.isEmpty) throw Exception('Selected audio is empty.');
+
+    return _uploadBytes(
+      bytes: bytes,
+      filename: _safeAudioFilename(filename),
+      endpointPath: '/media/room-music',
+      failedMessage: 'Failed to upload room music',
+    );
+  }
+
+  Future<MediaUploadResult> _uploadBytes({
+    required List<int> bytes,
+    required String filename,
+    required String endpointPath,
+    required String failedMessage,
+  }) async {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
       throw Exception('Please login again before uploading media.');
     }
 
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) throw Exception('Selected image is empty.');
-
-    final filename = _safeFilename(file.name);
-    final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpointPath)))
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(VmApiConfig.endpoint(endpointPath)),
+    )
       ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: filename,
+        ),
+      );
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(_errorMessage(response, fallback: 'Failed to upload image'));
+      throw Exception(_errorMessage(response, fallback: failedMessage));
     }
 
-    return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return MediaUploadResult.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
-  String _safeFilename(String value) {
+  String _safeImageFilename(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return 'vibematch_image.jpg';
     final safe = trimmed.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     return safe.contains('.') ? safe : '$safe.jpg';
+  }
+
+  String _safeAudioFilename(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 'vibematch_room_music.mp3';
+    final safe = trimmed.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return safe.contains('.') ? safe : '$safe.mp3';
   }
 
   String _errorMessage(http.Response response, {required String fallback}) {
@@ -105,11 +166,18 @@ class MediaUploadService {
 }
 
 class MediaUploadResult {
-  const MediaUploadResult({required this.url, required this.mediaType, required this.contentType, required this.sizeBytes});
+  const MediaUploadResult({
+    required this.url,
+    required this.mediaType,
+    required this.contentType,
+    required this.sizeBytes,
+  });
+
   final String url;
   final String mediaType;
   final String contentType;
   final int sizeBytes;
+
   factory MediaUploadResult.fromJson(Map<String, dynamic> json) {
     return MediaUploadResult(
       url: json['url']?.toString() ?? '',
@@ -122,6 +190,7 @@ class MediaUploadResult {
 
 class MediaUploadCancelledException implements Exception {
   const MediaUploadCancelledException();
+
   @override
   String toString() => 'Image selection cancelled.';
 }

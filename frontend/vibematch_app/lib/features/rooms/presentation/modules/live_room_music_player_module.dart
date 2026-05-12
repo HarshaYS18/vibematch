@@ -6,7 +6,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_audio_service.dart';
 import '../../data/live_room_music_signaling_service.dart';
+import '../../../media/data/media_upload_service.dart';
 import '../widgets/room_theme.dart';
 
 class LiveRoomMusicPlayerModule extends StatefulWidget {
@@ -30,10 +32,12 @@ class LiveRoomMusicPlayerModule extends StatefulWidget {
 
 class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
   final AudioPlayer _player = AudioPlayer();
+  final MediaUploadService _mediaUploadService = const MediaUploadService();
   final TextEditingController _searchController = TextEditingController();
 
   final List<RoomMusicTrack> _tracks = <RoomMusicTrack>[];
   final Set<String> _selectedTrackIds = <String>{};
+  final Map<String, String> _uploadedMusicUrls = <String, String>{};
 
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration>? _durationSub;
@@ -98,7 +102,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         type: FileType.audio,
-        withData: kIsWeb,
+        withData: true,
       );
       if (result == null) return;
 
@@ -162,16 +166,42 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
       _duration = Duration.zero;
     });
 
+    final uploadedUrl = await _ensureUploadedTrack(track);
+    if (uploadedUrl == null) return;
+
     if (kIsWeb && track.bytes != null) {
       await _player.play(BytesSource(track.bytes!));
     } else if (track.path != null && track.path!.trim().isNotEmpty) {
       await _player.play(DeviceFileSource(track.path!));
+    } else if (track.bytes != null) {
+      await _player.play(BytesSource(track.bytes!));
     } else {
       return;
     }
 
+    await LiveRoomAudioService.instance.startRoomMusic(
+      url: uploadedUrl,
+      title: track.title,
+    );
     unawaited(_broadcastProducerStarted());
     unawaited(_broadcastMusicControl('play'));
+  }
+
+  Future<String?> _ensureUploadedTrack(RoomMusicTrack track) async {
+    final existing = _uploadedMusicUrls[track.id];
+    if (existing != null && existing.trim().isNotEmpty) return existing;
+
+    final bytes = track.bytes;
+    if (bytes == null || bytes.isEmpty) return null;
+
+    final result = await _mediaUploadService.uploadRoomMusicBytes(
+      bytes: bytes,
+      filename: track.title,
+    );
+
+    if (result.url.trim().isEmpty) return null;
+    _uploadedMusicUrls[track.id] = result.url;
+    return result.url;
   }
 
   Future<void> _playNext() async {
@@ -210,6 +240,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
 
     if (_tracks.isEmpty) {
       unawaited(_player.stop());
+      unawaited(LiveRoomAudioService.instance.stopRoomMusic());
       unawaited(_broadcastMusicControl('stop'));
     }
   }
@@ -225,6 +256,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
         _duration = Duration.zero;
       });
       unawaited(_player.stop());
+      unawaited(LiveRoomAudioService.instance.stopRoomMusic());
       unawaited(_broadcastMusicControl('stop'));
       return;
     }
