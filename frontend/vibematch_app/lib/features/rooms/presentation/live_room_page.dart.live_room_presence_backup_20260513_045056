@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_routes.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
-import '../../presence/data/presence_api_service.dart';
 import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_membership_service.dart';
 import '../data/room_moderation_repository.dart';
@@ -89,14 +88,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   final LiveRoomNavigationController _navigationController =
       const LiveRoomNavigationController();
 
-  final PresenceApiService _presenceApi = const PresenceApiService();
-
   _PendingSeatInvite? _pendingSeatInvite;
   Timer? _seatInviteAutoHideTimer;
   Timer? _hostSeatOneTimer;
   Timer? _hostSeatOneRetryTimer;
-  Timer? _roomPresenceHeartbeatTimer;
-  bool _roomPresenceLeft = false;
   VoidCallback? _roomMembershipListener;
 
   SeatUser get _currentUser {
@@ -224,7 +219,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     unawaited(RoomMusicController.instance.attachRoom(widget.roomId));
     unawaited(_roomStateController.loadPersistedRoomSettings());
     _autoOccupySeatOneForHostOrAdmin();
-    _startRoomPresence();
   }
 
   @override
@@ -232,8 +226,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _seatInviteAutoHideTimer?.cancel();
     _hostSeatOneTimer?.cancel();
     _hostSeatOneRetryTimer?.cancel();
-    _roomPresenceHeartbeatTimer?.cancel();
-    unawaited(_leaveRoomPresence());
     _roomStateController.removeListener(_onRoomStateChanged);
     final membershipListener = _roomMembershipListener;
     if (membershipListener != null) {
@@ -249,62 +241,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     super.dispose();
   }
 
-  bool get _isSecretPresenceRoom {
-    final mode = widget.modeTitle.toLowerCase();
-    final privacy = _privacyMode.toString().toLowerCase();
-    return mode.contains('secret') || privacy.contains('secret');
-  }
-
-  void _startRoomPresence() {
-    _roomPresenceLeft = false;
-    _roomPresenceHeartbeatTimer?.cancel();
-
-    unawaited(_enterRoomPresence());
-
-    _roomPresenceHeartbeatTimer = Timer.periodic(
-      const Duration(seconds: 25),
-      (_) => unawaited(_sendRoomPresenceHeartbeat()),
-    );
-  }
-
-  Future<void> _enterRoomPresence() async {
-    try {
-      await _presenceApi.enterRoom(
-        roomPublicId: _roomId,
-        roomName: _roomName,
-        roomMode: widget.modeTitle,
-        isSecret: _isSecretPresenceRoom,
-      );
-    } catch (_) {
-      // Room presence must never block live room loading.
-    }
-  }
-
-  Future<void> _sendRoomPresenceHeartbeat() async {
-    if (_roomPresenceLeft) return;
-
-    try {
-      await _presenceApi.heartbeat(
-        roomPublicId: _roomId,
-        roomName: _roomName,
-        roomMode: widget.modeTitle,
-        isSecret: _isSecretPresenceRoom,
-      );
-    } catch (_) {
-      // Keep room stable even if heartbeat fails temporarily.
-    }
-  }
-
-  Future<void> _leaveRoomPresence() async {
-    if (_roomPresenceLeft) return;
-    _roomPresenceLeft = true;
-
-    try {
-      await _presenceApi.leaveRoom();
-    } catch (_) {
-      // Best effort. Backend also expires stale room presence by heartbeat window.
-    }
-  }
   void _onRoomStateChanged() {
     if (mounted) setState(() {});
   }
@@ -1288,6 +1224,5 @@ class _PendingSeatInvite {
   final SeatUser invitedUser;
   final int seatIndex;
 }
-
 
 

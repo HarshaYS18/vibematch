@@ -6,7 +6,6 @@ import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
-import '../../presence/data/presence_api_service.dart';
 import '../../vip/presentation/vip_program_page.dart';
 import '../data/profile_api_service.dart';
 import '../data/love_bond_realtime_service.dart';
@@ -39,9 +38,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   final PageController _coverController = PageController();
   final ProfileApiService _profileApi = const ProfileApiService();
   final AuthApiService _authApi = const AuthApiService();
-  final PresenceApiService _presenceApi = const PresenceApiService();
   Timer? _coverTimer;
-  Timer? _presenceTimer;
   StreamSubscription<ProfileRelationshipRealtimeEvent>? _relationshipRealtimeSub;
   int _coverIndex = 0;
   bool _loadingProfile = false;
@@ -50,7 +47,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   CurrentUser? _viewer;
   PublicUserProfile? _backendProfile;
   UserRelationship? _relationship;
-  PresenceDto? _presence;
   FamilySummaryDto? _familySummary;
   List<ProfileVibeDto> _profileVibes = const <ProfileVibeDto>[];
   bool _loadingFamily = false;
@@ -69,7 +65,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     super.initState();
     _viewer = _authApi.cachedUser;
     _startCoverAutoScroll();
-    _startPresencePolling();
     _recordProfileVisit();
     _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen(_onRelationshipRealtimeEvent);
     unawaited(_loadBackendProfile());
@@ -80,7 +75,6 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   @override
   void dispose() {
     _coverTimer?.cancel();
-    _presenceTimer?.cancel();
     _relationshipRealtimeSub?.cancel();
     _coverController.dispose();
     super.dispose();
@@ -194,36 +188,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     // Backend records profile visits when getPublicProfile() is loaded.
   }
 
-  void _startPresencePolling() {
-    _presenceTimer?.cancel();
-    unawaited(_loadRealtimePresence());
-    _presenceTimer = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) => unawaited(_loadRealtimePresence()),
-    );
-  }
-
-  Future<void> _loadRealtimePresence() async {
-    final publicUserId = _targetPublicUserId();
-    if (publicUserId <= 0) return;
-
-    try {
-      final presence = await _presenceApi.getPublicPresence(publicUserId);
-      if (!mounted) return;
-      setState(() => _presence = presence);
-    } catch (_) {
-      // Keep previous presence snapshot if network temporarily fails.
-    }
-  }
-
-  String? _visibleCurrentRoomName() {
-    final presence = _presence;
-    if (presence == null || !presence.hasVisibleRoom) return null;
-    return presence.roomName;
-  }
   void _startCoverAutoScroll() {
     _coverTimer?.cancel();
-    _presenceTimer?.cancel();
     _coverTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted || !_coverController.hasClients || publicProfileCoverPhotos.length < 2) return;
       final nextIndex = (_coverIndex + 1) % publicProfileCoverPhotos.length;
@@ -384,7 +350,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 vipLevel: _vipLevel(),
                 svipLevel: _svipLevel(),
                 presenceLabel: _presenceLabel(),
-                currentRoomName: _visibleCurrentRoomName(),
+                currentRoomName: widget.currentRoomName,
                 familyName: widget.familyName,
                 familyLevel: widget.familyLevel,
                 coverPhotos: publicProfileCoverPhotos,
@@ -567,8 +533,6 @@ class _PublicProfileBackendError extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(margin: const EdgeInsets.fromLTRB(18, 8, 18, 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))), child: Row(children: [const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19), const SizedBox(width: 9), Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))), TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900)))]));
 }
-
-
 
 
 
