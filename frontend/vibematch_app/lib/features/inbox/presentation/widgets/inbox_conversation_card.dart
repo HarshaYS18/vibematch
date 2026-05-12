@@ -154,7 +154,7 @@ class _WhatsAppAvatar extends StatelessWidget {
               ? Image.network(
                   conversation.avatarUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _AvatarInitials(conversation: conversation),
+                  errorBuilder: (context, error, stackTrace) => _AvatarInitials(conversation: conversation),
                 )
               : _AvatarInitials(conversation: conversation),
         ),
