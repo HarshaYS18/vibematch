@@ -304,6 +304,11 @@ class CricketRoomModeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addPenalty(int runs) {
+    scorer.addPenalty(runs);
+    notifyListeners();
+  }
+
   void addExtra(CricketExtraType type, int runs) {
     scorer.addExtra(type, runs);
     notifyListeners();
@@ -328,6 +333,22 @@ class CricketRoomModeController extends ChangeNotifier {
     scorer.startSecondInnings();
     notifyListeners();
   }
+
+  void setStrikerPlayer(String playerId) {
+    scorer.setStrikerPlayer(playerId);
+    notifyListeners();
+  }
+
+  void setNonStrikerPlayer(String playerId) {
+    scorer.setNonStrikerPlayer(playerId);
+    notifyListeners();
+  }
+
+  void setBowlerPlayer(String playerId) {
+    scorer.setBowlerPlayer(playerId);
+    notifyListeners();
+  }
+
 
   @override
   void dispose() {
@@ -404,6 +425,9 @@ class CricketFixedScoreboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final snapshot = state.snapshot;
+    final striker = state.playerById(state.strikerId).name;
+    final nonStriker = state.playerById(state.nonStrikerId).name;
+    final bowler = state.playerById(state.bowlerId).name;
     final target = state.targetRuns;
     final ballsRemaining = math.max(
       0,
@@ -468,8 +492,8 @@ class CricketFixedScoreboard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             target == null
-                ? '${state.battingTeam.name} batting • Scorer seat: 3'
-                : 'Target $target • Need ${math.max(0, target - snapshot.runs)} from $ballsRemaining balls${requiredRate == null ? '' : ' • RRR ${requiredRate.toStringAsFixed(2)}'}',
+                ? '$striker*  $nonStriker  • Bowler $bowler'
+                : '$striker*  $nonStriker  • Bowler $bowler • Need ${math.max(0, target - snapshot.runs)} from $ballsRemaining balls${requiredRate == null ? '' : ' • RRR ${requiredRate.toStringAsFixed(2)}'}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -494,13 +518,128 @@ class CricketFixedScoreboard extends StatelessWidget {
   }
 }
 
-class CricketScorerHalfOverlay extends StatelessWidget {
+
+Future<void> _showCricketPlayerPicker({
+  required BuildContext context,
+  required String title,
+  required List<CricketPlayer> players,
+  required ValueChanged<CricketPlayer> onSelected,
+}) async {
+  if (players.isEmpty) return;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (_) {
+      return Container(
+        padding: EdgeInsets.fromLTRB(
+          14,
+          10,
+          14,
+          MediaQuery.paddingOf(context).bottom + 14,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFFF9F8F2),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(width: 42),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: const TextStyle(
+                color: RoomColors.plum,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: players.map((player) {
+                return ChoiceChip(
+                  selected: false,
+                  label: Text(player.name),
+                  onSelected: (_) {
+                    Navigator.pop(context);
+                    onSelected(player);
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Set<String> _dismissedPlayerIds(CricketMatchState state) {
+  return state.inningsEvents
+      .where((event) => event.dismissedPlayerId != null)
+      .map((event) => event.dismissedPlayerId!)
+      .toSet();
+}
+
+List<CricketPlayer> _availableNextBatters(CricketMatchState state) {
+  final dismissed = _dismissedPlayerIds(state);
+  return state.battingTeam.players
+      .where(
+        (player) =>
+            !dismissed.contains(player.id) &&
+            player.id != state.strikerId &&
+            player.id != state.nonStrikerId,
+      )
+      .toList();
+}
+
+List<CricketPlayer> _availableOpeningBatters(CricketMatchState state) {
+  return state.battingTeam.players.toList();
+}
+
+List<CricketPlayer> _availableSecondOpeningBatters(CricketMatchState state) {
+  return state.battingTeam.players
+      .where((player) => player.id != state.strikerId)
+      .toList();
+}
+
+List<CricketPlayer> _availableBowlers(CricketMatchState state) {
+  return state.bowlingTeam.players
+      .where((player) => player.id != state.bowlerId)
+      .toList();
+}
+
+bool _lastBallWasLegalOverEnd(CricketMatchState state) {
+  final events = state.inningsEvents;
+  if (events.isEmpty) return false;
+  final last = events.last;
+  if (!last.isLegalBall) return false;
+  final legalBalls = events.where((event) => event.isLegalBall).length;
+  return legalBalls > 0 && legalBalls % state.ballsPerOver == 0;
+}
+
+class CricketScorerHalfOverlay extends StatefulWidget {
   const CricketScorerHalfOverlay({
     super.key,
     required this.controller,
   });
 
   final CricketRoomModeController controller;
+
+  @override
+  State<CricketScorerHalfOverlay> createState() =>
+      _CricketScorerHalfOverlayState();
+}
+
+class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
+  bool _resultShown = false;
+  bool _pickerOpen = false;
+
+  CricketRoomModeController get controller => widget.controller;
 
   @override
   Widget build(BuildContext context) {
@@ -542,28 +681,37 @@ class CricketScorerHalfOverlay extends StatelessWidget {
                         for (final run in const [0, 1, 2, 3, 4, 5, 6])
                           _PremiumScoreButton(
                             label: '$run',
-                            onTap: () => controller.addRuns(run),
+                            onTap: () => _scoreRun(context, run),
                           ),
                         _PremiumScoreButton(
                           label: 'Wd',
-                          onTap: () => controller.addExtra(CricketExtraType.wide, 1),
+                          onTap: () => _scoreExtra(
+                            context,
+                            CricketExtraType.wide,
+                            1,
+                          ),
                         ),
                         _PremiumScoreButton(
                           label: 'Nb',
-                          onTap: () => controller.addExtra(CricketExtraType.noBall, 1),
+                          onTap: () => _scoreExtra(
+                            context,
+                            CricketExtraType.noBall,
+                            1,
+                          ),
                         ),
                         _PremiumScoreButton(
-                          label: 'Bye',
-                          onTap: () => controller.addExtra(CricketExtraType.bye, 1),
+                          label: '+1 Pen',
+                          onTap: () => _scorePenalty(context, 1),
                         ),
                         _PremiumScoreButton(
-                          label: 'LB',
-                          onTap: () => controller.addExtra(CricketExtraType.legBye, 1),
+                          label: '-1 Pen',
+                          danger: true,
+                          onTap: () => _scorePenalty(context, -1),
                         ),
                         _PremiumScoreButton(
                           label: 'Wicket',
                           danger: true,
-                          onTap: () => controller.addWicket(CricketWicketType.bowled),
+                          onTap: () => _scoreWicket(context),
                         ),
                       ],
                     ),
@@ -575,15 +723,24 @@ class CricketScorerHalfOverlay extends StatelessWidget {
                         child: OutlinedButton.icon(
                           onPressed: controller.undo,
                           icon: const Icon(Icons.undo_rounded, size: 17),
-                          label: const Text('Undo', overflow: TextOverflow.ellipsis),
+                          label: const Text(
+                            'Undo',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: controller.match.status == CricketMatchStatus.inningsBreak ? controller.startSecondInnings : controller.endInnings,
+                          onPressed: () => _handleEndInningsTap(context),
                           icon: const Icon(Icons.flag_rounded, size: 17),
-                          label: Text(controller.match.status == CricketMatchStatus.inningsBreak ? '2nd innings' : 'End innings', overflow: TextOverflow.ellipsis),
+                          label: Text(
+                            controller.match.status ==
+                                    CricketMatchStatus.inningsBreak
+                                ? '2nd innings'
+                                : 'End innings',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
                     ],
@@ -594,6 +751,195 @@ class CricketScorerHalfOverlay extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _scoreRun(BuildContext context, int runs) async {
+    controller.addRuns(runs);
+    await _handlePostBallFlow(context);
+  }
+
+  Future<void> _scoreExtra(
+    BuildContext context,
+    CricketExtraType type,
+    int runs,
+  ) async {
+    controller.addExtra(type, runs);
+    await _handlePostBallFlow(context);
+  }
+
+  Future<void> _scorePenalty(BuildContext context, int runs) async {
+    try {
+      controller.addPenalty(runs);
+    } catch (_) {
+      controller.addExtra(CricketExtraType.penalty, runs);
+    }
+    await _handlePostBallFlow(context);
+  }
+
+  Future<void> _scoreWicket(BuildContext context) async {
+    controller.addWicket(CricketWicketType.bowled);
+
+    final state = controller.match;
+    if (state.status == CricketMatchStatus.completed ||
+        state.status == CricketMatchStatus.inningsBreak) {
+      await _handlePostBallFlow(context);
+      return;
+    }
+
+    await _guardedPicker(
+      context: context,
+      title: 'Select new batsman',
+      players: _availableNextBatters(state),
+      onSelected: (player) => controller.setStrikerPlayer(player.id),
+    );
+
+    await _handlePostBallFlow(context);
+  }
+
+  Future<void> _handleEndInningsTap(BuildContext context) async {
+    if (controller.match.status == CricketMatchStatus.inningsBreak) {
+      await _startSecondInningsFlow(context);
+      return;
+    }
+
+    controller.endInnings();
+    await _handlePostBallFlow(context);
+  }
+
+  Future<void> _handlePostBallFlow(BuildContext context) async {
+    final state = controller.match;
+
+    if (state.status == CricketMatchStatus.completed) {
+      await _showResultIfNeeded(context);
+      return;
+    }
+
+    if (state.status == CricketMatchStatus.inningsBreak) {
+      await _startSecondInningsFlow(context);
+      return;
+    }
+
+    if (_lastBallWasLegalOverEnd(state)) {
+      await _guardedPicker(
+        context: context,
+        title: 'Select next bowler',
+        players: _availableBowlers(state),
+        onSelected: (player) => controller.setBowlerPlayer(player.id),
+      );
+    }
+  }
+
+  Future<void> _startSecondInningsFlow(BuildContext context) async {
+    controller.startSecondInnings();
+
+    await _guardedPicker(
+      context: context,
+      title: 'Select opening batsman 1',
+      players: _availableOpeningBatters(controller.match),
+      onSelected: (player) => controller.setStrikerPlayer(player.id),
+    );
+
+    await _guardedPicker(
+      context: context,
+      title: 'Select opening batsman 2',
+      players: _availableSecondOpeningBatters(controller.match),
+      onSelected: (player) => controller.setNonStrikerPlayer(player.id),
+    );
+
+    await _guardedPicker(
+      context: context,
+      title: 'Select opening bowler',
+      players: controller.match.bowlingTeam.players,
+      onSelected: (player) => controller.setBowlerPlayer(player.id),
+    );
+  }
+
+  Future<void> _guardedPicker({
+    required BuildContext context,
+    required String title,
+    required List<CricketPlayer> players,
+    required ValueChanged<CricketPlayer> onSelected,
+  }) async {
+    if (_pickerOpen) return;
+    _pickerOpen = true;
+    await _showCricketPlayerPicker(
+      context: context,
+      title: title,
+      players: players,
+      onSelected: onSelected,
+    );
+    _pickerOpen = false;
+  }
+
+  Future<void> _showResultIfNeeded(BuildContext context) async {
+    if (_resultShown) return;
+    _resultShown = true;
+
+    final state = controller.match;
+    final snapshot = state.snapshot;
+    final target = state.targetRuns;
+
+    String result;
+    if (target != null && snapshot.runs >= target) {
+      final wicketsLeft = math.max(0, state.totalWickets - snapshot.wickets);
+      result = '${state.battingTeam.name} won by $wicketsLeft wickets';
+    } else if (target != null) {
+      final runsShort = math.max(0, target - snapshot.runs - 1);
+      result = '${state.bowlingTeam.name} won by $runsShort runs';
+    } else {
+      result = 'Match completed';
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return Container(
+          padding: EdgeInsets.fromLTRB(
+            14,
+            10,
+            14,
+            MediaQuery.paddingOf(context).bottom + 14,
+          ),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF9F8F2),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SheetHandle(width: 44),
+              const SizedBox(height: 14),
+              const Icon(
+                Icons.emoji_events_rounded,
+                color: Color(0xFFC99A3B),
+                size: 42,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                result,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: RoomColors.plum,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${state.battingTeam.shortName} ${snapshot.runs}/${snapshot.wickets} (${snapshot.oversText})',
+                style: const TextStyle(
+                  color: Color(0xFF81758C),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+          ),
+        );
+      },
     );
   }
 }

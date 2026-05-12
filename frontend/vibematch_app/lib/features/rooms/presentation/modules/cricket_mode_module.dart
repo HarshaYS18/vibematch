@@ -110,6 +110,7 @@ class CricketBallEvent {
     if (extraType == CricketExtraType.noBall) return runsBat > 0 ? 'Nb+$runsBat' : 'Nb';
     if (extraType == CricketExtraType.bye) return 'B$extrasRuns';
     if (extraType == CricketExtraType.legBye) return 'LB$extrasRuns';
+    if (extraType == CricketExtraType.penalty) return extrasRuns > 0 ? '+${extrasRuns}P' : '${extrasRuns}P';
     return '$runsBat';
   }
 }
@@ -361,6 +362,19 @@ class CricketScoringEngine {
     );
   }
 
+  static CricketMatchState addPenalty(CricketMatchState state, int runs) {
+    final safeRuns = runs.clamp(-1, 1);
+    if (safeRuns == 0) return state;
+
+    return _appendBall(
+      state,
+      runsBat: 0,
+      extrasRuns: safeRuns,
+      extraType: CricketExtraType.penalty,
+      isLegalBall: false,
+    );
+  }
+
   static CricketMatchState addWicket(CricketMatchState state, CricketWicketType type) {
     return _appendBall(
       state,
@@ -463,7 +477,7 @@ class CricketScoringEngine {
     final targetReached = state.targetRuns != null && snap.runs >= state.targetRuns!;
     if (allOut || oversDone || targetReached) {
       if (next.innings == 1) {
-        return startSecondInnings(endInnings(next));
+        return endInnings(next);
       }
       return next.copyWith(status: CricketMatchStatus.completed);
     }
@@ -541,11 +555,25 @@ class CricketModeController extends ChangeNotifier {
   void addRuns(int runs) => _set(CricketScoringEngine.addRuns(_state, runs));
   void addExtra(CricketExtraType type, int runs) => _set(CricketScoringEngine.addExtra(_state, type, runs));
   void addNoBallRuns(int runs) => _set(CricketScoringEngine.addNoBallRuns(_state, runs));
+  void addPenalty(int runs) => _set(CricketScoringEngine.addPenalty(_state, runs));
   void addWicket(CricketWicketType type) => _set(CricketScoringEngine.addWicket(_state, type));
   void undo() => _set(CricketScoringEngine.undoLastBall(_state));
   void endInnings() => _set(CricketScoringEngine.endInnings(_state));
   void startSecondInnings() => _set(CricketScoringEngine.startSecondInnings(_state));
   void complete() => _set(_state.copyWith(status: CricketMatchStatus.completed));
+
+  void setStrikerPlayer(String playerId) {
+    _set(_state.copyWith(strikerId: playerId));
+  }
+
+  void setNonStrikerPlayer(String playerId) {
+    _set(_state.copyWith(nonStrikerId: playerId));
+  }
+
+  void setBowlerPlayer(String playerId) {
+    _set(_state.copyWith(bowlerId: playerId));
+  }
+
 
   void _set(CricketMatchState value) {
     _state = value;
