@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../widgets/room_theme.dart';
+import 'cricket_room_mode_signal.dart';
 
 const RoomBackgroundTheme cricketFloodlightArenaBackgroundTheme = RoomBackgroundTheme(
   id: 'cricket_floodlight_arena',
@@ -540,12 +541,14 @@ class _CricketModeSheetState extends State<CricketModeSheet> {
       return;
     }
     widget.onBackgroundChanged(_selectedCricketBackground);
+    CricketRoomModeSignal.activate(widget.roomId);
     _controller.startMatch();
     widget.onSystemMessage?.call('Cricket Mode started. Room background switched to ${_selectedCricketBackground.name}.');
   }
 
   void _endMode() {
     _controller.complete();
+    CricketRoomModeSignal.deactivate(widget.roomId);
     widget.onBackgroundChanged(widget.previousBackground);
     widget.onSystemMessage?.call('Cricket Mode ended. Room background restored.');
   }

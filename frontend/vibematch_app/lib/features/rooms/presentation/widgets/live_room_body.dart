@@ -7,7 +7,6 @@ import '../modules/cricket_room_mode_registry.dart';
 import 'live_room_seat_invite_notification.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
-import 'room_theme.dart';
 import 'room_top_bar.dart';
 
 class LiveRoomBody extends StatelessWidget {
@@ -131,34 +130,24 @@ class LiveRoomBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = LiveRoomMediaSignalingService.instance;
     final shouldShowMicButton = showMicButton ?? _derivedShowMicButton;
-    final currentTheme = activeRoomBackgroundTheme.value;
-    final cricketBackgroundActive =
-        CricketRoomModeRegistry.isCricketBackground(currentTheme);
     final cricketController = CricketRoomModeRegistry.controllerFor(
       roomId: roomId,
       roomName: roomName,
     );
+    final cricketModeActive = cricketController.active;
     final currentUser = media.activeLoggedInSeatUser;
-    final scorerVisible = cricketBackgroundActive &&
+    final scorerVisible = cricketModeActive &&
         currentUser != null &&
         CricketRoomModeModule.canScore(
           seats: seats,
           currentUserId: currentUser.id,
         );
     final effectiveLayoutId =
-        cricketBackgroundActive ? CricketRoomRules.fixedLayoutId : layoutId;
+        cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
     final scorerOverlayBottomPadding = scorerVisible
         ? MediaQuery.sizeOf(context).height *
             CricketRoomRules.scorerOverlayHeightFactor
         : 0.0;
-
-    if (cricketBackgroundActive && !cricketController.active) {
-      cricketController.startRoomMode(
-        currentLayoutId: effectiveLayoutId,
-        currentBackground: currentTheme,
-      );
-    }
-
     return SafeArea(
       child: Stack(
         children: [
@@ -218,7 +207,7 @@ class LiveRoomBody extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        if (cricketBackgroundActive)
+                        if (cricketModeActive)
                           CricketRoomModeModule.fixedScoreboard(
                             state: cricketController.match,
                             margin: const EdgeInsets.only(bottom: 8),
@@ -257,7 +246,7 @@ class LiveRoomBody extends StatelessWidget {
               ),
             ],
           ),
-          if (cricketBackgroundActive)
+          if (cricketModeActive)
             AnimatedBuilder(
               animation: cricketController,
               builder: (context, child) {
