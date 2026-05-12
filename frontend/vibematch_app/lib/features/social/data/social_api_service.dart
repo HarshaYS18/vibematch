@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
+import '../models/social_user.dart';
 
 class SocialApiService {
   const SocialApiService({this.authApiService = const AuthApiService()});
@@ -26,10 +27,35 @@ class SocialApiService {
   }
 
   Future<List<PublicUserSummary>> listFriends() async {
+    final users = await listFriendUsers();
+    return users.map(PublicUserSummary.fromSocialUser).toList(growable: false);
+  }
+
+  Future<List<SocialUser>> listFriendUsers({bool onlineOnly = false}) async {
     final response = await _get('/social/friends');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final users = decoded['users'] as List<dynamic>? ?? const [];
-    return users.whereType<Map<String, dynamic>>().map(PublicUserSummary.fromJson).toList();
+    final mapped = users
+        .whereType<Map<String, dynamic>>()
+        .map(SocialUser.fromJson)
+        .where((user) => !onlineOnly || user.isOnline)
+        .toList(growable: false);
+    mapped.sort((a, b) {
+      if (a.isOnline != b.isOnline) return a.isOnline ? -1 : 1;
+      return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+    });
+    return mapped;
+  }
+
+  Future<List<SocialUser>> listFollowingUsers() => _listSocialUsers('/social/following');
+
+  Future<List<SocialUser>> listFollowerUsers() => _listSocialUsers('/social/followers');
+
+  Future<List<SocialUser>> _listSocialUsers(String path) async {
+    final response = await _get(path);
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final users = decoded['users'] as List<dynamic>? ?? const [];
+    return users.whereType<Map<String, dynamic>>().map(SocialUser.fromJson).toList(growable: false);
   }
 
   Future<http.Response> _get(String path) async {
@@ -55,12 +81,24 @@ class SocialApiService {
     if (token == null || token.trim().isEmpty) {
       throw Exception('Please login again.');
     }
-    return {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
+    return {'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
   }
 
   void _throwIfFailed(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
-    throw Exception('Social API failed (${response.statusCode}): ${response.body}');
+    final body = response.body.trim();
+    if (body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) {
+          final detail = decoded['detail']?.toString().trim();
+          if (detail != null && detail.isNotEmpty) throw Exception(detail);
+        }
+      } catch (_) {
+        throw Exception(body);
+      }
+    }
+    throw Exception('Social API failed (${response.statusCode})');
   }
 }
 
@@ -114,6 +152,16 @@ class PublicUserSummary {
       username: json['username']?.toString(),
       displayName: json['display_name']?.toString(),
       avatarUrl: json['avatar_url']?.toString(),
+    );
+  }
+
+  factory PublicUserSummary.fromSocialUser(SocialUser user) {
+    return PublicUserSummary(
+      id: int.tryParse(user.id) ?? 0,
+      publicUserId: user.publicUserId ?? int.tryParse(user.id) ?? 0,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
     );
   }
 }
