@@ -154,27 +154,22 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
 
     final relationship = _relationship;
     final status = _followStatus;
+    final shouldUnfollow = status == PublicFollowStatus.following || status == PublicFollowStatus.mutual;
 
-    if (status == PublicFollowStatus.following) {
-      _showAction(context, 'You are already following ${_displayName()}.');
-      return;
-    }
-    if (status == PublicFollowStatus.mutual) {
-      _showAction(context, 'You and ${_displayName()} are already friends.');
-      return;
-    }
-    if (relationship != null && !relationship.canFollow) {
+    if (!shouldUnfollow && relationship != null && !relationship.canFollow) {
       _showFollowBlockedPopup(relationship.followBlockReason);
       return;
     }
 
     setState(() => _followBusy = true);
     try {
-      final nextRelationship = await _profileApi.followUser(publicUserId);
+      final nextRelationship = shouldUnfollow
+          ? await _profileApi.unfollowUser(publicUserId)
+          : await _profileApi.followUser(publicUserId);
       if (!mounted) return;
       setState(() => _relationship = nextRelationship);
-      _publishRelationshipRealtime(nextRelationship.isFriend ? 'friends' : 'follow');
-      _showAction(context, nextRelationship.isFriend ? 'You both follow each other now. You are friends.' : 'You are now following this profile.');
+      _publishRelationshipRealtime(shouldUnfollow ? 'unfollow' : (nextRelationship.isFriend ? 'friends' : 'follow'));
+      _showAction(context, _followStatus.message);
       unawaited(_refreshRelationshipOnly());
     } catch (error) {
       if (!mounted) return;
