@@ -31,8 +31,9 @@ class CricketRoomApiService {
     String? reason,
   }) async {
     final path = '/rooms/$roomId/cricket/tournaments/$tournamentId';
+    final safeReason = reason?.trim();
     final uri = Uri.parse(VmApiConfig.endpoint(path)).replace(
-      queryParameters: reason == null || reason.trim().isEmpty ? null : {'reason': reason.trim()},
+      queryParameters: safeReason == null || safeReason.isEmpty ? null : {'reason': safeReason},
     );
     final response = await http.delete(uri, headers: await _headers());
     _ensureOk(response);
@@ -104,8 +105,8 @@ class CricketRoomApiService {
   }) async {
     final response = await _patch('/rooms/$roomId/cricket/matches/$matchId/score', {
       'score': score,
-      if (result != null) 'result': result,
-      if (pointsTable != null) 'points_table': pointsTable,
+      ?'result': result,
+      ?'points_table': pointsTable,
     });
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -120,7 +121,7 @@ class CricketRoomApiService {
     final response = await _post('/rooms/$roomId/cricket/matches/$matchId/complete', {
       'score': score,
       'result': result,
-      if (pointsTable != null) 'points_table': pointsTable,
+      ?'points_table': pointsTable,
     });
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -152,8 +153,6 @@ class CricketRoomApiService {
   }
 
   Future<Map<String, String>> _headers() async {
-    var token = _auth.cachedAccessToken;
-    token ??= (await _auth.getCurrentUser()).id.toString();
     final cachedToken = _auth.cachedAccessToken;
     if (cachedToken == null || cachedToken.trim().isEmpty) {
       throw Exception('Please login again before using Cricket Mode.');
