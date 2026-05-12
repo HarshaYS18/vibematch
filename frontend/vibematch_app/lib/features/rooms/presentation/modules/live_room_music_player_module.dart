@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
@@ -103,7 +103,8 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
 
       final nextTracks = <RoomMusicTrack>[];
       for (final file in result.files) {
-        final id = '${file.name}-${file.size}-${file.path ?? file.identifier ?? ''}';
+        final stablePart = file.path ?? file.bytes?.lengthInBytes.toString() ?? '';
+        final id = '${file.name}-${file.size}-$stablePart';
         if (_tracks.any((track) => track.id == id) ||
             nextTracks.any((track) => track.id == id)) {
           continue;
@@ -327,7 +328,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
                   title: track?.title ?? 'No song selected',
                   subtitle: track == null
                       ? 'Add songs from this device to start room music'
-                      : 'Ready for WebRTC room music sync',
+                      : 'Music control sync event ready for room broadcast',
                   isPlaying: _isPlaying,
                   positionLabel: _formatDuration(_position),
                   durationLabel: _formatDuration(_duration),
@@ -453,6 +454,7 @@ class _CompactMusicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final safeSliderValue = sliderValue.clamp(0.0, sliderMax).toDouble();
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -528,7 +530,7 @@ class _CompactMusicCard extends StatelessWidget {
               Text(positionLabel, style: _timeStyle),
               Expanded(
                 child: Slider(
-                  value: sliderValue.clamp(0, sliderMax),
+                  value: safeSliderValue,
                   max: sliderMax <= 0 ? 1 : sliderMax,
                   onChanged: onSeek,
                 ),
