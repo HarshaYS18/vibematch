@@ -22,6 +22,7 @@ function getOrCreateRoom(roomId) {
       roomImagesEnabled: true,
       guestMessagesEnabled: true,
       musicState: createDefaultMusicState(),
+      cricketState: createDefaultCricketState(),
       createdAt: new Date().toISOString(),
     };
     rooms.set(id, room);
@@ -30,6 +31,7 @@ function getOrCreateRoom(roomId) {
   if (room.roomImagesEnabled !== false) room.roomImagesEnabled = true;
   if (room.guestMessagesEnabled !== false) room.guestMessagesEnabled = true;
   if (!room.musicState) room.musicState = createDefaultMusicState();
+  if (!room.cricketState) room.cricketState = createDefaultCricketState();
   cleanupExpiredBlocks(room);
   return room;
 }
@@ -52,6 +54,18 @@ function createDefaultMusicState() {
   };
 }
 
+function createDefaultCricketState() {
+  return {
+    active: false,
+    action: 'stop',
+    controllerPeerId: '',
+    controllerUserId: '',
+    controllerName: '',
+    setup: null,
+    updatedAt: null,
+  };
+}
+
 function cleanupExpiredBlocks(room) {
   const now = Date.now();
   for (const [userId, entry] of room.blockedUsers.entries()) {
@@ -70,6 +84,7 @@ function roomSnapshot(room) {
     room_images_enabled: room.roomImagesEnabled !== false,
     guest_messages_enabled: room.guestMessagesEnabled !== false,
     music_state: room.musicState || createDefaultMusicState(),
+    cricket_state: room.cricketState || createDefaultCricketState(),
     peers: Array.from(room.peers.values()).map((peer) => ({
       peer_id: peer.id,
       user_id: peer.userId,
@@ -160,6 +175,7 @@ module.exports = {
   roomSnapshot,
   createPeer,
   createDefaultMusicState,
+  createDefaultCricketState,
   findPeerByUserId,
   seatIndexFrom,
   clearPeerSeat,

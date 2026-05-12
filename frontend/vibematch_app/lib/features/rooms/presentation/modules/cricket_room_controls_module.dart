@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_media_signaling_service.dart';
+
 import '../widgets/room_theme.dart';
 import 'cricket_mode_module.dart';
 import 'cricket_room_mode_module.dart';
@@ -23,17 +25,50 @@ class CricketRoomControlsModule extends StatefulWidget {
   State<CricketRoomControlsModule> createState() => _CricketRoomControlsModuleState();
 }
 
+
 class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
   bool _expanded = false;
+  Offset _position = const Offset(14, 94);
+
+  Offset _clampPosition(Offset next, Size size, {required bool expanded}) {
+    final width = expanded ? 178.0 : 54.0;
+    final height = expanded ? 154.0 : 54.0;
+    final maxX = math.max(8.0, size.width - width - 8);
+    final maxY = math.max(8.0, size.height - height - 76);
+    return Offset(
+      next.dx.clamp(8.0, maxX).toDouble(),
+      next.dy.clamp(54.0, maxY).toDouble(),
+    );
+  }
+
+  void _move(DragUpdateDetails details, Size size) {
+    setState(() {
+      _position = _clampPosition(
+        _position + details.delta,
+        size,
+        expanded: _expanded,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topRight,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 94, 14, 0),
-        child: Material(
-          color: Colors.transparent,
+    final size = MediaQuery.sizeOf(context);
+    final safePosition = _clampPosition(_position, size, expanded: _expanded);
+
+    if (safePosition != _position) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _position = safePosition);
+      });
+    }
+
+    return Positioned(
+      left: safePosition.dx,
+      top: safePosition.dy,
+      child: Material(
+        color: Colors.transparent,
+        child: GestureDetector(
+          onPanUpdate: (details) => _move(details, size),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
@@ -72,17 +107,24 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            const Icon(Icons.sports_cricket_rounded, color: Colors.white, size: 25),
+            const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 24),
             Positioned(
-              right: 6,
-              bottom: 6,
+              right: 5,
+              bottom: 5,
               child: Container(
-                width: 10,
-                height: 10,
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
                   color: widget.canManage ? const Color(0xFFFFD36A) : Colors.white38,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xEE07160D), width: 1.5),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xEE07160D), width: 1.2),
+                ),
+                child: const Text(
+                  'CP',
+                  style: TextStyle(
+                    color: Color(0xFF251538),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ),
@@ -106,12 +148,12 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(colors: [Color(0xFF0E8F54), Color(0xFF86FF9D)]),
               ),
-              child: const Icon(Icons.sports_cricket_rounded, color: Colors.white, size: 16),
+              child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 16),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                widget.canManage ? 'Umpire CP' : 'Cricket',
+                widget.canManage ? 'Cricket CP' : 'Cricket',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
@@ -129,14 +171,8 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
         ),
         const SizedBox(height: 8),
         _CricketControlButton(
-          icon: Icons.table_chart_rounded,
-          label: 'Points Table',
-          enabled: true,
-          onTap: () => _openPointsTable(context),
-        ),
-        _CricketControlButton(
-          icon: Icons.workspace_premium_rounded,
-          label: 'Result',
+          icon: Icons.scoreboard_rounded,
+          label: 'Scoreboard',
           enabled: true,
           onTap: () => _openResult(context),
         ),
@@ -146,16 +182,13 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
           danger: true,
           enabled: widget.canManage,
           onTap: () {
+            LiveRoomMediaSignalingService.instance.endCricketMode(widget.controller.match.roomId);
             CricketRoomModeRegistry.deactivateRoom(roomId: widget.controller.match.roomId);
             widget.onEndMode();
           },
         ),
       ],
     );
-  }
-
-  void _openPointsTable(BuildContext context) {
-    CricketRoomModeModule.openPointsTable(context: context, rows: _pointsRows());
   }
 
   void _openResult(BuildContext context) {
@@ -165,42 +198,6 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
       backgroundColor: Colors.transparent,
       builder: (_) => CricketMatchResultSheet(controller: widget.controller),
     );
-  }
-
-  List<CricketPointsRow> _pointsRows() {
-    final match = widget.controller.match;
-    final snapshot = match.snapshot;
-    final teams = widget.controller.tournament.teams.isEmpty
-        ? <String>[match.teamA.name, match.teamB.name]
-        : widget.controller.tournament.teams;
-    final rows = <CricketPointsRow>[];
-
-    for (var index = 0; index < teams.length; index += 1) {
-      final isBattingTeam = teams[index] == match.battingTeam.name || index == 0;
-      final runsFor = isBattingTeam ? snapshot.runs : math.max(0, snapshot.runs - 8 - (index * 4));
-      final runsAgainst = isBattingTeam ? math.max(0, snapshot.runs - 11) : snapshot.runs;
-      final balls = math.max(6, snapshot.legalBalls == 0 ? 24 : snapshot.legalBalls);
-      rows.add(
-        CricketPointsRow(
-          teamName: teams[index],
-          played: snapshot.legalBalls == 0 ? 0 : 1,
-          won: isBattingTeam && snapshot.runs > runsAgainst ? 1 : 0,
-          lost: !isBattingTeam && snapshot.runs > runsFor ? 1 : 0,
-          tied: 0,
-          noResult: 0,
-          points: isBattingTeam && snapshot.runs > runsAgainst ? widget.controller.tournament.rules.winPoints : 0,
-          runsFor: runsFor,
-          ballsFaced: balls,
-          runsAgainst: runsAgainst,
-          ballsBowled: balls,
-          wicketsLost: isBattingTeam ? snapshot.wickets : math.max(0, snapshot.wickets - 1),
-          wicketsTaken: isBattingTeam ? math.max(0, snapshot.wickets - 1) : snapshot.wickets,
-          form: isBattingTeam ? 'W' : 'L',
-        ),
-      );
-    }
-
-    return rows;
   }
 }
 

@@ -143,6 +143,8 @@ wss.on('connection', (ws) => {
       if (type === 'room/system_message') return handlers.roomSystemMessage({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'room/chat_clear') return handlers.roomChatClear({ room: currentRoom, peer: currentPeer });
       if (type === 'room/chat') return handlers.roomChat({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'room_cricket/start') return handlers.roomCricketStart({ room: currentRoom, peer: currentPeer, payload });
+      if (type === 'room_cricket/end') return handlers.roomCricketEnd({ room: currentRoom, peer: currentPeer });
       if (type === 'room_music/control') return handlers.roomMusicControl({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'room_music/producer_started') return handlers.roomMusicProducerStarted({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'room_music/stop') return handlers.roomMusicStop({ room: currentRoom, peer: currentPeer });

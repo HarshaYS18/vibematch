@@ -5,6 +5,7 @@ const {
   roomSnapshot,
   createPeer,
   createDefaultMusicState,
+  createDefaultCricketState,
   findPeerByUserId,
   seatIndexFrom,
   clearPeerSeat,
@@ -62,6 +63,15 @@ function joinRoom({ ws, payload, setSession }) {
   send(ws, 'room/joined', { peer_id: peer.id, room: roomSnapshot(room) });
   if (room.musicState?.active === true) {
     send(ws, 'room_music/state', { room_id: room.id, music_state: room.musicState });
+  }
+  if (room.cricketState?.active === true) {
+    send(ws, 'room_cricket/state', {
+      room_id: room.id,
+      active: true,
+      cricket_state: room.cricketState,
+      setup: room.cricketState.setup,
+      room: roomSnapshot(room),
+    });
   }
   broadcast(room, 'room/peer_joined', {
     peer_id: peer.id,
@@ -506,6 +516,52 @@ function roomMusicStop({ room, peer }) {
   });
 }
 
+function roomCricketStart({ room, peer, payload }) {
+  if (!canControlRoom(peer)) throw new Error('Only host/admin can start Cricket Mode.');
+
+  const setup = payload.setup || payload;
+  room.cricketState = {
+    active: true,
+    action: 'start',
+    controllerPeerId: peer.id,
+    controllerUserId: peer.userId,
+    controllerName: peer.displayName,
+    setup,
+    updatedAt: new Date().toISOString(),
+  };
+
+  broadcast(room, 'room_cricket/state', {
+    id: randomUUID(),
+    room_id: room.id,
+    active: true,
+    cricket_state: room.cricketState,
+    setup,
+    room: roomSnapshot(room),
+  });
+}
+
+function roomCricketEnd({ room, peer }) {
+  if (!canControlRoom(peer)) throw new Error('Only host/admin can end Cricket Mode.');
+
+  room.cricketState = {
+    ...createDefaultCricketState(),
+    action: 'stop',
+    controllerPeerId: peer.id,
+    controllerUserId: peer.userId,
+    controllerName: peer.displayName,
+    updatedAt: new Date().toISOString(),
+  };
+
+  broadcast(room, 'room_cricket/state', {
+    id: randomUUID(),
+    room_id: room.id,
+    active: false,
+    cricket_state: room.cricketState,
+    setup: null,
+    room: roomSnapshot(room),
+  });
+}
+
 function peerClosed(room, peer) {
   room.peers.delete(peer.id);
   if (room.musicState?.controllerPeerId === peer.id || room.musicState?.producerPeerId === peer.id) {
@@ -548,5 +604,7 @@ module.exports = {
   roomMusicControl,
   roomMusicProducerStarted,
   roomMusicStop,
+  roomCricketStart,
+  roomCricketEnd,
   peerClosed,
 };

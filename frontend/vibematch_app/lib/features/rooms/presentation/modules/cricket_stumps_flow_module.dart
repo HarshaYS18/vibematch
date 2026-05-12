@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../data/cricket_stumps_flow_repository.dart';
+import '../../data/live_room_media_signaling_service.dart';
 import '../widgets/room_theme.dart';
 import 'cricket_room_mode_signal.dart';
 
@@ -566,6 +567,11 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
           bowlerId: _bowler!.id,
         ),
       );
+      final startedSetup = CricketRoomModeSignal.setupFor(widget.roomId);
+      if (startedSetup != null) {
+        LiveRoomMediaSignalingService.instance.startCricketMode(startedSetup);
+      }
+
       widget.onSystemMessage?.call(
         '${_tossWinner!.name} won the toss and chose to ${_decision == _TossDecision.bat ? 'bat' : 'ball'}. Seat 3 is now the Umpire/scorer seat.',
       );

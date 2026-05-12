@@ -11,6 +11,9 @@ import '../../../core/network/vm_media_config.dart';
 import '../../../main.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
+import '../presentation/modules/cricket_room_mode_signal.dart';
+import '../presentation/widgets/cricket_room_backgrounds.dart';
+import '../presentation/widgets/room_theme.dart';
 import 'live_room_audio_service.dart';
 import 'live_room_foreground_service.dart';
 import 'live_room_presence_repository.dart';
@@ -339,6 +342,22 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void setRoomAnnouncement(String announcementText) {
     _send('room_settings/announcement', <String, Object?>{
       'announcement_text': announcementText.trim(),
+    });
+  }
+
+  void startCricketMode(CricketQuickMatchSetup setup) {
+    _send('room_cricket/start', <String, Object?>{
+      'room_id': setup.roomId,
+      'setup': setup.toJson(),
+    });
+  }
+
+  void endCricketMode(String roomId) {
+    final safeRoomId = roomId.trim();
+    if (safeRoomId.isEmpty) return;
+
+    _send('room_cricket/end', <String, Object?>{
+      'room_id': safeRoomId,
     });
   }
 
@@ -693,6 +712,30 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         if (roomData is Map<String, dynamic>) {
           roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
           _enforceCurrentUserAudioStateFromSnapshot(roomSnapshot.value);
+        }
+
+        return;
+      }
+
+      if (type == 'room_cricket/state') {
+        final roomId = payload['room_id']?.toString() ?? _roomId ?? '';
+        final cricketState = payload['cricket_state'];
+        final active = payload['active'] == true ||
+            (cricketState is Map<String, dynamic> &&
+                cricketState['active'] == true);
+
+        final rawSetup = payload['setup'] ??
+            (cricketState is Map<String, dynamic> ? cricketState['setup'] : null);
+
+        if (active && rawSetup is Map<String, dynamic>) {
+          final setup = CricketQuickMatchSetup.fromJson(rawSetup);
+          CricketRoomModeSignal.activateWithSetup(
+            roomId: roomId.isEmpty ? setup.roomId : roomId,
+            setup: setup,
+          );
+          activeRoomBackgroundTheme.value = cricketFloodlightArenaBackgroundTheme;
+        } else {
+          CricketRoomModeSignal.deactivate(roomId);
         }
 
         return;
