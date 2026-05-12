@@ -151,7 +151,12 @@ function adminAssignSeat({ room, payload }) {
     throw new Error(`Seat ${seatIndex + 1} is locked`);
   }
 
-  clearSeatOccupant(room, seatIndex);
+  for (const peer of room.peers.values()) {
+    if (peer.seatIndex === seatIndex && peer.userId !== target.userId) {
+      throw new Error(`Seat ${seatIndex + 1} is already occupied`);
+    }
+  }
+
   target.seatIndex = seatIndex;
   target.adminMuted = false;
 

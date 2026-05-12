@@ -509,22 +509,13 @@ class LiveRoomSeatController {
       return;
     }
 
-    final applicant = allRoomUsers.firstWhereOrNull(
-      (user) => user.id == applicantId,
-    );
-
-    if (applicant == null) {
-      messages[messageIndex] = latestEntry.copyWith(
-        message: '${latestEntry.senderName} is no longer in the room',
-        applicationExpired: true,
-      );
-      onToast('${latestEntry.senderName} is no longer in the room');
-      onChanged();
-      return;
-    }
-
+    // Important:
+    // Do not depend on allRoomUsers here. The applicant can exist in the
+    // live media server snapshot before the local allRoomUsers list refreshes.
+    // The media server is the source of truth and will assign only if the
+    // target user is still in the room and the requested seat is empty.
     LiveRoomMediaSignalingService.instance.forceAssignSeat(
-      targetUserId: applicant.id,
+      targetUserId: applicantId,
       seatIndex: seatIndex,
     );
 

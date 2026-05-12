@@ -26,8 +26,12 @@ class MiniProfileHeaderRow extends StatelessWidget {
   final VoidCallback onSetAdminTap;
   final VoidCallback onRemoveAdminTap;
 
-  bool get _isChannelHost => user.isHost || user.roleLabel.toLowerCase().contains('channel host');
-  bool get _isChannelAdmin => !_isChannelHost && (user.isRoomAdmin || user.roleLabel.toLowerCase() == 'admin');
+  bool get _isChannelHost =>
+      user.isHost || user.roleLabel.toLowerCase().contains('channel host');
+
+  bool get _isChannelAdmin =>
+      !_isChannelHost &&
+      (user.isRoomAdmin || user.roleLabel.toLowerCase() == 'admin');
 
   String get _roomTag {
     if (_isChannelHost) return 'Channel Host';
@@ -36,16 +40,22 @@ class MiniProfileHeaderRow extends StatelessWidget {
   }
 
   List<Color> get _tagGradient {
-    if (_isChannelHost) return const [Color(0xFFFFD166), Color(0xFFC99A3B), Color(0xFFFF8A3D)];
-    if (_isChannelAdmin) return const [Color(0xFF12C7B7), Color(0xFF4A9BFF), Color(0xFF6D5DF6)];
+    if (_isChannelHost) {
+      return const [Color(0xFFFFD166), Color(0xFFC99A3B), Color(0xFFFF8A3D)];
+    }
+    if (_isChannelAdmin) {
+      return const [Color(0xFF12C7B7), Color(0xFF4A9BFF), Color(0xFF6D5DF6)];
+    }
     return const [RoomColors.aqua, RoomColors.violet];
   }
 
-  Color get _tagShadowColor => _isChannelHost ? RoomColors.gold : RoomColors.aqua;
+  Color get _tagShadowColor =>
+      _isChannelHost ? RoomColors.gold : RoomColors.aqua;
 
   @override
   Widget build(BuildContext context) {
     final tag = _roomTag;
+
     return SizedBox(
       height: 32,
       child: Stack(
@@ -70,7 +80,6 @@ class MiniProfileHeaderRow extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (tag.isNotEmpty) ...[
                       _RoomRoleTag(
@@ -81,7 +90,7 @@ class MiniProfileHeaderRow extends StatelessWidget {
                       const SizedBox(width: 6),
                     ],
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 190),
+                      constraints: const BoxConstraints(maxWidth: 176),
                       child: Text(
                         user.name,
                         textAlign: TextAlign.center,
@@ -95,6 +104,17 @@ class MiniProfileHeaderRow extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (tag.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Opacity(
+                        opacity: 0,
+                        child: _RoomRoleTag(
+                          label: tag,
+                          gradient: _tagGradient,
+                          shadowColor: _tagShadowColor,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -135,9 +155,16 @@ class _RoomRoleTag extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: gradient),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradient,
+        ),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.62), width: 0.8),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.62),
+          width: 0.8,
+        ),
         boxShadow: [
           BoxShadow(
             color: shadowColor.withValues(alpha: 0.22),
@@ -150,7 +177,12 @@ class _RoomRoleTag extends StatelessWidget {
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Colors.white, fontSize: 9.4, fontWeight: FontWeight.w900, height: 1),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9.4,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
       ),
     );
   }
