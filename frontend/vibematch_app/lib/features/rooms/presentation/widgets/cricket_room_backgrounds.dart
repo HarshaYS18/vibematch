@@ -45,3 +45,36 @@ const List<RoomBackgroundTheme> cricketRoomBackgroundThemes = [
 bool isCricketRoomBackground(RoomBackgroundTheme theme) {
   return cricketRoomBackgroundThemes.any((item) => item.id == theme.id) || theme.id.startsWith('cricket_');
 }
+
+
+class CricketRoomBackgroundPickerSheet extends StatelessWidget {
+  const CricketRoomBackgroundPickerSheet({
+    super.key,
+    required this.currentTheme,
+    required this.onThemeSelected,
+  });
+
+  final RoomBackgroundTheme currentTheme;
+  final ValueChanged<RoomBackgroundTheme> onThemeSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return RoomBackgroundPickerSheet(
+      currentTheme: currentTheme,
+      onThemeSelected: onThemeSelected,
+      onStoreTap: () {
+        RoomToast.show(
+          context,
+          'Cricket backgrounds will update from CDN',
+        );
+      },
+      viewerState: const RoomBackgroundViewerState(
+        ownedThemeIds: {
+          'cricket_floodlight_arena',
+          'cricket_stadium_night',
+          'cricket_royal_pitch',
+        },
+      ),
+    );
+  }
+}
