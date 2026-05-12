@@ -18,6 +18,45 @@ function log(type, payload = {}) {
   console.log(`[${new Date().toISOString()}] ${type}`, payload);
 }
 
+function externalMusicPeer(payload = {}) {
+  const peerId = String(payload.controller_peer_id || payload.peer_id || 'external_music_controller').trim();
+  const userId = String(payload.controller_user_id || payload.user_id || 'external_music_user').trim();
+  const displayName = String(payload.controller_name || payload.display_name || 'Room music').trim();
+  return {
+    id: peerId || 'external_music_controller',
+    userId: userId || 'external_music_user',
+    displayName: displayName || 'Room music',
+    isHost: payload.is_host === true || payload.isHost === true,
+    isRoomAdmin: payload.is_room_admin !== false && payload.isRoomAdmin !== false,
+    roleLabel: 'Music Controller',
+  };
+}
+
+function handleExternalMusicEvent({ ws, type, payload }) {
+  const roomId = String(payload.room_id || payload.roomId || '').trim();
+  if (!roomId) return false;
+
+  const room = getOrCreateRoom(roomId);
+  const peer = externalMusicPeer(payload);
+
+  if (type === 'room_music/control_external') {
+    handlers.roomMusicControl({ room, peer, payload });
+    return true;
+  }
+
+  if (type === 'room_music/producer_started_external') {
+    handlers.roomMusicProducerStarted({ room, peer, payload });
+    return true;
+  }
+
+  if (type === 'room_music/stop_external') {
+    handlers.roomMusicStop({ room, peer });
+    return true;
+  }
+
+  return false;
+}
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'vibematch-media-server', rooms: rooms.size });
 });
@@ -78,6 +117,7 @@ wss.on('connection', (ws) => {
     log('event/received', { type, payload });
 
     try {
+      if (handleExternalMusicEvent({ ws, type, payload })) return;
       if (type === 'room/join') return handlers.joinRoom({ ws, payload, setSession });
       if (!requireRoom()) return;
 
