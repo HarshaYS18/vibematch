@@ -66,7 +66,7 @@ class _InboxPageState extends State<InboxPage> {
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
+      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF008069), content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
   }
 
   void _openLockSetupSheet() {
@@ -296,7 +296,14 @@ class _InboxPageState extends State<InboxPage> {
     final page = Stack(
       children: [
         Scaffold(
-          backgroundColor: const Color(0xFFFAF7F1),
+          backgroundColor: Colors.white,
+          floatingActionButton: FloatingActionButton(
+            onPressed: _openSearch,
+            backgroundColor: const Color(0xFF00A884),
+            foregroundColor: Colors.white,
+            elevation: 4,
+            child: const Icon(Icons.chat_rounded),
+          ),
           body: SafeArea(
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
@@ -304,21 +311,19 @@ class _InboxPageState extends State<InboxPage> {
                 SliverToBoxAdapter(child: InboxHeader(lockedCount: _controller.lockedCount, reportTaskCount: _controller.pendingReportTaskCount, onLockTap: _openLockedVault, onReportTasksTap: _openCsReportTasks, onSettingsTap: _openSettings, onSearchTap: _openSearch)),
                 SliverToBoxAdapter(child: InboxFilterBar(filters: _controller.filters, selectedFilter: _controller.selectedFilter, onChanged: _controller.selectFilter)),
                 if (_controller.isLoading && visibleConversations.isEmpty)
-                  const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
+                  const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator(color: Color(0xFF00A884))))
                 else if (visibleConversations.isEmpty)
                   const SliverFillRemaining(hasScrollBody: false, child: _EmptyInboxState())
                 else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 104),
-                    sliver: SliverList.separated(
-                      itemCount: visibleConversations.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 6),
-                      itemBuilder: (context, index) {
-                        final conversation = visibleConversations[index];
-                        return InboxConversationCard(conversation: conversation, onTap: () => _openConversation(conversation), onLongPress: () => _showChatOptions(conversation));
-                      },
-                    ),
+                  SliverList.separated(
+                    itemCount: visibleConversations.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1, indent: 78, endIndent: 12, color: Color(0xFFE9EDEF)),
+                    itemBuilder: (context, index) {
+                      final conversation = visibleConversations[index];
+                      return InboxConversationCard(conversation: conversation, onTap: () => _openConversation(conversation), onLongPress: () => _showChatOptions(conversation));
+                    },
                   ),
+                const SliverToBoxAdapter(child: SizedBox(height: 104)),
               ],
             ),
           ),
@@ -357,16 +362,16 @@ class _InboxChatOptionsSheet extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.72),
         padding: EdgeInsets.fromLTRB(14, 8, 14, 10 + bottomPadding),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))]),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))]),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
+            Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFD1D7DB), borderRadius: BorderRadius.circular(999))),
             const SizedBox(height: 10),
-            Text(conversation.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900)),
+            Text(conversation.title, style: const TextStyle(color: Color(0xFF111B21), fontSize: 17, fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
             _OptionTile(icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: conversation.isPinned ? 'Unpin chat' : 'Pin chat', onTap: onTogglePin),
             _OptionTile(icon: conversation.isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded, title: conversation.isMuted ? 'Unmute chat' : 'Mute chat', onTap: conversation.isOfficial ? null : onToggleMute),
@@ -390,14 +395,14 @@ class _OptionTile extends StatelessWidget {
     final disabled = onTap == null;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: Opacity(
         opacity: disabled ? 0.45 : 1,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-          margin: const EdgeInsets.only(bottom: 7),
-          decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))),
-          child: Row(children: [Icon(icon, color: const Color(0xFF4A2A63), size: 20), const SizedBox(width: 10), Expanded(child: Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900))), const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5))]),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          margin: const EdgeInsets.only(bottom: 5),
+          decoration: BoxDecoration(color: const Color(0xFFF0F2F5), borderRadius: BorderRadius.circular(14)),
+          child: Row(children: [Icon(icon, color: const Color(0xFF008069), size: 20), const SizedBox(width: 12), Expanded(child: Text(title, style: const TextStyle(color: Color(0xFF111B21), fontSize: 14, fontWeight: FontWeight.w700))), const Icon(Icons.chevron_right_rounded, color: Color(0xFF8696A0))]),
         ),
       ),
     );
@@ -408,6 +413,6 @@ class _EmptyInboxState extends StatelessWidget {
   const _EmptyInboxState();
   @override
   Widget build(BuildContext context) {
-    return Center(child: Container(margin: const EdgeInsets.all(24), padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), border: Border.all(color: const Color(0xFFECE2D8))), child: const Text('No chats here', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 14, fontWeight: FontWeight.w800))));
+    return Center(child: Container(margin: const EdgeInsets.all(24), padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: const Color(0xFFF0F2F5), borderRadius: BorderRadius.circular(22)), child: const Text('No chats here', style: TextStyle(color: Color(0xFF54656F), fontSize: 14, fontWeight: FontWeight.w700))));
   }
 }
