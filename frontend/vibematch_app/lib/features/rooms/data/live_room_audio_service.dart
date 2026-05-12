@@ -53,6 +53,8 @@ class LiveRoomAudioService {
   final ValueNotifier<bool> localMicCapturing = ValueNotifier<bool>(false);
   final ValueNotifier<bool> audioPublishing = ValueNotifier<bool>(false);
   final ValueNotifier<int> remoteAudioCount = ValueNotifier<int>(0);
+  final ValueNotifier<List<RTCVideoRenderer>> remoteAudioRenderers =
+      ValueNotifier<List<RTCVideoRenderer>>(<RTCVideoRenderer>[]);
   final ValueNotifier<List<AudioSeatSnapshot>> seats = ValueNotifier<List<AudioSeatSnapshot>>(<AudioSeatSnapshot>[]);
   final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
 
@@ -120,6 +122,56 @@ class LiveRoomAudioService {
     _emitWithAck('setSelfMuted', <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'muted': muted}, onAck: _handleSeatAck);
   }
 
+
+  Future<bool> startRoomMusic({
+    required String url,
+    required String title,
+  }) async {
+    final safeUrl = url.trim();
+    if (safeUrl.isEmpty) {
+      _setError('Room music URL is empty.');
+      return false;
+    }
+
+    if (!_canSendRoomEvent()) {
+      _scheduleRecovery('start room music while disconnected');
+      _setError('Audio room is not connected yet. Try again after joining audio.');
+      return false;
+    }
+
+    final ack = await _emitWithAckFuture('startRoomMusic', <String, Object?>{
+      'roomId': _roomId,
+      'peerId': _peerId,
+      'url': safeUrl,
+      'title': title.trim().isEmpty ? 'Room music' : title.trim(),
+    });
+
+    if (ack['ok'] == true) {
+      _debug('room music started: ${ack['music']}');
+      return true;
+    }
+
+    _setError('Room music start failed: ${ack['error'] ?? 'unknown'}');
+    return false;
+  }
+
+  Future<bool> stopRoomMusic() async {
+    if (!_canSendRoomEvent()) return false;
+
+    final ack = await _emitWithAckFuture('stopRoomMusic', <String, Object?>{
+      'roomId': _roomId,
+      'peerId': _peerId,
+    });
+
+    if (ack['ok'] == true) {
+      _debug('room music stopped');
+      return true;
+    }
+
+    _setError('Room music stop failed: ${ack['error'] ?? 'unknown'}');
+    return false;
+  }
+
   Future<void> recoverAfterForeground() async {
     _debug('audio foreground recovery requested');
     await _recoverSession('app foreground');
@@ -139,6 +191,7 @@ class LiveRoomAudioService {
     _selfMuted = true;
     joined.value = false;
     seats.value = <AudioSeatSnapshot>[];
+    remoteAudioRenderers.value = <RTCVideoRenderer>[];
     _roomId = null;
     _peerId = null;
     _currentUser = null;
@@ -630,16 +683,55 @@ class LiveRoomAudioService {
       if (_remoteConsumersByProducerId.containsKey(producerId)) return;
       _remoteConsumersByProducerId[producerId] = consumer;
 
+      try {
+        consumer.track.enabled = true;
+      } catch (error) {
+        _debug('remote audio track enable failed producer=$producerId error=$error');
+      }
+
+      try {
+        consumer.resume();
+      } catch (error) {
+        _debug('local consumer resume failed producer=$producerId error=$error');
+      }
+
+      try {
+        await Helper.setSpeakerphoneOn(true);
+      } catch (error) {
+        _debug('set speakerphone failed: $error');
+      }
+
       final renderer = RTCVideoRenderer();
       await renderer.initialize();
       renderer.srcObject = consumer.stream;
+
       _remoteAudioRenderersByProducerId[producerId] = renderer;
       remoteAudioCount.value = _remoteConsumersByProducerId.length;
+      remoteAudioRenderers.value =
+          List<RTCVideoRenderer>.from(_remoteAudioRenderersByProducerId.values);
+
+      final resumeAck = await _emitWithAckFuture('resumeConsumer', <String, Object?>{
+        'roomId': _roomId,
+        'peerId': _peerId,
+        'consumerId': consumer.id,
+        'producerId': producerId,
+      });
+
+      if (resumeAck['ok'] != true) {
+        _debug('server consumer resume failed producer=$producerId ack=$resumeAck');
+      }
 
       consumer.on('transportclose', () => unawaited(_closeRemoteConsumer(producerId)));
       consumer.on('trackended', () => unawaited(_closeRemoteConsumer(producerId)));
 
-      _debug('remote audio consumer attached producer=$producerId consumer=${consumer.id} track=${consumer.track.id}');
+      _debug(
+        'remote audio consumer attached/resumed '
+        'producer=$producerId '
+        'consumer=${consumer.id} '
+        'track=${consumer.track.id} '
+        'enabled=${consumer.track.enabled} '
+        'stream=${consumer.stream.id}',
+      );
     } catch (error) {
       _setError('Remote consumer attach failed: $error');
     }
@@ -713,6 +805,8 @@ class LiveRoomAudioService {
       await renderer?.dispose();
     } catch (_) {}
     remoteAudioCount.value = _remoteConsumersByProducerId.length;
+    remoteAudioRenderers.value =
+        List<RTCVideoRenderer>.from(_remoteAudioRenderersByProducerId.values);
     _closingRemoteProducerIds.remove(producerId);
     if (consumer != null || renderer != null) _debug('remote audio consumer closed producer=$producerId');
   }

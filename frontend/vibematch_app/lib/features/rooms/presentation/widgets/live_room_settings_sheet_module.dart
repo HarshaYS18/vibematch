@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../data/room_music_controller.dart';
 import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
-import '../modules/live_room_music_player_module.dart';
 import 'live_room_blocked_list_sheet.dart';
 import 'room_settings_sheet.dart';
 
@@ -67,8 +67,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   void _openMusicModule(BuildContext context) {
     Navigator.of(context).pop();
     Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (!context.mounted) return;
-      LiveRoomMusicPlayerModule.open(context, roomId: roomId);
+      RoomMusicController.instance.showOverlay();
     });
   }
 

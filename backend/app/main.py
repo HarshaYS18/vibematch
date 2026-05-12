@@ -23,6 +23,7 @@ from app.api.routes import (
     mvp_social,
     notifications,
     role_badges,
+    room_music_media,
     social,
     users,
     vibes,
@@ -115,6 +116,7 @@ app.include_router(social.router)
 app.include_router(vibes.router)
 app.include_router(notifications.router)
 app.include_router(media.router)
+app.include_router(room_music_media.router)
 app.include_router(mvp_core.router)
 app.include_router(mvp_social.router)
 app.include_router(mvp_economy.router)

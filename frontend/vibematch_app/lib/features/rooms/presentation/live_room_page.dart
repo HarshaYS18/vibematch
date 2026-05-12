@@ -6,6 +6,7 @@ import '../../../app/app_routes.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
 import '../data/live_room_media_signaling_service.dart';
 import '../data/room_moderation_repository.dart';
+import '../data/room_music_controller.dart';
 import 'controllers/live_room_gift_controller.dart';
 import 'controllers/live_room_message_controller.dart';
 import 'controllers/live_room_mention_text_controller.dart';
@@ -26,6 +27,7 @@ import 'modules/live_room_gift_actions_module.dart';
 import 'modules/live_room_inbox_actions_module.dart';
 import 'modules/live_room_leave_actions_module.dart';
 import 'modules/live_room_message_actions_module.dart';
+import 'modules/room_music_overlay.dart';
 import 'widgets/live_room_announcement_sheet.dart';
 import 'widgets/live_room_background_sheet.dart';
 import 'widgets/live_room_body.dart';
@@ -36,6 +38,7 @@ import 'widgets/live_room_join_requests_sheet.dart';
 import 'widgets/live_room_mini_profile_launcher.dart';
 import 'widgets/live_room_minimized_bubble.dart';
 import 'widgets/live_room_privacy_sheet.dart';
+import 'widgets/live_room_remote_audio_renderers.dart';
 import 'widgets/live_room_seat_invite_notification.dart';
 import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
@@ -193,6 +196,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       _giftController.selectedReceiverIds.add(_roomUsers.first.id);
     }
 
+    unawaited(RoomMusicController.instance.attachRoom(widget.roomId));
     unawaited(_roomStateController.loadPersistedRoomSettings());
     _autoOccupySeatOneForHostOrAdmin();
   }
@@ -208,6 +212,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _messageFocusNode.dispose();
     _giftController.dispose();
     _moderationController.dispose();
+    unawaited(RoomMusicController.instance.stopBecauseControllerExitedRoom());
     _roomStateController.dispose();
     super.dispose();
   }
@@ -388,6 +393,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 onReject: _rejectSeatInvite,
                 onAccept: _acceptSeatInvite,
               ),
+            const RoomMusicOverlayHost(),
+            const LiveRoomRemoteAudioRenderers(),
           ],
         ),
       ),
@@ -1049,7 +1056,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         onSelected: (layout) {
           _seatController.changeLayout(layout);
           Navigator.pop(context);
-          unawaited(_roomStateController.loadPersistedRoomSettings());
+          unawaited(RoomMusicController.instance.attachRoom(widget.roomId));
+    unawaited(_roomStateController.loadPersistedRoomSettings());
           _autoOccupySeatOneForHostOrAdmin();
         },
       ),
