@@ -5,6 +5,7 @@ import '../../data/live_room_restrictions_service.dart';
 import '../../data/live_room_settings_event_bus.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
+import '../modules/cricket_mode_module.dart';
 import '../widgets/room_theme.dart';
 import '../widgets/vibesync_room_module.dart';
 
@@ -97,6 +98,7 @@ class LiveRoomStateController extends ChangeNotifier {
       final nextTheme = _themeFromId(event.backgroundThemeId);
       if (nextTheme != _selectedBackgroundTheme) {
         _selectedBackgroundTheme = nextTheme;
+        activeRoomBackgroundTheme.value = nextTheme;
         changed = true;
       }
     }
@@ -240,6 +242,7 @@ class LiveRoomStateController extends ChangeNotifier {
       final theme = _themeFromId(settings.backgroundThemeId);
       if (theme != _selectedBackgroundTheme) {
         _selectedBackgroundTheme = theme;
+        activeRoomBackgroundTheme.value = theme;
         changed = true;
       }
 
@@ -258,7 +261,10 @@ class LiveRoomStateController extends ChangeNotifier {
   RoomBackgroundTheme _themeFromId(String themeId) {
     final cleanId = themeId.trim();
     if (cleanId.isEmpty) return _selectedBackgroundTheme;
-    return ownedRoomBackgroundThemes.firstWhere(
+    return <RoomBackgroundTheme>[
+      ...ownedRoomBackgroundThemes,
+      ...cricketModeBackgroundThemes,
+    ].firstWhere(
       (theme) => theme.id == cleanId,
       orElse: () => _selectedBackgroundTheme,
     );
@@ -267,6 +273,7 @@ class LiveRoomStateController extends ChangeNotifier {
   void setRoomBackgroundTheme(RoomBackgroundTheme value) {
     if (value == _selectedBackgroundTheme) return;
     _selectedBackgroundTheme = value;
+    activeRoomBackgroundTheme.value = value;
     notifyListeners();
 
     _settingsRepository
@@ -275,6 +282,7 @@ class LiveRoomStateController extends ChangeNotifier {
           final theme = _themeFromId(settings.backgroundThemeId);
           if (theme != _selectedBackgroundTheme) {
             _selectedBackgroundTheme = theme;
+            activeRoomBackgroundTheme.value = theme;
             notifyListeners();
           }
           LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
