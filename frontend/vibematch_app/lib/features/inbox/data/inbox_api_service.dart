@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -278,3 +278,4 @@ class InboxApiService {
     return Color(int.tryParse(hex, radix: 16) ?? 0xFF6D5DF6);
   }
 }
+

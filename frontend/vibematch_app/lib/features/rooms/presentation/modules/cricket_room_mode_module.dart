@@ -514,6 +514,209 @@ String _matchResultText(CricketMatchState state) {
 
 
 
+
+class _CompletedBatterRow {
+  const _CompletedBatterRow({
+    required this.name,
+    required this.runs,
+    required this.balls,
+    required this.fours,
+    required this.sixes,
+    required this.out,
+  });
+
+  final String name;
+  final int runs;
+  final int balls;
+  final int fours;
+  final int sixes;
+  final bool out;
+
+  double get strikeRate => balls == 0 ? 0 : (runs * 100) / balls;
+}
+
+class _CompletedBowlerRow {
+  const _CompletedBowlerRow({
+    required this.name,
+    required this.legalBalls,
+    required this.runs,
+    required this.wickets,
+  });
+
+  final String name;
+  final int legalBalls;
+  final int runs;
+  final int wickets;
+
+  String get oversText => CricketMath.oversText(legalBalls);
+  double get economy => legalBalls == 0 ? 0 : runs / (legalBalls / 6);
+}
+
+List<CricketBallEvent> _inningsEventsForSummary(CricketMatchState state) {
+  return state.inningsEvents.toList();
+}
+
+List<_CompletedBatterRow> _completedBatters(CricketMatchState state) {
+  final events = _inningsEventsForSummary(state);
+  final rows = <_CompletedBatterRow>[];
+
+  for (final player in state.battingTeam.players) {
+    final playerEvents = events.where((event) => event.strikerId == player.id).toList();
+    final dismissed = events.any((event) => event.dismissedPlayerId == player.id);
+    if (playerEvents.isEmpty && !dismissed && player.id != state.strikerId && player.id != state.nonStrikerId) {
+      continue;
+    }
+
+    var runs = 0;
+    var balls = 0;
+    var fours = 0;
+    var sixes = 0;
+
+    for (final event in playerEvents) {
+      runs += event.runsBat;
+      if (event.isLegalBall) balls += 1;
+      if (event.runsBat == 4) fours += 1;
+      if (event.runsBat == 6) sixes += 1;
+    }
+
+    rows.add(
+      _CompletedBatterRow(
+        name: player.name,
+        runs: runs,
+        balls: balls,
+        fours: fours,
+        sixes: sixes,
+        out: dismissed,
+      ),
+    );
+  }
+
+  return rows;
+}
+
+List<_CompletedBowlerRow> _completedBowlers(CricketMatchState state) {
+  final events = _inningsEventsForSummary(state);
+  final rows = <_CompletedBowlerRow>[];
+
+  for (final player in state.bowlingTeam.players) {
+    final playerEvents = events.where((event) => event.bowlerId == player.id).toList();
+    if (playerEvents.isEmpty) continue;
+
+    var legalBalls = 0;
+    var runs = 0;
+    var wickets = 0;
+
+    for (final event in playerEvents) {
+      if (event.isLegalBall) legalBalls += 1;
+      if (event.extraType != CricketExtraType.penalty) runs += event.totalRuns;
+      if (event.wicketType != null && event.wicketType != CricketWicketType.runOut) wickets += 1;
+    }
+
+    rows.add(
+      _CompletedBowlerRow(
+        name: player.name,
+        legalBalls: legalBalls,
+        runs: runs,
+        wickets: wickets,
+      ),
+    );
+  }
+
+  return rows;
+}
+
+class _CompletedInningsScoreboard extends StatelessWidget {
+  const _CompletedInningsScoreboard({
+    required this.state,
+    required this.resultText,
+    required this.snapshot,
+  });
+
+  final CricketMatchState state;
+  final String resultText;
+  final CricketScoreSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final batters = _completedBatters(state);
+    final bowlers = _completedBowlers(state);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (resultText.isNotEmpty)
+          Text(
+            resultText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFFFFD36A),
+              fontSize: 15.5,
+              fontWeight: FontWeight.w900,
+            ),
+          )
+        else
+          Text(
+            '${state.battingTeam.name} innings complete',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFFFFD36A),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        const SizedBox(height: 3),
+        Text(
+          '${state.battingTeam.shortName} ${snapshot.runs}/${snapshot.wickets} (${snapshot.oversText})',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        for (final row in batters.take(4))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 3),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _TinyScoreText(
+                    '${row.name}${row.out ? '' : '*'}',
+                    strong: true,
+                  ),
+                ),
+                _TinyScoreText('${row.runs}(${row.balls})'),
+                const SizedBox(width: 8),
+                _TinyScoreText('4s ${row.fours}'),
+                const SizedBox(width: 8),
+                _TinyScoreText('6s ${row.sixes}'),
+                const SizedBox(width: 8),
+                _TinyScoreText('SR ${row.strikeRate.toStringAsFixed(0)}'),
+              ],
+            ),
+          ),
+        if (bowlers.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          for (final row in bowlers.take(2))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Row(
+                children: [
+                  Expanded(child: _TinyScoreText(row.name, strong: true)),
+                  _TinyScoreText('${row.oversText}-${row.runs}-${row.wickets}'),
+                  const SizedBox(width: 8),
+                  _TinyScoreText('ECO ${row.economy.toStringAsFixed(1)}'),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
 class CricketFixedScoreboard extends StatelessWidget {
   const CricketFixedScoreboard({
     super.key,
@@ -570,6 +773,14 @@ class CricketFixedScoreboard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (state.status == CricketMatchStatus.inningsBreak ||
+                state.status == CricketMatchStatus.completed)
+              _CompletedInningsScoreboard(
+                state: state,
+                resultText: resultText,
+                snapshot: snapshot,
+              )
+            else ...[
             Row(
               children: [
                 const Icon(
@@ -622,13 +833,11 @@ class CricketFixedScoreboard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             _CricbuzzBatterLine(
-              tag: 'Bats 1',
               name: '${striker.name}*',
               stats: strikerStats,
             ),
             const SizedBox(height: 4),
             _CricbuzzBatterLine(
-              tag: 'Bats 2',
               name: nonStriker.name,
               stats: nonStrikerStats,
             ),
@@ -670,6 +879,7 @@ class CricketFixedScoreboard extends StatelessWidget {
               ),
             ],
           ],
+            ],
         ),
       ),
     );
@@ -678,12 +888,10 @@ class CricketFixedScoreboard extends StatelessWidget {
 
 class _CricbuzzBatterLine extends StatelessWidget {
   const _CricbuzzBatterLine({
-    required this.tag,
     required this.name,
     required this.stats,
   });
 
-  final String tag;
   final String name;
   final _CricketBatterStats stats;
 
@@ -691,7 +899,6 @@ class _CricbuzzBatterLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        SizedBox(width: 42, child: _TinyScoreText(tag, strong: true)),
         Expanded(child: _TinyScoreText(name, strong: true)),
         _TinyScoreText('${stats.runs}(${stats.balls})'),
         const SizedBox(width: 8),

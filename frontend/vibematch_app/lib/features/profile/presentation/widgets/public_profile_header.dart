@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../../auth/models/role_badge.dart';
 import '../models/public_profile_models.dart';
@@ -40,6 +40,7 @@ class PublicProfileHeader extends StatelessWidget {
     this.showOwnerActions = false,
     this.followersCount,
     this.followingCount,
+    this.roomsCount,
   });
 
   final String displayName;
@@ -74,6 +75,7 @@ class PublicProfileHeader extends StatelessWidget {
   final bool showOwnerActions;
   final int? followersCount;
   final int? followingCount;
+  final int? roomsCount;
 
   List<Widget> _badgeLineItems() {
     final fallbackRole = roleTag?.trim();
@@ -95,6 +97,7 @@ class PublicProfileHeader extends StatelessWidget {
     final badges = _badgeLineItems();
     final followersText = _compactCount(followersCount ?? 0);
     final followingText = _compactCount(followingCount ?? 0);
+    final roomsText = _compactCount(roomsCount ?? 0);
     final score = matchScore;
 
     return Container(
@@ -170,7 +173,7 @@ class PublicProfileHeader extends StatelessWidget {
                 Row(children: [Expanded(child: PublicMainProfileButton(label: followStatus.label, icon: followStatus.icon, filled: true, onTap: onFollowTap)), const SizedBox(width: 10), Expanded(child: PublicMainProfileButton(label: 'Message', icon: Icons.chat_bubble_rounded, filled: false, onTap: onMessageTap))]),
               ],
               const SizedBox(height: 16),
-              Row(children: [Expanded(child: PublicStat(value: followersText, label: 'Followers')), const SizedBox(width: 6), Expanded(child: PublicStat(value: followingText, label: 'Following')), const SizedBox(width: 6), const Expanded(child: PublicStat(value: '0', label: 'Rooms')), const SizedBox(width: 6), const Expanded(child: PublicStat(value: '0', label: 'Received'))]),
+              Row(children: [Expanded(child: PublicStat(value: followersText, label: 'Followers')), const SizedBox(width: 6), Expanded(child: PublicStat(value: followingText, label: 'Following')), const SizedBox(width: 6), Expanded(child: PublicStat(value: roomsText, label: 'Rooms')), const SizedBox(width: 6), const Expanded(child: PublicStat(value: '0', label: 'Received'))]),
             ]),
           ),
         ],
@@ -216,3 +219,4 @@ class _PresenceLine extends StatelessWidget {
     return Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [PublicTinyStatusChip(icon: Icons.circle, label: presenceLabel, color: const Color(0xFF12C7B7)), if (roomName != null) InkWell(onTap: onRoomTap, borderRadius: BorderRadius.circular(99), child: PublicTinyStatusChip(icon: Icons.graphic_eq_rounded, label: 'In chatroom: $roomName', color: const Color(0xFF6D5DF6)))]);
   }
 }
+

@@ -4,20 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../data/cricket_stumps_flow_repository.dart';
 import '../../data/live_room_media_signaling_service.dart';
+import '../widgets/cricket_room_backgrounds.dart';
 import '../widgets/room_theme.dart';
 import 'cricket_room_mode_signal.dart';
 
-const RoomBackgroundTheme cricketStumpsPitchBackgroundTheme = RoomBackgroundTheme(
-  id: 'cricket_floodlight_arena',
-  name: 'Cricket Floodlight Arena',
-  accent: Color(0xFF65FF8F),
-  sourceType: RoomBackgroundSourceType.event,
-  unlockType: RoomBackgroundUnlockType.free,
-  ownershipType: RoomBackgroundOwnershipType.free,
-  isDefault: true,
-  overlayOpacity: 0.48,
-  fallbackColors: [Color(0xFF04130A), Color(0xFF0B3E1F)],
-);
 
 class CricketStumpsFlowModule {
   CricketStumpsFlowModule._();
@@ -550,7 +540,7 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
       );
 
       if (!mounted) return;
-      widget.onBackgroundChanged(cricketStumpsPitchBackgroundTheme);
+      widget.onBackgroundChanged(cricketFloodlightArenaBackgroundTheme);
       CricketRoomModeSignal.activateWithSetup(
         roomId: widget.roomId,
         setup: CricketQuickMatchSetup(

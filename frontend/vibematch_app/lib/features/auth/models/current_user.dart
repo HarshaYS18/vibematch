@@ -1,4 +1,4 @@
-import '../../profile/models/vip_wallet_models.dart';
+﻿import '../../profile/models/vip_wallet_models.dart';
 import 'role_badge.dart';
 
 class CurrentUser {
@@ -174,6 +174,38 @@ class CurrentUser {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'public_user_id': publicUserId,
+      'display_custom_id': displayCustomId,
+      'username': username,
+      'display_name': displayName,
+      'avatar_url': avatarUrl,
+      'bio': bio,
+      'cover_photo_urls': coverPhotoUrls,
+      'date_of_birth': dateOfBirth?.toIso8601String(),
+      'gender': gender,
+      'profession': profession,
+      'marital_status': maritalStatus,
+      'friend_gender_preference': friendGenderPreference,
+      'friend_marital_preference': friendMaritalPreference,
+      'interests': interests,
+      'roles': roles,
+      'primary_role': primaryRole,
+      'primary_role_badge': primaryRoleBadge?.toJson(),
+      'role_badges': roleBadges.map((badge) => badge.toJson()).toList(growable: false),
+      'vip': vip.toJson(),
+      'wallet': wallet.toJson(),
+      'is_active': isActive,
+      'is_banned': isBanned,
+      'last_device_id': lastDeviceId,
+      'last_login_at': lastLoginAt?.toIso8601String(),
+      'last_seen_at': lastSeenAt?.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
   CurrentUser copyWith({
     int? id,
     int? publicUserId,
@@ -339,3 +371,4 @@ class CurrentUser {
   String get roleDisplayLabel => primaryRoleBadge?.displayTitle ?? RoleBadge.fromRole(primaryRole).displayTitle;
   String? get rolePillLabel => primaryRoleBadge?.pillLabel;
 }
+

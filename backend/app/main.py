@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,7 @@ from app.api.routes import (
     inbox,
     inbox_ws,
     internal_test,
+    love_bonds,
     media,
     moderation,
     mvp_core,
@@ -56,6 +57,9 @@ from app.models import (
     InboxMessage,
     InboxParticipant,
     InboxReport,
+    LoveBond,
+    LoveBondInventory,
+    LoveBondRequest,
     MvpFeatureState,
     Room,
     RubyWithdrawRequest,
@@ -114,6 +118,7 @@ app.include_router(moderation.router)
 app.include_router(rooms.router)
 app.include_router(cricket.router)
 app.include_router(inbox.router)
+app.include_router(love_bonds.router)
 app.include_router(inbox_ws.router)
 app.include_router(social.router)
 app.include_router(vibes.router)
@@ -131,3 +136,6 @@ app.include_router(economy_admin.router)
 app.include_router(games.router)
 app.include_router(coin_sales.router)
 app.include_router(vip_admin.router)
+
+
+

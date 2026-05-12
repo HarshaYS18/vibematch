@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 class RoleBadge {
   const RoleBadge({
@@ -166,6 +166,26 @@ class RoleBadge {
     }
   }
 
+  Map<String, dynamic> toJson() {
+    String hex(Color color) {
+      final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
+      return '#${value.substring(2).toUpperCase()}';
+    }
+
+    return {
+      'role': role,
+      'display_title': displayTitle,
+      'badge_label': badgeLabel,
+      'pill_label': pillLabel,
+      'group': group,
+      'priority': priority,
+      'icon': icon,
+      'background_color': hex(backgroundColor),
+      'text_color': hex(textColor),
+      'border_color': hex(borderColor),
+      'show_verified_tick': showVerifiedTick,
+    };
+  }
   IconData get iconData {
     switch (icon) {
       case 'workspace_premium':
@@ -243,3 +263,4 @@ class RoleBadge {
     return fallback;
   }
 }
+

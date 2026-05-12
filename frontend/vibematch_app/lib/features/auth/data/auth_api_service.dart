@@ -1,13 +1,18 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../models/current_user.dart';
 
 class AuthApiService {
   const AuthApiService();
+
+  static const String _tokenKey = 'vm_auth_access_token';
+  static const String _userJsonKey = 'vm_auth_user_json';
+  static const String _deviceIdKey = 'vm_auth_device_id';
 
   static String get baseUrl => VmApiConfig.baseUrl;
 
@@ -21,9 +26,49 @@ class AuthApiService {
       return existingDeviceId;
     }
 
+    final prefs = await SharedPreferences.getInstance();
+    final savedDeviceId = prefs.getString(_deviceIdKey);
+    if (savedDeviceId != null && savedDeviceId.trim().isNotEmpty) {
+      _cachedDeviceId = savedDeviceId;
+      return savedDeviceId;
+    }
+
     final generatedDeviceId = 'vm-dev-${DateTime.now().millisecondsSinceEpoch.toString()}';
     _cachedDeviceId = generatedDeviceId;
+    await prefs.setString(_deviceIdKey, generatedDeviceId);
     return generatedDeviceId;
+  }
+
+  Future<void> restoreSavedSession() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    _cachedAccessToken = prefs.getString(_tokenKey);
+    _cachedDeviceId = prefs.getString(_deviceIdKey);
+
+    final savedUserJson = prefs.getString(_userJsonKey);
+    if (savedUserJson != null && savedUserJson.trim().isNotEmpty) {
+      try {
+        _cachedUser = CurrentUser.fromJson(jsonDecode(savedUserJson) as Map<String, dynamic>);
+        AuthUserRealtimeService.instance.publish(_cachedUser!);
+      } catch (_) {
+        _cachedUser = null;
+      }
+    }
+  }
+
+  Future<void> _persistSession({
+    required String accessToken,
+    required CurrentUser user,
+    required String deviceId,
+  }) async {
+    _cachedAccessToken = accessToken;
+    _cachedUser = user;
+    _cachedDeviceId = deviceId;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, accessToken);
+    await prefs.setString(_deviceIdKey, deviceId);
+    await prefs.setString(_userJsonKey, jsonEncode(user.toJson()));
   }
 
   Future<AuthLoginResult> devLogin({
@@ -69,7 +114,7 @@ class AuthApiService {
     _cachedDeviceId = resolvedDeviceId;
 
     final user = await getCurrentUser(accessToken: accessToken, forceRefresh: true);
-    _cachedUser = user;
+    await _persistSession(accessToken: accessToken, user: user, deviceId: resolvedDeviceId);
     AuthUserRealtimeService.instance.publish(user);
 
     return AuthLoginResult(accessToken: accessToken, tokenType: tokenType, user: user);
@@ -113,7 +158,7 @@ class AuthApiService {
     _cachedAccessToken = accessToken;
     _cachedDeviceId = resolvedDeviceId;
     final user = await getCurrentUser(accessToken: accessToken, forceRefresh: true);
-    _cachedUser = user;
+    await _persistSession(accessToken: accessToken, user: user, deviceId: resolvedDeviceId);
     AuthUserRealtimeService.instance.publish(user);
     return AuthLoginResult(accessToken: accessToken, tokenType: tokenType, user: user);
   }
@@ -140,8 +185,8 @@ class AuthApiService {
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final user = CurrentUser.fromJson(decoded);
 
-    _cachedAccessToken = token;
-    _cachedUser = user;
+    final deviceId = _cachedDeviceId ?? await getCurrentDeviceId();
+    await _persistSession(accessToken: token, user: user, deviceId: deviceId);
     AuthUserRealtimeService.instance.publish(user);
     return user;
   }
@@ -185,6 +230,10 @@ class AuthApiService {
   Future<void> logout() async {
     _cachedAccessToken = null;
     _cachedUser = null;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
+    await prefs.remove(_userJsonKey);
   }
 
   String? get cachedAccessToken => _cachedAccessToken;
@@ -228,3 +277,4 @@ class AuthLoginResult {
   final String tokenType;
   final CurrentUser user;
 }
+

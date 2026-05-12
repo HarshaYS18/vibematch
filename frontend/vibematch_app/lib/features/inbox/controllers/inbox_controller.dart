@@ -1,7 +1,8 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 
 import '../data/inbox_api_service.dart';
 import '../data/inbox_backup_api_service.dart';
+import '../../profile/data/love_bond_realtime_service.dart';
 import '../data/inbox_socket_service.dart';
 import '../models/inbox_models.dart';
 
@@ -284,6 +285,73 @@ class InboxController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> acceptLoveBondRequest({
+    required String conversationId,
+    required InboxMessage message,
+  }) async {
+    final requestId = message.loveBondRequestId;
+    if (requestId == null || requestId.trim().isEmpty) return;
+
+    _updateMessage(
+      conversationId: conversationId,
+      message: message,
+      mapper: (item) => item.copyWith(
+        text: 'Accepted ${item.loveBondCardName ?? 'relationship'} request.',
+        loveBondStatus: 'accepted',
+      ),
+    );
+
+    try {
+      await LoveBondRealtimeService.acceptRequestOnBackend(
+        requestId: requestId,
+        receiverPublicUserId: 0,
+      );
+      await loadFromBackend();
+    } catch (_) {
+      _updateMessage(
+        conversationId: conversationId,
+        message: message,
+        mapper: (item) => item.copyWith(
+          text: message.text,
+          loveBondStatus: message.loveBondStatus ?? 'pending',
+        ),
+      );
+    }
+  }
+
+  Future<void> rejectLoveBondRequest({
+    required String conversationId,
+    required InboxMessage message,
+  }) async {
+    final requestId = message.loveBondRequestId;
+    if (requestId == null || requestId.trim().isEmpty) return;
+
+    _updateMessage(
+      conversationId: conversationId,
+      message: message,
+      mapper: (item) => item.copyWith(
+        text: 'Rejected ${item.loveBondCardName ?? 'relationship'} request.',
+        loveBondStatus: 'rejected',
+      ),
+    );
+
+    try {
+      await LoveBondRealtimeService.rejectRequestOnBackend(
+        requestId: requestId,
+        receiverPublicUserId: 0,
+      );
+      await loadFromBackend();
+    } catch (_) {
+      _updateMessage(
+        conversationId: conversationId,
+        message: message,
+        mapper: (item) => item.copyWith(
+          text: message.text,
+          loveBondStatus: message.loveBondStatus ?? 'pending',
+        ),
+      );
+    }
+  }
   Future<void> sendTextMessage({required String conversationId, required String text, String? replyToText}) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
@@ -296,13 +364,13 @@ class InboxController extends ChangeNotifier {
   }
 
   void addMockAttachment({required String conversationId, required InboxMessageType type}) {
-    final text = switch (type) { InboxMessageType.image => '📷 Photo attached', InboxMessageType.voice => '🎙 Voice message 0:08', InboxMessageType.document => '📄 Document attached', InboxMessageType.location => '📍 Shared location', _ => 'Attachment' };
+    final text = switch (type) { InboxMessageType.image => 'ðŸ“· Photo attached', InboxMessageType.voice => 'ðŸŽ™ Voice message 0:08', InboxMessageType.document => 'ðŸ“„ Document attached', InboxMessageType.location => 'ðŸ“ Shared location', _ => 'Attachment' };
     _appendMessage(conversationId, InboxMessage(id: 'local_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: text, time: 'Now', isMine: true, type: type, status: InboxMessageStatus.read));
   }
 
   void addPickedDocumentAttachment({required String conversationId, required String fileName, required int sizeBytes, String? filePath}) {
     final sizeLabel = _formatBytes(sizeBytes);
-    _appendMessage(conversationId, InboxMessage(id: 'doc_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: '📄 $fileName • $sizeLabel', time: 'Now', isMine: true, type: InboxMessageType.document, status: InboxMessageStatus.read));
+    _appendMessage(conversationId, InboxMessage(id: 'doc_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: 'ðŸ“„ $fileName â€¢ $sizeLabel', time: 'Now', isMine: true, type: InboxMessageType.document, status: InboxMessageStatus.read));
   }
 
   Future<InboxReportTask> submitConversationReport({required InboxConversation conversation, required String reason}) async {
@@ -337,3 +405,4 @@ class InboxController extends ChangeNotifier {
   void _upsertReportTask(InboxReportTask task) { final index = _reportTasks.indexWhere((item) => item.id == task.id); if (index == -1) { _reportTasks.insert(0, task); } else { _reportTasks[index] = task; } _safeNotify(); }
   bool _sameMessage(InboxMessage a, InboxMessage b) => a.id != null && b.id != null ? a.id == b.id : a.sender == b.sender && a.text == b.text && a.time == b.time && a.isMine == b.isMine;
 }
+

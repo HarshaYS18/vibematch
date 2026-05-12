@@ -1,0 +1,289 @@
+﻿import 'package:flutter/foundation.dart';
+
+import '../presentation/love_bonds/models/love_bond_models.dart';
+
+enum LoveBondRequestStatus {
+  pending,
+  accepted,
+  rejected,
+}
+
+class LoveBondPerson {
+  const LoveBondPerson({
+    required this.userId,
+    required this.publicUserId,
+    required this.displayName,
+    this.gender,
+    this.avatarUrl,
+  });
+
+  final String userId;
+  final int publicUserId;
+  final String displayName;
+  final String? gender;
+  final String? avatarUrl;
+
+  String get avatarInitial {
+    final trimmed = displayName.trim();
+    return trimmed.isEmpty ? 'V' : trimmed[0].toUpperCase();
+  }
+
+  bool get isMale {
+    final value = gender?.trim().toLowerCase();
+    return value == 'male' || value == 'boy' || value == 'man';
+  }
+
+  bool get isFemale {
+    final value = gender?.trim().toLowerCase();
+    return value == 'female' || value == 'girl' || value == 'woman';
+  }
+}
+
+class LoveBondRequest {
+  const LoveBondRequest({
+    required this.id,
+    required this.cardType,
+    required this.cardName,
+    required this.sender,
+    required this.receiver,
+    required this.status,
+    required this.createdAt,
+  });
+
+  final String id;
+  final LoveBondType cardType;
+  final String cardName;
+  final LoveBondPerson sender;
+  final LoveBondPerson receiver;
+  final LoveBondRequestStatus status;
+  final DateTime createdAt;
+
+  LoveBondRequest copyWith({
+    LoveBondRequestStatus? status,
+  }) {
+    return LoveBondRequest(
+      id: id,
+      cardType: cardType,
+      cardName: cardName,
+      sender: sender,
+      receiver: receiver,
+      status: status ?? this.status,
+      createdAt: createdAt,
+    );
+  }
+
+  bool involvesPublicUserId(int publicUserId) {
+    return sender.publicUserId == publicUserId || receiver.publicUserId == publicUserId;
+  }
+
+  LoveBondPerson? ownerFor(int publicUserId) {
+    if (sender.publicUserId == publicUserId) return sender;
+    if (receiver.publicUserId == publicUserId) return receiver;
+    return null;
+  }
+
+  LoveBondPerson? partnerFor(int publicUserId) {
+    if (sender.publicUserId == publicUserId) return receiver;
+    if (receiver.publicUserId == publicUserId) return sender;
+    return null;
+  }
+
+  String profileTitleFor(int profilePublicUserId) {
+    if (cardType == LoveBondType.lover) return 'Lover';
+    if (cardType == LoveBondType.bestie) return 'Bestie';
+
+    final partner = partnerFor(profilePublicUserId);
+    if (partner == null) return cardName;
+
+    if (partner.isFemale) return 'Sister';
+    if (partner.isMale) return 'Brother';
+
+    // If gender is missing, fall back to the originally sent card title.
+    return cardName.trim().isEmpty ? 'Sibling' : cardName;
+  }
+}
+
+class LoveBondInventoryItem {
+  const LoveBondInventoryItem({
+    required this.cardType,
+    required this.cardName,
+    required this.quantity,
+  });
+
+  final LoveBondType cardType;
+  final String cardName;
+  final int quantity;
+
+  LoveBondInventoryItem copyWith({
+    int? quantity,
+  }) {
+    return LoveBondInventoryItem(
+      cardType: cardType,
+      cardName: cardName,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+}
+
+class LoveBondRealtimeService {
+  const LoveBondRealtimeService._();
+
+  static final ValueNotifier<List<LoveBondRequest>> requests =
+      ValueNotifier(<LoveBondRequest>[]);
+
+  static final ValueNotifier<Map<int, List<LoveBondInventoryItem>>> inventoryByPublicUserId =
+      ValueNotifier(<int, List<LoveBondInventoryItem>>{});
+
+  static List<LoveBondRequest> activeBondsFor(int publicUserId) {
+    return requests.value
+        .where((request) => request.status == LoveBondRequestStatus.accepted)
+        .where((request) => request.involvesPublicUserId(publicUserId))
+        .toList(growable: false);
+  }
+
+  static List<LoveBondRequest> pendingInboxRequestsFor(int publicUserId) {
+    return requests.value
+        .where((request) => request.status == LoveBondRequestStatus.pending)
+        .where((request) => request.receiver.publicUserId == publicUserId)
+        .toList(growable: false);
+  }
+
+  static void seedInventoryIfEmpty(int publicUserId) {
+    if (inventoryByPublicUserId.value.containsKey(publicUserId)) return;
+
+    final next = Map<int, List<LoveBondInventoryItem>>.from(inventoryByPublicUserId.value);
+    next[publicUserId] = const [
+      LoveBondInventoryItem(cardType: LoveBondType.lover, cardName: 'Love', quantity: 1),
+      LoveBondInventoryItem(cardType: LoveBondType.bestie, cardName: 'Bestie', quantity: 1),
+      LoveBondInventoryItem(cardType: LoveBondType.brother, cardName: 'Sibling', quantity: 1),
+    ];
+    inventoryByPublicUserId.value = next;
+  }
+
+  static bool hasCard({
+    required int ownerPublicUserId,
+    required LoveBondType cardType,
+  }) {
+    seedInventoryIfEmpty(ownerPublicUserId);
+    final normalizedCardType = _inventoryCardType(cardType);
+    return inventoryByPublicUserId.value[ownerPublicUserId]
+            ?.any((item) => _inventoryCardType(item.cardType) == normalizedCardType && item.quantity > 0) ??
+        false;
+  }
+
+  static LoveBondRequest sendRequest({
+    required LoveBondType cardType,
+    required String cardName,
+    required LoveBondPerson sender,
+    required LoveBondPerson receiver,
+  }) {
+    seedInventoryIfEmpty(sender.publicUserId);
+
+    final normalizedCardType = _inventoryCardType(cardType);
+    if (!hasCard(ownerPublicUserId: sender.publicUserId, cardType: normalizedCardType)) {
+      throw StateError('You do not own this relationship card.');
+    }
+
+    final existingPending = requests.value.where((request) {
+      return request.status == LoveBondRequestStatus.pending &&
+          _inventoryCardType(request.cardType) == normalizedCardType &&
+          request.sender.publicUserId == sender.publicUserId &&
+          request.receiver.publicUserId == receiver.publicUserId;
+    }).isNotEmpty;
+
+    if (existingPending) {
+      throw StateError('Request already pending.');
+    }
+
+    _decreaseInventory(ownerPublicUserId: sender.publicUserId, cardType: normalizedCardType);
+
+    final request = LoveBondRequest(
+      id: 'love_bond_${DateTime.now().microsecondsSinceEpoch}',
+      cardType: normalizedCardType,
+      cardName: normalizedCardType == LoveBondType.brother ? 'Sibling' : cardName,
+      sender: sender,
+      receiver: receiver,
+      status: LoveBondRequestStatus.pending,
+      createdAt: DateTime.now(),
+    );
+
+    requests.value = [...requests.value, request];
+    return request;
+  }
+
+  static void acceptRequest(String requestId) {
+    _setRequestStatus(requestId, LoveBondRequestStatus.accepted);
+  }
+
+  static void rejectRequest(String requestId) {
+    final request = requests.value.where((item) => item.id == requestId).firstOrNull;
+    if (request == null || request.status != LoveBondRequestStatus.pending) return;
+
+    _increaseInventory(
+      ownerPublicUserId: request.sender.publicUserId,
+      cardType: _inventoryCardType(request.cardType),
+    );
+    _setRequestStatus(requestId, LoveBondRequestStatus.rejected);
+  }
+
+  static LoveBondType _inventoryCardType(LoveBondType type) {
+    // Brother and Sister use one shared Store asset/card: Sibling.
+    if (type == LoveBondType.sister) return LoveBondType.brother;
+    return type;
+  }
+
+  static void _setRequestStatus(String requestId, LoveBondRequestStatus status) {
+    requests.value = requests.value.map((request) {
+      if (request.id != requestId) return request;
+      return request.copyWith(status: status);
+    }).toList(growable: false);
+  }
+
+  static void _decreaseInventory({
+    required int ownerPublicUserId,
+    required LoveBondType cardType,
+  }) {
+    final current = [...(inventoryByPublicUserId.value[ownerPublicUserId] ?? const <LoveBondInventoryItem>[])];
+    final normalizedCardType = _inventoryCardType(cardType);
+
+    final nextItems = current.map((item) {
+      if (_inventoryCardType(item.cardType) != normalizedCardType) return item;
+      return item.copyWith(quantity: (item.quantity - 1).clamp(0, 999999));
+    }).toList(growable: false);
+
+    final next = Map<int, List<LoveBondInventoryItem>>.from(inventoryByPublicUserId.value);
+    next[ownerPublicUserId] = nextItems;
+    inventoryByPublicUserId.value = next;
+  }
+
+  static void _increaseInventory({
+    required int ownerPublicUserId,
+    required LoveBondType cardType,
+  }) {
+    seedInventoryIfEmpty(ownerPublicUserId);
+    final current = [...(inventoryByPublicUserId.value[ownerPublicUserId] ?? const <LoveBondInventoryItem>[])];
+    final normalizedCardType = _inventoryCardType(cardType);
+    var found = false;
+
+    final nextItems = current.map((item) {
+      if (_inventoryCardType(item.cardType) != normalizedCardType) return item;
+      found = true;
+      return item.copyWith(quantity: item.quantity + 1);
+    }).toList(growable: false);
+
+    final finalItems = found
+        ? nextItems
+        : [
+            ...nextItems,
+            LoveBondInventoryItem(
+              cardType: normalizedCardType,
+              cardName: normalizedCardType == LoveBondType.brother ? 'Sibling' : normalizedCardType.defaultTitle,
+              quantity: 1,
+            ),
+          ];
+
+    final next = Map<int, List<LoveBondInventoryItem>>.from(inventoryByPublicUserId.value);
+    next[ownerPublicUserId] = finalItems;
+    inventoryByPublicUserId.value = next;
+  }
+}

@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
+import '../../data/love_bond_realtime_service.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../love_bonds/widgets/love_bond_card.dart';
+import '../love_bonds/widgets/love_bond_realtime_cards.dart';
 import '../models/me_page_models.dart';
 import 'me_shared_widgets.dart';
 
@@ -58,48 +60,61 @@ class MeVipSvipPanel extends StatelessWidget {
 class MeRelationshipPanel extends StatelessWidget {
   const MeRelationshipPanel({
     super.key,
+    required this.publicUserId,
     required this.relationshipLabel,
     required this.onBondTap,
   });
 
+  final int publicUserId;
   final String relationshipLabel;
   final ValueChanged<LoveBondCardData> onBondTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: meWhitePanelDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Love & Bonds',
-            style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900),
+    LoveBondRealtimeService.seedInventoryIfEmpty(publicUserId);
+
+    return ValueListenableBuilder<List<LoveBondRequest>>(
+      valueListenable: LoveBondRealtimeService.requests,
+      builder: (context, requests, child) {
+        final activeBonds = LoveBondRealtimeService.activeBondsFor(publicUserId);
+        if (activeBonds.isEmpty) return const SizedBox.shrink();
+
+        final cards = loveBondCardsForProfile(publicUserId);
+
+        return Container(
+          padding: const EdgeInsets.all(15),
+          decoration: meWhitePanelDecoration(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Love & Bonds',
+                style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 13),
+              SizedBox(
+                height: 156,
+                child: Row(
+                  children: [
+                    for (var index = 0; index < cards.length; index++) ...[
+                      Expanded(
+                        child: LoveBondCard(
+                          bond: cards[index],
+                          onTap: () => onBondTap(cards[index]),
+                        ),
+                      ),
+                      if (index != cards.length - 1) const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 13),
-          SizedBox(
-            height: 156,
-            child: Row(
-              children: [
-                for (var index = 0; index < mockLoveBondCards.length; index++) ...[
-                  Expanded(
-                    child: LoveBondCard(
-                      bond: mockLoveBondCards[index],
-                      onTap: () => onBondTap(mockLoveBondCards[index]),
-                    ),
-                  ),
-                  if (index != mockLoveBondCards.length - 1) const SizedBox(width: 8),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
-
 class MeAccountCard extends StatelessWidget {
   const MeAccountCard({
     super.key,
@@ -206,3 +221,5 @@ class _CompactLevelCard extends StatelessWidget {
     );
   }
 }
+
+

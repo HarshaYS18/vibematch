@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../app/app_shell.dart';
@@ -39,6 +39,7 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
+      await _authApiService.restoreSavedSession();
       final user = await _authApiService.getCurrentUser();
       if (mounted) setState(() => _currentUser = user);
     } catch (_) {
@@ -188,7 +189,7 @@ class _LoginScreen extends StatelessWidget {
                       const _LoginPeopleOrbit(),
                       const SizedBox(height: 36),
                       const Text(
-                        'Let’s meet new\npeople around you',
+                        'Letâ€™s meet new\npeople around you',
                         textAlign: TextAlign.left,
                         style: TextStyle(color: Color(0xFF191423), fontSize: 34, height: 1.18, fontWeight: FontWeight.w900, letterSpacing: -0.9),
                       ),
@@ -427,3 +428,4 @@ class _OrbitAvatarData {
   final List<Color> colors;
   final String initial;
 }
+

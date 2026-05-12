@@ -1,4 +1,4 @@
-from app.models.user import User
+﻿from app.models.user import User
 from app.models.auth_identity import AuthIdentity
 from app.models.role import UserRole, RoleName
 from app.models.admin_log import AdminLog
@@ -58,3 +58,12 @@ from app.models.economy import (
 from app.models.game import GameBet, GameDefinition, GameRiskAudit
 from app.models.vip_status import UserVipStatus
 from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeShare
+
+from app.models.love_bond import (
+    LoveBond,
+    LoveBondCardType,
+    LoveBondInventory,
+    LoveBondRequest,
+    LoveBondRequestStatus,
+    LoveBondStatus,
+)

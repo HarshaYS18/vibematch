@@ -1,4 +1,4 @@
-class UserVipSummary {
+﻿class UserVipSummary {
   const UserVipSummary({
     required this.vipLevel,
     required this.svipLevel,
@@ -40,6 +40,17 @@ class UserVipSummary {
         nameGradientKey = 'default',
         nameGradientColors = const <String>[];
 
+  Map<String, dynamic> toJson() {
+    return {
+      'vip_level': vipLevel,
+      'svip_level': svipLevel,
+      'vip_is_active': vipIsActive,
+      'svip_is_active': svipIsActive,
+      'svip_expires_at': svipExpiresAt?.toIso8601String(),
+      'name_gradient_key': nameGradientKey,
+      'name_gradient_colors': nameGradientColors,
+    };
+  }
   bool get hasActiveSvipGradient => svipIsActive && svipLevel > 0 && nameGradientColors.length >= 2;
 }
 
@@ -66,6 +77,14 @@ class UserWalletSummary {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'coin_balance': coinBalance,
+      'ruby_balance': rubyBalance,
+      'lifetime_coins_spent': lifetimeCoinsSpent,
+      'lifetime_rubies_earned': lifetimeRubiesEarned,
+    };
+  }
   const UserWalletSummary.empty()
       : coinBalance = 0,
         rubyBalance = 0,
@@ -96,3 +115,4 @@ DateTime? _date(dynamic value) {
   if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value);
   return null;
 }
+

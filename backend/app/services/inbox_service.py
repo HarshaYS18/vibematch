@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -358,3 +358,4 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
 
 def report_to_dict(report: InboxReport) -> dict:
     return {"id": report.public_id, "reported_conversation_id": report.conversation.public_id, "reported_user_name": report.reported_user_name, "reporter_name": _display_name(report.reporter), "reason": report.reason, "snapshot": report.snapshot_json, "created_at_label": _time_label(report.created_at), "status": report.status, "cs_note": report.cs_note, "monitor_action": report.monitor_action}
+

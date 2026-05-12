@@ -6,6 +6,7 @@ import '../../data/live_room_settings_event_bus.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
 import '../modules/cricket_mode_module.dart';
+import '../widgets/cricket_room_backgrounds.dart';
 import '../widgets/room_theme.dart';
 import '../widgets/vibesync_room_module.dart';
 
@@ -264,6 +265,7 @@ class LiveRoomStateController extends ChangeNotifier {
     return <RoomBackgroundTheme>[
       ...ownedRoomBackgroundThemes,
       ...cricketModeBackgroundThemes,
+      ...cricketRoomBackgroundThemes,
     ].firstWhere(
       (theme) => theme.id == cleanId,
       orElse: () => _selectedBackgroundTheme,

@@ -1,5 +1,7 @@
-import 'package:file_picker/file_picker.dart';
+﻿import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../../../../app/app_routes.dart';
 
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
@@ -77,6 +79,23 @@ class _InboxChatPageState extends State<InboxChatPage> {
     setState(() => _replyToText = null);
   }
 
+  void _openInvitedRoom(InboxMessage message) {
+    final conversation = _conversation;
+    final roomName = message.inviteRoomName ?? conversation.currentRoomName ?? 'Live Room';
+    final roomId = message.inviteRoomId ?? conversation.currentRoomId ?? roomName;
+
+    Navigator.pushNamed(
+      context,
+      VmRoutes.liveRoom,
+      arguments: LiveRoomRouteArgs(
+        roomName: roomName,
+        roomId: roomId,
+        language: 'Telugu',
+        modeTitle: 'Open',
+        onlineCount: 1,
+      ),
+    );
+  }
   void _insertEmoji(String emoji) {
     final selection = _textController.selection;
     final oldText = _textController.text;
@@ -158,6 +177,21 @@ class _InboxChatPageState extends State<InboxChatPage> {
     );
   }
 
+  Future<void> _acceptLoveBondRequest(InboxMessage message) async {
+    await widget.controller.acceptLoveBondRequest(
+      conversationId: _conversation.id,
+      message: message,
+    );
+    if (mounted) _showToast('Relationship request accepted.');
+  }
+
+  Future<void> _rejectLoveBondRequest(InboxMessage message) async {
+    await widget.controller.rejectLoveBondRequest(
+      conversationId: _conversation.id,
+      message: message,
+    );
+    if (mounted) _showToast('Relationship request rejected. Card returned to sender.');
+  }
   void _openMessageActions(InboxMessage message) {
     showModalBottomSheet<void>(
       context: context,
@@ -221,9 +255,15 @@ class _InboxChatPageState extends State<InboxChatPage> {
                     onLongPress: () => _openMessageActions(messages[index]),
                     onReplyTap: () => setState(() => _replyToText = messages[index].text),
                     onJoinInviteTap: messages[index].isInvite
-                        ? () => _showToast('Room invite will open ${messages[index].inviteRoomName ?? conversation.currentRoomName}.')
+                        ? () => _openInvitedRoom(messages[index])
                         : null,
-                  );
+                                      onAcceptLoveBondTap: messages[index].isLoveBondRequest
+                        ? () => _acceptLoveBondRequest(messages[index])
+                        : null,
+                    onRejectLoveBondTap: messages[index].isLoveBondRequest
+                        ? () => _rejectLoveBondRequest(messages[index])
+                        : null,
+);
                 },
               ),
             ),
@@ -328,6 +368,8 @@ class _MessageBubble extends StatelessWidget {
     required this.onLongPress,
     required this.onReplyTap,
     required this.onJoinInviteTap,
+    required this.onAcceptLoveBondTap,
+    required this.onRejectLoveBondTap,
   });
 
   final InboxMessage message;
@@ -336,6 +378,8 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback onReplyTap;
   final VoidCallback? onJoinInviteTap;
 
+  final VoidCallback? onAcceptLoveBondTap;
+  final VoidCallback? onRejectLoveBondTap;
   @override
   Widget build(BuildContext context) {
     final mine = message.isMine;
@@ -366,9 +410,24 @@ class _MessageBubble extends StatelessWidget {
                 children: [
                   if (message.isForwarded) _BubbleMeta(label: 'Forwarded', mine: mine, icon: Icons.shortcut_rounded),
                   if (message.replyToText != null) _ReplySnippet(text: message.replyToText!, mine: mine),
-                  if (message.isInvite)
+                  if (message.isLoveBondRequest)
+
+                    _LoveBondRequestCard(
+
+                      message: message,
+
+                      onAccept: onAcceptLoveBondTap,
+
+                      onReject: onRejectLoveBondTap,
+
+                    )
+
+                  else if (message.isInvite)
+
                     _InviteCard(message: message, onTap: onJoinInviteTap)
+
                   else
+
                     Text(
                       message.text,
                       style: TextStyle(color: mine ? Colors.white : const Color(0xFF251538), fontSize: 12.8, height: 1.3, fontWeight: FontWeight.w700),
@@ -462,6 +521,141 @@ class _ReplySnippet extends StatelessWidget {
   }
 }
 
+class _LoveBondRequestCard extends StatelessWidget {
+  const _LoveBondRequestCard({
+    required this.message,
+    required this.onAccept,
+    required this.onReject,
+  });
+
+  final InboxMessage message;
+  final VoidCallback? onAccept;
+  final VoidCallback? onReject;
+
+  bool get _pending => (message.loveBondStatus ?? 'pending').toLowerCase() == 'pending';
+
+  @override
+  Widget build(BuildContext context) {
+    final cardName = message.loveBondCardName?.trim().isNotEmpty == true
+        ? message.loveBondCardName!.trim()
+        : 'Relationship';
+
+    return Container(
+      width: 245,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF5AAA), Color(0xFF6D5DF6)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF5AAA).withValues(alpha: 0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.favorite_rounded, color: Colors.white, size: 23),
+          const SizedBox(height: 7),
+          Text(
+            cardName,
+            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message.text,
+            style: const TextStyle(color: Colors.white70, fontSize: 11.2, fontWeight: FontWeight.w800, height: 1.25),
+          ),
+          const SizedBox(height: 10),
+          if (_pending && !message.isMine)
+            Row(
+              children: [
+                Expanded(
+                  child: _LoveBondActionButton(
+                    label: 'Reject',
+                    icon: Icons.close_rounded,
+                    onTap: onReject,
+                    filled: false,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _LoveBondActionButton(
+                    label: 'Accept',
+                    icon: Icons.check_rounded,
+                    onTap: onAccept,
+                    filled: true,
+                  ),
+                ),
+              ],
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+              ),
+              child: Text(
+                (message.loveBondStatus ?? 'pending').toUpperCase(),
+                style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoveBondActionButton extends StatelessWidget {
+  const _LoveBondActionButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    required this.filled,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+        decoration: BoxDecoration(
+          color: filled ? Colors.white : Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.38)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: filled ? const Color(0xFF251538) : Colors.white, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: filled ? const Color(0xFF251538) : Colors.white,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 class _InviteCard extends StatelessWidget {
   const _InviteCard({required this.message, required this.onTap});
 
@@ -485,7 +679,7 @@ class _InviteCard extends StatelessWidget {
           const SizedBox(height: 7),
           Text(roomName, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
           const SizedBox(height: 4),
-          const Text('Room invite • Valid access required', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800)),
+          const Text('Room invite â€¢ Valid access required', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800)),
           const SizedBox(height: 9),
           InkWell(
             borderRadius: BorderRadius.circular(999),
@@ -648,7 +842,7 @@ class _MessageActionsSheet extends StatelessWidget {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: ['❤️', '😂', '😮', '😢', '🙏', '🔥'].map((reaction) {
+            children: ['â¤ï¸', 'ðŸ˜‚', 'ðŸ˜®', 'ðŸ˜¢', 'ðŸ™', 'ðŸ”¥'].map((reaction) {
               return InkWell(
                 borderRadius: BorderRadius.circular(999),
                 onTap: () => onReaction(reaction),
@@ -747,3 +941,6 @@ class _ActionTile extends StatelessWidget {
     );
   }
 }
+
+
+

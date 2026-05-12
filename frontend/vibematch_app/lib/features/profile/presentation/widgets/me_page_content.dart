@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
 import '../../../economy/presentation/merchant_seller_panel_page.dart';
@@ -10,6 +10,7 @@ import '../../../rooms/presentation/live_room_page.dart';
 import '../../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/presentation/wallet_page.dart';
+import '../../data/love_bond_realtime_service.dart';
 import '../control_center/coin_supply_grant_page.dart';
 import '../control_center/super_power_panel_page.dart';
 import '../control_center/vibes_reports_review_page.dart';
@@ -285,7 +286,7 @@ class MePageContent extends StatelessWidget {
 
   void _openRooms(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ProfileRoomsPage(userId: user.id)),
+      MaterialPageRoute(builder: (_) => ProfileRoomsPage(userId: user.id, publicUserId: user.publicUserId)),
     );
   }
 
@@ -323,6 +324,7 @@ class MePageContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 116),
       children: [
+        _MeLoveBondBackendSyncGate(user: user),
         MePremiumProfileHero(
           displayName: MeProfileConstants.displayNameFor(user),
           publicId: user.publicUserId.toString(),
@@ -352,6 +354,8 @@ class MePageContent extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         MeStatsRow(
+          userId: user.id,
+          publicUserId: user.publicUserId,
           onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1),
           onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0),
           onRoomsTap: () => _openRooms(context),
@@ -359,6 +363,7 @@ class MePageContent extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         MeRelationshipPanel(
+          publicUserId: user.publicUserId,
           relationshipLabel: relationshipType,
           onBondTap: (bond) => _openBondDetail(context, bond),
         ),
@@ -417,4 +422,54 @@ class MePageContent extends StatelessWidget {
       ],
     );
   }
+}
+
+
+
+class _MeLoveBondBackendSyncGate extends StatefulWidget {
+  const _MeLoveBondBackendSyncGate({required this.user});
+
+  final CurrentUser user;
+
+  @override
+  State<_MeLoveBondBackendSyncGate> createState() => _MeLoveBondBackendSyncGateState();
+}
+
+class _MeLoveBondBackendSyncGateState extends State<_MeLoveBondBackendSyncGate> {
+  bool _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MeLoveBondBackendSyncGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.publicUserId != widget.user.publicUserId) {
+      _started = false;
+      _sync();
+    }
+  }
+
+  Future<void> _sync() async {
+    if (_started) return;
+    _started = true;
+
+    try {
+      await LoveBondRealtimeService.syncMyBondsFromBackend(
+        currentUserId: widget.user.id,
+        currentPublicUserId: widget.user.publicUserId,
+        currentDisplayName: widget.user.displayName ?? widget.user.username ?? 'Vibe User',
+        currentGender: widget.user.gender,
+        currentAvatarUrl: widget.user.avatarUrl,
+      );
+    } catch (_) {
+      // Keep current local state if backend is temporarily unavailable.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

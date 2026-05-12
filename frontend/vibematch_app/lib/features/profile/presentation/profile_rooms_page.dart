@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../rooms/presentation/live_room_page.dart';
 import '../data/profile_rooms_repository.dart';
@@ -7,13 +7,18 @@ class ProfileRoomsPage extends StatelessWidget {
   const ProfileRoomsPage({
     super.key,
     required this.userId,
+    this.publicUserId,
   });
 
   final int userId;
+  final int? publicUserId;
 
   @override
   Widget build(BuildContext context) {
-    final rooms = const ProfileRoomsRepository().loadMyRooms(userId: userId);
+    final rooms = const ProfileRoomsRepository().loadMyRooms(
+      userId: userId,
+      publicUserId: publicUserId,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
@@ -147,7 +152,7 @@ class _RoomCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      '${room.roomId} • ${room.language} • ${room.modeTitle}',
+                      '${room.roomId} â€¢ ${room.language} â€¢ ${room.modeTitle}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800),
@@ -325,3 +330,4 @@ IconData _roleIcon(ProfileRoomRole role) {
       return Icons.group_rounded;
   }
 }
+

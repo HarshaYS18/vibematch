@@ -1,3 +1,5 @@
+﻿import '../../rooms/data/live_room_membership_service.dart';
+
 class ProfileRoomRecord {
   const ProfileRoomRecord({
     required this.roomId,
@@ -34,17 +36,56 @@ enum ProfileRoomRole { owner, admin, member }
 class ProfileRoomsRepository {
   const ProfileRoomsRepository();
 
-  // Future backend mapping:
-  // GET /rooms/me
-  // Returns all rooms where the authenticated user is owner, admin, or member.
-  //
-  // Important privacy rule:
-  // - Me page can show the authenticated user's room memberships.
-  // - Public profile page must not expose another user's full room list.
-  // - Public profile can show safe public counters/status only, subject to room
-  //   privacy rules. Secret Vibe rooms must never be exposed publicly.
+  List<ProfileRoomRecord> loadMyRooms({
+    required int userId,
+    int? publicUserId,
+  }) {
+    final records = <ProfileRoomRecord>[
+      ..._mockOwnerAdminMemberRooms,
+      ..._acceptedMemberRoomsFor(userId: userId, publicUserId: publicUserId),
+    ];
 
-  List<ProfileRoomRecord> loadMyRooms({required int userId}) {
+    final deduped = <String, ProfileRoomRecord>{};
+    for (final record in records) {
+      deduped.putIfAbsent(record.roomId, () => record);
+    }
+
+    return deduped.values.toList(growable: false);
+  }
+
+  int publicRoomsCountFor({
+    required int publicUserId,
+  }) {
+    return loadMyRooms(
+      userId: publicUserId,
+      publicUserId: publicUserId,
+    ).length;
+  }
+
+  List<ProfileRoomRecord> _acceptedMemberRoomsFor({
+    required int userId,
+    int? publicUserId,
+  }) {
+    final ids = <String>{
+      userId.toString(),
+      'user_$userId',
+      if (publicUserId != null) publicUserId.toString(),
+      if (publicUserId != null) 'user_$publicUserId',
+    };
+
+    return LiveRoomMembershipService.memberRoomsForUserIds(ids).map((snapshot) {
+      return ProfileRoomRecord(
+        roomId: snapshot.roomId,
+        roomName: snapshot.roomName?.trim().isNotEmpty == true ? snapshot.roomName!.trim() : 'Member Room',
+        language: snapshot.language?.trim().isNotEmpty == true ? snapshot.language!.trim() : 'Telugu',
+        modeTitle: snapshot.modeTitle?.trim().isNotEmpty == true ? snapshot.modeTitle!.trim() : 'Open',
+        onlineCount: snapshot.onlineCount ?? 1,
+        role: ProfileRoomRole.member,
+      );
+    }).toList(growable: false);
+  }
+
+  List<ProfileRoomRecord> get _mockOwnerAdminMemberRooms {
     return const [
       ProfileRoomRecord(
         roomId: 'VM257808',

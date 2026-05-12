@@ -1,20 +1,26 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../rooms/data/live_room_membership_service.dart';
 import '../../../social/data/social_api_service.dart';
 import '../../data/profile_api_service.dart';
+import '../../data/profile_rooms_repository.dart';
 import 'me_shared_widgets.dart';
 
 class MeStatsRow extends StatefulWidget {
   const MeStatsRow({
     super.key,
+    required this.userId,
+    required this.publicUserId,
     required this.onFollowingTap,
     required this.onFollowersTap,
     required this.onRoomsTap,
     required this.onVisitorsTap,
   });
 
+  final int userId;
+  final int publicUserId;
   final VoidCallback onFollowingTap;
   final VoidCallback onFollowersTap;
   final VoidCallback onRoomsTap;
@@ -29,6 +35,7 @@ class _MeStatsRowState extends State<MeStatsRow> {
   StreamSubscription<ProfileRelationshipRealtimeEvent>? _relationshipRealtimeSub;
   int? _followingCount;
   int? _followersCount;
+  late int _roomsCount = _loadRoomsCount();
 
   @override
   void initState() {
@@ -36,13 +43,34 @@ class _MeStatsRowState extends State<MeStatsRow> {
     _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen((_) {
       unawaited(_loadFollowStats());
     });
+    LiveRoomMembershipService.snapshots.addListener(_handleRoomMembershipChanged);
     unawaited(_loadFollowStats());
   }
 
   @override
+  void didUpdateWidget(covariant MeStatsRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId || oldWidget.publicUserId != widget.publicUserId) {
+      setState(() => _roomsCount = _loadRoomsCount());
+    }
+  }
+
+  @override
   void dispose() {
+    LiveRoomMembershipService.snapshots.removeListener(_handleRoomMembershipChanged);
     _relationshipRealtimeSub?.cancel();
     super.dispose();
+  }
+
+  void _handleRoomMembershipChanged() {
+    if (!mounted) return;
+    setState(() => _roomsCount = _loadRoomsCount());
+  }
+
+  int _loadRoomsCount() {
+    return const ProfileRoomsRepository()
+        .loadMyRooms(userId: widget.userId, publicUserId: widget.publicUserId)
+        .length;
   }
 
   Future<void> _loadFollowStats() async {
@@ -88,7 +116,7 @@ class _MeStatsRowState extends State<MeStatsRow> {
         const SizedBox(width: 7),
         MeProfileStat(
           label: 'Rooms',
-          value: '12',
+          value: _compactCount(_roomsCount, '0'),
           icon: Icons.mic_rounded,
           onTap: widget.onRoomsTap,
         ),

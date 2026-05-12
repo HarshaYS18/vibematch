@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
@@ -21,6 +21,7 @@ class InboxMessageType(str, Enum):
     DOCUMENT = "document"
     LOCATION = "location"
     ROOM_INVITE = "room_invite"
+    RELATIONSHIP_REQUEST = "relationship_request"
     SYSTEM = "system"
 
 
@@ -157,3 +158,5 @@ class InboxLockOtp(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
     user = relationship("User")
+
+

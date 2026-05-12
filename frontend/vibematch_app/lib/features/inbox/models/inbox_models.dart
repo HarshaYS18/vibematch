@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 enum InboxConversationType {
   official('Official'),
@@ -48,6 +48,7 @@ enum InboxMessageType {
   location,
   contact,
   roomInvite,
+  relationshipRequest,
   system;
 }
 
@@ -62,7 +63,7 @@ enum InboxMessageStatus {
 enum InboxReportStatus {
   pendingCsReview('Pending CS review'),
   rejectedByCs('Rejected by CS'),
-  acceptedEscalated('Accepted • Sent to Monitor'),
+  acceptedEscalated('Accepted â€¢ Sent to Monitor'),
   monitorActionTaken('Monitor action taken');
 
   const InboxReportStatus(this.label);
@@ -269,6 +270,9 @@ class InboxMessage {
     this.isForwarded = false,
     this.inviteRoomName,
     this.inviteRoomId,
+    this.loveBondRequestId,
+    this.loveBondCardName,
+    this.loveBondStatus,
   });
 
   final String? id;
@@ -284,8 +288,12 @@ class InboxMessage {
   final bool isForwarded;
   final String? inviteRoomName;
   final String? inviteRoomId;
+  final String? loveBondRequestId;
+  final String? loveBondCardName;
+  final String? loveBondStatus;
 
   bool get isInvite => inviteRoomName != null || inviteRoomId != null || type == InboxMessageType.roomInvite;
+  bool get isLoveBondRequest => loveBondRequestId != null || type == InboxMessageType.relationshipRequest;
 
   InboxMessage copyWith({
     String? id,
@@ -303,6 +311,9 @@ class InboxMessage {
     bool? isForwarded,
     String? inviteRoomName,
     String? inviteRoomId,
+    String? loveBondRequestId,
+    String? loveBondCardName,
+    String? loveBondStatus,
   }) {
     return InboxMessage(
       id: id ?? this.id,
@@ -318,6 +329,9 @@ class InboxMessage {
       isForwarded: isForwarded ?? this.isForwarded,
       inviteRoomName: inviteRoomName ?? this.inviteRoomName,
       inviteRoomId: inviteRoomId ?? this.inviteRoomId,
+      loveBondRequestId: loveBondRequestId ?? this.loveBondRequestId,
+      loveBondCardName: loveBondCardName ?? this.loveBondCardName,
+      loveBondStatus: loveBondStatus ?? this.loveBondStatus,
     );
   }
 }
@@ -363,3 +377,4 @@ class InboxReportTask {
     );
   }
 }
+

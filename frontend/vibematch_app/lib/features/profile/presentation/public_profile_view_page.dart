@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -8,6 +8,8 @@ import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
 import '../../vip/presentation/vip_program_page.dart';
 import '../data/profile_api_service.dart';
+import '../data/love_bond_realtime_service.dart';
+import '../data/profile_rooms_repository.dart';
 import '../data/profile_visitor_repository.dart';
 import 'models/edit_profile_models.dart';
 import 'models/public_profile_models.dart';
@@ -63,6 +65,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     _recordProfileVisit();
     _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen(_onRelationshipRealtimeEvent);
     unawaited(_loadBackendProfile());
+    unawaited(_syncPublicLoveBonds());
   }
 
   @override
@@ -75,6 +78,18 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
 
   int _targetPublicUserId() => widget.publicUserId ?? widget.user.publicUserId;
 
+  Future<void> _syncPublicLoveBonds() async {
+    final publicUserId = _targetPublicUserId();
+    if (publicUserId <= 0) return;
+
+    try {
+      await LoveBondRealtimeService.syncPublicBondsFromBackend(
+        profilePublicUserId: publicUserId,
+      );
+    } catch (_) {
+      // Keep current local state if backend is temporarily unavailable.
+    }
+  }
   Future<void> _loadBackendProfile() async {
     final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
@@ -272,6 +287,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 showSocialActions: !_isSelfProfile,
                 followersCount: _relationship?.followersCount,
                 followingCount: _relationship?.followingCount,
+                roomsCount: const ProfileRoomsRepository().publicRoomsCountFor(publicUserId: _targetPublicUserId()),
                 onCoverChanged: (index) => setState(() => _coverIndex = index),
                 onBackTap: () => Navigator.pop(context),
                 onQrTap: _openProfileQrActions,
@@ -285,7 +301,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 onSvipTap: () => _openViewerVipProgram(initialTabIndex: 1),
               ),
             ),
-            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 0), child: PublicLoveBondsPanel(onVisitorTap: () => _showAction(context, 'Bond details are private and cannot be opened by visitors.')))),
+            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 0), child: PublicLoveBondsPanel(publicUserId: _targetPublicUserId(), onVisitorTap: () => _showAction(context, 'Bond details are private and cannot be opened by visitors.')))),
             if (profile != null)
               SliverToBoxAdapter(
                 child: Padding(
@@ -328,3 +344,6 @@ class _PublicProfileBackendError extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(margin: const EdgeInsets.fromLTRB(18, 8, 18, 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))), child: Row(children: [const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19), const SizedBox(width: 9), Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))), TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900)))]));
 }
+
+
+
