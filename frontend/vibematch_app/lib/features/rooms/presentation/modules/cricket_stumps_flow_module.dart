@@ -129,30 +129,51 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
   int? _activeMatchId;
   bool _saving = false;
 
-  final _quickA = TextEditingController(text: 'Vibe Strikers');
-  final _quickB = TextEditingController(text: 'Royal Hitters');
-  final _playersPerTeam = TextEditingController(text: '5');
+  final _quickA = TextEditingController();
+  final _quickB = TextEditingController();
+  int _playersPerTeamValue = 5;
   final _overs = TextEditingController(text: '5');
-  final _wickets = TextEditingController(text: '4');
-  final _teamAPlayers = TextEditingController(text: 'Arjun, Dev, Kiran, Manoj, Sai');
-  final _teamBPlayers = TextEditingController(text: 'Ravi, Bala, Surya, Mahesh, Vikram');
+  int _wicketsValueState = 4;
+  final List<TextEditingController> _teamAPlayerControllers = <TextEditingController>[];
+  final List<TextEditingController> _teamBPlayerControllers = <TextEditingController>[];
 
-  int get _playerTarget =>
-      math.max(2, int.tryParse(_playersPerTeam.text) ?? 5);
+  int get _playerTarget => _playersPerTeamValue;
 
   int get _oversValue => math.max(1, int.tryParse(_overs.text) ?? 5);
 
-  int get _wicketsValue => math.max(1, int.tryParse(_wickets.text) ?? 4);
+  int get _wicketsValue => _wicketsValueState;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncPlayerControllers();
+  }
+
+  void _syncPlayerControllers() {
+    void sync(List<TextEditingController> controllers) {
+      while (controllers.length < _playerTarget) {
+        controllers.add(TextEditingController());
+      }
+      while (controllers.length > _playerTarget) {
+        controllers.removeLast().dispose();
+      }
+    }
+
+    sync(_teamAPlayerControllers);
+    sync(_teamBPlayerControllers);
+  }
 
   @override
   void dispose() {
     _quickA.dispose();
     _quickB.dispose();
-    _playersPerTeam.dispose();
     _overs.dispose();
-    _wickets.dispose();
-    _teamAPlayers.dispose();
-    _teamBPlayers.dispose();
+    for (final controller in _teamAPlayerControllers) {
+      controller.dispose();
+    }
+    for (final controller in _teamBPlayerControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -220,32 +241,46 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
         ),
         _Input(label: 'Team A', controller: _quickA),
         _Input(label: 'Team B', controller: _quickB),
-        _Input(
-          label: 'Team A player names comma separated',
-          controller: _teamAPlayers,
-        ),
-        _Input(
-          label: 'Team B player names comma separated',
-          controller: _teamBPlayers,
-        ),
         Row(
           children: [
             Expanded(
-              child: _Input(
+              child: _NumberDropdown(
                 label: 'Players/team',
-                controller: _playersPerTeam,
-                number: true,
+                value: _playersPerTeamValue,
+                max: 12,
+                onChanged: (value) {
+                  setState(() {
+                    _playersPerTeamValue = value;
+                    if (_wicketsValueState > value) {
+                      _wicketsValueState = value;
+                    }
+                    _syncPlayerControllers();
+                  });
+                },
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _Input(
+              child: _NumberDropdown(
                 label: 'Wickets',
-                controller: _wickets,
-                number: true,
+                value: _wicketsValueState,
+                max: 12,
+                onChanged: (value) {
+                  setState(() {
+                    _wicketsValueState = value;
+                  });
+                },
               ),
             ),
           ],
+        ),
+        _PlayerNameList(
+          title: 'Team A players',
+          controllers: _teamAPlayerControllers,
+        ),
+        _PlayerNameList(
+          title: 'Team B players',
+          controllers: _teamBPlayerControllers,
         ),
         _Input(label: 'Overs', controller: _overs, number: true),
         FilledButton.icon(
@@ -378,8 +413,8 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     setState(() {
       _selectedFixture = StumpsFixture(
         id: 'quick_${DateTime.now().millisecondsSinceEpoch}',
-        teamA: _quickTeam(teamAName, 'qa', _teamAPlayers.text),
-        teamB: _quickTeam(teamBName, 'qb', _teamBPlayers.text),
+        teamA: _quickTeam(teamAName, 'qa', _teamAPlayerControllers),
+        teamB: _quickTeam(teamBName, 'qb', _teamBPlayerControllers),
         round: 1,
       );
       _activeMatchId = null;
@@ -392,16 +427,17 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     });
   }
 
-  StumpsTeam _quickTeam(String name, String prefix, String rawPlayerNames) {
-    final enteredNames = rawPlayerNames
-        .split(',')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
-
+  StumpsTeam _quickTeam(
+    String name,
+    String prefix,
+    List<TextEditingController> playerControllers,
+  ) {
     final playerNames = List<String>.generate(_playerTarget, (index) {
-      if (index < enteredNames.length) return enteredNames[index];
-      return '$name P${index + 1}';
+      if (index < playerControllers.length) {
+        final value = playerControllers[index].text.trim();
+        if (value.isNotEmpty) return value;
+      }
+      return 'Player ${index + 1}';
     });
 
     return StumpsTeam(
@@ -659,6 +695,123 @@ class _InfoCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _NumberDropdown extends StatelessWidget {
+  const _NumberDropdown({
+    required this.label,
+    required this.value,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: DropdownButtonFormField<int>(
+        initialValue: value.clamp(1, max),
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        items: List<DropdownMenuItem<int>>.generate(
+          max,
+          (index) {
+            final number = index + 1;
+            return DropdownMenuItem<int>(
+              value: number,
+              child: Text('$number'),
+            );
+          },
+        ),
+        onChanged: (value) {
+          if (value != null) onChanged(value);
+        },
+      ),
+    );
+  }
+}
+
+class _PlayerNameList extends StatelessWidget {
+  const _PlayerNameList({
+    required this.title,
+    required this.controllers,
+  });
+
+  final String title;
+  final List<TextEditingController> controllers;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8DED4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: RoomColors.plum,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (var index = 0; index < controllers.length; index += 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 28,
+                    child: Text(
+                      '${index + 1}.',
+                      style: const TextStyle(
+                        color: Color(0xFF81758C),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: controllers[index],
+                      decoration: InputDecoration(
+                        hintText: 'Player ${index + 1} name',
+                        isDense: true,
+                        filled: true,
+                        fillColor: const Color(0xFFF9F8F2),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
