@@ -209,7 +209,7 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
                           width: 38,
                           height: 38,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Text(
+                          errorBuilder: (context, error, stackTrace) => Text(
                             user.avatarText,
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
                           ),
