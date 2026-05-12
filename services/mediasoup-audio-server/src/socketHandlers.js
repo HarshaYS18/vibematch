@@ -16,6 +16,12 @@ const {
   setSelfMuted,
   setAdminMuted,
 } = require('./roomManager');
+const {
+  SERVER_MUSIC_PEER_ID,
+  ensureRoomMusicState,
+  startRoomMusic,
+  stopRoomMusic,
+} = require('./musicSourceManager');
 
 async function createWebRtcTransport(router) {
   const transport = await router.createWebRtcTransport(config.mediasoup.webRtcTransport);
@@ -36,7 +42,7 @@ async function createWebRtcTransport(router) {
 }
 
 function getProducerSnapshot(room, requestingPeerId) {
-  return Array.from(room.peers.values())
+  const peerProducers = Array.from(room.peers.values())
     .filter((peer) => peer.id !== requestingPeerId)
     .flatMap((peer) =>
       Array.from(peer.producers.values()).map((producer) => ({
@@ -44,8 +50,22 @@ function getProducerSnapshot(room, requestingPeerId) {
         peerId: peer.id,
         kind: producer.kind,
         seatNo: peer.seatNo,
+        appData: producer.appData || {},
       })),
     );
+
+  const music = ensureRoomMusicState(room);
+  if (music.producer && !music.producer.closed && music.state.active) {
+    peerProducers.push({
+      producerId: music.producer.id,
+      peerId: SERVER_MUSIC_PEER_ID,
+      kind: music.producer.kind,
+      seatNo: null,
+      appData: music.producer.appData || {},
+    });
+  }
+
+  return peerProducers;
 }
 
 function closePeerProducers(room, peer, io) {
@@ -90,6 +110,14 @@ function emitSeatsUpdated(io, roomId, room, extra = {}) {
   return payload;
 }
 
+async function stopMusicIfControlledByPeer(room, io, peerId, reason) {
+  if (!room) return;
+  const music = ensureRoomMusicState(room);
+  if (music.state.active && music.state.controllerPeerId === String(peerId)) {
+    await stopRoomMusic(room, io, reason);
+  }
+}
+
 function registerSocketHandlers(io) {
   io.on('connection', (socket) => {
     console.log(`[socket] connected socket=${socket.id}`);
@@ -107,6 +135,7 @@ function registerSocketHandlers(io) {
         joinedPeerId = String(peerId);
 
         const room = await getOrCreateRoom(joinedRoomId);
+        ensureRoomMusicState(room);
         let peer = room.peers.get(joinedPeerId);
 
         if (!peer) peer = createPeer(room, joinedPeerId, socket.id);
@@ -124,6 +153,7 @@ function registerSocketHandlers(io) {
             maxRoomPeers: config.maxRoomPeers,
             seats: getSeatSnapshot(room),
             producers: getProducerSnapshot(room, joinedPeerId),
+            music: ensureRoomMusicState(room).state,
           },
         });
 
@@ -331,7 +361,7 @@ function registerSocketHandlers(io) {
           peer.producers.delete(producer.id);
         });
 
-        const payload = { producerId: producer.id, peerId: peer.id, kind: producer.kind, seatNo: peer.seatNo };
+        const payload = { producerId: producer.id, peerId: peer.id, kind: producer.kind, seatNo: peer.seatNo, appData: producer.appData || {} };
         socket.to(roomId).emit('newProducer', payload);
         io.to(roomId).emit('seatsUpdated', { seats: getSeatSnapshot(room) });
         safeCallback(callback, { ok: true, ...payload });
@@ -377,6 +407,69 @@ function registerSocketHandlers(io) {
         });
       } catch (error) {
         console.error('[consume] error', error);
+        safeCallback(callback, { ok: false, error: error.message });
+      }
+    });
+
+    socket.on('resumeConsumer', async ({ roomId, peerId, consumerId }, callback) => {
+      try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
+        const room = getRoom(roomId);
+        if (!room) throw new Error('room not found');
+
+        const peer = room.peers.get(String(peerId));
+        if (!peer) throw new Error('peer not found');
+
+        const consumer = peer.consumers.get(String(consumerId));
+        if (!consumer) throw new Error('consumer not found');
+
+        await consumer.resume();
+        console.log(`[resumeConsumer] room=${roomId} peer=${peerId} consumer=${consumer.id} producer=${consumer.producerId}`);
+        safeCallback(callback, { ok: true });
+      } catch (error) {
+        console.error('[resumeConsumer] error', error);
+        safeCallback(callback, { ok: false, error: error.message });
+      }
+    });
+
+    socket.on('startRoomMusic', async ({ roomId, peerId, url, title }, callback) => {
+      try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
+        const room = getRoom(roomId);
+        if (!room) throw new Error('room not found');
+
+        console.log('[startRoomMusic] request', { roomId, peerId, title, url });
+        const music = await startRoomMusic({
+          room,
+          io,
+          controllerPeerId: String(peerId),
+          url,
+          title,
+        });
+
+        console.log('[startRoomMusic] ok', {
+          roomId,
+          producerId: music.producerId,
+          title: music.title,
+        });
+        safeCallback(callback, { ok: true, music });
+      } catch (error) {
+        console.error('[startRoomMusic] error', error);
+        safeCallback(callback, { ok: false, error: error.message });
+      }
+    });
+
+    socket.on('stopRoomMusic', async ({ roomId, peerId }, callback) => {
+      try {
+        requireJoinedPeer(roomId, peerId, joinedRoomId, joinedPeerId);
+        const room = getRoom(roomId);
+        if (!room) throw new Error('room not found');
+
+        await stopRoomMusic(room, io, 'stop-requested');
+        console.log('[stopRoomMusic] ok', { roomId, peerId });
+        safeCallback(callback, { ok: true });
+      } catch (error) {
+        console.error('[stopRoomMusic] error', error);
         safeCallback(callback, { ok: false, error: error.message });
       }
     });
@@ -431,6 +524,10 @@ function registerSocketHandlers(io) {
         console.log(`[socket] stale disconnect ignored socket=${socket.id} activeSocket=${existingPeer.socketId} room=${joinedRoomId} peer=${joinedPeerId}`);
         return;
       }
+
+      stopMusicIfControlledByPeer(existingRoom, io, joinedPeerId, 'controller-disconnect').catch((error) => {
+        console.error('[disconnect] stop controlled room music failed', error);
+      });
 
       const room = removePeer(joinedRoomId, joinedPeerId);
       socket.to(joinedRoomId).emit('peerLeft', { peerId: joinedPeerId });
