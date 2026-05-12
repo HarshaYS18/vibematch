@@ -42,7 +42,7 @@ class SocialUser {
       publicUserId: publicId,
       displayName: displayName,
       username: username ?? (publicId == null ? displayName.toLowerCase().replaceAll(' ', '_') : publicId.toString()),
-      avatarText: avatarTextSource.characters.first.toUpperCase(),
+      avatarText: avatarTextSource.substring(0, 1).toUpperCase(),
       avatarUrl: _nullableText(json['avatar_url']),
       colors: gradientForSeed(publicId?.toString() ?? username ?? displayName),
       isOnline: json['is_online'] == true,
