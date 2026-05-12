@@ -63,7 +63,7 @@ enum InboxMessageStatus {
 enum InboxReportStatus {
   pendingCsReview('Pending CS review'),
   rejectedByCs('Rejected by CS'),
-  acceptedEscalated('Accepted â€¢ Sent to Monitor'),
+  acceptedEscalated('Accepted • Sent to Monitor'),
   monitorActionTaken('Monitor action taken');
 
   const InboxReportStatus(this.label);
@@ -186,6 +186,7 @@ class InboxConversation {
     required this.lastSeenText,
     required this.colors,
     required this.messages,
+    this.avatarUrl,
     this.currentRoomName,
     this.currentRoomId,
     this.isLockedByBackend = false,
@@ -200,6 +201,7 @@ class InboxConversation {
   final String subtitle;
   final String time;
   final String avatarText;
+  final String? avatarUrl;
   final InboxConversationType type;
   final int unreadCount;
   final bool isOnline;
@@ -218,6 +220,7 @@ class InboxConversation {
   bool get isStranger => type == InboxConversationType.stranger;
   bool get isRoomInvite => type == InboxConversationType.roomInvite;
   bool get isMutualFollowChat => type == InboxConversationType.chat && !isStranger;
+  bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
 
   InboxConversation copyWith({
     String? subtitle,
@@ -238,6 +241,7 @@ class InboxConversation {
       subtitle: subtitle ?? this.subtitle,
       time: time ?? this.time,
       avatarText: avatarText,
+      avatarUrl: avatarUrl,
       type: type,
       unreadCount: unreadCount ?? this.unreadCount,
       isOnline: isOnline,
@@ -377,4 +381,3 @@ class InboxReportTask {
     );
   }
 }
-
