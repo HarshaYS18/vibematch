@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from sqlalchemy import and_, exists
 from sqlalchemy.orm import Session
 
@@ -5,13 +7,40 @@ from app.models.follow import UserFollow
 from app.models.user import User
 
 
-def public_user_summary(user: User) -> dict:
+_ONLINE_WINDOW = timedelta(minutes=5)
+
+
+def is_user_online(user: User) -> bool:
+    last_seen = user.last_seen_at or user.last_login_at
+    if last_seen is None:
+        return False
+    return last_seen >= datetime.utcnow() - _ONLINE_WINDOW
+
+
+def public_user_summary(
+    user: User,
+    *,
+    current_user: User | None = None,
+    is_following_value: bool | None = None,
+    is_followed_by_value: bool | None = None,
+) -> dict:
+    following = False
+    followed_by = False
+    if current_user is not None and current_user.id != user.id:
+        following = is_following_value if is_following_value is not None else False
+        followed_by = is_followed_by_value if is_followed_by_value is not None else False
     return {
         "id": user.id,
         "public_user_id": user.public_user_id,
         "username": user.username,
         "display_name": user.display_name,
         "avatar_url": user.avatar_url,
+        "is_online": is_user_online(user),
+        "last_seen_at": user.last_seen_at,
+        "is_following": following,
+        "is_followed_by": followed_by,
+        "follows_me": followed_by,
+        "is_friend": following and followed_by,
     }
 
 
@@ -43,7 +72,12 @@ def follow_status(db: Session, current_user: User, target_user: User) -> dict:
     else:
         action_label = "Follow"
     return {
-        "target_user": public_user_summary(target_user),
+        "target_user": public_user_summary(
+            target_user,
+            current_user=current_user,
+            is_following_value=following,
+            is_followed_by_value=followed_by,
+        ),
         "is_following": following,
         "is_followed_by": followed_by,
         "is_friends": friends,
