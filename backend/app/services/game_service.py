@@ -13,7 +13,8 @@ from app.models.game import GameBet, GameDefinition, GameRiskAudit
 from app.models.user import User
 from app.services import economy_service
 
-JUNGLE_HUNT_KEY = "jackpot_king"
+JUNGLE_HUNT_KEY = "jungle_hunt"
+LEGACY_JUNGLE_HUNT_KEYS = {"jackpot_king", "jungle_hunt"}
 
 DEFAULT_TARGETS = [
     {"id": 0, "label": "Rabbit", "emoji": "🐰", "multiplier": 5, "theme_color": "#FF5CA8"},
@@ -113,8 +114,9 @@ def _definition_payload(definition: GameDefinition) -> dict[str, Any]:
 
 
 def seed_default_games(db: Session, actor: User | None = None) -> GameDefinition:
-    existing = db.query(GameDefinition).filter(GameDefinition.game_key == JUNGLE_HUNT_KEY).first()
+    existing = db.query(GameDefinition).filter(GameDefinition.game_key.in_(LEGACY_JUNGLE_HUNT_KEYS)).first()
     if existing:
+        existing.game_key = JUNGLE_HUNT_KEY
         existing.display_name = "Jungle Hunt"
         existing.ui_config_json = _dumps(DEFAULT_UI)
         existing.rules_json = _dumps(DEFAULT_RULES)
@@ -158,7 +160,7 @@ def list_catalog(db: Session, include_disabled: bool = False) -> list[dict[str, 
 
 
 def get_definition(db: Session, game_key: str, include_disabled: bool = False) -> GameDefinition:
-    normalized = JUNGLE_HUNT_KEY if game_key in {"jungle_hunt", JUNGLE_HUNT_KEY} else game_key
+    normalized = JUNGLE_HUNT_KEY if game_key in LEGACY_JUNGLE_HUNT_KEYS else game_key
     definition = db.query(GameDefinition).filter(GameDefinition.game_key == normalized).first()
     if not definition and normalized == JUNGLE_HUNT_KEY:
         definition = seed_default_games(db)
@@ -517,3 +519,7 @@ def settle_round(db: Session, round_id: int, user: User) -> dict[str, Any]:
     wallet = economy_service.get_or_create_wallet(db, user.id)
     risk_result = evaluate_risk(db, user, 0, round_obj, risk)
     return {"round_id": round_id, "game_key": round_obj.game_key, "status": GameRoundStatus.COMPLETED.value, "winning_target_id": winning_target_id, "multiplier": multiplier, "total_user_bet": total_user_bet, "total_user_winnings": total_user_winnings, "wallet_coin_balance": wallet.coin_balance, "risk_level": risk_result["level"], "risk_score": risk_result["score"], "risk_action": "AUDIT", "audit_message": "Global round settled server-side. All rooms see the same result.", "top_winners": top_winners}
+
+
+
+
