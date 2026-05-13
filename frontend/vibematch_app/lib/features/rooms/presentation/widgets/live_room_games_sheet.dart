@@ -42,7 +42,7 @@ class LiveRoomGamesSheet extends StatelessWidget {
           const Text(
             'Room games available for MVP testing',
             style: TextStyle(
-              color: RoomColors.muted,
+              color: Color(0xFF82758E),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
