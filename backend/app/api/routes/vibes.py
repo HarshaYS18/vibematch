@@ -82,7 +82,19 @@ def _author_response(user: User) -> VibeAuthorResponse:
 
 
 def _role_names(user: User) -> set[str]:
-    return {role.role_name.value if hasattr(role.role_name, "value") else str(role.role_name) for role in getattr(user, "roles", [])}
+    names: set[str] = set()
+
+    for user_role in getattr(user, "roles", []) or []:
+        raw_role = getattr(user_role, "role", None)
+        if raw_role is None:
+            raw_role = getattr(user_role, "role_name", None)
+
+        if raw_role is None:
+            continue
+
+        names.add(raw_role.value if hasattr(raw_role, "value") else str(raw_role))
+
+    return names
 
 
 def _require_report_reviewer(current_user: User) -> None:
@@ -324,3 +336,4 @@ def delete_vibe(post_id: int, db: Session = Depends(get_db), current_user: User 
     post.is_deleted = True
     db.commit()
     return VibeDeleteResponse(post_id=post_id, deleted=True)
+
