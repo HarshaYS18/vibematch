@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../data/game_api_service.dart';
+import '../data/jungle_hunt_history_api.dart';
 import 'widgets/jungle_hunt_basket_strip.dart';
 
 class JungleHuntGlobalGamePage extends StatefulWidget {
@@ -19,6 +20,7 @@ enum _JunglePhase { loading, betting, locked, revealing, result }
 
 class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
   final GameApiService _api = const GameApiService();
+  final JungleHuntHistoryApi _historyApi = const JungleHuntHistoryApi();
   final Map<int, int> _placedByTarget = <int, int>{};
   final List<_HistoryItem> _history = <_HistoryItem>[];
 
@@ -44,6 +46,7 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadHistory());
     unawaited(_joinGlobalRound());
   }
 
@@ -55,6 +58,27 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
     super.dispose();
   }
 
+  Future<void> _loadHistory() async {
+    try {
+      final items = await _historyApi.loadHistory(limit: 30);
+      if (!mounted) return;
+
+      setState(() {
+        _history
+          ..clear()
+          ..addAll(
+            items.map(
+              (item) => _HistoryItem(
+                target: _targetForHistoryId(item.winningTargetId),
+                roundId: item.roundId,
+              ),
+            ),
+          );
+      });
+    } catch (_) {
+      // History is non-blocking. If backend is unavailable, keep local/fallback history.
+    }
+  }
   Future<void> _joinGlobalRound() async {
     if (_loading) return;
     setState(() {
@@ -692,8 +716,8 @@ class _BottomPanel extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(10, 9, 10, MediaQuery.paddingOf(context).bottom + 9),
       decoration: BoxDecoration(
-        color: const Color(0xFF2D1809).withValues(alpha: 0.92),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        color: const Color(0xFF160B05).withValues(alpha: 0.94),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         border: Border(top: BorderSide(color: const Color(0xFFFFD36A).withValues(alpha: 0.30))),
       ),
       child: Column(
@@ -712,7 +736,7 @@ class _BottomPanel extends StatelessWidget {
             children: amounts.map((amount) {
               return Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: _AmountPill(amount: amount, index: amounts.indexOf(amount), selected: amount == selectedAmount, enabled: enabled, onTap: () => onAmount(amount)),
                 ),
               );
@@ -725,7 +749,13 @@ class _BottomPanel extends StatelessWidget {
 }
 
 class _AmountPill extends StatelessWidget {
-  const _AmountPill({required this.amount, required this.index, required this.selected, required this.enabled, required this.onTap});
+  const _AmountPill({
+    required this.amount,
+    required this.index,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
 
   final int amount;
   final int index;
@@ -735,44 +765,202 @@ class _AmountPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final style = _casinoChipStyles[index % _casinoChipStyles.length];
+
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 160),
-        opacity: enabled ? 1 : 0.72,
-        child: AnimatedContainer(
+        opacity: enabled ? 1 : 0.86,
+        child: AnimatedScale(
           duration: const Duration(milliseconds: 160),
-          height: 58,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: selected ? const [Color(0xFFFFFFFF), Color(0xFFFFD36A), Color(0xFFFF7A18)] : _chipGradients[index % _chipGradients.length],
-            ),
-            border: Border.all(color: Colors.white.withValues(alpha: selected ? 0.78 : 0.30), width: selected ? 2.4 : 1.2),
-            boxShadow: selected ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.52), blurRadius: 18)] : null,
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                top: 2,
-                left: 5,
-                right: 5,
-                bottom: 24,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.white.withValues(alpha: 0.28)),
+          scale: selected ? 1.10 : 1,
+          child: SizedBox(
+            width: 66,
+            height: 66,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (selected)
+                  Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFD36A).withValues(alpha: 0.70),
+                          blurRadius: 22,
+                          spreadRadius: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+                CustomPaint(
+                  size: const Size(62, 62),
+                  painter: _CasinoChipPainter(
+                    style: style,
+                    selected: selected,
+                  ),
                 ),
-              ),
-              Center(child: Text(_compact(amount), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black, blurRadius: 3)]))),
-            ],
+                Container(
+                  width: 39,
+                  height: 39,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: const Alignment(-0.35, -0.45),
+                      radius: 0.95,
+                      colors: selected
+                          ? const [
+                              Color(0xFFFFF8D2),
+                              Color(0xFFFFC857),
+                              Color(0xFF8A3B00),
+                            ]
+                          : [
+                              style.light,
+                              style.main,
+                              style.dark,
+                            ],
+                    ),
+                    border: Border.all(
+                      color: selected
+                          ? const Color(0xFFFFFFFF)
+                          : Colors.white.withValues(alpha: 0.45),
+                      width: selected ? 2.2 : 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.24),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    _compact(amount),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.2,
+                      shadows: [
+                        Shadow(color: Colors.black, blurRadius: 5),
+                        Shadow(color: Colors.black, offset: Offset(0, 1)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+class _CasinoChipPainter extends CustomPainter {
+  const _CasinoChipPainter({
+    required this.style,
+    required this.selected,
+  });
+
+  final _CasinoChipStyle style;
+  final bool selected;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.width / 2;
+
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.34)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    canvas.drawCircle(center + const Offset(0, 4), radius - 2, shadowPaint);
+
+    final outerPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.35, -0.45),
+        radius: 0.95,
+        colors: [
+          style.light,
+          style.main,
+          style.dark,
+        ],
+      ).createShader(Offset.zero & size);
+    canvas.drawCircle(center, radius - 2, outerPaint);
+
+    final rimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = selected ? 4.2 : 3.2
+      ..color = selected ? const Color(0xFFFFF4B8) : Colors.white.withValues(alpha: 0.34);
+    canvas.drawCircle(center, radius - 5, rimPaint);
+
+    final innerRimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..color = Colors.black.withValues(alpha: 0.24);
+    canvas.drawCircle(center, radius - 13, innerRimPaint);
+
+    final markPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5.4
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withValues(alpha: selected ? 0.82 : 0.58);
+
+    final markRadius = radius - 8;
+    final rect = Rect.fromCircle(center: center, radius: markRadius);
+    for (var i = 0; i < 8; i++) {
+      final start = (math.pi * 2 * i / 8) - 0.10;
+      canvas.drawArc(rect, start, 0.20, false, markPaint);
+    }
+
+    final glossPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0x66FFFFFF),
+          Color(0x18FFFFFF),
+          Color(0x00FFFFFF),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height / 2.2));
+    canvas.drawArc(
+      Rect.fromCircle(center: center - const Offset(4, 6), radius: radius - 10),
+      math.pi,
+      math.pi,
+      false,
+      glossPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CasinoChipPainter oldDelegate) {
+    return oldDelegate.style != style || oldDelegate.selected != selected;
+  }
+}
+
+class _CasinoChipStyle {
+  const _CasinoChipStyle({
+    required this.light,
+    required this.main,
+    required this.dark,
+  });
+
+  final Color light;
+  final Color main;
+  final Color dark;
+}
+
+const List<_CasinoChipStyle> _casinoChipStyles = <_CasinoChipStyle>[
+  _CasinoChipStyle(light: Color(0xFFFFF0A8), main: Color(0xFFFF9B22), dark: Color(0xFF7A3100)),
+  _CasinoChipStyle(light: Color(0xFFBAE7FF), main: Color(0xFF2563EB), dark: Color(0xFF071D66)),
+  _CasinoChipStyle(light: Color(0xFFB8FFDF), main: Color(0xFF0FA66A), dark: Color(0xFF063C2A)),
+  _CasinoChipStyle(light: Color(0xFFFFB3CA), main: Color(0xFFE11D48), dark: Color(0xFF5A0922)),
+  _CasinoChipStyle(light: Color(0xFFE5C5FF), main: Color(0xFF7C3AED), dark: Color(0xFF2A085C)),
+];
 
 class _ResultOverlay extends StatelessWidget {
   const _ResultOverlay({required this.result, required this.didBet, required this.topWinners});
@@ -856,13 +1044,14 @@ class _ErrorStrip extends StatelessWidget {
 }
 
 class _JungleTarget {
-  const _JungleTarget({required this.id, required this.label, required this.emoji, required this.asset, required this.multiplier});
+  const _JungleTarget({required this.id, required this.label, required this.emoji, required this.asset, required this.multiplier, this.isBasket = false});
 
   final int id;
   final String label;
   final String emoji;
   final String asset;
   final int multiplier;
+  final bool isBasket;
 }
 
 class _HistoryItem {
@@ -888,18 +1077,36 @@ const List<_JungleTarget> _targets = <_JungleTarget>[
   _JungleTarget(id: 6, label: 'Eagle', emoji: '🦅', asset: 'assets/games/jungle_hunt/animals/animal_eagle.png', multiplier: 25),
   _JungleTarget(id: 7, label: 'Lion', emoji: '🦁', asset: 'assets/games/jungle_hunt/animals/animal_lion.png', multiplier: 45),
 ];
-
-const List<List<Color>> _chipGradients = <List<Color>>[
-  <Color>[Color(0xFFFFC857), Color(0xFFFF7A18), Color(0xFF9A3D00)],
-  <Color>[Color(0xFF57D7FF), Color(0xFF2563EB), Color(0xFF172A88)],
-  <Color>[Color(0xFF63F7B4), Color(0xFF0FA66A), Color(0xFF07533B)],
-  <Color>[Color(0xFFFF6B93), Color(0xFFE11D48), Color(0xFF7F1231)],
-  <Color>[Color(0xFFC084FC), Color(0xFF7C3AED), Color(0xFF3B0764)],
-];
-
+
 const List<int> _amounts = <int>[10000, 50000, 100000, 500000, 1000000];
 
 
+
+_JungleTarget _targetForHistoryId(int id) {
+  if (id == 100) {
+    return const _JungleTarget(
+      id: 100,
+      label: 'Basket',
+      emoji: '??',
+      asset: '',
+      multiplier: 0,
+      isBasket: true,
+    );
+  }
+
+  if (id == 101) {
+    return const _JungleTarget(
+      id: 101,
+      label: 'Basket',
+      emoji: '??',
+      asset: '',
+      multiplier: 0,
+      isBasket: true,
+    );
+  }
+
+  return _targets.firstWhere((target) => target.id == id, orElse: () => _targets.first);
+}
 String _phaseLabel(_JunglePhase phase) {
   switch (phase) {
     case _JunglePhase.loading:
@@ -938,6 +1145,11 @@ int _int(dynamic value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
+
+
+
+
 
 
 
