@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
+import '../../../control_center/presentation/control_center_page.dart';
 import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
@@ -13,7 +14,6 @@ import '../../../wallet/presentation/wallet_page.dart';
 import '../../data/love_bond_realtime_service.dart';
 import '../../data/profile_api_service.dart';
 import '../control_center/coin_supply_grant_page.dart';
-import '../control_center/super_power_panel_page.dart';
 import '../control_center/vibes_reports_review_page.dart';
 import '../control_center/vip_svip_admin_page.dart';
 import '../cover_photos/edit_cover_photos_page.dart';
@@ -137,7 +137,7 @@ SeatUser get _viewerSeatUser {
   void _openControlCentre(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => SuperPowerPanelPage(currentRole: user.primaryRole),
+        builder: (_) => const ControlCenterPage(),
       ),
     );
   }
