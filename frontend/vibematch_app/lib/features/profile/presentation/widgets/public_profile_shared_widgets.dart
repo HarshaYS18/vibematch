@@ -27,26 +27,41 @@ class PublicCoverPhotoView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final url = cover.imageUrl.trim();
+    if (url.isEmpty) return const _PublicCoverFallback();
     return Image.network(
-      cover.imageUrl,
+      url,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: const Color(0xFF251538),
-        alignment: Alignment.center,
-        child: const Icon(Icons.broken_image_rounded, color: Colors.white70, size: 34),
-      ),
+      alignment: Alignment.center,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (context, error, stackTrace) => const _PublicCoverFallback(),
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
-        return Container(
-          color: const Color(0xFF251538),
-          alignment: Alignment.center,
-          child: const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-          ),
-        );
+        return const _PublicCoverFallback(showLoader: true);
       },
+    );
+  }
+}
+
+class _PublicCoverFallback extends StatelessWidget {
+  const _PublicCoverFallback({this.showLoader = false});
+
+  final bool showLoader;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF251538), Color(0xFF6D5DF6), Color(0xFFE84C72)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: showLoader
+          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+          : Icon(Icons.auto_awesome_rounded, color: Colors.white.withValues(alpha: 0.82), size: 34),
     );
   }
 }
