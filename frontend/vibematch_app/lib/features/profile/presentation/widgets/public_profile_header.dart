@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../auth/models/role_badge.dart';
 import '../models/public_profile_models.dart';
@@ -36,6 +36,7 @@ class PublicProfileHeader extends StatelessWidget {
     required this.onFamilyTap,
     required this.onVipTap,
     required this.onSvipTap,
+    this.avatarUrl,
     this.showSocialActions = true,
     this.showOwnerActions = false,
     this.followersCount,
@@ -71,6 +72,7 @@ class PublicProfileHeader extends StatelessWidget {
   final VoidCallback onFamilyTap;
   final VoidCallback onVipTap;
   final VoidCallback onSvipTap;
+  final String? avatarUrl;
   final bool showSocialActions;
   final bool showOwnerActions;
   final int? followersCount;
@@ -79,6 +81,7 @@ class PublicProfileHeader extends StatelessWidget {
 
   List<Widget> _badgeLineItems() {
     final fallbackRole = roleTag?.trim();
+    final safeFamilyName = familyName.trim();
     return [
       if (roleBadge != null && roleBadge!.badgeLabel.trim().isNotEmpty)
         OfficialRoleBadgePill(badge: roleBadge!)
@@ -88,13 +91,15 @@ class PublicProfileHeader extends StatelessWidget {
         PublicBadge(icon: Icons.diamond_rounded, label: 'VIP $vipLevel', color: const Color(0xFFE84C72), onTap: onVipTap),
       if (svipLevel > 0)
         PublicBadge(icon: Icons.auto_awesome_rounded, label: 'SVIP $svipLevel', color: const Color(0xFF6D5DF6), onTap: onSvipTap),
-      if (familyName.trim().isNotEmpty) PublicBadge(icon: Icons.family_restroom_rounded, label: familyName, color: const Color(0xFF12C7B7), onTap: onFamilyTap),
+      if (safeFamilyName.isNotEmpty && familyLevel > 0)
+        PublicBadge(icon: Icons.family_restroom_rounded, label: safeFamilyName, color: const Color(0xFF12C7B7), onTap: onFamilyTap),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
     final badges = _badgeLineItems();
+    final safeCoverPhotos = coverPhotos.isEmpty ? publicProfileCoverPhotos : coverPhotos;
     final followersText = _compactCount(followersCount ?? 0);
     final followingText = _compactCount(followingCount ?? 0);
     final roomsText = _compactCount(roomsCount ?? 0);
@@ -111,7 +116,12 @@ class PublicProfileHeader extends StatelessWidget {
             children: [
               SizedBox(
                 height: 164,
-                child: PageView.builder(controller: coverController, itemCount: coverPhotos.length, onPageChanged: onCoverChanged, itemBuilder: (context, index) => PublicCoverPhotoView(cover: coverPhotos[index])),
+                child: PageView.builder(
+                  controller: coverController,
+                  itemCount: safeCoverPhotos.length,
+                  onPageChanged: onCoverChanged,
+                  itemBuilder: (context, index) => PublicCoverPhotoView(cover: safeCoverPhotos[index]),
+                ),
               ),
               Positioned(left: 14, top: 14, child: PublicHeaderIconButton(icon: Icons.arrow_back_rounded, onTap: onBackTap)),
               Positioned(
@@ -127,19 +137,20 @@ class PublicProfileHeader extends StatelessWidget {
                   PublicHeaderIconButton(icon: Icons.ios_share_rounded, onTap: onShareTap),
                 ]),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 12,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    coverPhotos.length,
-                    (index) => AnimatedContainer(duration: const Duration(milliseconds: 180), margin: const EdgeInsets.symmetric(horizontal: 3), width: index == coverIndex ? 18 : 6, height: 6, decoration: BoxDecoration(color: Colors.white.withValues(alpha: index == coverIndex ? 0.95 : 0.45), borderRadius: BorderRadius.circular(99))),
+              if (safeCoverPhotos.length > 1)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 12,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      safeCoverPhotos.length,
+                      (index) => AnimatedContainer(duration: const Duration(milliseconds: 180), margin: const EdgeInsets.symmetric(horizontal: 3), width: index == coverIndex ? 18 : 6, height: 6, decoration: BoxDecoration(color: Colors.white.withValues(alpha: index == coverIndex ? 0.95 : 0.45), borderRadius: BorderRadius.circular(99))),
+                    ),
                   ),
                 ),
-              ),
-              Positioned(left: 18, bottom: -54, child: _PublicAvatar(displayName: displayName)),
+              Positioned(left: 18, bottom: -54, child: _PublicAvatar(displayName: displayName, avatarUrl: avatarUrl)),
             ],
           ),
           const SizedBox(height: 62),
@@ -199,12 +210,33 @@ class _PremiumMatchScorePill extends StatelessWidget {
 }
 
 class _PublicAvatar extends StatelessWidget {
-  const _PublicAvatar({required this.displayName});
+  const _PublicAvatar({required this.displayName, this.avatarUrl});
   final String displayName;
+  final String? avatarUrl;
   @override
   Widget build(BuildContext context) {
     final firstLetter = displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase();
-    return Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9))]), child: Container(width: 96, height: 96, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)])), child: Center(child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900)))));
+    final url = avatarUrl?.trim();
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9))]),
+      child: ClipOval(
+        child: Container(
+          width: 96,
+          height: 96,
+          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)])),
+          child: url == null || url.isEmpty
+              ? Center(child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900)))
+              : Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.high,
+                  errorBuilder: (context, error, stackTrace) => Center(child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900))),
+                ),
+        ),
+      ),
+    );
   }
 }
 
@@ -219,4 +251,3 @@ class _PresenceLine extends StatelessWidget {
     return Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [PublicTinyStatusChip(icon: Icons.circle, label: presenceLabel, color: const Color(0xFF12C7B7)), if (roomName != null) InkWell(onTap: onRoomTap, borderRadius: BorderRadius.circular(99), child: PublicTinyStatusChip(icon: Icons.graphic_eq_rounded, label: 'In chatroom: $roomName', color: const Color(0xFF6D5DF6)))]);
   }
 }
-
