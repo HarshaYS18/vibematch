@@ -75,6 +75,7 @@ class PublicVibeItem {
     required this.comments,
     required this.icon,
     required this.colors,
+    this.mediaUrl,
   });
 
   final String title;
@@ -85,27 +86,7 @@ class PublicVibeItem {
   final String comments;
   final IconData icon;
   final List<Color> colors;
+  final String? mediaUrl;
 }
 
-const List<PublicVibeItem> mockPublicVibes = <PublicVibeItem>[
-  PublicVibeItem(
-    title: 'Room Highlights',
-    mediaType: 'Photo',
-    timeAgo: 'today',
-    body: 'Shared a new vibe from the room.',
-    likes: '0',
-    comments: '0',
-    icon: Icons.auto_awesome_rounded,
-    colors: <Color>[Color(0xFF6D5DF6), Color(0xFFE84C72)],
-  ),
-  PublicVibeItem(
-    title: 'Live Moments',
-    mediaType: 'Video',
-    timeAgo: 'recently',
-    body: 'A live social moment appears here.',
-    likes: '0',
-    comments: '0',
-    icon: Icons.graphic_eq_rounded,
-    colors: <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-  ),
-];
+const List<PublicVibeItem> mockPublicVibes = <PublicVibeItem>[];
