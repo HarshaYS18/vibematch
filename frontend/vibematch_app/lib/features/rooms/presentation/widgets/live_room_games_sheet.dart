@@ -5,16 +5,10 @@ import 'room_theme.dart';
 class LiveRoomGamesSheet extends StatelessWidget {
   const LiveRoomGamesSheet({
     super.key,
-    required this.onCrystalHuntTap,
-    required this.onLudoTap,
-    required this.onCarromTap,
-    required this.onPkTap,
+    required this.onJungleHuntTap,
   });
 
-  final VoidCallback onCrystalHuntTap;
-  final VoidCallback onLudoTap;
-  final VoidCallback onCarromTap;
-  final VoidCallback onPkTap;
+  final VoidCallback onJungleHuntTap;
 
   @override
   Widget build(BuildContext context) {
@@ -43,32 +37,21 @@ class LiveRoomGamesSheet extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _MiniGameChip(
-                icon: Icons.pets_rounded,
-                label: 'Jungle Hunt',
-                onTap: onCrystalHuntTap,
-              ),
-              _MiniGameChip(
-                icon: Icons.sports_esports_rounded,
-                label: 'Ludo',
-                onTap: onLudoTap,
-              ),
-              _MiniGameChip(
-                icon: Icons.grid_4x4_rounded,
-                label: 'Carrom',
-                onTap: onCarromTap,
-              ),
-              _MiniGameChip(
-                icon: Icons.emoji_events_rounded,
-                label: 'PK',
-                onTap: onPkTap,
-              ),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            'Available room games',
+            style: TextStyle(
+              color: RoomColors.plum.withValues(alpha: 0.58),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _MiniGameChip(
+            icon: Icons.pets_rounded,
+            label: 'Jungle Hunt',
+            subtitle: 'Coin game • backend result',
+            onTap: onJungleHuntTap,
           ),
         ],
       ),
@@ -80,42 +63,69 @@ class _MiniGameChip extends StatelessWidget {
   const _MiniGameChip({
     required this.icon,
     required this.label,
+    required this.subtitle,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       onTap: onTap,
       child: Container(
-        width: 138,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
           color: const Color(0xFFFCFAF6),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: RoomColors.softLine),
         ),
         child: Row(
           children: [
-            Icon(icon, color: RoomColors.aqua, size: 20),
-            const SizedBox(width: 8),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: RoomColors.aqua.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(icon, color: RoomColors.aqua, size: 23),
+            ),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: RoomColors.plum,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: RoomColors.plum,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: RoomColors.plum.withValues(alpha: 0.56),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
             ),
+            const Icon(Icons.chevron_right_rounded, color: RoomColors.plum),
           ],
         ),
       ),
