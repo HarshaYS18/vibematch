@@ -5,13 +5,15 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.admin_log import AdminLog
 from app.models.login_history import LoginHistory
-from app.models.role import RoleName
+from app.models.role import ROLE_POWER, RoleName
 from app.models.special_permission import SpecialPermission
 from app.models.user import User
 from app.schemas.admin import (
+    AdminControlSummaryResponse,
     AdminUserResponse,
     AssignRoleRequest,
     AssignRoleResponse,
+    RoleOptionResponse,
 )
 from app.schemas.audit_log import AdminLogResponse, LoginHistoryResponse
 from app.schemas.special_permission import (
@@ -73,6 +75,18 @@ def require_founder_owner(current_user: User) -> None:
         )
 
 
+def _can_view_sensitive_logs(current_user: User) -> bool:
+    return get_primary_role(current_user) == RoleName.FOUNDER_OWNER
+
+
+def _can_assign_official_roles(current_user: User) -> bool:
+    return get_primary_role(current_user) == RoleName.FOUNDER_OWNER
+
+
+def _role_label(role: RoleName) -> str:
+    return role.value.replace("_", " ").title()
+
+
 def build_admin_user_response(user: User) -> AdminUserResponse:
     roles = [role.value for role in get_user_roles(user)]
     primary_role = get_primary_role(user).value
@@ -88,6 +102,49 @@ def build_admin_user_response(user: User) -> AdminUserResponse:
         roles=roles,
         primary_role=primary_role,
     )
+
+
+@router.get("/control-summary", response_model=AdminControlSummaryResponse)
+def get_control_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_admin_control_access(current_user)
+    current_role = get_primary_role(current_user)
+    users = db.query(User).all()
+    official_users = [user for user in users if get_primary_role(user) != RoleName.USER]
+    return AdminControlSummaryResponse(
+        current_user_id=current_user.id,
+        current_primary_role=current_role.value,
+        can_assign_roles=_can_assign_official_roles(current_user),
+        can_view_audit_logs=_can_view_sensitive_logs(current_user),
+        can_view_login_history=_can_view_sensitive_logs(current_user),
+        users_count=len(users),
+        active_users_count=len([user for user in users if user.is_active]),
+        banned_users_count=len([user for user in users if user.is_banned]),
+        official_users_count=len(official_users),
+        recent_audit_count=db.query(AdminLog).count(),
+    )
+
+
+@router.get("/role-options", response_model=list[RoleOptionResponse])
+def list_role_options(
+    current_user: User = Depends(get_current_user),
+):
+    require_admin_control_access(current_user)
+    actor_role = get_primary_role(current_user)
+    actor_power = get_role_power(actor_role)
+    return [
+        RoleOptionResponse(
+            value=role.value,
+            label=_role_label(role),
+            power=ROLE_POWER.get(role, 0),
+            assignable=_can_assign_official_roles(current_user)
+            and role != RoleName.FOUNDER_OWNER
+            and ROLE_POWER.get(role, 0) < actor_power,
+        )
+        for role in RoleName
+    ]
 
 
 @router.get("/users", response_model=list[AdminUserResponse])
@@ -119,101 +176,48 @@ def list_login_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Step 2N:
-    Founder Owner can view latest login attempts across the app.
-    """
-
     require_founder_owner(current_user)
 
-    history = (
-        db.query(LoginHistory)
-        .order_by(LoginHistory.id.desc())
-        .limit(100)
-        .all()
-    )
-
+    history = db.query(LoginHistory).order_by(LoginHistory.id.desc()).limit(100).all()
     return history
 
 
-@router.get(
-    "/login-history/user/{user_id}",
-    response_model=list[LoginHistoryResponse],
-)
+@router.get("/login-history/user/{user_id}", response_model=list[LoginHistoryResponse])
 def list_login_history_for_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Step 2N:
-    Founder Owner can view login attempts for a specific user.
-    """
-
     require_founder_owner(current_user)
 
-    history = (
-        db.query(LoginHistory)
-        .filter(LoginHistory.user_id == user_id)
-        .order_by(LoginHistory.id.desc())
-        .limit(100)
-        .all()
-    )
-
+    history = db.query(LoginHistory).filter(LoginHistory.user_id == user_id).order_by(LoginHistory.id.desc()).limit(100).all()
     return history
 
 
-@router.get(
-    "/login-history/device/{device_id}",
-    response_model=list[LoginHistoryResponse],
-)
+@router.get("/login-history/device/{device_id}", response_model=list[LoginHistoryResponse])
 def list_login_history_for_device(
     device_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Step 2N:
-    Founder Owner can view login attempts for a specific device_id.
-    """
-
     require_founder_owner(current_user)
 
-    history = (
-        db.query(LoginHistory)
-        .filter(LoginHistory.device_id == device_id)
-        .order_by(LoginHistory.id.desc())
-        .limit(100)
-        .all()
-    )
-
+    history = db.query(LoginHistory).filter(LoginHistory.device_id == device_id).order_by(LoginHistory.id.desc()).limit(100).all()
     return history
 
 
-@router.get(
-    "/special-permissions",
-    response_model=list[SpecialPermissionResponse],
-)
+@router.get("/special-permissions", response_model=list[SpecialPermissionResponse])
 def list_special_permissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     require_founder_owner(current_user)
 
-    permissions = (
-        db.query(SpecialPermission)
-        .order_by(SpecialPermission.id.desc())
-        .limit(100)
-        .all()
-    )
-
+    permissions = db.query(SpecialPermission).order_by(SpecialPermission.id.desc()).limit(100).all()
     return permissions
 
 
-@router.post(
-    "/special-permissions/grant",
-    response_model=SpecialPermissionActionResponse,
-)
+@router.post("/special-permissions/grant", response_model=SpecialPermissionActionResponse)
 def grant_user_special_permission(
     payload: GrantSpecialPermissionRequest,
     db: Session = Depends(get_db),
@@ -231,16 +235,9 @@ def grant_user_special_permission(
             action="SPECIAL_PERMISSION_GRANT_FAILED",
             resource_type="special_permission",
             reason=payload.reason,
-            metadata_json={
-                "permission": payload.permission.value,
-                "failure_reason": "Target user not found",
-            },
+            metadata_json={"permission": payload.permission.value, "failure_reason": "Target user not found"},
         )
-
-        raise HTTPException(
-            status_code=404,
-            detail="Target user not found",
-        )
+        raise HTTPException(status_code=404, detail="Target user not found")
 
     target_role = get_primary_role(target_user)
 
@@ -258,11 +255,7 @@ def grant_user_special_permission(
                 "block_reason": "Cannot grant special permission to protected owner-level account",
             },
         )
-
-        raise HTTPException(
-            status_code=403,
-            detail="Cannot grant special permission to Founder Owner or Owner accounts",
-        )
+        raise HTTPException(status_code=403, detail="Cannot grant special permission to Founder Owner or Owner accounts")
 
     special_permission = grant_special_permission(
         db=db,
@@ -297,10 +290,7 @@ def grant_user_special_permission(
     )
 
 
-@router.post(
-    "/special-permissions/revoke",
-    response_model=SpecialPermissionActionResponse,
-)
+@router.post("/special-permissions/revoke", response_model=SpecialPermissionActionResponse)
 def revoke_user_special_permission(
     payload: RevokeSpecialPermissionRequest,
     db: Session = Depends(get_db),
@@ -308,11 +298,7 @@ def revoke_user_special_permission(
 ):
     require_founder_owner(current_user)
 
-    special_permission = (
-        db.query(SpecialPermission)
-        .filter(SpecialPermission.id == payload.special_permission_id)
-        .first()
-    )
+    special_permission = db.query(SpecialPermission).filter(SpecialPermission.id == payload.special_permission_id).first()
 
     if not special_permission:
         create_admin_log(
@@ -322,21 +308,12 @@ def revoke_user_special_permission(
             resource_type="special_permission",
             resource_id=str(payload.special_permission_id),
             reason=payload.reason,
-            metadata_json={
-                "failure_reason": "Special permission not found",
-            },
+            metadata_json={"failure_reason": "Special permission not found"},
         )
-
-        raise HTTPException(
-            status_code=404,
-            detail="Special permission not found",
-        )
+        raise HTTPException(status_code=404, detail="Special permission not found")
 
     if not special_permission.is_active:
-        raise HTTPException(
-            status_code=400,
-            detail="Special permission is already inactive",
-        )
+        raise HTTPException(status_code=400, detail="Special permission is already inactive")
 
     revoked_permission = revoke_special_permission(
         db=db,
@@ -353,9 +330,7 @@ def revoke_user_special_permission(
         resource_type="special_permission",
         resource_id=str(revoked_permission.id),
         reason=payload.reason,
-        metadata_json={
-            "permission": revoked_permission.permission.value,
-        },
+        metadata_json={"permission": revoked_permission.permission.value},
     )
 
     return SpecialPermissionActionResponse(
@@ -378,10 +353,7 @@ def assign_user_role(
     actor_role = get_primary_role(current_user)
 
     if actor_role != RoleName.FOUNDER_OWNER:
-        raise HTTPException(
-            status_code=403,
-            detail="Only Founder Owner can assign official roles in this foundation step",
-        )
+        raise HTTPException(status_code=403, detail="Only Founder Owner can assign official roles in this foundation step")
 
     if payload.role == RoleName.FOUNDER_OWNER:
         create_admin_log(
@@ -391,16 +363,9 @@ def assign_user_role(
             action="ROLE_ASSIGN_BLOCKED",
             resource_type="user_role",
             reason=payload.reason,
-            metadata_json={
-                "attempted_role": payload.role.value,
-                "block_reason": "Founder Owner role cannot be assigned from API",
-            },
+            metadata_json={"attempted_role": payload.role.value, "block_reason": "Founder Owner role cannot be assigned from API"},
         )
-
-        raise HTTPException(
-            status_code=403,
-            detail="Founder Owner role cannot be assigned from API",
-        )
+        raise HTTPException(status_code=403, detail="Founder Owner role cannot be assigned from API")
 
     target_user = db.query(User).filter(User.id == payload.target_user_id).first()
 
@@ -412,16 +377,9 @@ def assign_user_role(
             action="ROLE_ASSIGN_FAILED",
             resource_type="user_role",
             reason=payload.reason,
-            metadata_json={
-                "attempted_role": payload.role.value,
-                "failure_reason": "Target user not found",
-            },
+            metadata_json={"attempted_role": payload.role.value, "failure_reason": "Target user not found"},
         )
-
-        raise HTTPException(
-            status_code=404,
-            detail="Target user not found",
-        )
+        raise HTTPException(status_code=404, detail="Target user not found")
 
     target_role = get_primary_role(target_user)
 
@@ -439,11 +397,7 @@ def assign_user_role(
                 "block_reason": "Founder Owner cannot be modified",
             },
         )
-
-        raise HTTPException(
-            status_code=403,
-            detail="Founder Owner cannot be modified",
-        )
+        raise HTTPException(status_code=403, detail="Founder Owner cannot be modified")
 
     if get_role_power(actor_role) <= get_role_power(payload.role):
         create_admin_log(
@@ -460,11 +414,7 @@ def assign_user_role(
                 "block_reason": "Cannot assign equal or higher role",
             },
         )
-
-        raise HTTPException(
-            status_code=403,
-            detail="Cannot assign a role equal to or higher than your own role",
-        )
+        raise HTTPException(status_code=403, detail="Cannot assign a role equal to or higher than your own role")
 
     if not can_act_on(current_user, target_user):
         create_admin_log(
@@ -481,11 +431,7 @@ def assign_user_role(
                 "block_reason": "Actor can only act on lower role users",
             },
         )
-
-        raise HTTPException(
-            status_code=403,
-            detail="You can only act on lower role users",
-        )
+        raise HTTPException(status_code=403, detail="You can only act on lower role users")
 
     assigned_role = assign_role(
         db=db,
