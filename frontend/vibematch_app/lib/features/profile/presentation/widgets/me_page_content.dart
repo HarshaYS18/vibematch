@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
 import '../../../control_center/presentation/control_center_page.dart';
@@ -6,11 +8,13 @@ import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
 import '../../../games/presentation/game_test_page.dart';
+import '../../../presence/data/presence_api_service.dart';
 import '../../../rooms/presentation/live_room_models.dart';
 import '../../../rooms/presentation/live_room_page.dart';
 import '../../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
-import '../../../wallet/presentation/wallet_page.dart';
+import '../../../wallet/data/wallet_api_service.dart';
+import '../../../wallet/presentation/wallet_page_modular.dart';
 import '../../data/love_bond_realtime_service.dart';
 import '../../data/profile_api_service.dart';
 import '../control_center/coin_supply_grant_page.dart';
@@ -35,7 +39,7 @@ import 'me_profile_hero.dart';
 import 'me_session_sheet.dart';
 import 'me_stats_row.dart';
 
-class MePageContent extends StatelessWidget {
+class MePageContent extends StatefulWidget {
   const MePageContent({
     super.key,
     required this.user,
@@ -46,25 +50,36 @@ class MePageContent extends StatelessWidget {
   final CurrentUser user;
   final Future<void> Function() onLogoutPressed;
   final Future<void> Function() onRefreshPressed;
-SeatUser get _viewerSeatUser {
-    return mockRoomUsers.firstWhere(
-      (item) => item.isCurrentUser,
-      orElse: () => mockRoomUsers.isNotEmpty ? mockRoomUsers.first : _fallbackSeatUser,
-    );
-  }
 
-  SeatUser get _fallbackSeatUser {
+  @override
+  State<MePageContent> createState() => _MePageContentState();
+}
+
+class _MePageContentState extends State<MePageContent> {
+  final WalletApiService _walletApi = const WalletApiService();
+  final PresenceApiService _presenceApi = const PresenceApiService();
+  final ProfileApiService _profileApi = const ProfileApiService();
+
+  VmWallet? _wallet;
+  PresenceDto? _presence;
+  FamilySummaryDto? _family;
+  bool _loadingRealData = true;
+  String? _loadError;
+
+  CurrentUser get user => widget.user;
+
+  SeatUser get _viewerSeatUser {
     return SeatUser(
       id: 'user_${user.publicUserId}',
-      name: MeProfileConstants.displayNameFor(user),
+      name: _displayName,
       roleLabel: user.roleDisplayLabel,
-      familyName: MeProfileConstants.familyName,
-      familyLevel: 'bronze',
-      relationshipText: MeProfileConstants.relationshipTypeFor(user),
-      vipLevel: user.vip.vipLevel,
-      svipLevel: user.vip.svipLevel,
-      sendingLevel: 1,
-      receivingLevel: 1,
+      familyName: _family?.shouldShow == true ? _family!.safeName : '',
+      familyLevel: (_family?.level ?? 0).toString(),
+      relationshipText: '',
+      vipLevel: _vipLevel,
+      svipLevel: _svipLevel,
+      sendingLevel: 0,
+      receivingLevel: 0,
       sentExp: 0,
       receivedExp: 0,
       medals: const [],
@@ -75,9 +90,82 @@ SeatUser get _viewerSeatUser {
     );
   }
 
-  List<SeatUser> get _socialPreviewUsers {
-    final users = <SeatUser>[...mockRoomUsers, ...mockInviteUsers];
-    return users.isEmpty ? <SeatUser>[_fallbackSeatUser] : users;
+  List<SeatUser> get _socialPreviewUsers => <SeatUser>[_viewerSeatUser];
+
+  String get _displayName {
+    final displayName = user.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) return displayName;
+    final username = user.username?.trim();
+    if (username != null && username.isNotEmpty) return username;
+    return 'User ${user.publicUserId}';
+  }
+
+  int get _vipLevel => _wallet?.vipLevel ?? user.vip.vipLevel;
+  int get _svipLevel => _wallet?.svipLevel ?? user.vip.svipLevel;
+  int get _coinBalance => _wallet?.coinBalance ?? user.wallet.coinBalance;
+  int get _rubyBalance => _wallet?.rubyBalance ?? user.wallet.rubyBalance;
+  int get _lifetimeRechargeCoins => _wallet?.lifetimeRechargeCoins ?? user.wallet.lifetimeCoinsSpent;
+  int get _monthlyRechargeCoins => _wallet?.monthlyRechargeCoins ?? 0;
+
+  String? get _currentRoomName => _presence?.hasVisibleRoom == true ? _presence!.roomName : null;
+  String? get _currentRoomId => _presence?.hasVisibleRoom == true ? _presence!.roomPublicId : null;
+  String get _lastSeenText => _presence?.onlineLabel ?? _lastSeenFromUser;
+  MePresenceStatus get _presenceStatus => (_presence?.isOnline ?? false) ? MePresenceStatus.online : MePresenceStatus.offline;
+
+  String get _lastSeenFromUser {
+    final seen = user.lastSeenAt;
+    if (seen == null) return 'Offline';
+    final diff = DateTime.now().difference(seen.toLocal());
+    if (diff.inMinutes < 1) return 'last seen just now';
+    if (diff.inMinutes < 60) return 'last seen ${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return 'last seen ${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+    if (diff.inDays < 30) return 'last seen ${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    return 'last seen a month ago';
+  }
+
+  String get _coverPhotoStatus {
+    if (user.coverPhotoUrls.isEmpty) return 'No cover photo';
+    return '${user.coverPhotoUrls.length} active';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadRealData());
+  }
+
+  @override
+  void didUpdateWidget(covariant MePageContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.publicUserId != widget.user.publicUserId) {
+      unawaited(_loadRealData());
+    }
+  }
+
+  Future<void> _loadRealData() async {
+    setState(() {
+      _loadingRealData = true;
+      _loadError = null;
+    });
+    try {
+      final walletFuture = _walletApi.getWallet();
+      final presenceFuture = _presenceApi.getPublicPresence(user.publicUserId);
+      final familyFuture = _profileApi.getMyFamily();
+      final results = await Future.wait<Object?>([walletFuture, presenceFuture, familyFuture]);
+      if (!mounted) return;
+      setState(() {
+        _wallet = results[0] as VmWallet;
+        _presence = results[1] as PresenceDto;
+        _family = results[2] as FamilySummaryDto;
+        _loadingRealData = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+        _loadingRealData = false;
+      });
+    }
   }
 
   void _showAction(BuildContext context, String message) {
@@ -92,13 +180,18 @@ SeatUser get _viewerSeatUser {
       );
   }
 
+  Future<void> _refreshAll() async {
+    await widget.onRefreshPressed();
+    await _loadRealData();
+  }
+
   Future<void> _endSession(BuildContext context) async {
     final shouldEnd = await showMeSessionSheet(context);
-    if (shouldEnd == true) await onLogoutPressed();
+    if (shouldEnd == true) await widget.onLogoutPressed();
   }
 
   void _openEditProfile(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => EditProfilePage(user: user)));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => EditProfilePage(user: user))).then((_) => _refreshAll());
   }
 
   void _openProfileQrActions(BuildContext context) {
@@ -107,15 +200,11 @@ SeatUser get _viewerSeatUser {
 
   Future<void> _openEditCoverPhotos(BuildContext context) async {
     final changed = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => EditCoverPhotosPage(initialCoverPhotoUrls: user.coverPhotoUrls)));
-    if (changed == true) await onRefreshPressed();
+    if (changed == true) await _refreshAll();
   }
 
   void _openAccountSettings(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AccountSettingsPage(svipLevel: user.vip.svipLevel),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => AccountSettingsPage(svipLevel: _svipLevel)));
   }
 
   void _openHelpCentre(BuildContext context) {
@@ -131,15 +220,11 @@ SeatUser get _viewerSeatUser {
   }
 
   void _openWallet(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletPage()));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletPageModular())).then((_) => _loadRealData());
   }
 
   void _openControlCentre(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ControlCenterPage(),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ControlCenterPage())).then((_) => _refreshAll());
   }
 
   void _openVibesReportsReview(BuildContext context) {
@@ -155,7 +240,7 @@ SeatUser get _viewerSeatUser {
       _showAction(context, 'Only Owner/Super Owner can adjust VIP/SVIP levels.');
       return;
     }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VipSvipAdminPage()));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VipSvipAdminPage())).then((_) => _refreshAll());
   }
 
   void _openCoinSupplyGrant(BuildContext context) {
@@ -163,7 +248,7 @@ SeatUser get _viewerSeatUser {
       _showAction(context, 'Only Owner/Super Owner can grant coin supply.');
       return;
     }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage()));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage())).then((_) => _refreshAll());
   }
 
   void _openGameTest(BuildContext context) {
@@ -171,11 +256,33 @@ SeatUser get _viewerSeatUser {
   }
 
   void _openMerchantSellerPanel(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MerchantSellerPanelPage()));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MerchantSellerPanelPage())).then((_) => _refreshAll());
   }
 
   void _openFamily(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FamilyModularPage()));
+    final family = _family;
+    if (family == null || !family.shouldShow) {
+      _showAction(context, 'You are not in a family yet.');
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FamilyModularPage(
+          openCurrentFamily: true,
+          initialFamilyProfile: FamilyProfileUiModel(
+            id: family.safeId,
+            name: family.safeName,
+            minimumVipLabel: 'VIP 0',
+            memberCount: family.memberCount,
+            maxMembers: family.memberCount > 0 ? family.memberCount : 1,
+            rankLabel: 'Family Lv. ${family.level}',
+            ownerUserId: family.ownerPublicUserId?.toString() ?? '',
+            quarterCarryExp: family.totalExp,
+            giftCoinsThisQuarter: family.totalExp,
+            timeMinutesToday: 0,
+          ),
+        ),
+      ).then((_) => _loadRealData());
   }
 
   void _openProfile(BuildContext context) {
@@ -183,13 +290,14 @@ SeatUser get _viewerSeatUser {
       MaterialPageRoute(
         builder: (_) => PublicProfileViewPage(
           user: user,
-          vipLevel: user.vip.vipLevel,
-          svipLevel: user.vip.svipLevel,
-          presenceLabel: MeProfileConstants.lastSeenText,
-          currentRoomName: MeProfileConstants.currentRoomName,
-          relationshipLabel: MeProfileConstants.relationshipTypeFor(user),
-          familyName: MeProfileConstants.familyName,
-          familyLevel: MeProfileConstants.familyLevel,
+          publicUserId: user.publicUserId,
+          vipLevel: _vipLevel,
+          svipLevel: _svipLevel,
+          presenceLabel: _lastSeenText,
+          currentRoomName: _currentRoomName,
+          relationshipLabel: '',
+          familyName: _family?.shouldShow == true ? _family!.safeName : '',
+          familyLevel: _family?.level ?? 0,
         ),
       ),
     );
@@ -200,10 +308,10 @@ SeatUser get _viewerSeatUser {
       MaterialPageRoute(
         builder: (_) => VipProgramPage(
           initialTabIndex: initialTabIndex,
-          vipLevel: user.vip.vipLevel,
-          svipLevel: user.vip.svipLevel,
-          lifetimeRechargeCoins: user.wallet.lifetimeCoinsSpent,
-          monthlyRechargeCoins: 42000,
+          vipLevel: _vipLevel,
+          svipLevel: _svipLevel,
+          lifetimeRechargeCoins: _lifetimeRechargeCoins,
+          monthlyRechargeCoins: _monthlyRechargeCoins,
         ),
       ),
     );
@@ -226,22 +334,17 @@ SeatUser get _viewerSeatUser {
   }
 
   void _openVisitors(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ProfileVisitorsPage(profileOwnerUserId: user.id),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProfileVisitorsPage(profileOwnerUserId: user.id)));
   }
 
   void _openRooms(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ProfileRoomsPage(userId: user.id, publicUserId: user.publicUserId)),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProfileRoomsPage(userId: user.id, publicUserId: user.publicUserId)));
   }
 
   void _openCurrentRoom(BuildContext context) {
-    final roomName = MeProfileConstants.currentRoomName;
-    if (roomName == null || roomName.trim().isEmpty) {
+    final roomName = _currentRoomName;
+    final roomId = _currentRoomId;
+    if (roomName == null || roomName.trim().isEmpty || roomId == null || roomId.trim().isEmpty) {
       _showAction(context, 'No active room right now.');
       return;
     }
@@ -250,10 +353,10 @@ SeatUser get _viewerSeatUser {
       MaterialPageRoute(
         builder: (_) => LiveRoomPage(
           roomName: roomName,
-          roomId: 'VM257808',
-          language: 'Telugu',
-          modeTitle: 'Open',
-          onlineCount: 128,
+          roomId: roomId,
+          language: 'English',
+          modeTitle: _presence?.roomMode ?? 'Open',
+          onlineCount: 1,
         ),
       ),
     );
@@ -261,414 +364,108 @@ SeatUser get _viewerSeatUser {
 
   @override
   Widget build(BuildContext context) {
-    final vipColor = MeProfileConstants.vipMainColor(user.vip.vipLevel);
-    final vipDark = MeProfileConstants.vipDarkColor(user.vip.vipLevel);
-    final relationshipType = MeProfileConstants.relationshipTypeFor(user);
-    final items = buildMeActionItems(
-      vipLevel: user.vip.vipLevel,
-      svipLevel: user.vip.svipLevel,
-      coverPhotoStatus: MeProfileConstants.coverPhotoStatus,
-    );
+    final vipColor = MeProfileConstants.vipMainColor(_vipLevel);
+    final vipDark = MeProfileConstants.vipDarkColor(_vipLevel);
+    final items = buildMeActionItems(vipLevel: _vipLevel, svipLevel: _svipLevel, coverPhotoStatus: _coverPhotoStatus);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 116),
-      children: [
-        _MeLoveBondBackendSyncGate(user: user),
-        _MeRealFamilyHero(
-          user: user,
-          vipColor: vipColor,
-          vipDark: vipDark,
-          onAvatarTap: () => _openProfile(context),
-          onQrTap: () => _openProfileQrActions(context),
-          onEditCoverPhotosTap: () => _openEditCoverPhotos(context),
-          onWalletTap: () => _openWallet(context),
-          onVipTap: () => _openVipProgram(context),
-          onSvipTap: () => _openVipProgram(context, initialTabIndex: 1),
-          onRoomTap: () => _openCurrentRoom(context),
-          onNoFamilyTap: () => _showAction(context, 'You are not in a family yet.'),
-        ),
-        const SizedBox(height: 14),
-        MeStatsRow(
-          userId: user.id,
-          publicUserId: user.publicUserId,
-          onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1),
-          onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0),
-          onRoomsTap: () => _openRooms(context),
-          onVisitorsTap: () => _openVisitors(context),
-        ),
-        const SizedBox(height: 14),
-        MeRelationshipPanel(
-          publicUserId: user.publicUserId,
-          relationshipLabel: relationshipType,
-          onBondTap: (bond) => _openBondDetail(context, bond),
-        ),
-        const SizedBox(height: 18),
-        const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
-        const SizedBox(height: 12),
-        ...items.where((item) {
-          if (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant' || item.action == 'vibes_reports_review') return user.canSeeOwnerControls;
-          return true;
-        }).map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: MeAccountCard(
-              item: item,
-              onTap: () async {
-                if (item.action == 'edit_profile') {
-                  _openEditProfile(context);
-                } else if (item.action == 'edit_cover_photos') {
-                  await _openEditCoverPhotos(context);
-                } else if (item.action == 'vibes_reports_review') {
-                  _openVibesReportsReview(context);
-                } else if (item.action == 'vip_svip_admin') {
-                  _openVipSvipAdmin(context);
-                } else if (item.action == 'coin_supply_grant') {
-                  _openCoinSupplyGrant(context);
-                } else if (item.action == 'game_test') {
-                  _openGameTest(context);
-                } else if (item.action == 'family' || item.title == 'Family') {
-                  _openFamily(context);
-                } else if (item.title == 'VIP / SVIP Center' || item.title == 'VIP / SVIP') {
-                  _openVipProgram(context, initialTabIndex: item.subtitle.contains('SVIP') ? 1 : 0);
-                } else if (item.title == 'Love & Bonds') {
-                  _openLoveBonds(context);
-                } else if (item.title == 'Store & Inventory') {
-                  _openStore(context);
-                } else if (item.title == 'Control Center') {
-                  _openControlCentre(context);
-                } else if (item.title == 'Merchant & Seller Panel') {
-                  _openMerchantSellerPanel(context);
-                } else if (item.title == 'Settings') {
-                  _openAccountSettings(context);
-                } else if (item.title == 'Help Centre') {
-                  _openHelpCentre(context);
-                } else if (item.action == 'logout') {
-                  await _endSession(context);
-                } else if (item.action == 'refresh') {
-                  await onRefreshPressed();
-                  if (context.mounted) _showAction(context, 'Profile refreshed.');
-                } else {
-                  _showAction(context, item.action);
-                }
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-
-
-class _MeRealFamilyHero extends StatefulWidget {
-  const _MeRealFamilyHero({
-    required this.user,
-    required this.vipColor,
-    required this.vipDark,
-    required this.onAvatarTap,
-    required this.onQrTap,
-    required this.onEditCoverPhotosTap,
-    required this.onWalletTap,
-    required this.onVipTap,
-    required this.onSvipTap,
-    required this.onRoomTap,
-    required this.onNoFamilyTap,
-  });
-
-  final CurrentUser user;
-  final Color vipColor;
-  final Color vipDark;
-  final VoidCallback onAvatarTap;
-  final VoidCallback onQrTap;
-  final VoidCallback onEditCoverPhotosTap;
-  final VoidCallback onWalletTap;
-  final VoidCallback onVipTap;
-  final VoidCallback onSvipTap;
-  final VoidCallback onRoomTap;
-  final VoidCallback onNoFamilyTap;
-
-  @override
-  State<_MeRealFamilyHero> createState() => _MeRealFamilyHeroState();
-}
-
-class _MeRealFamilyHeroState extends State<_MeRealFamilyHero> {
-  final ProfileApiService _profileApi = const ProfileApiService();
-  FamilySummaryDto? _family;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFamily();
-  }
-
-  @override
-  void didUpdateWidget(covariant _MeRealFamilyHero oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.user.publicUserId != widget.user.publicUserId) {
-      _loadFamily();
-    }
-  }
-
-  Future<void> _loadFamily() async {
-    setState(() => _loading = true);
-    try {
-      final family = await _profileApi.getMyFamily();
-      if (!mounted) return;
-      setState(() => _family = family);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _family = FamilySummaryDto.empty());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _openRealFamily() {
-    final family = _family;
-    if (family == null || !family.shouldShow) {
-      widget.onNoFamilyTap();
-      return;
-    }
-
-    final familyProfile = FamilyProfileUiModel(
-      id: family.safeId,
-      name: family.safeName,
-      minimumVipLabel: 'VIP 0',
-      memberCount: family.memberCount,
-      maxMembers: family.memberCount > 0 ? family.memberCount : 1,
-      rankLabel: 'Family Lv. ${family.level}',
-      ownerUserId: family.ownerPublicUserId?.toString() ?? '',
-      quarterCarryExp: family.totalExp,
-      giftCoinsThisQuarter: family.totalExp,
-      timeMinutesToday: 0,
-    );
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => FamilyModularPage(
-          openCurrentFamily: true,
-          initialFamilyProfile: familyProfile,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final family = _family;
-    final hasFamily = family != null && family.shouldShow;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        MePremiumProfileHero(
-          displayName: MeProfileConstants.displayNameFor(widget.user),
-          publicId: widget.user.publicUserId.toString(),
-          role: widget.user.primaryRole,
-          roleTag: MeProfileConstants.roleTagFor(widget.user.primaryRole),
-          roleBadge: widget.user.primaryRoleBadge,
-          vipLevel: widget.user.vip.vipLevel,
-          svipLevel: widget.user.vip.svipLevel,
-          vipFrozen: !widget.user.vip.vipIsActive,
-          vipColor: widget.vipColor,
-          vipDark: widget.vipDark,
-          diamonds: MeProfileConstants.formatNumber(widget.user.wallet.lifetimeCoinsSpent),
-          coins: MeProfileConstants.formatNumber(widget.user.wallet.coinBalance),
-          presence: MeProfileConstants.presence,
-          lastSeenText: MeProfileConstants.lastSeenText,
-          currentRoomName: MeProfileConstants.currentRoomName,
-          familyName: hasFamily ? family.safeName : '',
-          familyLevel: hasFamily ? family.level : 0,
-          onFamilyTap: _openRealFamily,
-          onAvatarTap: widget.onAvatarTap,
-          onQrTap: widget.onQrTap,
-          onEditCoverPhotosTap: widget.onEditCoverPhotosTap,
-          onWalletTap: widget.onWalletTap,
-          onVipTap: widget.onVipTap,
-          onSvipTap: widget.onSvipTap,
-          onRoomTap: widget.onRoomTap,
-        ),
-        if (_loading)
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: LinearProgressIndicator(
-              minHeight: 3,
-              color: Color(0xFF12C7B7),
-              backgroundColor: Color(0xFFECE2D8),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _MeRealVibesSection extends StatefulWidget {
-  const _MeRealVibesSection();
-
-  @override
-  State<_MeRealVibesSection> createState() => _MeRealVibesSectionState();
-}
-
-class _MeRealVibesSectionState extends State<_MeRealVibesSection> {
-  final ProfileApiService _profileApi = const ProfileApiService();
-  late Future<List<ProfileVibeDto>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _profileApi.listMyVibes();
-  }
-
-  Future<void> _refresh() async {
-    final nextFuture = _profileApi.listMyVibes();
-    setState(() => _future = nextFuture);
-    await nextFuture;
-  }
-
-  BoxDecoration _panelDecoration() {
-    return BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.97),
-      borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: const Color(0xFFECE2D8)),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFF251538).withValues(alpha: 0.045),
-          blurRadius: 22,
-          offset: const Offset(0, 10),
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<ProfileVibeDto>>(
-      future: _future,
-      builder: (context, snapshot) {
-        final vibes = snapshot.data ?? const <ProfileVibeDto>[];
-
-        return Container(
-          padding: const EdgeInsets.all(15),
-          decoration: _panelDecoration(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'My Vibes',
-                      style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                  Text(
-                    '${vibes.length}',
-                    style: const TextStyle(color: Color(0xFFE84C72), fontSize: 12, fontWeight: FontWeight.w900),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 13),
-              if (snapshot.connectionState == ConnectionState.waiting && vibes.isEmpty)
-                const LinearProgressIndicator(minHeight: 3, color: Color(0xFF6D5DF6), backgroundColor: Color(0xFFECE2D8))
-              else if (snapshot.hasError && vibes.isEmpty)
-                _MeVibesMessage(
-                  icon: Icons.wifi_off_rounded,
-                  title: 'Could not load Vibes',
-                  body: snapshot.error.toString().replaceFirst('Exception: ', ''),
-                  onTap: _refresh,
-                )
-              else if (vibes.isEmpty)
-                const _MeVibesMessage(
-                  icon: Icons.auto_awesome_rounded,
-                  title: 'No Vibes yet',
-                  body: 'When you post real Vibes, they will appear here.',
-                )
-              else
-                Column(
-                  children: [
-                    for (var index = 0; index < vibes.take(3).length; index++) ...[
-                      _MeRealVibeCard(vibe: vibes[index]),
-                      if (index != vibes.take(3).length - 1) const SizedBox(height: 10),
-                    ],
-                  ],
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MeRealVibeCard extends StatelessWidget {
-  const _MeRealVibeCard({required this.vibe});
-
-  final ProfileVibeDto vibe;
-
-  @override
-  Widget build(BuildContext context) {
-    final mediaType = vibe.mediaType.trim().toLowerCase();
-    final icon = switch (mediaType) {
-      'photo' => Icons.photo_rounded,
-      'video' => Icons.play_circle_fill_rounded,
-      _ => Icons.notes_rounded,
-    };
-
-    final colors = switch (mediaType) {
-      'photo' => const <Color>[Color(0xFF6D5DF6), Color(0xFFE84C72)],
-      'video' => const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-      _ => const <Color>[Color(0xFF251538), Color(0xFFC99A3B)],
-    };
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAF7F1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFECE2D8)),
-      ),
-      child: Row(
+    return RefreshIndicator(
+      color: const Color(0xFF12C7B7),
+      onRefresh: _refreshAll,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 116),
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: colors),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
+          _MeLoveBondBackendSyncGate(user: user),
+          if (_loadingRealData) const LinearProgressIndicator(minHeight: 3, color: Color(0xFF12C7B7), backgroundColor: Color(0xFFECE2D8)),
+          if (_loadError != null) _RealDataErrorBanner(message: _loadError!, onRetry: _loadRealData),
+          MePremiumProfileHero(
+            displayName: _displayName,
+            publicId: user.visibleId,
+            role: user.primaryRole,
+            roleTag: MeProfileConstants.roleTagFor(user.primaryRole),
+            roleBadge: user.primaryRoleBadge,
+            vipLevel: _vipLevel,
+            svipLevel: _svipLevel,
+            vipFrozen: !user.vip.vipIsActive,
+            vipColor: vipColor,
+            vipDark: vipDark,
+            diamonds: MeProfileConstants.formatNumber(_rubyBalance),
+            coins: MeProfileConstants.formatNumber(_coinBalance),
+            presence: _presenceStatus,
+            lastSeenText: _lastSeenText,
+            currentRoomName: _currentRoomName,
+            familyName: _family?.shouldShow == true ? _family!.safeName : '',
+            familyLevel: _family?.level ?? 0,
+            onFamilyTap: _openFamily,
+            onAvatarTap: () => _openProfile(context),
+            onQrTap: () => _openProfileQrActions(context),
+            onEditCoverPhotosTap: () => _openEditCoverPhotos(context),
+            onWalletTap: () => _openWallet(context),
+            onVipTap: () => _openVipProgram(context),
+            onSvipTap: () => _openVipProgram(context, initialTabIndex: 1),
+            onRoomTap: () => _openCurrentRoom(context),
           ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  vibe.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  vibe.caption.trim().isEmpty ? 'Shared a Vibe.' : vibe.caption.trim(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12, fontWeight: FontWeight.w700, height: 1.25),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Text(vibe.timeAgo, style: const TextStyle(color: Color(0xFF12A99E), fontSize: 10.5, fontWeight: FontWeight.w900)),
-                    const SizedBox(width: 9),
-                    Text('❤ ${vibe.likesLabel}', style: const TextStyle(color: Color(0xFFE84C72), fontSize: 10.5, fontWeight: FontWeight.w900)),
-                    const SizedBox(width: 9),
-                    Text('💬 ${vibe.commentsLabel}', style: const TextStyle(color: Color(0xFF6D5DF6), fontSize: 10.5, fontWeight: FontWeight.w900)),
-                  ],
-                ),
-              ],
+          const SizedBox(height: 14),
+          MeStatsRow(
+            userId: user.id,
+            publicUserId: user.publicUserId,
+            onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1),
+            onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0),
+            onRoomsTap: () => _openRooms(context),
+            onVisitorsTap: () => _openVisitors(context),
+          ),
+          const SizedBox(height: 14),
+          MeRelationshipPanel(publicUserId: user.publicUserId, relationshipLabel: '', onBondTap: (bond) => _openBondDetail(context, bond)),
+          const SizedBox(height: 18),
+          const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
+          const SizedBox(height: 12),
+          ...items.where((item) {
+            if (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant' || item.action == 'vibes_reports_review') return user.canSeeOwnerControls;
+            return true;
+          }).map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: MeAccountCard(
+                item: item,
+                onTap: () async {
+                  if (item.action == 'edit_profile') {
+                    _openEditProfile(context);
+                  } else if (item.action == 'edit_cover_photos') {
+                    await _openEditCoverPhotos(context);
+                  } else if (item.action == 'vibes_reports_review') {
+                    _openVibesReportsReview(context);
+                  } else if (item.action == 'vip_svip_admin') {
+                    _openVipSvipAdmin(context);
+                  } else if (item.action == 'coin_supply_grant') {
+                    _openCoinSupplyGrant(context);
+                  } else if (item.action == 'game_test') {
+                    _openGameTest(context);
+                  } else if (item.action == 'family' || item.title == 'Family') {
+                    _openFamily(context);
+                  } else if (item.title == 'VIP / SVIP Center' || item.title == 'VIP / SVIP') {
+                    _openVipProgram(context, initialTabIndex: item.subtitle.contains('SVIP') ? 1 : 0);
+                  } else if (item.title == 'Love & Bonds') {
+                    _openLoveBonds(context);
+                  } else if (item.title == 'Store & Inventory') {
+                    _openStore(context);
+                  } else if (item.title == 'Control Center') {
+                    _openControlCentre(context);
+                  } else if (item.title == 'Merchant & Seller Panel') {
+                    _openMerchantSellerPanel(context);
+                  } else if (item.title == 'Settings') {
+                    _openAccountSettings(context);
+                  } else if (item.title == 'Help Centre') {
+                    _openHelpCentre(context);
+                  } else if (item.action == 'logout') {
+                    await _endSession(context);
+                  } else if (item.action == 'refresh') {
+                    await _refreshAll();
+                    if (context.mounted) _showAction(context, 'Profile refreshed.');
+                  } else {
+                    _showAction(context, item.action);
+                  }
+                },
+              ),
             ),
           ),
         ],
@@ -677,49 +474,30 @@ class _MeRealVibeCard extends StatelessWidget {
   }
 }
 
-class _MeVibesMessage extends StatelessWidget {
-  const _MeVibesMessage({
-    required this.icon,
-    required this.title,
-    required this.body,
-    this.onTap,
-  });
+class _RealDataErrorBanner extends StatelessWidget {
+  const _RealDataErrorBanner({required this.message, required this.onRetry});
 
-  final IconData icon;
-  final String title;
-  final String body;
-  final Future<void> Function()? onTap;
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap == null ? null : () => onTap!.call(),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFAF7F1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFECE2D8)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: const Color(0xFF6D5DF6), size: 30),
-            const SizedBox(height: 8),
-            Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 15, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12, fontWeight: FontWeight.w700, height: 1.3),
-            ),
-          ],
-        ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE8C77C))),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
       ),
     );
   }
 }
+
 class _MeLoveBondBackendSyncGate extends StatefulWidget {
   const _MeLoveBondBackendSyncGate({required this.user});
 
@@ -760,12 +538,10 @@ class _MeLoveBondBackendSyncGateState extends State<_MeLoveBondBackendSyncGate> 
         currentAvatarUrl: widget.user.avatarUrl,
       );
     } catch (_) {
-      // Keep current local state if backend is temporarily unavailable.
+      // Love bonds panel keeps its existing state if the network request fails.
     }
   }
 
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
-
-
