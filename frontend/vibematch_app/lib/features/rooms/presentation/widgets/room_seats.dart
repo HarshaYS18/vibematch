@@ -245,12 +245,51 @@ class _SeatAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = seat.user;
+    final avatarUrl = user?.avatarUrl?.trim();
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
     return SizedBox(width: _RoomSeatLayoutState.avatarSize + 14, height: _RoomSeatLayoutState.avatarSize + 14, child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
       if (selected) Container(width: _RoomSeatLayoutState.avatarSize + 8, height: _RoomSeatLayoutState.avatarSize + 8, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.92), width: 1.4))),
-      RoomAvatarFrameHost(frame: user == null ? null : defaultStaticAvatarFrame, size: _RoomSeatLayoutState.avatarSize, child: Container(width: _RoomSeatLayoutState.avatarSize, height: _RoomSeatLayoutState.avatarSize, decoration: BoxDecoration(shape: BoxShape.circle, color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.08 : 0.12) : null, gradient: user == null ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors), border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.86) : Colors.white.withValues(alpha: 0.18), width: selected ? 1.4 : 1.1)), child: Center(child: user == null ? Icon(seat.locked ? Icons.lock_rounded : Icons.add_rounded, color: Colors.white70, size: seat.locked ? 22 : 28) : Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900))))),
+      RoomAvatarFrameHost(
+        frame: user == null ? null : defaultStaticAvatarFrame,
+        size: _RoomSeatLayoutState.avatarSize,
+        child: Container(
+          width: _RoomSeatLayoutState.avatarSize,
+          height: _RoomSeatLayoutState.avatarSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.08 : 0.12) : null,
+            gradient: user == null || hasAvatar ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
+            border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.86) : Colors.white.withValues(alpha: 0.18), width: selected ? 1.4 : 1.1),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: user == null
+              ? Center(child: Icon(seat.locked ? Icons.lock_rounded : Icons.add_rounded, color: Colors.white70, size: seat.locked ? 22 : 28))
+              : hasAvatar
+                  ? Image.network(
+                      avatarUrl,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.high,
+                      errorBuilder: (context, error, stackTrace) => _SeatAvatarFallback(user: user),
+                    )
+                  : _SeatAvatarFallback(user: user),
+        ),
+      ),
       if (user?.selfMuted ?? false) Positioned(right: 0, bottom: 5, child: Container(width: 21, height: 21, decoration: BoxDecoration(color: RoomColors.selfMute, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.3)), child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 11))),
       if (user?.adminMuted ?? false) Positioned(right: 0, bottom: 5, child: Container(width: 21, height: 21, decoration: BoxDecoration(color: RoomColors.coral, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.3), boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 2))]), child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 11))),
     ]));
+  }
+}
+
+class _SeatAvatarFallback extends StatelessWidget {
+  const _SeatAvatarFallback({required this.user});
+  final SeatUser user;
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors)),
+      child: Center(child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900))),
+    );
   }
 }
 
