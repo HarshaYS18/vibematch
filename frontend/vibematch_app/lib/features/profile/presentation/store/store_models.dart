@@ -22,6 +22,7 @@ enum VmStoreItemType {
   chatBubble,
   roomBackground,
   specialId,
+  gradientName,
   loveCard,
   brotherCard,
   sisterCard,
