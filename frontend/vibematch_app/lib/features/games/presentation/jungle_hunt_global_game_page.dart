@@ -344,7 +344,7 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
             Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.22))),
             SafeArea(
               top: !widget.embeddedInRoom,
-              child: Column(
+child: Column(
                 children: [
                   _Header(
                     roundId: _round?.id,
@@ -425,18 +425,14 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
   }
 
   List<_RoundWinner> _topWinners(GameRoundResult result) {
-    if (result.topWinners.isNotEmpty) {
-      return result.topWinners
-          .take(3)
-          .map((winner) => _RoundWinner(name: winner.name, avatar: winner.avatar, coins: winner.coins))
-          .toList(growable: false);
+    if (result.topWinners.isEmpty) {
+      return const <_RoundWinner>[];
     }
-    final base = math.max(result.totalUserWinnings, result.multiplier * 10000);
-    return <_RoundWinner>[
-      _RoundWinner(name: 'Top 1', avatar: '👑', coins: base + 120000),
-      _RoundWinner(name: 'Top 2', avatar: '🔥', coins: (base * 0.72).round()),
-      _RoundWinner(name: 'Top 3', avatar: '⭐', coins: (base * 0.46).round()),
-    ];
+
+    return result.topWinners
+        .take(3)
+        .map((winner) => _RoundWinner(name: winner.name, avatar: winner.avatar, coins: winner.coins))
+        .toList(growable: false);
   }
 }
 
@@ -511,7 +507,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
-      child: Column(
+child: Column(
         children: [
           Row(
             children: [
@@ -759,7 +755,7 @@ class _CenterStatus extends StatelessWidget {
         border: Border.all(color: const Color(0xFF71370E), width: 8),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 16, offset: const Offset(0, 8))],
       ),
-      child: Column(
+child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF4A210A), fontSize: 13, fontWeight: FontWeight.w900, height: 1.05)),
@@ -789,7 +785,7 @@ class _BottomPanel extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         border: Border(top: BorderSide(color: const Color(0xFFFFD36A).withValues(alpha: 0.30))),
       ),
-      child: Column(
+child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
@@ -1054,7 +1050,7 @@ class _ResultOverlay extends StatelessWidget {
           border: Border.all(color: Color(0xFFFFD36A), width: 1.3),
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 28)],
         ),
-        child: Column(
+child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, height: 1.15)),
@@ -1076,7 +1072,7 @@ class _WinnerPodium extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 86,
-      child: Column(
+child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(radius: 24, backgroundColor: const Color(0xFFFFD36A), child: Text(winner.avatar, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
@@ -1214,6 +1210,11 @@ int _int(dynamic value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
+
+
+
+
 
 
 
