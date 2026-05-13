@@ -107,7 +107,7 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
         _secondsLeft = revealLeft > 0 ? revealLeft : 15;
         _revealIndex = 0;
       });
-      unawaited(_beginReveal(totalMs: (_secondsLeft * 1000).clamp(3000, 15000)));
+      unawaited(_beginReveal(totalMs: (_secondsLeft * 200).clamp(1200, 3000)));
       return;
     }
 
@@ -156,7 +156,7 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
             _secondsLeft = 15;
             _revealIndex = 0;
           });
-          unawaited(_beginReveal(totalMs: 15000));
+          unawaited(_beginReveal(totalMs: 3000));
         } else {
           setState(() => _secondsLeft -= 1);
         }
@@ -713,7 +713,7 @@ class _BottomPanel extends StatelessWidget {
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: _AmountPill(amount: amount, selected: amount == selectedAmount, enabled: enabled, onTap: () => onAmount(amount)),
+                  child: _AmountPill(amount: amount, index: amounts.indexOf(amount), selected: amount == selectedAmount, enabled: enabled, onTap: () => onAmount(amount)),
                 ),
               );
             }).toList(),
@@ -725,9 +725,10 @@ class _BottomPanel extends StatelessWidget {
 }
 
 class _AmountPill extends StatelessWidget {
-  const _AmountPill({required this.amount, required this.selected, required this.enabled, required this.onTap});
+  const _AmountPill({required this.amount, required this.index, required this.selected, required this.enabled, required this.onTap});
 
   final int amount;
+  final int index;
   final bool selected;
   final bool enabled;
   final VoidCallback onTap;
@@ -741,14 +742,14 @@ class _AmountPill extends StatelessWidget {
         opacity: enabled ? 1 : 0.52,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          height: 44,
+          height: 54,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
+            shape: BoxShape.circle,
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: selected ? const [Color(0xFFFFF4A5), Color(0xFFFFB23F), Color(0xFFB65B12)] : const [Color(0xFF84E6FF), Color(0xFF2B7DFF), Color(0xFF3124A8)],
+              colors: selected ? const [Color(0xFFFFFFFF), Color(0xFFFFD36A), Color(0xFFFF7A18)] : _chipGradients[index % _chipGradients.length],
             ),
             border: Border.all(color: Colors.white.withValues(alpha: selected ? 0.78 : 0.30), width: selected ? 2 : 1),
             boxShadow: selected ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.34), blurRadius: 12)] : null,
@@ -888,6 +889,14 @@ const List<_JungleTarget> _targets = <_JungleTarget>[
   _JungleTarget(id: 7, label: 'Lion', emoji: '🦁', asset: 'assets/games/jungle_hunt/animals/animal_lion.png', multiplier: 45),
 ];
 
+const List<List<Color>> _chipGradients = <List<Color>>[
+  <Color>[Color(0xFFFFC857), Color(0xFFFF7A18), Color(0xFF9A3D00)],
+  <Color>[Color(0xFF57D7FF), Color(0xFF2563EB), Color(0xFF172A88)],
+  <Color>[Color(0xFF63F7B4), Color(0xFF0FA66A), Color(0xFF07533B)],
+  <Color>[Color(0xFFFF6B93), Color(0xFFE11D48), Color(0xFF7F1231)],
+  <Color>[Color(0xFFC084FC), Color(0xFF7C3AED), Color(0xFF3B0764)],
+];
+
 const List<int> _amounts = <int>[10000, 50000, 100000, 500000, 1000000];
 
 
@@ -929,6 +938,8 @@ int _int(dynamic value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
+
 
 
 
