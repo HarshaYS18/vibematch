@@ -21,6 +21,13 @@ from app.models.wallet import (
     WalletLedgerEntry,
     WalletLedgerSource,
 )
+from app.models.economy import (
+    CoinPoolLedgerDirection,
+    CoinPoolLedgerEntry,
+    CoinPoolLedgerSource,
+    CoinPoolType,
+    CoinSupplyPool,
+)
 from app.models.inbox import (
     InboxConversation,
     InboxConversationType,
