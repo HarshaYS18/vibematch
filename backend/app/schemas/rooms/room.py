@@ -52,6 +52,8 @@ class RoomParticipantUserResponse(BaseModel):
     is_owner: bool = False
     is_member: bool = False
     is_room_admin: bool = False
+    is_online: bool = False
+    list_section: str = "visitor"
     joined_at: datetime
     last_seen_at: datetime
 
