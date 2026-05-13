@@ -49,8 +49,8 @@ class LiveRoomGamesSheet extends StatelessWidget {
             runSpacing: 8,
             children: [
               _MiniGameChip(
-                icon: Icons.casino_rounded,
-                label: 'Crystal Hunt',
+                icon: Icons.pets_rounded,
+                label: 'Jungle Hunt',
                 onTap: onCrystalHuntTap,
               ),
               _MiniGameChip(
