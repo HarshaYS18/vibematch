@@ -19,16 +19,11 @@ router = APIRouter(prefix="/social", tags=["Social"])
 
 def _self_follow_status(current_user: User) -> FollowStatusResponse:
     return FollowStatusResponse(
-        public_user_id=current_user.public_user_id,
+        target_user=PublicUserSummary(**social_service.public_user_summary(current_user, current_user=current_user)),
         is_following=False,
-        follows_me=False,
-        is_friend=False,
-        blocked_by_me=False,
-        blocked_me=False,
-        can_follow=False,
-        follow_block_reason="This is your own profile.",
-        followers_count=0,
-        following_count=0,
+        is_followed_by=False,
+        is_friends=False,
+        action_label="You",
     )
 
 
