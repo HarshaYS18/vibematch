@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'room_theme.dart';
 
 class LiveRoomGamesSheet extends StatelessWidget {
   const LiveRoomGamesSheet({
     super.key,
-    required this.onCrystalHuntTap,
-    required this.onLudoTap,
-    required this.onCarromTap,
-    required this.onPkTap,
+    required this.onGalacticSpinsTap,
   });
 
-  final VoidCallback onCrystalHuntTap;
-  final VoidCallback onLudoTap;
-  final VoidCallback onCarromTap;
-  final VoidCallback onPkTap;
+  final VoidCallback onGalacticSpinsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -43,77 +38,122 @@ class LiveRoomGamesSheet extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _MiniGameChip(
-                icon: Icons.casino_rounded,
-                label: 'Crystal Hunt',
-                onTap: onCrystalHuntTap,
-              ),
-              _MiniGameChip(
-                icon: Icons.sports_esports_rounded,
-                label: 'Ludo',
-                onTap: onLudoTap,
-              ),
-              _MiniGameChip(
-                icon: Icons.grid_4x4_rounded,
-                label: 'Carrom',
-                onTap: onCarromTap,
-              ),
-              _MiniGameChip(
-                icon: Icons.emoji_events_rounded,
-                label: 'PK',
-                onTap: onPkTap,
-              ),
-            ],
+          const SizedBox(height: 4),
+          const Text(
+            'Room games available for MVP testing',
+            style: TextStyle(
+              color: RoomColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
+          const SizedBox(height: 12),
+          _GalacticSpinsGameCard(onTap: onGalacticSpinsTap),
         ],
       ),
     );
   }
 }
 
-class _MiniGameChip extends StatelessWidget {
-  const _MiniGameChip({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+class _GalacticSpinsGameCard extends StatelessWidget {
+  const _GalacticSpinsGameCard({required this.onTap});
 
-  final IconData icon;
-  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(22),
       onTap: onTap,
       child: Container(
-        width: 138,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        width: double.infinity,
+        padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: const Color(0xFFFCFAF6),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: RoomColors.softLine),
+          borderRadius: BorderRadius.circular(22),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF101A3A),
+              Color(0xFF251052),
+              Color(0xFF101A3A),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(color: const Color(0xFFFFD76A), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFFC857).withValues(alpha: 0.22),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Icon(icon, color: RoomColors.aqua, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: RoomColors.plum,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
+            Container(
+              width: 58,
+              height: 58,
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF070B1B),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFF38E8FF).withValues(alpha: 0.65),
                 ),
+              ),
+              child: SvgPicture.asset(
+                'assets/images/games/galactic_spins/symbols/symbol_wild_star.svg',
+                fit: BoxFit.contain,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Galactic Spins',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'Slot-style test game with backend economy route',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Color(0xFFC8D5FF),
+                      fontSize: 11.5,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFFFD76A),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFFD76A).withValues(alpha: 0.28),
+                    blurRadius: 12,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.play_arrow_rounded,
+                color: Color(0xFF251052),
+                size: 24,
               ),
             ),
           ],
