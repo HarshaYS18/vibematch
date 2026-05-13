@@ -27,6 +27,12 @@ def _pool_response(pool: CoinSupplyPool) -> CoinSellerPoolResponse:
     )
 
 
+def _target_identifier(public_user_id: int | None, identifier: str | None) -> str:
+    if identifier is not None and identifier.strip():
+        return identifier.strip()
+    return str(public_user_id or "").strip()
+
+
 @router.get("/my-supply-pools", response_model=list[CoinSellerPoolResponse])
 def my_supply_pools(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return [_pool_response(pool) for pool in coin_sales_service.get_seller_pools(db, current_user)]
@@ -37,7 +43,7 @@ def grant_supply_to_seller(payload: CoinSellerSupplyGrantRequest, db: Session = 
     pool = coin_sales_service.grant_supply_to_seller(
         db=db,
         actor=current_user,
-        target_public_user_id=payload.target_public_user_id,
+        target_identifier=_target_identifier(payload.target_public_user_id, payload.target_user_identifier),
         pool_type=payload.pool_type,
         amount=payload.amount,
         reason=payload.reason,
@@ -50,7 +56,7 @@ def sell_to_user(payload: CoinSellerSellToUserRequest, db: Session = Depends(get
     return CoinSellerSaleResponse(**coin_sales_service.sell_to_user(
         db=db,
         seller=current_user,
-        target_public_user_id=payload.target_public_user_id,
+        target_identifier=_target_identifier(payload.target_public_user_id, payload.target_user_identifier),
         coin_amount=payload.coin_amount,
         payment_amount=payload.payment_amount,
         payment_currency=payload.payment_currency,
