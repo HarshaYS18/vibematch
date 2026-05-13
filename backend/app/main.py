@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, auth, economy, galactic_spins, inbox, inbox_ws, moderation, presence, users, wallet, wallet_ws
+from app.api.routes import admin, auth, economy, galactic_spins, inbox, inbox_ws, moderation, presence, public_profile, users, wallet, wallet_ws
 from app.api.routes.rooms import rooms
 from app.database import Base, engine
 from app.models import (
@@ -56,6 +56,7 @@ def health():
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(public_profile.router)
 app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(rooms.router)
