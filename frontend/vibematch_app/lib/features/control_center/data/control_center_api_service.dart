@@ -56,7 +56,7 @@ class ControlCenterApiService {
   }
 
   Future<void> mintCoins({required String poolType, required int amount, required String reason, int? targetUserId}) async {
-    await _apiClient.postMap('/super-owner/coins/mint', headers: _headers(), body: {'target_pool_type': poolType, 'amount': amount, 'reason': reason, if (targetUserId != null) 'target_user_id': targetUserId});
+    await _apiClient.postMap('/super-owner/coins/mint', headers: _headers(), body: {'target_pool_type': poolType, 'amount': amount, 'reason': reason, 'target_user_id': ?targetUserId});
   }
 
   Future<void> sendCoinsToAll({required int coinAmount, required bool activeOnly, required String reason}) async {
@@ -85,7 +85,7 @@ class ControlCenterApiService {
   }
 
   Future<void> adjustLevels({required int targetUserId, int? sendExpTotal, int? receiveExpTotal, int? rubyTotal, required String reason}) async {
-    await _apiClient.postMap('/super-owner/levels-adjust', headers: _headers(), body: {'target_user_id': targetUserId, if (sendExpTotal != null) 'send_exp_total': sendExpTotal, if (receiveExpTotal != null) 'receive_exp_total': receiveExpTotal, if (rubyTotal != null) 'ruby_total': rubyTotal, 'reason': reason});
+    await _apiClient.postMap('/super-owner/levels-adjust', headers: _headers(), body: {'target_user_id': targetUserId, 'send_exp_total': ?sendExpTotal, 'receive_exp_total': ?receiveExpTotal, 'ruby_total': ?rubyTotal, 'reason': reason});
   }
 
   Future<List<SuperOwnerLogItem>> loadSuperOwnerLogs() async {

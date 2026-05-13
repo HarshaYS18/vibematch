@@ -151,7 +151,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<RoleOption>(
-            value: selected,
+            initialValue: selected,
             decoration: _input('Role'),
             items: assignableRoles.map((role) => DropdownMenuItem(value: role, child: Text('${role.label} • P${role.power}'))).toList(growable: false),
             onChanged: (role) {
@@ -271,7 +271,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<String>(
-            value: selectedPool,
+            initialValue: selectedPool,
             decoration: _input('Target pool'),
             items: poolTypes.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(growable: false),
             onChanged: (value) {
@@ -441,7 +441,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<SpecialPermissionOption>(
-            value: selected,
+            initialValue: selected,
             decoration: _input('Permission'),
             items: _permissionOptions.map((item) => DropdownMenuItem(value: item, child: Text(item.label))).toList(growable: false),
             onChanged: (value) {
@@ -773,7 +773,7 @@ class _CompactRecordCard extends StatelessWidget {
   final String status;
   final Widget? trailing;
   @override
-  Widget build(BuildContext context) => Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFEDE3D7))), child: Row(children: [Icon(icon, color: const Color(0xFFE84C72), size: 20), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)), Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, fontWeight: FontWeight.w700))])), Text(status, style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11, fontWeight: FontWeight.w900)), if (trailing != null) trailing!]));
+  Widget build(BuildContext context) => Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFEDE3D7))), child: Row(children: [Icon(icon, color: const Color(0xFFE84C72), size: 20), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)), Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, fontWeight: FontWeight.w700))])), Text(status, style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11, fontWeight: FontWeight.w900)), ?trailing]));
 }
 
 class _ControlSheet extends StatelessWidget {

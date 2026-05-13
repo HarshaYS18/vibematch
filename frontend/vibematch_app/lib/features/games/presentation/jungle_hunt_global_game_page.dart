@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../data/game_api_service.dart';
+import 'widgets/jungle_hunt_basket_strip.dart';
 
 class JungleHuntGlobalGamePage extends StatefulWidget {
   const JungleHuntGlobalGamePage({super.key, this.embeddedInRoom = false});
@@ -346,7 +347,11 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
                       ],
                     ),
                   ),
-                  _BottomPanel(
+                  JungleHuntBasketStrip(
+                    leftHighlighted: _result?.winningTargetId == 100,
+                    rightHighlighted: _result?.winningTargetId == 101,
+                    assetForId: (id) => _targets.firstWhere((target) => target.id == id).asset,
+                  ),                  _BottomPanel(
                     amounts: _amounts,
                     selectedAmount: _selectedAmount,
                     totalPlaced: _placedByTarget.values.fold<int>(0, (sum, item) => sum + item),
@@ -924,5 +929,6 @@ int _int(dynamic value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
 
 
