@@ -17,8 +17,14 @@ class LiveRoomGamesActionsModule {
       builder: (_) => LiveRoomGamesSheet(
         onJungleHuntTap: () {
           Navigator.pop(context);
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const JungleHuntGamePage()),
+          LiveRoomSheetController.showTransparentSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => const FractionallySizedBox(
+              heightFactor: 0.70,
+              alignment: Alignment.bottomCenter,
+              child: JungleHuntGamePage(embeddedInRoom: true),
+            ),
           );
         },
       ),
