@@ -14,6 +14,8 @@ class JungleHuntGamePage extends StatefulWidget {
   State<JungleHuntGamePage> createState() => _JungleHuntGamePageState();
 }
 
+enum _JunglePhase { loading, betting, locked, revealing, result }
+
 class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
   final GameApiService _api = const GameApiService();
   final Map<int, int> _placedByTarget = <int, int>{};
@@ -27,17 +29,19 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
   int? _selectedTargetId;
   int _selectedAmount = 10000;
   int _secondsLeft = 0;
+  int _revealIndex = 0;
   bool _loading = false;
   bool _showResultOverlay = false;
   String? _error;
+  _JunglePhase _phase = _JunglePhase.loading;
 
-  bool get _isOpen => _round != null && _secondsLeft > 0 && !_loading;
+  bool get _isBettingOpen => _round != null && _phase == _JunglePhase.betting && _secondsLeft > 2 && !_loading;
   bool get _didBet => _placedByTarget.values.fold<int>(0, (sum, item) => sum + item) > 0;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    unawaited(_loadAndJoinGlobalRound());
   }
 
   @override
@@ -63,7 +67,7 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
     }
   }
 
-  Future<void> _load() async {
+  Future<void> _loadAndJoinGlobalRound() async {
     await _busy(() async {
       var games = await _api.loadCatalog();
       if (games.isEmpty) games = <GameDefinition>[await _api.seedDefaultGames()];
@@ -73,45 +77,99 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
         (item) => item.gameKey == 'jungle_hunt' || item.gameKey == 'jackpot_king',
         orElse: () => list.first,
       );
-      if (!mounted) return;
-      setState(() {
-        _game = game;
-        _selectedTargetId = _targets.first.id;
-        _selectedAmount = _amounts.first;
-      });
-    });
-  }
-
-  Future<void> _startRound() async {
-    final game = _game;
-    if (game == null) return;
-    await _busy(() async {
       final round = await _api.createRound(gameKey: game.gameKey);
       if (!mounted) return;
       setState(() {
+        _game = game;
         _round = round;
         _result = null;
         _showResultOverlay = false;
+        _selectedTargetId = _targets.first.id;
+        _selectedAmount = _amounts.first;
         _placedByTarget.clear();
-        _secondsLeft = _roundSeconds(game);
       });
-      _timer?.cancel();
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (!mounted) return;
-        if (_secondsLeft <= 1) {
-          setState(() => _secondsLeft = 0);
-          timer.cancel();
-          unawaited(_finishRound());
+      _applyServerPhase(round);
+      _startPhaseTicker();
+    });
+  }
+
+  void _applyServerPhase(GameRound round) {
+    final metadata = round.metadata;
+    final phase = metadata['phase']?.toString().toUpperCase();
+    final bettingLeft = _int(metadata['betting_seconds_left']);
+    final revealLeft = _int(metadata['reveal_seconds_left']);
+
+    setState(() {
+      if (phase == 'REVEALING') {
+        _phase = _JunglePhase.revealing;
+        _secondsLeft = revealLeft > 0 ? revealLeft : 15;
+        _revealIndex = 0;
+      } else if (phase == 'LOCKED') {
+        _phase = _JunglePhase.locked;
+        _secondsLeft = bettingLeft > 0 ? bettingLeft : 2;
+      } else if (phase == 'RESULT') {
+        _phase = _JunglePhase.result;
+        _secondsLeft = 3;
+      } else {
+        _phase = bettingLeft <= 2 ? _JunglePhase.locked : _JunglePhase.betting;
+        _secondsLeft = bettingLeft > 0 ? bettingLeft : 30;
+      }
+    });
+  }
+
+  void _startPhaseTicker() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      switch (_phase) {
+        case _JunglePhase.loading:
           return;
-        }
-        setState(() => _secondsLeft -= 1);
-      });
+        case _JunglePhase.betting:
+          if (_secondsLeft <= 3) {
+            setState(() {
+              _phase = _JunglePhase.locked;
+              _secondsLeft = 2;
+            });
+          } else {
+            setState(() => _secondsLeft -= 1);
+          }
+          return;
+        case _JunglePhase.locked:
+          if (_secondsLeft <= 1) {
+            setState(() {
+              _phase = _JunglePhase.revealing;
+              _secondsLeft = 15;
+              _revealIndex = 0;
+            });
+          } else {
+            setState(() => _secondsLeft -= 1);
+          }
+          return;
+        case _JunglePhase.revealing:
+          if (_secondsLeft <= 1) {
+            timer.cancel();
+            setState(() => _secondsLeft = 0);
+            unawaited(_finishRound());
+          } else {
+            setState(() {
+              _secondsLeft -= 1;
+              _revealIndex = (_revealIndex + 1) % _targets.length;
+            });
+          }
+          return;
+        case _JunglePhase.result:
+          return;
+      }
     });
   }
 
   Future<void> _placeOn(_JungleTarget target) async {
     final round = _round;
-    if (round == null || !_isOpen) return;
+    if (round == null) return;
+    if (!_isBettingOpen) {
+      _showToast('Betting is locked for this phase.');
+      return;
+    }
     setState(() => _selectedTargetId = target.id);
     await _busy(() async {
       final result = await _api.placeBet(
@@ -119,10 +177,13 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
         targetId: target.id,
         amount: _selectedAmount,
       );
-      if (!mounted || result.acceptedAmount <= 0) return;
+      if (!mounted) return;
+      if (result.acceptedAmount <= 0) {
+        _showToast(result.message.isEmpty ? 'Bet rejected by game safety.' : result.message);
+        return;
+      }
       setState(() {
-        _placedByTarget[target.id] =
-            (_placedByTarget[target.id] ?? 0) + result.acceptedAmount;
+        _placedByTarget[target.id] = (_placedByTarget[target.id] ?? 0) + result.acceptedAmount;
       });
     });
   }
@@ -136,6 +197,9 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
       final winner = _targetForId(result.winningTargetId);
       setState(() {
         _result = result;
+        _phase = _JunglePhase.result;
+        _secondsLeft = 3;
+        _revealIndex = _targets.indexWhere((target) => target.id == winner.id);
         _history.insert(0, _HistoryItem(target: winner, roundId: result.roundId));
         if (_history.length > 8) _history.removeLast();
         _showResultOverlay = true;
@@ -144,8 +208,23 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
       _overlayTimer = Timer(const Duration(seconds: 3), () {
         if (!mounted) return;
         setState(() => _showResultOverlay = false);
+        unawaited(_loadAndJoinGlobalRound());
       });
     });
+  }
+
+  void _showToast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w900)),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF2D1809),
+        ),
+      );
   }
 
   @override
@@ -179,9 +258,10 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
                   _Header(
                     roundId: _round?.id,
                     history: _history,
+                    phase: _phase,
                     onClose: () => Navigator.pop(context),
                   ),
-                  if (_error != null) _ErrorStrip(message: _error!, onRetry: _load),
+                  if (_error != null) _ErrorStrip(message: _error!, onRetry: _loadAndJoinGlobalRound),
                   Expanded(
                     child: Stack(
                       alignment: Alignment.center,
@@ -191,14 +271,14 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
                           selectedId: _selectedTargetId,
                           winnerId: _result?.winningTargetId,
                           placedByTarget: _placedByTarget,
-                          isOpen: _isOpen,
+                          isOpen: _isBettingOpen,
+                          revealIndex: _phase == _JunglePhase.revealing ? _revealIndex : null,
                           onTap: _placeOn,
                         ),
-                        _TimerButton(
+                        _CenterStatus(
+                          phase: _phase,
                           secondsLeft: _secondsLeft,
                           loading: _loading,
-                          result: _result,
-                          onStart: _startRound,
                         ),
                       ],
                     ),
@@ -207,6 +287,7 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
                     amounts: _amounts,
                     selectedAmount: _selectedAmount,
                     totalPlaced: _placedByTarget.values.fold<int>(0, (sum, item) => sum + item),
+                    enabled: _phase == _JunglePhase.betting,
                     onAmount: (amount) => setState(() => _selectedAmount = amount),
                   ),
                 ],
@@ -220,7 +301,7 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
                   topWinners: _topWinners(_result!),
                 ),
               ),
-            if (_loading)
+            if (_loading && _phase == _JunglePhase.loading)
               Positioned.fill(
                 child: IgnorePointer(
                   child: Container(
@@ -239,24 +320,35 @@ class _JungleHuntGamePageState extends State<JungleHuntGamePage> {
       ),
     );
 
-    return widget.embeddedInRoom ? shell : shell;
+    return shell;
   }
 
   List<_RoundWinner> _topWinners(GameRoundResult result) {
+    if (result.topWinners.isNotEmpty) {
+      return result.topWinners
+          .take(3)
+          .map((winner) => _RoundWinner(
+                name: winner.name,
+                avatar: winner.avatar,
+                coins: winner.coins,
+              ))
+          .toList(growable: false);
+    }
     final base = math.max(result.totalUserWinnings, result.multiplier * 10000);
     return <_RoundWinner>[
-      _RoundWinner(name: 'Aarav', avatar: '🧑', coins: base + 120000),
-      _RoundWinner(name: 'Meera', avatar: '👩', coins: (base * 0.72).round()),
-      _RoundWinner(name: 'Vikram', avatar: '🧔', coins: (base * 0.46).round()),
+      _RoundWinner(name: 'Top 1', avatar: '👑', coins: base + 120000),
+      _RoundWinner(name: 'Top 2', avatar: '🔥', coins: (base * 0.72).round()),
+      _RoundWinner(name: 'Top 3', avatar: '⭐', coins: (base * 0.46).round()),
     ];
   }
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.roundId, required this.history, required this.onClose});
+  const _Header({required this.roundId, required this.history, required this.phase, required this.onClose});
 
   final int? roundId;
   final List<_HistoryItem> history;
+  final _JunglePhase phase;
   final VoidCallback onClose;
 
   @override
@@ -276,7 +368,7 @@ class _Header extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      roundId == null ? 'Ready' : 'Round #$roundId',
+                      roundId == null ? _phaseLabel(phase) : 'Round #$roundId',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.70), fontSize: 11, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(width: 8),
@@ -332,13 +424,14 @@ class _HistoryStrip extends StatelessWidget {
 }
 
 class _TargetWheel extends StatelessWidget {
-  const _TargetWheel({required this.targets, required this.selectedId, required this.winnerId, required this.placedByTarget, required this.isOpen, required this.onTap});
+  const _TargetWheel({required this.targets, required this.selectedId, required this.winnerId, required this.placedByTarget, required this.isOpen, required this.revealIndex, required this.onTap});
 
   final List<_JungleTarget> targets;
   final int? selectedId;
   final int? winnerId;
   final Map<int, int> placedByTarget;
   final bool isOpen;
+  final int? revealIndex;
   final ValueChanged<_JungleTarget> onTap;
 
   @override
@@ -373,6 +466,7 @@ class _TargetWheel extends StatelessWidget {
                   target: targets[i],
                   selected: selectedId == targets[i].id,
                   winner: winnerId == targets[i].id,
+                  revealing: revealIndex == i,
                   placed: placedByTarget[targets[i].id] ?? 0,
                   enabled: isOpen,
                   onTap: () => onTap(targets[i]),
@@ -386,38 +480,37 @@ class _TargetWheel extends StatelessWidget {
 }
 
 class _TargetTile extends StatelessWidget {
-  const _TargetTile({required this.target, required this.selected, required this.winner, required this.placed, required this.enabled, required this.onTap});
+  const _TargetTile({required this.target, required this.selected, required this.winner, required this.revealing, required this.placed, required this.enabled, required this.onTap});
 
   final _JungleTarget target;
   final bool selected;
   final bool winner;
+  final bool revealing;
   final int placed;
   final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final highlighted = winner || selected || revealing;
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: AnimatedScale(
-        scale: winner ? 1.14 : selected ? 1.06 : 1.0,
+        scale: winner ? 1.16 : revealing ? 1.10 : selected ? 1.06 : 1.0,
         duration: const Duration(milliseconds: 160),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: winner
-                      ? const [Color(0xFFFFF6A5), Color(0xFFFF8F00)]
-                      : selected
-                          ? const [Color(0xFF66FFD0), Color(0xFF087D54)]
-                          : const [Color(0xFFFFD36A), Color(0xFF7B3E11)],
+                gradient: SweepGradient(
+                  colors: highlighted
+                      ? const [Color(0xFFFFFFFF), Color(0xFFFFF176), Color(0xFFFF8F00), Color(0xFFFFFFFF)]
+                      : const [Color(0xFFFFD36A), Color(0xFF7B3E11), Color(0xFFFFD36A)],
                 ),
-                boxShadow: selected || winner ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.45), blurRadius: 18)] : null,
+                boxShadow: highlighted ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.55), blurRadius: 20, spreadRadius: 1)] : null,
               ),
               padding: const EdgeInsets.all(4),
               child: ClipOval(
@@ -459,41 +552,46 @@ class _TargetTile extends StatelessWidget {
   }
 }
 
-class _TimerButton extends StatelessWidget {
-  const _TimerButton({required this.secondsLeft, required this.loading, required this.result, required this.onStart});
+class _CenterStatus extends StatelessWidget {
+  const _CenterStatus({required this.phase, required this.secondsLeft, required this.loading});
 
+  final _JunglePhase phase;
   final int secondsLeft;
   final bool loading;
-  final GameRoundResult? result;
-  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
-    final active = secondsLeft > 0;
-    return GestureDetector(
-      onTap: active || loading ? null : onStart,
-      child: Container(
-        width: 122,
-        height: 122,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(colors: [Color(0xFFFFE8A8), Color(0xFFFF9E2D)]),
-          border: Border.all(color: const Color(0xFF71370E), width: 8),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 16, offset: const Offset(0, 8))],
-        ),
-        child: Text(active ? '${secondsLeft}s' : result == null ? 'START' : 'NEXT', style: const TextStyle(color: Color(0xFF4A210A), fontSize: 26, fontWeight: FontWeight.w900)),
+    final label = _phaseLabel(phase);
+    final value = loading && phase == _JunglePhase.loading ? '...' : '${secondsLeft}s';
+    return Container(
+      width: 122,
+      height: 122,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(colors: [Color(0xFFFFE8A8), Color(0xFFFF9E2D)]),
+        border: Border.all(color: const Color(0xFF71370E), width: 8),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 16, offset: const Offset(0, 8))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF4A210A), fontSize: 13, fontWeight: FontWeight.w900, height: 1.05)),
+          const SizedBox(height: 5),
+          Text(value, style: const TextStyle(color: Color(0xFF4A210A), fontSize: 25, fontWeight: FontWeight.w900)),
+        ],
       ),
     );
   }
 }
 
 class _BottomPanel extends StatelessWidget {
-  const _BottomPanel({required this.amounts, required this.selectedAmount, required this.totalPlaced, required this.onAmount});
+  const _BottomPanel({required this.amounts, required this.selectedAmount, required this.totalPlaced, required this.enabled, required this.onAmount});
 
   final List<int> amounts;
   final int selectedAmount;
   final int totalPlaced;
+  final bool enabled;
   final ValueChanged<int> onAmount;
 
   @override
@@ -513,6 +611,8 @@ class _BottomPanel extends StatelessWidget {
               const Text('🪙', style: TextStyle(fontSize: 18)),
               const SizedBox(width: 6),
               Expanded(child: Text('This round: ${_money(totalPlaced)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
+              if (!enabled)
+                Text('Locked', style: TextStyle(color: Colors.white.withValues(alpha: 0.64), fontSize: 11, fontWeight: FontWeight.w900)),
             ],
           ),
           const SizedBox(height: 8),
@@ -521,7 +621,7 @@ class _BottomPanel extends StatelessWidget {
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: _AmountPill(amount: amount, selected: amount == selectedAmount, onTap: () => onAmount(amount)),
+                  child: _AmountPill(amount: amount, selected: amount == selectedAmount, enabled: enabled, onTap: () => onAmount(amount)),
                 ),
               );
             }).toList(),
@@ -533,50 +633,55 @@ class _BottomPanel extends StatelessWidget {
 }
 
 class _AmountPill extends StatelessWidget {
-  const _AmountPill({required this.amount, required this.selected, required this.onTap});
+  const _AmountPill({required this.amount, required this.selected, required this.enabled, required this.onTap});
 
   final int amount;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
         duration: const Duration(milliseconds: 160),
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: selected
-                ? const [Color(0xFFFFF4A5), Color(0xFFFFB23F), Color(0xFFB65B12)]
-                : const [Color(0xFF84E6FF), Color(0xFF2B7DFF), Color(0xFF3124A8)],
+        opacity: enabled ? 1 : 0.52,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: selected
+                  ? const [Color(0xFFFFF4A5), Color(0xFFFFB23F), Color(0xFFB65B12)]
+                  : const [Color(0xFF84E6FF), Color(0xFF2B7DFF), Color(0xFF3124A8)],
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: selected ? 0.78 : 0.30), width: selected ? 2 : 1),
+            boxShadow: selected ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.34), blurRadius: 12)] : null,
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: selected ? 0.78 : 0.30), width: selected ? 2 : 1),
-          boxShadow: selected ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.34), blurRadius: 12)] : null,
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              top: 2,
-              left: 5,
-              right: 5,
-              bottom: 24,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: Colors.white.withValues(alpha: 0.28),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                top: 2,
+                left: 5,
+                right: 5,
+                bottom: 24,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.white.withValues(alpha: 0.28),
+                  ),
                 ),
               ),
-            ),
-            Center(
-              child: Text(_compact(amount), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black, blurRadius: 3)])),
-            ),
-          ],
+              Center(
+                child: Text(_compact(amount), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black, blurRadius: 3)])),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -634,7 +739,7 @@ class _WinnerPodium extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircleAvatar(radius: 24, backgroundColor: const Color(0xFFFFD36A), child: Text(winner.avatar, style: const TextStyle(fontSize: 24))),
+          CircleAvatar(radius: 24, backgroundColor: const Color(0xFFFFD36A), child: Text(winner.avatar, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
           const SizedBox(height: 6),
           Text(winner.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
           const SizedBox(height: 3),
@@ -692,12 +797,12 @@ class _RoundWinner {
 
 const List<_JungleTarget> _targets = <_JungleTarget>[
   _JungleTarget(id: 0, label: 'Rabbit', emoji: '🐰', asset: 'assets/games/jungle_hunt/animals/animal_rabbit.png', multiplier: 5),
-  _JungleTarget(id: 1, label: 'Panda', emoji: '🐼', asset: 'assets/games/jungle_hunt/animals/animal_panda.png', multiplier: 8),
-  _JungleTarget(id: 2, label: 'Shark', emoji: '🦈', asset: 'assets/games/jungle_hunt/animals/animal_shark.png', multiplier: 10),
-  _JungleTarget(id: 3, label: 'Monkey', emoji: '🐵', asset: 'assets/games/jungle_hunt/animals/animal_monkey.png', multiplier: 12),
-  _JungleTarget(id: 4, label: 'Fox', emoji: '🦊', asset: 'assets/games/jungle_hunt/animals/animal_fox.png', multiplier: 15),
-  _JungleTarget(id: 5, label: 'Tiger', emoji: '🐯', asset: 'assets/games/jungle_hunt/animals/animal_tiger.png', multiplier: 25),
-  _JungleTarget(id: 6, label: 'Eagle', emoji: '🦅', asset: 'assets/games/jungle_hunt/animals/animal_eagle.png', multiplier: 30),
+  _JungleTarget(id: 1, label: 'Monkey', emoji: '🐵', asset: 'assets/games/jungle_hunt/animals/animal_monkey.png', multiplier: 5),
+  _JungleTarget(id: 2, label: 'Wolf', emoji: '🐺', asset: 'assets/games/jungle_hunt/animals/animal_wolf.png', multiplier: 5),
+  _JungleTarget(id: 3, label: 'Deer', emoji: '🦌', asset: 'assets/games/jungle_hunt/animals/animal_deer.png', multiplier: 5),
+  _JungleTarget(id: 4, label: 'Dragon', emoji: '🐉', asset: 'assets/games/jungle_hunt/animals/animal_dragon.png', multiplier: 10),
+  _JungleTarget(id: 5, label: 'Panda', emoji: '🐼', asset: 'assets/games/jungle_hunt/animals/animal_panda.png', multiplier: 15),
+  _JungleTarget(id: 6, label: 'Eagle', emoji: '🦅', asset: 'assets/games/jungle_hunt/animals/animal_eagle.png', multiplier: 25),
   _JungleTarget(id: 7, label: 'Lion', emoji: '🦁', asset: 'assets/games/jungle_hunt/animals/animal_lion.png', multiplier: 45),
 ];
 
@@ -707,10 +812,19 @@ _JungleTarget _targetForId(int id) {
   return _targets.firstWhere((target) => target.id == id, orElse: () => _targets.first);
 }
 
-int _roundSeconds(GameDefinition game) {
-  final value = game.rules['round_seconds'];
-  if (value is num && value > 0) return value.toInt().clamp(8, 60);
-  return 24;
+String _phaseLabel(_JunglePhase phase) {
+  switch (phase) {
+    case _JunglePhase.loading:
+      return 'Loading';
+    case _JunglePhase.betting:
+      return 'Select';
+    case _JunglePhase.locked:
+      return 'Locked';
+    case _JunglePhase.revealing:
+      return 'Reveal';
+    case _JunglePhase.result:
+      return 'Result';
+  }
 }
 
 String _compact(int value) {
@@ -728,4 +842,11 @@ String _money(int value) {
     if (reverseIndex > 1 && reverseIndex % 3 == 1) buffer.write(',');
   }
   return buffer.toString();
+}
+
+int _int(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
 }
