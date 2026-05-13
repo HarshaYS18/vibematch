@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../../social/data/social_mock_data.dart';
 import '../data/vibes_api_service.dart';
-import '../data/vibes_mock_data.dart';
 import '../models/vibe_models.dart';
 
 class VibesController extends ChangeNotifier {
@@ -26,7 +25,7 @@ class VibesController extends ChangeNotifier {
     'Trending',
   ];
 
-  final List<VibeItem> _vibes = [...VibesMockData.vibes];
+  final List<VibeItem> _vibes = <VibeItem>[];
 
   List<VibeItem> get vibes => List.unmodifiable(_vibes);
 
