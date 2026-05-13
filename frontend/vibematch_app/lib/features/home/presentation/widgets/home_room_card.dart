@@ -57,42 +57,46 @@ class HomeRoomCard extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                _HomeRoomCover(room: room, size: 92),
-                Positioned(
-                  left: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xDD251538),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.72), width: 1.2),
-                    ),
-                    child: Text(
-                      '#$rank',
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _HomeRoomCover(room: room, size: 82),
+                  Positioned(
+                    left: 7,
+                    top: 7,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xDD251538),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.72), width: 1.2),
+                      ),
+                      child: Text(
+                        '#$rank',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  right: 8,
-                  bottom: 8,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.42),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
+                  Positioned(
+                    right: 7,
+                    bottom: 7,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
+                      ),
+                      child: Icon(_roomTypeIcon, color: Colors.white, size: 13),
                     ),
-                    child: Icon(_roomTypeIcon, color: Colors.white, size: 13),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(width: 13),
             Expanded(
@@ -212,34 +216,38 @@ class _HomeRoomCover extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (room.hasCoverPhoto)
-            Image.network(
-              room.coverPhotoUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => fallback,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return fallback;
-              },
-            )
-          else
-            fallback,
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.10),
-                  Colors.black.withValues(alpha: 0.28),
-                ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (room.hasCoverPhoto)
+              Image.network(
+                room.coverPhotoUrl!,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                errorBuilder: (context, error, stackTrace) => fallback,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return fallback;
+                },
+              )
+            else
+              fallback,
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.08),
+                    Colors.black.withValues(alpha: 0.24),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
