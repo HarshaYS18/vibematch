@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../games/presentation/jungle_hunt_game_page.dart';
+import '../../../games/presentation/jungle_hunt_global_game_page.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../widgets/live_room_games_sheet.dart';
 
@@ -23,7 +23,7 @@ class LiveRoomGamesActionsModule {
             builder: (_) => const FractionallySizedBox(
               heightFactor: 0.70,
               alignment: Alignment.bottomCenter,
-              child: JungleHuntGamePage(embeddedInRoom: true),
+              child: JungleHuntGlobalGamePage(embeddedInRoom: true),
             ),
           );
         },
