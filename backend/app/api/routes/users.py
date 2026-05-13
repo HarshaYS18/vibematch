@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import func, or_
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.database import get_db
+from app.models import ProfileVisit
 from app.models.follow import UserBlock, UserFollow
 from app.models.user import User
 from app.schemas.profile_visit import ProfileVisitListResponse, ProfileVisitRecordResponse
@@ -156,10 +157,6 @@ def _relationship_payload(db: Session, profile_user: User, current_user: User | 
         follows_me = _has_follow(db, profile_user.id, current_user.id)
         blocked_by_me = _is_blocked(db, current_user.id, profile_user.id)
         blocked_me = _is_blocked(db, profile_user.id, current_user.id)
-
-        # Product rule:
-        # If B blocks A, B may still follow A, but A cannot follow B back.
-        # Therefore only blocked_me prevents the current viewer from following this profile.
         can_follow = not blocked_me
         if blocked_me:
             follow_block_reason = f"{_display_name(profile_user)} doesn't allow you to follow."
@@ -194,7 +191,6 @@ def _get_public_active_user(db: Session, public_user_id: int) -> User:
     return user
 
 
-
 def _profile_visit_payload(db: Session, visit: ProfileVisit) -> ProfileVisitRecordResponse:
     visitor = visit.visitor
     primary_role = get_primary_role(visitor)
@@ -217,33 +213,22 @@ def _profile_visit_payload(db: Session, visit: ProfileVisit) -> ProfileVisitReco
 def _record_profile_visit(db: Session, profile_owner: User, visitor: User, source: str = "public_profile") -> None:
     if profile_owner.id == visitor.id:
         return
-
     visit = (
         db.query(ProfileVisit)
-        .filter(
-            ProfileVisit.profile_owner_user_id == profile_owner.id,
-            ProfileVisit.visitor_user_id == visitor.id,
-        )
+        .filter(ProfileVisit.profile_owner_user_id == profile_owner.id, ProfileVisit.visitor_user_id == visitor.id)
         .first()
     )
-
     now = datetime.utcnow()
     if visit is None:
-        visit = ProfileVisit(
-            profile_owner_user_id=profile_owner.id,
-            visitor_user_id=visitor.id,
-            source=source,
-            visit_count=1,
-            first_visited_at=now,
-            last_visited_at=now,
-        )
+        visit = ProfileVisit(profile_owner_user_id=profile_owner.id, visitor_user_id=visitor.id, source=source, visit_count=1, first_visited_at=now, last_visited_at=now)
         db.add(visit)
     else:
         visit.visit_count += 1
         visit.source = source
         visit.last_visited_at = now
-
     db.commit()
+
+
 @router.get("/me", response_model=UserMeResponse)
 def get_me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return _user_me_response(db, current_user)
@@ -309,11 +294,9 @@ def follow_user(public_user_id: int, db: Session = Depends(get_db), current_user
     user = _get_public_active_user(db, public_user_id)
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot follow yourself")
-
     relationship = _relationship_payload(db, user, current_user)
     if not relationship.can_follow:
         raise HTTPException(status_code=403, detail=relationship.follow_block_reason or f"{_display_name(user)} doesn't allow you to follow.")
-
     existing = db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == user.id).first()
     if existing is None:
         db.add(UserFollow(follower_user_id=current_user.id, followed_user_id=user.id))
@@ -355,16 +338,6 @@ def unblock_user(public_user_id: int, db: Session = Depends(get_db), current_use
 
 
 @router.get("/me/visitors", response_model=ProfileVisitListResponse)
-def list_my_profile_visitors(
-    limit: int = Query(default=50, ge=1, le=200),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    visits = (
-        db.query(ProfileVisit)
-        .filter(ProfileVisit.profile_owner_user_id == current_user.id)
-        .order_by(ProfileVisit.last_visited_at.desc())
-        .limit(limit)
-        .all()
-    )
+def list_my_profile_visitors(limit: int = Query(default=50, ge=1, le=200), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    visits = db.query(ProfileVisit).filter(ProfileVisit.profile_owner_user_id == current_user.id).order_by(ProfileVisit.last_visited_at.desc()).limit(limit).all()
     return ProfileVisitListResponse(visitors=[_profile_visit_payload(db, visit) for visit in visits])
