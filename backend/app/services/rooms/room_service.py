@@ -14,7 +14,9 @@ from app.services import profile_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
 
-_ACTIVE_PARTICIPANT_WINDOW = timedelta(minutes=2)
+# A user is considered inside/online in a room only while their room heartbeat
+# is fresh. After 10 minutes without room heartbeat they auto-exit the room.
+_ACTIVE_PARTICIPANT_WINDOW = timedelta(minutes=10)
 _UNLIMITED_ROOM_ROLES = {"founder_owner", "owner"}
 
 
@@ -155,7 +157,8 @@ def generate_room_public_id(db: Session) -> str:
 
 def _refresh_room_online_count(db: Session, room: Room) -> int:
     cutoff = datetime.utcnow() - _ACTIVE_PARTICIPANT_WINDOW
-    db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at < cutoff).update({RoomParticipant.is_active: False, RoomParticipant.left_at: datetime.utcnow()}, synchronize_session=False)
+    now = datetime.utcnow()
+    db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at < cutoff).update({RoomParticipant.is_active: False, RoomParticipant.left_at: now}, synchronize_session=False)
     count = db.query(func.count(RoomParticipant.id)).filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True)).scalar() or 0
     room.online_count = count
     room.trending_score = max(room.trending_score, count)
