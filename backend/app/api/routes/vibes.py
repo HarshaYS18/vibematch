@@ -99,16 +99,10 @@ def _get_visible_post_or_404(db: Session, post_id: int) -> VibePost:
 
 def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostResponse:
     likes_count = db.query(func.count(VibeReaction.id)).filter(VibeReaction.post_id == post.id).scalar() or 0
-    comments_count = db.query(func.count(VibeComment.id)).filter(
-        VibeComment.post_id == post.id,
-        VibeComment.is_deleted.is_(False),
-    ).scalar() or 0
+    comments_count = db.query(func.count(VibeComment.id)).filter(VibeComment.post_id == post.id, VibeComment.is_deleted.is_(False)).scalar() or 0
     shares_count = db.query(func.count(VibeShare.id)).filter(VibeShare.post_id == post.id).scalar() or 0
     reports_count = db.query(func.count(VibeReport.id)).filter(VibeReport.post_id == post.id).scalar() or 0
-    liked_by_me = db.query(VibeReaction.id).filter(
-        VibeReaction.post_id == post.id,
-        VibeReaction.user_id == current_user.id,
-    ).first() is not None
+    liked_by_me = db.query(VibeReaction.id).filter(VibeReaction.post_id == post.id, VibeReaction.user_id == current_user.id).first() is not None
     return VibePostResponse(
         id=post.id,
         caption=post.caption,
@@ -144,12 +138,7 @@ def _report_queue_item(report: VibeReport) -> VibeReportQueueItemResponse:
 
 def _check_mention_all_limit(db: Session, current_user: User) -> None:
     since = datetime.utcnow() - timedelta(days=1)
-    used_count = db.query(func.count(VibePost.id)).filter(
-        VibePost.author_user_id == current_user.id,
-        VibePost.uses_mention_all.is_(True),
-        VibePost.is_deleted.is_(False),
-        VibePost.created_at >= since,
-    ).scalar() or 0
+    used_count = db.query(func.count(VibePost.id)).filter(VibePost.author_user_id == current_user.id, VibePost.uses_mention_all.is_(True), VibePost.is_deleted.is_(False), VibePost.created_at >= since).scalar() or 0
     if used_count >= _MENTION_ALL_DAILY_LIMIT:
         raise HTTPException(status_code=429, detail=f"@all is limited to {_MENTION_ALL_DAILY_LIMIT} Vibes per 24 hours")
 
@@ -162,19 +151,12 @@ def _resolve_mentioned_users(db: Session, current_user: User, mentions: list[str
             normalized.append(token)
     if not normalized:
         return []
-
     users: list[User] = []
     seen_ids: set[int] = set()
     for token in normalized[:50]:
         query = db.query(User).filter(User.is_active.is_(True), User.is_banned.is_(False))
         public_id = int(token) if token.isdigit() else None
-        user = query.filter(
-            (User.username.ilike(token))
-            | (User.display_name.ilike(token))
-            | (User.official_handle.ilike(token))
-            | (User.official_handle.ilike(f"@{token}"))
-            | (User.public_user_id == public_id if public_id is not None else False)
-        ).first()
+        user = query.filter((User.username.ilike(token)) | (User.display_name.ilike(token)) | (User.official_handle.ilike(token)) | (User.official_handle.ilike(f"@{token}")) | (User.public_user_id == public_id if public_id is not None else False)).first()
         if user and user.id != current_user.id and user.id not in seen_ids:
             seen_ids.add(user.id)
             users.append(user)
@@ -182,32 +164,14 @@ def _resolve_mentioned_users(db: Session, current_user: User, mentions: list[str
 
 
 def _followers_for_mention_all(db: Session, current_user: User) -> list[User]:
-    return (
-        db.query(User)
-        .join(UserFollow, UserFollow.follower_user_id == User.id)
-        .filter(
-            UserFollow.followed_user_id == current_user.id,
-            User.is_active.is_(True),
-            User.is_banned.is_(False),
-            User.id != current_user.id,
-        )
-        .limit(1000)
-        .all()
-    )
+    return db.query(User).join(UserFollow, UserFollow.follower_user_id == User.id).filter(UserFollow.followed_user_id == current_user.id, User.is_active.is_(True), User.is_banned.is_(False), User.id != current_user.id).limit(1000).all()
 
 
 def _send_direct_mention_inbox_snapshot(db: Session, post: VibePost, sender: User, recipient: User, caption_preview: str) -> None:
     conversation = inbox_service.create_direct_conversation(db, sender, recipient)
     text = f"Mentioned you in a Vibe\n\n{caption_preview}\n\nVibe ID: {post.id}"
     message_type = InboxMessageType.IMAGE.value if post.media_type == "photo" and post.media_url else InboxMessageType.TEXT.value
-    inbox_service.send_message(
-        db=db,
-        conversation=conversation,
-        sender=sender,
-        text=text,
-        message_type=message_type,
-        attachment_url=post.media_url,
-    )
+    inbox_service.send_message(db=db, conversation=conversation, sender=sender, text=text, message_type=message_type, attachment_url=post.media_url)
 
 
 def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, mentions: list[str], uses_mention_all: bool) -> None:
@@ -216,67 +180,39 @@ def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, me
     caption_preview = post.caption[:160].strip()
     if len(post.caption) > 160:
         caption_preview += "..."
-
     def create_vibe_notification(user: User, notification_type: str, title: str, body: str) -> None:
-        notification_service.create_notification(
-            db,
-            recipient=user,
-            actor=current_user,
-            notification_type=notification_type,
-            title=title,
-            body=body,
-            target_type="vibe",
-            target_id=str(post.id),
-            metadata={
-                "post_id": post.id,
-                "author_public_user_id": current_user.public_user_id,
-                "author_name": author_name,
-                "media_type": post.media_type,
-            },
-        )
-
+        notification_service.create_notification(db, recipient=user, actor=current_user, notification_type=notification_type, title=title, body=body, target_type="vibe", target_id=str(post.id), metadata={"post_id": post.id, "author_public_user_id": current_user.public_user_id, "author_name": author_name, "media_type": post.media_type})
     for user in _resolve_mentioned_users(db, current_user, mentions):
         if user.id in notified_user_ids:
             continue
         notified_user_ids.add(user.id)
-        create_vibe_notification(
-            user,
-            "vibe_mention",
-            f"{author_name} mentioned you",
-            f"Mentioned you in a Vibe: \"{caption_preview}\"",
-        )
+        create_vibe_notification(user, "vibe_mention", f"{author_name} mentioned you", f"Mentioned you in a Vibe: \"{caption_preview}\"")
         _send_direct_mention_inbox_snapshot(db, post, current_user, user, caption_preview)
-
     if uses_mention_all:
         for user in _followers_for_mention_all(db, current_user):
             if user.id in notified_user_ids:
                 continue
             notified_user_ids.add(user.id)
-            create_vibe_notification(
-                user,
-                "vibe_mention_all",
-                f"{author_name} posted to followers",
-                f"Mentioned all followers in a new Vibe: \"{caption_preview}\"",
-            )
+            create_vibe_notification(user, "vibe_mention_all", f"{author_name} posted to followers", f"Mentioned all followers in a new Vibe: \"{caption_preview}\"")
 
 
 @router.get("/feed", response_model=VibeFeedResponse)
-def list_vibes_feed(
-    limit: int = Query(default=30, ge=1, le=100),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def list_vibes_feed(limit: int = Query(default=30, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     posts = db.query(VibePost).filter(VibePost.is_deleted.is_(False)).order_by(VibePost.created_at.desc()).limit(limit).all()
     return VibeFeedResponse(posts=[_post_response(db, post, current_user) for post in posts])
 
 
+@router.get("/user/{public_user_id}", response_model=list[VibePostResponse])
+def list_public_user_vibes(public_user_id: int, limit: int = Query(default=30, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.public_user_id == public_user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    posts = db.query(VibePost).filter(VibePost.author_user_id == user.id, VibePost.is_deleted.is_(False)).order_by(VibePost.created_at.desc()).limit(limit).all()
+    return [_post_response(db, post, current_user) for post in posts]
+
+
 @router.get("/reports", response_model=VibeReportQueueResponse)
-def list_vibe_reports(
-    status: str | None = Query(default="PENDING"),
-    limit: int = Query(default=50, ge=1, le=100),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def list_vibe_reports(status: str | None = Query(default="PENDING"), limit: int = Query(default=50, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_report_reviewer(current_user)
     query = db.query(VibeReport).join(VibePost, VibeReport.post_id == VibePost.id)
     if status and status.upper() != "ALL":
@@ -286,12 +222,7 @@ def list_vibe_reports(
 
 
 @router.post("/reports/{report_id}/review", response_model=VibeReportResponse)
-def review_vibe_report(
-    report_id: int,
-    payload: VibeReportReviewRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def review_vibe_report(report_id: int, payload: VibeReportReviewRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_report_reviewer(current_user)
     report = db.query(VibeReport).filter(VibeReport.id == report_id).first()
     if not report:
@@ -306,24 +237,11 @@ def review_vibe_report(
 
 
 @router.post("", response_model=VibePostResponse)
-def create_vibe(
-    payload: VibePostCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def create_vibe(payload: VibePostCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if payload.uses_mention_all:
         _check_mention_all_limit(db, current_user)
-
     normalized_mentions = [mention for mention in (_normalize_mention(item) for item in payload.mentions) if mention and mention != "all"]
-    post = VibePost(
-        author_user_id=current_user.id,
-        caption=payload.caption.strip(),
-        media_type=payload.media_type,
-        media_url=payload.media_url.strip() if payload.media_url else None,
-        tag=payload.tag.strip() if payload.tag else None,
-        mentions_csv=_mentions_to_csv(normalized_mentions),
-        uses_mention_all=payload.uses_mention_all,
-    )
+    post = VibePost(author_user_id=current_user.id, caption=payload.caption.strip(), media_type=payload.media_type, media_url=payload.media_url.strip() if payload.media_url else None, tag=payload.tag.strip() if payload.tag else None, mentions_csv=_mentions_to_csv(normalized_mentions), uses_mention_all=payload.uses_mention_all)
     db.add(post)
     db.commit()
     db.refresh(post)
