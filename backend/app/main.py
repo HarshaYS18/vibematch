@@ -1,13 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, auth, galactic_spins, inbox, inbox_ws, moderation, users
+from app.api.routes import admin, auth, galactic_spins, inbox, inbox_ws, moderation, users, wallet
 from app.api.routes.rooms import rooms
 from app.database import Base, engine
 from app.models import (
     AdminLog,
     AuthIdentity,
     DeviceBan,
+    GameHousePool,
+    GameLedgerEntry,
     InboxBackupJob,
     InboxBackupSetting,
     InboxConversation,
@@ -21,6 +23,8 @@ from app.models import (
     User,
     UserBan,
     UserRole,
+    Wallet,
+    WalletLedgerEntry,
 )
 
 
@@ -55,4 +59,5 @@ app.include_router(moderation.router)
 app.include_router(rooms.router)
 app.include_router(inbox.router)
 app.include_router(inbox_ws.router)
+app.include_router(wallet.router)
 app.include_router(galactic_spins.router)
