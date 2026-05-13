@@ -71,21 +71,7 @@ class GameApiService {
 }
 
 class GameDefinition {
-  const GameDefinition({
-    required this.gameKey,
-    required this.displayName,
-    required this.category,
-    required this.isEnabled,
-    required this.isCoinGame,
-    required this.minAppVersion,
-    required this.configVersion,
-    required this.cdnBaseUrl,
-    required this.configUrl,
-    required this.assetManifestUrl,
-    required this.uiConfig,
-    required this.rules,
-    required this.risk,
-  });
+  const GameDefinition({required this.gameKey, required this.displayName, required this.category, required this.isEnabled, required this.isCoinGame, required this.minAppVersion, required this.configVersion, required this.cdnBaseUrl, required this.configUrl, required this.assetManifestUrl, required this.uiConfig, required this.rules, required this.risk});
 
   final String gameKey;
   final String displayName;
@@ -125,9 +111,9 @@ class GameDefinition {
 
   List<int> get allowedBets {
     final rawBets = rules['allowed_bets'];
-    if (rawBets is! List) return const [400, 10000, 100000];
+    if (rawBets is! List) return const [10000, 50000, 100000, 500000, 1000000];
     final parsed = rawBets.map(_int).where((item) => item > 0).toList(growable: false);
-    return parsed.isEmpty ? const [400, 10000, 100000] : parsed;
+    return parsed.isEmpty ? const [10000, 50000, 100000, 500000, 1000000] : parsed;
   }
 }
 
@@ -140,13 +126,7 @@ class GameTarget {
   final int multiplier;
   final String? themeColor;
 
-  factory GameTarget.fromJson(Map<String, dynamic> json) => GameTarget(
-        id: _int(json['id']),
-        label: json['label']?.toString() ?? 'Target',
-        emoji: _text(json['emoji']),
-        multiplier: _int(json['multiplier']),
-        themeColor: _text(json['theme_color']),
-      );
+  factory GameTarget.fromJson(Map<String, dynamic> json) => GameTarget(id: _int(json['id']), label: json['label']?.toString() ?? 'Target', emoji: _text(json['emoji']), multiplier: _int(json['multiplier']), themeColor: _text(json['theme_color']));
 }
 
 class GameRound {
@@ -160,15 +140,7 @@ class GameRound {
   final int roundPoolAmount;
   final Map<String, dynamic> metadata;
 
-  factory GameRound.fromJson(Map<String, dynamic> json) => GameRound(
-        id: _int(json['id']),
-        gameKey: json['game_key']?.toString() ?? '',
-        roomId: _nullableInt(json['room_id']),
-        status: json['status']?.toString() ?? 'CREATED',
-        entryFee: _int(json['entry_fee']),
-        roundPoolAmount: _int(json['round_pool_amount']),
-        metadata: _map(json['metadata']),
-      );
+  factory GameRound.fromJson(Map<String, dynamic> json) => GameRound(id: _int(json['id']), gameKey: json['game_key']?.toString() ?? '', roomId: _nullableInt(json['room_id']), status: json['status']?.toString() ?? 'CREATED', entryFee: _int(json['entry_fee']), roundPoolAmount: _int(json['round_pool_amount']), metadata: _map(json['metadata']));
 }
 
 class GameBetResult {
@@ -185,18 +157,7 @@ class GameBetResult {
   final String riskAction;
   final String message;
 
-  factory GameBetResult.fromJson(Map<String, dynamic> json) => GameBetResult(
-        betId: _nullableInt(json['bet_id']),
-        roundId: _int(json['round_id']),
-        targetId: _int(json['target_id']),
-        requestedAmount: _int(json['requested_amount']),
-        acceptedAmount: _int(json['accepted_amount']),
-        walletCoinBalance: _int(json['wallet_coin_balance']),
-        riskLevel: json['risk_level']?.toString() ?? 'LOW',
-        riskScore: _int(json['risk_score']),
-        riskAction: json['risk_action']?.toString() ?? 'ALLOW',
-        message: json['message']?.toString() ?? '',
-      );
+  factory GameBetResult.fromJson(Map<String, dynamic> json) => GameBetResult(betId: _nullableInt(json['bet_id']), roundId: _int(json['round_id']), targetId: _int(json['target_id']), requestedAmount: _int(json['requested_amount']), acceptedAmount: _int(json['accepted_amount']), walletCoinBalance: _int(json['wallet_coin_balance']), riskLevel: json['risk_level']?.toString() ?? 'LOW', riskScore: _int(json['risk_score']), riskAction: json['risk_action']?.toString() ?? 'ALLOW', message: json['message']?.toString() ?? '');
 
   bool get shouldShowLoadingOverlay {
     final normalized = riskAction.trim().toUpperCase();
@@ -207,7 +168,7 @@ class GameBetResult {
 }
 
 class GameRoundResult {
-  const GameRoundResult({required this.roundId, required this.gameKey, required this.status, required this.winningTargetId, required this.multiplier, required this.totalUserBet, required this.totalUserWinnings, required this.walletCoinBalance, required this.riskAction, required this.auditMessage});
+  const GameRoundResult({required this.roundId, required this.gameKey, required this.status, required this.winningTargetId, required this.multiplier, required this.totalUserBet, required this.totalUserWinnings, required this.walletCoinBalance, required this.riskAction, required this.auditMessage, required this.topWinners});
 
   final int roundId;
   final String gameKey;
@@ -219,19 +180,35 @@ class GameRoundResult {
   final int walletCoinBalance;
   final String riskAction;
   final String auditMessage;
+  final List<GameRoundWinner> topWinners;
 
-  factory GameRoundResult.fromJson(Map<String, dynamic> json) => GameRoundResult(
-        roundId: _int(json['round_id']),
-        gameKey: json['game_key']?.toString() ?? '',
-        status: json['status']?.toString() ?? 'COMPLETED',
-        winningTargetId: _int(json['winning_target_id']),
-        multiplier: _int(json['multiplier']),
-        totalUserBet: _int(json['total_user_bet']),
-        totalUserWinnings: _int(json['total_user_winnings']),
-        walletCoinBalance: _int(json['wallet_coin_balance']),
-        riskAction: json['risk_action']?.toString() ?? 'AUDIT',
-        auditMessage: json['audit_message']?.toString() ?? '',
-      );
+  factory GameRoundResult.fromJson(Map<String, dynamic> json) {
+    final winners = json['top_winners'] as List<dynamic>? ?? const [];
+    return GameRoundResult(
+      roundId: _int(json['round_id']),
+      gameKey: json['game_key']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'COMPLETED',
+      winningTargetId: _int(json['winning_target_id']),
+      multiplier: _int(json['multiplier']),
+      totalUserBet: _int(json['total_user_bet']),
+      totalUserWinnings: _int(json['total_user_winnings']),
+      walletCoinBalance: _int(json['wallet_coin_balance']),
+      riskAction: json['risk_action']?.toString() ?? 'AUDIT',
+      auditMessage: json['audit_message']?.toString() ?? '',
+      topWinners: winners.whereType<Map<String, dynamic>>().map(GameRoundWinner.fromJson).toList(growable: false),
+    );
+  }
+}
+
+class GameRoundWinner {
+  const GameRoundWinner({required this.userId, required this.name, required this.avatar, required this.coins});
+
+  final int userId;
+  final String name;
+  final String avatar;
+  final int coins;
+
+  factory GameRoundWinner.fromJson(Map<String, dynamic> json) => GameRoundWinner(userId: _int(json['user_id']), name: json['name']?.toString() ?? 'Player', avatar: json['avatar']?.toString() ?? 'U', coins: _int(json['coins']));
 }
 
 Map<String, dynamic> _map(dynamic value) {
