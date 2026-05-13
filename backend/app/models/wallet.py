@@ -29,6 +29,7 @@ class WalletLedgerSource(str, Enum):
     GAME_WIN = "game_win"
     GAME_REFUND = "game_refund"
     STORE_PURCHASE = "store_purchase"
+    RUBY_CONVERT = "ruby_convert"
     PAYOUT = "payout"
     ADJUSTMENT = "adjustment"
 
@@ -44,6 +45,12 @@ class Wallet(Base):
     lifetime_coin_out: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     lifetime_ruby_in: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     lifetime_ruby_out: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    lifetime_recharge_coins: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False, index=True)
+    monthly_recharge_coins: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False, index=True)
+    monthly_recharge_period: Mapped[str | None] = mapped_column(String(7), nullable=True, index=True)
+    vip_level: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
+    svip_level: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
+    svip_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     is_frozen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     freeze_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
