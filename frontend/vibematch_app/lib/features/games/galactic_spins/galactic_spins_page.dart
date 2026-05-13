@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class GalacticSpinsPage extends StatefulWidget {
   const GalacticSpinsPage({super.key});
@@ -12,17 +13,17 @@ class GalacticSpinsPage extends StatefulWidget {
 
 class _GalacticSpinsPageState extends State<GalacticSpinsPage>
     with SingleTickerProviderStateMixin {
-  final math.Random _random = math.Random();
+  final math.Random _rng = math.Random();
   late final AnimationController _spinController;
   late List<List<_SlotSymbol>> _reels;
   Timer? _autoTimer;
-
   int _balance = 25000;
   int _bet = 100;
   int _lines = 25;
   int _lastWin = 0;
-  bool _isSpinning = false;
+  bool _spinning = false;
   bool _autoPlay = false;
+  bool _muted = false;
 
   @override
   void initState() {
@@ -41,39 +42,32 @@ class _GalacticSpinsPageState extends State<GalacticSpinsPage>
     super.dispose();
   }
 
-  List<List<_SlotSymbol>> _newReels() {
-    return List.generate(
-      5,
-      (_) => List.generate(3, (_) => _weightedSymbols[_random.nextInt(_weightedSymbols.length)]),
-    );
-  }
+  List<List<_SlotSymbol>> _newReels() => List.generate(
+        5,
+        (_) => List.generate(
+          3,
+          (_) => _weighted[_rng.nextInt(_weighted.length)],
+        ),
+      );
 
   Future<void> _spin() async {
-    if (_isSpinning) return;
-    if (_balance < _bet) {
-      _toast('Insufficient test coins');
-      return;
-    }
-
+    if (_spinning) return;
+    if (_balance < _bet) return _toast('Insufficient test coins');
     setState(() {
-      _isSpinning = true;
+      _spinning = true;
       _lastWin = 0;
       _balance -= _bet;
     });
-
     await _spinController.forward(from: 0);
-
     final reels = _newReels();
     final rawWin = _score(reels);
     final win = math.min(rawWin, _bet * 50);
-
     setState(() {
       _reels = reels;
       _lastWin = win;
       _balance += win;
-      _isSpinning = false;
+      _spinning = false;
     });
-
     if (win > 0) _toast('You won $win test coins');
   }
 
@@ -100,7 +94,7 @@ class _GalacticSpinsPageState extends State<GalacticSpinsPage>
     _autoTimer?.cancel();
     if (_autoPlay) {
       _autoTimer = Timer.periodic(const Duration(milliseconds: 1400), (_) {
-        if (mounted && !_isSpinning && _balance >= _bet) _spin();
+        if (mounted && !_spinning && _balance >= _bet) _spin();
       });
       _toast('Auto play started');
     } else {
@@ -132,7 +126,7 @@ class _GalacticSpinsPageState extends State<GalacticSpinsPage>
           border: Border.all(color: const Color(0xFF38E8FF).withValues(alpha: 0.35)),
         ),
         child: const Text(
-          'Galactic Spins MVP is a test-credit mini game UI. Production wiring should call /games/galactic-spins/spin so the server owns results, wallet movement, exposure caps, fraud checks, and audit logs.',
+          'Galactic Spins now uses the packaged SVG assets from assets/images/games/galactic_spins. Production mode should call /games/galactic-spins/spin so backend owns RNG, wallet movement, payout caps, risk controls, and audit logs.',
           style: TextStyle(color: Color(0xFFD7E5FF), fontSize: 13, height: 1.35, fontWeight: FontWeight.w700),
         ),
       ),
@@ -140,53 +134,54 @@ class _GalacticSpinsPageState extends State<GalacticSpinsPage>
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF070A18),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            const _SpaceBackground(),
-            Column(
-              children: [
-                _Header(onBack: () => Navigator.pop(context)),
-                Expanded(child: _buildBody()),
-                _buildControls(),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Row(
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: const Color(0xFF070A18),
+        body: SafeArea(
+          child: Stack(
             children: [
+              const _SpaceBackground(),
+              Column(
+                children: [
+                  _Header(
+                    muted: _muted,
+                    onBack: () => Navigator.pop(context),
+                    onSoundTap: () {
+                      setState(() => _muted = !_muted);
+                      _toast(_muted ? 'Sound muted' : 'Sound enabled');
+                    },
+                  ),
+                  Expanded(child: _body()),
+                  _controls(),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _body() => SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(children: [
               Expanded(child: _InfoPanel(label: 'Balance', value: '$_balance', color: const Color(0xFF38E8FF))),
               const SizedBox(width: 10),
               Expanded(child: _InfoPanel(label: 'Last win', value: '$_lastWin', color: const Color(0xFFFFD76A))),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              gradient: const LinearGradient(colors: [Color(0xFF101A3A), Color(0xFF251052), Color(0xFF101A3A)]),
-              border: Border.all(color: const Color(0xFFB54DFF), width: 1.4),
-              boxShadow: [BoxShadow(color: const Color(0xFFB54DFF).withValues(alpha: 0.22), blurRadius: 26)],
-            ),
-            child: AnimatedBuilder(
-              animation: _spinController,
-              builder: (_, __) {
-                return Row(
+            ]),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                gradient: const LinearGradient(colors: [Color(0xFF101A3A), Color(0xFF251052), Color(0xFF101A3A)]),
+                border: Border.all(color: const Color(0xFFB54DFF), width: 1.4),
+                boxShadow: [BoxShadow(color: const Color(0xFFB54DFF).withValues(alpha: 0.22), blurRadius: 26)],
+              ),
+              child: AnimatedBuilder(
+                animation: _spinController,
+                builder: (_, __) => Row(
                   children: List.generate(_reels.length, (reelIndex) {
-                    final shift = _isSpinning ? math.sin((_spinController.value * math.pi * 8) + reelIndex) * 8 : 0.0;
+                    final shift = _spinning ? math.sin((_spinController.value * math.pi * 8) + reelIndex) * 8 : 0.0;
                     return Expanded(
                       child: Transform.translate(
                         offset: Offset(0, shift),
@@ -194,22 +189,18 @@ class _GalacticSpinsPageState extends State<GalacticSpinsPage>
                       ),
                     );
                   }),
-                );
-              },
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
+            const SizedBox(height: 12),
+            Row(children: [
               Expanded(child: _InfoPanel(label: 'Lines', value: '$_lines', color: const Color(0xFF38E8FF), onTap: _changeLines)),
               const SizedBox(width: 10),
               Expanded(child: _InfoPanel(label: 'Bet', value: '$_bet', color: const Color(0xFFFFD76A))),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ]),
+          ],
+        ),
+      );
 
   void _changeLines() {
     const values = [1, 5, 10, 15, 20, 25];
@@ -217,33 +208,27 @@ class _GalacticSpinsPageState extends State<GalacticSpinsPage>
     setState(() => _lines = values[(index + 1) % values.length]);
   }
 
-  Widget _buildControls() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(12, 10, 12, 12 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D1229).withValues(alpha: 0.96),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(color: const Color(0xFF273D80)),
-      ),
-      child: Row(
-        children: [
+  Widget _controls() => Container(
+        padding: EdgeInsets.fromLTRB(12, 10, 12, 12 + MediaQuery.paddingOf(context).bottom),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1229).withValues(alpha: 0.96),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: const Color(0xFF273D80)),
+        ),
+        child: Row(children: [
           _SmallButton(icon: Icons.remove_rounded, onTap: () => setState(() => _bet = (_bet - 10).clamp(10, 100000))),
           const SizedBox(width: 8),
           Expanded(child: _DeckButton(label: _autoPlay ? 'STOP' : 'AUTO', icon: Icons.repeat_rounded, onTap: _toggleAutoPlay)),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: _isSpinning ? null : _spin,
-            child: Container(
-              width: 92,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const RadialGradient(colors: [Color(0xFFFF3D55), Color(0xFFB0002D)]),
-                border: Border.all(color: const Color(0xFFFFD76A), width: 4),
-                boxShadow: [BoxShadow(color: const Color(0xFFFFB347).withValues(alpha: 0.45), blurRadius: 24)],
-              ),
-              child: Center(
-                child: Text(_isSpinning ? '...' : 'SPIN', style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+            onTap: _spinning ? null : _spin,
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 160),
+              scale: _spinning ? 0.94 : 1,
+              child: SizedBox(
+                width: 94,
+                height: 74,
+                child: SvgPicture.asset('assets/images/games/galactic_spins/ui/button_spin.svg', fit: BoxFit.contain),
               ),
             ),
           ),
@@ -251,19 +236,16 @@ class _GalacticSpinsPageState extends State<GalacticSpinsPage>
           Expanded(child: _DeckButton(label: 'INFO', icon: Icons.info_rounded, onTap: _openInfo)),
           const SizedBox(width: 8),
           _SmallButton(icon: Icons.add_rounded, onTap: () => setState(() => _bet = (_bet + 10).clamp(10, 100000))),
-        ],
-      ),
-    );
-  }
+        ]),
+      );
 }
 
 enum _SlotSymbol { wild, diamond, seven, bar, grapes, cherries, orange }
 
-const List<_SlotSymbol> _weightedSymbols = [
+const List<_SlotSymbol> _weighted = [
   _SlotSymbol.orange, _SlotSymbol.orange, _SlotSymbol.orange, _SlotSymbol.orange,
   _SlotSymbol.cherries, _SlotSymbol.cherries, _SlotSymbol.cherries,
-  _SlotSymbol.grapes, _SlotSymbol.grapes,
-  _SlotSymbol.bar, _SlotSymbol.bar,
+  _SlotSymbol.grapes, _SlotSymbol.grapes, _SlotSymbol.bar, _SlotSymbol.bar,
   _SlotSymbol.seven, _SlotSymbol.diamond, _SlotSymbol.wild,
 ];
 
@@ -286,9 +268,14 @@ const List<List<int>> _payLines = [
 ];
 
 extension _SlotSymbolX on _SlotSymbol {
-  String get text => switch (this) {
-        _SlotSymbol.wild => '⭐', _SlotSymbol.diamond => '💎', _SlotSymbol.seven => '7', _SlotSymbol.bar => 'BAR',
-        _SlotSymbol.grapes => '🍇', _SlotSymbol.cherries => '🍒', _SlotSymbol.orange => '🍊',
+  String get assetPath => switch (this) {
+        _SlotSymbol.wild => 'assets/images/games/galactic_spins/symbols/symbol_wild_star.svg',
+        _SlotSymbol.diamond => 'assets/images/games/galactic_spins/symbols/symbol_diamond.svg',
+        _SlotSymbol.seven => 'assets/images/games/galactic_spins/symbols/symbol_seven.svg',
+        _SlotSymbol.bar => 'assets/images/games/galactic_spins/symbols/symbol_bar.svg',
+        _SlotSymbol.grapes => 'assets/images/games/galactic_spins/symbols/symbol_grapes.svg',
+        _SlotSymbol.cherries => 'assets/images/games/galactic_spins/symbols/symbol_cherries.svg',
+        _SlotSymbol.orange => 'assets/images/games/galactic_spins/symbols/symbol_orange.svg',
       };
   Color get color => switch (this) {
         _SlotSymbol.wild => const Color(0xFFFFD76A), _SlotSymbol.diamond => const Color(0xFF38E8FF),
@@ -299,17 +286,19 @@ extension _SlotSymbolX on _SlotSymbol {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.onBack});
+  const _Header({required this.onBack, required this.onSoundTap, required this.muted});
   final VoidCallback onBack;
+  final VoidCallback onSoundTap;
+  final bool muted;
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
         child: Row(children: [
           _SmallButton(icon: Icons.arrow_back_rounded, onTap: onBack),
           const SizedBox(width: 10),
-          const Expanded(child: Center(child: Text('GALACTIC SPINS', style: TextStyle(color: Color(0xFFFFD76A), fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.4)))),
+          Expanded(child: SizedBox(height: 72, child: SvgPicture.asset('assets/images/games/galactic_spins/ui/logo_galactic_spins.svg', fit: BoxFit.contain))),
           const SizedBox(width: 10),
-          _SmallButton(icon: Icons.volume_up_rounded, onTap: () {}),
+          _SmallButton(icon: muted ? Icons.volume_off_rounded : Icons.volume_up_rounded, onTap: onSoundTap),
         ]),
       );
 }
@@ -332,12 +321,13 @@ class _SymbolTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         margin: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(colors: [symbol.color.withValues(alpha: 0.30), const Color(0xFF111B3A)]),
           border: Border.all(color: symbol.color.withValues(alpha: 0.6)),
         ),
-        child: Center(child: Text(symbol.text, style: TextStyle(color: Colors.white, fontSize: symbol == _SlotSymbol.bar ? 13 : 26, fontWeight: FontWeight.w900))),
+        child: Center(child: SvgPicture.asset(symbol.assetPath, fit: BoxFit.contain)),
       );
 }
 
@@ -372,7 +362,7 @@ class _DeckButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           height: 52,
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF12387E), Color(0xFF101A3A)]), border: Border.all(color: Color(0xFF38E8FF))),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF12387E), Color(0xFF101A3A)]), border: Border.all(color: const Color(0xFF38E8FF))),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 5), Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)))]),
         ),
       );
