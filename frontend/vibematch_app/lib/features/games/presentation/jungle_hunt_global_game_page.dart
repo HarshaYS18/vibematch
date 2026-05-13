@@ -885,9 +885,6 @@ const List<_JungleTarget> _targets = <_JungleTarget>[
 
 const List<int> _amounts = <int>[10000, 50000, 100000, 500000, 1000000];
 
-_JungleTarget _targetForId(int id) {
-  return _targets.firstWhere((target) => target.id == id, orElse: () => _targets.first);
-}
 
 String _phaseLabel(_JunglePhase phase) {
   switch (phase) {
@@ -927,3 +924,5 @@ int _int(dynamic value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
+
