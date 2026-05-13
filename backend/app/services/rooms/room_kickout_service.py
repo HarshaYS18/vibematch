@@ -1,9 +1,17 @@
 from datetime import datetime, timedelta
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
+from app.models.user import User
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest
+from app.services.role_service import get_primary_role
+from app.models.role import RoleName
+
+
+_PROTECTED_ROOM_KICKOUT_ROLES = {RoleName.FOUNDER_OWNER, RoleName.OWNER}
+_PROTECTED_PUBLIC_USER_IDS = {"6922022"}
 
 
 def _calculate_blocked_until(duration: str) -> tuple[datetime | None, bool]:
@@ -21,6 +29,42 @@ def _calculate_blocked_until(duration: str) -> tuple[datetime | None, bool]:
     raise ValueError("Unsupported kickout duration")
 
 
+def _target_public_id_as_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value.isdigit():
+        return None
+    return int(value)
+
+
+def _load_target_user(db: Session, payload: RoomKickoutCreateRequest) -> User | None:
+    if payload.target_user_id is not None:
+        user = db.query(User).filter(User.id == payload.target_user_id).first()
+        if user is not None:
+            return user
+
+    public_id = _target_public_id_as_int(payload.target_public_user_id)
+    if public_id is not None:
+        return db.query(User).filter(User.public_user_id == public_id).first()
+
+    return None
+
+
+def _assert_target_can_be_kicked(db: Session, payload: RoomKickoutCreateRequest) -> None:
+    public_id = (payload.target_public_user_id or "").strip()
+    if public_id in _PROTECTED_PUBLIC_USER_IDS:
+        raise HTTPException(status_code=403, detail="Super Owner/Founder Owner cannot be kicked from any chatroom")
+
+    target_user = _load_target_user(db, payload)
+    if target_user is None:
+        return
+
+    primary_role = get_primary_role(target_user)
+    if primary_role in _PROTECTED_ROOM_KICKOUT_ROLES:
+        raise HTTPException(status_code=403, detail="Super Owner and Owner accounts cannot be kicked from any chatroom")
+
+
 def create_room_kickout(
     db: Session,
     room_public_id: str,
@@ -28,6 +72,7 @@ def create_room_kickout(
     actor_user_id: int | None = None,
     actor_public_user_id: str | None = None,
 ) -> RoomKickout:
+    _assert_target_can_be_kicked(db, payload)
     blocked_until, is_permanent = _calculate_blocked_until(payload.duration.value)
 
     kickout = RoomKickout(
@@ -77,14 +122,6 @@ def remove_room_kickout(
     actor_user_id: int | None = None,
     actor_public_user_id: str | None = None,
 ) -> RoomKickout | None:
-    """
-    Soft-remove a room kickout/blocked-list entry.
-
-    Temporary dev contract: actor identity is accepted for the future auth/audit
-    connection. Permission checks and audit logs will be added when room roles
-    are fully backend-enforced.
-    """
-
     kickout = (
         db.query(RoomKickout)
         .filter(RoomKickout.id == kickout_id)
