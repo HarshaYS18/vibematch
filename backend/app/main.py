@@ -12,7 +12,6 @@ from app.api.routes import (
     economy_admin,
     families,
     games,
-    gifts,
     inbox,
     inbox_ws,
     internal_test,
@@ -144,7 +143,6 @@ app.include_router(internal_test.router)
 app.include_router(economy.router)
 app.include_router(economy_admin.router)
 app.include_router(games.router)
-app.include_router(gifts.router)
 app.include_router(coin_sales.router)
 app.include_router(vip_admin.router)
 app.include_router(wallet.router)
