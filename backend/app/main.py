@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +10,9 @@ from app.api.routes import (
     coin_sales,
     economy,
     economy_admin,
+    families,
     games,
+    gifts,
     inbox,
     inbox_ws,
     internal_test,
@@ -32,6 +34,7 @@ from app.api.routes import (
     users,
     vibes,
     vip_admin,
+    wallet,
 )
 from app.api.routes.rooms import cricket, rooms
 from app.database import Base, engine
@@ -84,7 +87,6 @@ from app.models import (
     WalletLedger,
 )
 
-
 STATIC_DIR = Path("static")
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "uploads").mkdir(parents=True, exist_ok=True)
@@ -92,7 +94,6 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Vibe Match API")
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -123,6 +124,7 @@ app.include_router(moderation.router)
 app.include_router(super_owner.router)
 app.include_router(rooms.router)
 app.include_router(cricket.router)
+app.include_router(families.router)
 app.include_router(inbox.router)
 app.include_router(love_bonds.router)
 app.include_router(inbox_ws.router)
@@ -142,10 +144,7 @@ app.include_router(internal_test.router)
 app.include_router(economy.router)
 app.include_router(economy_admin.router)
 app.include_router(games.router)
+app.include_router(gifts.router)
 app.include_router(coin_sales.router)
 app.include_router(vip_admin.router)
-
-
-
-
-
+app.include_router(wallet.router)
