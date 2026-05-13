@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+<filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="gold" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#fff5a6"/><stop offset="0.45" stop-color="#ffb000"/><stop offset="1" stop-color="#8b3900"/></linearGradient>
+<linearGradient id="cyan" x1="0" x2="1"><stop offset="0" stop-color="#69f8ff"/><stop offset="1" stop-color="#0066ff"/></linearGradient>
+<radialGradient id="dark" cx="50%" cy="45%" r="70%"><stop offset="0" stop-color="#1e356f"/><stop offset="1" stop-color="#060819"/></radialGradient>
+</defs><circle cx="128" cy="118" r="92" fill="url(#dark)" stroke="url(#gold)" stroke-width="9" filter="url(#glow)"/>
+<polygon points="128.0,7.0 153.3,70.2 221.2,74.7 168.9,118.3 185.6,184.3 128.0,148.0 70.4,184.3 87.1,118.3 34.8,74.7 102.7,70.2" fill="url(#cyan)" stroke="url(#gold)" stroke-width="10" filter="url(#soft)"/>
+<text x="128" y="226" text-anchor="middle" font-family="Arial Black" font-size="52" fill="url(#gold)" stroke="#25105f" stroke-width="5">WILD</text></svg>
