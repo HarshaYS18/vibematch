@@ -393,6 +393,17 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
                   topWinners: _topWinners(_result!),
                 ),
               ),
+            if (_showResultOverlay && _result != null)
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 78,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: _WinningItemImage(
+                    target: _targetForHistoryId(_result!.winningTargetId),
+                  ),
+                ),
+              ),
             if (_loading && _phase == _JunglePhase.loading)
               Positioned.fill(
                 child: IgnorePointer(
@@ -426,6 +437,64 @@ class _JungleHuntGlobalGamePageState extends State<JungleHuntGlobalGamePage> {
       _RoundWinner(name: 'Top 2', avatar: '🔥', coins: (base * 0.72).round()),
       _RoundWinner(name: 'Top 3', avatar: '⭐', coins: (base * 0.46).round()),
     ];
+  }
+}
+
+class _WinningItemImage extends StatelessWidget {
+  const _WinningItemImage({required this.target});
+
+  final _JungleTarget target;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasAsset = target.asset.trim().isNotEmpty;
+
+    return Center(
+      child: Container(
+        width: 82,
+        height: 82,
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const SweepGradient(
+            colors: [
+              Color(0xFFFFFFFF),
+              Color(0xFFFFF176),
+              Color(0xFFFF8F00),
+              Color(0xFFFFFFFF),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFFC857).withValues(alpha: 0.68),
+              blurRadius: 28,
+              spreadRadius: 4,
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.42),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: Container(
+            color: const Color(0xFF2A1306),
+            child: hasAsset
+                ? Image.asset(
+                    target.asset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: Text(target.emoji, style: const TextStyle(fontSize: 38)),
+                    ),
+                  )
+                : Center(
+                    child: Text(target.emoji, style: const TextStyle(fontSize: 38)),
+                  ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1145,6 +1214,9 @@ int _int(dynamic value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
+
+
 
 
 
