@@ -7,6 +7,8 @@ from app.database import Base, engine
 from app.models import (
     AdminLog,
     AuthIdentity,
+    CoinPoolLedgerEntry,
+    CoinSupplyPool,
     DeviceBan,
     GameHousePool,
     GameLedgerEntry,
