@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../shared/gradient_names/gradient_name_style.dart';
+import '../../../../shared/gradient_names/gradient_name_text.dart';
 import 'store_models.dart';
 import 'store_repository.dart';
 
@@ -233,7 +235,7 @@ class _StoreHeroCard extends StatelessWidget {
           ])),
         ]),
         const SizedBox(height: 12),
-        const Text('Items use remote asset/config keys so frames, effects, bubbles, backgrounds and cards can be updated later without an app update.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700)),
+        const Text('Items use remote asset/config keys so frames, effects, bubbles, backgrounds and gradient names can be updated later without an app update.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
         InkWell(
           onTap: onLoveDebugTap,
@@ -345,13 +347,14 @@ class _RemoteConfigNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final specialText = section == VmStoreSection.specialItems ? ' Gradient names are 100,000 coins each for 30 days.' : '';
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: const Color(0xFFE9FBF8), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0x3312C7B7))),
       child: Row(children: [
         const Icon(Icons.cloud_sync_rounded, color: Color(0xFF12C7B7), size: 22),
         const SizedBox(width: 10),
-        Expanded(child: Text('${section.label} uses remote item keys. Backend/CDN can change active items, prices, previews and durations without app update.', style: const TextStyle(color: Color(0xFF064D46), fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w800))),
+        Expanded(child: Text('${section.label} uses remote item keys. Backend/CDN can change active items, prices, previews and durations without app update.$specialText', style: const TextStyle(color: Color(0xFF064D46), fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w800))),
       ]),
     );
   }
@@ -370,6 +373,7 @@ class _StoreItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gradientStyleId = item.type == VmStoreItemType.gradientName ? item.previewAssetKey.split('/').last : null;
     return Container(
       decoration: _storePanelDecoration(radius: 24),
       clipBehavior: Clip.antiAlias,
@@ -378,7 +382,19 @@ class _StoreItemCard extends StatelessWidget {
           child: Stack(fit: StackFit.expand, children: [
             DecoratedBox(
               decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: item.colors)),
-              child: Icon(item.section.icon, color: Colors.white.withValues(alpha: 0.86), size: 46),
+              child: Center(
+                child: item.type == VmStoreItemType.gradientName
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: GradientNameText(
+                          'Vibe Name',
+                          textAlign: TextAlign.center,
+                          style: GradientNameStyle.byId(gradientStyleId),
+                          textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                        ),
+                      )
+                    : Icon(item.section.icon, color: Colors.white.withValues(alpha: 0.86), size: 46),
+              ),
             ),
             Positioned(top: 8, left: 8, child: _TinyBadge(label: item.rarity.label)),
             if (item.isDynamicRemoteItem) const Positioned(top: 8, right: 8, child: _TinyBadge(label: 'Remote')),
@@ -398,7 +414,7 @@ class _StoreItemCard extends StatelessWidget {
             ]),
             const SizedBox(height: 9),
             _StoreActionButton(
-              label: equipped ? 'Equipped' : owned ? 'Equip' : item.isFree ? 'Free' : '${item.priceCoins} coins',
+              label: equipped ? 'Equipped' : owned ? 'Equip' : item.isFree ? 'Free' : '${_formatCoins(item.priceCoins)} coins',
               enabled: !busy,
               filled: !equipped,
               onTap: equipped ? onUnequip : owned ? onEquip : onBuy,
@@ -407,6 +423,12 @@ class _StoreItemCard extends StatelessWidget {
         ),
       ]),
     );
+  }
+
+  static String _formatCoins(int value) {
+    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+    if (value >= 1000) return '${(value / 1000).toStringAsFixed(0)}K';
+    return value.toString();
   }
 }
 
