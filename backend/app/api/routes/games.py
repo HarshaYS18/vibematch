@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
+from app.schemas.game_history import GameRoundHistoryResponse
 from app.schemas.games import (
     GameAdminUpsertRequest,
     GameBetRequest,
@@ -34,6 +35,11 @@ def get_game_catalog(db: Session = Depends(get_db)):
 @router.get("/catalog/{game_key}", response_model=GameDefinitionResponse)
 def get_game_definition(game_key: str, db: Session = Depends(get_db)):
     return GameDefinitionResponse(**game_service._definition_payload(game_service.get_definition(db, game_key)))
+
+
+@router.get("/global/jungle-hunt/history", response_model=GameRoundHistoryResponse)
+def get_jungle_hunt_history(limit: int = 30, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return GameRoundHistoryResponse(**game_service.get_history(db, limit=limit))
 
 
 @router.post("/admin/seed-defaults", response_model=GameDefinitionResponse)
