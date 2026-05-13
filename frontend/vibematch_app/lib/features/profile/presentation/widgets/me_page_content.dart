@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../auth/models/current_user.dart';
-import '../../../control_center/presentation/control_center_page.dart';
+import '../../../control_center/presentation/control_center_hub_page.dart';
 import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
@@ -232,7 +232,7 @@ class _MePageContentState extends State<MePageContent> {
 
   void _openControlCentre(BuildContext context) {
     Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const ControlCenterPage()))
+        .push(MaterialPageRoute(builder: (_) => const ControlCenterHubPage()))
         .then((_) => _refreshAll());
   }
 
@@ -563,3 +563,4 @@ class _MeLoveBondBackendSyncGateState extends State<_MeLoveBondBackendSyncGate> 
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
+
