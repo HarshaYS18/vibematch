@@ -437,7 +437,7 @@ class _Header extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.26),
                       borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: const Color(0xFFFFD36A).withValues(alpha: 0.34)),
+                      border: Border.all(color: const Color(0xFFFFD36A).withValues(alpha: 0.52)),
                     ),
                     child: Text('🪙 ${coinBalance == null ? '--' : _compact(coinBalance!)}', style: const TextStyle(color: Color(0xFFFFD36A), fontSize: 11, fontWeight: FontWeight.w900)),
                   ),
@@ -739,10 +739,10 @@ class _AmountPill extends StatelessWidget {
       onTap: enabled ? onTap : null,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 160),
-        opacity: enabled ? 1 : 0.52,
+        opacity: enabled ? 1 : 0.72,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          height: 54,
+          height: 58,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
@@ -751,8 +751,8 @@ class _AmountPill extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: selected ? const [Color(0xFFFFFFFF), Color(0xFFFFD36A), Color(0xFFFF7A18)] : _chipGradients[index % _chipGradients.length],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: selected ? 0.78 : 0.30), width: selected ? 2 : 1),
-            boxShadow: selected ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.34), blurRadius: 12)] : null,
+            border: Border.all(color: Colors.white.withValues(alpha: selected ? 0.78 : 0.30), width: selected ? 2.4 : 1.2),
+            boxShadow: selected ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.52), blurRadius: 18)] : null,
           ),
           child: Stack(
             children: [
@@ -938,6 +938,8 @@ int _int(dynamic value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
+
 
 
 
