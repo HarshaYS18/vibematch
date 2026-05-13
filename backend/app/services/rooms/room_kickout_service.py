@@ -10,7 +10,17 @@ from app.services.role_service import get_primary_role
 from app.models.role import RoleName
 
 
-_PROTECTED_ROOM_KICKOUT_ROLES = {RoleName.FOUNDER_OWNER, RoleName.OWNER}
+# Protected platform official/staff roles. Business roles like agency_owner,
+# bd, coin_seller, merchant, and reseller are not protected here unless they
+# also hold one of these official backend roles.
+_PROTECTED_ROOM_KICKOUT_ROLES = {
+    RoleName.FOUNDER_OWNER,
+    RoleName.OWNER,
+    RoleName.SUPERADMIN,
+    RoleName.ADMIN,
+    RoleName.MONITOR,
+    RoleName.CS,
+}
 _PROTECTED_PUBLIC_USER_IDS = {"6922022"}
 
 
@@ -62,7 +72,7 @@ def _assert_target_can_be_kicked(db: Session, payload: RoomKickoutCreateRequest)
 
     primary_role = get_primary_role(target_user)
     if primary_role in _PROTECTED_ROOM_KICKOUT_ROLES:
-        raise HTTPException(status_code=403, detail="Super Owner and Owner accounts cannot be kicked from any chatroom")
+        raise HTTPException(status_code=403, detail="Official/staff accounts cannot be kicked from any chatroom")
 
 
 def create_room_kickout(
