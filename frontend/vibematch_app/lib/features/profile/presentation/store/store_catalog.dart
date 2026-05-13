@@ -1,12 +1,35 @@
 import 'package:flutter/material.dart';
 
+import '../../../../shared/gradient_names/gradient_name_style.dart';
 import 'store_models.dart';
 
 class VmStoreCatalog {
   const VmStoreCatalog._();
 
-  static const List<VmStoreItem> dynamicItems = [
-    VmStoreItem(
+  static const int gradientNamePriceCoins = 100000;
+  static const int gradientNameDurationDays = 30;
+
+  static List<VmStoreItem> get gradientNameItems {
+    return GradientNameStyle.storeStyles.map((style) {
+      return VmStoreItem(
+        id: 'gradient_name_${style.id}_30d',
+        title: style.label,
+        subtitle: 'Gradient colored name effect across app for 30 days.',
+        section: VmStoreSection.specialItems,
+        type: VmStoreItemType.gradientName,
+        rarity: VmStoreItemRarity.svip,
+        priceCoins: gradientNamePriceCoins,
+        isDynamicRemoteItem: true,
+        isLimited: false,
+        previewAssetKey: 'remote://gradient-name/${style.id}',
+        durationDays: gradientNameDurationDays,
+        colors: style.colors,
+      );
+    }).toList(growable: false);
+  }
+
+  static final List<VmStoreItem> dynamicItems = [
+    const VmStoreItem(
       id: 'frame_neon_rose_30d',
       title: 'Neon Rose Frame',
       subtitle: 'Animated-style rose profile frame for 30 days.',
@@ -20,7 +43,7 @@ class VmStoreCatalog {
       durationDays: 30,
       colors: [Color(0xFFE84C72), Color(0xFF6D5DF6)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'frame_royal_gold_perm',
       title: 'Royal Gold Frame',
       subtitle: 'Permanent luxury official-style gold frame.',
@@ -34,7 +57,7 @@ class VmStoreCatalog {
       requiredVipLevel: 10,
       colors: [Color(0xFFC99A3B), Color(0xFFFFD36A)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'entrance_love_comet_7d',
       title: 'Love Comet Entrance',
       subtitle: 'Video plus sound entrance effect for rooms.',
@@ -48,7 +71,7 @@ class VmStoreCatalog {
       durationDays: 7,
       colors: [Color(0xFFE84C72), Color(0xFFFF8AA8)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'entrance_phoenix_30d',
       title: 'Phoenix Arrival',
       subtitle: 'Premium room entry video effect with sound.',
@@ -63,7 +86,7 @@ class VmStoreCatalog {
       durationDays: 30,
       colors: [Color(0xFFFF7A1A), Color(0xFFC99A3B)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'bubble_midnight_glass_perm',
       title: 'Midnight Glass Bubble',
       subtitle: 'Premium chat bubble for room and Inbox display.',
@@ -76,7 +99,7 @@ class VmStoreCatalog {
       previewAssetKey: 'cdn://store/chat_bubbles/midnight_glass_v1.webp',
       colors: [Color(0xFF251538), Color(0xFF6D5DF6)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'room_bg_dark_luxury_perm',
       title: 'Luxury Dark Room',
       subtitle: 'Static premium room background theme.',
@@ -89,7 +112,7 @@ class VmStoreCatalog {
       previewAssetKey: 'cdn://store/room_backgrounds/luxury_dark_v1.webp',
       colors: [Color(0xFF08050D), Color(0xFF251538)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'room_bg_ocean_drive_30d',
       title: 'Ocean Drive Room',
       subtitle: 'Dynamic-ready room background config for 30 days.',
@@ -103,7 +126,7 @@ class VmStoreCatalog {
       durationDays: 30,
       colors: [Color(0xFF12C7B7), Color(0xFF0C5B82)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'special_id_7_digits',
       title: '7 Digit Special ID',
       subtitle: 'Reserve a premium short numeric display ID.',
@@ -117,7 +140,7 @@ class VmStoreCatalog {
       maxOwnable: 1,
       colors: [Color(0xFF251538), Color(0xFFC99A3B)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'bond_love_card',
       title: 'Love Card',
       subtitle: 'Create one Lover bond if you do not already have one.',
@@ -131,7 +154,7 @@ class VmStoreCatalog {
       maxOwnable: 1,
       colors: [Color(0xFFE84C72), Color(0xFFFFD36A)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'bond_brother_card',
       title: 'Brother Card',
       subtitle: 'Send to create a Brother bond after acceptance.',
@@ -144,7 +167,7 @@ class VmStoreCatalog {
       previewAssetKey: 'cdn://store/bond_cards/brother_card_v1.webp',
       colors: [Color(0xFF6D5DF6), Color(0xFF12C7B7)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'bond_sister_card',
       title: 'Sister Card',
       subtitle: 'Send to create a Sister bond after acceptance.',
@@ -157,7 +180,7 @@ class VmStoreCatalog {
       previewAssetKey: 'cdn://store/bond_cards/sister_card_v1.webp',
       colors: [Color(0xFFFF8AA8), Color(0xFF6D5DF6)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'bond_bestie_card',
       title: 'Bestie Card',
       subtitle: 'Send to create a Bestie bond after acceptance.',
@@ -170,7 +193,7 @@ class VmStoreCatalog {
       previewAssetKey: 'cdn://store/bond_cards/bestie_card_v1.webp',
       colors: [Color(0xFF12C7B7), Color(0xFFC99A3B)],
     ),
-    VmStoreItem(
+    const VmStoreItem(
       id: 'special_name_glow_30d',
       title: 'Name Glow',
       subtitle: 'Glowing name effect in room, profile and chat.',
@@ -185,6 +208,7 @@ class VmStoreCatalog {
       durationDays: 30,
       colors: [Color(0xFFFFD36A), Color(0xFFE84C72)],
     ),
+    ...gradientNameItems,
   ];
 
   static List<VmStoreItem> visibleStoreItems({required bool hasLoveRelationship}) {
