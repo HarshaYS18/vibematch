@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../shared/gradient_names/gradient_name_style.dart';
+import '../../../../shared/gradient_names/gradient_name_text.dart';
 import '../../models/inbox_models.dart';
 
 class InboxConversationCard extends StatelessWidget {
@@ -38,11 +40,12 @@ class InboxConversationCard extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
+                          child: GradientNameText(
                             conversation.title,
+                            style: conversation.isOfficial ? GradientNameStyle.official : GradientNameStyle.defaultName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            textStyle: TextStyle(
                               color: const Color(0xFF111B21),
                               fontSize: 16,
                               fontWeight: conversation.unreadCount > 0 ? FontWeight.w800 : FontWeight.w600,
