@@ -13,28 +13,31 @@ class GameTargetConfig(BaseModel):
 
 
 class GameRulesConfig(BaseModel):
-    round_seconds: int = 24
-    lock_seconds: int = 1
-    result_seconds: int = 5
-    allowed_bets: list[int] = Field(default_factory=lambda: [400, 10_000, 100_000])
-    custom_bet_enabled: bool = True
-    min_bet: int = 100
-    max_bet: int = 100_000
-    max_total_bet_per_round: int = 300_000
+    round_seconds: int = 30
+    lock_seconds: int = 2
+    reveal_seconds: int = 15
+    result_seconds: int = 3
+    allowed_bets: list[int] = Field(default_factory=lambda: [10_000, 50_000, 100_000, 500_000, 1_000_000])
+    custom_bet_enabled: bool = False
+    min_bet: int = 10_000
+    max_bet: int = 1_000_000
+    max_total_bet_per_round: int = 6_000_000
+    max_targets_per_user_round: int = 6
+    close_betting_last_seconds: int = 2
     targets: list[GameTargetConfig] = Field(default_factory=list)
 
 
 class GameRiskConfig(BaseModel):
     enabled: bool = True
-    max_daily_loss: int = 500_000
-    max_daily_bet_volume: int = 2_000_000
+    max_daily_loss: int = 1_500_000
+    max_daily_bet_volume: int = 6_000_000
     max_single_bet_low: int = 100_000
     max_single_bet_medium: int = 50_000
     max_single_bet_high: int = 10_000
-    force_min_bet_extreme: int = 400
+    force_min_bet_extreme: int = 10_000
     cooldown_seconds_high_risk: int = 300
-    manual_review_score: int = 90
-    block_score: int = 120
+    manual_review_score: int = 70
+    block_score: int = 95
 
 
 class GameDefinitionResponse(BaseModel):
@@ -120,3 +123,4 @@ class GameRoundResultResponse(BaseModel):
     risk_score: int
     risk_action: str
     audit_message: str
+    top_winners: list[dict[str, Any]] = Field(default_factory=list)
