@@ -26,3 +26,23 @@ class AssignRoleResponse(BaseModel):
     target_user_id: int
     assigned_role: str
     assigned_by_user_id: int
+
+
+class AdminControlSummaryResponse(BaseModel):
+    current_user_id: int
+    current_primary_role: str
+    can_assign_roles: bool
+    can_view_audit_logs: bool
+    can_view_login_history: bool
+    users_count: int
+    active_users_count: int
+    banned_users_count: int
+    official_users_count: int
+    recent_audit_count: int
+
+
+class RoleOptionResponse(BaseModel):
+    value: str
+    label: str
+    power: int
+    assignable: bool
