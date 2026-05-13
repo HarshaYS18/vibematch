@@ -127,6 +127,14 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
     }
   }
 
+
+  void _closeSheetAndRunAction(Future<void> Function() action, String success) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _runAction(action, success);
+    });
+  }
   AdminUser? _findUserByPublicId(String text) {
     final id = int.tryParse(text.trim());
     if (id == null) return null;
@@ -169,8 +177,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
             onPressed: () {
               final safeReason = reason.text.trim();
               if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              Navigator.pop(context);
-              _runAction(() => _api.assignRole(targetUserId: user.id, role: selected.value, reason: safeReason), 'Role updated and audit logged.');
+              _closeSheetAndRunAction(() => _api.assignRole(targetUserId: user.id, role: selected.value, reason: safeReason), 'Role updated and audit logged.');
             },
           ),
         ],
@@ -207,8 +214,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
             onPressed: () {
               final safeReason = reason.text.trim();
               if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              Navigator.pop(context);
-              _runAction(
+              _closeSheetAndRunAction(
                 () => user.isBanned
                     ? _api.unbanUser(targetUserId: user.id, reason: safeReason)
                     : _api.banUser(targetUserId: user.id, reason: safeReason, deviceId: deviceId.text),
@@ -241,8 +247,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
             onPressed: () {
               final safeReason = reason.text.trim();
               if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              Navigator.pop(context);
-              _runAction(() => _api.unbanDevice(deviceId: ban.deviceId, reason: safeReason), 'Device unbanned and audit logged.');
+              _closeSheetAndRunAction(() => _api.unbanDevice(deviceId: ban.deviceId, reason: safeReason), 'Device unbanned and audit logged.');
             },
           ),
         ],
@@ -295,8 +300,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
               final targetUserId = int.tryParse(target.text.trim());
               final safeReason = reason.text.trim();
               if (coinAmount <= 0 || safeReason.isEmpty) return _toast('Amount and reason are required.', danger: true);
-              Navigator.pop(context);
-              _runAction(() => _api.mintCoins(poolType: selectedPool, amount: coinAmount, targetUserId: targetUserId, reason: safeReason), 'Coins minted to supply pool and audit logged.');
+              _closeSheetAndRunAction(() => _api.mintCoins(poolType: selectedPool, amount: coinAmount, targetUserId: targetUserId, reason: safeReason), 'Coins minted to supply pool and audit logged.');
             },
           ),
         ],
@@ -335,8 +339,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
               final coins = int.tryParse(amount.text.trim()) ?? 0;
               final safeReason = reason.text.trim();
               if (coins <= 0 || safeReason.isEmpty) return _toast('Amount and reason are required.', danger: true);
-              Navigator.pop(context);
-              _runAction(() => _api.sendCoinsToAll(coinAmount: coins, activeOnly: activeOnly, reason: safeReason), 'Coins sent to users and audit logged.');
+              _closeSheetAndRunAction(() => _api.sendCoinsToAll(coinAmount: coins, activeOnly: activeOnly, reason: safeReason), 'Coins sent to users and audit logged.');
             },
           ),
         ],
@@ -370,8 +373,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
               final safeReason = reason.text.trim();
               if (text.isNotEmpty && parsed == null) return _toast('Custom ID must be numeric.', danger: true);
               if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              Navigator.pop(context);
-              _runAction(() => _api.assignCustomId(targetUserId: user.id, customId: parsed, reason: safeReason), 'Custom ID updated and audit logged.');
+              _closeSheetAndRunAction(() => _api.assignCustomId(targetUserId: user.id, customId: parsed, reason: safeReason), 'Custom ID updated and audit logged.');
             },
           ),
         ],
@@ -412,8 +414,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
               final svipLevel = int.tryParse(svip.text.trim()) ?? -1;
               final safeReason = reason.text.trim();
               if (vipLevel < 0 || svipLevel < 0 || safeReason.isEmpty) return _toast('Levels and reason are required.', danger: true);
-              Navigator.pop(context);
-              _runAction(
+              _closeSheetAndRunAction(
                 () => _api.adjustVip(targetUserId: user.id, vipLevel: vipLevel, svipLevel: svipLevel, vipActive: vipActive, svipActive: svipActive, reason: safeReason),
                 'VIP/SVIP stored in DB and audit logged.',
               );
@@ -459,8 +460,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
             onPressed: () {
               final safeReason = reason.text.trim();
               if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              Navigator.pop(context);
-              _runAction(() => _api.grantSpecialPermission(targetUserId: user.id, permission: selected.value, reason: safeReason), 'Special permission stored and audit logged.');
+              _closeSheetAndRunAction(() => _api.grantSpecialPermission(targetUserId: user.id, permission: selected.value, reason: safeReason), 'Special permission stored and audit logged.');
             },
           ),
         ],
@@ -492,8 +492,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
               final user = _findUserByPublicId(userId.text);
               final safeReason = reason.text.trim();
               if (user == null || safeReason.isEmpty) return _toast('Valid user ID and reason are required.', danger: true);
-              Navigator.pop(context);
-              _runAction(() => _api.setStealth(targetUserId: user.id, enabled: enabled, reason: safeReason), 'Stealth setting stored and audit logged.');
+              _closeSheetAndRunAction(() => _api.setStealth(targetUserId: user.id, enabled: enabled, reason: safeReason), 'Stealth setting stored and audit logged.');
             },
           ),
         ],
@@ -822,3 +821,4 @@ String _fmt(int value) {
   }
   return buffer.toString();
 }
+

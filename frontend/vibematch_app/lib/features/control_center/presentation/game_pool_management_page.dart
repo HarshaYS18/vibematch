@@ -84,6 +84,14 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
     }
   }
 
+
+  void _closeSheetAndRun(Future<void> Function() action, String success) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _run(action, success);
+    });
+  }
   Future<void> _openTransferSheet({required bool allocate}) async {
     final amount = TextEditingController();
     final reason = TextEditingController(text: allocate ? 'Super Owner allocate to Jungle Hunt game pool' : 'Super Owner withdraw from Jungle Hunt game pool');
@@ -105,8 +113,7 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
               final value = int.tryParse(amount.text.trim()) ?? 0;
               final safeReason = reason.text.trim();
               if (value <= 0 || safeReason.length < 3) return _toast('Amount and reason are required.', danger: true);
-              Navigator.pop(context);
-              _run(
+              _closeSheetAndRun(
                 () => allocate ? _api.allocate(gameKey: 'jackpot_king', amount: value, reason: safeReason) : _api.withdraw(gameKey: 'jackpot_king', amount: value, reason: safeReason),
                 allocate ? 'Allocated to Jungle Hunt pool.' : 'Withdrawn to Main pool.',
               );
@@ -154,8 +161,7 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
                 final value = int.tryParse(amount.text.trim()) ?? 0;
                 final safeReason = reason.text.trim();
                 if (value <= 0 || safeReason.length < 3) return _toast('Amount and reason are required.', danger: true);
-                Navigator.pop(context);
-                _run(
+                _closeSheetAndRun(
                   () => _api.adjust(gameKey: pool.gameKey, poolType: pool.poolType, direction: direction, amount: value, reason: safeReason),
                   'Game pool adjusted and audit logged.',
                 );
@@ -217,8 +223,7 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
               onPressed: () {
                 final safeReason = reason.text.trim();
                 if (safeReason.length < 3) return _toast('Reason is required.', danger: true);
-                Navigator.pop(context);
-                _run(
+                _closeSheetAndRun(
                   () => _api.updateSettings(
                     gameKey: pool.gameKey,
                     poolType: pool.poolType,
@@ -461,3 +466,4 @@ int _int(Object? value) {
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '') ?? 0;
 }
+
