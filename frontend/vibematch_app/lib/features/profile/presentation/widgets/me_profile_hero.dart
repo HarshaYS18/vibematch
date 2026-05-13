@@ -108,6 +108,7 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
 
   List<Widget> _badgeLineItems() {
     final badge = widget.roleBadge;
+    final familyName = widget.familyName.trim();
     return [
       if (badge != null)
         OfficialRoleBadgePill(badge: badge)
@@ -117,23 +118,26 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
           icon: widget.roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
           color: const Color(0xFFC99A3B),
         ),
-      MeProfileMiniBadge(
-        label: widget.vipFrozen ? 'VIP ${widget.vipLevel} Frozen' : 'VIP ${widget.vipLevel}',
-        icon: widget.vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
-        color: widget.vipColor,
-        onTap: widget.onVipTap,
-      ),
-      MeProfileMiniBadge(
-        label: 'SVIP ${widget.svipLevel}',
-        icon: Icons.auto_awesome_rounded,
-        color: const Color(0xFFC99A3B),
-        onTap: widget.onSvipTap,
-      ),
-      MeFamilyTagLight(
-        familyName: widget.familyName,
-        familyLevel: widget.familyLevel,
-        onTap: widget.onFamilyTap,
-      ),
+      if (widget.vipLevel > 0)
+        MeProfileMiniBadge(
+          label: widget.vipFrozen ? 'VIP ${widget.vipLevel} Frozen' : 'VIP ${widget.vipLevel}',
+          icon: widget.vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
+          color: widget.vipColor,
+          onTap: widget.onVipTap,
+        ),
+      if (widget.svipLevel > 0)
+        MeProfileMiniBadge(
+          label: 'SVIP ${widget.svipLevel}',
+          icon: Icons.auto_awesome_rounded,
+          color: const Color(0xFFC99A3B),
+          onTap: widget.onSvipTap,
+        ),
+      if (familyName.isNotEmpty && widget.familyLevel > 0)
+        MeFamilyTagLight(
+          familyName: familyName,
+          familyLevel: widget.familyLevel,
+          onTap: widget.onFamilyTap,
+        ),
     ];
   }
 
@@ -236,23 +240,25 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                   'ID ${widget.publicId}',
                   style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 13, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 30,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        for (var index = 0; index < badges.length; index++) ...[
-                          badges[index],
-                          if (index != badges.length - 1) const SizedBox(width: 8),
+                if (badges.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 30,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          for (var index = 0; index < badges.length; index++) ...[
+                            badges[index],
+                            if (index != badges.length - 1) const SizedBox(width: 8),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
