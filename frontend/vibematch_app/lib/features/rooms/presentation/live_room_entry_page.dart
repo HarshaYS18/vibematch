@@ -52,7 +52,6 @@ class _LiveRoomEntryPageState extends State<LiveRoomEntryPage> {
       language: widget.language,
       modeTitle: widget.modeTitle,
       onlineCount: widget.onlineCount,
-      currentUser: widget.currentUser,
     );
   }
 }
