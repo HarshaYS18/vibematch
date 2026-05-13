@@ -28,6 +28,7 @@ from app.api.routes import (
     room_music_media,
     room_realtime,
     social,
+    super_owner,
     users,
     vibes,
     vip_admin,
@@ -119,6 +120,7 @@ app.include_router(users.router)
 app.include_router(role_badges.router)
 app.include_router(admin.router)
 app.include_router(moderation.router)
+app.include_router(super_owner.router)
 app.include_router(rooms.router)
 app.include_router(cricket.router)
 app.include_router(inbox.router)
