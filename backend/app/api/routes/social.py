@@ -17,6 +17,21 @@ from app.services import social_service
 router = APIRouter(prefix="/social", tags=["Social"])
 
 
+def _self_follow_status(current_user: User) -> FollowStatusResponse:
+    return FollowStatusResponse(
+        public_user_id=current_user.public_user_id,
+        is_following=False,
+        follows_me=False,
+        is_friend=False,
+        blocked_by_me=False,
+        blocked_me=False,
+        can_follow=False,
+        follow_block_reason="This is your own profile.",
+        followers_count=0,
+        following_count=0,
+    )
+
+
 def _get_target_user(db: Session, target_user_id: int, current_user: User) -> User:
     if target_user_id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot use this action on yourself.")
@@ -54,6 +69,8 @@ def get_follow_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if target_user_id == current_user.id:
+        return _self_follow_status(current_user)
     target_user = _get_target_user(db, target_user_id, current_user)
     return FollowStatusResponse(**social_service.follow_status(db, current_user, target_user))
 
@@ -84,6 +101,8 @@ def get_follow_status_by_public_id(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if public_user_id == current_user.public_user_id:
+        return _self_follow_status(current_user)
     target_user = _get_target_user_by_public_id(db, public_user_id, current_user)
     return FollowStatusResponse(**social_service.follow_status(db, current_user, target_user))
 
