@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../shared/gradient_names/equipped_gradient_name_text.dart';
 import '../../../auth/models/role_badge.dart';
 import '../models/me_page_models.dart';
 import '../models/public_profile_models.dart';
@@ -211,11 +212,12 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Flexible(
-                      child: Text(
+                      child: EquippedGradientNameText(
                         widget.displayName,
+                        role: widget.role,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        textStyle: const TextStyle(
                           color: Color(0xFF251538),
                           fontSize: 27,
                           fontWeight: FontWeight.w900,
