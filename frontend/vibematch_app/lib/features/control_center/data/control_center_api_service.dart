@@ -50,6 +50,11 @@ class ControlCenterApiService {
     await _apiClient.postMap('/moderation/devices/unban', headers: _headers(), body: {'device_id': deviceId, 'reason': reason});
   }
 
+  Future<List<SuperOwnerPoolItem>> loadCoinPools() async {
+    final json = await _apiClient.getList('/super-owner/coin-pools', headers: _headers());
+    return json.whereType<Map<String, dynamic>>().map(SuperOwnerPoolItem.fromJson).toList(growable: false);
+  }
+
   Future<void> mintCoins({required String poolType, required int amount, required String reason, int? targetUserId}) async {
     await _apiClient.postMap('/super-owner/coins/mint', headers: _headers(), body: {'target_pool_type': poolType, 'amount': amount, 'reason': reason, if (targetUserId != null) 'target_user_id': targetUserId});
   }
@@ -177,6 +182,17 @@ class DeviceBanItem {
   factory DeviceBanItem.fromJson(Map<String, dynamic> json) => DeviceBanItem(id: _int(json['id']), deviceId: json['device_id']?.toString() ?? '', reason: json['reason']?.toString() ?? 'No reason', isActive: json['is_active'] != false);
 }
 
+class SuperOwnerPoolItem {
+  const SuperOwnerPoolItem({required this.id, required this.ownerUserId, required this.poolType, required this.balance, required this.reservedBalance, required this.status});
+  final int id;
+  final int? ownerUserId;
+  final String poolType;
+  final int balance;
+  final int reservedBalance;
+  final String status;
+  factory SuperOwnerPoolItem.fromJson(Map<String, dynamic> json) => SuperOwnerPoolItem(id: _int(json['id']), ownerUserId: json['owner_user_id'] == null ? null : _int(json['owner_user_id']), poolType: json['pool_type']?.toString() ?? '', balance: _int(json['balance']), reservedBalance: _int(json['reserved_balance']), status: json['status']?.toString() ?? 'ACTIVE');
+}
+
 class SpecialPermissionOption {
   const SpecialPermissionOption({required this.value, required this.label});
   final String value;
@@ -185,12 +201,15 @@ class SpecialPermissionOption {
 }
 
 class SuperOwnerLogItem {
-  const SuperOwnerLogItem({required this.id, required this.action, required this.reason, required this.createdAt});
+  const SuperOwnerLogItem({required this.id, required this.action, required this.reason, required this.createdAt, this.actorUserId, this.targetUserId, this.resourceType});
   final int id;
+  final int? actorUserId;
+  final int? targetUserId;
   final String action;
+  final String? resourceType;
   final String reason;
   final String createdAt;
-  factory SuperOwnerLogItem.fromJson(Map<String, dynamic> json) => SuperOwnerLogItem(id: _int(json['id']), action: json['action']?.toString() ?? 'LOG', reason: json['reason']?.toString() ?? '', createdAt: json['created_at']?.toString() ?? '');
+  factory SuperOwnerLogItem.fromJson(Map<String, dynamic> json) => SuperOwnerLogItem(id: _int(json['id']), actorUserId: json['actor_user_id'] == null ? null : _int(json['actor_user_id']), targetUserId: json['target_user_id'] == null ? null : _int(json['target_user_id']), action: json['action']?.toString() ?? 'LOG', resourceType: json['resource_type']?.toString(), reason: json['reason']?.toString() ?? '', createdAt: json['created_at']?.toString() ?? '');
 }
 
 class SuperOwnerReviewItem {
