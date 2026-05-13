@@ -32,6 +32,44 @@ class ControlCenterApiService {
     );
   }
 
+  Future<void> banUser({required int targetUserId, required String reason, String? deviceId}) async {
+    await _apiClient.postMap(
+      '/moderation/users/ban',
+      headers: _headers(),
+      body: {
+        'target_user_id': targetUserId,
+        'reason': reason,
+        if (deviceId != null && deviceId.trim().isNotEmpty) 'device_id': deviceId.trim(),
+      },
+    );
+  }
+
+  Future<void> unbanUser({required int targetUserId, required String reason}) async {
+    await _apiClient.postMap(
+      '/moderation/users/unban',
+      headers: _headers(),
+      body: {'target_user_id': targetUserId, 'reason': reason},
+    );
+  }
+
+  Future<List<UserBanItem>> loadUserBans() async {
+    final json = await _apiClient.getList('/moderation/users/bans', headers: _headers());
+    return json.whereType<Map<String, dynamic>>().map(UserBanItem.fromJson).toList(growable: false);
+  }
+
+  Future<List<DeviceBanItem>> loadDeviceBans() async {
+    final json = await _apiClient.getList('/moderation/devices/bans', headers: _headers());
+    return json.whereType<Map<String, dynamic>>().map(DeviceBanItem.fromJson).toList(growable: false);
+  }
+
+  Future<void> unbanDevice({required String deviceId, required String reason}) async {
+    await _apiClient.postMap(
+      '/moderation/devices/unban',
+      headers: _headers(),
+      body: {'device_id': deviceId, 'reason': reason},
+    );
+  }
+
   Map<String, String> _headers() {
     final token = _authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -67,6 +105,10 @@ class AdminControlSummary {
   final int bannedUsersCount;
   final int officialUsersCount;
   final int recentAuditCount;
+
+  bool get isSuperOwnerPanel => currentPrimaryRole == 'founder_owner';
+  bool get isOwnerPanel => currentPrimaryRole == 'owner';
+  bool get isSuperAdminPanel => currentPrimaryRole == 'superadmin';
 
   factory AdminControlSummary.fromJson(Map<String, dynamic> json) {
     return AdminControlSummary(
@@ -109,6 +151,8 @@ class AdminUser {
 
   String get title => displayName.trim().isNotEmpty ? displayName : username;
   String get roleLabel => primaryRole.replaceAll('_', ' ').toUpperCase();
+  bool get isNormalUser => primaryRole == 'user';
+  bool get isProtectedOfficial => primaryRole == 'founder_owner' || primaryRole == 'owner' || primaryRole == 'superadmin' || primaryRole == 'admin' || primaryRole == 'monitor' || primaryRole == 'cs';
 
   factory AdminUser.fromJson(Map<String, dynamic> json) {
     final username = json['username']?.toString() ?? 'user_${json['public_user_id']}';
@@ -142,6 +186,44 @@ class RoleOption {
       label: json['label']?.toString() ?? 'User',
       power: _int(json['power']),
       assignable: json['assignable'] == true,
+    );
+  }
+}
+
+class UserBanItem {
+  const UserBanItem({required this.id, required this.userId, required this.reason, required this.isActive, this.deviceId});
+
+  final int id;
+  final int userId;
+  final String reason;
+  final bool isActive;
+  final String? deviceId;
+
+  factory UserBanItem.fromJson(Map<String, dynamic> json) {
+    return UserBanItem(
+      id: _int(json['id']),
+      userId: _int(json['user_id']),
+      reason: json['reason']?.toString() ?? 'No reason',
+      isActive: json['is_active'] != false,
+      deviceId: json['device_id_snapshot']?.toString(),
+    );
+  }
+}
+
+class DeviceBanItem {
+  const DeviceBanItem({required this.id, required this.deviceId, required this.reason, required this.isActive});
+
+  final int id;
+  final String deviceId;
+  final String reason;
+  final bool isActive;
+
+  factory DeviceBanItem.fromJson(Map<String, dynamic> json) {
+    return DeviceBanItem(
+      id: _int(json['id']),
+      deviceId: json['device_id']?.toString() ?? '',
+      reason: json['reason']?.toString() ?? 'No reason',
+      isActive: json['is_active'] != false,
     );
   }
 }
