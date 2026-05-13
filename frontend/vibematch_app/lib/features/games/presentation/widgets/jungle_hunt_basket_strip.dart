@@ -14,14 +14,27 @@ class JungleHuntBasketStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 5),
-      child: Row(
-        children: [
-          _BasketCapsule(ids: const [4, 5, 6, 7], highlighted: leftHighlighted, assetForId: assetForId),
-          const Spacer(),
-          _BasketCapsule(ids: const [0, 1, 2, 3], highlighted: rightHighlighted, assetForId: assetForId),
-        ],
+    return SizedBox(
+      height: 42,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 0, 10, 2),
+        child: Row(
+          children: [
+            Flexible(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _BasketCapsule(ids: const [4, 5, 6, 7], highlighted: leftHighlighted, assetForId: assetForId),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _BasketCapsule(ids: const [0, 1, 2, 3], highlighted: rightHighlighted, assetForId: assetForId),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -39,22 +52,22 @@ class _BasketCapsule extends StatelessWidget {
     return IgnorePointer(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: 132,
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        width: 112,
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             colors: highlighted
                 ? const [Color(0xFFFFF6A5), Color(0xFFFF9E2D), Color(0xFF7A350B)]
-                : [Colors.black.withValues(alpha: 0.22), Colors.white.withValues(alpha: 0.08)],
+                : [Colors.black.withValues(alpha: 0.24), Colors.white.withValues(alpha: 0.07)],
           ),
           border: Border.all(
             color: highlighted ? const Color(0xFFFFF6A5) : Colors.white.withValues(alpha: 0.14),
-            width: highlighted ? 1.8 : 1,
+            width: highlighted ? 1.6 : 1,
           ),
           boxShadow: highlighted
-              ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.44), blurRadius: 18, spreadRadius: 1)]
+              ? [BoxShadow(color: const Color(0xFFFFD36A).withValues(alpha: 0.42), blurRadius: 14, spreadRadius: 1)]
               : null,
         ),
         child: Stack(
@@ -62,15 +75,15 @@ class _BasketCapsule extends StatelessWidget {
             Positioned.fill(
               child: Icon(
                 Icons.shopping_basket_rounded,
-                color: Colors.white.withValues(alpha: highlighted ? 0.36 : 0.18),
-                size: 42,
+                color: Colors.white.withValues(alpha: highlighted ? 0.32 : 0.16),
+                size: 34,
               ),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: ids
                   .map((id) => Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
                         child: _AnimalDot(assetPath: assetForId(id)),
                       ))
                   .toList(growable: false),
@@ -90,8 +103,8 @@ class _AnimalDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 27,
-      height: 27,
+      width: 22,
+      height: 22,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFF2A1306),
