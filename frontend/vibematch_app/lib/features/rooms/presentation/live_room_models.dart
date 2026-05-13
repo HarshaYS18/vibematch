@@ -108,6 +108,7 @@ class SeatUser {
     required this.receivedExp,
     required this.medals,
     required this.avatarColors,
+    this.avatarUrl,
     this.svipLevel = 0,
     this.age,
     this.locationLabel,
@@ -133,6 +134,7 @@ class SeatUser {
   final int receivedExp;
   final List<String> medals;
   final List<Color> avatarColors;
+  final String? avatarUrl;
   final int svipLevel;
   final int? age;
   final String? locationLabel;
@@ -160,6 +162,8 @@ class SeatUser {
     int? receivedExp,
     List<String>? medals,
     List<Color>? avatarColors,
+    String? avatarUrl,
+    bool clearAvatarUrl = false,
     bool? isCurrentUser,
     bool? isHost,
     bool? isRoomAdmin,
@@ -185,6 +189,7 @@ class SeatUser {
       receivedExp: receivedExp ?? this.receivedExp,
       medals: medals ?? this.medals,
       avatarColors: avatarColors ?? this.avatarColors,
+      avatarUrl: clearAvatarUrl ? null : (avatarUrl ?? this.avatarUrl),
       svipLevel: svipLevel ?? this.svipLevel,
       age: age ?? this.age,
       locationLabel: locationLabel ?? this.locationLabel,
@@ -314,15 +319,5 @@ final List<SeatUser> mockInviteUsers = <SeatUser>[];
 final List<ChatEntry> mockChatEntries = <ChatEntry>[];
 
 const List<GiftItem> mockGiftItems = [
-  GiftItem(id: 'love_bomb', name: 'Love Bomb', category: GiftCategory.classic, coins: 1, icon: Icons.favorite_rounded, chatSymbol: '❤️', assetPath: 'assets/images/gifts/love_bomb.png', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
   GiftItem(id: 'love_rocket', name: 'Love Rocket', category: GiftCategory.premium, coins: 999, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/gifts/love_rocket/icon/love_rocket_icon.webp', videoAssetPath: 'assets/videos/gifts/love_rocket.mp4', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
-  GiftItem(id: 'rocket', name: 'Rocket', category: GiftCategory.classic, coins: 99, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/images/gifts/rocket.png', colors: [Color(0xFF18C7B7), Color(0xFF6C63FF)]),
-  GiftItem(id: 'lucky_star', name: 'Lucky Star', category: GiftCategory.lucky, coins: 19, icon: Icons.auto_awesome_rounded, chatSymbol: '✨', assetPath: 'assets/images/gifts/lucky_star.png', colors: [Color(0xFFFFD166), Color(0xFFFF7A45)]),
-  GiftItem(id: 'relationship_ring', name: 'Couple Ring', category: GiftCategory.relationship, coins: 299, icon: Icons.favorite_rounded, chatSymbol: '💍', assetPath: 'assets/images/gifts/couple_ring.png', colors: [Color(0xFFE84C72), Color(0xFFFFC857)]),
-  GiftItem(id: 'event_crown', name: 'Event Crown', category: GiftCategory.event, coins: 199, icon: Icons.emoji_events_rounded, chatSymbol: '🏆', assetPath: 'assets/images/gifts/event_crown.png', colors: [Color(0xFFC99A3B), Color(0xFFE84C72)]),
-  GiftItem(id: 'svip_aura', name: 'SVIP Aura', category: GiftCategory.svip, coins: 399, icon: Icons.diamond_rounded, chatSymbol: '💎', assetPath: 'assets/images/gifts/svip_aura.png', colors: [Color(0xFF8C5CF6), Color(0xFF12C7B7)]),
-  GiftItem(id: 'vip_crown', name: 'VIP Crown', category: GiftCategory.vip, coins: 499, icon: Icons.workspace_premium_rounded, chatSymbol: '👑', assetPath: 'assets/images/gifts/royal_crown.png', colors: [Color(0xFFFFD166), Color(0xFF111827)]),
-  GiftItem(id: 'royal_crown', name: 'Royal Crown', category: GiftCategory.premium, coins: 999, icon: Icons.workspace_premium_rounded, chatSymbol: '👑', assetPath: 'assets/images/gifts/royal_crown.png', colors: [Color(0xFFFFD166), Color(0xFF111827)]),
-  GiftItem(id: 'owned_rose_pack', name: 'Rose Pack', category: GiftCategory.baggage, coins: 0, icon: Icons.inventory_2_rounded, chatSymbol: '🎒', assetPath: 'assets/images/gifts/rose_pack.png', colors: [Color(0xFFFF6B9A), Color(0xFFFFC2D8)]),
-  GiftItem(id: 'owned_lucky_box', name: 'Lucky Box', category: GiftCategory.baggage, coins: 0, icon: Icons.card_giftcard_rounded, chatSymbol: '🎁', assetPath: 'assets/images/gifts/lucky_box.png', colors: [Color(0xFFFFD166), Color(0xFFFF7A45)]),
 ];
