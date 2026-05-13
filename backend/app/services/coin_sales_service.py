@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.economy import CoinSaleOrder, CoinSaleStatus, CoinSupplyPool, CoinSupplyPoolType, EconomyCurrency, EconomyDirection, WalletLedger
@@ -46,6 +47,24 @@ def _primary_role(user: User) -> RoleName:
     return role_service.get_primary_role(user)
 
 
+def _resolve_user_identifier(db: Session, identifier: int | str) -> User:
+    raw = str(identifier).strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Target user ID is required")
+    normalized = raw[1:] if raw.startswith("#") else raw
+    if not normalized.isdigit():
+        raise HTTPException(status_code=400, detail="User ID must be numeric public ID or custom ID")
+    numeric_id = int(normalized)
+    user = (
+        db.query(User)
+        .filter(or_(User.public_user_id == numeric_id, User.display_custom_id == numeric_id))
+        .first()
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="Target user not found by public ID or custom ID")
+    return user
+
+
 def assert_can_sell(actor: User) -> RoleName:
     role = _primary_role(actor)
     if role not in SELLER_ROLES:
@@ -87,12 +106,10 @@ def get_seller_pools(db: Session, actor: User) -> list[CoinSupplyPool]:
     return query.filter(CoinSupplyPool.owner_user_id == actor.id, CoinSupplyPool.pool_type.in_(allowed)).order_by(CoinSupplyPool.id.asc()).all()
 
 
-def grant_supply_to_seller(db: Session, actor: User, target_public_user_id: int, pool_type: str, amount: int, reason: str) -> CoinSupplyPool:
+def grant_supply_to_seller(db: Session, actor: User, target_identifier: int | str, pool_type: str, amount: int, reason: str) -> CoinSupplyPool:
     if not role_service.is_owner_or_above(actor):
         raise HTTPException(status_code=403, detail="Only Owner or Super Owner can grant seller supply.")
-    target = db.query(User).filter(User.public_user_id == target_public_user_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Target user not found")
+    target = _resolve_user_identifier(db, target_identifier)
     if pool_type not in SELLABLE_POOL_TYPES:
         raise HTTPException(status_code=400, detail="Invalid seller supply pool type")
     pool = economy_service.get_or_create_coin_pool(db, CoinSupplyPoolType(pool_type), target.id)
@@ -129,12 +146,8 @@ def _find_pool_for_sale(db: Session, actor: User, source_pool_id: int | None) ->
     return pool
 
 
-def sell_to_user(db: Session, seller: User, target_public_user_id: int, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None, source_pool_id: int | None, reason: str) -> dict:
-    buyer = db.query(User).filter(User.public_user_id == target_public_user_id).first()
-    if not buyer:
-        raise HTTPException(status_code=404, detail="Buyer user not found")
-    if buyer.id == seller.id:
-        raise HTTPException(status_code=400, detail="Cannot sell coins to yourself")
+def sell_to_user(db: Session, seller: User, target_identifier: int | str, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None, source_pool_id: int | None, reason: str) -> dict:
+    buyer = _resolve_user_identifier(db, target_identifier)
     source = _find_pool_for_sale(db, seller, source_pool_id)
     assert_can_use_pool(seller, source)
     if source.balance < coin_amount:
@@ -194,10 +207,11 @@ def sell_to_user(db: Session, seller: User, target_public_user_id: int, coin_amo
         "seller_user_id": seller.id,
         "buyer_user_id": buyer.id,
         "buyer_public_user_id": buyer.public_user_id,
+        "buyer_display_custom_id": buyer.display_custom_id,
         "source_pool_id": source.id,
         "coin_amount": coin_amount,
         "buyer_wallet_coin_balance": wallet.coin_balance,
         "seller_pool_balance": source.balance,
         "delivery_status": order.delivery_status,
-        "note": "Coins delivered to buyer wallet. Seller supply pool coins remain separate from personal wallet coins.",
+        "note": "Coins delivered to buyer wallet. Self recharge and custom ID recharge are allowed. Seller supply pool coins remain separate from personal wallet coins.",
     }
