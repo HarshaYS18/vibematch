@@ -26,16 +26,40 @@ class LiveRoomModerationController {
     required SeatUser target,
     required bool canManageRoom,
   }) {
-    if (!canManageRoom) return false;
     if (target.id == currentUser.id) return false;
 
-    final viewerPower = _roomPower(currentUser);
-    final targetPower = _roomPower(target);
+    final viewerRole = _platformRoomRole(currentUser);
+    final targetRole = _platformRoomRole(target);
 
-    if (targetPower >= 100) return false;
-    if (viewerPower >= 100) return targetPower < 100;
-    if (viewerPower >= 90) return targetPower < 90;
-    return false;
+    // Founder Owner / Super Owner and Owner must get moderation action access
+    // even when they are not room admins. Backend still validates every kick.
+    final viewerIsTopOfficial = viewerRole == _RoomPlatformRole.superOwner ||
+        viewerRole == _RoomPlatformRole.owner;
+
+    if (!canManageRoom && !viewerIsTopOfficial) return false;
+
+    // Super Owner and Owner cannot kick each other from any room.
+    if (viewerRole == _RoomPlatformRole.superOwner &&
+        targetRole == _RoomPlatformRole.owner) {
+      return false;
+    }
+    if (viewerRole == _RoomPlatformRole.owner &&
+        targetRole == _RoomPlatformRole.superOwner) {
+      return false;
+    }
+    if (viewerRole == _RoomPlatformRole.owner &&
+        targetRole == _RoomPlatformRole.owner) {
+      return false;
+    }
+
+    // Super Owner and Owner can kick normal officials/admins/room admins/users.
+    if (viewerIsTopOfficial) {
+      return targetRole != _RoomPlatformRole.superOwner &&
+          targetRole != _RoomPlatformRole.owner;
+    }
+
+    // Room admins can only kick normal users, never platform officials/admins.
+    return targetRole == _RoomPlatformRole.normal;
   }
 
   Future<LiveRoomModerationResult> kickOutUser({
@@ -46,7 +70,8 @@ class LiveRoomModerationController {
   }) async {
     if (!canKickOutUser(target: target, canManageRoom: canManageRoom)) {
       return LiveRoomModerationResult(
-        systemMessage: '${currentUser.name} cannot remove ${target.name} because this account is protected.',
+        systemMessage:
+            '${currentUser.name} cannot remove ${target.name} because this account is protected.',
       );
     }
 
@@ -63,7 +88,8 @@ class LiveRoomModerationController {
 
       return LiveRoomModerationResult(
         removedUserId: target.id,
-        systemMessage: '${currentUser.name} removed ${target.name} from the room for ${duration.label}',
+        systemMessage:
+            '${currentUser.name} removed ${target.name} from the room for ${duration.label}',
       );
     } catch (_) {
       return const LiveRoomModerationResult(
@@ -72,29 +98,45 @@ class LiveRoomModerationController {
     }
   }
 
-  int _roomPower(SeatUser user) {
+  _RoomPlatformRole _platformRoomRole(SeatUser user) {
     final id = user.id.toLowerCase();
     final role = user.roleLabel.toLowerCase();
-    final isOwner = user.isHost ||
-        id == 'user_6922022' ||
+
+    if (id == 'user_6922022' ||
         id == 'founder_owner' ||
         role.contains('founder owner') ||
-        role.contains('super owner') ||
-        role.contains('owner') ||
-        role.contains('channel host') ||
-        role == 'host';
-    if (isOwner) return 100;
+        role.contains('super owner')) {
+      return _RoomPlatformRole.superOwner;
+    }
 
-    final isAdmin = user.isRoomAdmin || role.contains('admin') || role.contains('administrator');
-    if (isAdmin) return 90;
+    // Keep channel host separate from platform Owner. A room host should not
+    // receive platform Owner kick privileges unless their actual role says Owner.
+    if (role == 'owner' ||
+        role.contains('official owner') ||
+        role.contains('platform owner')) {
+      return _RoomPlatformRole.owner;
+    }
 
-    return 0;
+    if (role.contains('superadmin') ||
+        role.contains('super admin') ||
+        role == 'admin' ||
+        role.contains('administrator') ||
+        role.contains('monitor') ||
+        role == 'cs' ||
+        role.contains('customer service') ||
+        role.contains('support')) {
+      return _RoomPlatformRole.official;
+    }
+
+    return _RoomPlatformRole.normal;
   }
 
   void dispose() {
     _repository.close();
   }
 }
+
+enum _RoomPlatformRole { normal, official, owner, superOwner }
 
 class LiveRoomModerationResult {
   const LiveRoomModerationResult({
