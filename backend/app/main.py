@@ -26,6 +26,7 @@ from app.api.routes import (
     presence,
     role_badges,
     room_music_media,
+    room_realtime,
     social,
     users,
     vibes,
@@ -123,6 +124,7 @@ app.include_router(cricket.router)
 app.include_router(inbox.router)
 app.include_router(love_bonds.router)
 app.include_router(inbox_ws.router)
+app.include_router(room_realtime.router)
 app.include_router(social.router)
 app.include_router(vibes.router)
 app.include_router(notifications.router)
