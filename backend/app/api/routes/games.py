@@ -14,7 +14,8 @@ from app.schemas.games import (
     GameRoundResponse,
     GameRoundResultResponse,
 )
-from app.services import game_service, role_service
+from app.services import global_jungle_game_service as game_service
+from app.services import role_service
 
 router = APIRouter(prefix="/games", tags=["Games"])
 
