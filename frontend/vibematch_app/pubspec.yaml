@@ -41,6 +41,8 @@ flutter:
     - assets/icons/
     - assets/images/branding/
     - assets/images/vip_badges/
+    - assets/images/games/galactic_spins/symbols/
+    - assets/images/games/galactic_spins/ui/
     - assets/images/gifts/
     - assets/gifts/love_rocket/icon/
     - assets/gifts/love_rocket/effect/
