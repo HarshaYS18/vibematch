@@ -148,10 +148,11 @@ class _MePageContentState extends State<MePageContent> {
       _loadError = null;
     });
     try {
-      final walletFuture = _walletApi.getWallet();
-      final presenceFuture = _presenceApi.getPublicPresence(user.publicUserId);
-      final familyFuture = _profileApi.getMyFamily();
-      final results = await Future.wait<Object?>([walletFuture, presenceFuture, familyFuture]);
+      final results = await Future.wait<Object?>([
+        _walletApi.getWallet(),
+        _presenceApi.getPublicPresence(user.publicUserId),
+        _profileApi.getMyFamily(),
+      ]);
       if (!mounted) return;
       setState(() {
         _wallet = results[0] as VmWallet;
@@ -191,7 +192,9 @@ class _MePageContentState extends State<MePageContent> {
   }
 
   void _openEditProfile(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => EditProfilePage(user: user))).then((_) => _refreshAll());
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => EditProfilePage(user: user)))
+        .then((_) => _refreshAll());
   }
 
   void _openProfileQrActions(BuildContext context) {
@@ -199,7 +202,9 @@ class _MePageContentState extends State<MePageContent> {
   }
 
   Future<void> _openEditCoverPhotos(BuildContext context) async {
-    final changed = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => EditCoverPhotosPage(initialCoverPhotoUrls: user.coverPhotoUrls)));
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => EditCoverPhotosPage(initialCoverPhotoUrls: user.coverPhotoUrls)),
+    );
     if (changed == true) await _refreshAll();
   }
 
@@ -220,11 +225,15 @@ class _MePageContentState extends State<MePageContent> {
   }
 
   void _openWallet(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletPageModular())).then((_) => _loadRealData());
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const WalletPageModular()))
+        .then((_) => _loadRealData());
   }
 
   void _openControlCentre(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ControlCenterPage())).then((_) => _refreshAll());
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ControlCenterPage()))
+        .then((_) => _refreshAll());
   }
 
   void _openVibesReportsReview(BuildContext context) {
@@ -240,7 +249,9 @@ class _MePageContentState extends State<MePageContent> {
       _showAction(context, 'Only Owner/Super Owner can adjust VIP/SVIP levels.');
       return;
     }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VipSvipAdminPage())).then((_) => _refreshAll());
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const VipSvipAdminPage()))
+        .then((_) => _refreshAll());
   }
 
   void _openCoinSupplyGrant(BuildContext context) {
@@ -248,7 +259,9 @@ class _MePageContentState extends State<MePageContent> {
       _showAction(context, 'Only Owner/Super Owner can grant coin supply.');
       return;
     }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage())).then((_) => _refreshAll());
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage()))
+        .then((_) => _refreshAll());
   }
 
   void _openGameTest(BuildContext context) {
@@ -256,7 +269,9 @@ class _MePageContentState extends State<MePageContent> {
   }
 
   void _openMerchantSellerPanel(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MerchantSellerPanelPage())).then((_) => _refreshAll());
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const MerchantSellerPanelPage()))
+        .then((_) => _refreshAll());
   }
 
   void _openFamily(BuildContext context) {
@@ -265,24 +280,27 @@ class _MePageContentState extends State<MePageContent> {
       _showAction(context, 'You are not in a family yet.');
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => FamilyModularPage(
-          openCurrentFamily: true,
-          initialFamilyProfile: FamilyProfileUiModel(
-            id: family.safeId,
-            name: family.safeName,
-            minimumVipLabel: 'VIP 0',
-            memberCount: family.memberCount,
-            maxMembers: family.memberCount > 0 ? family.memberCount : 1,
-            rankLabel: 'Family Lv. ${family.level}',
-            ownerUserId: family.ownerPublicUserId?.toString() ?? '',
-            quarterCarryExp: family.totalExp,
-            giftCoinsThisQuarter: family.totalExp,
-            timeMinutesToday: 0,
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => FamilyModularPage(
+              openCurrentFamily: true,
+              initialFamilyProfile: FamilyProfileUiModel(
+                id: family.safeId,
+                name: family.safeName,
+                minimumVipLabel: 'VIP 0',
+                memberCount: family.memberCount,
+                maxMembers: family.memberCount > 0 ? family.memberCount : 1,
+                rankLabel: 'Family Lv. ${family.level}',
+                ownerUserId: family.ownerPublicUserId?.toString() ?? '',
+                quarterCarryExp: family.totalExp,
+                giftCoinsThisQuarter: family.totalExp,
+                timeMinutesToday: 0,
+              ),
+            ),
           ),
-        ),
-      ).then((_) => _loadRealData());
+        )
+        .then((_) => _loadRealData());
   }
 
   void _openProfile(BuildContext context) {
@@ -396,7 +414,7 @@ class _MePageContentState extends State<MePageContent> {
             currentRoomName: _currentRoomName,
             familyName: _family?.shouldShow == true ? _family!.safeName : '',
             familyLevel: _family?.level ?? 0,
-            onFamilyTap: _openFamily,
+            onFamilyTap: () => _openFamily(context),
             onAvatarTap: () => _openProfile(context),
             onQrTap: () => _openProfileQrActions(context),
             onEditCoverPhotosTap: () => _openEditCoverPhotos(context),
