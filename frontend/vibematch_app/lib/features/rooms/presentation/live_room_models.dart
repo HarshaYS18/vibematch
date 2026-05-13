@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
-enum GiftCategory { classic, lucky, event, svip, premium, baggage }
+enum GiftCategory { classic, lucky, relationship, event, premium, svip, vip, baggage }
 enum RoomUserGender { male, female, undisclosed }
 enum RoomSystemEventType { none, userEntered, userRemoved }
 
@@ -53,12 +53,16 @@ extension GiftCategoryX on GiftCategory {
         return 'Classic';
       case GiftCategory.lucky:
         return 'Lucky';
+      case GiftCategory.relationship:
+        return 'Relationship';
       case GiftCategory.event:
         return 'Event';
-      case GiftCategory.svip:
-        return 'SVIP';
       case GiftCategory.premium:
         return 'Premium';
+      case GiftCategory.svip:
+        return 'SVIP';
+      case GiftCategory.vip:
+        return 'VIP';
       case GiftCategory.baggage:
         return 'Baggage';
     }
@@ -204,28 +208,7 @@ class RoomSeat {
 }
 
 class ChatEntry {
-  ChatEntry({
-    required this.senderName,
-    required this.message,
-    this.senderId,
-    this.vipLevel = 0,
-    this.sendingLevel = 0,
-    this.receivingLevel = 0,
-    this.isGift = false,
-    this.isSeatApplication = false,
-    this.seatIndex,
-    this.applicationCreatedAt,
-    this.applicationExpiresAt,
-    this.applicationApproved = false,
-    this.applicationRejected = false,
-    this.applicationExpired = false,
-    this.systemEventType = RoomSystemEventType.none,
-    this.autoDismissAt,
-    this.giftAssetPath,
-    this.imageUrl,
-    this.imageContentType,
-  });
-
+  ChatEntry({required this.senderName, required this.message, this.senderId, this.vipLevel = 0, this.sendingLevel = 0, this.receivingLevel = 0, this.isGift = false, this.isSeatApplication = false, this.seatIndex, this.applicationCreatedAt, this.applicationExpiresAt, this.applicationApproved = false, this.applicationRejected = false, this.applicationExpired = false, this.systemEventType = RoomSystemEventType.none, this.autoDismissAt, this.giftAssetPath, this.imageUrl, this.imageContentType});
   final String senderName;
   final String message;
   final String? senderId;
@@ -245,44 +228,13 @@ class ChatEntry {
   final String? giftAssetPath;
   final String? imageUrl;
   final String? imageContentType;
-
   bool get isSystemMessage => senderId == 'system' || systemEventType != RoomSystemEventType.none;
   bool get shouldAutoDismiss => autoDismissAt != null;
   bool get autoDismissed => autoDismissAt != null && DateTime.now().isAfter(autoDismissAt!);
   bool get applicationTimedOut => applicationExpired || (applicationExpiresAt != null && DateTime.now().isAfter(applicationExpiresAt!));
   bool get applicationResolved => applicationApproved || applicationRejected || applicationTimedOut;
   bool get isImageMessage => imageUrl?.trim().isNotEmpty ?? false;
-
-  ChatEntry copyWith({
-    String? message,
-    bool? applicationApproved,
-    bool? applicationRejected,
-    bool? applicationExpired,
-    RoomSystemEventType? systemEventType,
-    DateTime? autoDismissAt,
-    String? imageUrl,
-    String? imageContentType,
-  }) => ChatEntry(
-        senderName: senderName,
-        message: message ?? this.message,
-        senderId: senderId,
-        vipLevel: vipLevel,
-        sendingLevel: sendingLevel,
-        receivingLevel: receivingLevel,
-        isGift: isGift,
-        isSeatApplication: isSeatApplication,
-        seatIndex: seatIndex,
-        applicationCreatedAt: applicationCreatedAt,
-        applicationExpiresAt: applicationExpiresAt,
-        applicationApproved: applicationApproved ?? this.applicationApproved,
-        applicationRejected: applicationRejected ?? this.applicationRejected,
-        applicationExpired: applicationExpired ?? this.applicationExpired,
-        systemEventType: systemEventType ?? this.systemEventType,
-        autoDismissAt: autoDismissAt ?? this.autoDismissAt,
-        giftAssetPath: giftAssetPath,
-        imageUrl: imageUrl ?? this.imageUrl,
-        imageContentType: imageContentType ?? this.imageContentType,
-      );
+  ChatEntry copyWith({String? message, bool? applicationApproved, bool? applicationRejected, bool? applicationExpired, RoomSystemEventType? systemEventType, DateTime? autoDismissAt, String? imageUrl, String? imageContentType}) => ChatEntry(senderName: senderName, message: message ?? this.message, senderId: senderId, vipLevel: vipLevel, sendingLevel: sendingLevel, receivingLevel: receivingLevel, isGift: isGift, isSeatApplication: isSeatApplication, seatIndex: seatIndex, applicationCreatedAt: applicationCreatedAt, applicationExpiresAt: applicationExpiresAt, applicationApproved: applicationApproved ?? this.applicationApproved, applicationRejected: applicationRejected ?? this.applicationRejected, applicationExpired: applicationExpired ?? this.applicationExpired, systemEventType: systemEventType ?? this.systemEventType, autoDismissAt: autoDismissAt ?? this.autoDismissAt, giftAssetPath: giftAssetPath, imageUrl: imageUrl ?? this.imageUrl, imageContentType: imageContentType ?? this.imageContentType);
 }
 
 class GiftItem {
@@ -366,8 +318,10 @@ const List<GiftItem> mockGiftItems = [
   GiftItem(id: 'love_rocket', name: 'Love Rocket', category: GiftCategory.premium, coins: 999, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/gifts/love_rocket/icon/love_rocket_icon.webp', videoAssetPath: 'assets/videos/gifts/love_rocket.mp4', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
   GiftItem(id: 'rocket', name: 'Rocket', category: GiftCategory.classic, coins: 99, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/images/gifts/rocket.png', colors: [Color(0xFF18C7B7), Color(0xFF6C63FF)]),
   GiftItem(id: 'lucky_star', name: 'Lucky Star', category: GiftCategory.lucky, coins: 19, icon: Icons.auto_awesome_rounded, chatSymbol: '✨', assetPath: 'assets/images/gifts/lucky_star.png', colors: [Color(0xFFFFD166), Color(0xFFFF7A45)]),
+  GiftItem(id: 'relationship_ring', name: 'Couple Ring', category: GiftCategory.relationship, coins: 299, icon: Icons.favorite_rounded, chatSymbol: '💍', assetPath: 'assets/images/gifts/couple_ring.png', colors: [Color(0xFFE84C72), Color(0xFFFFC857)]),
   GiftItem(id: 'event_crown', name: 'Event Crown', category: GiftCategory.event, coins: 199, icon: Icons.emoji_events_rounded, chatSymbol: '🏆', assetPath: 'assets/images/gifts/event_crown.png', colors: [Color(0xFFC99A3B), Color(0xFFE84C72)]),
   GiftItem(id: 'svip_aura', name: 'SVIP Aura', category: GiftCategory.svip, coins: 399, icon: Icons.diamond_rounded, chatSymbol: '💎', assetPath: 'assets/images/gifts/svip_aura.png', colors: [Color(0xFF8C5CF6), Color(0xFF12C7B7)]),
+  GiftItem(id: 'vip_crown', name: 'VIP Crown', category: GiftCategory.vip, coins: 499, icon: Icons.workspace_premium_rounded, chatSymbol: '👑', assetPath: 'assets/images/gifts/royal_crown.png', colors: [Color(0xFFFFD166), Color(0xFF111827)]),
   GiftItem(id: 'royal_crown', name: 'Royal Crown', category: GiftCategory.premium, coins: 999, icon: Icons.workspace_premium_rounded, chatSymbol: '👑', assetPath: 'assets/images/gifts/royal_crown.png', colors: [Color(0xFFFFD166), Color(0xFF111827)]),
   GiftItem(id: 'owned_rose_pack', name: 'Rose Pack', category: GiftCategory.baggage, coins: 0, icon: Icons.inventory_2_rounded, chatSymbol: '🎒', assetPath: 'assets/images/gifts/rose_pack.png', colors: [Color(0xFFFF6B9A), Color(0xFFFFC2D8)]),
   GiftItem(id: 'owned_lucky_box', name: 'Lucky Box', category: GiftCategory.baggage, coins: 0, icon: Icons.card_giftcard_rounded, chatSymbol: '🎁', assetPath: 'assets/images/gifts/lucky_box.png', colors: [Color(0xFFFFD166), Color(0xFFFF7A45)]),
