@@ -34,6 +34,10 @@ logs/
 *.sqlite3
 *.db
 
+# Runtime uploads / local media generated while testing
+backend/static/uploads/
+!backend/static/uploads/.gitkeep
+
 # Flutter / Dart
 .dart_tool/
 .flutter-plugins
@@ -49,6 +53,11 @@ frontend/vibematch_app/.dart_tool/
 frontend/vibematch_app/build/
 frontend/vibematch_app/.flutter-plugins
 frontend/vibematch_app/.flutter-plugins-dependencies
+frontend/vibematch_app/linux/flutter/generated_plugin_registrant.cc
+frontend/vibematch_app/linux/flutter/generated_plugins.cmake
+frontend/vibematch_app/macos/Flutter/GeneratedPluginRegistrant.swift
+frontend/vibematch_app/windows/flutter/generated_plugin_registrant.cc
+frontend/vibematch_app/windows/flutter/generated_plugins.cmake
 
 # Android/Gradle
 .gradle/
