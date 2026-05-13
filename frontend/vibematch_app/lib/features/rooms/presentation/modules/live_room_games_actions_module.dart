@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../games/presentation/game_test_page.dart';
+import '../../../games/presentation/jungle_hunt_game_page.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../widgets/live_room_games_sheet.dart';
 import '../widgets/room_theme.dart';
@@ -18,19 +18,30 @@ class LiveRoomGamesActionsModule {
       builder: (_) => LiveRoomGamesSheet(
         onCrystalHuntTap: () {
           Navigator.pop(context);
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GameTestPage()));
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const JungleHuntGamePage()),
+          );
         },
         onLudoTap: () {
           Navigator.pop(context);
-          RoomToast.show(context, 'Ludo will connect to backend game catalog after free-game module is added.');
+          RoomToast.show(
+            context,
+            'Ludo will connect to backend game catalog after free-game module is added.',
+          );
         },
         onCarromTap: () {
           Navigator.pop(context);
-          RoomToast.show(context, 'Carrom will connect to backend game catalog after free-game module is added.');
+          RoomToast.show(
+            context,
+            'Carrom will connect to backend game catalog after free-game module is added.',
+          );
         },
         onPkTap: () {
           Navigator.pop(context);
-          RoomToast.show(context, 'PK game will connect to backend room battle flow after PK backend is added.');
+          RoomToast.show(
+            context,
+            'PK game will connect to backend room battle flow after PK backend is added.',
+          );
         },
       ),
     );
