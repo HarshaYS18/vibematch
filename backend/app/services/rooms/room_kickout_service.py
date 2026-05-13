@@ -3,17 +3,14 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.models.role import ROLE_POWER, RoleName
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
 from app.models.user import User
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest
 from app.services.role_service import get_primary_role
-from app.models.role import RoleName
 
 
-# Protected platform official/staff roles. Business roles like agency_owner,
-# bd, coin_seller, merchant, and reseller are not protected here unless they
-# also hold one of these official backend roles.
-_PROTECTED_ROOM_KICKOUT_ROLES = {
+_OFFICIAL_STAFF_ROLES = {
     RoleName.FOUNDER_OWNER,
     RoleName.OWNER,
     RoleName.SUPERADMIN,
@@ -61,18 +58,39 @@ def _load_target_user(db: Session, payload: RoomKickoutCreateRequest) -> User | 
     return None
 
 
-def _assert_target_can_be_kicked(db: Session, payload: RoomKickoutCreateRequest) -> None:
+def _role_power(role: RoleName) -> int:
+    return ROLE_POWER.get(role, 0)
+
+
+def _assert_target_can_be_kicked(
+    db: Session,
+    payload: RoomKickoutCreateRequest,
+    actor: User | None,
+) -> None:
     public_id = (payload.target_public_user_id or "").strip()
     if public_id in _PROTECTED_PUBLIC_USER_IDS:
-        raise HTTPException(status_code=403, detail="Super Owner/Founder Owner cannot be kicked from any chatroom")
+        raise HTTPException(status_code=403, detail="Founder Owner cannot be kicked from any chatroom")
 
     target_user = _load_target_user(db, payload)
     if target_user is None:
         return
 
-    primary_role = get_primary_role(target_user)
-    if primary_role in _PROTECTED_ROOM_KICKOUT_ROLES:
-        raise HTTPException(status_code=403, detail="Official/staff accounts cannot be kicked from any chatroom")
+    target_role = get_primary_role(target_user)
+    actor_role = get_primary_role(actor) if actor is not None else RoleName.USER
+
+    if target_role == RoleName.FOUNDER_OWNER:
+        raise HTTPException(status_code=403, detail="Founder Owner cannot be kicked from any chatroom")
+
+    if target_role == RoleName.OWNER:
+        raise HTTPException(status_code=403, detail="Owner accounts cannot be kicked from any chatroom")
+
+    if actor_role in {RoleName.FOUNDER_OWNER, RoleName.OWNER}:
+        if _role_power(actor_role) <= _role_power(target_role):
+            raise HTTPException(status_code=403, detail="Cannot kick equal or higher official role")
+        return
+
+    if target_role in _OFFICIAL_STAFF_ROLES:
+        raise HTTPException(status_code=403, detail="Official/staff accounts cannot be kicked by room admins or lower roles")
 
 
 def create_room_kickout(
@@ -82,7 +100,8 @@ def create_room_kickout(
     actor_user_id: int | None = None,
     actor_public_user_id: str | None = None,
 ) -> RoomKickout:
-    _assert_target_can_be_kicked(db, payload)
+    actor = db.query(User).filter(User.id == actor_user_id).first() if actor_user_id is not None else None
+    _assert_target_can_be_kicked(db, payload, actor)
     blocked_until, is_permanent = _calculate_blocked_until(payload.duration.value)
 
     kickout = RoomKickout(
