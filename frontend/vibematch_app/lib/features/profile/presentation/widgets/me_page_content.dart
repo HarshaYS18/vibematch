@@ -18,7 +18,6 @@ import '../../../wallet/presentation/wallet_page_modular.dart';
 import '../../data/love_bond_realtime_service.dart';
 import '../../data/profile_api_service.dart';
 import '../control_center/coin_supply_grant_page.dart';
-import '../control_center/vibes_reports_review_page.dart';
 import '../control_center/vip_svip_admin_page.dart';
 import '../cover_photos/edit_cover_photos_page.dart';
 import '../edit_profile_page.dart';
@@ -236,13 +235,6 @@ class _MePageContentState extends State<MePageContent> {
         .then((_) => _refreshAll());
   }
 
-  void _openVibesReportsReview(BuildContext context) {
-    if (!user.canSeeOwnerControls) {
-      _showAction(context, 'Only Owner/Super Owner control users can open Vibes reports review.');
-      return;
-    }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VibesReportsReviewPage()));
-  }
 
   void _openVipSvipAdmin(BuildContext context) {
     if (!user.canSeeOwnerControls) {
@@ -438,7 +430,7 @@ class _MePageContentState extends State<MePageContent> {
           const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
           const SizedBox(height: 12),
           ...items.where((item) {
-            if (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant' || item.action == 'vibes_reports_review') return user.canSeeOwnerControls;
+            if (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant') return user.canSeeOwnerControls;
             return true;
           }).map(
             (item) => Padding(
@@ -449,10 +441,7 @@ class _MePageContentState extends State<MePageContent> {
                   if (item.action == 'edit_profile') {
                     _openEditProfile(context);
                   } else if (item.action == 'edit_cover_photos') {
-                    await _openEditCoverPhotos(context);
-                  } else if (item.action == 'vibes_reports_review') {
-                    _openVibesReportsReview(context);
-                  } else if (item.action == 'vip_svip_admin') {
+                    await _openEditCoverPhotos(context);                  } else if (item.action == 'vip_svip_admin') {
                     _openVipSvipAdmin(context);
                   } else if (item.action == 'coin_supply_grant') {
                     _openCoinSupplyGrant(context);
@@ -563,4 +552,5 @@ class _MeLoveBondBackendSyncGateState extends State<_MeLoveBondBackendSyncGate> 
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
+
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'control_center_page.dart';
 import 'game_pool_management_page.dart';
+import '../../profile/presentation/control_center/vibes_reports_review_page.dart';
 
 class ControlCenterHubPage extends StatelessWidget {
   const ControlCenterHubPage({super.key});
@@ -39,7 +40,7 @@ class ControlCenterHubPage extends StatelessWidget {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Choose the management area. Existing CP is now under Management, and game risk pools are under Game Pool Management.',
+                  'Choose the management area. Existing CP is under Management, report review is under Moderation, and game risk pools are under Game Pool Management.',
                   style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.35),
                 ),
               ],
@@ -52,6 +53,14 @@ class ControlCenterHubPage extends StatelessWidget {
             subtitle: 'Existing users, roles, bans, coins, VIP/SVIP, logs and reviews.',
             gradient: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ControlCenterPage())),
+          ),
+          const SizedBox(height: 12),
+          _HubOptionCard(
+            icon: Icons.shield_rounded,
+            title: 'Moderation',
+            subtitle: 'Review reported Vibes, close reports, delete unsafe posts, and handle content safety.',
+            gradient: const [Color(0xFFE84C72), Color(0xFFFFC857)],
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VibesReportsReviewPage())),
           ),
           const SizedBox(height: 12),
           _HubOptionCard(
@@ -121,3 +130,4 @@ class _HubOptionCard extends StatelessWidget {
     );
   }
 }
+

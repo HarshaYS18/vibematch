@@ -139,13 +139,6 @@ List<MeActionItem> buildMeActionItems({
       action: 'Role-based Control Center will open if permitted.',
     ),
     MeActionItem(
-      icon: Icons.report_rounded,
-      title: 'Vibes Reports Review',
-      subtitle: 'Review reported Vibes, close reports, or delete unsafe posts',
-      color: Color(0xFFC99A3B),
-      action: 'vibes_reports_review',
-    ),
-    MeActionItem(
       icon: Icons.workspace_premium_rounded,
       title: 'VIP / SVIP Admin',
       subtitle: 'Owner control: adjust user VIP/SVIP levels and gradient names',
@@ -203,3 +196,4 @@ List<MeActionItem> buildMeActionItems({
     ),
   ];
 }
+
