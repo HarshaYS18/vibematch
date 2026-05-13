@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.role import ROLE_POWER, RoleName
+from app.models.room import Room
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
 from app.models.user import User
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest
@@ -62,8 +63,13 @@ def _role_power(role: RoleName) -> int:
     return ROLE_POWER.get(role, 0)
 
 
+def _is_top_official(role: RoleName) -> bool:
+    return role in {RoleName.FOUNDER_OWNER, RoleName.OWNER}
+
+
 def _assert_target_can_be_kicked(
     db: Session,
+    room_public_id: str,
     payload: RoomKickoutCreateRequest,
     actor: User | None,
 ) -> None:
@@ -75,6 +81,9 @@ def _assert_target_can_be_kicked(
     if target_user is None:
         return
 
+    room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+    is_channel_host = bool(room and room.owner_user_id == target_user.id)
+
     target_role = get_primary_role(target_user)
     actor_role = get_primary_role(actor) if actor is not None else RoleName.USER
 
@@ -84,11 +93,18 @@ def _assert_target_can_be_kicked(
     if target_role == RoleName.OWNER:
         raise HTTPException(status_code=403, detail="Owner accounts cannot be kicked from any chatroom")
 
-    if actor_role in {RoleName.FOUNDER_OWNER, RoleName.OWNER}:
+    # Founder Owner and Owner can kick channel hosts, room admins, normal users,
+    # and lower official/staff accounts. They still cannot kick Founder/Owner.
+    if _is_top_official(actor_role):
         if _role_power(actor_role) <= _role_power(target_role):
             raise HTTPException(status_code=403, detail="Cannot kick equal or higher official role")
         return
 
+    # Room-level admins cannot kick the channel host.
+    if is_channel_host:
+        raise HTTPException(status_code=403, detail="Only Founder Owner or Owner can kick a channel host")
+
+    # Lower users/room admins cannot kick protected official staff.
     if target_role in _OFFICIAL_STAFF_ROLES:
         raise HTTPException(status_code=403, detail="Official/staff accounts cannot be kicked by room admins or lower roles")
 
@@ -101,7 +117,7 @@ def create_room_kickout(
     actor_public_user_id: str | None = None,
 ) -> RoomKickout:
     actor = db.query(User).filter(User.id == actor_user_id).first() if actor_user_id is not None else None
-    _assert_target_can_be_kicked(db, payload, actor)
+    _assert_target_can_be_kicked(db, room_public_id, payload, actor)
     blocked_until, is_permanent = _calculate_blocked_until(payload.duration.value)
 
     kickout = RoomKickout(
