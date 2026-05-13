@@ -1,6 +1,12 @@
+import 'vm_api_config.dart';
+
 /// Central media server endpoint config for VibeMatch WebRTC internal testing.
 ///
-/// Raw room-state signaling server:
+/// MVP default room-state signaling now uses the FastAPI backend:
+/// ws://127.0.0.1:8000/ws/room-realtime
+/// ws://10.0.2.2:8000/ws/room-realtime for Android emulator.
+///
+/// Raw external room-state signaling server is still supported with:
 /// flutter run -d android --dart-define=VM_MEDIA_WS_URL=ws://192.168.1.8:9000/ws
 /// flutter run -d chrome --dart-define=VM_MEDIA_WS_URL=ws://127.0.0.1:9000/ws
 ///
@@ -28,10 +34,13 @@ abstract final class VmMediaConfig {
     if (override.isNotEmpty) return override;
 
     if (_mediaEnv == 'androidEmulator') {
-      return 'ws://10.0.2.2:9000/ws';
+      return 'ws://10.0.2.2:8000/ws/room-realtime';
     }
 
-    return 'ws://127.0.0.1:9000/ws';
+    final base = VmApiConfig.baseUrl
+        .replaceFirst('https://', 'wss://')
+        .replaceFirst('http://', 'ws://');
+    return '$base/ws/room-realtime';
   }
 
   static String get audioUrl {
