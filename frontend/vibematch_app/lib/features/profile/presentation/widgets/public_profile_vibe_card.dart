@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 import '../models/public_profile_models.dart';
 import 'public_profile_shared_widgets.dart';
@@ -70,31 +71,7 @@ class PublicVibeCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 13),
-              Container(
-                height: 148,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: vibe.colors,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Stack(
-                  children: [
-                    const Positioned.fill(
-                      child: CustomPaint(painter: PublicCoverPatternPainter()),
-                    ),
-                    Center(
-                      child: Icon(
-                        vibe.icon,
-                        color: Colors.white.withValues(alpha: 0.86),
-                        size: 46,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _PublicVibeMediaPreview(vibe: vibe),
               const SizedBox(height: 13),
               Text(
                 vibe.body,
@@ -138,6 +115,156 @@ class PublicVibeCard extends StatelessWidget {
   }
 }
 
+class _PublicVibeMediaPreview extends StatelessWidget {
+  const _PublicVibeMediaPreview({required this.vibe});
+
+  final PublicVibeItem vibe;
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaUrl = vibe.mediaUrl?.trim();
+    final type = vibe.mediaType.toLowerCase().trim();
+
+    if (mediaUrl != null && mediaUrl.isNotEmpty && type == 'photo') {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: AspectRatio(
+          aspectRatio: 4 / 5,
+          child: Image.network(
+            mediaUrl,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (context, error, stackTrace) => _FallbackMedia(vibe: vibe),
+          ),
+        ),
+      );
+    }
+
+    if (mediaUrl != null && mediaUrl.isNotEmpty && type == 'video') {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: AspectRatio(
+          aspectRatio: 9 / 16,
+          child: _AutoPlayPublicVibeVideo(url: mediaUrl, fallback: _FallbackMedia(vibe: vibe)),
+        ),
+      );
+    }
+
+    return _FallbackMedia(vibe: vibe);
+  }
+}
+
+class _AutoPlayPublicVibeVideo extends StatefulWidget {
+  const _AutoPlayPublicVibeVideo({required this.url, required this.fallback});
+
+  final String url;
+  final Widget fallback;
+
+  @override
+  State<_AutoPlayPublicVibeVideo> createState() => _AutoPlayPublicVibeVideoState();
+}
+
+class _AutoPlayPublicVibeVideoState extends State<_AutoPlayPublicVibeVideo> {
+  VideoPlayerController? _controller;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AutoPlayPublicVibeVideo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _controller?.dispose();
+      _controller = null;
+      _ready = false;
+      _init();
+    }
+  }
+
+  Future<void> _init() async {
+    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _controller = controller;
+    try {
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.setVolume(0);
+      await controller.play();
+      if (!mounted) return;
+      setState(() => _ready = true);
+    } catch (_) {
+      if (mounted) setState(() => _ready = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (!_ready || controller == null || !controller.value.isInitialized) return widget.fallback;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: controller.value.size.width,
+            height: controller.value.size.height,
+            child: VideoPlayer(controller),
+          ),
+        ),
+        const Positioned(
+          right: 12,
+          bottom: 12,
+          child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 28),
+        ),
+      ],
+    );
+  }
+}
+
+class _FallbackMedia extends StatelessWidget {
+  const _FallbackMedia({required this.vibe});
+
+  final PublicVibeItem vibe;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 148,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: vibe.colors,
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Stack(
+        children: [
+          const Positioned.fill(child: CustomPaint(painter: PublicCoverPatternPainter())),
+          Center(
+            child: Icon(
+              vibe.icon,
+              color: Colors.white.withValues(alpha: 0.86),
+              size: 46,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class PublicCoverPatternPainter extends CustomPainter {
   const PublicCoverPatternPainter();
 
@@ -172,12 +299,7 @@ class PublicCoverPatternPainter extends CustomPainter {
 }
 
 class _VibeActionButton extends StatelessWidget {
-  const _VibeActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
+  const _VibeActionButton({required this.icon, required this.label, required this.color, required this.onTap});
 
   final IconData icon;
   final String label;
@@ -199,14 +321,7 @@ class _VibeActionButton extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 15),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF251538),
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+            Text(label, style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900)),
           ],
         ),
       ),
