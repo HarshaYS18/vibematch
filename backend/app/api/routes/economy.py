@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -49,6 +49,30 @@ def _pool_response(pool: CoinSupplyPool | GamePool | None) -> EconomyPoolRespons
     )
 
 
+def _public_wallet_summary(db: Session, user: User) -> dict:
+    wallet = economy_level_service.get_or_create_wallet(db, user.id)
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    return {
+        "user_id": user.id,
+        "public_user_id": user.public_user_id,
+        "display_name": user.display_name or user.username,
+        "avatar_url": user.avatar_url,
+        "monthly_gift_coins_sent": levels["monthly_gift_coins_sent"],
+        "monthly_gift_coins_received": levels["monthly_gift_coins_received"],
+        "lifetime_send_exp": levels["lifetime_send_exp"],
+        "lifetime_receive_exp": levels["lifetime_receive_exp"],
+        "sent_level": levels["sent"].get("level", 0),
+        "receive_level": levels["received"].get("level", 0),
+        "vip_level": levels["vip"].get("level", 0),
+        "svip_level": levels["svip"].get("level", 0),
+        "sent": levels["sent"],
+        "received": levels["received"],
+        "vip": levels["vip"],
+        "svip": levels["svip"],
+        "rule": "Mini profile Sent/Received are current-month gift coin totals. Sent Lv/Receive Lv use lifetime gift EXP.",
+    }
+
+
 @router.get("/me", response_model=EconomyDashboardResponse)
 def get_my_economy_dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     data = economy_service.dashboard_for_user(db, current_user)
@@ -58,6 +82,14 @@ def get_my_economy_dashboard(current_user: User = Depends(get_current_user), db:
         merchant_pool=_pool_response(data["merchant_pool"]),
         gaming_pool=_pool_response(data["gaming_pool"]),
     )
+
+
+@router.get("/users/public/{public_user_id}/summary")
+def get_public_user_economy_summary(public_user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.public_user_id == public_user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _public_wallet_summary(db, user)
 
 
 @router.post("/gifts/preview", response_model=GiftEconomyPreviewResponse)
