@@ -124,6 +124,16 @@ class GiftSendRequest(BaseModel):
     is_relationship_gift: bool = False
 
 
+class GiftSendPublicRequest(BaseModel):
+    receiver_public_user_id: int
+    gift_id: str = Field(..., min_length=1, max_length=80)
+    coin_value: int = Field(..., gt=0)
+    quantity: int = Field(default=1, gt=0)
+    room_public_id: str | None = None
+    relationship_id: int | None = None
+    is_relationship_gift: bool = False
+
+
 class GiftSendResponse(BaseModel):
     gift_transaction_id: int
     sender_user_id: int
@@ -142,6 +152,9 @@ class GiftSendResponse(BaseModel):
     experience_updates: dict[str, Any] = Field(default_factory=dict)
     ruby_rule: str | None = None
     rule: str
+    lucky_multiplier: int | None = None
+    lucky_reward_coin_amount: int | None = None
+    lucky_result: dict[str, Any] | None = None
 
 
 class RubyConversionRequest(BaseModel):
@@ -157,7 +170,6 @@ class RubyWithdrawRequestCreate(BaseModel):
 class GamePoolCreateRequest(BaseModel):
     game_key: str = Field(..., min_length=2, max_length=80)
     pool_type: str
-    owner_user_id: int | None = None
     opening_balance: int = Field(default=0, ge=0)
     daily_payout_cap: int = Field(default=0, ge=0)
     daily_loss_limit: int = Field(default=0, ge=0)
