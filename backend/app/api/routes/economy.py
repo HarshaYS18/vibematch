@@ -7,8 +7,9 @@ from app.models.economy import CoinSupplyPool, GamePool, UserWallet
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
-from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, GiftSendRequest, GiftSendResponse, RubyConversionRequest, RubyWithdrawRequestCreate
+from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, GiftSendPublicRequest, GiftSendRequest, GiftSendResponse, RubyConversionRequest, RubyWithdrawRequestCreate
 from app.services import economy_level_service, economy_service
+from app.services.lucky_gift_service import roll_lucky_gift
 from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.websocket.inbox_ws import inbox_ws_manager
 
@@ -83,6 +84,32 @@ def _active_room_user_ids(db: Session, room_id: int, sender_user_id: int, receiv
     return list(dict.fromkeys(ids))
 
 
+def _room_id_from_public_id(db: Session, room_public_id: str | None) -> int | None:
+    clean = (room_public_id or "").strip()
+    if not clean:
+        return None
+    room = db.query(Room).filter(Room.room_public_id == clean, Room.is_active.is_(True)).first()
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+    return room.id
+
+
+def _receiver_id_from_public_id(db: Session, receiver_public_user_id: int) -> int:
+    receiver = db.query(User).filter(User.public_user_id == receiver_public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    if receiver is None:
+        raise HTTPException(status_code=404, detail="Receiver not found")
+    return receiver.id
+
+
+async def _broadcast_user_level_updates(db: Session, sender_user_id: int, receiver_user_id: int) -> None:
+    sender = db.query(User).filter(User.id == sender_user_id).first()
+    receiver = db.query(User).filter(User.id == receiver_user_id).first()
+    if sender is not None:
+        await inbox_ws_manager.send_to_user(sender_user_id, {"event": "all_levels_updated", "payload": {"economy": _public_wallet_summary(db, sender)}})
+    if receiver is not None:
+        await inbox_ws_manager.send_to_user(receiver_user_id, {"event": "all_levels_updated", "payload": {"economy": _public_wallet_summary(db, receiver)}})
+
+
 async def _broadcast_room_level_and_rankings(db: Session, room_id: int | None, sender_user_id: int, receiver_user_id: int, exp_updates: dict) -> None:
     if room_id is None:
         return
@@ -101,6 +128,11 @@ async def _broadcast_room_level_and_rankings(db: Session, room_id: int | None, s
             "contribution_rankings": rankings,
         },
     )
+
+
+async def _broadcast_after_gift(db: Session, *, room_id: int | None, sender_user_id: int, receiver_user_id: int, exp_updates: dict) -> None:
+    await _broadcast_user_level_updates(db, sender_user_id, receiver_user_id)
+    await _broadcast_room_level_and_rankings(db, room_id, sender_user_id, receiver_user_id, exp_updates)
 
 
 @router.get("/me", response_model=EconomyDashboardResponse)
@@ -163,7 +195,58 @@ async def send_gift(
     exp_updates = result.get("experience_updates") if isinstance(result.get("experience_updates"), dict) else {}
     await inbox_ws_manager.send_to_user(current_user.id, {"event": "experience_updated", "scope": "send", "payload": exp_updates.get("sender")})
     await inbox_ws_manager.send_to_user(payload.receiver_user_id, {"event": "experience_updated", "scope": "receive", "payload": exp_updates.get("receiver"), "ruby": {"earned": result.get("receiver_ruby_amount"), "balance": result.get("receiver_ruby_balance"), "lifetime_rubies_earned": result.get("receiver_lifetime_rubies_earned")}})
-    await _broadcast_room_level_and_rankings(db, payload.room_id, current_user.id, payload.receiver_user_id, exp_updates)
+    await _broadcast_after_gift(db, room_id=payload.room_id, sender_user_id=current_user.id, receiver_user_id=payload.receiver_user_id, exp_updates=exp_updates)
+    return GiftSendResponse(**result)
+
+
+@router.post("/gifts/send-public", response_model=GiftSendResponse)
+async def send_gift_public(payload: GiftSendPublicRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    receiver_user_id = _receiver_id_from_public_id(db, payload.receiver_public_user_id)
+    room_id = _room_id_from_public_id(db, payload.room_public_id)
+    result = economy_service.send_gift(
+        db=db,
+        sender=current_user,
+        receiver_user_id=receiver_user_id,
+        gift_id=payload.gift_id,
+        coin_value=payload.coin_value,
+        quantity=payload.quantity,
+        room_id=room_id,
+        relationship_id=payload.relationship_id,
+        is_relationship_gift=payload.is_relationship_gift,
+    )
+    exp_updates = result.get("experience_updates") if isinstance(result.get("experience_updates"), dict) else {}
+    await _broadcast_after_gift(db, room_id=room_id, sender_user_id=current_user.id, receiver_user_id=receiver_user_id, exp_updates=exp_updates)
+    return GiftSendResponse(**result)
+
+
+@router.post("/gifts/send-lucky-public", response_model=GiftSendResponse)
+async def send_lucky_gift_public(payload: GiftSendPublicRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    receiver_user_id = _receiver_id_from_public_id(db, payload.receiver_public_user_id)
+    room_id = _room_id_from_public_id(db, payload.room_public_id)
+    result = economy_service.send_gift(
+        db=db,
+        sender=current_user,
+        receiver_user_id=receiver_user_id,
+        gift_id=payload.gift_id,
+        coin_value=payload.coin_value,
+        quantity=payload.quantity,
+        room_id=room_id,
+        relationship_id=payload.relationship_id,
+        is_relationship_gift=payload.is_relationship_gift,
+    )
+    total_coin_value = result["total_coin_value"]
+    lucky_result = roll_lucky_gift(gift_id=payload.gift_id, gift_name=payload.gift_id.replace("_", " ").title(), base_coin_value=payload.coin_value, quantity=payload.quantity, house_risk_score=0)
+    reward = int(lucky_result.get("reward_coin_amount") or 0)
+    if reward > 0:
+        economy_service.credit_lucky_gift_reward(db, current_user.id, reward, str(result["gift_transaction_id"]), current_user.id)
+        sender_wallet = economy_service.get_or_create_wallet(db, current_user.id)
+        result["sender_coin_balance"] = sender_wallet.coin_balance
+    result["lucky_multiplier"] = int(lucky_result.get("multiplier") or 1)
+    result["lucky_reward_coin_amount"] = reward
+    result["lucky_result"] = lucky_result
+    result["rule"] = f"Lucky gift committed for {total_coin_value} coins. Reward returned: {reward} coins. EXP and room rankings updated instantly."
+    exp_updates = result.get("experience_updates") if isinstance(result.get("experience_updates"), dict) else {}
+    await _broadcast_after_gift(db, room_id=room_id, sender_user_id=current_user.id, receiver_user_id=receiver_user_id, exp_updates=exp_updates)
     return GiftSendResponse(**result)
 
 
