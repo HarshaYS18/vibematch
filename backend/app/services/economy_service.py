@@ -100,6 +100,25 @@ def _debit_wallet(db: Session, wallet: UserWallet, currency: EconomyCurrency, am
     db.add(WalletLedger(user_id=wallet.user_id, currency_type=currency.value, direction=EconomyDirection.DEBIT.value, amount=amount, before_balance=before, after_balance=after, source_type=source_type, source_id=source_id, created_by_user_id=created_by_user_id, reason=reason))
 
 
+def credit_lucky_gift_reward(db: Session, user_id: int, reward_coin_amount: int, source_id: str, created_by_user_id: int | None = None) -> UserWallet:
+    wallet = get_or_create_wallet(db, user_id)
+    if reward_coin_amount <= 0:
+        return wallet
+    _credit_wallet(
+        db,
+        wallet,
+        EconomyCurrency.COIN,
+        reward_coin_amount,
+        "LUCKY_GIFT_REWARD",
+        source_id,
+        created_by_user_id,
+        "Lucky gift multiplier reward",
+    )
+    db.commit()
+    db.refresh(wallet)
+    return wallet
+
+
 def _credit_coin_pool(db: Session, pool: CoinSupplyPool, amount: int, source_type: str, created_by_user_id: int | None, reason: str | None, source_pool_id: int | None = None, target_user_id: int | None = None) -> None:
     _assert_active_pool(pool)
     before = pool.balance
