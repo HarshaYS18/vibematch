@@ -5,6 +5,7 @@ import '../features/auth/presentation/auth_gate.dart';
 import '../features/banner_manager/presentation/banner_manager_page.dart';
 import '../features/control_center/presentation/control_center_page.dart';
 import '../features/events/presentation/events_page.dart';
+import '../features/experience/presentation/experience_detail_page.dart';
 import '../features/family/presentation/family_page.dart';
 import '../features/love_bond/presentation/love_bond_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
@@ -48,6 +49,13 @@ class AppRouteFactory {
 
       case VmRoutes.roomLevel:
         return _buildRoute(settings, const RoomLevelPage());
+
+      case VmRoutes.experienceDetail:
+        final args = settings.arguments;
+        if (args is ExperienceDetailRouteArgs) {
+          return _buildRoute(settings, ExperienceDetailPage(args: args));
+        }
+        return _buildRoute(settings, const ExperienceDetailPage(args: ExperienceDetailRouteArgs(kind: ExperienceDetailKind.sent)));
 
       case VmRoutes.profile:
         final args = settings.arguments;
