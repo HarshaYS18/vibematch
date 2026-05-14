@@ -22,6 +22,7 @@ from app.models.economy import (
 )
 from app.models.room import Room
 from app.models.user import User
+from app.services import experience_service
 
 RUBY_EARNING_BASIS_POINTS = 3000
 
@@ -165,7 +166,7 @@ def preview_gift_economy(coin_value: int, quantity: int, room_id: int | None, re
     return {"total_coin_value": total, "receiver_ruby_amount": rubies, "platform_share_coin_value": total - rubies, "send_exp_amount": total, "receive_exp_amount": total, "room_exp_amount": total if room_id else 0, "love_score_amount": total if relationship_id or is_relationship_gift else 0, "rule": "100 received coins = 30 rubies. Coins spend; rubies earn/withdraw. Pool coins are inventory only."}
 
 
-def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, coin_value: int, quantity: int, room_id: int | None, relationship_id: int | None, is_relationship_gift: bool) -> dict[str, int | str]:
+def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, coin_value: int, quantity: int, room_id: int | None, relationship_id: int | None, is_relationship_gift: bool) -> dict:
     if sender.id == receiver_user_id:
         raise HTTPException(status_code=400, detail="Sender and receiver cannot be the same user")
 
@@ -209,6 +210,17 @@ def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, co
     _credit_wallet(db, receiver_wallet, EconomyCurrency.RUBY, receiver_ruby_amount, "GIFT_RECEIVE_RUBY", str(gift_tx.id), sender.id, f"Received gift {gift_id}")
     receiver_wallet.lifetime_coins_received_as_gifts += total_coin_value
 
+    exp_updates = experience_service.apply_gift_exp(
+        db,
+        sender_user_id=sender.id,
+        receiver_user_id=receiver_user_id,
+        room_id=room_id,
+        send_exp=total_coin_value,
+        receive_exp=total_coin_value,
+        room_exp=room_exp_amount,
+        source_id=str(gift_tx.id),
+    )
+
     db.commit()
     db.refresh(gift_tx)
     db.refresh(sender_wallet)
@@ -227,7 +239,11 @@ def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, co
         "love_score_amount": love_score_amount,
         "sender_coin_balance": sender_wallet.coin_balance,
         "receiver_ruby_balance": receiver_wallet.ruby_balance,
-        "rule": "Gift send committed. Sender coins debited; receiver rubies credited at 30%.",
+        "receiver_lifetime_gift_coin_value": receiver_wallet.lifetime_coins_received_as_gifts,
+        "receiver_lifetime_rubies_earned": receiver_wallet.lifetime_rubies_earned,
+        "experience_updates": exp_updates,
+        "ruby_rule": "Receiver rubies = total gift coin value × 30%.",
+        "rule": "Gift send committed. Sender coins debited; receiver rubies credited at 30%; Send/Receive/Room EXP updated instantly.",
     }
 
 
