@@ -32,6 +32,10 @@ analyzer:
     use_build_context_synchronously: ignore
     prefer_null_aware_operators: ignore
 
+    # Style-only lint. Keep analyze focused on real compile/runtime issues while
+    # large live-room files are being modularized gradually.
+    curly_braces_in_flow_control_structures: ignore
+
 linter:
   rules:
     # avoid_print: false
