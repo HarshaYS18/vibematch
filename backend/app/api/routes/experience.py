@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.services import experience_service
+from app.services import level_progression_service as progression
 
 router = APIRouter(prefix="/experience", tags=["Experience"])
 
@@ -36,6 +37,23 @@ def get_room_experience(room_id: int, db: Session = Depends(get_db)):
     return payload
 
 
+@router.get("/vip-svip/preview")
+def preview_vip_svip_progression(
+    lifetime_recharge_coin_exp: int = Query(default=0, ge=0),
+    monthly_recharge_coin_exp: int = Query(default=0, ge=0),
+):
+    """Preview VIP/SVIP level math before recharge history is fully wired.
+
+    VIP = lifetime recharge coin EXP.
+    SVIP = monthly recharge coin EXP.
+    Max target = ₹5 crore worth of coins.
+    """
+    return experience_service.vip_svip_payload(
+        lifetime_recharge_coin_exp=lifetime_recharge_coin_exp,
+        monthly_recharge_coin_exp=monthly_recharge_coin_exp,
+    )
+
+
 @router.get("/tasks")
 def get_experience_tasks():
     return {
@@ -51,5 +69,24 @@ def get_experience_tasks():
             {"id": "room_gifts", "title": "Grow room activity", "description": "Gifts sent inside a room add Room EXP instantly.", "exp_rule": "1 room gift coin value = 1 Room EXP"},
             {"id": "room_events", "title": "Host events", "description": "Future room events can add bonus Room EXP after backend task rules are enabled.", "exp_rule": "coming later"},
         ],
-        "level_rule": "Level requirement uses a triangular curve: EXP needed for level N = 1000 × (N - 1) × N / 2, capped at Lv 200.",
+        "vip_tasks": [
+            {"id": "lifetime_recharge", "title": "Recharge coins", "description": "Lifetime recharge coin value grows VIP Lv.", "exp_rule": "1 recharge coin value = 1 VIP EXP"},
+        ],
+        "svip_tasks": [
+            {"id": "monthly_recharge", "title": "Monthly recharge", "description": "Current-month recharge coin value grows SVIP Lv for that month.", "exp_rule": "1 monthly recharge coin value = 1 SVIP EXP"},
+        ],
+        "level_rule": {
+            "summary": "Gradual curve that gets harder and harder as levels increase.",
+            "max_rupee_value": progression.MAX_RUPEE_VALUE,
+            "max_total_exp": progression.MAX_TOTAL_EXP,
+            "inr_to_coin_exp_rate": progression.INR_TO_COIN_EXP_RATE,
+            "curve_exponent": progression.DEFAULT_CURVE_EXPONENT,
+            "tracks": {
+                "vip": {"max_level": progression.max_level_for_track(progression.ProgressionTrack.VIP)},
+                "svip": {"max_level": progression.max_level_for_track(progression.ProgressionTrack.SVIP)},
+                "send": {"max_level": progression.max_level_for_track(progression.ProgressionTrack.SEND)},
+                "receive": {"max_level": progression.max_level_for_track(progression.ProgressionTrack.RECEIVE)},
+                "room": {"max_level": progression.max_level_for_track(progression.ProgressionTrack.ROOM)},
+            },
+        },
     }
