@@ -20,11 +20,13 @@
   factory UserVipSummary.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const UserVipSummary.empty();
     final colors = json['name_gradient_colors'];
+    final vip = _map(json['vip']);
+    final svip = _map(json['svip']);
     return UserVipSummary(
-      vipLevel: _int(json['vip_level']),
-      svipLevel: _int(json['svip_level']),
+      vipLevel: _firstPositive([json['vip_level'], vip['level']]),
+      svipLevel: _firstPositive([json['svip_level'], svip['level']]),
       vipIsActive: _bool(json['vip_is_active'], fallback: true),
-      svipIsActive: _bool(json['svip_is_active']),
+      svipIsActive: _bool(json['svip_is_active'], fallback: _firstPositive([json['svip_level'], svip['level']]) > 0),
       svipExpiresAt: _date(json['svip_expires_at']),
       nameGradientKey: (json['name_gradient_key'] ?? 'default').toString(),
       nameGradientColors: colors is List ? colors.map((item) => item.toString()).where((item) => item.trim().isNotEmpty).toList() : const <String>[],
@@ -49,8 +51,11 @@
       'svip_expires_at': svipExpiresAt?.toIso8601String(),
       'name_gradient_key': nameGradientKey,
       'name_gradient_colors': nameGradientColors,
+      'vip': {'level': vipLevel},
+      'svip': {'level': svipLevel},
     };
   }
+
   bool get hasActiveSvipGradient => svipIsActive && svipLevel > 0 && nameGradientColors.length >= 2;
 }
 
@@ -85,6 +90,8 @@ class UserWalletSummary {
     if (json == null) return const UserWalletSummary.empty();
     final sent = _map(json['sent']);
     final received = _map(json['received']);
+    final lifetimeSendExp = _firstPositive([json['lifetime_send_exp'], sent['total_exp'], json['lifetime_coins_spent']]);
+    final lifetimeReceiveExp = _firstPositive([json['lifetime_receive_exp'], received['total_exp'], json['lifetime_coins_received_as_gifts']]);
     return UserWalletSummary(
       coinBalance: _int(json['coin_balance']),
       rubyBalance: _int(json['ruby_balance']),
@@ -93,10 +100,10 @@ class UserWalletSummary {
       lifetimeRubiesEarned: _int(json['lifetime_rubies_earned']),
       monthlyGiftCoinsSent: _int(json['monthly_gift_coins_sent']),
       monthlyGiftCoinsReceived: _int(json['monthly_gift_coins_received']),
-      lifetimeSendExp: _int(json['lifetime_send_exp']) == 0 ? _int(json['lifetime_coins_spent']) : _int(json['lifetime_send_exp']),
-      lifetimeReceiveExp: _int(json['lifetime_receive_exp']) == 0 ? _int(json['lifetime_coins_received_as_gifts']) : _int(json['lifetime_receive_exp']),
-      sendLevel: _int(sent['level']),
-      receiveLevel: _int(received['level']),
+      lifetimeSendExp: lifetimeSendExp,
+      lifetimeReceiveExp: lifetimeReceiveExp,
+      sendLevel: _firstPositive([json['sent_level'], sent['level']]),
+      receiveLevel: _firstPositive([json['receive_level'], received['level']]),
     );
   }
 
@@ -111,6 +118,8 @@ class UserWalletSummary {
       'monthly_gift_coins_received': monthlyGiftCoinsReceived,
       'lifetime_send_exp': lifetimeSendExp,
       'lifetime_receive_exp': lifetimeReceiveExp,
+      'sent_level': sendLevel,
+      'receive_level': receiveLevel,
       'sent': {'level': sendLevel, 'total_exp': lifetimeSendExp},
       'received': {'level': receiveLevel, 'total_exp': lifetimeReceiveExp},
     };
@@ -136,6 +145,14 @@ Map<String, dynamic> _map(dynamic value) {
   return const <String, dynamic>{};
 }
 
+int _firstPositive(List<dynamic> values) {
+  for (final value in values) {
+    final parsed = _int(value);
+    if (parsed > 0) return parsed;
+  }
+  return 0;
+}
+
 int _int(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
@@ -159,4 +176,3 @@ DateTime? _date(dynamic value) {
   if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value);
   return null;
 }
-
