@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../../../wallet/data/wallet_api_service.dart';
+import '../../data/active_room_context.dart';
+import '../../data/gift_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import '../widgets/gift_flight_bus.dart';
@@ -108,12 +110,14 @@ class LiveRoomGiftController {
   final ValueChangedLike<ChatEntry> onFinalGiftMessage;
   final ValueChangedLike<String> onToast;
   final WalletApiService _walletApi = const WalletApiService();
+  final GiftApiService _giftApi = const GiftApiService();
 
   GiftCategory selectedCategory = GiftCategory.premium;
   GiftItem? selectedGift = mockGiftItems.isEmpty ? null : mockGiftItems.first;
   final Set<String> selectedReceiverIds = <String>{};
   int selectedCombo = 1;
   int coinBalance = 0;
+  bool luckyGiftSendInProgress = false;
 
   final List<GiftSlide> giftSlides = <GiftSlide>[];
   final Map<String, Timer> _giftTimers = <String, Timer>{};
@@ -213,34 +217,33 @@ class LiveRoomGiftController {
       unawaited(refreshCoinBalance());
       return;
     }
-    coinBalance -= totalCost;
 
+    if (gift.category == GiftCategory.lucky) {
+      unawaited(_sendLuckyGift(gift: gift, receivers: receivers, roomUsers: roomUsers, effectiveCombo: effectiveCombo));
+      return;
+    }
+
+    coinBalance -= totalCost;
     final sentToAll = !gift.isVideoGift && receivers.length == roomUsers.length && roomUsers.isNotEmpty;
     final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
     final deliveredCombo = sentToAll ? effectiveCombo * receivers.length : effectiveCombo;
     for (final receiver in targets) {
-      final luckyResult = gift.category == GiftCategory.lucky ? _rollLuckyGift(gift: gift, combo: deliveredCombo) : null;
-      if (luckyResult != null) {
-        coinBalance += luckyResult.rewardCoinAmount;
-      }
-
-      final slideColors = _slideColorsForMultiplier(gift.colors, luckyResult?.multiplier);
       final slide = GiftSlide(
         id: '${receiver?.id ?? 'all'}-${DateTime.now().microsecondsSinceEpoch}',
         senderName: currentUser.name,
         receiverName: receiver?.name ?? 'all',
-        giftName: luckyResult == null ? gift.name : '${gift.name} x${luckyResult.multiplier}',
+        giftName: gift.name,
         giftIcon: gift.icon,
         giftAssetPath: gift.assetPath,
         videoAssetPath: gift.videoAssetPath,
-        colors: slideColors,
+        colors: gift.colors,
         combo: deliveredCombo,
         baseCombo: deliveredCombo,
         remainingSeconds: gift.isVideoGift ? 10 : 15,
       );
       _startGiftSlide(slide);
 
-      final shouldFly = gift.category == GiftCategory.lucky || (gift.coins * deliveredCombo) < smallGiftFlightThreshold;
+      final shouldFly = (gift.coins * deliveredCombo) < smallGiftFlightThreshold;
       if (shouldFly) {
         GiftFlightBus.publish(
           GiftFlightEvent(
@@ -249,14 +252,81 @@ class LiveRoomGiftController {
             senderName: currentUser.name,
             receiverName: receiver?.name ?? 'all',
             combo: deliveredCombo,
-            multiplier: luckyResult?.multiplier,
-            rewardCoinAmount: luckyResult?.rewardCoinAmount,
             endAlignment: _receiverAlignment(receiver, roomUsers),
           ),
         );
       }
     }
     onChanged();
+  }
+
+  Future<void> _sendLuckyGift({
+    required GiftItem gift,
+    required List<SeatUser> receivers,
+    required List<SeatUser> roomUsers,
+    required int effectiveCombo,
+  }) async {
+    if (luckyGiftSendInProgress) {
+      onToast('Lucky gift is processing');
+      return;
+    }
+    luckyGiftSendInProgress = true;
+    onChanged();
+
+    try {
+      for (final receiver in receivers) {
+        final receiverPublicUserId = _publicUserIdFromSeatUser(receiver);
+        if (receiverPublicUserId == null) {
+          onToast('${receiver.name} does not have a valid public user ID yet');
+          continue;
+        }
+
+        final result = await _giftApi.sendLuckyGiftPublic(
+          receiverPublicUserId: receiverPublicUserId,
+          giftId: gift.id,
+          coinValue: gift.coins,
+          quantity: effectiveCombo,
+          roomPublicId: ActiveRoomContext.roomPublicId,
+        );
+
+        final multiplier = result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
+        final rewardCoinAmount = result.luckyRewardCoinAmount ?? result.luckyResult?.rewardCoinAmount ?? 0;
+        coinBalance = result.senderCoinBalance;
+        final slideColors = _slideColorsForMultiplier(gift.colors, multiplier);
+        final slide = GiftSlide(
+          id: '${receiver.id}-${DateTime.now().microsecondsSinceEpoch}',
+          senderName: currentUser.name,
+          receiverName: receiver.name,
+          giftName: '${gift.name} x$multiplier',
+          giftIcon: gift.icon,
+          giftAssetPath: gift.assetPath,
+          videoAssetPath: gift.videoAssetPath,
+          colors: slideColors,
+          combo: effectiveCombo,
+          baseCombo: effectiveCombo,
+          remainingSeconds: gift.isVideoGift ? 10 : 15,
+        );
+        _startGiftSlide(slide);
+        GiftFlightBus.publish(
+          GiftFlightEvent(
+            id: 'flight-${slide.id}',
+            gift: gift,
+            senderName: currentUser.name,
+            receiverName: receiver.name,
+            combo: effectiveCombo,
+            multiplier: multiplier,
+            rewardCoinAmount: rewardCoinAmount,
+            endAlignment: _receiverAlignment(receiver, roomUsers),
+          ),
+        );
+      }
+    } catch (error) {
+      onToast(error.toString().replaceFirst('Exception: ', ''));
+      unawaited(refreshCoinBalance());
+    } finally {
+      luckyGiftSendInProgress = false;
+      onChanged();
+    }
   }
 
   bool sendLuckyPacket({required int coinAmount, required int winnerCount, required String message, required List<SeatUser> roomUsers}) {
@@ -402,44 +472,13 @@ class LiveRoomGiftController {
     onFinalGiftMessage(ChatEntry(senderName: slide.senderName, senderId: currentUser.id, senderAvatarUrl: currentUser.avatarUrl, message: 'sent to ${slide.receiverName} ${slide.giftName} x${slide.combo}', vipLevel: currentUser.vipLevel, sendingLevel: currentUser.sendingLevel, receivingLevel: currentUser.receivingLevel, isGift: true, giftAssetPath: slide.giftAssetPath));
   }
 
-  _LuckyGiftResult _rollLuckyGift({required GiftItem gift, required int combo}) {
-    final table = <_LuckyWeight>[
-      const _LuckyWeight(1, 840000),
-      const _LuckyWeight(2, 110000),
-      const _LuckyWeight(5, 35000),
-      const _LuckyWeight(10, 10000),
-      const _LuckyWeight(50, 3500),
-      const _LuckyWeight(100, 1200),
-      const _LuckyWeight(500, 250),
-      const _LuckyWeight(1000, 50),
-    ];
-    final maxMultiplier = _maxMultiplierForGift(gift.id);
-    final filtered = table.where((item) => item.multiplier <= maxMultiplier).toList(growable: false);
-    final totalWeight = filtered.fold<int>(0, (sum, item) => sum + item.weight);
-    var cursor = _random.nextInt(totalWeight);
-    var selected = filtered.first;
-    for (final item in filtered) {
-      cursor -= item.weight;
-      if (cursor <= 0) {
-        selected = item;
-        break;
-      }
-    }
-    final totalCoinValue = gift.coins * combo;
-    return _LuckyGiftResult(multiplier: selected.multiplier, rewardCoinAmount: totalCoinValue * selected.multiplier);
-  }
-
-  int _maxMultiplierForGift(String giftId) {
-    switch (giftId) {
-      case 'spellbound_tome':
-        return 1000;
-      case 'eternal_bond_rings':
-      case 'sun_fortune_coin':
-      case 'moonlit_koi':
-        return 500;
-      default:
-        return 100;
-    }
+  int? _publicUserIdFromSeatUser(SeatUser user) {
+    final id = user.id.trim();
+    final direct = int.tryParse(id);
+    if (direct != null && direct > 0) return direct;
+    final match = RegExp(r'(\d{7,12})').firstMatch(id);
+    if (match == null) return null;
+    return int.tryParse(match.group(1) ?? '');
   }
 
   List<Color> _slideColorsForMultiplier(List<Color> baseColors, int? multiplier) {
@@ -470,18 +509,6 @@ class LiveRoomGiftController {
     _luckyPacketTimer = null;
     LuckyPacketRoomBus.clearController(this);
   }
-}
-
-class _LuckyGiftResult {
-  const _LuckyGiftResult({required this.multiplier, required this.rewardCoinAmount});
-  final int multiplier;
-  final int rewardCoinAmount;
-}
-
-class _LuckyWeight {
-  const _LuckyWeight(this.multiplier, this.weight);
-  final int multiplier;
-  final int weight;
 }
 
 typedef VoidCallbackLike = void Function();
