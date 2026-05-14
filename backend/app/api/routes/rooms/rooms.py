@@ -61,7 +61,6 @@ def get_room_contribution_rankings(
     category: str = Query(default="sent"),
     limit: int = Query(default=100, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     payload = room_contribution_rankings(db=db, room_public_id=room_public_id, category=category, period=period, limit=limit)
     if payload is None:
