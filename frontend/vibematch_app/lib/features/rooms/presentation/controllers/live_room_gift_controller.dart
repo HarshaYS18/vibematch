@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
+import '../widgets/gift_flight_bus.dart';
 import '../widgets/gift_flight_overlay.dart';
 
 enum LuckyPacketPhase { countdown, claim, results }
@@ -115,7 +116,6 @@ class LiveRoomGiftController {
   int coinBalance = 0;
 
   final List<GiftSlide> giftSlides = <GiftSlide>[];
-  final ValueNotifier<GiftFlightEvent?> giftFlightEvent = ValueNotifier<GiftFlightEvent?>(null);
   final Map<String, Timer> _giftTimers = <String, Timer>{};
   final Set<String> _finishedGiftMessageIds = <String>{};
 
@@ -138,10 +138,6 @@ class LiveRoomGiftController {
   GiftSlide? get activeComboSlide {
     final normalSlides = giftSlides.where((slide) => !slide.isVideoGift && slide.giftName != 'Lucky Packet').toList(growable: false);
     return normalSlides.isEmpty ? null : normalSlides.first;
-  }
-
-  void clearGiftFlightEvent() {
-    giftFlightEvent.value = null;
   }
 
   void ensureDefaultReceiver(List<SeatUser> roomUsers) {
@@ -246,15 +242,17 @@ class LiveRoomGiftController {
 
       final shouldFly = gift.category == GiftCategory.lucky || (gift.coins * deliveredCombo) < smallGiftFlightThreshold;
       if (shouldFly) {
-        giftFlightEvent.value = GiftFlightEvent(
-          id: 'flight-${slide.id}',
-          gift: gift,
-          senderName: currentUser.name,
-          receiverName: receiver?.name ?? 'all',
-          combo: deliveredCombo,
-          multiplier: luckyResult?.multiplier,
-          rewardCoinAmount: luckyResult?.rewardCoinAmount,
-          endAlignment: _receiverAlignment(receiver, roomUsers),
+        GiftFlightBus.publish(
+          GiftFlightEvent(
+            id: 'flight-${slide.id}',
+            gift: gift,
+            senderName: currentUser.name,
+            receiverName: receiver?.name ?? 'all',
+            combo: deliveredCombo,
+            multiplier: luckyResult?.multiplier,
+            rewardCoinAmount: luckyResult?.rewardCoinAmount,
+            endAlignment: _receiverAlignment(receiver, roomUsers),
+          ),
         );
       }
     }
@@ -468,7 +466,6 @@ class LiveRoomGiftController {
       timer.cancel();
     }
     _giftTimers.clear();
-    giftFlightEvent.dispose();
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
     LuckyPacketRoomBus.clearController(this);
