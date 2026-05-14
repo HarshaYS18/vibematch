@@ -1,10 +1,15 @@
 ﻿import 'dart:convert';
+import 'dart:math';
+import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
+import '../presentation/profile_image_crop_page.dart';
 
 class MediaUploadService {
   const MediaUploadService({
@@ -31,108 +36,109 @@ class MediaUploadService {
     );
   }
 
-  Future<MediaUploadResult> pickAndUploadAvatar() async {
-    final file = await pickImage(
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 90,
+  Future<MediaUploadResult> pickCropAndUploadAvatar(BuildContext context) async {
+    final file = await pickImage(maxWidth: 1800, maxHeight: 1800, imageQuality: 95);
+    if (file == null) throw const MediaUploadCancelledException();
+    final bytes = await file.readAsBytes();
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ProfileImageCropPage(
+          imageBytes: bytes,
+          title: 'Crop Avatar',
+          aspectRatio: 1,
+          helpText: 'Avatar uses a square 1:1 crop with a 3×3 grid. The final image is saved as 512×512 for profile, mini-card and chatroom seats.',
+        ),
+      ),
     );
+    if (confirmed != true) throw const MediaUploadCancelledException();
+    final cropped = _centerCropJpeg(bytes: bytes, aspectRatio: 1, outputWidth: 512, outputHeight: 512);
+    return _uploadBytes(bytes: cropped, filename: 'vibematch_avatar.jpg', endpointPath: '/media/avatar', failedMessage: 'Failed to upload avatar');
+  }
+
+  Future<MediaUploadResult> pickCropAndUploadProfileCover(BuildContext context) async {
+    final file = await pickImage(maxWidth: 2400, maxHeight: 1600, imageQuality: 95);
+    if (file == null) throw const MediaUploadCancelledException();
+    final bytes = await file.readAsBytes();
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ProfileImageCropPage(
+          imageBytes: bytes,
+          title: 'Crop Cover',
+          aspectRatio: 16 / 9,
+          helpText: 'Cover photo uses a wide 16:9 crop with a 3×3 grid. The final image is saved as 1600×900 for profile headers.',
+        ),
+      ),
+    );
+    if (confirmed != true) throw const MediaUploadCancelledException();
+    final cropped = _centerCropJpeg(bytes: bytes, aspectRatio: 16 / 9, outputWidth: 1600, outputHeight: 900);
+    return _uploadBytes(bytes: cropped, filename: 'vibematch_cover.jpg', endpointPath: '/media/profile-cover', failedMessage: 'Failed to upload cover');
+  }
+
+  Future<MediaUploadResult> pickAndUploadAvatar() async {
+    final file = await pickImage(maxWidth: 1200, maxHeight: 1200, imageQuality: 90);
     if (file == null) throw const MediaUploadCancelledException();
     return uploadImage(file: file, endpointPath: '/media/avatar');
   }
 
   Future<MediaUploadResult> pickAndUploadProfileCover() async {
-    final file = await pickImage(
-      maxWidth: 1800,
-      maxHeight: 900,
-      imageQuality: 90,
-    );
+    final file = await pickImage(maxWidth: 1800, maxHeight: 900, imageQuality: 90);
     if (file == null) throw const MediaUploadCancelledException();
     return uploadImage(file: file, endpointPath: '/media/profile-cover');
   }
 
   Future<MediaUploadResult> pickAndUploadRoomAvatar() async {
-    final file = await pickImage(
-      maxWidth: 1400,
-      maxHeight: 1400,
-      imageQuality: 90,
-    );
+    final file = await pickImage(maxWidth: 1400, maxHeight: 1400, imageQuality: 90);
     if (file == null) throw const MediaUploadCancelledException();
     return uploadImage(file: file, endpointPath: '/media/room-avatar');
   }
 
   Future<MediaUploadResult> pickAndUploadChatImage() async {
-    final file = await pickImage(
-      maxWidth: 1800,
-      maxHeight: 1800,
-      imageQuality: 88,
-    );
+    final file = await pickImage(maxWidth: 1800, maxHeight: 1800, imageQuality: 88);
     if (file == null) throw const MediaUploadCancelledException();
     return uploadImage(file: file, endpointPath: '/media/chat-image');
   }
 
-  Future<MediaUploadResult> uploadImage({
-    required XFile file,
-    required String endpointPath,
-  }) async {
+  Future<MediaUploadResult> uploadImage({required XFile file, required String endpointPath}) async {
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) throw Exception('Selected image is empty.');
-
-    return _uploadBytes(
-      bytes: bytes,
-      filename: _safeImageFilename(file.name),
-      endpointPath: endpointPath,
-      failedMessage: 'Failed to upload image',
-    );
+    return _uploadBytes(bytes: bytes, filename: _safeImageFilename(file.name), endpointPath: endpointPath, failedMessage: 'Failed to upload image');
   }
 
-  Future<MediaUploadResult> uploadRoomMusicBytes({
-    required List<int> bytes,
-    required String filename,
-  }) async {
+  Future<MediaUploadResult> uploadRoomMusicBytes({required List<int> bytes, required String filename}) async {
     if (bytes.isEmpty) throw Exception('Selected audio is empty.');
-
-    return _uploadBytes(
-      bytes: bytes,
-      filename: _safeAudioFilename(filename),
-      endpointPath: '/media/room-music',
-      failedMessage: 'Failed to upload room music',
-    );
+    return _uploadBytes(bytes: bytes, filename: _safeAudioFilename(filename), endpointPath: '/media/room-music', failedMessage: 'Failed to upload room music');
   }
 
-  Future<MediaUploadResult> _uploadBytes({
-    required List<int> bytes,
-    required String filename,
-    required String endpointPath,
-    required String failedMessage,
-  }) async {
-    final token = authApiService.cachedAccessToken;
-    if (token == null || token.trim().isEmpty) {
-      throw Exception('Please login again before uploading media.');
+  Uint8List _centerCropJpeg({required Uint8List bytes, required double aspectRatio, required int outputWidth, required int outputHeight}) {
+    final source = img.decodeImage(bytes);
+    if (source == null) throw Exception('Selected image could not be decoded.');
+    final sourceRatio = source.width / source.height;
+    late final int cropWidth;
+    late final int cropHeight;
+    if (sourceRatio > aspectRatio) {
+      cropHeight = source.height;
+      cropWidth = max(1, (source.height * aspectRatio).round());
+    } else {
+      cropWidth = source.width;
+      cropHeight = max(1, (source.width / aspectRatio).round());
     }
+    final x = max(0, ((source.width - cropWidth) / 2).round());
+    final y = max(0, ((source.height - cropHeight) / 2).round());
+    final cropped = img.copyCrop(source, x: x, y: y, width: cropWidth, height: cropHeight);
+    final resized = img.copyResize(cropped, width: outputWidth, height: outputHeight, interpolation: img.Interpolation.cubic);
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
+  }
 
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse(VmApiConfig.endpoint(endpointPath)),
-    )
+  Future<MediaUploadResult> _uploadBytes({required List<int> bytes, required String filename, required String endpointPath, required String failedMessage}) async {
+    final token = authApiService.cachedAccessToken;
+    if (token == null || token.trim().isEmpty) throw Exception('Please login again before uploading media.');
+    final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpointPath)))
       ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: filename,
-        ),
-      );
-
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(_errorMessage(response, fallback: failedMessage));
-    }
-
-    return MediaUploadResult.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+    if (response.statusCode < 200 || response.statusCode >= 300) throw Exception(_errorMessage(response, fallback: failedMessage));
+    return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   String _safeImageFilename(String value) {
@@ -166,31 +172,16 @@ class MediaUploadService {
 }
 
 class MediaUploadResult {
-  const MediaUploadResult({
-    required this.url,
-    required this.mediaType,
-    required this.contentType,
-    required this.sizeBytes,
-  });
-
+  const MediaUploadResult({required this.url, required this.mediaType, required this.contentType, required this.sizeBytes});
   final String url;
   final String mediaType;
   final String contentType;
   final int sizeBytes;
-
-  factory MediaUploadResult.fromJson(Map<String, dynamic> json) {
-    return MediaUploadResult(
-      url: json['url']?.toString() ?? '',
-      mediaType: json['media_type']?.toString() ?? 'image',
-      contentType: json['content_type']?.toString() ?? 'image/jpeg',
-      sizeBytes: int.tryParse(json['size_bytes']?.toString() ?? '') ?? 0,
-    );
-  }
+  factory MediaUploadResult.fromJson(Map<String, dynamic> json) => MediaUploadResult(url: json['url']?.toString() ?? '', mediaType: json['media_type']?.toString() ?? 'image', contentType: json['content_type']?.toString() ?? 'image/jpeg', sizeBytes: int.tryParse(json['size_bytes']?.toString() ?? '') ?? 0);
 }
 
 class MediaUploadCancelledException implements Exception {
   const MediaUploadCancelledException();
-
   @override
   String toString() => 'Image selection cancelled.';
 }
