@@ -7,6 +7,7 @@ from app.models.economy import CoinSupplyPool
 from app.models.user import User
 from app.schemas.economy import AllocatePoolCoinsRequest, EconomyPoolResponse, GamePoolCreateRequest, GameRoundCreateRequest, MintCoinsRequest, OfficialRechargeRequest, OfficialRechargeResponse, SellerSaleRequest
 from app.services import economy_level_service, economy_service
+from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/economy/admin", tags=["Economy Admin"])
 
@@ -46,6 +47,23 @@ def _wallet_response(db: Session, wallet):
     }
 
 
+async def _broadcast_wallet_vip_svip_update(target_user_id: int, wallet_payload: dict) -> None:
+    await inbox_ws_manager.send_to_user(
+        target_user_id,
+        {
+            "event": "wallet_vip_svip_updated",
+            "payload": {
+                "wallet": wallet_payload,
+                "vip": wallet_payload.get("vip"),
+                "svip": wallet_payload.get("svip"),
+                "coin_balance": wallet_payload.get("coin_balance"),
+                "lifetime_recharge_coin_exp": wallet_payload.get("lifetime_recharge_coin_exp"),
+                "monthly_recharge_coin_exp": wallet_payload.get("monthly_recharge_coin_exp"),
+            },
+        },
+    )
+
+
 @router.post("/mint", response_model=EconomyPoolResponse)
 def mint_coins(payload: MintCoinsRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     pool = economy_service.mint_to_pool(db=db, actor=current_user, target_pool_type=payload.target_pool_type, target_user_id=payload.target_user_id, amount=payload.amount, reason=payload.reason)
@@ -59,7 +77,7 @@ def allocate_pool_coins(payload: AllocatePoolCoinsRequest, current_user: User = 
 
 
 @router.post("/official-recharge", response_model=OfficialRechargeResponse)
-def official_recharge_wallet(payload: OfficialRechargeRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def official_recharge_wallet(payload: OfficialRechargeRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     result = economy_level_service.credit_official_recharge(
         db=db,
         actor=current_user,
@@ -72,6 +90,8 @@ def official_recharge_wallet(payload: OfficialRechargeRequest, current_user: Use
         proof_url=payload.proof_url,
     )
     target = result["target"]
+    wallet_payload = _wallet_response(db, result["wallet"])
+    await _broadcast_wallet_vip_svip_update(target.id, wallet_payload)
     return OfficialRechargeResponse(
         order_id=None,
         target_user_id=target.id,
@@ -79,8 +99,8 @@ def official_recharge_wallet(payload: OfficialRechargeRequest, current_user: Use
         coin_amount=payload.coin_amount,
         payment_amount=payload.payment_amount,
         payment_currency=payload.payment_currency,
-        wallet=_wallet_response(db, result["wallet"]),
-        rule="Official recharge credited to wallet and counted toward VIP lifetime EXP + SVIP monthly EXP.",
+        wallet=wallet_payload,
+        rule="Official recharge credited to wallet, counted toward VIP lifetime EXP + SVIP monthly EXP, and broadcast instantly to the user session.",
     )
 
 
