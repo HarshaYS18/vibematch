@@ -172,77 +172,71 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                   Positioned.fill(
                     child: Padding(
                       padding: EdgeInsets.only(
-                        left: frameWidth * 0.155,
+                        left: frameWidth * 0.145,
                         right: frameWidth * 0.185,
-                        top: frameHeight * 0.255,
-                        bottom: frameHeight * 0.215,
+                        top: frameHeight * 0.245,
+                        bottom: frameHeight * 0.205,
                       ),
-                      child: Transform.translate(
-                        offset: Offset(-frameWidth * 0.012, -frameHeight * 0.030),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Transform.translate(
-                              offset: Offset(-frameWidth * 0.010, -frameHeight * 0.030),
-                              child: _BroadcastAvatar(
-                                name: widget.event.senderName,
-                                avatarUrl: widget.event.senderAvatarUrl,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.event.senderName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFFFFFFFF),
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.0,
-                                      shadows: [
-                                        Shadow(color: Colors.black87, blurRadius: 6),
-                                      ],
-                                    ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _BroadcastAvatar(
+                            name: widget.event.senderName,
+                            avatarUrl: widget.event.senderAvatarUrl,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.event.senderName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFFFFF),
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.0,
+                                    shadows: [
+                                      Shadow(color: Colors.black87, blurRadius: 6),
+                                    ],
                                   ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    'sent ${widget.event.giftName} to ${widget.event.targetName} x${widget.event.combo}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFFFFF2BF),
-                                      fontSize: 10.8,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1.0,
-                                      shadows: [
-                                        Shadow(color: Colors.black87, blurRadius: 6),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (widget.event.giftAssetPath?.trim().isNotEmpty ?? false) ...[
-                              const SizedBox(width: 7),
-                              Image.asset(
-                                widget.event.giftAssetPath!,
-                                width: 34,
-                                height: 34,
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => const Icon(
-                                  Icons.card_giftcard_rounded,
-                                  color: Color(0xFFFFD166),
-                                  size: 26,
                                 ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'sent ${widget.event.giftName} to ${widget.event.targetName} x${widget.event.combo}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFF2BF),
+                                    fontSize: 10.8,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.0,
+                                    shadows: [
+                                      Shadow(color: Colors.black87, blurRadius: 6),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (widget.event.giftAssetPath?.trim().isNotEmpty ?? false) ...[
+                            const SizedBox(width: 7),
+                            Image.asset(
+                              widget.event.giftAssetPath!,
+                              width: 34,
+                              height: 34,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.card_giftcard_rounded,
+                                color: Color(0xFFFFD166),
+                                size: 26,
                               ),
-                            ],
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
