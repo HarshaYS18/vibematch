@@ -15,6 +15,10 @@ class EconomyWalletResponse(BaseModel):
     lifetime_rubies_earned: int
     lifetime_recharge_coin_exp: int = 0
     monthly_recharge_coin_exp: int = 0
+    monthly_gift_coins_sent: int = 0
+    monthly_gift_coins_received: int = 0
+    lifetime_send_exp: int = 0
+    lifetime_receive_exp: int = 0
     vip: dict[str, Any] = Field(default_factory=dict)
     svip: dict[str, Any] = Field(default_factory=dict)
     sent: dict[str, Any] = Field(default_factory=dict)
