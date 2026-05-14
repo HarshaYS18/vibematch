@@ -205,7 +205,7 @@ class _MePageContentState extends State<MePageContent> {
     final roomName = _currentRoomName;
     final roomId = _currentRoomId;
     if (roomName == null || roomName.trim().isEmpty || roomId == null || roomId.trim().isEmpty) { _showAction(context, 'No active room right now.'); return; }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => LiveRoomPage(roomName: roomName, roomId: roomId, language: 'English', modeTitle: _presence?.roomMode ?? 'Open', onlineCount: 1, currentUser: user)));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => LiveRoomPage(roomName: roomName, roomId: roomId, language: 'English', modeTitle: _presence?.roomMode ?? 'Open', onlineCount: 1)));
   }
 
   @override
@@ -308,3 +308,4 @@ class _MeLoveBondBackendSyncGateState extends State<_MeLoveBondBackendSyncGate> 
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
+
