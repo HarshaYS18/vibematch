@@ -17,6 +17,7 @@ from app.api.routes import (
     game_pool_admin,
     game_props_admin,
     games,
+    gift_catalog,
     inbox,
     inbox_backup_google,
     inbox_ws,
@@ -155,6 +156,7 @@ app.include_router(mvp_room_modes.router)
 app.include_router(internal_test.router)
 app.include_router(economy.router)
 app.include_router(economy_gift_public.router)
+app.include_router(gift_catalog.router)
 app.include_router(economy_admin.router)
 app.include_router(games.router)
 app.include_router(coin_sales.router)
