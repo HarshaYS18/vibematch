@@ -157,14 +157,14 @@ LUCKY_GIFTS = [
 ]
 
 MULTIPLIER_TABLE = [
-    {"multiplier": 1, "weight": 840000, "label": "safe"},
-    {"multiplier": 2, "weight": 110000, "label": "small_win"},
-    {"multiplier": 5, "weight": 35000, "label": "nice_win"},
-    {"multiplier": 10, "weight": 10000, "label": "big_win"},
-    {"multiplier": 50, "weight": 3500, "label": "rare_win"},
-    {"multiplier": 100, "weight": 1200, "label": "super_win"},
-    {"multiplier": 500, "weight": 250, "label": "mega_win"},
-    {"multiplier": 1000, "weight": 50, "label": "legend_win"},
+    {"multiplier": 1, "weight": 810000, "label": "safe"},
+    {"multiplier": 2, "weight": 112000, "label": "small_win"},
+    {"multiplier": 5, "weight": 44000, "label": "nice_win"},
+    {"multiplier": 10, "weight": 20000, "label": "big_win"},
+    {"multiplier": 50, "weight": 8500, "label": "rare_win"},
+    {"multiplier": 100, "weight": 4200, "label": "super_win"},
+    {"multiplier": 500, "weight": 1100, "label": "mega_win"},
+    {"multiplier": 1000, "weight": 200, "label": "legend_win"},
 ]
 
 
@@ -214,5 +214,5 @@ def roll_lucky_multiplier(gift_id: str, total_coin_value: int, house_risk_score:
         "reward_coin_amount": reward,
         "risk_label": selected["label"],
         "is_global_broadcast_worthy": multiplier >= 500,
-        "logic": "Backend-authoritative weighted multiplier roll. 500x and 1000x are ultra-rare and can be reduced further by house risk score.",
+        "logic": "Backend-authoritative weighted multiplier roll. 100x/500x are boosted for testing and can be reduced by house risk score.",
     }
