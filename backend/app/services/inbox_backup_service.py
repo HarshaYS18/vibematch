@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.inbox import InboxConversation, InboxParticipant
 from app.models.inbox_backup import (
     InboxBackupJob,
@@ -16,6 +17,18 @@ from app.services import google_drive_service
 
 def _public_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:20]}"
+
+
+def _is_google_drive_configured() -> bool:
+    return bool(settings.GOOGLE_DRIVE_CLIENT_ID and settings.GOOGLE_DRIVE_CLIENT_SECRET)
+
+
+def _dev_mock_auth_url(user: User) -> str:
+    return (
+        "vibematch-dev://inbox-backup/google-drive/mock-authorize"
+        f"?state=inbox_backup_user_{user.id}"
+        "&code=dev_mock_drive_code"
+    )
 
 
 def get_or_create_setting(db: Session, user: User) -> InboxBackupSetting:
@@ -51,17 +64,41 @@ def get_status(db: Session, user: User) -> dict:
 
 
 def google_drive_authorize_url(user: User) -> str:
+    if not _is_google_drive_configured():
+        return _dev_mock_auth_url(user)
     return google_drive_service.build_authorization_url(state=f"inbox_backup_user_{user.id}")
 
 
-def connect_google_drive(db: Session, user: User, authorization_code: str, google_email: str | None = None) -> InboxBackupSetting:
+def connect_google_drive(db: Session, user: User, authorization_code: str | None, google_email: str | None = None) -> InboxBackupSetting:
+    setting = get_or_create_setting(db, user)
+
+    if not _is_google_drive_configured():
+        setting.provider = InboxBackupProvider.GOOGLE_DRIVE.value
+        setting.is_authorized = True
+        setting.is_enabled = True
+        setting.google_drive_email = google_email or user.email or f"user_{user.public_user_id}@vibematch.dev"
+        setting.google_drive_folder_id = setting.google_drive_folder_id or f"dev_drive_folder_{user.public_user_id}"
+        setting.encrypted_refresh_token = google_drive_service.encrypt_text("dev_mock_refresh_token")
+        setting.last_status = InboxBackupStatus.CONNECTED.value
+        setting.last_error = None
+        setting.metadata_json = {
+            "mode": "dev_mock",
+            "note": "Google OAuth is not configured. This connection is for local/dev testing only.",
+            "connected_at": datetime.utcnow().isoformat(),
+        }
+        db.commit()
+        db.refresh(setting)
+        return setting
+
+    if not authorization_code:
+        raise ValueError("Authorization code is required to connect Google Drive.")
+
     tokens = google_drive_service.exchange_code_for_tokens(authorization_code)
     access_token = tokens.get("access_token")
     refresh_token = tokens.get("refresh_token")
     if not access_token or not refresh_token:
         raise ValueError("Google did not return the required access and refresh tokens.")
 
-    setting = get_or_create_setting(db, user)
     email = google_email or google_drive_service.get_profile_email(access_token) or user.email
     folder_id = google_drive_service.ensure_backup_folder(access_token, setting.google_drive_folder_id)
 
@@ -129,23 +166,27 @@ def _access_token_from_setting(setting: InboxBackupSetting) -> str:
     return access_token
 
 
-def run_backup_now(db: Session, user: User) -> InboxBackupJob:
-    setting = get_or_create_setting(db, user)
-    if not setting.is_authorized:
-        raise ValueError("Google Drive is not authorized for Inbox backup.")
-
+def _build_backup_payload(db: Session, user: User) -> dict:
     conversations = (
         db.query(InboxConversation)
         .join(InboxParticipant, InboxParticipant.conversation_id == InboxConversation.id)
         .filter(InboxParticipant.user_id == user.id)
         .all()
     )
-    payload = {
+    return {
         "version": 1,
         "created_at": datetime.utcnow().isoformat(),
         "user_public_id": user.public_user_id,
         "conversations": [_serialize_conversation(item, user) for item in conversations],
     }
+
+
+def run_backup_now(db: Session, user: User) -> InboxBackupJob:
+    setting = get_or_create_setting(db, user)
+    if not setting.is_authorized:
+        raise ValueError("Google Drive is not authorized for Inbox backup.")
+
+    payload = _build_backup_payload(db, user)
     encrypted_payload = {"payload": google_drive_service.encrypt_text(str(payload))}
     filename = f"vibematch_inbox_backup_{user.public_user_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json.enc"
 
@@ -163,17 +204,31 @@ def run_backup_now(db: Session, user: User) -> InboxBackupJob:
     db.refresh(job)
 
     try:
-        access_token = _access_token_from_setting(setting)
-        folder_id = google_drive_service.ensure_backup_folder(access_token, setting.google_drive_folder_id)
-        setting.google_drive_folder_id = folder_id
-        file_id = google_drive_service.upload_backup_file(access_token, folder_id, filename, encrypted_payload)
-        job.backup_file_id = file_id
-        job.status = InboxBackupStatus.BACKUP_COMPLETED.value
-        job.completed_at = datetime.utcnow()
-        setting.last_backup_at = job.completed_at
-        setting.last_status = InboxBackupStatus.BACKUP_COMPLETED.value
-        setting.last_error = None
-        setting.backup_count += 1
+        if not _is_google_drive_configured():
+            job.backup_file_id = f"dev_drive_file_{job.public_id}"
+            job.status = InboxBackupStatus.BACKUP_COMPLETED.value
+            job.completed_at = datetime.utcnow()
+            setting.last_backup_at = job.completed_at
+            setting.last_status = InboxBackupStatus.BACKUP_COMPLETED.value
+            setting.last_error = None
+            setting.backup_count += 1
+            setting.metadata_json = {
+                **(setting.metadata_json or {}),
+                "last_dev_backup_file_id": job.backup_file_id,
+                "last_dev_backup_file_name": filename,
+            }
+        else:
+            access_token = _access_token_from_setting(setting)
+            folder_id = google_drive_service.ensure_backup_folder(access_token, setting.google_drive_folder_id)
+            setting.google_drive_folder_id = folder_id
+            file_id = google_drive_service.upload_backup_file(access_token, folder_id, filename, encrypted_payload)
+            job.backup_file_id = file_id
+            job.status = InboxBackupStatus.BACKUP_COMPLETED.value
+            job.completed_at = datetime.utcnow()
+            setting.last_backup_at = job.completed_at
+            setting.last_status = InboxBackupStatus.BACKUP_COMPLETED.value
+            setting.last_error = None
+            setting.backup_count += 1
     except Exception as error:
         job.status = InboxBackupStatus.BACKUP_FAILED.value
         job.error_message = str(error)
@@ -214,15 +269,28 @@ def run_restore_latest(db: Session, user: User) -> InboxBackupJob:
     db.refresh(job)
 
     try:
-        access_token = _access_token_from_setting(setting)
-        payload = google_drive_service.download_backup_file(access_token, latest.backup_file_id)
-        job.encrypted_payload_json = {"restored_from": latest.public_id, "downloaded_payload": payload}
-        job.status = InboxBackupStatus.RESTORE_COMPLETED.value
-        job.completed_at = datetime.utcnow()
-        setting.last_restore_at = job.completed_at
-        setting.last_status = InboxBackupStatus.RESTORE_COMPLETED.value
-        setting.last_error = None
-        setting.restore_count += 1
+        if not _is_google_drive_configured():
+            job.encrypted_payload_json = {
+                "restored_from": latest.public_id,
+                "downloaded_payload": latest.encrypted_payload_json,
+                "mode": "dev_mock",
+            }
+            job.status = InboxBackupStatus.RESTORE_COMPLETED.value
+            job.completed_at = datetime.utcnow()
+            setting.last_restore_at = job.completed_at
+            setting.last_status = InboxBackupStatus.RESTORE_COMPLETED.value
+            setting.last_error = None
+            setting.restore_count += 1
+        else:
+            access_token = _access_token_from_setting(setting)
+            payload = google_drive_service.download_backup_file(access_token, latest.backup_file_id)
+            job.encrypted_payload_json = {"restored_from": latest.public_id, "downloaded_payload": payload}
+            job.status = InboxBackupStatus.RESTORE_COMPLETED.value
+            job.completed_at = datetime.utcnow()
+            setting.last_restore_at = job.completed_at
+            setting.last_status = InboxBackupStatus.RESTORE_COMPLETED.value
+            setting.last_error = None
+            setting.restore_count += 1
     except Exception as error:
         job.status = InboxBackupStatus.RESTORE_FAILED.value
         job.error_message = str(error)
