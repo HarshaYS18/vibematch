@@ -178,7 +178,7 @@ class InboxGoogleDriveAuthStartResponse(BaseModel):
 
 class InboxGoogleDriveConnectRequest(BaseModel):
     google_drive_email: str | None = None
-    authorization_code: str | None = None
+    authorization_code: str | None = "dev_mock_drive_code"
 
 
 class InboxBackupJobResponse(BaseModel):
