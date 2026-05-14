@@ -11,6 +11,7 @@ from app.services.rooms.room_background_service import list_room_backgrounds
 from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_service import (
+    cleanup_stale_room_participants,
     create_room,
     get_room_by_public_id,
     heartbeat_room,
@@ -30,6 +31,12 @@ router = APIRouter(prefix="/rooms", tags=["Rooms"])
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_live_room(payload: RoomCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return create_room(db=db, current_user=current_user, payload=payload)
+
+
+@router.post("/cleanup-stale")
+def cleanup_stale_rooms(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    removed_count = cleanup_stale_room_participants(db)
+    return {"removed_count": removed_count, "rule": "Active room participants with no heartbeat for 10 minutes are removed from the room."}
 
 
 @router.get("/trending", response_model=list[RoomTrendingResponse])
