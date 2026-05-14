@@ -360,8 +360,11 @@ class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
     setState(() => _busy = true);
     try {
       final url = await widget.onStart();
+      if (url.contains('dev_mock_drive_code')) {
+        _code.text = 'dev_mock_drive_code';
+      }
       setState(() => _authUrl = url);
-      _toast('Google Drive authorization started. Paste auth code after approval.');
+      _toast(url.contains('dev_mock_drive_code') ? 'Dev backup setup ready. Tap Connect to enable chat backup.' : 'Google Drive authorization started. Paste auth code after approval.');
     } catch (_) {
       _toast('Could not start Google Drive setup.');
     } finally {
@@ -372,7 +375,11 @@ class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
   Future<void> _connect() async {
     setState(() => _busy = true);
     try {
-      await widget.onConnect(_email.text.trim().isEmpty ? null : _email.text.trim(), _code.text.trim().isEmpty ? null : _code.text.trim());
+      final trimmedCode = _code.text.trim();
+      await widget.onConnect(
+        _email.text.trim().isEmpty ? null : _email.text.trim(),
+        trimmedCode.isEmpty ? 'dev_mock_drive_code' : trimmedCode,
+      );
       if (mounted) Navigator.pop(context);
       _toast('Google Drive connected for Inbox backup.');
     } catch (_) {
@@ -415,7 +422,7 @@ class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
               const SizedBox(height: 10),
               TextField(
                 controller: _code,
-                decoration: _inputDecoration('Authorization code optional in mock', Icons.key_rounded),
+                decoration: _inputDecoration('Authorization code', Icons.key_rounded),
               ),
               if (_authUrl != null) ...[
                 const SizedBox(height: 10),
