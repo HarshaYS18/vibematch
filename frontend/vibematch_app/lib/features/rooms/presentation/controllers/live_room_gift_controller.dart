@@ -133,6 +133,7 @@ class LiveRoomGiftController {
   final Random _random = Random();
 
   bool get selectedGiftIsLuckyPacket => selectedGift?.id == 'lucky_packet';
+  bool get selectedGiftIsFromPremiumSection => selectedCategory == GiftCategory.premium || selectedGift?.category == GiftCategory.premium;
 
   Future<void> refreshCoinBalance() async {
     try {
@@ -228,6 +229,7 @@ class LiveRoomGiftController {
       return;
     }
 
+    final shouldPublishPremiumBroadcast = selectedGiftIsFromPremiumSection;
     coinBalance -= totalCost;
     final sentToAll = !gift.isVideoGift && receivers.length == roomUsers.length && roomUsers.isNotEmpty;
     final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
@@ -251,6 +253,7 @@ class LiveRoomGiftController {
         gift: gift,
         receiverName: receiver?.name ?? 'all',
         combo: deliveredCombo,
+        shouldPublish: shouldPublishPremiumBroadcast,
       );
 
       final shouldFly = (gift.coins * deliveredCombo) < smallGiftFlightThreshold;
@@ -595,8 +598,9 @@ class LiveRoomGiftController {
     required GiftItem gift,
     required String receiverName,
     required int combo,
+    required bool shouldPublish,
   }) {
-    if (gift.category != GiftCategory.premium) return;
+    if (!shouldPublish) return;
     PremiumGiftBroadcastBus.publish(
       PremiumGiftBroadcastEvent(
         id: 'premium-${gift.id}-${DateTime.now().microsecondsSinceEpoch}',
