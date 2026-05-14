@@ -8,7 +8,7 @@ class GiftSlideOverlay extends StatelessWidget {
     super.key,
     required this.slides,
     required this.onComboTap,
-    this.topFactor = 0.38,
+    this.topFactor = 0.42,
   });
 
   final List<GiftSlide> slides;
@@ -45,8 +45,8 @@ class GiftSlideStackModule extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleSlides = slides.where((slide) {
       final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15);
-      return ageSeconds <= 7;
-    }).take(3).toList(growable: false);
+      return ageSeconds <= 6;
+    }).take(1).toList(growable: false);
 
     if (visibleSlides.isEmpty) return const SizedBox.shrink();
 
@@ -56,7 +56,7 @@ class GiftSlideStackModule extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: visibleSlides.map((slide) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 7),
+            padding: const EdgeInsets.only(bottom: 5),
             child: GiftSlideCardModule(
               key: ValueKey(slide.id),
               slide: slide,
@@ -82,20 +82,22 @@ class GiftSlideCardModule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15).toDouble();
-    final exitProgress = ageSeconds <= 5 ? 0.0 : ((ageSeconds - 5) / 2).clamp(0.0, 1.0).toDouble();
+    final holdSeconds = 3.8;
+    final exitProgress = ageSeconds <= holdSeconds ? 0.0 : ((ageSeconds - holdSeconds) / 1.6).clamp(0.0, 1.0).toDouble();
     final accent = _accentForSlide(slide);
 
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: -1.0, end: exitProgress),
-      duration: const Duration(milliseconds: 520),
-      curve: Curves.easeOutCubic,
+      tween: Tween<double>(begin: 0.0, end: 1.0 + exitProgress),
+      duration: const Duration(milliseconds: 660),
+      curve: Curves.easeOutQuart,
       builder: (context, value, child) {
-        final isEntering = value < 0;
-        final enterProgress = (value + 1).clamp(0.0, 1.0).toDouble();
-        final exitValue = value.clamp(0.0, 1.0).toDouble();
-        final opacity = isEntering ? enterProgress : (1 - exitValue).clamp(0.0, 1.0).toDouble();
-        final dx = isEntering ? -320 + (320 * enterProgress) : -exitValue * 250;
-        final scale = isEntering ? 0.96 + (0.04 * enterProgress) : 1.0 - (exitValue * 0.035);
+        final enterProgress = value.clamp(0.0, 1.0).toDouble();
+        final exitValue = (value - 1.0).clamp(0.0, 1.0).toDouble();
+        final enterCurve = Curves.easeOutCubic.transform(enterProgress);
+        final exitCurve = Curves.easeInCubic.transform(exitValue);
+        final opacity = exitValue > 0 ? (1 - exitCurve).clamp(0.0, 1.0).toDouble() : enterCurve;
+        final dx = exitValue > 0 ? -360 * exitCurve : 390 * (1 - enterCurve);
+        final scale = exitValue > 0 ? 1.0 - (exitCurve * 0.025) : 0.97 + (0.03 * enterCurve);
 
         return Opacity(
           opacity: opacity,
@@ -106,10 +108,11 @@ class GiftSlideCardModule extends StatelessWidget {
         );
       },
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
         onTap: onComboTap,
         child: Container(
-          width: 314,
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+          width: 286,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             gradient: LinearGradient(
@@ -117,34 +120,33 @@ class GiftSlideCardModule extends StatelessWidget {
               end: Alignment.centerRight,
               colors: [
                 Colors.black.withValues(alpha: 0.00),
-                Colors.black.withValues(alpha: 0.54),
-                Colors.black.withValues(alpha: 0.64),
-                Colors.black.withValues(alpha: 0.54),
+                Colors.black.withValues(alpha: 0.48),
+                Colors.black.withValues(alpha: 0.62),
+                Colors.black.withValues(alpha: 0.48),
                 Colors.black.withValues(alpha: 0.00),
               ],
-              stops: const [0.0, 0.12, 0.50, 0.88, 1.0],
+              stops: const [0.0, 0.13, 0.50, 0.87, 1.0],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 0.8),
           ),
           child: Row(
             children: [
               Container(
-                width: 3,
-                height: 35,
+                width: 2.5,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.86),
+                  color: accent.withValues(alpha: 0.78),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 6),
               GiftVisual(
                 icon: slide.giftIcon,
                 colors: slide.colors,
                 assetPath: slide.giftAssetPath,
-                size: 40,
+                size: 34,
                 padding: 2,
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 7),
               Expanded(
                 child: Text(
                   '${slide.senderName} sent ${slide.receiverName} ${slide.giftName}',
@@ -152,25 +154,25 @@ class GiftSlideCardModule extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12.5,
-                    height: 1.1,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11.4,
+                    height: 1.05,
                   ),
                 ),
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.22),
+                  color: accent.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: accent.withValues(alpha: 0.60), width: 0.8),
+                  border: Border.all(color: accent.withValues(alpha: 0.46), width: 0.7),
                 ),
                 child: Text(
                   'x${slide.combo}',
                   style: TextStyle(
                     color: accent == Colors.white ? Colors.white : accent,
-                    fontSize: 12,
+                    fontSize: 10.8,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
