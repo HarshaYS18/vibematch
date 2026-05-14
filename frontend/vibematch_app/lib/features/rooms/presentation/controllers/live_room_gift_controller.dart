@@ -8,6 +8,7 @@ import '../../../wallet/data/wallet_api_service.dart';
 import '../../data/active_room_context.dart';
 import '../../data/gift_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
+import '../../data/mini_profile_economy_service.dart';
 import '../live_room_models.dart';
 import '../widgets/gift_flight_bus.dart';
 import '../widgets/gift_flight_overlay.dart';
@@ -119,6 +120,7 @@ class LiveRoomGiftController {
   final Set<String> selectedReceiverIds = <String>{};
   int selectedCombo = 1;
   int coinBalance = 0;
+  bool giftSendInProgress = false;
   bool luckyGiftSendInProgress = false;
 
   final List<GiftSlide> giftSlides = <GiftSlide>[];
@@ -229,48 +231,109 @@ class LiveRoomGiftController {
       return;
     }
 
-    final shouldPublishPremiumBroadcast = selectedGiftIsFromPremiumSection;
-    coinBalance -= totalCost;
-    final sentToAll = !gift.isVideoGift && receivers.length == roomUsers.length && roomUsers.isNotEmpty;
-    final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
-    final deliveredCombo = sentToAll ? effectiveCombo * receivers.length : effectiveCombo;
-    for (final receiver in targets) {
-      final slide = GiftSlide(
-        id: '${receiver?.id ?? 'all'}-${DateTime.now().microsecondsSinceEpoch}',
-        senderName: currentUser.name,
-        receiverName: receiver?.name ?? 'all',
-        giftName: gift.name,
-        giftIcon: gift.icon,
-        giftAssetPath: gift.assetPath,
-        videoAssetPath: gift.videoAssetPath,
-        colors: gift.colors,
-        combo: deliveredCombo,
-        baseCombo: deliveredCombo,
-        remainingSeconds: gift.isVideoGift ? 10 : 15,
-      );
-      _startGiftSlide(slide);
-      _publishPremiumBroadcastIfNeeded(
-        gift: gift,
-        receiverName: receiver?.name ?? 'all',
-        combo: deliveredCombo,
-        shouldPublish: shouldPublishPremiumBroadcast,
-      );
+    unawaited(_sendNormalGift(gift: gift, receivers: receivers, roomUsers: roomUsers, effectiveCombo: effectiveCombo));
+  }
 
-      final shouldFly = (gift.coins * deliveredCombo) < smallGiftFlightThreshold;
-      if (shouldFly) {
-        GiftFlightBus.publish(
-          GiftFlightEvent(
-            id: 'flight-${slide.id}',
-            gift: gift,
-            senderName: currentUser.name,
-            receiverName: receiver?.name ?? 'all',
-            combo: deliveredCombo,
-            endAlignment: _receiverAlignment(receiver, roomUsers),
-          ),
+  Future<void> _sendNormalGift({
+    required GiftItem gift,
+    required List<SeatUser> receivers,
+    required List<SeatUser> roomUsers,
+    required int effectiveCombo,
+  }) async {
+    if (giftSendInProgress) {
+      onToast('Gift is processing');
+      return;
+    }
+    giftSendInProgress = true;
+    onChanged();
+
+    try {
+      final shouldPublishPremiumBroadcast = selectedGiftIsFromPremiumSection;
+      final sentToAll = !gift.isVideoGift && receivers.length == roomUsers.length && roomUsers.isNotEmpty;
+      final deliveredCombo = sentToAll ? effectiveCombo * receivers.length : effectiveCombo;
+
+      for (final receiver in receivers) {
+        final receiverPublicUserId = _publicUserIdFromSeatUser(receiver);
+        if (receiverPublicUserId == null) {
+          onToast('${receiver.name} does not have a valid public user ID yet');
+          continue;
+        }
+
+        final result = await _giftApi.sendGiftPublic(
+          receiverPublicUserId: receiverPublicUserId,
+          giftId: gift.id,
+          coinValue: gift.coins,
+          quantity: effectiveCombo,
+          roomPublicId: ActiveRoomContext.roomPublicId,
+        );
+        coinBalance = result.senderCoinBalance;
+      }
+
+      final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
+      for (final receiver in targets) {
+        _showCommittedGiftSlide(
+          gift: gift,
+          receiver: receiver,
+          receiverName: receiver?.name ?? 'all',
+          combo: deliveredCombo,
+          roomUsers: roomUsers,
+          shouldPublishPremiumBroadcast: shouldPublishPremiumBroadcast,
         );
       }
+
+      MiniProfileEconomyService.instance.clearCache();
+      unawaited(refreshCoinBalance());
+    } catch (error) {
+      onToast(error.toString().replaceFirst('Exception: ', ''));
+      unawaited(refreshCoinBalance());
+    } finally {
+      giftSendInProgress = false;
+      onChanged();
     }
-    onChanged();
+  }
+
+  void _showCommittedGiftSlide({
+    required GiftItem gift,
+    required SeatUser? receiver,
+    required String receiverName,
+    required int combo,
+    required List<SeatUser> roomUsers,
+    required bool shouldPublishPremiumBroadcast,
+  }) {
+    final slide = GiftSlide(
+      id: '${receiver?.id ?? 'all'}-${DateTime.now().microsecondsSinceEpoch}',
+      senderName: currentUser.name,
+      receiverName: receiverName,
+      giftName: gift.name,
+      giftIcon: gift.icon,
+      giftAssetPath: gift.assetPath,
+      videoAssetPath: gift.videoAssetPath,
+      colors: gift.colors,
+      combo: combo,
+      baseCombo: combo,
+      remainingSeconds: gift.isVideoGift ? 10 : 15,
+    );
+    _startGiftSlide(slide);
+    _publishPremiumBroadcastIfNeeded(
+      gift: gift,
+      receiverName: receiverName,
+      combo: combo,
+      shouldPublish: shouldPublishPremiumBroadcast,
+    );
+
+    final shouldFly = (gift.coins * combo) < smallGiftFlightThreshold;
+    if (shouldFly) {
+      GiftFlightBus.publish(
+        GiftFlightEvent(
+          id: 'flight-${slide.id}',
+          gift: gift,
+          senderName: currentUser.name,
+          receiverName: receiverName,
+          combo: combo,
+          endAlignment: _receiverAlignment(receiver, roomUsers),
+        ),
+      );
+    }
   }
 
   Future<void> _sendLuckyGift({
@@ -329,6 +392,8 @@ class LiveRoomGiftController {
           endAlignment: _receiverAlignment(receiver, roomUsers),
         );
       }
+      MiniProfileEconomyService.instance.clearCache();
+      unawaited(refreshCoinBalance());
     } catch (error) {
       onToast(error.toString().replaceFirst('Exception: ', ''));
       unawaited(refreshCoinBalance());
@@ -436,6 +501,8 @@ class LiveRoomGiftController {
         rewardCoinAmount: rewardCoinAmount,
         endAlignment: context.endAlignment,
       );
+      MiniProfileEconomyService.instance.clearCache();
+      unawaited(refreshCoinBalance());
     } catch (error) {
       onToast(error.toString().replaceFirst('Exception: ', ''));
       unawaited(refreshCoinBalance());
