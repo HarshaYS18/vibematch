@@ -73,35 +73,85 @@ class WalletRealtimeSyncService {
     try {
       final decoded = raw is String ? jsonDecode(raw) : raw;
       if (decoded is! Map<String, dynamic>) return;
-      if (decoded['event'] != 'wallet_vip_svip_updated') return;
-
-      final payload = _map(decoded['payload']);
-      final walletJson = _map(payload['wallet']);
-      if (walletJson.isEmpty) return;
-
-      final auth = const AuthApiService();
-      final currentUser = auth.cachedUser;
-      if (currentUser == null) return;
-
-      final nextWallet = UserWalletSummary.fromJson(walletJson);
-      final vipProgress = _map(walletJson['vip']);
-      final svipProgress = _map(walletJson['svip']);
-      final nextVip = UserVipSummary(
-        vipLevel: _int(vipProgress['level']),
-        svipLevel: _int(svipProgress['level']),
-        vipIsActive: true,
-        svipIsActive: _int(svipProgress['level']) > 0,
-        svipExpiresAt: currentUser.vip.svipExpiresAt,
-        nameGradientKey: currentUser.vip.nameGradientKey,
-        nameGradientColors: currentUser.vip.nameGradientColors,
-      );
-
-      AuthUserRealtimeService.instance.publish(
-        currentUser.copyWith(wallet: nextWallet, vip: nextVip, updatedAt: DateTime.now()),
-      );
+      final event = decoded['event']?.toString();
+      if (event == 'wallet_vip_svip_updated') {
+        _handleWalletVipSvipUpdated(_map(decoded['payload']));
+        return;
+      }
+      if (event == 'all_levels_updated') {
+        _handleAllLevelsUpdated(_map(decoded['payload']));
+        return;
+      }
     } catch (_) {
       // Ignore malformed realtime events. Full refresh still works through /users/me.
     }
+  }
+
+  void _handleWalletVipSvipUpdated(Map<String, dynamic> payload) {
+    final walletJson = _map(payload['wallet']);
+    if (walletJson.isEmpty) return;
+
+    final auth = const AuthApiService();
+    final currentUser = auth.cachedUser;
+    if (currentUser == null) return;
+
+    final nextWallet = UserWalletSummary.fromJson(walletJson);
+    final vipProgress = _map(walletJson['vip']);
+    final svipProgress = _map(walletJson['svip']);
+    final nextVip = UserVipSummary(
+      vipLevel: _int(vipProgress['level']),
+      svipLevel: _int(svipProgress['level']),
+      vipIsActive: true,
+      svipIsActive: _int(svipProgress['level']) > 0,
+      svipExpiresAt: currentUser.vip.svipExpiresAt,
+      nameGradientKey: currentUser.vip.nameGradientKey,
+      nameGradientColors: currentUser.vip.nameGradientColors,
+    );
+
+    AuthUserRealtimeService.instance.publish(
+      currentUser.copyWith(wallet: nextWallet, vip: nextVip, updatedAt: DateTime.now()),
+    );
+  }
+
+  void _handleAllLevelsUpdated(Map<String, dynamic> payload) {
+    final economy = _map(payload['economy']);
+    if (economy.isEmpty) return;
+
+    final auth = const AuthApiService();
+    final currentUser = auth.cachedUser;
+    if (currentUser == null) return;
+
+    final sent = _map(economy['sent']);
+    final received = _map(economy['received']);
+    final vip = _map(economy['vip']);
+    final svip = _map(economy['svip']);
+
+    final nextWallet = UserWalletSummary(
+      coinBalance: currentUser.wallet.coinBalance,
+      rubyBalance: currentUser.wallet.rubyBalance,
+      lifetimeCoinsSpent: currentUser.wallet.lifetimeCoinsSpent,
+      lifetimeCoinsReceivedAsGifts: currentUser.wallet.lifetimeCoinsReceivedAsGifts,
+      lifetimeRubiesEarned: currentUser.wallet.lifetimeRubiesEarned,
+      monthlyGiftCoinsSent: _int(economy['monthly_gift_coins_sent']),
+      monthlyGiftCoinsReceived: _int(economy['monthly_gift_coins_received']),
+      lifetimeSendExp: _firstPositive([economy['lifetime_send_exp'], sent['total_exp'], currentUser.wallet.lifetimeSendExp]),
+      lifetimeReceiveExp: _firstPositive([economy['lifetime_receive_exp'], received['total_exp'], currentUser.wallet.lifetimeReceiveExp]),
+      sendLevel: _firstPositive([economy['sent_level'], sent['level'], currentUser.wallet.sendLevel]),
+      receiveLevel: _firstPositive([economy['receive_level'], received['level'], currentUser.wallet.receiveLevel]),
+    );
+
+    final nextVip = UserVipSummary(
+      vipLevel: _firstPositive([economy['vip_level'], vip['level'], currentUser.vip.vipLevel]),
+      svipLevel: _firstPositive([economy['svip_level'], svip['level'], currentUser.vip.svipLevel]),
+      vipIsActive: true,
+      svipIsActive: _firstPositive([economy['svip_level'], svip['level'], currentUser.vip.svipLevel]) > 0,
+      svipExpiresAt: currentUser.vip.svipExpiresAt,
+      nameGradientKey: currentUser.vip.nameGradientKey,
+      nameGradientColors: currentUser.vip.nameGradientColors,
+    );
+
+    final nextUser = currentUser.copyWith(wallet: nextWallet, vip: nextVip, updatedAt: DateTime.now());
+    auth.persistCurrentUser(nextUser);
   }
 
   String _webSocketUrl(String path) {
@@ -117,6 +167,14 @@ Map<String, dynamic> _map(dynamic value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) return value.cast<String, dynamic>();
   return const <String, dynamic>{};
+}
+
+int _firstPositive(List<dynamic> values) {
+  for (final value in values) {
+    final parsed = _int(value);
+    if (parsed > 0) return parsed;
+  }
+  return 0;
 }
 
 int _int(dynamic value) {
