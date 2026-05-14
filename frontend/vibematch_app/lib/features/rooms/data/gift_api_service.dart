@@ -54,6 +54,34 @@ class GiftApiService {
     return GiftSendPublicResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
+  Future<GiftSendPublicResult> sendLuckyGiftPublic({
+    required int receiverPublicUserId,
+    required String giftId,
+    required int coinValue,
+    required int quantity,
+    String? roomPublicId,
+    int houseRiskScore = 0,
+    int? relationshipId,
+    bool isRelationshipGift = false,
+  }) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/economy/gifts/send-lucky-public')),
+      headers: _headers(),
+      body: jsonEncode({
+        'receiver_public_user_id': receiverPublicUserId,
+        'gift_id': giftId,
+        'coin_value': coinValue,
+        'quantity': quantity,
+        'room_public_id': roomPublicId,
+        'house_risk_score': houseRiskScore,
+        'relationship_id': relationshipId,
+        'is_relationship_gift': isRelationshipGift,
+      }),
+    );
+    _throwIfBad(response, 'Lucky gift send failed');
+    return GiftSendPublicResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Map<String, String> _headers() {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -111,6 +139,9 @@ class GiftSendPublicResult {
     required this.receiverRubyAmount,
     required this.senderCoinBalance,
     required this.receiverRubyBalance,
+    this.luckyMultiplier,
+    this.luckyRewardCoinAmount,
+    this.luckyResult,
   });
 
   final int giftTransactionId;
@@ -120,16 +151,30 @@ class GiftSendPublicResult {
   final int receiverRubyAmount;
   final int senderCoinBalance;
   final int receiverRubyBalance;
+  final int? luckyMultiplier;
+  final int? luckyRewardCoinAmount;
+  final LuckyGiftRollResult? luckyResult;
 
-  factory GiftSendPublicResult.fromJson(Map<String, dynamic> json) => GiftSendPublicResult(
-        giftTransactionId: _int(json['gift_transaction_id']),
-        senderUserId: _int(json['sender_user_id']),
-        receiverUserId: _int(json['receiver_user_id']),
-        totalCoinValue: _int(json['total_coin_value']),
-        receiverRubyAmount: _int(json['receiver_ruby_amount']),
-        senderCoinBalance: _int(json['sender_coin_balance']),
-        receiverRubyBalance: _int(json['receiver_ruby_balance']),
-      );
+  factory GiftSendPublicResult.fromJson(Map<String, dynamic> json) {
+    final rawLuckyResult = json['lucky_result'];
+    final parsedLuckyResult = rawLuckyResult is Map<String, dynamic>
+        ? LuckyGiftRollResult.fromJson(rawLuckyResult)
+        : rawLuckyResult is Map
+            ? LuckyGiftRollResult.fromJson(rawLuckyResult.cast<String, dynamic>())
+            : null;
+    return GiftSendPublicResult(
+      giftTransactionId: _int(json['gift_transaction_id']),
+      senderUserId: _int(json['sender_user_id']),
+      receiverUserId: _int(json['receiver_user_id']),
+      totalCoinValue: _int(json['total_coin_value']),
+      receiverRubyAmount: _int(json['receiver_ruby_amount']),
+      senderCoinBalance: _int(json['sender_coin_balance']),
+      receiverRubyBalance: _int(json['receiver_ruby_balance']),
+      luckyMultiplier: json.containsKey('lucky_multiplier') ? _int(json['lucky_multiplier']) : parsedLuckyResult?.multiplier,
+      luckyRewardCoinAmount: json.containsKey('lucky_reward_coin_amount') ? _int(json['lucky_reward_coin_amount']) : parsedLuckyResult?.rewardCoinAmount,
+      luckyResult: parsedLuckyResult,
+    );
+  }
 }
 
 int _int(Object? value) {
