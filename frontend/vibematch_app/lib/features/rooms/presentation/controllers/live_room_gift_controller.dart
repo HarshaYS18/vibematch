@@ -125,6 +125,7 @@ class LiveRoomGiftController {
   final Set<String> _finishedGiftMessageIds = <String>{};
   final Map<String, _LuckyComboContext> _luckyComboContexts = <String, _LuckyComboContext>{};
   final Set<String> _luckyComboProcessingSlideIds = <String>{};
+  final Set<String> _luckyComboProcessingKeys = <String>{};
 
   LuckyPacketRoomEvent? activeLuckyPacket;
   Timer? _luckyPacketTimer;
@@ -380,11 +381,13 @@ class LiveRoomGiftController {
   }
 
   Future<void> _triggerLuckyCombo({required GiftSlide slide, required _LuckyComboContext context}) async {
-    if (_luckyComboProcessingSlideIds.contains(slide.id)) {
+    final comboKey = '${context.receiverPublicUserId}:${context.gift.id}:${context.baseCombo}';
+    if (_luckyComboProcessingSlideIds.contains(slide.id) || _luckyComboProcessingKeys.contains(comboKey)) {
       onToast('Lucky combo is processing');
       return;
     }
     _luckyComboProcessingSlideIds.add(slide.id);
+    _luckyComboProcessingKeys.add(comboKey);
     onChanged();
 
     try {
@@ -398,6 +401,14 @@ class LiveRoomGiftController {
       final multiplier = result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
       final rewardCoinAmount = result.luckyRewardCoinAmount ?? result.luckyResult?.rewardCoinAmount ?? 0;
       coinBalance = result.senderCoinBalance;
+
+      final existingLuckySlideIndex = giftSlides.indexWhere((item) => _luckyComboContexts.containsKey(item.id));
+      if (existingLuckySlideIndex != -1) {
+        final oldSlide = giftSlides.removeAt(existingLuckySlideIndex);
+        _giftTimers.remove(oldSlide.id)?.cancel();
+        _luckyComboContexts.remove(oldSlide.id);
+        _luckyComboProcessingSlideIds.remove(oldSlide.id);
+      }
 
       final comboSlide = _createLuckySlide(
         gift: context.gift,
@@ -421,6 +432,7 @@ class LiveRoomGiftController {
       unawaited(refreshCoinBalance());
     } finally {
       _luckyComboProcessingSlideIds.remove(slide.id);
+      _luckyComboProcessingKeys.remove(comboKey);
       onChanged();
     }
   }
@@ -608,6 +620,7 @@ class LiveRoomGiftController {
     _giftTimers.clear();
     _luckyComboContexts.clear();
     _luckyComboProcessingSlideIds.clear();
+    _luckyComboProcessingKeys.clear();
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
     LuckyPacketRoomBus.clearController(this);
