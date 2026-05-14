@@ -64,6 +64,11 @@ class Room(Base):
     is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_members_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # Locked room access. Store only a hash, never the plain lock/password.
+    lock_password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    lock_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    lock_updated_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Persistent room customization/state.
     background_theme_id: Mapped[str] = mapped_column(
         String(80),
