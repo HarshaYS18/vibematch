@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Alignment, Color;
 
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../data/active_room_context.dart';
