@@ -6,6 +6,8 @@ import '../../modules/ribbon_chat/presentation/ribbon_message_overlay.dart';
 import '../../modules/video_gift/presentation/video_gift_overlay.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../live_room_models.dart';
+import 'gift_flight_bus.dart';
+import 'gift_flight_overlay.dart';
 import 'gift_modules/lucky_packet_room_overlay.dart';
 import 'live_room_event_carousel.dart';
 import 'room_gifts.dart';
@@ -59,6 +61,15 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
           VideoGiftOverlay(
             slides: widget.slides,
             onVideoFinished: widget.onVideoGiftFinished,
+          ),
+          ValueListenableBuilder<GiftFlightEvent?>(
+            valueListenable: GiftFlightBus.latest,
+            builder: (context, event, _) {
+              return GiftFlightOverlay(
+                event: event,
+                onCompleted: GiftFlightBus.clear,
+              );
+            },
           ),
           RibbonMessageOverlay(messages: _ribbonMessages),
           if (!hasActiveVideoGift && !hasLuckyPacketDialog)
