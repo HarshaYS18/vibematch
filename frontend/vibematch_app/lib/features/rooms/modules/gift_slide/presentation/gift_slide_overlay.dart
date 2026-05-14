@@ -8,7 +8,7 @@ class GiftSlideOverlay extends StatelessWidget {
     super.key,
     required this.slides,
     required this.onComboTap,
-    this.topFactor = 0.30,
+    this.topFactor = 0.38,
   });
 
   final List<GiftSlide> slides;
@@ -56,7 +56,7 @@ class GiftSlideStackModule extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: visibleSlides.map((slide) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 7),
             child: GiftSlideCardModule(
               key: ValueKey(slide.id),
               slide: slide,
@@ -83,6 +83,7 @@ class GiftSlideCardModule extends StatelessWidget {
   Widget build(BuildContext context) {
     final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15).toDouble();
     final exitProgress = ageSeconds <= 5 ? 0.0 : ((ageSeconds - 5) / 2).clamp(0.0, 1.0).toDouble();
+    final accent = _accentForSlide(slide);
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: -1.0, end: exitProgress),
@@ -93,8 +94,8 @@ class GiftSlideCardModule extends StatelessWidget {
         final enterProgress = (value + 1).clamp(0.0, 1.0).toDouble();
         final exitValue = value.clamp(0.0, 1.0).toDouble();
         final opacity = isEntering ? enterProgress : (1 - exitValue).clamp(0.0, 1.0).toDouble();
-        final dx = isEntering ? -340 + (340 * enterProgress) : -exitValue * 260;
-        final scale = isEntering ? 0.86 + (0.14 * enterProgress) : 1.0 - (exitValue * 0.05);
+        final dx = isEntering ? -320 + (320 * enterProgress) : -exitValue * 250;
+        final scale = isEntering ? 0.96 + (0.04 * enterProgress) : 1.0 - (exitValue * 0.035);
 
         return Opacity(
           opacity: opacity,
@@ -107,126 +108,85 @@ class GiftSlideCardModule extends StatelessWidget {
       child: GestureDetector(
         onTap: onComboTap,
         child: Container(
-          width: 306,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          width: 314,
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(999),
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
               colors: [
-                Colors.white.withValues(alpha: 0.58),
-                slide.colors.first.withValues(alpha: 0.50),
-                slide.colors.last.withValues(alpha: 0.42),
-                Colors.white.withValues(alpha: 0.16),
+                Colors.black.withValues(alpha: 0.00),
+                Colors.black.withValues(alpha: 0.54),
+                Colors.black.withValues(alpha: 0.64),
+                Colors.black.withValues(alpha: 0.54),
+                Colors.black.withValues(alpha: 0.00),
               ],
+              stops: const [0.0, 0.12, 0.50, 0.88, 1.0],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.70), width: 1.3),
-            boxShadow: [
-              BoxShadow(
-                color: slide.colors.first.withValues(alpha: 0.52),
-                blurRadius: 34,
-                offset: const Offset(0, 12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 0.8),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 3,
+                height: 35,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.86),
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
-              BoxShadow(
-                color: slide.colors.last.withValues(alpha: 0.34),
-                blurRadius: 24,
-                offset: const Offset(0, 5),
+              const SizedBox(width: 7),
+              GiftVisual(
+                icon: slide.giftIcon,
+                colors: slide.colors,
+                assetPath: slide.giftAssetPath,
+                size: 40,
+                padding: 2,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  '${slide.senderName} sent ${slide.receiverName} ${slide.giftName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12.5,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 7),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: accent.withValues(alpha: 0.60), width: 0.8),
+                ),
+                child: Text(
+                  'x${slide.combo}',
+                  style: TextStyle(
+                    color: accent == Colors.white ? Colors.white : accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(21),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.36),
-                          Colors.white.withValues(alpha: 0.07),
-                          slide.colors.first.withValues(alpha: 0.12),
-                          Colors.white.withValues(alpha: 0.20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: -2,
-                  top: -24,
-                  child: Transform.rotate(
-                    angle: -0.42,
-                    child: Container(
-                      width: 54,
-                      height: 128,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white.withValues(alpha: 0.0),
-                            Colors.white.withValues(alpha: 0.72),
-                            Colors.white.withValues(alpha: 0.0),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    GiftVisual(
-                      icon: slide.giftIcon,
-                      colors: slide.colors,
-                      assetPath: slide.giftAssetPath,
-                      size: 44,
-                      padding: 2,
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        '${slide.senderName} sent ${slide.receiverName} ${slide.giftName}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12.5,
-                          height: 1.1,
-                          shadows: [
-                            Shadow(color: Colors.black54, blurRadius: 8),
-                            Shadow(color: Colors.white60, blurRadius: 12),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 7),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.30),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
-                      ),
-                      child: Text(
-                        'x${slide.combo}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          shadows: [Shadow(color: Colors.white70, blurRadius: 8)],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
           ),
         ),
       ),
     );
+  }
+
+  Color _accentForSlide(GiftSlide slide) {
+    final name = slide.giftName.toLowerCase();
+    if (name.contains('x1000')) return const Color(0xFF22D3EE);
+    if (name.contains('x500')) return const Color(0xFFFF2D95);
+    if (name.contains('x100')) return const Color(0xFFFFD166);
+    return Colors.white;
   }
 }
