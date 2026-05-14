@@ -13,10 +13,16 @@ class RoomCreateRequest(BaseModel):
     language: str = Field(default="English", max_length=40)
     mode: str = Field(default="Open", max_length=40)
     type: str = Field(default="Chat", max_length=40)
+    lock_password: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class RoomModeUpdateRequest(BaseModel):
     mode: str = Field(..., min_length=2, max_length=40)
+    lock_password: str | None = Field(default=None, min_length=1, max_length=64)
+
+
+class RoomJoinRequest(BaseModel):
+    lock_password: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class RoomTrendingResponse(BaseModel):
@@ -39,6 +45,7 @@ class RoomDetailResponse(RoomTrendingResponse):
     is_secret: bool
     is_locked: bool
     is_members_only: bool
+    has_lock_password: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
