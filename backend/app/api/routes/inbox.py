@@ -18,6 +18,7 @@ from app.schemas.inbox import (
     InboxGoogleDriveConnectRequest,
     InboxLockChangeRequest,
     InboxLockDebugOtpResponse,
+    InboxLockOwnerResetByIdentifierRequest,
     InboxLockRecoveryRequestResponse,
     InboxLockRecoveryStartRequest,
     InboxLockRecoveryVerifyRequest,
@@ -63,6 +64,17 @@ def _require_owner_or_founder(user: User) -> None:
 
 def _conversation_payload(conversation: InboxConversation, user: User) -> dict:
     return inbox_service.conversation_to_dict(conversation, user)
+
+
+def _find_user_by_visible_id(db: Session, value: str) -> User | None:
+    clean = (value or "").strip()
+    if not clean:
+        return None
+    numeric = int(clean) if clean.isdigit() else None
+    query = db.query(User)
+    if numeric is not None:
+        return query.filter((User.public_user_id == numeric) | (User.display_custom_id == numeric)).first()
+    return None
 
 
 async def _broadcast_conversation(conversation: InboxConversation) -> None:
@@ -139,14 +151,16 @@ def get_lock_status(db: Session = Depends(get_db), current_user: User = Depends(
 
 @router.post("/lock/setup/start", response_model=InboxLockDebugOtpResponse)
 def start_lock_setup(request: InboxLockStartSetupRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    otp = inbox_lock_service.start_setup(db, current_user, request.mobile_number)
-    return InboxLockDebugOtpResponse(status="otp_sent", expires_in_minutes=inbox_lock_service.OTP_EXPIRE_MINUTES, debug_otp=otp)
+    if request.lock_code:
+        inbox_lock_service.setup_lock(db, current_user, request.lock_code)
+        return InboxLockDebugOtpResponse(status="lock_enabled", expires_in_minutes=0, debug_otp=None)
+    return InboxLockDebugOtpResponse(status="ready_to_set_lock", expires_in_minutes=0, debug_otp=None)
 
 
 @router.post("/lock/setup/verify", response_model=InboxLockStatusResponse)
 def verify_lock_setup(request: InboxLockVerifySetupRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        inbox_lock_service.verify_setup(db, current_user, request.mobile_number, request.otp, request.lock_code)
+        inbox_lock_service.setup_lock(db, current_user, request.lock_code)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return InboxLockStatusResponse(**inbox_lock_service.get_status(db, current_user))
@@ -170,26 +184,19 @@ def change_lock(request: InboxLockChangeRequest, db: Session = Depends(get_db), 
 
 @router.post("/lock/recovery/start", response_model=InboxLockDebugOtpResponse)
 def start_lock_recovery(request: InboxLockRecoveryStartRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    try:
-        otp = inbox_lock_service.start_recovery(db, current_user, request.mobile_number)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return InboxLockDebugOtpResponse(status="recovery_otp_sent", expires_in_minutes=inbox_lock_service.OTP_EXPIRE_MINUTES, debug_otp=otp)
+    inbox_lock_service.request_cs_recovery(db, current_user)
+    return InboxLockDebugOtpResponse(status="contact_cs", expires_in_minutes=0, debug_otp=None)
 
 
 @router.post("/lock/recovery/verify", response_model=InboxLockStatusResponse)
 def verify_lock_recovery(request: InboxLockRecoveryVerifyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    try:
-        inbox_lock_service.recover_lock(db, current_user, request.mobile_number, request.otp, request.new_lock_code)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return InboxLockStatusResponse(**inbox_lock_service.get_status(db, current_user))
+    raise HTTPException(status_code=400, detail="Inbox lock recovery is handled by CS. Please contact Vibe Match Team / CS.")
 
 
 @router.post("/lock/recovery/request-cs", response_model=InboxLockRecoveryRequestResponse)
 def request_cs_recovery(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     inbox_lock_service.request_cs_recovery(db, current_user)
-    return InboxLockRecoveryRequestResponse(status="submitted", message="Recovery request submitted. CS will review your identity confirmation request.")
+    return InboxLockRecoveryRequestResponse(status="submitted", message="For Inbox lock recovery, please contact Vibe Match Team / CS. CS can verify identity and escalate reset if needed.")
 
 
 @router.post("/lock/owner-reset/{target_user_id}", response_model=InboxLockStatusResponse)
@@ -198,7 +205,17 @@ def owner_reset_lock(target_user_id: int, db: Session = Depends(get_db), current
     target_user = db.query(User).filter(User.id == target_user_id).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found")
-    inbox_lock_service.owner_reset_lock(db, target_user)
+    inbox_lock_service.owner_reset_lock(db, target_user, "1234")
+    return InboxLockStatusResponse(**inbox_lock_service.get_status(db, target_user))
+
+
+@router.post("/lock/owner-reset-by-id", response_model=InboxLockStatusResponse)
+def owner_reset_lock_by_visible_id(request: InboxLockOwnerResetByIdentifierRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_owner_or_founder(current_user)
+    target_user = _find_user_by_visible_id(db, request.user_identifier)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found by public ID or custom ID")
+    inbox_lock_service.owner_reset_lock(db, target_user, "1234")
     return InboxLockStatusResponse(**inbox_lock_service.get_status(db, target_user))
 
 
@@ -239,15 +256,7 @@ async def send_room_invite_by_public_id(public_user_id: int, request: InboxRoomI
     target_user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True)).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found")
-    conversation, message = inbox_service.send_room_invite_message(
-        db=db,
-        sender=current_user,
-        target_user=target_user,
-        room_name=request.room_name,
-        room_public_id=request.room_public_id,
-        room_language=request.room_language,
-        mode_title=request.mode_title,
-    )
+    conversation, message = inbox_service.send_room_invite_message(db=db, sender=current_user, target_user=target_user, room_name=request.room_name, room_public_id=request.room_public_id, room_language=request.room_language, mode_title=request.mode_title)
     target_payload = inbox_service.message_to_dict(message, target_user)
     sender_payload = inbox_service.message_to_dict(message, current_user)
     await _broadcast_message(conversation, target_payload)
