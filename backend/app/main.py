@@ -10,6 +10,7 @@ from app.api.routes import (
     coin_sales,
     economy,
     economy_admin,
+    experience,
     families,
     game_pool_admin,
     game_props_admin,
@@ -71,11 +72,13 @@ from app.models import (
     MvpFeatureState,
     ProfileVisit,
     Room,
+    RoomExperienceStatus,
     RubyWithdrawRequest,
     SpecialPermission,
     User,
     UserBan,
     UserBlock,
+    UserExperienceStatus,
     UserFollow,
     UserNotification,
     UserRoomPresence,
@@ -134,6 +137,7 @@ app.include_router(inbox_backup_google.router)
 app.include_router(love_bonds.router)
 app.include_router(inbox_ws.router)
 app.include_router(room_realtime.router)
+app.include_router(experience.router)
 app.include_router(social.router)
 app.include_router(vibes.router)
 app.include_router(notifications.router)
