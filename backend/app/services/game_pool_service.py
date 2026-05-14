@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.economy import EconomyDirection, EconomyPoolStatus, GamePool, GamePoolLedger, GamePoolType
 from app.models.user import User
+from app.services import jungle_hunt_props_runtime_service
 
 GLOBAL_GAME_KEY = "__GLOBAL__"
 MAIN_POOL_TYPE = GamePoolType.GAME_HOUSE_POOL.value
@@ -222,7 +223,7 @@ def _today_amount(db: Session, pool_id: int, source_types: list[str], direction:
     )
 
 
-def validate_exposure(
+def _validate_exposure_base(
     db: Session,
     game_key: str,
     proposed_worst_payout: int,
@@ -281,3 +282,30 @@ def record_payout(db: Session, game_key: str, round_id: int, user_id: int, amoun
         raise HTTPException(status_code=409, detail="Insufficient game house pool reserve for payout")
     _ledger(db, main_pool, EconomyDirection.DEBIT.value, remaining, "GAME_BACKSTOP_PAYOUT", actor, "Main pool backstop payout", round_id=round_id, user_id=user_id)
     main_pool.balance -= remaining
+
+
+def get_testing_mode(db: Session, game_key: str) -> bool:
+    return jungle_hunt_props_runtime_service.get_testing_mode(db, game_key)
+
+
+def validate_exposure(
+    db: Session,
+    game_key: str,
+    proposed_worst_payout: int,
+    proposed_single_payout: int,
+) -> tuple[bool, str, dict]:
+    if get_testing_mode(db, game_key):
+        return True, "TESTING_MODE_BYPASS", {
+            "testing_mode_enabled": True,
+            "game_key": game_key,
+            "proposed_worst_payout": proposed_worst_payout,
+            "proposed_single_payout": proposed_single_payout,
+        }
+
+    return _validate_exposure_base(
+        db=db,
+        game_key=game_key,
+        proposed_worst_payout=proposed_worst_payout,
+        proposed_single_payout=proposed_single_payout,
+    )
+

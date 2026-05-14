@@ -98,16 +98,17 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       familyName: '',
       familyLevel: 'bronze',
       relationshipText: '',
-      vipLevel: isOfficial ? 32 : user.vip.vipLevel,
-      svipLevel: isOfficial ? 3 : user.vip.svipLevel,
-      sendingLevel: isOfficial ? 52 : 1,
-      receivingLevel: isOfficial ? 44 : 1,
+      vipLevel: user.vip.vipLevel,
+      svipLevel: user.vip.svipLevel,
+      sendingLevel: 0,
+      receivingLevel: 0,
       sentExp: 0,
       receivedExp: 0,
       medals: const <String>[],
       avatarColors: isOfficial
           ? const <Color>[Color(0xFFFFC857), Color(0xFFE84C72)]
           : const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      avatarUrl: user.avatarUrl,
       isCurrentUser: true,
       isHost: isOfficial,
       isRoomAdmin: isOfficial,
@@ -135,6 +136,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       receivedExp: user.receivedExp,
       medals: user.medals,
       avatarColors: user.avatarColors,
+      avatarUrl: user.avatarUrl,
       age: user.age,
       locationLabel: user.locationLabel,
       locationVisible: user.locationVisible,
@@ -314,7 +316,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       'apply_only_mode_enabled': enabled,
     });
   }
-
 
   void setRoomImagesEnabled(bool enabled) {
     _send('room_settings/images', <String, Object?>{
@@ -624,6 +625,11 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       'peer_id': stablePeerId,
       'user_id': user.id,
       'display_name': user.name,
+      'avatar_url': user.avatarUrl,
+      'vip_level': user.vipLevel,
+      'svip_level': user.svipLevel,
+      'sending_level': user.sendingLevel,
+      'receiving_level': user.receivingLevel,
       'is_host': user.isHost,
       'is_room_admin': user.isRoomAdmin || user.isHost,
       'role_label': user.isHost
@@ -722,12 +728,16 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       if (type == 'room_cricket/state') {
         final roomId = payload['room_id']?.toString() ?? _roomId ?? '';
         final cricketState = payload['cricket_state'];
-        final active = payload['active'] == true ||
+        final active =
+            payload['active'] == true ||
             (cricketState is Map<String, dynamic> &&
                 cricketState['active'] == true);
 
-        final rawSetup = payload['setup'] ??
-            (cricketState is Map<String, dynamic> ? cricketState['setup'] : null);
+        final rawSetup =
+            payload['setup'] ??
+            (cricketState is Map<String, dynamic>
+                ? cricketState['setup']
+                : null);
 
         if (active && rawSetup is Map<String, dynamic>) {
           final setup = CricketQuickMatchSetup.fromJson(rawSetup);
@@ -736,7 +746,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
             roomId: safeRoomId,
             setup: setup,
           );
-          activeRoomBackgroundTheme.value = cricketFloodlightArenaBackgroundTheme;
+          activeRoomBackgroundTheme.value =
+              cricketFloodlightArenaBackgroundTheme;
           LiveRoomSettingsEventBus.publish(
             LiveRoomSettingsEvent(
               id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -1150,6 +1161,11 @@ class LiveMediaPeerSnapshot {
     this.isHost = false,
     this.isRoomAdmin = false,
     this.roleLabel = '',
+    this.avatarUrl,
+    this.vipLevel = 0,
+    this.svipLevel = 0,
+    this.sendingLevel = 0,
+    this.receivingLevel = 0,
     this.seatIndex,
     this.micEnabled = false,
     this.adminMuted = false,
@@ -1161,6 +1177,11 @@ class LiveMediaPeerSnapshot {
   final bool isHost;
   final bool isRoomAdmin;
   final String roleLabel;
+  final String? avatarUrl;
+  final int vipLevel;
+  final int svipLevel;
+  final int sendingLevel;
+  final int receivingLevel;
   final int? seatIndex;
   final bool micEnabled;
   final bool adminMuted;
@@ -1173,6 +1194,11 @@ class LiveMediaPeerSnapshot {
       isHost: json['is_host'] == true || json['isHost'] == true,
       isRoomAdmin: json['is_room_admin'] == true || json['isRoomAdmin'] == true,
       roleLabel: json['role_label']?.toString() ?? '',
+      avatarUrl: _text(json['avatar_url'] ?? json['avatarUrl']),
+      vipLevel: _int(json['vip_level'] ?? json['vipLevel']),
+      svipLevel: _int(json['svip_level'] ?? json['svipLevel']),
+      sendingLevel: _int(json['sending_level'] ?? json['sendingLevel']),
+      receivingLevel: _int(json['receiving_level'] ?? json['receivingLevel']),
       seatIndex: int.tryParse(json['seat_index']?.toString() ?? ''),
       micEnabled: json['mic_enabled'] == true || json['micEnabled'] == true,
       adminMuted: json['admin_muted'] == true || json['adminMuted'] == true,
@@ -1186,6 +1212,12 @@ class LiveMediaPeerSnapshot {
     bool? isHost,
     bool? isRoomAdmin,
     String? roleLabel,
+    String? avatarUrl,
+    bool clearAvatarUrl = false,
+    int? vipLevel,
+    int? svipLevel,
+    int? sendingLevel,
+    int? receivingLevel,
     int? seatIndex,
     bool clearSeatIndex = false,
     bool? micEnabled,
@@ -1198,9 +1230,26 @@ class LiveMediaPeerSnapshot {
       isHost: isHost ?? this.isHost,
       isRoomAdmin: isRoomAdmin ?? this.isRoomAdmin,
       roleLabel: roleLabel ?? this.roleLabel,
+      avatarUrl: clearAvatarUrl ? null : avatarUrl ?? this.avatarUrl,
+      vipLevel: vipLevel ?? this.vipLevel,
+      svipLevel: svipLevel ?? this.svipLevel,
+      sendingLevel: sendingLevel ?? this.sendingLevel,
+      receivingLevel: receivingLevel ?? this.receivingLevel,
       seatIndex: clearSeatIndex ? null : seatIndex ?? this.seatIndex,
       micEnabled: micEnabled ?? this.micEnabled,
       adminMuted: adminMuted ?? this.adminMuted,
     );
   }
+}
+
+String? _text(dynamic value) {
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty || text == 'null' ? null : text;
+}
+
+int _int(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
 }

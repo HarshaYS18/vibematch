@@ -96,8 +96,8 @@ class LiveRoomPresenceRepository {
                   familyName: '',
                   relationshipText: '',
                   vipLevel: 0,
-                  sendingLevel: 1,
-                  receivingLevel: 1,
+                  sendingLevel: 0,
+                  receivingLevel: 0,
                   sentExp: 0,
                   receivedExp: 0,
                   medals: const [],
@@ -276,6 +276,7 @@ class LiveRoomPresenceSnapshot {
         : <String, dynamic>{};
     final svipLevel = _int(vip['svip_level']);
     final vipLevel = _int(vip['vip_level']);
+    final avatarUrl = _text(json['avatar_url']) ?? _text(json['avatarUrl']);
     final isOwner = json['is_owner'] == true;
     final isRoomAdmin = json['is_room_admin'] == true;
     final isMember = json['is_member'] == true;
@@ -295,12 +296,13 @@ class LiveRoomPresenceSnapshot {
       relationshipText: '',
       vipLevel: vipLevel,
       svipLevel: svipLevel,
-      sendingLevel: 1,
-      receivingLevel: 1,
-      sentExp: 0,
-      receivedExp: 0,
+      sendingLevel: _int(json['sending_level'] ?? json['sendingLevel']),
+      receivingLevel: _int(json['receiving_level'] ?? json['receivingLevel']),
+      sentExp: _int(json['sent_exp'] ?? json['sentExp']),
+      receivedExp: _int(json['received_exp'] ?? json['receivedExp']),
       medals: const [],
       avatarColors: _avatarColors(publicUserId),
+      avatarUrl: avatarUrl,
       isHost: isOwner,
       isRoomAdmin: isRoomAdmin || isOwner,
     );

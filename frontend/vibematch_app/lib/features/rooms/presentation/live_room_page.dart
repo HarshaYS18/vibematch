@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -305,6 +305,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       // Best effort. Backend also expires stale room presence by heartbeat window.
     }
   }
+
   void _onRoomStateChanged() {
     if (mounted) setState(() {});
   }
@@ -546,12 +547,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     final requesterId = entry.senderId;
     if (requesterId != null && requesterId.trim().isNotEmpty) {
-      LiveRoomMembershipService.markGuest(
-        roomId: _roomId,
-        userId: requesterId,
-      );
+      LiveRoomMembershipService.markGuest(roomId: _roomId, userId: requesterId);
     }
   }
+
   void _applyForSeat(int index) => _seatController.applyForSeat(
     index: index,
     messages: _roomMessageController.messages,
@@ -721,6 +720,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       'Your request to become a member of $_roomName has been sent to the channel host. The + button will stay hidden until the host accepts or rejects it.',
     );
   }
+
   void _openRoomUsersSheet() {
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
@@ -1180,7 +1180,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           _seatController.changeLayout(layout);
           Navigator.pop(context);
           unawaited(RoomMusicController.instance.attachRoom(widget.roomId));
-    unawaited(_roomStateController.loadPersistedRoomSettings());
+          unawaited(_roomStateController.loadPersistedRoomSettings());
           _autoOccupySeatOneForHostOrAdmin();
         },
       ),
@@ -1268,8 +1268,8 @@ const SeatUser _roomIdentityFallback = SeatUser(
   relationshipText: '',
   vipLevel: 0,
   svipLevel: 0,
-  sendingLevel: 1,
-  receivingLevel: 1,
+  sendingLevel: 0,
+  receivingLevel: 0,
   sentExp: 0,
   receivedExp: 0,
   medals: <String>[],
@@ -1288,6 +1288,3 @@ class _PendingSeatInvite {
   final SeatUser invitedUser;
   final int seatIndex;
 }
-
-
-

@@ -25,38 +25,53 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
 
   List<SeatUser> get _realtimeUsers {
     final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
-    final currentUserId = LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id;
+    final currentUserId =
+        LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id;
     if (snapshot == null) return const <SeatUser>[];
 
-    final seatedIds = snapshot.peers.where((peer) => peer.seatIndex != null).map((peer) => peer.userId).toSet();
+    final seatedIds = snapshot.peers
+        .where((peer) => peer.seatIndex != null)
+        .map((peer) => peer.userId)
+        .toSet();
     final seen = <String>{};
 
-    return snapshot.peers.where((peer) {
-      if (currentUserId != null && peer.userId == currentUserId) return false;
-      if (seatedIds.contains(peer.userId)) return false;
-      return seen.add(peer.userId);
-    }).map((peer) {
-      final existing = widget.users.firstWhereOrNull((user) => user.id == peer.userId);
-      if (existing != null) {
-        return existing.copyWith(selfMuted: !peer.micEnabled, adminMuted: peer.adminMuted);
-      }
-      return SeatUser(
-        id: peer.userId,
-        name: peer.displayName,
-        roleLabel: 'Member',
-        familyName: '',
-        relationshipText: '',
-        vipLevel: 1,
-        sendingLevel: 1,
-        receivingLevel: 1,
-        sentExp: 0,
-        receivedExp: 0,
-        medals: const [],
-        avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-        selfMuted: !peer.micEnabled,
-        adminMuted: peer.adminMuted,
-      );
-    }).toList();
+    return snapshot.peers
+        .where((peer) {
+          if (currentUserId != null && peer.userId == currentUserId)
+            return false;
+          if (seatedIds.contains(peer.userId)) return false;
+          return seen.add(peer.userId);
+        })
+        .map((peer) {
+          final existing = widget.users.firstWhereOrNull(
+            (user) => user.id == peer.userId,
+          );
+          if (existing != null) {
+            return existing.copyWith(
+              selfMuted: !peer.micEnabled,
+              adminMuted: peer.adminMuted,
+            );
+          }
+          return SeatUser(
+            id: peer.userId,
+            name: peer.displayName,
+            roleLabel: 'Member',
+            familyName: '',
+            relationshipText: '',
+            vipLevel: peer.vipLevel,
+            svipLevel: peer.svipLevel,
+            sendingLevel: peer.sendingLevel,
+            receivingLevel: peer.receivingLevel,
+            sentExp: 0,
+            receivedExp: 0,
+            medals: const [],
+            avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+            avatarUrl: peer.avatarUrl,
+            selfMuted: !peer.micEnabled,
+            adminMuted: peer.adminMuted,
+          );
+        })
+        .toList();
   }
 
   List<SeatUser> get _sortedUsers {
@@ -80,7 +95,10 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
     if (currentUserId != null && user.id == currentUserId) return;
     if (!_isOnline(user)) return;
     setState(() => _invitedIds.add(user.id));
-    signaling.sendSeatInvite(seatIndex: widget.seatIndex, targetUserId: user.id);
+    signaling.sendSeatInvite(
+      seatIndex: widget.seatIndex,
+      targetUserId: user.id,
+    );
     widget.onInvite(user);
   }
 
@@ -92,7 +110,12 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
       heightFactor: 0.40,
       alignment: Alignment.bottomCenter,
       child: Container(
-        padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 12),
+        padding: EdgeInsets.fromLTRB(
+          14,
+          10,
+          14,
+          MediaQuery.paddingOf(context).bottom + 12,
+        ),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

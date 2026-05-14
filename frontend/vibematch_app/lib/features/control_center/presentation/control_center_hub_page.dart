@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'control_center_page.dart';
 import 'game_pool_management_page.dart';
+import 'game_props_page.dart';
 import '../../profile/presentation/control_center/vibes_reports_review_page.dart';
 
 class ControlCenterHubPage extends StatelessWidget {
@@ -63,6 +64,15 @@ class ControlCenterHubPage extends StatelessWidget {
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VibesReportsReviewPage())),
           ),
           const SizedBox(height: 12),
+          const SizedBox(height: 12),
+          _HubOptionCard(
+            icon: Icons.tune_rounded,
+            title: 'Game Props',
+            subtitle: 'Jungle Hunt testing mode, exposure controls, whale rules, probabilities and round flow.',
+            gradient: const [Color(0xFF8C5CF6), Color(0xFF12C7B7), Color(0xFFFFC857)],
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GamePropsPage())),
+          ),
+
           _HubOptionCard(
             icon: Icons.account_balance_rounded,
             title: 'Game Pool Management',

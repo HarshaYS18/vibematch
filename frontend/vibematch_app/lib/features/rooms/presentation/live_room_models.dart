@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
 
 enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
-enum GiftCategory { classic, lucky, relationship, event, premium, svip, vip, baggage }
+
+enum GiftCategory {
+  classic,
+  lucky,
+  relationship,
+  event,
+  premium,
+  svip,
+  vip,
+  baggage,
+}
+
 enum RoomUserGender { male, female, undisclosed }
+
 enum RoomSystemEventType { none, userEntered, userRemoved }
 
 extension RoomPrivacyModeX on RoomPrivacyMode {
@@ -147,7 +159,8 @@ class SeatUser {
   final bool adminMuted;
 
   bool get muted => selfMuted || adminMuted;
-  bool get showLocation => locationVisible && (locationLabel?.trim().isNotEmpty ?? false);
+  bool get showLocation =>
+      locationVisible && (locationLabel?.trim().isNotEmpty ?? false);
 
   SeatUser copyWith({
     String? name,
@@ -209,14 +222,41 @@ class RoomSeat {
   final int index;
   final SeatUser? user;
   final bool locked;
-  RoomSeat copyWith({SeatUser? user, bool clearUser = false, bool? locked}) => RoomSeat(index: index, user: clearUser ? null : (user ?? this.user), locked: locked ?? this.locked);
+  RoomSeat copyWith({SeatUser? user, bool clearUser = false, bool? locked}) =>
+      RoomSeat(
+        index: index,
+        user: clearUser ? null : (user ?? this.user),
+        locked: locked ?? this.locked,
+      );
 }
 
 class ChatEntry {
-  ChatEntry({required this.senderName, required this.message, this.senderId, this.vipLevel = 0, this.sendingLevel = 0, this.receivingLevel = 0, this.isGift = false, this.isSeatApplication = false, this.seatIndex, this.applicationCreatedAt, this.applicationExpiresAt, this.applicationApproved = false, this.applicationRejected = false, this.applicationExpired = false, this.systemEventType = RoomSystemEventType.none, this.autoDismissAt, this.giftAssetPath, this.imageUrl, this.imageContentType});
+  ChatEntry({
+    required this.senderName,
+    required this.message,
+    this.senderId,
+    this.senderAvatarUrl,
+    this.vipLevel = 0,
+    this.sendingLevel = 0,
+    this.receivingLevel = 0,
+    this.isGift = false,
+    this.isSeatApplication = false,
+    this.seatIndex,
+    this.applicationCreatedAt,
+    this.applicationExpiresAt,
+    this.applicationApproved = false,
+    this.applicationRejected = false,
+    this.applicationExpired = false,
+    this.systemEventType = RoomSystemEventType.none,
+    this.autoDismissAt,
+    this.giftAssetPath,
+    this.imageUrl,
+    this.imageContentType,
+  });
   final String senderName;
   final String message;
   final String? senderId;
+  final String? senderAvatarUrl;
   final int vipLevel;
   final int sendingLevel;
   final int receivingLevel;
@@ -233,17 +273,67 @@ class ChatEntry {
   final String? giftAssetPath;
   final String? imageUrl;
   final String? imageContentType;
-  bool get isSystemMessage => senderId == 'system' || systemEventType != RoomSystemEventType.none;
+  bool get isSystemMessage =>
+      senderId == 'system' || systemEventType != RoomSystemEventType.none;
   bool get shouldAutoDismiss => autoDismissAt != null;
-  bool get autoDismissed => autoDismissAt != null && DateTime.now().isAfter(autoDismissAt!);
-  bool get applicationTimedOut => applicationExpired || (applicationExpiresAt != null && DateTime.now().isAfter(applicationExpiresAt!));
-  bool get applicationResolved => applicationApproved || applicationRejected || applicationTimedOut;
+  bool get autoDismissed =>
+      autoDismissAt != null && DateTime.now().isAfter(autoDismissAt!);
+  bool get applicationTimedOut =>
+      applicationExpired ||
+      (applicationExpiresAt != null &&
+          DateTime.now().isAfter(applicationExpiresAt!));
+  bool get applicationResolved =>
+      applicationApproved || applicationRejected || applicationTimedOut;
   bool get isImageMessage => imageUrl?.trim().isNotEmpty ?? false;
-  ChatEntry copyWith({String? message, bool? applicationApproved, bool? applicationRejected, bool? applicationExpired, RoomSystemEventType? systemEventType, DateTime? autoDismissAt, String? imageUrl, String? imageContentType}) => ChatEntry(senderName: senderName, message: message ?? this.message, senderId: senderId, vipLevel: vipLevel, sendingLevel: sendingLevel, receivingLevel: receivingLevel, isGift: isGift, isSeatApplication: isSeatApplication, seatIndex: seatIndex, applicationCreatedAt: applicationCreatedAt, applicationExpiresAt: applicationExpiresAt, applicationApproved: applicationApproved ?? this.applicationApproved, applicationRejected: applicationRejected ?? this.applicationRejected, applicationExpired: applicationExpired ?? this.applicationExpired, systemEventType: systemEventType ?? this.systemEventType, autoDismissAt: autoDismissAt ?? this.autoDismissAt, giftAssetPath: giftAssetPath, imageUrl: imageUrl ?? this.imageUrl, imageContentType: imageContentType ?? this.imageContentType);
+  ChatEntry copyWith({
+    String? message,
+    String? senderAvatarUrl,
+    bool clearSenderAvatarUrl = false,
+    bool? applicationApproved,
+    bool? applicationRejected,
+    bool? applicationExpired,
+    RoomSystemEventType? systemEventType,
+    DateTime? autoDismissAt,
+    String? imageUrl,
+    String? imageContentType,
+  }) => ChatEntry(
+    senderName: senderName,
+    message: message ?? this.message,
+    senderId: senderId,
+    senderAvatarUrl: clearSenderAvatarUrl
+        ? null
+        : senderAvatarUrl ?? this.senderAvatarUrl,
+    vipLevel: vipLevel,
+    sendingLevel: sendingLevel,
+    receivingLevel: receivingLevel,
+    isGift: isGift,
+    isSeatApplication: isSeatApplication,
+    seatIndex: seatIndex,
+    applicationCreatedAt: applicationCreatedAt,
+    applicationExpiresAt: applicationExpiresAt,
+    applicationApproved: applicationApproved ?? this.applicationApproved,
+    applicationRejected: applicationRejected ?? this.applicationRejected,
+    applicationExpired: applicationExpired ?? this.applicationExpired,
+    systemEventType: systemEventType ?? this.systemEventType,
+    autoDismissAt: autoDismissAt ?? this.autoDismissAt,
+    giftAssetPath: giftAssetPath,
+    imageUrl: imageUrl ?? this.imageUrl,
+    imageContentType: imageContentType ?? this.imageContentType,
+  );
 }
 
 class GiftItem {
-  const GiftItem({required this.id, required this.name, required this.category, required this.coins, required this.icon, required this.chatSymbol, required this.colors, this.assetPath, this.videoAssetPath});
+  const GiftItem({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.coins,
+    required this.icon,
+    required this.chatSymbol,
+    required this.colors,
+    this.assetPath,
+    this.videoAssetPath,
+  });
   final String id;
   final String name;
   final GiftCategory category;
@@ -257,7 +347,19 @@ class GiftItem {
 }
 
 class GiftSlide {
-  const GiftSlide({required this.id, required this.senderName, required this.receiverName, required this.giftName, required this.giftIcon, this.giftAssetPath, this.videoAssetPath, required this.colors, required this.combo, this.baseCombo = 1, required this.remainingSeconds});
+  const GiftSlide({
+    required this.id,
+    required this.senderName,
+    required this.receiverName,
+    required this.giftName,
+    required this.giftIcon,
+    this.giftAssetPath,
+    this.videoAssetPath,
+    required this.colors,
+    required this.combo,
+    this.baseCombo = 1,
+    required this.remainingSeconds,
+  });
   final String id;
   final String senderName;
   final String receiverName;
@@ -270,27 +372,56 @@ class GiftSlide {
   final int baseCombo;
   final int remainingSeconds;
   bool get isVideoGift => videoAssetPath?.trim().isNotEmpty ?? false;
-  GiftSlide copyWith({int? combo, int? baseCombo, int? remainingSeconds}) => GiftSlide(id: id, senderName: senderName, receiverName: receiverName, giftName: giftName, giftIcon: giftIcon, giftAssetPath: giftAssetPath, videoAssetPath: videoAssetPath, colors: colors, combo: combo ?? this.combo, baseCombo: baseCombo ?? this.baseCombo, remainingSeconds: remainingSeconds ?? this.remainingSeconds);
+  GiftSlide copyWith({int? combo, int? baseCombo, int? remainingSeconds}) =>
+      GiftSlide(
+        id: id,
+        senderName: senderName,
+        receiverName: receiverName,
+        giftName: giftName,
+        giftIcon: giftIcon,
+        giftAssetPath: giftAssetPath,
+        videoAssetPath: videoAssetPath,
+        colors: colors,
+        combo: combo ?? this.combo,
+        baseCombo: baseCombo ?? this.baseCombo,
+        remainingSeconds: remainingSeconds ?? this.remainingSeconds,
+      );
 }
 
 class SeatLayoutSpec {
-  const SeatLayoutSpec({required this.id, required this.columns, required this.rows, required this.hasHostSeats});
+  const SeatLayoutSpec({
+    required this.id,
+    required this.columns,
+    required this.rows,
+    required this.hasHostSeats,
+  });
   final String id;
   final int columns;
   final int rows;
   final bool hasHostSeats;
   int get topSeatCount => hasHostSeats ? 2 : 0;
   int get totalSeats => topSeatCount + (columns * rows);
-  String get label => hasHostSeats ? 'Host + ${columns}x$rows' : '${columns}x$rows';
+  String get label =>
+      hasHostSeats ? 'Host + ${columns}x$rows' : '${columns}x$rows';
   static const List<String> withoutHostLayouts = ['4x2', '5x2', '4x3', '5x3'];
-  static const List<String> withHostLayouts = ['host_4x2', 'host_5x2', 'host_4x3', 'host_5x3'];
+  static const List<String> withHostLayouts = [
+    'host_4x2',
+    'host_5x2',
+    'host_4x3',
+    'host_5x3',
+  ];
   static SeatLayoutSpec parse(String id) {
     final hasHost = id.startsWith('host_');
     final raw = id.replaceFirst('host_', '');
     final parts = raw.split('x');
     final columns = int.tryParse(parts.first) ?? 4;
     final rows = int.tryParse(parts.length > 1 ? parts.last : '2') ?? 2;
-    return SeatLayoutSpec(id: id, columns: columns, rows: rows, hasHostSeats: hasHost);
+    return SeatLayoutSpec(
+      id: id,
+      columns: columns,
+      rows: rows,
+      hasHostSeats: hasHost,
+    );
   }
 }
 
@@ -301,8 +432,10 @@ String avatarLetter(String input) {
 }
 
 String compactNumber(int value) {
-  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-  if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+  if (value >= 1000000)
+    return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+  if (value >= 1000)
+    return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
   return '$value';
 }
 
@@ -310,7 +443,8 @@ RoomPrivacyMode privacyModeFromTitle(String title) {
   final value = title.toLowerCase();
   if (value.contains('lock')) return RoomPrivacyMode.locked;
   if (value.contains('member')) return RoomPrivacyMode.membersOnly;
-  if (value.contains('private') || value.contains('secret')) return RoomPrivacyMode.privateVibe;
+  if (value.contains('private') || value.contains('secret'))
+    return RoomPrivacyMode.privateVibe;
   return RoomPrivacyMode.open;
 }
 
@@ -319,5 +453,15 @@ final List<SeatUser> mockInviteUsers = <SeatUser>[];
 final List<ChatEntry> mockChatEntries = <ChatEntry>[];
 
 const List<GiftItem> mockGiftItems = [
-  GiftItem(id: 'love_rocket', name: 'Love Rocket', category: GiftCategory.premium, coins: 999, icon: Icons.rocket_launch_rounded, chatSymbol: '🚀', assetPath: 'assets/gifts/love_rocket/icon/love_rocket_icon.webp', videoAssetPath: 'assets/videos/gifts/love_rocket.mp4', colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)]),
+  GiftItem(
+    id: 'love_rocket',
+    name: 'Love Rocket',
+    category: GiftCategory.premium,
+    coins: 999,
+    icon: Icons.rocket_launch_rounded,
+    chatSymbol: '🚀',
+    assetPath: 'assets/gifts/love_rocket/icon/love_rocket_icon.webp',
+    videoAssetPath: 'assets/videos/gifts/love_rocket.mp4',
+    colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)],
+  ),
 ];

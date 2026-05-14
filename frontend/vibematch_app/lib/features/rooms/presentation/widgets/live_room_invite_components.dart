@@ -66,10 +66,7 @@ class LiveRoomInviteEmptyState extends StatelessWidget {
     return const Center(
       child: Text(
         'No users available to invite.',
-        style: TextStyle(
-          color: Color(0xFF7B6A86),
-          fontWeight: FontWeight.w800,
-        ),
+        style: TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800),
       ),
     );
   }
@@ -141,22 +138,38 @@ class LiveRoomInviteAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avatarUrl = user.avatarUrl?.trim();
+    final fallback = Container(
+      width: 38,
+      height: 38,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: user.avatarColors),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Text(
+        user.name.isEmpty ? '?' : user.name.characters.first.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          width: 38,
-          height: 38,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: user.avatarColors),
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Text(
-            user.name.isEmpty ? '?' : user.name.characters.first.toUpperCase(),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-          ),
-        ),
+        avatarUrl == null || avatarUrl.isEmpty
+            ? fallback
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: Image.network(
+                  avatarUrl,
+                  width: 38,
+                  height: 38,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => fallback,
+                ),
+              ),
         if (isOnline)
           Positioned(
             right: -1,

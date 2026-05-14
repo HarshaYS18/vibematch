@@ -18,7 +18,13 @@ class RoomRankingsController {
     required RoomRankingPeriod period,
   }) {
     final rankedUsers = List<SeatUser>.from(users);
-    rankedUsers.sort((a, b) => _scoreFor(b, category, period).compareTo(_scoreFor(a, category, period)));
+    rankedUsers.sort(
+      (a, b) => _scoreFor(
+        b,
+        category,
+        period,
+      ).compareTo(_scoreFor(a, category, period)),
+    );
 
     return [
       for (var index = 0; index < rankedUsers.length; index++)
@@ -33,7 +39,11 @@ class RoomRankingsController {
     ];
   }
 
-  int _scoreFor(SeatUser user, RoomRankingCategory category, RoomRankingPeriod period) {
+  int _scoreFor(
+    SeatUser user,
+    RoomRankingCategory category,
+    RoomRankingPeriod period,
+  ) {
     final periodMultiplier = switch (period) {
       RoomRankingPeriod.daily => 0.18,
       RoomRankingPeriod.weekly => 0.52,
@@ -43,11 +53,13 @@ class RoomRankingsController {
     final base = switch (category) {
       RoomRankingCategory.wealth => _coinRechargeForPeriod(user, period),
       RoomRankingCategory.sent => user.sentExp + user.sendingLevel * 420,
-      RoomRankingCategory.received => user.receivedExp + user.receivingLevel * 420,
+      RoomRankingCategory.received =>
+        user.receivedExp + user.receivingLevel * 420,
       RoomRankingCategory.relation => _loveAndBondsScoreForPeriod(user, period),
     };
 
-    if (category == RoomRankingCategory.wealth || category == RoomRankingCategory.relation) {
+    if (category == RoomRankingCategory.wealth ||
+        category == RoomRankingCategory.relation) {
       return base;
     }
     return (base * periodMultiplier).round();
@@ -63,7 +75,8 @@ class RoomRankingsController {
   }
 
   int _loveAndBondsScoreForPeriod(SeatUser user, RoomRankingPeriod period) {
-    final lifetimeLoveScore = user.receivedExp ~/ 2 + user.sentExp ~/ 2 + user.vipLevel * 520;
+    final lifetimeLoveScore =
+        user.receivedExp ~/ 2 + user.sentExp ~/ 2 + user.vipLevel * 520;
     return switch (period) {
       RoomRankingPeriod.daily => (lifetimeLoveScore * 0.10).round(),
       RoomRankingPeriod.weekly => (lifetimeLoveScore * 0.38).round(),
@@ -71,7 +84,11 @@ class RoomRankingsController {
     };
   }
 
-  String _scoreTextFor(SeatUser user, RoomRankingCategory category, RoomRankingPeriod period) {
+  String _scoreTextFor(
+    SeatUser user,
+    RoomRankingCategory category,
+    RoomRankingPeriod period,
+  ) {
     final score = _scoreFor(user, category, period);
     if (category == RoomRankingCategory.wealth) return _maskCoinAmount(score);
     return _compactNumber(score);
@@ -85,9 +102,12 @@ class RoomRankingsController {
   }
 
   String _compactNumber(int value) {
-    if (value >= 1000000000) return '${(value / 1000000000).toStringAsFixed(value % 1000000000 == 0 ? 0 : 1)}B';
-    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1)}M';
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}K';
+    if (value >= 1000000000)
+      return '${(value / 1000000000).toStringAsFixed(value % 1000000000 == 0 ? 0 : 1)}B';
+    if (value >= 1000000)
+      return '${(value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1)}M';
+    if (value >= 1000)
+      return '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}K';
     return '$value';
   }
 
@@ -103,8 +123,14 @@ class RoomRankingsController {
   String _subtitleFor(SeatUser user, RoomRankingCategory category) {
     return switch (category) {
       RoomRankingCategory.wealth => 'VIP ${user.vipLevel}',
-      RoomRankingCategory.sent => 'Sending Lv ${user.sendingLevel}',
-      RoomRankingCategory.received => 'Receiving Lv ${user.receivingLevel}',
+      RoomRankingCategory.sent =>
+        user.sendingLevel > 0
+            ? 'Sending Lv ${user.sendingLevel}'
+            : 'Sending level unavailable',
+      RoomRankingCategory.received =>
+        user.receivingLevel > 0
+            ? 'Receiving Lv ${user.receivingLevel}'
+            : 'Receiving level unavailable',
       RoomRankingCategory.relation => 'Love & Bonds score',
     };
   }

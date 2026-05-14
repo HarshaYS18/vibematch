@@ -17,7 +17,9 @@ class LiveRoomUsersController {
     final ids = <String>{};
     final media = LiveRoomMediaSignalingService.instance;
     final snapshot = media.roomSnapshot.value;
-    final presenceUsers = LiveRoomPresenceRepository.currentParticipantsForRoom(media.roomId);
+    final presenceUsers = LiveRoomPresenceRepository.currentParticipantsForRoom(
+      media.roomId,
+    );
 
     void addUser(SeatUser user) {
       if (user.id.trim().isEmpty) return;
@@ -31,20 +33,33 @@ class LiveRoomUsersController {
 
     for (final user in seatedUsers) {
       final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(user.id);
-      addUser(_mergeSeatWithPresence(seatUser: user, presenceUser: presenceUser));
+      addUser(
+        _mergeSeatWithPresence(seatUser: user, presenceUser: presenceUser),
+      );
     }
 
     if (snapshot != null) {
       for (final peer in snapshot.peers) {
-        final existingSeatUser = seatedUsers.firstWhereOrNull((user) => user.id == peer.userId);
-        final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(peer.userId);
-        addUser(_seatUserFromPeer(peer: peer, baseUser: existingSeatUser ?? presenceUser));
+        final existingSeatUser = seatedUsers.firstWhereOrNull(
+          (user) => user.id == peer.userId,
+        );
+        final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(
+          peer.userId,
+        );
+        addUser(
+          _seatUserFromPeer(
+            peer: peer,
+            baseUser: existingSeatUser ?? presenceUser,
+          ),
+        );
       }
     }
 
     for (final user in fallbackRoomUsers) {
       final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(user.id);
-      addUser(_mergeSeatWithPresence(seatUser: user, presenceUser: presenceUser));
+      addUser(
+        _mergeSeatWithPresence(seatUser: user, presenceUser: presenceUser),
+      );
     }
 
     for (final user in inviteUsers) {
@@ -68,7 +83,11 @@ class LiveRoomUsersController {
     String currentUserId = '',
   }) {
     final seatedIds = seatedUsers.map((user) => user.id).toSet();
-    return allRoomUsers.where((user) => user.id != currentUserId && !seatedIds.contains(user.id)).toList();
+    return allRoomUsers
+        .where(
+          (user) => user.id != currentUserId && !seatedIds.contains(user.id),
+        )
+        .toList();
   }
 
   SeatUser resolveUserFromChatEntry({
@@ -77,17 +96,50 @@ class LiveRoomUsersController {
   }) {
     final senderId = entry.senderId;
     if (senderId == null) {
-      return SeatUser(id: 'unknown_sender', name: entry.senderName, roleLabel: 'Member', familyName: '', relationshipText: '', vipLevel: entry.vipLevel, sendingLevel: entry.sendingLevel, receivingLevel: entry.receivingLevel, sentExp: 0, receivedExp: 0, medals: const [], avatarColors: const []);
+      return SeatUser(
+        id: 'unknown_sender',
+        name: entry.senderName,
+        roleLabel: 'Member',
+        familyName: '',
+        relationshipText: '',
+        vipLevel: entry.vipLevel,
+        sendingLevel: entry.sendingLevel,
+        receivingLevel: entry.receivingLevel,
+        sentExp: 0,
+        receivedExp: 0,
+        medals: const [],
+        avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+        avatarUrl: entry.senderAvatarUrl,
+      );
     }
 
     return allRoomUsers.firstWhere(
       (item) => item.id == senderId,
-      orElse: () => SeatUser(id: senderId, name: entry.senderName, roleLabel: 'Member', familyName: '', relationshipText: '', vipLevel: entry.vipLevel, sendingLevel: entry.sendingLevel, receivingLevel: entry.receivingLevel, sentExp: 0, receivedExp: 0, medals: const [], avatarColors: const []),
+      orElse: () => SeatUser(
+        id: senderId,
+        name: entry.senderName,
+        roleLabel: 'Member',
+        familyName: '',
+        relationshipText: '',
+        vipLevel: entry.vipLevel,
+        sendingLevel: entry.sendingLevel,
+        receivingLevel: entry.receivingLevel,
+        sentExp: 0,
+        receivedExp: 0,
+        medals: const [],
+        avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+        avatarUrl: entry.senderAvatarUrl,
+      ),
     );
   }
 
-  SeatUser _seatUserFromPeer({required LiveMediaPeerSnapshot peer, SeatUser? baseUser}) {
-    final displayName = peer.displayName.trim().isNotEmpty ? peer.displayName.trim() : (baseUser?.name ?? _fallbackDisplayNameForUserId(peer.userId));
+  SeatUser _seatUserFromPeer({
+    required LiveMediaPeerSnapshot peer,
+    SeatUser? baseUser,
+  }) {
+    final displayName = peer.displayName.trim().isNotEmpty
+        ? peer.displayName.trim()
+        : (baseUser?.name ?? _fallbackDisplayNameForUserId(peer.userId));
     return SeatUser(
       id: peer.userId,
       name: displayName,
@@ -95,14 +147,17 @@ class LiveRoomUsersController {
       familyName: baseUser?.familyName ?? '',
       familyLevel: baseUser?.familyLevel ?? 'bronze',
       relationshipText: baseUser?.relationshipText ?? '',
-      vipLevel: baseUser?.vipLevel ?? 0,
-      svipLevel: baseUser?.svipLevel ?? 0,
-      sendingLevel: baseUser?.sendingLevel ?? 1,
-      receivingLevel: baseUser?.receivingLevel ?? 1,
+      vipLevel: baseUser?.vipLevel ?? peer.vipLevel,
+      svipLevel: baseUser?.svipLevel ?? peer.svipLevel,
+      sendingLevel: baseUser?.sendingLevel ?? peer.sendingLevel,
+      receivingLevel: baseUser?.receivingLevel ?? peer.receivingLevel,
       sentExp: baseUser?.sentExp ?? 0,
       receivedExp: baseUser?.receivedExp ?? 0,
       medals: baseUser?.medals ?? const [],
-      avatarColors: baseUser?.avatarColors ?? const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      avatarColors:
+          baseUser?.avatarColors ??
+          const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      avatarUrl: baseUser?.avatarUrl ?? peer.avatarUrl,
       age: baseUser?.age,
       locationLabel: baseUser?.locationLabel,
       locationVisible: baseUser?.locationVisible ?? true,
@@ -115,7 +170,10 @@ class LiveRoomUsersController {
     );
   }
 
-  SeatUser _mergeSeatWithPresence({required SeatUser seatUser, SeatUser? presenceUser}) {
+  SeatUser _mergeSeatWithPresence({
+    required SeatUser seatUser,
+    SeatUser? presenceUser,
+  }) {
     if (presenceUser == null) return seatUser;
     return SeatUser(
       id: seatUser.id,
@@ -132,6 +190,7 @@ class LiveRoomUsersController {
       receivedExp: presenceUser.receivedExp,
       medals: presenceUser.medals,
       avatarColors: presenceUser.avatarColors,
+      avatarUrl: presenceUser.avatarUrl,
       age: presenceUser.age,
       locationLabel: presenceUser.locationLabel,
       locationVisible: presenceUser.locationVisible,

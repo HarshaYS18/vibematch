@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -15,6 +16,19 @@ from app.services import global_jungle_game_service as old
 JUNGLE_HUNT_KEY = old.JUNGLE_HUNT_KEY
 LEFT_BASKET_ID = old.LEFT_BASKET_ID
 RIGHT_BASKET_ID = old.RIGHT_BASKET_ID
+LEGACY_JUNGLE_KEYS = {"jungle_hunt", "jackpot_king", JUNGLE_HUNT_KEY}
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
 
 
 def seed_default_games(db: Session, actor: User | None = None) -> GameDefinition:
@@ -28,7 +42,7 @@ def list_catalog(db: Session, include_disabled: bool = False) -> list[dict[str, 
 
 
 def get_definition(db: Session, game_key: str, include_disabled: bool = False) -> GameDefinition:
-    if game_key in {"jungle_hunt", JUNGLE_HUNT_KEY}:
+    if game_key in LEGACY_JUNGLE_KEYS:
         game_pool_service.ensure_main_and_game_pools(db, JUNGLE_HUNT_KEY)
     return old.get_definition(db, game_key, include_disabled=include_disabled)
 
@@ -42,7 +56,7 @@ def upsert_definition(db: Session, actor: User, game_key: str, payload: dict[str
 
 
 def create_round(db: Session, game_key: str, user: User, room_id: int | None = None) -> GameRound:
-    if game_key in {"jungle_hunt", JUNGLE_HUNT_KEY}:
+    if game_key in LEGACY_JUNGLE_KEYS:
         game_pool_service.ensure_main_and_game_pools(db, JUNGLE_HUNT_KEY)
     return old.create_round(db, game_key, user, room_id)
 
@@ -105,7 +119,7 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
             0,
             reason,
             "Bet rejected by production Game House Pool exposure guard",
-            {"requested_amount": amount, "target_id": target_id, "pool_guard": metadata},
+            {"requested_amount": amount, "target_id": target_id, "pool_guard": _json_safe(metadata)},
             user.id,
         )
         db.commit()

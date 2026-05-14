@@ -23,11 +23,7 @@ class RoomUserListHeader extends StatelessWidget {
 }
 
 class RoomUserListCard extends StatelessWidget {
-  const RoomUserListCard({
-    super.key,
-    required this.user,
-    required this.onTap,
-  });
+  const RoomUserListCard({super.key, required this.user, required this.onTap});
 
   final SeatUser user;
   final VoidCallback onTap;
@@ -41,10 +37,7 @@ class RoomUserListCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
               RoomUserListAvatar(user: user, onTap: onTap),
@@ -71,25 +64,38 @@ class RoomUserListAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(colors: user.avatarColors),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          avatarLetter(user.name),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 21,
-            fontWeight: FontWeight.w900,
-          ),
+    final avatarUrl = user.avatarUrl?.trim();
+    final fallback = Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(colors: user.avatarColors),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        avatarLetter(user.name),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 21,
+          fontWeight: FontWeight.w900,
         ),
       ),
+    );
+
+    return GestureDetector(
+      onTap: onTap,
+      child: avatarUrl == null || avatarUrl.isEmpty
+          ? fallback
+          : ClipOval(
+              child: Image.network(
+                avatarUrl,
+                width: 52,
+                height: 52,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => fallback,
+              ),
+            ),
     );
   }
 }

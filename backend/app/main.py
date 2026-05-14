@@ -12,6 +12,7 @@ from app.api.routes import (
     economy_admin,
     families,
     game_pool_admin,
+    game_props_admin,
     games,
     inbox,
     inbox_ws,
@@ -123,6 +124,7 @@ app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(super_owner.router)
 app.include_router(game_pool_admin.router)
+app.include_router(game_props_admin.router)
 app.include_router(rooms.router)
 app.include_router(cricket.router)
 app.include_router(families.router)

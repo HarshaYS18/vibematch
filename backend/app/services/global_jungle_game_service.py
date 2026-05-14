@@ -92,7 +92,23 @@ def _basket_target_ids(outcome_id: int) -> list[int]:
 
 
 def _sync_jungle_definition(db: Session, actor: User | None = None) -> GameDefinition:
-    definition = db.query(GameDefinition).filter(GameDefinition.game_key == JUNGLE_HUNT_KEY).first()
+    rows = (
+        db.query(GameDefinition)
+        .filter(GameDefinition.game_key.in_([JUNGLE_HUNT_KEY, "jackpot_king"]))
+        .order_by(GameDefinition.id.asc())
+        .all()
+    )
+    definition = next((row for row in rows if row.game_key == JUNGLE_HUNT_KEY), None)
+    legacy_definition = next((row for row in rows if row.game_key == "jackpot_king"), None)
+
+    if definition is None and legacy_definition is not None:
+        definition = legacy_definition
+        definition.game_key = JUNGLE_HUNT_KEY
+
+    existing_ui = base._loads(definition.ui_config_json, {}) if definition else {}
+    existing_rules = base._loads(definition.rules_json, {}) if definition else {}
+    existing_risk = base._loads(definition.risk_config_json, {}) if definition else {}
+
     if not definition:
         definition = GameDefinition(
             game_key=JUNGLE_HUNT_KEY,
@@ -102,9 +118,9 @@ def _sync_jungle_definition(db: Session, actor: User | None = None) -> GameDefin
             is_coin_game=True,
             min_app_version="1.0.0",
             config_version=4,
-            ui_config_json=base._dumps(JUNGLE_UI),
-            rules_json=base._dumps(JUNGLE_RULES),
-            risk_config_json=base._dumps(JUNGLE_RISK),
+            ui_config_json=base._dumps({**JUNGLE_UI, **existing_ui}),
+            rules_json=base._dumps({**JUNGLE_RULES, **existing_rules}),
+            risk_config_json=base._dumps({**JUNGLE_RISK, **existing_risk}),
             created_by_user_id=actor.id if actor else None,
             updated_by_user_id=actor.id if actor else None,
         )
@@ -114,9 +130,9 @@ def _sync_jungle_definition(db: Session, actor: User | None = None) -> GameDefin
         definition.is_enabled = True
         definition.is_coin_game = True
         definition.config_version = max(int(definition.config_version or 1), 4)
-        definition.ui_config_json = base._dumps(JUNGLE_UI)
-        definition.rules_json = base._dumps(JUNGLE_RULES)
-        definition.risk_config_json = base._dumps(JUNGLE_RISK)
+        definition.ui_config_json = base._dumps({**JUNGLE_UI, **existing_ui})
+        definition.rules_json = base._dumps({**JUNGLE_RULES, **existing_rules})
+        definition.risk_config_json = base._dumps({**JUNGLE_RISK, **existing_risk})
         if actor:
             definition.updated_by_user_id = actor.id
     db.commit()
@@ -130,11 +146,15 @@ def seed_default_games(db: Session, actor: User | None = None) -> GameDefinition
 
 def list_catalog(db: Session, include_disabled: bool = False) -> list[dict[str, Any]]:
     _sync_jungle_definition(db)
-    return base.list_catalog(db, include_disabled=include_disabled)
+    query = db.query(GameDefinition)
+    if not include_disabled:
+        query = query.filter(GameDefinition.is_enabled.is_(True))
+    definitions = query.order_by(GameDefinition.category.asc(), GameDefinition.display_name.asc()).all()
+    return [base._definition_payload(item) for item in definitions]
 
 
 def get_definition(db: Session, game_key: str, include_disabled: bool = False) -> GameDefinition:
-    if game_key in {"jungle_hunt", JUNGLE_HUNT_KEY}:
+    if game_key in {"jungle_hunt", "jackpot_king", JUNGLE_HUNT_KEY}:
         _sync_jungle_definition(db)
         game_key = JUNGLE_HUNT_KEY
     return base.get_definition(db, game_key, include_disabled=include_disabled)
@@ -149,7 +169,7 @@ def upsert_definition(db: Session, actor: User, game_key: str, payload: dict[str
 
 
 def create_round(db: Session, game_key: str, user: User, room_id: int | None = None) -> GameRound:
-    if game_key in {"jungle_hunt", JUNGLE_HUNT_KEY}:
+    if game_key in {"jungle_hunt", "jackpot_king", JUNGLE_HUNT_KEY}:
         _sync_jungle_definition(db)
         return base.get_or_create_global_round(db, JUNGLE_HUNT_KEY, user)
     return base.create_round(db, game_key, user, room_id)
@@ -196,7 +216,10 @@ def _reject_bet(db: Session, round_obj: GameRound, user: User, target_id: int, a
     return {"bet_id": None, "round_id": round_obj.id, "target_id": target_id, "requested_amount": amount, "accepted_amount": 0, "wallet_coin_balance": wallet.coin_balance, "risk_level": "HIGH", "risk_score": 0, "risk_action": action, "message": message}
 
 
-def _evaluate_whale_risk(db: Session, user: User, amount: int) -> tuple[bool, str, dict[str, Any]]:
+def _evaluate_whale_risk(db: Session, user: User, amount: int, risk: dict[str, Any]) -> tuple[bool, str, dict[str, Any]]:
+    if risk.get("testing_mode_enabled") is True:
+        return False, "testing_mode_bypass", {"testing_mode_enabled": True}
+
     since_day = datetime.utcnow() - timedelta(hours=24)
     since_recent = datetime.utcnow() - timedelta(minutes=5)
     daily_volume = int(db.query(func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.user_id == user.id, GameBet.created_at >= since_day).scalar() or 0)
@@ -205,13 +228,13 @@ def _evaluate_whale_risk(db: Session, user: User, amount: int) -> tuple[bool, st
     recent_count = db.query(GameBet).filter(GameBet.user_id == user.id, GameBet.created_at >= since_recent).count()
     daily_loss = max(debits - credits, 0)
     reasons: list[str] = []
-    if amount >= int(JUNGLE_RISK["whale_single_bet"]):
+    if amount >= int(risk.get("whale_single_bet", JUNGLE_RISK["whale_single_bet"])):
         reasons.append("large_single_bet")
-    if daily_volume + amount > int(JUNGLE_RISK["max_daily_bet_volume"]):
+    if daily_volume + amount > int(risk.get("max_daily_bet_volume", JUNGLE_RISK["max_daily_bet_volume"])):
         reasons.append("daily_volume_limit")
-    if daily_loss > int(JUNGLE_RISK["max_daily_loss"]):
+    if daily_loss > int(risk.get("max_daily_loss", JUNGLE_RISK["max_daily_loss"])):
         reasons.append("daily_loss_limit")
-    if recent_count >= int(JUNGLE_RISK["whale_recent_bet_count"]):
+    if recent_count >= int(risk.get("whale_recent_bet_count", JUNGLE_RISK["whale_recent_bet_count"])):
         reasons.append("high_velocity")
     blocked = "daily_volume_limit" in reasons or "daily_loss_limit" in reasons or len(reasons) >= 2
     return blocked, ",".join(reasons), {"daily_volume": daily_volume, "daily_loss": daily_loss, "recent_count": recent_count, "reasons": reasons}
@@ -223,37 +246,41 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
         raise HTTPException(status_code=404, detail="Game round not found")
     if round_obj.game_key != JUNGLE_HUNT_KEY:
         return base.place_bet(db, round_id, user, target_id, amount)
-    _sync_jungle_definition(db)
-    phase = base._phase_metadata(round_obj, JUNGLE_RULES)
+    definition = _sync_jungle_definition(db)
+    rules = {**JUNGLE_RULES, **base._loads(definition.rules_json, {})}
+    risk = {**JUNGLE_RISK, **base._loads(definition.risk_config_json, {})}
+    phase = base._phase_metadata(round_obj, rules)
     if phase["phase"] != "BETTING":
         return _reject_bet(db, round_obj, user, target_id, amount, "BETTING_CLOSED", "Betting is closed for this round", phase)
-    if int(phase.get("betting_seconds_left", 0)) <= int(JUNGLE_RULES["close_betting_last_seconds"]):
+    if int(phase.get("betting_seconds_left", 0)) <= int(rules.get("close_betting_last_seconds", JUNGLE_RULES["close_betting_last_seconds"])):
         return _reject_bet(db, round_obj, user, target_id, amount, "LAST_SECONDS_LOCKED", "Betting is locked in the last 2 seconds", phase)
-    target_map = {int(item["id"]): item for item in JUNGLE_TARGETS}
+    targets = rules.get("targets") or JUNGLE_TARGETS
+    target_map = {int(item["id"]): item for item in targets}
     if target_id not in target_map:
         raise HTTPException(status_code=400, detail="Invalid game target")
-    if amount not in {10_000, 50_000, 100_000, 500_000, 1_000_000}:
+    allowed_bets = {int(item) for item in rules.get("allowed_bets", JUNGLE_RULES["allowed_bets"])}
+    if amount not in allowed_bets:
         return _reject_bet(db, round_obj, user, target_id, amount, "INVALID_BET_AMOUNT", "Use one of the allowed bet chips")
     distinct_targets = {row[0] for row in db.query(GameBet.target_id).filter(GameBet.round_id == round_id, GameBet.user_id == user.id).distinct().all()}
-    if target_id not in distinct_targets and len(distinct_targets) >= 6:
+    if target_id not in distinct_targets and len(distinct_targets) >= int(rules.get("max_targets_per_user_round", JUNGLE_RULES["max_targets_per_user_round"])):
         return _reject_bet(db, round_obj, user, target_id, amount, "TARGET_LIMIT_REACHED", "You can bid on only 6 items per round")
     existing_total = int(db.query(func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id, GameBet.user_id == user.id).scalar() or 0)
-    if existing_total + amount > int(JUNGLE_RULES["max_total_bet_per_round"]):
+    if existing_total + amount > int(rules.get("max_total_bet_per_round", JUNGLE_RULES["max_total_bet_per_round"])):
         return _reject_bet(db, round_obj, user, target_id, amount, "ROUND_USER_LIMIT", "Round bet limit reached")
-    blocked, reason, risk_meta = _evaluate_whale_risk(db, user, amount)
+    blocked, reason, risk_meta = _evaluate_whale_risk(db, user, amount, risk)
     if blocked:
         return _reject_bet(db, round_obj, user, target_id, amount, "REJECT_WHALE_RISK", "Bet rejected by strict whale detection", risk_meta)
     multiplier = int(target_map[target_id]["multiplier"])
     target_total_after = int(db.query(func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id, GameBet.target_id == target_id).scalar() or 0) + amount
     target_liability = target_total_after * multiplier
-    if target_liability > int(JUNGLE_RULES["max_target_liability"]):
+    if target_liability > int(rules.get("max_target_liability", JUNGLE_RULES["max_target_liability"])):
         return _reject_bet(db, round_obj, user, target_id, amount, "HIGH_TARGET_LIABILITY", "Bet not accepted because this item liability is too high", {"target_liability": target_liability, "multiplier": multiplier})
     all_target_totals = dict(db.query(GameBet.target_id, func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id).group_by(GameBet.target_id).all())
     all_target_totals[target_id] = target_total_after
     worst_liability = 0
-    for item in JUNGLE_TARGETS:
+    for item in targets:
         worst_liability = max(worst_liability, int(all_target_totals.get(item["id"], 0)) * int(item["multiplier"]))
-    if worst_liability > int(JUNGLE_RULES["max_round_liability"]):
+    if worst_liability > int(rules.get("max_round_liability", JUNGLE_RULES["max_round_liability"])):
         return _reject_bet(db, round_obj, user, target_id, amount, "HIGH_ROUND_LIABILITY", "Bet not accepted because round liability is too high", {"worst_liability": worst_liability})
     wallet = economy_service.get_or_create_wallet(db, user.id)
     if wallet.coin_balance < amount:
@@ -265,7 +292,7 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     bet = GameBet(round_id=round_id, user_id=user.id, target_id=target_id, amount=amount, accepted_amount=amount, risk_level="LOW", risk_score=0, risk_action="ALLOW", metadata_json=base._dumps({"scope": "GLOBAL", "whale_reason": reason}))
     db.add(bet)
     round_obj.round_pool_amount += amount
-    platform_fee = amount * int(JUNGLE_RULES["platform_fee_basis_points"]) // 10_000
+    platform_fee = amount * int(rules.get("platform_fee_basis_points", JUNGLE_RULES["platform_fee_basis_points"])) // 10_000
     round_obj.platform_fee_amount += platform_fee
     round_obj.reward_pool_amount += max(amount - platform_fee, 0)
     base.audit(db, round_obj.game_key, round_obj.id, user.id, "BET_ACCEPTED", "LOW", 0, "ALLOW", "Bet accepted after strict whale and liability checks", {"amount": amount, "target_id": target_id, "scope": "GLOBAL"}, user.id)

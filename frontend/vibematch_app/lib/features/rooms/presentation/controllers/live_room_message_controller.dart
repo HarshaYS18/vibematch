@@ -69,6 +69,7 @@ class LiveRoomMessageController {
       ChatEntry(
         senderName: currentUser.name,
         senderId: currentUser.id,
+        senderAvatarUrl: currentUser.avatarUrl,
         message: trimmed,
         vipLevel: currentUser.vipLevel,
         sendingLevel: currentUser.sendingLevel,
@@ -101,6 +102,7 @@ class LiveRoomMessageController {
       ChatEntry(
         senderName: currentUser.name,
         senderId: currentUser.id,
+        senderAvatarUrl: currentUser.avatarUrl,
         message: 'sent an image',
         vipLevel: currentUser.vipLevel,
         sendingLevel: currentUser.sendingLevel,
@@ -130,7 +132,7 @@ class LiveRoomMessageController {
   }
 
   void insertUserEnteredSystemEvent(SeatUser user) =>
-      _insertUserEnteredByName(user.name);
+      _insertUserEnteredByName(user.name, avatarUrl: user.avatarUrl);
 
   void insertUserRemovedSystemEvent({
     required String actorName,
@@ -186,6 +188,7 @@ class LiveRoomMessageController {
       ChatEntry(
         senderName: currentUser.name,
         senderId: currentUser.id,
+        senderAvatarUrl: currentUser.avatarUrl,
         message: approved
             ? 'approved ${user.name} to join $roomName'
             : 'rejected ${user.name}\'s join request',
@@ -254,10 +257,11 @@ class LiveRoomMessageController {
       ChatEntry(
         senderName: applicant?.name ?? event.applicantName,
         senderId: event.applicantUserId,
+        senderAvatarUrl: applicant?.avatarUrl,
         message: 'has applied for seat ${event.seatIndex + 1}',
         vipLevel: applicant?.vipLevel ?? 0,
-        sendingLevel: applicant?.sendingLevel ?? 1,
-        receivingLevel: applicant?.receivingLevel ?? 1,
+        sendingLevel: applicant?.sendingLevel ?? 0,
+        receivingLevel: applicant?.receivingLevel ?? 0,
         isSeatApplication: true,
         seatIndex: event.seatIndex,
         applicationCreatedAt: event.createdAt,
@@ -313,11 +317,12 @@ class LiveRoomMessageController {
     }
   }
 
-  void _insertUserEnteredByName(String rawName) {
+  void _insertUserEnteredByName(String rawName, {String? avatarUrl}) {
     final name = rawName.trim().isEmpty ? 'User' : rawName.trim();
     final entry = ChatEntry(
       senderName: name,
       senderId: 'system',
+      senderAvatarUrl: avatarUrl,
       message: '$name Entered the Room',
       systemEventType: RoomSystemEventType.userEntered,
       autoDismissAt: DateTime.now().add(const Duration(seconds: 5)),

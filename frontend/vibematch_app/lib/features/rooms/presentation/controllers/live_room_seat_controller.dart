@@ -97,7 +97,14 @@ class LiveRoomSeatController {
     final changed =
         nextUser.isRoomAdmin != currentUser.isRoomAdmin ||
         nextUser.isHost != currentUser.isHost ||
-        nextUser.roleLabel != currentUser.roleLabel;
+        nextUser.roleLabel != currentUser.roleLabel ||
+        nextUser.avatarUrl != currentUser.avatarUrl ||
+        nextUser.vipLevel != currentUser.vipLevel ||
+        nextUser.svipLevel != currentUser.svipLevel ||
+        nextUser.sendingLevel != currentUser.sendingLevel ||
+        nextUser.receivingLevel != currentUser.receivingLevel ||
+        nextUser.sentExp != currentUser.sentExp ||
+        nextUser.receivedExp != currentUser.receivedExp;
     if (!changed) return false;
     currentUser = nextUser;
     LiveRoomMediaSignalingService.instance.seedActiveRoomSeatUser(nextUser);
@@ -111,6 +118,11 @@ class LiveRoomSeatController {
       roleLabel: liveUser.roleLabel,
       vipLevel: liveUser.vipLevel,
       svipLevel: liveUser.svipLevel,
+      sendingLevel: liveUser.sendingLevel,
+      receivingLevel: liveUser.receivingLevel,
+      sentExp: liveUser.sentExp,
+      receivedExp: liveUser.receivedExp,
+      avatarUrl: liveUser.avatarUrl,
     );
   }
 
@@ -191,16 +203,17 @@ class LiveRoomSeatController {
       familyName: baseUser?.familyName ?? '',
       familyLevel: baseUser?.familyLevel ?? 'bronze',
       relationshipText: baseUser?.relationshipText ?? '',
-      vipLevel: baseUser?.vipLevel ?? (isFounder ? 32 : 0),
-      svipLevel: baseUser?.svipLevel ?? (isFounder ? 3 : 0),
-      sendingLevel: baseUser?.sendingLevel ?? 1,
-      receivingLevel: baseUser?.receivingLevel ?? 1,
+      vipLevel: baseUser?.vipLevel ?? peer.vipLevel,
+      svipLevel: baseUser?.svipLevel ?? peer.svipLevel,
+      sendingLevel: baseUser?.sendingLevel ?? peer.sendingLevel,
+      receivingLevel: baseUser?.receivingLevel ?? peer.receivingLevel,
       sentExp: baseUser?.sentExp ?? 0,
       receivedExp: baseUser?.receivedExp ?? 0,
       medals: baseUser?.medals ?? const [],
       avatarColors:
           baseUser?.avatarColors ??
           const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      avatarUrl: baseUser?.avatarUrl ?? peer.avatarUrl,
       age: baseUser?.age,
       locationLabel: baseUser?.locationLabel,
       locationVisible: baseUser?.locationVisible ?? true,
@@ -432,6 +445,7 @@ class LiveRoomSeatController {
       ChatEntry(
         senderName: currentUser.name,
         senderId: currentUser.id,
+        senderAvatarUrl: currentUser.avatarUrl,
         message: 'has applied for seat ${index + 1}',
         vipLevel: currentUser.vipLevel,
         sendingLevel: currentUser.sendingLevel,

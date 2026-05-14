@@ -21,8 +21,18 @@ class MiniProfileLevelRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sentStyle = experiencePillStyleFor(type: ExperienceLevelType.sent, level: user.sendingLevel);
-    final receivedStyle = experiencePillStyleFor(type: ExperienceLevelType.received, level: user.receivingLevel);
+    final sentStyle = user.sendingLevel > 0
+        ? experiencePillStyleFor(
+            type: ExperienceLevelType.sent,
+            level: user.sendingLevel,
+          )
+        : null;
+    final receivedStyle = user.receivingLevel > 0
+        ? experiencePillStyleFor(
+            type: ExperienceLevelType.received,
+            level: user.receivingLevel,
+          )
+        : null;
 
     final items = <Widget>[
       if (user.svipLevel > 0)
@@ -37,31 +47,35 @@ class MiniProfileLevelRow extends StatelessWidget {
           active: true,
           onTap: onSvipTap,
         ),
-      MiniProfileCleanLevelPill(
-        label: 'Lv ${user.sendingLevel}',
-        icon: sentStyle.crownIcon,
-        width: 68,
-        background: sentStyle.gradient.first,
-        gradientColors: sentStyle.gradient,
-        border: sentStyle.glowColor,
-        textColor: sentStyle.textColor,
-        shineColor: sentStyle.crownColor,
-        active: user.sendingLevel > 0,
-        onTap: onSendingLevelTap,
-      ),
-      MiniProfileCleanLevelPill(
-        label: 'Lv ${user.receivingLevel}',
-        icon: receivedStyle.crownIcon,
-        width: 68,
-        background: receivedStyle.gradient.first,
-        gradientColors: receivedStyle.gradient,
-        border: receivedStyle.glowColor,
-        textColor: receivedStyle.textColor,
-        shineColor: receivedStyle.crownColor,
-        active: user.receivingLevel > 0,
-        onTap: onReceivingLevelTap,
-      ),
+      if (sentStyle != null)
+        MiniProfileCleanLevelPill(
+          label: 'Lv ${user.sendingLevel}',
+          icon: sentStyle.crownIcon,
+          width: 68,
+          background: sentStyle.gradient.first,
+          gradientColors: sentStyle.gradient,
+          border: sentStyle.glowColor,
+          textColor: sentStyle.textColor,
+          shineColor: sentStyle.crownColor,
+          active: true,
+          onTap: onSendingLevelTap,
+        ),
+      if (receivedStyle != null)
+        MiniProfileCleanLevelPill(
+          label: 'Lv ${user.receivingLevel}',
+          icon: receivedStyle.crownIcon,
+          width: 68,
+          background: receivedStyle.gradient.first,
+          gradientColors: receivedStyle.gradient,
+          border: receivedStyle.glowColor,
+          textColor: receivedStyle.textColor,
+          shineColor: receivedStyle.crownColor,
+          active: true,
+          onTap: onReceivingLevelTap,
+        ),
     ];
+
+    if (items.isEmpty) return const SizedBox.shrink();
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -173,7 +187,12 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
                         fontSize: 10.2,
                         fontWeight: FontWeight.w900,
                         shadows: active && effectiveGradient != null
-                            ? [Shadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 3)]
+                            ? [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.22),
+                                  blurRadius: 3,
+                                ),
+                              ]
                             : null,
                       ),
                     ),
