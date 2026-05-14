@@ -11,6 +11,7 @@ from app.api.routes import (
     economy,
     economy_admin,
     experience,
+    experience_room_public,
     families,
     game_pool_admin,
     game_props_admin,
@@ -138,6 +139,7 @@ app.include_router(love_bonds.router)
 app.include_router(inbox_ws.router)
 app.include_router(room_realtime.router)
 app.include_router(experience.router)
+app.include_router(experience_room_public.router)
 app.include_router(social.router)
 app.include_router(vibes.router)
 app.include_router(notifications.router)
