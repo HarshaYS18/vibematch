@@ -29,18 +29,10 @@ class MiniProfileEconomySummary {
     return MiniProfileEconomySummary(
       monthlyGiftCoinsSent: _int(json['monthly_gift_coins_sent']),
       monthlyGiftCoinsReceived: _int(json['monthly_gift_coins_received']),
-      lifetimeSendExp: _int(json['lifetime_send_exp']) == 0
-          ? _int(sent['total_exp'])
-          : _int(json['lifetime_send_exp']),
-      lifetimeReceiveExp: _int(json['lifetime_receive_exp']) == 0
-          ? _int(received['total_exp'])
-          : _int(json['lifetime_receive_exp']),
-      sentLevel: _int(json['sent_level']) == 0
-          ? _int(sent['level'])
-          : _int(json['sent_level']),
-      receiveLevel: _int(json['receive_level']) == 0
-          ? _int(received['level'])
-          : _int(json['receive_level']),
+      lifetimeSendExp: _int(json['lifetime_send_exp']) == 0 ? _int(sent['total_exp']) : _int(json['lifetime_send_exp']),
+      lifetimeReceiveExp: _int(json['lifetime_receive_exp']) == 0 ? _int(received['total_exp']) : _int(json['lifetime_receive_exp']),
+      sentLevel: _int(json['sent_level']) == 0 ? _int(sent['level']) : _int(json['sent_level']),
+      receiveLevel: _int(json['receive_level']) == 0 ? _int(received['level']) : _int(json['receive_level']),
     );
   }
 
@@ -61,53 +53,69 @@ class MiniProfileEconomyService {
 
   static final MiniProfileEconomyService instance = MiniProfileEconomyService._();
   final AuthLocalStorage _storage = AuthLocalStorage();
-  final Map<int, Future<MiniProfileEconomySummary>> _cache = <int, Future<MiniProfileEconomySummary>>{};
 
-  Future<MiniProfileEconomySummary> summaryForSeatUser(SeatUser user) {
-    final publicUserId = _publicUserIdFromSeatId(user.id);
-    if (publicUserId == null) {
-      return Future<MiniProfileEconomySummary>.value(
-        MiniProfileEconomySummary.fromSeatUser(user),
-      );
+  Future<MiniProfileEconomySummary> summaryForSeatUser(SeatUser user) async {
+    final token = await _storage.getAccessToken();
+    final headers = <String, String>{'Accept': 'application/json'};
+    if (token != null && token.trim().isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
     }
-    return _cache.putIfAbsent(publicUserId, () => _fetch(publicUserId, user));
+
+    final ids = _lookupCandidates(user.id);
+    for (final candidate in ids) {
+      final summary = await _tryFetch(candidate.path, headers, user);
+      if (summary != null) return summary;
+    }
+
+    return MiniProfileEconomySummary.fromSeatUser(user);
   }
 
   void clearCache() {
-    _cache.clear();
+    // Kept for callers, but mini profile must always fetch fresh backend values.
   }
 
-  Future<MiniProfileEconomySummary> _fetch(int publicUserId, SeatUser fallbackUser) async {
+  Future<MiniProfileEconomySummary?> _tryFetch(String path, Map<String, String> headers, SeatUser fallbackUser) async {
     try {
-      final token = await _storage.getAccessToken();
-      final headers = <String, String>{'Accept': 'application/json'};
-      if (token != null && token.trim().isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
-      }
       final response = await http.get(
-        Uri.parse(VmApiConfig.endpoint('/economy/users/public/$publicUserId/summary')),
+        Uri.parse(VmApiConfig.endpoint(path)),
         headers: headers,
       );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return MiniProfileEconomySummary.fromSeatUser(fallbackUser);
-      }
+      if (response.statusCode < 200 || response.statusCode >= 300) return null;
       final decoded = jsonDecode(response.body);
-      if (decoded is! Map<String, dynamic>) {
-        return MiniProfileEconomySummary.fromSeatUser(fallbackUser);
-      }
+      if (decoded is! Map<String, dynamic>) return null;
       return MiniProfileEconomySummary.fromJson(decoded);
     } catch (_) {
-      return MiniProfileEconomySummary.fromSeatUser(fallbackUser);
+      return null;
     }
   }
 
-  int? _publicUserIdFromSeatId(String seatUserId) {
-    final direct = int.tryParse(seatUserId.trim());
-    if (direct != null && direct > 0) return direct;
-    final match = RegExp(r'(\d{7,12})').firstMatch(seatUserId);
-    if (match == null) return null;
-    return int.tryParse(match.group(1) ?? '');
+  List<_MiniProfileLookupCandidate> _lookupCandidates(String seatUserId) {
+    final value = seatUserId.trim();
+    final candidates = <_MiniProfileLookupCandidate>[];
+    final direct = int.tryParse(value);
+    if (direct != null && direct > 0) {
+      if (value.length >= 7) {
+        candidates.add(_MiniProfileLookupCandidate('/economy/users/public/$direct/summary'));
+      }
+      candidates.add(_MiniProfileLookupCandidate('/economy/users/$direct/summary'));
+    }
+
+    final match = RegExp(r'(\d{1,12})').firstMatch(value);
+    final extracted = int.tryParse(match?.group(1) ?? '');
+    if (extracted != null && extracted > 0 && extracted != direct) {
+      if ('$extracted'.length >= 7) {
+        candidates.add(_MiniProfileLookupCandidate('/economy/users/public/$extracted/summary'));
+      }
+      candidates.add(_MiniProfileLookupCandidate('/economy/users/$extracted/summary'));
+    }
+
+    return candidates;
   }
+}
+
+class _MiniProfileLookupCandidate {
+  const _MiniProfileLookupCandidate(this.path);
+  final String path;
 }
 
 Map<String, dynamic> _map(dynamic value) {
