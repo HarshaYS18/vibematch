@@ -8,6 +8,7 @@ from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJo
 from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
 from app.services.rooms.room_background_service import list_room_backgrounds
+from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_service import (
     create_room,
@@ -44,6 +45,21 @@ def get_following_rooms(language: str | None = Query(default=None), category: st
 @router.get("/backgrounds", response_model=list[RoomBackgroundConfigResponse])
 def get_room_backgrounds(mode: str = Query(default="chat_room")):
     return list_room_backgrounds(mode=mode)
+
+
+@router.get("/{room_public_id}/contributions")
+def get_room_contribution_rankings(
+    room_public_id: str,
+    period: str = Query(default="daily"),
+    category: str = Query(default="sent"),
+    limit: int = Query(default=100, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    payload = room_contribution_rankings(db=db, room_public_id=room_public_id, category=category, period=period, limit=limit)
+    if payload is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    return payload
 
 
 @router.get("/{room_public_id}", response_model=RoomDetailResponse)
