@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../modules/gift_slide/presentation/gift_slide_overlay.dart';
 import '../../modules/ribbon_chat/models/ribbon_message.dart';
 import '../../modules/ribbon_chat/presentation/ribbon_message_overlay.dart';
-import '../../modules/video_gift/presentation/video_gift_overlay.dart';
+import '../../modules/video_gift/presentation/clean_video_gift_overlay.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../live_room_models.dart';
 import 'gift_flight_bus.dart';
@@ -60,7 +60,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             slides: normalSlides,
             onComboTap: widget.onComboTap,
           ),
-          VideoGiftOverlay(
+          CleanVideoGiftOverlay(
             slides: widget.slides,
             onVideoFinished: widget.onVideoGiftFinished,
           ),
