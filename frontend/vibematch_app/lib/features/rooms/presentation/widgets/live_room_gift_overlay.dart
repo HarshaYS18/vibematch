@@ -10,6 +10,7 @@ import 'gift_flight_bus.dart';
 import 'gift_flight_overlay.dart';
 import 'gift_modules/lucky_packet_room_overlay.dart';
 import 'live_room_event_carousel.dart';
+import 'premium_gift_broadcast_overlay.dart';
 import 'room_gifts.dart';
 
 class LiveRoomGiftOverlay extends StatefulWidget {
@@ -54,6 +55,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         fit: StackFit.expand,
         clipBehavior: Clip.none,
         children: [
+          const PremiumGiftBroadcastOverlay(),
           GiftSlideOverlay(
             slides: normalSlides,
             onComboTap: widget.onComboTap,
