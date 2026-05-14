@@ -4,9 +4,12 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.economy import CoinSupplyPool, GamePool, UserWallet
+from app.models.room import Room
+from app.models.room_participant import RoomParticipant
 from app.models.user import User
 from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, GiftSendRequest, GiftSendResponse, RubyConversionRequest, RubyWithdrawRequestCreate
 from app.services import economy_level_service, economy_service
+from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/economy", tags=["Economy"])
@@ -73,6 +76,33 @@ def _public_wallet_summary(db: Session, user: User) -> dict:
     }
 
 
+def _active_room_user_ids(db: Session, room_id: int, sender_user_id: int, receiver_user_id: int) -> list[int]:
+    ids = [sender_user_id, receiver_user_id]
+    rows = db.query(RoomParticipant.user_id).filter(RoomParticipant.room_id == room_id, RoomParticipant.is_active.is_(True)).all()
+    ids.extend(int(row[0]) for row in rows)
+    return list(dict.fromkeys(ids))
+
+
+async def _broadcast_room_level_and_rankings(db: Session, room_id: int | None, sender_user_id: int, receiver_user_id: int, exp_updates: dict) -> None:
+    if room_id is None:
+        return
+    room = db.query(Room).filter(Room.id == room_id).first()
+    if room is None:
+        return
+    user_ids = _active_room_user_ids(db, room_id, sender_user_id, receiver_user_id)
+    room_exp = exp_updates.get("room") if isinstance(exp_updates, dict) else None
+    rankings = room_contribution_rankings(db=db, room_public_id=room.room_public_id, category="sent", period="daily", limit=100)
+    await inbox_ws_manager.broadcast_to_users(
+        user_ids,
+        {
+            "event": "room_level_and_contribution_updated",
+            "room_public_id": room.room_public_id,
+            "room_level": room_exp,
+            "contribution_rankings": rankings,
+        },
+    )
+
+
 @router.get("/me", response_model=EconomyDashboardResponse)
 def get_my_economy_dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     data = economy_service.dashboard_for_user(db, current_user)
@@ -133,8 +163,7 @@ async def send_gift(
     exp_updates = result.get("experience_updates") if isinstance(result.get("experience_updates"), dict) else {}
     await inbox_ws_manager.send_to_user(current_user.id, {"event": "experience_updated", "scope": "send", "payload": exp_updates.get("sender")})
     await inbox_ws_manager.send_to_user(payload.receiver_user_id, {"event": "experience_updated", "scope": "receive", "payload": exp_updates.get("receiver"), "ruby": {"earned": result.get("receiver_ruby_amount"), "balance": result.get("receiver_ruby_balance"), "lifetime_rubies_earned": result.get("receiver_lifetime_rubies_earned")}})
-    if exp_updates.get("room") is not None:
-        await inbox_ws_manager.broadcast_to_users([current_user.id, payload.receiver_user_id], {"event": "room_experience_updated", "payload": exp_updates.get("room")})
+    await _broadcast_room_level_and_rankings(db, payload.room_id, current_user.id, payload.receiver_user_id, exp_updates)
     return GiftSendResponse(**result)
 
 
