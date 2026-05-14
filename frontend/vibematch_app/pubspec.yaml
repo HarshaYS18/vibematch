@@ -50,6 +50,7 @@ flutter:
     - assets/images/gifts/
     - assets/gifts/normal/
     - assets/gifts/lucky/
+    - assets/gifts/broadcast/
     - assets/gifts/love_rocket/icon/
     - assets/gifts/love_rocket/effect/
     - assets/images/events/
