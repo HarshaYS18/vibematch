@@ -123,6 +123,8 @@ class LiveRoomGiftController {
   final List<GiftSlide> giftSlides = <GiftSlide>[];
   final Map<String, Timer> _giftTimers = <String, Timer>{};
   final Set<String> _finishedGiftMessageIds = <String>{};
+  final Map<String, _LuckyComboContext> _luckyComboContexts = <String, _LuckyComboContext>{};
+  final Set<String> _luckyComboProcessingSlideIds = <String>{};
 
   LuckyPacketRoomEvent? activeLuckyPacket;
   Timer? _luckyPacketTimer;
@@ -293,32 +295,28 @@ class LiveRoomGiftController {
         final multiplier = result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
         final rewardCoinAmount = result.luckyRewardCoinAmount ?? result.luckyResult?.rewardCoinAmount ?? 0;
         coinBalance = result.senderCoinBalance;
-        final slideColors = _slideColorsForMultiplier(gift.colors, multiplier);
-        final slide = GiftSlide(
-          id: '${receiver.id}-${DateTime.now().microsecondsSinceEpoch}',
-          senderName: currentUser.name,
+        final slide = _createLuckySlide(
+          gift: gift,
           receiverName: receiver.name,
-          giftName: '${gift.name} x$multiplier',
-          giftIcon: gift.icon,
-          giftAssetPath: gift.assetPath,
-          videoAssetPath: gift.videoAssetPath,
-          colors: slideColors,
           combo: effectiveCombo,
+          multiplier: multiplier,
+        );
+        _luckyComboContexts[slide.id] = _LuckyComboContext(
+          gift: gift,
+          receiverPublicUserId: receiverPublicUserId,
+          receiverName: receiver.name,
           baseCombo: effectiveCombo,
-          remainingSeconds: gift.isVideoGift ? 10 : 15,
+          endAlignment: _receiverAlignment(receiver, roomUsers),
         );
         _startGiftSlide(slide);
-        GiftFlightBus.publish(
-          GiftFlightEvent(
-            id: 'flight-${slide.id}',
-            gift: gift,
-            senderName: currentUser.name,
-            receiverName: receiver.name,
-            combo: effectiveCombo,
-            multiplier: multiplier,
-            rewardCoinAmount: rewardCoinAmount,
-            endAlignment: _receiverAlignment(receiver, roomUsers),
-          ),
+        _publishLuckyFlight(
+          slide: slide,
+          gift: gift,
+          receiverName: receiver.name,
+          combo: effectiveCombo,
+          multiplier: multiplier,
+          rewardCoinAmount: rewardCoinAmount,
+          endAlignment: _receiverAlignment(receiver, roomUsers),
         );
       }
     } catch (error) {
@@ -367,6 +365,12 @@ class LiveRoomGiftController {
 
   void tapGiftCombo(GiftSlide slide) {
     if (slide.isVideoGift || slide.giftName == 'Lucky Packet') return;
+    final luckyContext = _luckyComboContexts[slide.id];
+    if (luckyContext != null) {
+      unawaited(_triggerLuckyCombo(slide: slide, context: luckyContext));
+      return;
+    }
+
     final index = giftSlides.indexWhere((item) => item.id == slide.id);
     if (index < 0) return;
     final active = giftSlides[index];
@@ -375,10 +379,58 @@ class LiveRoomGiftController {
     onChanged();
   }
 
+  Future<void> _triggerLuckyCombo({required GiftSlide slide, required _LuckyComboContext context}) async {
+    if (_luckyComboProcessingSlideIds.contains(slide.id)) {
+      onToast('Lucky combo is processing');
+      return;
+    }
+    _luckyComboProcessingSlideIds.add(slide.id);
+    onChanged();
+
+    try {
+      final result = await _giftApi.sendLuckyGiftPublic(
+        receiverPublicUserId: context.receiverPublicUserId,
+        giftId: context.gift.id,
+        coinValue: context.gift.coins,
+        quantity: context.baseCombo,
+        roomPublicId: ActiveRoomContext.roomPublicId,
+      );
+      final multiplier = result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
+      final rewardCoinAmount = result.luckyRewardCoinAmount ?? result.luckyResult?.rewardCoinAmount ?? 0;
+      coinBalance = result.senderCoinBalance;
+
+      final comboSlide = _createLuckySlide(
+        gift: context.gift,
+        receiverName: context.receiverName,
+        combo: context.baseCombo,
+        multiplier: multiplier,
+      );
+      _luckyComboContexts[comboSlide.id] = context;
+      _startGiftSlide(comboSlide);
+      _publishLuckyFlight(
+        slide: comboSlide,
+        gift: context.gift,
+        receiverName: context.receiverName,
+        combo: context.baseCombo,
+        multiplier: multiplier,
+        rewardCoinAmount: rewardCoinAmount,
+        endAlignment: context.endAlignment,
+      );
+    } catch (error) {
+      onToast(error.toString().replaceFirst('Exception: ', ''));
+      unawaited(refreshCoinBalance());
+    } finally {
+      _luckyComboProcessingSlideIds.remove(slide.id);
+      onChanged();
+    }
+  }
+
   void finishVideoGift(GiftSlide slide) {
     final index = giftSlides.indexWhere((item) => item.id == slide.id);
     if (index < 0) return;
     _giftTimers.remove(slide.id)?.cancel();
+    _luckyComboContexts.remove(slide.id);
+    _luckyComboProcessingSlideIds.remove(slide.id);
     giftSlides.removeAt(index);
     onChanged();
   }
@@ -452,6 +504,8 @@ class LiveRoomGiftController {
       if (index < 0) {
         timer.cancel();
         _giftTimers.remove(slide.id);
+        _luckyComboContexts.remove(slide.id);
+        _luckyComboProcessingSlideIds.remove(slide.id);
         return;
       }
       final active = giftSlides[index];
@@ -459,6 +513,8 @@ class LiveRoomGiftController {
         timer.cancel();
         giftSlides.removeAt(index);
         _giftTimers.remove(slide.id);
+        _luckyComboContexts.remove(slide.id);
+        _luckyComboProcessingSlideIds.remove(slide.id);
         if (!active.isVideoGift) _insertFinalGiftMessage(active);
         onChanged();
         return;
@@ -471,6 +527,50 @@ class LiveRoomGiftController {
   void _insertFinalGiftMessage(GiftSlide slide) {
     if (!_finishedGiftMessageIds.add(slide.id)) return;
     onFinalGiftMessage(ChatEntry(senderName: slide.senderName, senderId: currentUser.id, senderAvatarUrl: currentUser.avatarUrl, message: 'sent to ${slide.receiverName} ${slide.giftName} x${slide.combo}', vipLevel: currentUser.vipLevel, sendingLevel: currentUser.sendingLevel, receivingLevel: currentUser.receivingLevel, isGift: true, giftAssetPath: slide.giftAssetPath));
+  }
+
+  GiftSlide _createLuckySlide({
+    required GiftItem gift,
+    required String receiverName,
+    required int combo,
+    required int multiplier,
+  }) {
+    return GiftSlide(
+      id: '$receiverName-${gift.id}-${DateTime.now().microsecondsSinceEpoch}',
+      senderName: currentUser.name,
+      receiverName: receiverName,
+      giftName: '${gift.name} x$multiplier',
+      giftIcon: gift.icon,
+      giftAssetPath: gift.assetPath,
+      videoAssetPath: gift.videoAssetPath,
+      colors: _slideColorsForMultiplier(gift.colors, multiplier),
+      combo: combo,
+      baseCombo: combo,
+      remainingSeconds: gift.isVideoGift ? 10 : 15,
+    );
+  }
+
+  void _publishLuckyFlight({
+    required GiftSlide slide,
+    required GiftItem gift,
+    required String receiverName,
+    required int combo,
+    required int multiplier,
+    required int rewardCoinAmount,
+    required Alignment endAlignment,
+  }) {
+    GiftFlightBus.publish(
+      GiftFlightEvent(
+        id: 'flight-${slide.id}',
+        gift: gift,
+        senderName: currentUser.name,
+        receiverName: receiverName,
+        combo: combo,
+        multiplier: multiplier,
+        rewardCoinAmount: rewardCoinAmount,
+        endAlignment: endAlignment,
+      ),
+    );
   }
 
   int? _publicUserIdFromSeatUser(SeatUser user) {
@@ -506,10 +606,28 @@ class LiveRoomGiftController {
       timer.cancel();
     }
     _giftTimers.clear();
+    _luckyComboContexts.clear();
+    _luckyComboProcessingSlideIds.clear();
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
     LuckyPacketRoomBus.clearController(this);
   }
+}
+
+class _LuckyComboContext {
+  const _LuckyComboContext({
+    required this.gift,
+    required this.receiverPublicUserId,
+    required this.receiverName,
+    required this.baseCombo,
+    required this.endAlignment,
+  });
+
+  final GiftItem gift;
+  final int receiverPublicUserId;
+  final String receiverName;
+  final int baseCombo;
+  final Alignment endAlignment;
 }
 
 typedef VoidCallbackLike = void Function();
