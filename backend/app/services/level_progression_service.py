@@ -12,10 +12,11 @@ class ProgressionTrack(str, Enum):
 
 
 # Product rule:
+# ₹100 recharge gives 1,00,000 coins.
+# Therefore ₹1 worth of coins = 1,000 coin EXP units.
 # Max level should represent around ₹5 crore worth of coins.
-# Assumption for backend testing: 1 INR worth of coins = 100 coin EXP units.
-# So ₹5,00,00,000 => 5,000,000,000 total EXP units at max level.
-INR_TO_COIN_EXP_RATE = 100
+# ₹5,00,00,000 × 1,000 = 50,000,000,000 total EXP units at max level.
+INR_TO_COIN_EXP_RATE = 1_000
 MAX_RUPEE_VALUE = 5_00_00_000
 MAX_TOTAL_EXP = MAX_RUPEE_VALUE * INR_TO_COIN_EXP_RATE
 MAX_LEVEL = 100
