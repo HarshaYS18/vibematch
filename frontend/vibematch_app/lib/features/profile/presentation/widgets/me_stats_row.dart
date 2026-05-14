@@ -2,10 +2,8 @@
 
 import 'package:flutter/material.dart';
 
-import '../../../rooms/data/live_room_membership_service.dart';
 import '../../../social/data/social_api_service.dart';
 import '../../data/profile_api_service.dart';
-import '../../data/profile_rooms_repository.dart';
 import 'me_shared_widgets.dart';
 
 class MeStatsRow extends StatefulWidget {
@@ -35,7 +33,6 @@ class _MeStatsRowState extends State<MeStatsRow> {
   StreamSubscription<ProfileRelationshipRealtimeEvent>? _relationshipRealtimeSub;
   int? _followingCount;
   int? _followersCount;
-  late int _roomsCount = _loadRoomsCount();
 
   @override
   void initState() {
@@ -43,7 +40,6 @@ class _MeStatsRowState extends State<MeStatsRow> {
     _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen((_) {
       unawaited(_loadFollowStats());
     });
-    LiveRoomMembershipService.snapshots.addListener(_handleRoomMembershipChanged);
     unawaited(_loadFollowStats());
   }
 
@@ -51,26 +47,14 @@ class _MeStatsRowState extends State<MeStatsRow> {
   void didUpdateWidget(covariant MeStatsRow oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.userId != widget.userId || oldWidget.publicUserId != widget.publicUserId) {
-      setState(() => _roomsCount = _loadRoomsCount());
+      unawaited(_loadFollowStats());
     }
   }
 
   @override
   void dispose() {
-    LiveRoomMembershipService.snapshots.removeListener(_handleRoomMembershipChanged);
     _relationshipRealtimeSub?.cancel();
     super.dispose();
-  }
-
-  void _handleRoomMembershipChanged() {
-    if (!mounted) return;
-    setState(() => _roomsCount = _loadRoomsCount());
-  }
-
-  int _loadRoomsCount() {
-    return const ProfileRoomsRepository()
-        .loadMyRooms(userId: widget.userId, publicUserId: widget.publicUserId)
-        .length;
   }
 
   Future<void> _loadFollowStats() async {
@@ -85,12 +69,16 @@ class _MeStatsRowState extends State<MeStatsRow> {
         _followersCount = results[1].length;
       });
     } catch (_) {
-      // Keep last visible values if backend is temporarily unavailable.
+      if (!mounted) return;
+      setState(() {
+        _followingCount ??= 0;
+        _followersCount ??= 0;
+      });
     }
   }
 
-  String _compactCount(int? value, String fallback) {
-    if (value == null) return fallback;
+  String _compactCount(int? value) {
+    if (value == null) return '...';
     if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
     if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
     return value.toString();
@@ -100,32 +88,22 @@ class _MeStatsRowState extends State<MeStatsRow> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        MeProfileStat(
-          label: 'Following',
-          value: _compactCount(_followingCount, '...'),
-          icon: Icons.people_alt_rounded,
-          onTap: widget.onFollowingTap,
+        Expanded(
+          child: MeProfileStat(
+            label: 'Following',
+            value: _compactCount(_followingCount),
+            icon: Icons.people_alt_rounded,
+            onTap: widget.onFollowingTap,
+          ),
         ),
-        const SizedBox(width: 7),
-        MeProfileStat(
-          label: 'Followers',
-          value: _compactCount(_followersCount, '...'),
-          icon: Icons.favorite_rounded,
-          onTap: widget.onFollowersTap,
-        ),
-        const SizedBox(width: 7),
-        MeProfileStat(
-          label: 'Rooms',
-          value: _compactCount(_roomsCount, '0'),
-          icon: Icons.mic_rounded,
-          onTap: widget.onRoomsTap,
-        ),
-        const SizedBox(width: 7),
-        MeProfileStat(
-          label: 'Visitors',
-          value: '296',
-          icon: Icons.visibility_rounded,
-          onTap: widget.onVisitorsTap,
+        const SizedBox(width: 9),
+        Expanded(
+          child: MeProfileStat(
+            label: 'Followers',
+            value: _compactCount(_followersCount),
+            icon: Icons.favorite_rounded,
+            onTap: widget.onFollowersTap,
+          ),
         ),
       ],
     );
