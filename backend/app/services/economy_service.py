@@ -87,7 +87,7 @@ def _debit_wallet(db: Session, wallet: UserWallet, currency: EconomyCurrency, am
     if currency == EconomyCurrency.COIN:
         before = wallet.coin_balance
         if before < amount:
-            raise HTTPException(status_code=400, detail="Insufficient coin balance")
+            raise HTTPException(status_code=400, detail="Insufficient coins. Please recharge.")
         wallet.coin_balance -= amount
         wallet.lifetime_coins_spent += amount
         after = wallet.coin_balance
@@ -104,16 +104,7 @@ def credit_lucky_gift_reward(db: Session, user_id: int, reward_coin_amount: int,
     wallet = get_or_create_wallet(db, user_id)
     if reward_coin_amount <= 0:
         return wallet
-    _credit_wallet(
-        db,
-        wallet,
-        EconomyCurrency.COIN,
-        reward_coin_amount,
-        "LUCKY_GIFT_REWARD",
-        source_id,
-        created_by_user_id,
-        "Lucky gift multiplier reward",
-    )
+    _credit_wallet(db, wallet, EconomyCurrency.COIN, reward_coin_amount, "LUCKY_GIFT_REWARD", source_id, created_by_user_id, "Lucky gift multiplier reward")
     db.commit()
     db.refresh(wallet)
     return wallet
@@ -203,25 +194,11 @@ def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, co
     love_score_amount = total_coin_value if relationship_id or is_relationship_gift else 0
 
     sender_wallet = get_or_create_wallet(db, sender.id)
+    if sender_wallet.coin_balance < total_coin_value:
+        raise HTTPException(status_code=400, detail="Insufficient coins. Please recharge.")
     receiver_wallet = get_or_create_wallet(db, receiver_user_id)
 
-    gift_tx = GiftTransaction(
-        sender_user_id=sender.id,
-        receiver_user_id=receiver_user_id,
-        room_id=room_id,
-        gift_id=gift_id,
-        coin_value=coin_value,
-        quantity=quantity,
-        total_coin_value=total_coin_value,
-        receiver_ruby_amount=receiver_ruby_amount,
-        platform_share_coin_value=platform_share_coin_value,
-        agency_share_coin_value=0,
-        room_exp_amount=room_exp_amount,
-        send_exp_amount=total_coin_value,
-        receive_exp_amount=total_coin_value,
-        relationship_id=relationship_id,
-        love_score_amount=love_score_amount,
-    )
+    gift_tx = GiftTransaction(sender_user_id=sender.id, receiver_user_id=receiver_user_id, room_id=room_id, gift_id=gift_id, coin_value=coin_value, quantity=quantity, total_coin_value=total_coin_value, receiver_ruby_amount=receiver_ruby_amount, platform_share_coin_value=platform_share_coin_value, agency_share_coin_value=0, room_exp_amount=room_exp_amount, send_exp_amount=total_coin_value, receive_exp_amount=total_coin_value, relationship_id=relationship_id, love_score_amount=love_score_amount)
     db.add(gift_tx)
     db.flush()
 
@@ -229,41 +206,14 @@ def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, co
     _credit_wallet(db, receiver_wallet, EconomyCurrency.RUBY, receiver_ruby_amount, "GIFT_RECEIVE_RUBY", str(gift_tx.id), sender.id, f"Received gift {gift_id}")
     receiver_wallet.lifetime_coins_received_as_gifts += total_coin_value
 
-    exp_updates = experience_service.apply_gift_exp(
-        db,
-        sender_user_id=sender.id,
-        receiver_user_id=receiver_user_id,
-        room_id=room_id,
-        send_exp=total_coin_value,
-        receive_exp=total_coin_value,
-        room_exp=room_exp_amount,
-        source_id=str(gift_tx.id),
-    )
+    exp_updates = experience_service.apply_gift_exp(db, sender_user_id=sender.id, receiver_user_id=receiver_user_id, room_id=room_id, send_exp=total_coin_value, receive_exp=total_coin_value, room_exp=room_exp_amount, source_id=str(gift_tx.id))
 
     db.commit()
     db.refresh(gift_tx)
     db.refresh(sender_wallet)
     db.refresh(receiver_wallet)
 
-    return {
-        "gift_transaction_id": gift_tx.id,
-        "sender_user_id": sender.id,
-        "receiver_user_id": receiver_user_id,
-        "total_coin_value": total_coin_value,
-        "receiver_ruby_amount": receiver_ruby_amount,
-        "platform_share_coin_value": platform_share_coin_value,
-        "send_exp_amount": total_coin_value,
-        "receive_exp_amount": total_coin_value,
-        "room_exp_amount": room_exp_amount,
-        "love_score_amount": love_score_amount,
-        "sender_coin_balance": sender_wallet.coin_balance,
-        "receiver_ruby_balance": receiver_wallet.ruby_balance,
-        "receiver_lifetime_gift_coin_value": receiver_wallet.lifetime_coins_received_as_gifts,
-        "receiver_lifetime_rubies_earned": receiver_wallet.lifetime_rubies_earned,
-        "experience_updates": exp_updates,
-        "ruby_rule": "Receiver rubies = total gift coin value × 30%.",
-        "rule": "Gift send committed. Sender coins debited; receiver rubies credited at 30%; Send/Receive/Room EXP updated instantly.",
-    }
+    return {"gift_transaction_id": gift_tx.id, "sender_user_id": sender.id, "receiver_user_id": receiver_user_id, "total_coin_value": total_coin_value, "receiver_ruby_amount": receiver_ruby_amount, "platform_share_coin_value": platform_share_coin_value, "send_exp_amount": total_coin_value, "receive_exp_amount": total_coin_value, "room_exp_amount": room_exp_amount, "love_score_amount": love_score_amount, "sender_coin_balance": sender_wallet.coin_balance, "receiver_ruby_balance": receiver_wallet.ruby_balance, "receiver_lifetime_gift_coin_value": receiver_wallet.lifetime_coins_received_as_gifts, "receiver_lifetime_rubies_earned": receiver_wallet.lifetime_rubies_earned, "experience_updates": exp_updates, "ruby_rule": "Receiver rubies = total gift coin value × 30%.", "rule": "Gift send committed. Sender coins debited; receiver rubies credited at 30%; Send/Receive/Room EXP updated instantly."}
 
 
 def convert_rubies_to_coins(db: Session, user: User, ruby_amount: int) -> UserWallet:
