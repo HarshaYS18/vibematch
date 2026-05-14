@@ -5,7 +5,6 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
-import '../../auth/models/current_user.dart';
 import '../../profile/models/vip_wallet_models.dart';
 
 class WalletRealtimeSyncService {
