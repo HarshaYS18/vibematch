@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/room_level_service.dart';
 import '../live_room_models.dart';
 import 'room_contribution_rankings_sheet.dart';
 import 'room_info_sheet.dart';
@@ -24,7 +25,7 @@ class RoomTopBar extends StatelessWidget {
     required this.onRemoveAdmin,
     this.onRoomRankingsTap,
     this.onRoomLevelTap,
-    this.roomLevel = 12,
+    this.roomLevel = 1,
     this.language = 'Telugu',
     this.canManageAdmins = true,
     this.currentUserIsMember = false,
@@ -93,7 +94,16 @@ class RoomTopBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 7),
-        Row(children: [const SizedBox(width: 2), _TrophyButton(onTap: openRankings), const SizedBox(width: 7), _RoomLevelBadge(level: roomLevel, onTap: onRoomLevelTap), const SizedBox(width: 7), _OnlineButton(count: onlineCount, onTap: onUsersTap)]),
+        Row(
+          children: [
+            const SizedBox(width: 2),
+            _TrophyButton(onTap: openRankings),
+            const SizedBox(width: 7),
+            _DynamicRoomLevelBadge(roomPublicId: roomId, fallbackLevel: roomLevel, onTap: onRoomLevelTap),
+            const SizedBox(width: 7),
+            _OnlineButton(count: onlineCount, onTap: onUsersTap),
+          ],
+        ),
       ],
     );
   }
@@ -108,7 +118,7 @@ class RoomTopBar extends StatelessWidget {
   }
 
   void _openDefaultRoomRankings(BuildContext context) {
-    showModalBottomSheet<void>(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => RoomContributionRankingsSheet(roomName: roomName, users: const <SeatUser>[]));
+    showModalBottomSheet<void>(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => RoomContributionRankingsSheet(roomName: roomName, roomPublicId: roomId, users: const <SeatUser>[]));
   }
 }
 
@@ -176,6 +186,25 @@ class _PrivacyIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = mode == RoomPrivacyMode.open ? RoomColors.aqua : RoomColors.gold;
     return Container(width: 18, height: 18, decoration: BoxDecoration(color: color.withValues(alpha: 0.16), shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.26), width: 0.8)), child: Icon(mode.icon, color: color, size: 10));
+  }
+}
+
+class _DynamicRoomLevelBadge extends StatelessWidget {
+  const _DynamicRoomLevelBadge({required this.roomPublicId, required this.fallbackLevel, this.onTap});
+
+  final String roomPublicId;
+  final int fallbackLevel;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<RoomLevelSummary>(
+      future: RoomLevelService.instance.fetchRoomLevel(roomPublicId: roomPublicId, fallbackLevel: fallbackLevel),
+      builder: (context, snapshot) {
+        final level = snapshot.data?.level ?? fallbackLevel;
+        return _RoomLevelBadge(level: level <= 0 ? 1 : level, onTap: onTap);
+      },
+    );
   }
 }
 
