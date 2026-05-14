@@ -138,31 +138,6 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                 alignment: Alignment.center,
                 children: [
                   Positioned.fill(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: frameWidth * 0.105,
-                        vertical: frameHeight * 0.29,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              const Color(0xFFFFF8D9).withValues(alpha: 0.00),
-                              const Color(0xFFFFF5C8).withValues(alpha: 0.18),
-                              const Color(0xFFE8EEF8).withValues(alpha: 0.22),
-                              const Color(0xFFFFF5C8).withValues(alpha: 0.18),
-                              const Color(0xFFFFF8D9).withValues(alpha: 0.00),
-                            ],
-                            stops: const [0, 0.16, 0.50, 0.84, 1],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
                     child: Image.asset(
                       'assets/gifts/broadcast/premium_gift_broadcast_frame.png',
                       fit: BoxFit.fill,
@@ -313,19 +288,6 @@ class _BroadcastAvatar extends StatelessWidget {
 class _FallbackPremiumFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFFFD166), width: 2.2),
-        gradient: LinearGradient(
-          colors: [
-            Colors.black.withValues(alpha: 0.00),
-            Colors.black.withValues(alpha: 0.55),
-            Colors.black.withValues(alpha: 0.55),
-            Colors.black.withValues(alpha: 0.00),
-          ],
-        ),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }
