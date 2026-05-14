@@ -11,6 +11,7 @@ import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import '../widgets/gift_flight_bus.dart';
 import '../widgets/gift_flight_overlay.dart';
+import '../widgets/premium_gift_broadcast_overlay.dart';
 
 enum LuckyPacketPhase { countdown, claim, results }
 
@@ -105,6 +106,8 @@ class LiveRoomGiftController {
   }
 
   static const int smallGiftFlightThreshold = 200000;
+  static const int premiumBroadcastCoinThreshold = 999;
+  static const int premiumBroadcastLuckyMultiplierThreshold = 100;
 
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
@@ -246,6 +249,12 @@ class LiveRoomGiftController {
         remainingSeconds: gift.isVideoGift ? 10 : 15,
       );
       _startGiftSlide(slide);
+      _publishPremiumBroadcastIfNeeded(
+        gift: gift,
+        receiverName: receiver?.name ?? 'all',
+        combo: deliveredCombo,
+        totalCoinValue: gift.coins * deliveredCombo,
+      );
 
       final shouldFly = (gift.coins * deliveredCombo) < smallGiftFlightThreshold;
       if (shouldFly) {
@@ -310,6 +319,13 @@ class LiveRoomGiftController {
           endAlignment: _receiverAlignment(receiver, roomUsers),
         );
         _startGiftSlide(slide);
+        _publishPremiumBroadcastIfNeeded(
+          gift: gift,
+          receiverName: receiver.name,
+          combo: effectiveCombo,
+          totalCoinValue: gift.coins * effectiveCombo,
+          luckyMultiplier: multiplier,
+        );
         _publishLuckyFlight(
           slide: slide,
           gift: gift,
@@ -418,6 +434,13 @@ class LiveRoomGiftController {
       );
       _luckyComboContexts[comboSlide.id] = context;
       _startGiftSlide(comboSlide);
+      _publishPremiumBroadcastIfNeeded(
+        gift: context.gift,
+        receiverName: context.receiverName,
+        combo: context.baseCombo,
+        totalCoinValue: context.gift.coins * context.baseCombo,
+        luckyMultiplier: multiplier,
+      );
       _publishLuckyFlight(
         slide: comboSlide,
         gift: context.gift,
@@ -581,6 +604,31 @@ class LiveRoomGiftController {
         multiplier: multiplier,
         rewardCoinAmount: rewardCoinAmount,
         endAlignment: endAlignment,
+      ),
+    );
+  }
+
+  void _publishPremiumBroadcastIfNeeded({
+    required GiftItem gift,
+    required String receiverName,
+    required int combo,
+    required int totalCoinValue,
+    int? luckyMultiplier,
+  }) {
+    final qualifies =
+        gift.category == GiftCategory.premium ||
+        totalCoinValue >= premiumBroadcastCoinThreshold ||
+        (luckyMultiplier ?? 0) >= premiumBroadcastLuckyMultiplierThreshold;
+    if (!qualifies) return;
+    PremiumGiftBroadcastBus.publish(
+      PremiumGiftBroadcastEvent(
+        id: 'premium-${gift.id}-${DateTime.now().microsecondsSinceEpoch}',
+        senderName: currentUser.name,
+        senderAvatarUrl: currentUser.avatarUrl,
+        targetName: receiverName,
+        giftName: gift.name,
+        combo: combo,
+        giftAssetPath: gift.assetPath,
       ),
     );
   }
