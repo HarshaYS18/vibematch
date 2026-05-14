@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.api.routes import (
     admin,
@@ -100,6 +101,26 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "uploads").mkdir(parents=True, exist_ok=True)
 
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_runtime_schema() -> None:
+    """Small dev/beta schema guard for existing local Postgres tables.
+
+    create_all creates new tables but does not add columns to existing tables.
+    This keeps local closed-beta testing from crashing when the room lock fields
+    are introduced before a formal Alembic migration pipeline is added.
+    """
+    statements = [
+        "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_password_hash VARCHAR(255)",
+        "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_updated_at TIMESTAMP",
+        "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_updated_by_user_id INTEGER",
+    ]
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
+_ensure_runtime_schema()
 
 app = FastAPI(title="Vibe Match API")
 
