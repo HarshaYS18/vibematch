@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../experience/presentation/experience_detail_page.dart';
+import '../../rooms/data/active_room_context.dart';
 import '../../rooms/data/live_room_media_signaling_service.dart';
 
 class RoomLevelPage extends StatelessWidget {
@@ -8,7 +9,7 @@ class RoomLevelPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeRoomId = LiveRoomMediaSignalingService.instance.roomId;
+    final activeRoomId = ActiveRoomContext.roomPublicId ?? LiveRoomMediaSignalingService.instance.roomId;
 
     if (activeRoomId == null || activeRoomId.trim().isEmpty) {
       return Scaffold(
@@ -26,7 +27,7 @@ class RoomLevelPage extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              'Room EXP details will load after the active room session is connected.',
+              'Room EXP details will load after the active room opens.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Color(0xFF7B6A86),
