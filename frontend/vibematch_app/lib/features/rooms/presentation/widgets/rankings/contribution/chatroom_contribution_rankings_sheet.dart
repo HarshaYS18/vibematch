@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../../data/room_contribution_rankings_api_service.dart';
 import '../../../controllers/room_rankings_controller.dart';
 import '../../../live_room_models.dart';
 import '../../room_theme.dart';
@@ -35,21 +38,70 @@ class _ChatroomContributionRankingsSheetState extends State<ChatroomContribution
   ];
 
   final RoomRankingsController _controller = const RoomRankingsController();
+  final RoomContributionRankingsApiService _api = const RoomContributionRankingsApiService();
   late RoomRankingPeriod _period = _periods.contains(widget.initialPeriod) ? widget.initialPeriod : RoomRankingPeriod.daily;
+  List<RoomRankingEntry>? _realEntries;
+  bool _loading = false;
+  String? _error;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadRealEntries());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 4), (_) => unawaited(_loadRealEntries(silent: true)));
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadRealEntries({bool silent = false}) async {
+    if (_loading && silent) return;
+    if (!silent && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final entries = await _api.fetchRoomContributions(roomPublicId: widget.roomPublicId, period: _period);
+      if (!mounted) return;
+      setState(() {
+        _realEntries = entries;
+        _loading = false;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _changePeriod(RoomRankingPeriod period) {
+    if (_period == period) return;
+    setState(() {
+      _period = period;
+      _realEntries = null;
+      _error = null;
+    });
+    unawaited(_loadRealEntries());
+  }
 
   @override
   Widget build(BuildContext context) {
     const category = RoomRankingCategory.sent;
     final accentColor = category.accentColor;
-    final roomScopedUsers = widget.users;
-    final entries = _controller.buildMockEntries(
-      users: roomScopedUsers,
-      category: category,
-      period: _period,
-    );
+    final fallbackEntries = _controller.buildMockEntries(users: widget.users, category: category, period: _period);
+    final entries = (_realEntries != null && _realEntries!.isNotEmpty) ? _realEntries! : fallbackEntries;
     final topEntries = entries.take(100).toList(growable: false);
     final currentEntry = _currentEntry(entries);
-    final backendPath = '/rooms/${widget.roomPublicId}/contributions?period=${_period.backendValue}';
+    final backendPath = '/rooms/${widget.roomPublicId}/contributions?period=${_period.backendValue}&category=sent';
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.78,
@@ -63,51 +115,32 @@ class _ChatroomContributionRankingsSheetState extends State<ChatroomContribution
               children: [
                 const SheetHandle(width: 44, color: Colors.white54),
                 const SizedBox(height: 12),
-                _ContributionHeader(
-                  roomName: widget.roomName,
-                  period: _period,
-                  accentColor: accentColor,
-                  onClose: () => Navigator.pop(context),
-                ),
+                _ContributionHeader(roomName: widget.roomName, period: _period, accentColor: accentColor, onClose: () => Navigator.pop(context)),
                 const SizedBox(height: 12),
-                _ContributionPeriodTabs(
-                  selectedPeriod: _period,
-                  accentColor: accentColor,
-                  onChanged: (period) => setState(() => _period = period),
-                ),
+                _ContributionPeriodTabs(selectedPeriod: _period, accentColor: accentColor, onChanged: _changePeriod),
                 const SizedBox(height: 12),
-                _RoomScopePill(
-                  roomName: widget.roomName,
-                  usersCount: roomScopedUsers.length,
-                  backendPath: backendPath,
-                ),
+                _RoomScopePill(roomName: widget.roomName, usersCount: topEntries.length, backendPath: backendPath, loading: _loading, error: _error),
                 const SizedBox(height: 12),
                 Expanded(
-                  child: ListView.separated(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.only(bottom: currentEntry == null ? 8 : 86),
-                    itemCount: topEntries.length + 1,
-                    separatorBuilder: (context, index) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return RoomRankingsPodiumPreview(entries: entries, accentColor: accentColor);
-                      }
-                      final entry = topEntries[index - 1];
-                      return RoomRankingEntryTile(
-                        entry: entry,
-                        accentColor: accentColor,
-                        onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(entry.user),
-                      );
-                    },
-                  ),
+                  child: topEntries.isEmpty && !_loading
+                      ? _EmptyContributionState(error: _error, onRetry: () => unawaited(_loadRealEntries()))
+                      : ListView.separated(
+                          physics: const BouncingScrollPhysics(),
+                          padding: EdgeInsets.only(bottom: currentEntry == null ? 8 : 86),
+                          itemCount: topEntries.length + 1,
+                          separatorBuilder: (context, index) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            if (index == 0) {
+                              return RoomRankingsPodiumPreview(entries: entries, accentColor: accentColor);
+                            }
+                            final entry = topEntries[index - 1];
+                            return RoomRankingEntryTile(entry: entry, accentColor: accentColor, onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(entry.user));
+                          },
+                        ),
                 ),
                 if (currentEntry != null) ...[
                   const SizedBox(height: 8),
-                  RoomRankingEntryTile(
-                    entry: currentEntry,
-                    accentColor: accentColor,
-                    onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(currentEntry.user),
-                  ),
+                  RoomRankingEntryTile(entry: currentEntry, accentColor: accentColor, onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(currentEntry.user)),
                 ],
               ],
             ),
@@ -126,12 +159,7 @@ class _ChatroomContributionRankingsSheetState extends State<ChatroomContribution
 }
 
 class _ContributionHeader extends StatelessWidget {
-  const _ContributionHeader({
-    required this.roomName,
-    required this.period,
-    required this.accentColor,
-    required this.onClose,
-  });
+  const _ContributionHeader({required this.roomName, required this.period, required this.accentColor, required this.onClose});
 
   final String roomName;
   final RoomRankingPeriod period;
@@ -145,12 +173,7 @@ class _ContributionHeader extends StatelessWidget {
         Container(
           width: 38,
           height: 38,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: accentColor.withValues(alpha: 0.18),
-            border: Border.all(color: accentColor.withValues(alpha: 0.42)),
-            boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.20), blurRadius: 18, offset: const Offset(0, 8))],
-          ),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: accentColor.withValues(alpha: 0.18), border: Border.all(color: accentColor.withValues(alpha: 0.42)), boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.20), blurRadius: 18, offset: const Offset(0, 8))]),
           child: Icon(Icons.emoji_events_rounded, color: accentColor, size: 20),
         ),
         const SizedBox(width: 10),
@@ -158,19 +181,9 @@ class _ContributionHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Chatroom Contribution',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -0.35),
-              ),
+              const Text('Chatroom Contribution', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -0.35)),
               const SizedBox(height: 2),
-              Text(
-                '${period.label} top contributors in this room',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 11.5, fontWeight: FontWeight.w800),
-              ),
+              Text('${period.label} real coin contributors in this room', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 11.5, fontWeight: FontWeight.w800)),
             ],
           ),
         ),
@@ -180,16 +193,7 @@ class _ContributionHeader extends StatelessWidget {
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: onClose,
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.10),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-              ),
-              child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-            ),
+            child: Container(width: 34, height: 34, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.10), border: Border.all(color: Colors.white.withValues(alpha: 0.14))), child: const Icon(Icons.close_rounded, color: Colors.white, size: 18)),
           ),
         ),
       ],
@@ -198,26 +202,21 @@ class _ContributionHeader extends StatelessWidget {
 }
 
 class _RoomScopePill extends StatelessWidget {
-  const _RoomScopePill({
-    required this.roomName,
-    required this.usersCount,
-    required this.backendPath,
-  });
+  const _RoomScopePill({required this.roomName, required this.usersCount, required this.backendPath, required this.loading, required this.error});
 
   final String roomName;
   final int usersCount;
   final String backendPath;
+  final bool loading;
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
+    final statusText = loading ? 'syncing live...' : (error == null ? 'live backend data' : 'fallback: $error');
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: 0.10))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -225,24 +224,35 @@ class _RoomScopePill extends StatelessWidget {
             children: [
               const Icon(Icons.meeting_room_rounded, color: RoomColors.gold, size: 15),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '$roomName only',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900),
-                ),
-              ),
-              Text('$usersCount users', style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 10.5, fontWeight: FontWeight.w800)),
+              Expanded(child: Text('$roomName only', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900))),
+              Text('$usersCount ranks', style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 10.5, fontWeight: FontWeight.w800)),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            'Backend later: GET $backendPath',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.34), fontSize: 9.5, fontWeight: FontWeight.w700),
-          ),
+          Text('$statusText · GET $backendPath', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.34), fontSize: 9.5, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyContributionState extends StatelessWidget {
+  const _EmptyContributionState({required this.error, required this.onRetry});
+
+  final String? error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.emoji_events_outlined, color: Colors.white.withValues(alpha: 0.56), size: 38),
+          const SizedBox(height: 10),
+          Text(error == null ? 'No gifts sent in this room yet' : 'Could not load real rankings', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );
@@ -250,11 +260,7 @@ class _RoomScopePill extends StatelessWidget {
 }
 
 class _ContributionPeriodTabs extends StatelessWidget {
-  const _ContributionPeriodTabs({
-    required this.selectedPeriod,
-    required this.accentColor,
-    required this.onChanged,
-  });
+  const _ContributionPeriodTabs({required this.selectedPeriod, required this.accentColor, required this.onChanged});
 
   final RoomRankingPeriod selectedPeriod;
   final Color accentColor;
@@ -263,7 +269,6 @@ class _ContributionPeriodTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const periods = [RoomRankingPeriod.daily, RoomRankingPeriod.weekly];
-
     return Row(
       children: periods.map((period) {
         final selected = selectedPeriod == period;
@@ -276,19 +281,8 @@ class _ContributionPeriodTabs extends StatelessWidget {
                 duration: const Duration(milliseconds: 140),
                 height: 34,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: selected ? accentColor : Colors.white.withValues(alpha: 0.08),
-                  border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.10)),
-                ),
-                child: Text(
-                  period.label,
-                  style: TextStyle(
-                    color: selected ? RoomColors.deep : Colors.white.withValues(alpha: 0.78),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), color: selected ? accentColor : Colors.white.withValues(alpha: 0.08), border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.10))),
+                child: Text(period.label, style: TextStyle(color: selected ? RoomColors.deep : Colors.white.withValues(alpha: 0.78), fontSize: 12, fontWeight: FontWeight.w900)),
               ),
             ),
           ),
