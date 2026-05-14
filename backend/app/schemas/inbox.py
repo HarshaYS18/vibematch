@@ -113,13 +113,14 @@ class InboxLockStatusResponse(BaseModel):
 
 
 class InboxLockStartSetupRequest(BaseModel):
-    mobile_number: str = Field(min_length=8, max_length=32)
+    lock_code: str | None = Field(default=None, min_length=4, max_length=12)
+    mobile_number: str | None = None
 
 
 class InboxLockVerifySetupRequest(BaseModel):
-    mobile_number: str = Field(min_length=8, max_length=32)
-    otp: str = Field(min_length=4, max_length=8)
     lock_code: str = Field(min_length=4, max_length=12)
+    mobile_number: str | None = None
+    otp: str | None = None
 
 
 class InboxLockVerifyRequest(BaseModel):
@@ -132,13 +133,17 @@ class InboxLockChangeRequest(BaseModel):
 
 
 class InboxLockRecoveryStartRequest(BaseModel):
-    mobile_number: str = Field(min_length=8, max_length=32)
+    mobile_number: str | None = None
 
 
 class InboxLockRecoveryVerifyRequest(BaseModel):
-    mobile_number: str = Field(min_length=8, max_length=32)
-    otp: str = Field(min_length=4, max_length=8)
+    mobile_number: str | None = None
+    otp: str | None = None
     new_lock_code: str = Field(min_length=4, max_length=12)
+
+
+class InboxLockOwnerResetByIdentifierRequest(BaseModel):
+    user_identifier: str = Field(min_length=1, max_length=64, description="public_user_id or display_custom_id")
 
 
 class InboxLockRecoveryRequestResponse(BaseModel):
@@ -148,7 +153,7 @@ class InboxLockRecoveryRequestResponse(BaseModel):
 
 class InboxLockDebugOtpResponse(BaseModel):
     status: str
-    expires_in_minutes: int
+    expires_in_minutes: int = 0
     debug_otp: str | None = None
 
 
