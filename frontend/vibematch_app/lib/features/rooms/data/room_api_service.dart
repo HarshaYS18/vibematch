@@ -18,6 +18,7 @@ class RoomApiService {
     String? subtitle,
     String? avatarUrl,
     String? coverPhotoUrl,
+    String? lockPassword,
   }) async {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -38,21 +39,25 @@ class RoomApiService {
         'language': language.trim(),
         'mode': mode.trim(),
         'type': type.trim(),
+        if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
       }),
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Failed to create room (${response.statusCode}): ${response.body}');
+      throw Exception(_errorMessage(response, fallback: 'Failed to create room'));
     }
 
     return RealRoom.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<RealRoom> updateRoomMode({required String roomId, required String mode}) async {
+  Future<RealRoom> updateRoomMode({required String roomId, required String mode, String? lockPassword}) async {
     final response = await http.patch(
       Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/mode')),
       headers: _authHeaders(),
-      body: jsonEncode({'mode': mode.trim()}),
+      body: jsonEncode({
+        'mode': mode.trim(),
+        if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
+      }),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(_errorMessage(response, fallback: 'Failed to update room mode'));
@@ -105,10 +110,16 @@ class RoomApiService {
     return RealRoom.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<RoomJoinSnapshot> joinRoom(String roomId) async {
-    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/join')), headers: _authHeaders());
+  Future<RoomJoinSnapshot> joinRoom(String roomId, {String? lockPassword}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/join')),
+      headers: _authHeaders(),
+      body: jsonEncode({
+        if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
+      }),
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Failed to join room (${response.statusCode}): ${response.body}');
+      throw Exception(_errorMessage(response, fallback: 'Failed to join room'));
     }
     return RoomJoinSnapshot.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -183,6 +194,7 @@ class RealRoom {
     this.isSecret = false,
     this.isLocked = false,
     this.isMembersOnly = false,
+    this.hasLockPassword = false,
   });
 
   final String id;
@@ -201,6 +213,7 @@ class RealRoom {
   final bool isSecret;
   final bool isLocked;
   final bool isMembersOnly;
+  final bool hasLockPassword;
 
   factory RealRoom.fromJson(Map<String, dynamic> json) {
     final friends = json['followed_friends_inside'];
@@ -221,6 +234,7 @@ class RealRoom {
       isSecret: json['is_secret'] == true,
       isLocked: json['is_locked'] == true,
       isMembersOnly: json['is_members_only'] == true,
+      hasLockPassword: json['has_lock_password'] == true,
     );
   }
 }
