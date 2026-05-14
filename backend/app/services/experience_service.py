@@ -137,12 +137,23 @@ def details_for_public_user_id(db: Session, public_user_id: int) -> dict | None:
     return payload
 
 
+def _room_details_payload(db: Session, room: Room) -> dict:
+    status = get_or_create_room_exp(db, room.id)
+    payload = room_exp_payload(status) or {}
+    payload["room_public_id"] = room.room_public_id
+    payload["room_name"] = room.name
+    return payload
+
+
 def details_for_room(db: Session, room_id: int) -> dict | None:
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         return None
-    status = get_or_create_room_exp(db, room_id)
-    payload = room_exp_payload(status)
-    if payload is not None:
-        payload["room_name"] = room.name
-    return payload
+    return _room_details_payload(db, room)
+
+
+def details_for_room_public_id(db: Session, room_public_id: str) -> dict | None:
+    room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+    if not room:
+        return None
+    return _room_details_payload(db, room)
