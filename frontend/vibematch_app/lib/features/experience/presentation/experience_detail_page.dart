@@ -9,12 +9,14 @@ class ExperienceDetailRouteArgs {
     required this.kind,
     this.publicUserId,
     this.roomId,
+    this.roomPublicId,
     this.title,
   });
 
   final ExperienceDetailKind kind;
   final int? publicUserId;
   final int? roomId;
+  final String? roomPublicId;
   final String? title;
 }
 
@@ -49,9 +51,13 @@ class _ExperienceDetailPageState extends State<ExperienceDetailPage> {
     try {
       final tasks = await _api.loadTasks();
       if (widget.args.kind == ExperienceDetailKind.room) {
+        final roomPublicId = widget.args.roomPublicId?.trim();
         final roomId = widget.args.roomId;
-        if (roomId == null) throw Exception('Missing room id');
-        final room = await _api.loadRoomExperience(roomId);
+        final room = roomPublicId != null && roomPublicId.isNotEmpty
+            ? await _api.loadRoomExperienceByPublicId(roomPublicId)
+            : roomId != null
+                ? await _api.loadRoomExperience(roomId)
+                : throw Exception('Missing room id');
         if (!mounted) return;
         setState(() {
           _roomProfile = room;
