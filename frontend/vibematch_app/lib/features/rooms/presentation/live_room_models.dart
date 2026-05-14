@@ -427,24 +427,33 @@ class SeatLayoutSpec {
 
 String avatarLetter(String input) {
   final trimmed = input.trim();
-  if (trimmed.isEmpty) return '?';
+  if (trimmed.isEmpty) {
+    return '?';
+  }
   return trimmed.substring(0, 1).toUpperCase();
 }
 
 String compactNumber(int value) {
-  if (value >= 1000000)
+  if (value >= 1000000) {
     return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-  if (value >= 1000)
+  }
+  if (value >= 1000) {
     return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+  }
   return '$value';
 }
 
 RoomPrivacyMode privacyModeFromTitle(String title) {
   final value = title.toLowerCase();
-  if (value.contains('lock')) return RoomPrivacyMode.locked;
-  if (value.contains('member')) return RoomPrivacyMode.membersOnly;
-  if (value.contains('private') || value.contains('secret'))
+  if (value.contains('lock')) {
+    return RoomPrivacyMode.locked;
+  }
+  if (value.contains('member')) {
+    return RoomPrivacyMode.membersOnly;
+  }
+  if (value.contains('private') || value.contains('secret')) {
     return RoomPrivacyMode.privateVibe;
+  }
   return RoomPrivacyMode.open;
 }
 
