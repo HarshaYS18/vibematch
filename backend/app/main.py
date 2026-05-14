@@ -10,6 +10,7 @@ from app.api.routes import (
     coin_sales,
     economy,
     economy_admin,
+    economy_gift_public,
     experience,
     experience_room_public,
     families,
@@ -153,6 +154,7 @@ app.include_router(mvp_operations.router)
 app.include_router(mvp_room_modes.router)
 app.include_router(internal_test.router)
 app.include_router(economy.router)
+app.include_router(economy_gift_public.router)
 app.include_router(economy_admin.router)
 app.include_router(games.router)
 app.include_router(coin_sales.router)
