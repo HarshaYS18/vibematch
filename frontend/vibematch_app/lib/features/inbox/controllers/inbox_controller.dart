@@ -194,9 +194,7 @@ class InboxController extends ChangeNotifier {
         final rawMessage = event['message'];
         if (conversationId != null && rawMessage is Map<String, dynamic>) {
           final message = _apiService.messageFromJson(rawMessage);
-          final conversation = conversationById(conversationId);
-          final alreadyExists = conversation?.messages.any((item) => item.id != null && item.id == message.id) ?? false;
-          if (!alreadyExists) _appendMessage(conversationId, message);
+          _appendOrReconcileMessage(conversationId, message);
         }
         break;
       case 'inbox_message_updated':
@@ -364,13 +362,13 @@ class InboxController extends ChangeNotifier {
   }
 
   void addMockAttachment({required String conversationId, required InboxMessageType type}) {
-    final text = switch (type) { InboxMessageType.image => 'ðŸ“· Photo attached', InboxMessageType.voice => 'ðŸŽ™ Voice message 0:08', InboxMessageType.document => 'ðŸ“„ Document attached', InboxMessageType.location => 'ðŸ“ Shared location', _ => 'Attachment' };
+    final text = switch (type) { InboxMessageType.image => '📷 Photo attached', InboxMessageType.voice => '🎙 Voice message 0:08', InboxMessageType.document => '📄 Document attached', InboxMessageType.location => '📍 Shared location', _ => 'Attachment' };
     _appendMessage(conversationId, InboxMessage(id: 'local_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: text, time: 'Now', isMine: true, type: type, status: InboxMessageStatus.read));
   }
 
   void addPickedDocumentAttachment({required String conversationId, required String fileName, required int sizeBytes, String? filePath}) {
     final sizeLabel = _formatBytes(sizeBytes);
-    _appendMessage(conversationId, InboxMessage(id: 'doc_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: 'ðŸ“„ $fileName â€¢ $sizeLabel', time: 'Now', isMine: true, type: InboxMessageType.document, status: InboxMessageStatus.read));
+    _appendMessage(conversationId, InboxMessage(id: 'doc_${DateTime.now().microsecondsSinceEpoch}', sender: 'You', text: '📄 $fileName • $sizeLabel', time: 'Now', isMine: true, type: InboxMessageType.document, status: InboxMessageStatus.read));
   }
 
   Future<InboxReportTask> submitConversationReport({required InboxConversation conversation, required String reason}) async {
@@ -396,7 +394,38 @@ class InboxController extends ChangeNotifier {
 
   String _formatBytes(int bytes) { if (bytes < 1024) return '$bytes B'; final kb = bytes / 1024; if (kb < 1024) return '${kb.toStringAsFixed(kb >= 100 ? 0 : 1)} KB'; final mb = kb / 1024; return '${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB'; }
   void _appendMessage(String conversationId, InboxMessage message) => _replaceConversation(conversationId, (chat) => chat.copyWith(messages: [...chat.messages, message], subtitle: message.text, time: 'Now', unreadCount: 0));
-  void _replaceLocalMessage(String conversationId, InboxMessage local, InboxMessage remote) => _updateMessage(conversationId: conversationId, message: local, mapper: (_) => remote);
+  void _appendOrReconcileMessage(String conversationId, InboxMessage message) => _replaceConversation(conversationId, (chat) {
+    final messages = [...chat.messages];
+    final exactIndex = messages.indexWhere((item) => item.id != null && item.id == message.id);
+    if (exactIndex != -1) {
+      messages[exactIndex] = message;
+      return chat.copyWith(messages: messages, subtitle: message.text, time: 'Now', unreadCount: 0);
+    }
+    final pendingIndex = messages.lastIndexWhere((item) => _isPendingLocalMatch(item, message));
+    if (pendingIndex != -1) {
+      messages[pendingIndex] = message;
+      return chat.copyWith(messages: messages, subtitle: message.text, time: 'Now', unreadCount: 0);
+    }
+    messages.add(message);
+    return chat.copyWith(messages: messages, subtitle: message.text, time: 'Now', unreadCount: 0);
+  });
+  void _replaceLocalMessage(String conversationId, InboxMessage local, InboxMessage remote) => _replaceConversation(conversationId, (chat) {
+    final messages = [...chat.messages];
+    final localIndex = messages.indexWhere((item) => _sameMessage(item, local));
+    final remoteIndex = messages.indexWhere((item) => item.id != null && item.id == remote.id);
+    if (localIndex != -1 && remoteIndex != -1 && localIndex != remoteIndex) {
+      messages.removeAt(localIndex);
+      final adjustedRemoteIndex = remoteIndex > localIndex ? remoteIndex - 1 : remoteIndex;
+      messages[adjustedRemoteIndex] = remote;
+    } else if (localIndex != -1) {
+      messages[localIndex] = remote;
+    } else if (remoteIndex != -1) {
+      messages[remoteIndex] = remote;
+    } else {
+      messages.add(remote);
+    }
+    return chat.copyWith(messages: messages, subtitle: remote.text, time: 'Now', unreadCount: 0);
+  });
   void _removeMessageById(String conversationId, String messageId) => _replaceConversation(conversationId, (chat) { final updated = chat.messages.where((item) => item.id != messageId).toList(); return chat.copyWith(messages: updated, subtitle: updated.isEmpty ? 'No messages yet' : updated.last.text); });
   void _updateMessage({required String conversationId, required InboxMessage message, required InboxMessage Function(InboxMessage item) mapper}) => _replaceConversation(conversationId, (chat) => chat.copyWith(messages: chat.messages.map((item) => _sameMessage(item, message) ? mapper(item) : item).toList()));
   void _replaceConversation(String conversationId, InboxConversation Function(InboxConversation chat) mapper) { _conversations = _conversations.map((chat) => chat.id == conversationId ? mapper(chat) : chat).toList(); _safeNotify(); }
@@ -404,5 +433,11 @@ class InboxController extends ChangeNotifier {
   void _replaceReportTask(String taskId, InboxReportTask replacement) { for (var index = 0; index < _reportTasks.length; index++) { if (_reportTasks[index].id == taskId) { _reportTasks[index] = replacement; _safeNotify(); return; } } }
   void _upsertReportTask(InboxReportTask task) { final index = _reportTasks.indexWhere((item) => item.id == task.id); if (index == -1) { _reportTasks.insert(0, task); } else { _reportTasks[index] = task; } _safeNotify(); }
   bool _sameMessage(InboxMessage a, InboxMessage b) => a.id != null && b.id != null ? a.id == b.id : a.sender == b.sender && a.text == b.text && a.time == b.time && a.isMine == b.isMine;
+  bool _isPendingLocalMatch(InboxMessage local, InboxMessage remote) {
+    final localId = local.id ?? '';
+    if (!localId.startsWith('local_') && !localId.startsWith('doc_')) return false;
+    if (!local.isMine || !remote.isMine) return false;
+    return local.text.trim() == remote.text.trim() && local.type == remote.type && local.replyToText == remote.replyToText;
+  }
 }
 
