@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_routes.dart';
+import '../../../experience/presentation/experience_detail_page.dart';
 import '../../../inbox/data/inbox_api_service.dart';
 import '../../../inbox/presentation/inbox_page_modular.dart';
 import '../../../social/data/social_api_service.dart';
@@ -10,8 +12,6 @@ import '../live_room_models.dart';
 import 'live_room_mini_profile_sheet.dart';
 import 'mini_profile_report_sheet.dart';
 import 'mini_profile_social_actions_row.dart';
-import 'rankings/room_rankings_models.dart';
-import 'rankings/room_rankings_sheet.dart';
 import 'room_kickout_duration_sheet.dart';
 
 class LiveRoomMiniProfileLauncher {
@@ -71,27 +71,29 @@ class LiveRoomMiniProfileLauncher {
           context: context,
           user: user,
         ),
-        onSendingLevelTap: () => LiveRoomProfileNavigator.openSendingExperiencePage(
+        onSendingLevelTap: () => _openExperienceDetailPage(
           context: context,
           user: user,
+          kind: ExperienceDetailKind.sent,
+          title: 'Sent Lv',
         ),
-        onReceivingLevelTap: () => LiveRoomProfileNavigator.openReceivingExperiencePage(
+        onReceivingLevelTap: () => _openExperienceDetailPage(
           context: context,
           user: user,
+          kind: ExperienceDetailKind.received,
+          title: 'Received Lv',
         ),
-        onSentRankingTap: () => _openRankingsSheet(
+        onSentRankingTap: () => _openExperienceDetailPage(
           context: context,
-          roomId: roomId,
-          roomName: roomName,
-          users: allRoomUsers,
-          initialCategory: RoomRankingCategory.sent,
+          user: user,
+          kind: ExperienceDetailKind.sent,
+          title: 'Sent Lv',
         ),
-        onReceivedRankingTap: () => _openRankingsSheet(
+        onReceivedRankingTap: () => _openExperienceDetailPage(
           context: context,
-          roomId: roomId,
-          roomName: roomName,
-          users: allRoomUsers,
-          initialCategory: RoomRankingCategory.received,
+          user: user,
+          kind: ExperienceDetailKind.received,
+          title: 'Received Lv',
         ),
         onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
           context: context,
@@ -197,28 +199,23 @@ class LiveRoomMiniProfileLauncher {
     return 0;
   }
 
-  static void _openRankingsSheet({
+  static void _openExperienceDetailPage({
     required BuildContext context,
-    required String? roomId,
-    required String roomName,
-    required List<SeatUser> users,
-    required RoomRankingCategory initialCategory,
+    required SeatUser user,
+    required ExperienceDetailKind kind,
+    required String title,
   }) {
     Navigator.pop(context);
-
+    final publicUserId = publicUserIdFromRoomUserId(user.id);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (!context.mounted) return;
-
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => RoomRankingsSheet(
-          roomPublicId: roomId ?? 'unknown_room',
-          roomName: roomName,
-          users: users,
-          initialCategory: initialCategory,
-          initialPeriod: RoomRankingPeriod.monthly,
+      Navigator.pushNamed(
+        context,
+        VmRoutes.experienceDetail,
+        arguments: ExperienceDetailRouteArgs(
+          kind: kind,
+          publicUserId: publicUserId,
+          title: title,
         ),
       );
     });
