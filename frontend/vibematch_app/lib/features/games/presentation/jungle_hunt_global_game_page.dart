@@ -830,40 +830,41 @@ class _AmountPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _casinoChipStyles[index % _casinoChipStyles.length];
+    final style = _premiumChipStyles[index % _premiumChipStyles.length];
 
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 160),
-        opacity: enabled ? 1 : 0.86,
+        duration: const Duration(milliseconds: 150),
+        opacity: enabled ? 1 : 0.72,
         child: AnimatedScale(
-          duration: const Duration(milliseconds: 160),
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutBack,
           scale: selected ? 1.10 : 1,
           child: SizedBox(
-            width: 66,
-            height: 66,
+            width: 68,
+            height: 68,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 if (selected)
                   Container(
-                    width: 66,
-                    height: 66,
+                    width: 68,
+                    height: 68,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFFD36A).withValues(alpha: 0.70),
-                          blurRadius: 22,
+                          color: const Color(0xFFFFD36A).withValues(alpha: 0.78),
+                          blurRadius: 24,
                           spreadRadius: 3,
                         ),
                       ],
                     ),
                   ),
                 CustomPaint(
-                  size: const Size(62, 62),
-                  painter: _CasinoChipPainter(
+                  size: const Size(64, 64),
+                  painter: _PremiumCasinoChipPainter(
                     style: style,
                     selected: selected,
                   ),
@@ -879,9 +880,9 @@ class _AmountPill extends StatelessWidget {
                       radius: 0.95,
                       colors: selected
                           ? const [
-                              Color(0xFFFFF8D2),
+                              Color(0xFFFFF7C7),
                               Color(0xFFFFC857),
-                              Color(0xFF8A3B00),
+                              Color(0xFF9A4B07),
                             ]
                           : [
                               style.light,
@@ -890,16 +891,14 @@ class _AmountPill extends StatelessWidget {
                             ],
                     ),
                     border: Border.all(
-                      color: selected
-                          ? const Color(0xFFFFFFFF)
-                          : Colors.white.withValues(alpha: 0.45),
+                      color: selected ? Colors.white : Colors.white.withValues(alpha: 0.48),
                       width: selected ? 2.2 : 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.24),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
+                        color: Colors.black.withValues(alpha: 0.32),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -909,7 +908,7 @@ class _AmountPill extends StatelessWidget {
                       color: Colors.white,
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 0.2,
+                      letterSpacing: 0.1,
                       shadows: [
                         Shadow(color: Colors.black, blurRadius: 5),
                         Shadow(color: Colors.black, offset: Offset(0, 1)),
@@ -926,13 +925,13 @@ class _AmountPill extends StatelessWidget {
   }
 }
 
-class _CasinoChipPainter extends CustomPainter {
-  const _CasinoChipPainter({
+class _PremiumCasinoChipPainter extends CustomPainter {
+  const _PremiumCasinoChipPainter({
     required this.style,
     required this.selected,
   });
 
-  final _CasinoChipStyle style;
+  final _PremiumChipStyle style;
   final bool selected;
 
   @override
@@ -941,14 +940,14 @@ class _CasinoChipPainter extends CustomPainter {
     final radius = size.width / 2;
 
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.34)
+      ..color = Colors.black.withValues(alpha: 0.42)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
-    canvas.drawCircle(center + const Offset(0, 4), radius - 2, shadowPaint);
+    canvas.drawCircle(center + const Offset(0, 4), radius - 3, shadowPaint);
 
     final outerPaint = Paint()
       ..shader = RadialGradient(
-        center: const Alignment(-0.35, -0.45),
-        radius: 0.95,
+        center: const Alignment(-0.38, -0.48),
+        radius: 0.96,
         colors: [
           style.light,
           style.main,
@@ -957,43 +956,49 @@ class _CasinoChipPainter extends CustomPainter {
       ).createShader(Offset.zero & size);
     canvas.drawCircle(center, radius - 2, outerPaint);
 
-    final rimPaint = Paint()
+    final outerRim = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = selected ? 4.2 : 3.2
-      ..color = selected ? const Color(0xFFFFF4B8) : Colors.white.withValues(alpha: 0.34);
-    canvas.drawCircle(center, radius - 5, rimPaint);
+      ..color = selected ? const Color(0xFFFFF2B6) : Colors.white.withValues(alpha: 0.38);
+    canvas.drawCircle(center, radius - 5, outerRim);
 
-    final innerRimPaint = Paint()
+    final darkRim = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
+      ..strokeWidth = 2.1
       ..color = Colors.black.withValues(alpha: 0.24);
-    canvas.drawCircle(center, radius - 13, innerRimPaint);
+    canvas.drawCircle(center, radius - 12, darkRim);
 
     final markPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.4
+      ..strokeWidth = 5.8
       ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: selected ? 0.82 : 0.58);
+      ..color = Colors.white.withValues(alpha: selected ? 0.88 : 0.62);
 
-    final markRadius = radius - 8;
-    final rect = Rect.fromCircle(center: center, radius: markRadius);
+    final markRect = Rect.fromCircle(center: center, radius: radius - 8);
     for (var i = 0; i < 8; i++) {
-      final start = (math.pi * 2 * i / 8) - 0.10;
-      canvas.drawArc(rect, start, 0.20, false, markPaint);
+      final start = (math.pi * 2 * i / 8) - 0.11;
+      canvas.drawArc(markRect, start, 0.22, false, markPaint);
     }
+
+    final innerGlow = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..color = Colors.white.withValues(alpha: 0.22);
+    canvas.drawCircle(center, radius - 18, innerGlow);
 
     final glossPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0x66FFFFFF),
-          Color(0x18FFFFFF),
+          Color(0x77FFFFFF),
+          Color(0x20FFFFFF),
           Color(0x00FFFFFF),
         ],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height / 2.2));
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.54));
+
     canvas.drawArc(
-      Rect.fromCircle(center: center - const Offset(4, 6), radius: radius - 10),
+      Rect.fromCircle(center: center - const Offset(5, 6), radius: radius - 9),
       math.pi,
       math.pi,
       false,
@@ -1002,13 +1007,13 @@ class _CasinoChipPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CasinoChipPainter oldDelegate) {
+  bool shouldRepaint(covariant _PremiumCasinoChipPainter oldDelegate) {
     return oldDelegate.style != style || oldDelegate.selected != selected;
   }
 }
 
-class _CasinoChipStyle {
-  const _CasinoChipStyle({
+class _PremiumChipStyle {
+  const _PremiumChipStyle({
     required this.light,
     required this.main,
     required this.dark,
@@ -1019,12 +1024,12 @@ class _CasinoChipStyle {
   final Color dark;
 }
 
-const List<_CasinoChipStyle> _casinoChipStyles = <_CasinoChipStyle>[
-  _CasinoChipStyle(light: Color(0xFFFFF0A8), main: Color(0xFFFF9B22), dark: Color(0xFF7A3100)),
-  _CasinoChipStyle(light: Color(0xFFBAE7FF), main: Color(0xFF2563EB), dark: Color(0xFF071D66)),
-  _CasinoChipStyle(light: Color(0xFFB8FFDF), main: Color(0xFF0FA66A), dark: Color(0xFF063C2A)),
-  _CasinoChipStyle(light: Color(0xFFFFB3CA), main: Color(0xFFE11D48), dark: Color(0xFF5A0922)),
-  _CasinoChipStyle(light: Color(0xFFE5C5FF), main: Color(0xFF7C3AED), dark: Color(0xFF2A085C)),
+const List<_PremiumChipStyle> _premiumChipStyles = <_PremiumChipStyle>[
+  _PremiumChipStyle(light: Color(0xFFFFF0A8), main: Color(0xFFFF9B22), dark: Color(0xFF7A3100)),
+  _PremiumChipStyle(light: Color(0xFFBAE7FF), main: Color(0xFF2563EB), dark: Color(0xFF071D66)),
+  _PremiumChipStyle(light: Color(0xFFB8FFDF), main: Color(0xFF0FA66A), dark: Color(0xFF063C2A)),
+  _PremiumChipStyle(light: Color(0xFFFFB3CA), main: Color(0xFFE11D48), dark: Color(0xFF5A0922)),
+  _PremiumChipStyle(light: Color(0xFFE5C5FF), main: Color(0xFF7C3AED), dark: Color(0xFF2A085C)),
 ];
 
 class _ResultOverlay extends StatelessWidget {
@@ -1210,6 +1215,9 @@ int _int(dynamic value) {
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }
+
+
+
 
 
 
