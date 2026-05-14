@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
-from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
+from app.models.economy import EconomyCurrency, EconomyDirection, GiftTransaction, UserWallet, WalletLedger
 from app.models.user import User
 from app.services import experience_service
 from app.services import level_progression_service as progression
@@ -28,6 +28,27 @@ def get_or_create_wallet(db: Session, user_id: int) -> UserWallet:
     return wallet
 
 
+def _current_month_filter(query):
+    now = datetime.utcnow()
+    return query.filter(
+        extract("year", GiftTransaction.created_at) == now.year,
+        extract("month", GiftTransaction.created_at) == now.month,
+    )
+
+
+def monthly_gift_coin_totals(db: Session, user_id: int) -> dict[str, int]:
+    sent_query = db.query(func.coalesce(func.sum(GiftTransaction.total_coin_value), 0)).filter(
+        GiftTransaction.sender_user_id == user_id,
+    )
+    received_query = db.query(func.coalesce(func.sum(GiftTransaction.total_coin_value), 0)).filter(
+        GiftTransaction.receiver_user_id == user_id,
+    )
+    return {
+        "sent": int(_current_month_filter(sent_query).scalar() or 0),
+        "received": int(_current_month_filter(received_query).scalar() or 0),
+    }
+
+
 def recharge_exp_totals(db: Session, user_id: int) -> dict[str, int]:
     now = datetime.utcnow()
     base_query = db.query(func.coalesce(func.sum(WalletLedger.amount), 0)).filter(
@@ -49,10 +70,15 @@ def recharge_exp_totals(db: Session, user_id: int) -> dict[str, int]:
 
 def wallet_level_payload(db: Session, wallet: UserWallet) -> dict:
     recharge = recharge_exp_totals(db, wallet.user_id)
+    monthly_gifts = monthly_gift_coin_totals(db, wallet.user_id)
     user_exp = experience_service.get_or_create_user_exp(db, wallet.user_id)
     return {
         "lifetime_recharge_coin_exp": recharge["lifetime"],
         "monthly_recharge_coin_exp": recharge["monthly"],
+        "monthly_gift_coins_sent": monthly_gifts["sent"],
+        "monthly_gift_coins_received": monthly_gifts["received"],
+        "lifetime_send_exp": user_exp.send_total_exp,
+        "lifetime_receive_exp": user_exp.receive_total_exp,
         "vip": progression.vip_payload(recharge["lifetime"]),
         "svip": progression.svip_payload(recharge["monthly"]),
         "sent": progression.send_payload(user_exp.send_total_exp),
