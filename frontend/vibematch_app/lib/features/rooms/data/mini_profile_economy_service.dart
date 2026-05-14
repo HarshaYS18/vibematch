@@ -8,6 +8,8 @@ import '../presentation/live_room_models.dart';
 
 class MiniProfileEconomySummary {
   const MiniProfileEconomySummary({
+    required this.vipLevel,
+    required this.svipLevel,
     required this.monthlyGiftCoinsSent,
     required this.monthlyGiftCoinsReceived,
     required this.lifetimeSendExp,
@@ -16,6 +18,8 @@ class MiniProfileEconomySummary {
     required this.receiveLevel,
   });
 
+  final int vipLevel;
+  final int svipLevel;
   final int monthlyGiftCoinsSent;
   final int monthlyGiftCoinsReceived;
   final int lifetimeSendExp;
@@ -26,7 +30,11 @@ class MiniProfileEconomySummary {
   factory MiniProfileEconomySummary.fromJson(Map<String, dynamic> json) {
     final sent = _map(json['sent']);
     final received = _map(json['received']);
+    final vip = _map(json['vip']);
+    final svip = _map(json['svip']);
     return MiniProfileEconomySummary(
+      vipLevel: _firstPositive([json['vip_level'], vip['level']]),
+      svipLevel: _firstPositive([json['svip_level'], svip['level']]),
       monthlyGiftCoinsSent: _int(json['monthly_gift_coins_sent']),
       monthlyGiftCoinsReceived: _int(json['monthly_gift_coins_received']),
       lifetimeSendExp: _int(json['lifetime_send_exp']) == 0 ? _int(sent['total_exp']) : _int(json['lifetime_send_exp']),
@@ -38,6 +46,8 @@ class MiniProfileEconomySummary {
 
   factory MiniProfileEconomySummary.fromSeatUser(SeatUser user) {
     return MiniProfileEconomySummary(
+      vipLevel: user.vipLevel,
+      svipLevel: user.svipLevel,
       monthlyGiftCoinsSent: user.sentExp,
       monthlyGiftCoinsReceived: user.receivedExp,
       lifetimeSendExp: user.sentExp,
@@ -122,6 +132,14 @@ Map<String, dynamic> _map(dynamic value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) return value.cast<String, dynamic>();
   return const <String, dynamic>{};
+}
+
+int _firstPositive(List<dynamic> values) {
+  for (final value in values) {
+    final parsed = _int(value);
+    if (parsed > 0) return parsed;
+  }
+  return 0;
 }
 
 int _int(dynamic value) {
