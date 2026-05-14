@@ -6,13 +6,14 @@ from app.database import get_db
 from app.models.economy import CoinSupplyPool, GamePool, UserWallet
 from app.models.user import User
 from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, GiftSendRequest, GiftSendResponse, RubyConversionRequest, RubyWithdrawRequestCreate
-from app.services import economy_service
+from app.services import economy_level_service, economy_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/economy", tags=["Economy"])
 
 
-def _wallet_response(wallet: UserWallet) -> EconomyWalletResponse:
+def _wallet_response(db: Session, wallet: UserWallet) -> EconomyWalletResponse:
+    levels = economy_level_service.wallet_level_payload(db, wallet)
     return EconomyWalletResponse(
         user_id=wallet.user_id,
         coin_balance=wallet.coin_balance,
@@ -20,7 +21,14 @@ def _wallet_response(wallet: UserWallet) -> EconomyWalletResponse:
         withdrawable_rubies=max(wallet.ruby_balance - wallet.locked_ruby_balance, 0),
         pending_withdraw_rubies=wallet.pending_withdraw_rubies,
         lifetime_coins_spent=wallet.lifetime_coins_spent,
+        lifetime_coins_received_as_gifts=wallet.lifetime_coins_received_as_gifts,
         lifetime_rubies_earned=wallet.lifetime_rubies_earned,
+        lifetime_recharge_coin_exp=levels["lifetime_recharge_coin_exp"],
+        monthly_recharge_coin_exp=levels["monthly_recharge_coin_exp"],
+        vip=levels["vip"],
+        svip=levels["svip"],
+        sent=levels["sent"],
+        received=levels["received"],
     )
 
 
@@ -41,7 +49,7 @@ def _pool_response(pool: CoinSupplyPool | GamePool | None) -> EconomyPoolRespons
 def get_my_economy_dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     data = economy_service.dashboard_for_user(db, current_user)
     return EconomyDashboardResponse(
-        wallet=_wallet_response(data["wallet"]),
+        wallet=_wallet_response(db, data["wallet"]),
         seller_pool=_pool_response(data["seller_pool"]),
         merchant_pool=_pool_response(data["merchant_pool"]),
         gaming_pool=_pool_response(data["gaming_pool"]),
@@ -89,7 +97,7 @@ async def send_gift(
 @router.post("/rubies/convert-to-coins", response_model=EconomyWalletResponse)
 def convert_rubies_to_coins(payload: RubyConversionRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     wallet = economy_service.convert_rubies_to_coins(db, current_user, payload.ruby_amount)
-    return _wallet_response(wallet)
+    return _wallet_response(db, wallet)
 
 
 @router.post("/rubies/withdraw")
