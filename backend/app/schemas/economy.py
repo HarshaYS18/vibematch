@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -104,6 +105,10 @@ class GiftSendResponse(BaseModel):
     love_score_amount: int
     sender_coin_balance: int
     receiver_ruby_balance: int
+    receiver_lifetime_gift_coin_value: int = 0
+    receiver_lifetime_rubies_earned: int = 0
+    experience_updates: dict[str, Any] = Field(default_factory=dict)
+    ruby_rule: str | None = None
     rule: str
 
 
