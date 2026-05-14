@@ -6,13 +6,14 @@ from app.database import get_db
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
-from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomMemberActionRequest, RoomModeUpdateRequest, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
+from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinRequest, RoomJoinResponse, RoomLeaveResponse, RoomMemberActionRequest, RoomModeUpdateRequest, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
 from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
 from app.services.rooms.room_background_service import list_room_backgrounds
 from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_service import (
+    apply_room_mode,
     cleanup_stale_room_participants,
     create_room,
     get_room_by_public_id,
@@ -41,25 +42,6 @@ def _can_manage_room(db: Session, room: Room, user: User) -> bool:
         return True
     participant = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id).first()
     return bool(participant and participant.is_room_admin)
-
-
-def _normalize_mode(value: str) -> str:
-    raw = (value or "Open").strip().lower()
-    if raw in {"locked", "lock"}:
-        return "Locked"
-    if raw in {"members only", "member only", "members_only", "member", "members"}:
-        return "Members Only"
-    if raw in {"secret vibe", "private vibe", "secret", "private_vibe", "private"}:
-        return "Secret Vibe"
-    return "Open"
-
-
-def _apply_mode(room: Room, mode: str) -> None:
-    normalized = _normalize_mode(mode)
-    room.mode = normalized
-    room.is_secret = normalized == "Secret Vibe"
-    room.is_locked = normalized == "Locked"
-    room.is_members_only = normalized == "Members Only"
 
 
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -117,15 +99,15 @@ def update_room_mode(room_public_id: str, payload: RoomModeUpdateRequest, db: Se
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
     if not _can_manage_room(db, room, current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host/admin or Owner can change room mode")
-    _apply_mode(room, payload.mode)
+    apply_room_mode(room, mode=payload.mode, actor_user_id=current_user.id, lock_password=payload.lock_password)
     db.commit()
     db.refresh(room)
     return room_to_detail_response(room)
 
 
 @router.post("/{room_public_id}/join", response_model=RoomJoinResponse)
-def join_live_room(room_public_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    joined = join_room(db=db, room_public_id=room_public_id, current_user=current_user)
+def join_live_room(room_public_id: str, payload: RoomJoinRequest | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    joined = join_room(db=db, room_public_id=room_public_id, current_user=current_user, lock_password=payload.lock_password if payload else None)
     if joined is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found or not accessible")
     return joined
