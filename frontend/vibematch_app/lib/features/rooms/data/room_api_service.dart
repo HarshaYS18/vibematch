@@ -48,6 +48,18 @@ class RoomApiService {
     return RealRoom.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
+  Future<RealRoom> updateRoomMode({required String roomId, required String mode}) async {
+    final response = await http.patch(
+      Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/mode')),
+      headers: _authHeaders(),
+      body: jsonEncode({'mode': mode.trim()}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_errorMessage(response, fallback: 'Failed to update room mode'));
+    }
+    return RealRoom.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<List<RealRoom>> listTrendingRooms({String? language, String? category, int limit = 30}) async {
     final query = <String, String>{'limit': '$limit'};
     if (language != null && language.trim().isNotEmpty) query['language'] = language.trim();
@@ -135,6 +147,21 @@ class RoomApiService {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
+  }
+
+  String _errorMessage(http.Response response, {required String fallback}) {
+    final body = response.body.trim();
+    if (body.isEmpty) return '$fallback (${response.statusCode})';
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail']?.toString().trim();
+        if (detail != null && detail.isNotEmpty) return detail;
+      }
+    } catch (_) {
+      return body;
+    }
+    return '$fallback (${response.statusCode})';
   }
 }
 
