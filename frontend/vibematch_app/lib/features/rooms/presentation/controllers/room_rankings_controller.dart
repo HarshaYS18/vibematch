@@ -90,24 +90,31 @@ class RoomRankingsController {
     RoomRankingPeriod period,
   ) {
     final score = _scoreFor(user, category, period);
-    if (category == RoomRankingCategory.wealth) return _maskCoinAmount(score);
+    if (category == RoomRankingCategory.wealth) {
+      return _maskCoinAmount(score);
+    }
     return _compactNumber(score);
   }
 
   String _maskCoinAmount(int value) {
     final raw = value.abs().toString();
-    if (raw.length <= 3) return raw;
+    if (raw.length <= 3) {
+      return raw;
+    }
     final hidden = List<String>.filled(raw.length - 3, '*').join();
     return '${raw.substring(0, 2)}$hidden${raw.substring(raw.length - 1)}';
   }
 
   String _compactNumber(int value) {
-    if (value >= 1000000000)
+    if (value >= 1000000000) {
       return '${(value / 1000000000).toStringAsFixed(value % 1000000000 == 0 ? 0 : 1)}B';
-    if (value >= 1000000)
+    }
+    if (value >= 1000000) {
       return '${(value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1)}M';
-    if (value >= 1000)
+    }
+    if (value >= 1000) {
       return '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}K';
+    }
     return '$value';
   }
 
