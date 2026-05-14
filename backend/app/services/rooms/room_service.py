@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password, verify_password
 from app.models.follow import UserFollow
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
@@ -57,11 +58,58 @@ def _normalize_mode(value: str | None) -> str:
     raw = (value or "Open").strip().lower()
     if raw in {"locked", "lock"}:
         return "Locked"
-    if raw in {"members only", "member only", "members_only", "member"}:
+    if raw in {"members only", "member only", "members_only", "member", "members"}:
         return "Members Only"
-    if raw in {"secret vibe", "private vibe", "secret", "private_vibe"}:
+    if raw in {"secret vibe", "private vibe", "secret", "private_vibe", "private"}:
         return "Secret Vibe"
     return "Open"
+
+
+def _clean_lock_password(value: str | None) -> str | None:
+    text = (value or "").strip()
+    return text or None
+
+
+def _set_room_lock_password(room: Room, lock_password: str | None, actor_user_id: int | None) -> None:
+    clean_password = _clean_lock_password(lock_password)
+    if clean_password is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Enter a room lock before locking the room.")
+    room.lock_password_hash = hash_password(clean_password)
+    room.lock_updated_at = datetime.utcnow()
+    room.lock_updated_by_user_id = actor_user_id
+
+
+def _clear_room_lock_password(room: Room) -> None:
+    room.lock_password_hash = None
+    room.lock_updated_at = None
+    room.lock_updated_by_user_id = None
+
+
+def _lock_password_matches(room: Room, lock_password: str | None) -> bool:
+    clean_password = _clean_lock_password(lock_password)
+    stored_hash = (room.lock_password_hash or "").strip()
+    if clean_password is None or not stored_hash:
+        return False
+    try:
+        return verify_password(clean_password, stored_hash)
+    except Exception:
+        return False
+
+
+def apply_room_mode(room: Room, *, mode: str, actor_user_id: int | None = None, lock_password: str | None = None) -> Room:
+    normalized = _normalize_mode(mode)
+    room.mode = normalized
+    room.is_secret = normalized == "Secret Vibe"
+    room.is_locked = normalized == "Locked"
+    room.is_members_only = normalized == "Members Only"
+
+    if normalized == "Locked":
+        _set_room_lock_password(room, lock_password, actor_user_id)
+    else:
+        _clear_room_lock_password(room)
+
+    room.updated_at = datetime.utcnow()
+    return room
 
 
 def _apply_room_payload(room: Room, payload: RoomCreateRequest) -> Room:
@@ -76,11 +124,8 @@ def _apply_room_payload(room: Room, payload: RoomCreateRequest) -> Room:
     elif payload.avatar_url and payload.avatar_url.strip():
         room.cover_photo_url = payload.avatar_url.strip()
     room.language = payload.language.strip() or "English"
-    room.mode = mode
     room.room_type = room_type
-    room.is_secret = mode == "Secret Vibe"
-    room.is_locked = mode == "Locked"
-    room.is_members_only = mode == "Members Only"
+    apply_room_mode(room, mode=mode, actor_user_id=room.owner_user_id, lock_password=payload.lock_password)
     room.is_active = True
     room.updated_at = datetime.utcnow()
     return room
@@ -120,25 +165,31 @@ def _upsert_saved_participant(db: Session, room: Room, user: User, *, is_member:
     return participant
 
 
-def _can_enter_room(db: Session, room: Room, user: User) -> bool:
-    # Host, official Owner/Super Owner, and approved chatroom admins can enter.
+def _can_enter_room(db: Session, room: Room, user: User, lock_password: str | None = None) -> bool:
+    # Host, official Owner/Super Owner, and approved chatroom admins can enter without lock/password.
     if _can_manage_room_db(db, room, user):
         return True
     participant = _existing_participant(db, room, user)
     approved = participant is not None and (participant.is_member or participant.is_room_admin)
-    if room.is_secret or room.is_members_only or room.is_locked:
-        return approved
+    if approved:
+        return True
+    if room.is_secret or room.is_members_only:
+        return False
+    if room.is_locked:
+        return _lock_password_matches(room, lock_password)
     # Open rooms allow visitors to enter, but they are not chatroom members until approved.
     return True
 
 
-def _room_access_denied_message(room: Room) -> str:
+def _room_access_denied_message(room: Room, *, lock_password: str | None = None) -> str:
     if room.is_secret:
         return "This Secret Vibe room is invite-only."
     if room.is_members_only:
         return "This room is members-only. Ask the channel host/admin for approval."
     if room.is_locked:
-        return "This room is locked. Enter with a valid invite or room access approval."
+        if _clean_lock_password(lock_password) is None:
+            return "This room is locked. Enter the room lock or use an invite from the channel owner/admin."
+        return "Incorrect room lock. Try again or ask the channel owner/admin for an invite."
     return "Room not found or not accessible"
 
 
@@ -191,7 +242,7 @@ def room_to_trending_response(room: Room, followed_friends_inside: list[str] | N
 
 
 def room_to_detail_response(room: Room) -> RoomDetailResponse:
-    return RoomDetailResponse(id=room.room_public_id, name=room.name, subtitle=room.subtitle, avatar_url=room.avatar_url, cover_photo_url=room.cover_photo_url or room.avatar_url, language=room.language, mode=room.mode, type=room.room_type, online_count=room.online_count, trending_score=room.trending_score, followed_friends_inside=[], owner_user_id=room.owner_user_id, is_active=room.is_active, is_secret=room.is_secret, is_locked=room.is_locked, is_members_only=room.is_members_only)
+    return RoomDetailResponse(id=room.room_public_id, name=room.name, subtitle=room.subtitle, avatar_url=room.avatar_url, cover_photo_url=room.cover_photo_url or room.avatar_url, language=room.language, mode=room.mode, type=room.room_type, online_count=room.online_count, trending_score=room.trending_score, followed_friends_inside=[], owner_user_id=room.owner_user_id, is_active=room.is_active, is_secret=room.is_secret, is_locked=room.is_locked, is_members_only=room.is_members_only, has_lock_password=bool((room.lock_password_hash or '').strip()))
 
 
 def participant_to_response(db: Session, participant: RoomParticipant, room: Room) -> RoomParticipantUserResponse:
@@ -242,7 +293,8 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
     room_type = payload.type.strip() or "Chat"
     avatar_url = payload.avatar_url.strip() if payload.avatar_url else None
     cover_photo_url = payload.cover_photo_url.strip() if payload.cover_photo_url else avatar_url
-    room = Room(room_public_id=generate_room_public_id(db), owner_user_id=current_user.id, name=payload.name.strip(), subtitle=payload.subtitle.strip() if payload.subtitle else None, avatar_url=avatar_url, cover_photo_url=cover_photo_url, language=payload.language.strip() or "English", mode=mode, room_type=room_type, online_count=0, trending_score=1, is_secret=mode == "Secret Vibe", is_locked=mode == "Locked", is_members_only=mode == "Members Only", is_active=True)
+    room = Room(room_public_id=generate_room_public_id(db), owner_user_id=current_user.id, name=payload.name.strip(), subtitle=payload.subtitle.strip() if payload.subtitle else None, avatar_url=avatar_url, cover_photo_url=cover_photo_url, language=payload.language.strip() or "English", room_type=room_type, online_count=0, trending_score=1, is_active=True)
+    apply_room_mode(room, mode=mode, actor_user_id=current_user.id, lock_password=payload.lock_password)
     db.add(room)
     db.flush()
     _upsert_active_participant(db, room, current_user)
@@ -266,12 +318,12 @@ def get_room_by_public_id(db: Session, room_public_id: str) -> RoomDetailRespons
     return room_to_detail_response(room)
 
 
-def join_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinResponse | None:
+def join_room(db: Session, room_public_id: str, current_user: User, lock_password: str | None = None) -> RoomJoinResponse | None:
     room = get_room_model_by_public_id(db, room_public_id)
     if not room:
         return None
-    if not _can_enter_room(db, room, current_user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_room_access_denied_message(room))
+    if not _can_enter_room(db, room, current_user, lock_password=lock_password):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_room_access_denied_message(room, lock_password=lock_password))
 
     previous = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == current_user.id).first()
     was_active = previous.is_active if previous is not None else False
@@ -286,7 +338,16 @@ def join_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinR
 
 
 def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinResponse | None:
-    joined = join_room(db, room_public_id, current_user)
+    room = get_room_model_by_public_id(db, room_public_id)
+    if room is None:
+        return None
+    participant = _existing_participant(db, room, current_user)
+    if participant is not None and participant.is_active:
+        joined = join_room(db, room_public_id, current_user, lock_password=None)
+        if joined is not None:
+            joined.should_show_entered_message = False
+        return joined
+    joined = join_room(db, room_public_id, current_user, lock_password=None)
     if joined is not None:
         joined.should_show_entered_message = False
     return joined
