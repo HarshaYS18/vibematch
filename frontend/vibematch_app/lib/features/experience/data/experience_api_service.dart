@@ -37,6 +37,12 @@ class ExperienceApiService {
     return RoomExperienceProfile.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
+  Future<RoomExperienceProfile> loadRoomExperienceByPublicId(String roomPublicId) async {
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/experience/rooms/public/$roomPublicId')), headers: await _headers());
+    _throwIfFailed(response, 'load room experience');
+    return RoomExperienceProfile.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<ExperienceTasks> loadTasks() async {
     final response = await http.get(Uri.parse(VmApiConfig.endpoint('/experience/tasks')), headers: await _headers());
     _throwIfFailed(response, 'load experience tasks');
@@ -76,15 +82,17 @@ class ExperienceProfile {
 }
 
 class RoomExperienceProfile {
-  const RoomExperienceProfile({required this.roomId, this.roomName, required this.room});
+  const RoomExperienceProfile({required this.roomId, this.roomPublicId, this.roomName, required this.room});
 
   final int roomId;
+  final String? roomPublicId;
   final String? roomName;
   final ExperienceProgress room;
 
   factory RoomExperienceProfile.fromJson(Map<String, dynamic> json) {
     return RoomExperienceProfile(
       roomId: (json['room_id'] as num?)?.toInt() ?? 0,
+      roomPublicId: json['room_public_id']?.toString(),
       roomName: json['room_name']?.toString(),
       room: ExperienceProgress.fromJson((json['room'] as Map?)?.cast<String, dynamic>() ?? const {}),
     );
@@ -113,6 +121,7 @@ class ExperienceProgress {
   final bool isMaxLevel;
 
   factory ExperienceProgress.fromJson(Map<String, dynamic> json) {
+    final rawProgress = (json['progress'] as num?)?.toDouble() ?? 0.0;
     return ExperienceProgress(
       level: (json['level'] as num?)?.toInt() ?? 1,
       totalExp: (json['total_exp'] as num?)?.toInt() ?? 0,
@@ -120,7 +129,7 @@ class ExperienceProgress {
       nextLevelExp: (json['next_level_exp'] as num?)?.toInt() ?? 0,
       expIntoLevel: (json['exp_into_level'] as num?)?.toInt() ?? 0,
       expNeededForNextLevel: (json['exp_needed_for_next_level'] as num?)?.toInt() ?? 1,
-      progress: ((json['progress'] as num?)?.toDouble() ?? 0).clamp(0, 1),
+      progress: rawProgress.clamp(0.0, 1.0),
       isMaxLevel: json['is_max_level'] == true,
     );
   }
