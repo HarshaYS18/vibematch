@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/mini_profile_economy_service.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
 import 'vip_badge.dart';
@@ -105,20 +106,35 @@ class UserMiniProfileSheet extends StatelessWidget {
                   const SizedBox(height: 7),
                   _MetaRow(user: user),
                   const SizedBox(height: 9),
-                  _StatsLine(
-                    sentTotalCoins: user.sentExp,
-                    receivedTotalCoins: user.receivedExp,
-                    onSentTap: onSentRankingTap,
-                    onReceivedTap: onReceivedRankingTap,
-                  ),
-                  const SizedBox(height: 9),
-                  _MiniActionRow(
-                    onVipTap: onVipTap,
-                    onSendingLevelTap: onSendingLevelTap,
-                    onReceivingLevelTap: onReceivingLevelTap,
-                    onFamilyTap: onFamilyTap,
-                    onRelationshipTap: onRelationshipTap,
-                    onMedalsTap: onMedalsTap,
+                  FutureBuilder<MiniProfileEconomySummary>(
+                    future: MiniProfileEconomyService.instance.summaryForSeatUser(user),
+                    builder: (context, snapshot) {
+                      final economy = snapshot.data ?? MiniProfileEconomySummary.fromSeatUser(user);
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _StatsLine(
+                            sentTotalCoins: economy.monthlyGiftCoinsSent,
+                            receivedTotalCoins: economy.monthlyGiftCoinsReceived,
+                            onSentTap: onSentRankingTap,
+                            onReceivedTap: onReceivedRankingTap,
+                          ),
+                          const SizedBox(height: 9),
+                          _MiniActionRow(
+                            sendingLevel: economy.sentLevel,
+                            receivingLevel: economy.receiveLevel,
+                            lifetimeSendExp: economy.lifetimeSendExp,
+                            lifetimeReceiveExp: economy.lifetimeReceiveExp,
+                            onVipTap: onVipTap,
+                            onSendingLevelTap: onSendingLevelTap,
+                            onReceivingLevelTap: onReceivingLevelTap,
+                            onFamilyTap: onFamilyTap,
+                            onRelationshipTap: onRelationshipTap,
+                            onMedalsTap: onMedalsTap,
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 10),
                   _SendGiftButton(onTap: onGiftTap),
@@ -473,8 +489,23 @@ class _FollowStat extends StatelessWidget {
 }
 
 class _MiniActionRow extends StatelessWidget {
-  const _MiniActionRow({required this.onVipTap, required this.onSendingLevelTap, required this.onReceivingLevelTap, required this.onFamilyTap, required this.onRelationshipTap, required this.onMedalsTap});
+  const _MiniActionRow({
+    required this.sendingLevel,
+    required this.receivingLevel,
+    required this.lifetimeSendExp,
+    required this.lifetimeReceiveExp,
+    required this.onVipTap,
+    required this.onSendingLevelTap,
+    required this.onReceivingLevelTap,
+    required this.onFamilyTap,
+    required this.onRelationshipTap,
+    required this.onMedalsTap,
+  });
 
+  final int sendingLevel;
+  final int receivingLevel;
+  final int lifetimeSendExp;
+  final int lifetimeReceiveExp;
   final VoidCallback onVipTap;
   final VoidCallback onSendingLevelTap;
   final VoidCallback onReceivingLevelTap;
@@ -490,8 +521,18 @@ class _MiniActionRow extends StatelessWidget {
       child: Row(
         children: [
           _ActionPill(icon: Icons.workspace_premium_rounded, label: 'VIP', color: RoomColors.gold, onTap: onVipTap),
-          _ActionPill(icon: Icons.north_east_rounded, label: 'Send Lv', color: RoomColors.violet, onTap: onSendingLevelTap),
-          _ActionPill(icon: Icons.favorite_rounded, label: 'Receive Lv', color: RoomColors.coral, onTap: onReceivingLevelTap),
+          _ActionPill(
+            icon: Icons.north_east_rounded,
+            label: 'Sent Lv $sendingLevel · ${compactNumber(lifetimeSendExp)}',
+            color: RoomColors.violet,
+            onTap: onSendingLevelTap,
+          ),
+          _ActionPill(
+            icon: Icons.favorite_rounded,
+            label: 'Receive Lv $receivingLevel · ${compactNumber(lifetimeReceiveExp)}',
+            color: RoomColors.coral,
+            onTap: onReceivingLevelTap,
+          ),
           _ActionPill(icon: Icons.groups_rounded, label: 'Family', color: RoomColors.aqua, onTap: onFamilyTap),
           _ActionPill(icon: Icons.favorite_border_rounded, label: 'Bonds', color: RoomColors.coral, onTap: onRelationshipTap),
           _ActionPill(icon: Icons.workspace_premium_rounded, label: 'Badges', color: RoomColors.gold, onTap: onMedalsTap),
