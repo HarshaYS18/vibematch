@@ -11,7 +11,14 @@ class EconomyWalletResponse(BaseModel):
     withdrawable_rubies: int
     pending_withdraw_rubies: int
     lifetime_coins_spent: int
+    lifetime_coins_received_as_gifts: int = 0
     lifetime_rubies_earned: int
+    lifetime_recharge_coin_exp: int = 0
+    monthly_recharge_coin_exp: int = 0
+    vip: dict[str, Any] = Field(default_factory=dict)
+    svip: dict[str, Any] = Field(default_factory=dict)
+    sent: dict[str, Any] = Field(default_factory=dict)
+    received: dict[str, Any] = Field(default_factory=dict)
 
 
 class EconomyPoolResponse(BaseModel):
@@ -42,6 +49,27 @@ class InternalWalletGrantRequest(BaseModel):
     target_user_id: int
     coin_amount: int = Field(..., gt=0, le=100_000_000)
     reason: str = Field(..., min_length=3, max_length=255)
+
+
+class OfficialRechargeRequest(BaseModel):
+    target_user_id: int | None = None
+    target_public_user_id: int | None = None
+    coin_amount: int = Field(..., gt=0)
+    payment_amount: int = Field(default=0, ge=0)
+    payment_currency: str = "INR"
+    reason: str = Field(..., min_length=3, max_length=255)
+    proof_url: str | None = None
+
+
+class OfficialRechargeResponse(BaseModel):
+    order_id: int | None = None
+    target_user_id: int
+    target_public_user_id: int | None = None
+    coin_amount: int
+    payment_amount: int
+    payment_currency: str
+    wallet: EconomyWalletResponse
+    rule: str
 
 
 class AllocatePoolCoinsRequest(BaseModel):
