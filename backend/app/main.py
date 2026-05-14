@@ -15,6 +15,7 @@ from app.api.routes import (
     game_props_admin,
     games,
     inbox,
+    inbox_backup_google,
     inbox_ws,
     internal_test,
     love_bonds,
@@ -129,6 +130,7 @@ app.include_router(rooms.router)
 app.include_router(cricket.router)
 app.include_router(families.router)
 app.include_router(inbox.router)
+app.include_router(inbox_backup_google.router)
 app.include_router(love_bonds.router)
 app.include_router(inbox_ws.router)
 app.include_router(room_realtime.router)
