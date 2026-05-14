@@ -48,6 +48,12 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
       RoomToast.show(context, 'Room ID missing. Re-enter room and try again.');
       return;
     }
+    final lockText = _passwordController.text.trim();
+    if (mode == RoomPrivacyMode.locked && lockText.isEmpty) {
+      setState(() => _mode = mode);
+      RoomToast.show(context, 'Enter a room lock before locking the room.');
+      return;
+    }
 
     setState(() {
       _saving = true;
@@ -55,7 +61,11 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     });
 
     try {
-      final updated = await _roomApi.updateRoomMode(roomId: roomId, mode: _backendModeName(mode));
+      final updated = await _roomApi.updateRoomMode(
+        roomId: roomId,
+        mode: _backendModeName(mode),
+        lockPassword: mode == RoomPrivacyMode.locked ? lockText : null,
+      );
       if (!mounted) return;
       final confirmedMode = privacyModeFromTitle(updated.mode);
       setState(() => _mode = confirmedMode);
@@ -89,7 +99,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
       case RoomPrivacyMode.open:
         return 'Room is now Open and visible in eligible lists.';
       case RoomPrivacyMode.locked:
-        return 'Room is now Locked. Host/admins can enter; users need approved access/invite.';
+        return 'Room is now Locked. Host/admins and invited/approved users can enter; visitors must type the lock.';
       case RoomPrivacyMode.membersOnly:
         return 'Room is now Members Only. Only approved members/admins can enter.';
       case RoomPrivacyMode.privateVibe:
@@ -102,7 +112,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
       case RoomPrivacyMode.open:
         return 'Visible publicly. Visitors can enter, but they are not members until approved.';
       case RoomPrivacyMode.locked:
-        return 'Host/admins enter directly. Users need approved access, invite, or future password support.';
+        return 'Host/admins and invited/approved users enter directly. Other users must type the room lock.';
       case RoomPrivacyMode.membersOnly:
         return 'Only approved chatroom members, room admins, host, and Owner roles can enter.';
       case RoomPrivacyMode.privateVibe:
@@ -115,7 +125,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.46,
+        height: MediaQuery.sizeOf(context).height * 0.50,
         child: Container(
           padding: EdgeInsets.fromLTRB(
             12,
@@ -174,7 +184,12 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
                         selected: _mode == mode,
                         description: _modeDescription(mode),
                         saving: _saving,
-                        onTap: () => unawaited(_saveMode(mode)),
+                        onTap: () {
+                          setState(() => _mode = mode);
+                          if (mode != RoomPrivacyMode.locked) {
+                            unawaited(_saveMode(mode));
+                          }
+                        },
                       );
                     }),
                     if (_mode == RoomPrivacyMode.locked) ...[
@@ -182,14 +197,32 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
                       TextField(
                         controller: _passwordController,
                         obscureText: true,
-                        enabled: false,
+                        enabled: !_saving,
+                        maxLength: 64,
                         decoration: InputDecoration(
-                          hintText: 'Password support will be wired after invite/access approvals',
+                          hintText: 'Enter room lock',
+                          counterText: '',
                           isDense: true,
                           filled: true,
                           fillColor: const Color(0xFFFAF7F1),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(13), borderSide: BorderSide.none),
+                        ),
+                        onSubmitted: (_) => unawaited(_saveMode(RoomPrivacyMode.locked)),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _saving ? null : () => unawaited(_saveMode(RoomPrivacyMode.locked)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: RoomColors.plum,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
+                          ),
+                          icon: const Icon(Icons.lock_rounded, size: 16),
+                          label: const Text('Lock Room', style: TextStyle(fontWeight: FontWeight.w900)),
                         ),
                       ),
                     ],
