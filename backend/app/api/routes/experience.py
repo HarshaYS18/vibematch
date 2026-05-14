@@ -29,6 +29,14 @@ def get_user_experience_by_public_id(public_user_id: int, db: Session = Depends(
     return payload
 
 
+@router.get("/rooms/public/{room_public_id}")
+def get_room_experience_by_public_id(room_public_id: str, db: Session = Depends(get_db)):
+    payload = experience_service.details_for_room_public_id(db, room_public_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+    return payload
+
+
 @router.get("/rooms/{room_id}")
 def get_room_experience(room_id: int, db: Session = Depends(get_db)):
     payload = experience_service.details_for_room(db, room_id)
