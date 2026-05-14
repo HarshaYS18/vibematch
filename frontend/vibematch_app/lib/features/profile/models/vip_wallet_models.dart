@@ -59,21 +59,44 @@ class UserWalletSummary {
     required this.coinBalance,
     required this.rubyBalance,
     required this.lifetimeCoinsSpent,
+    required this.lifetimeCoinsReceivedAsGifts,
     required this.lifetimeRubiesEarned,
+    required this.monthlyGiftCoinsSent,
+    required this.monthlyGiftCoinsReceived,
+    required this.lifetimeSendExp,
+    required this.lifetimeReceiveExp,
+    required this.sendLevel,
+    required this.receiveLevel,
   });
 
   final int coinBalance;
   final int rubyBalance;
   final int lifetimeCoinsSpent;
+  final int lifetimeCoinsReceivedAsGifts;
   final int lifetimeRubiesEarned;
+  final int monthlyGiftCoinsSent;
+  final int monthlyGiftCoinsReceived;
+  final int lifetimeSendExp;
+  final int lifetimeReceiveExp;
+  final int sendLevel;
+  final int receiveLevel;
 
   factory UserWalletSummary.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const UserWalletSummary.empty();
+    final sent = _map(json['sent']);
+    final received = _map(json['received']);
     return UserWalletSummary(
       coinBalance: _int(json['coin_balance']),
       rubyBalance: _int(json['ruby_balance']),
       lifetimeCoinsSpent: _int(json['lifetime_coins_spent']),
+      lifetimeCoinsReceivedAsGifts: _int(json['lifetime_coins_received_as_gifts']),
       lifetimeRubiesEarned: _int(json['lifetime_rubies_earned']),
+      monthlyGiftCoinsSent: _int(json['monthly_gift_coins_sent']),
+      monthlyGiftCoinsReceived: _int(json['monthly_gift_coins_received']),
+      lifetimeSendExp: _int(json['lifetime_send_exp']) == 0 ? _int(json['lifetime_coins_spent']) : _int(json['lifetime_send_exp']),
+      lifetimeReceiveExp: _int(json['lifetime_receive_exp']) == 0 ? _int(json['lifetime_coins_received_as_gifts']) : _int(json['lifetime_receive_exp']),
+      sendLevel: _int(sent['level']),
+      receiveLevel: _int(received['level']),
     );
   }
 
@@ -82,14 +105,35 @@ class UserWalletSummary {
       'coin_balance': coinBalance,
       'ruby_balance': rubyBalance,
       'lifetime_coins_spent': lifetimeCoinsSpent,
+      'lifetime_coins_received_as_gifts': lifetimeCoinsReceivedAsGifts,
       'lifetime_rubies_earned': lifetimeRubiesEarned,
+      'monthly_gift_coins_sent': monthlyGiftCoinsSent,
+      'monthly_gift_coins_received': monthlyGiftCoinsReceived,
+      'lifetime_send_exp': lifetimeSendExp,
+      'lifetime_receive_exp': lifetimeReceiveExp,
+      'sent': {'level': sendLevel, 'total_exp': lifetimeSendExp},
+      'received': {'level': receiveLevel, 'total_exp': lifetimeReceiveExp},
     };
   }
+
   const UserWalletSummary.empty()
       : coinBalance = 0,
         rubyBalance = 0,
         lifetimeCoinsSpent = 0,
-        lifetimeRubiesEarned = 0;
+        lifetimeCoinsReceivedAsGifts = 0,
+        lifetimeRubiesEarned = 0,
+        monthlyGiftCoinsSent = 0,
+        monthlyGiftCoinsReceived = 0,
+        lifetimeSendExp = 0,
+        lifetimeReceiveExp = 0,
+        sendLevel = 0,
+        receiveLevel = 0;
+}
+
+Map<String, dynamic> _map(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return value.cast<String, dynamic>();
+  return const <String, dynamic>{};
 }
 
 int _int(dynamic value) {
