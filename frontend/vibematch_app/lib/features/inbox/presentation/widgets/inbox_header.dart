@@ -21,17 +21,17 @@ class InboxHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF008069),
+      color: Colors.white,
       padding: const EdgeInsets.fromLTRB(18, 12, 12, 10),
       child: Row(
         children: [
           const Expanded(
             child: Text(
-              'Chats',
+              'Inbox',
               style: TextStyle(
                 fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF111B21),
                 letterSpacing: -0.35,
               ),
             ),
@@ -70,9 +70,9 @@ class _HeaderBadgeButton extends StatelessWidget {
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: const Color(0xFF25D366),
+                color: const Color(0xFF12C7B7),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: const Color(0xFF008069), width: 1.4),
+                border: Border.all(color: Colors.white, width: 1.4),
               ),
               child: Center(
                 child: Text(
@@ -101,7 +101,7 @@ class _HeaderButton extends StatelessWidget {
       child: SizedBox(
         width: 38,
         height: 38,
-        child: Icon(icon, color: Colors.white, size: 22),
+        child: Icon(icon, color: const Color(0xFF54656F), size: 22),
       ),
     );
   }
