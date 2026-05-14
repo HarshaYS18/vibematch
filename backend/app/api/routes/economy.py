@@ -7,6 +7,7 @@ from app.models.economy import CoinSupplyPool, GamePool, UserWallet
 from app.models.user import User
 from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, GiftSendRequest, GiftSendResponse, RubyConversionRequest, RubyWithdrawRequestCreate
 from app.services import economy_service
+from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/economy", tags=["Economy"])
 
@@ -61,24 +62,28 @@ def preview_gift_economy(payload: GiftEconomyPreviewRequest):
 
 
 @router.post("/gifts/send", response_model=GiftSendResponse)
-def send_gift(
+async def send_gift(
     payload: GiftSendRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return GiftSendResponse(
-        **economy_service.send_gift(
-            db=db,
-            sender=current_user,
-            receiver_user_id=payload.receiver_user_id,
-            gift_id=payload.gift_id,
-            coin_value=payload.coin_value,
-            quantity=payload.quantity,
-            room_id=payload.room_id,
-            relationship_id=payload.relationship_id,
-            is_relationship_gift=payload.is_relationship_gift,
-        )
+    result = economy_service.send_gift(
+        db=db,
+        sender=current_user,
+        receiver_user_id=payload.receiver_user_id,
+        gift_id=payload.gift_id,
+        coin_value=payload.coin_value,
+        quantity=payload.quantity,
+        room_id=payload.room_id,
+        relationship_id=payload.relationship_id,
+        is_relationship_gift=payload.is_relationship_gift,
     )
+    exp_updates = result.get("experience_updates") if isinstance(result.get("experience_updates"), dict) else {}
+    await inbox_ws_manager.send_to_user(current_user.id, {"event": "experience_updated", "scope": "send", "payload": exp_updates.get("sender")})
+    await inbox_ws_manager.send_to_user(payload.receiver_user_id, {"event": "experience_updated", "scope": "receive", "payload": exp_updates.get("receiver"), "ruby": {"earned": result.get("receiver_ruby_amount"), "balance": result.get("receiver_ruby_balance"), "lifetime_rubies_earned": result.get("receiver_lifetime_rubies_earned")}})
+    if exp_updates.get("room") is not None:
+        await inbox_ws_manager.broadcast_to_users([current_user.id, payload.receiver_user_id], {"event": "room_experience_updated", "payload": exp_updates.get("room")})
+    return GiftSendResponse(**result)
 
 
 @router.post("/rubies/convert-to-coins", response_model=EconomyWalletResponse)
