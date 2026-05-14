@@ -11,30 +11,35 @@ class ProgressionTrack(str, Enum):
     ROOM = "room"
 
 
-# Product rule:
-# ₹100 recharge gives 1,00,000 coins.
-# Therefore ₹1 worth of coins = 1,000 coin EXP units.
-# Max level should represent around ₹5 crore worth of coins.
-# ₹5,00,00,000 × 1,000 = 50,000,000,000 total EXP units at max level.
+# Product rules:
+# ₹100 recharge gives 1,00,000 coins, so ₹1 worth of coins = 1,000 coin EXP units.
+# VIP max: VIP 50 costs 50,000,000,000 coins total.
+# SVIP max: highest SVIP costs 200,000,000 monthly recharge coins total.
 INR_TO_COIN_EXP_RATE = 1_000
-MAX_RUPEE_VALUE = 5_00_00_000
-MAX_TOTAL_EXP = MAX_RUPEE_VALUE * INR_TO_COIN_EXP_RATE
-MAX_LEVEL = 100
+VIP_MAX_LEVEL = 50
+SVIP_MAX_LEVEL = 50
+STANDARD_MAX_LEVEL = 100
+VIP_MAX_TOTAL_EXP = 50_000_000_000
+SVIP_MAX_TOTAL_EXP = 200_000_000
+STANDARD_MAX_TOTAL_EXP = VIP_MAX_TOTAL_EXP
+MAX_RUPEE_VALUE = VIP_MAX_TOTAL_EXP // INR_TO_COIN_EXP_RATE
+MAX_TOTAL_EXP = VIP_MAX_TOTAL_EXP
+MAX_LEVEL = STANDARD_MAX_LEVEL
 
 TRACK_MAX_LEVELS: dict[ProgressionTrack, int] = {
-    ProgressionTrack.VIP: 100,
-    ProgressionTrack.SVIP: 50,
-    ProgressionTrack.SEND: 100,
-    ProgressionTrack.RECEIVE: 100,
-    ProgressionTrack.ROOM: 100,
+    ProgressionTrack.VIP: VIP_MAX_LEVEL,
+    ProgressionTrack.SVIP: SVIP_MAX_LEVEL,
+    ProgressionTrack.SEND: STANDARD_MAX_LEVEL,
+    ProgressionTrack.RECEIVE: STANDARD_MAX_LEVEL,
+    ProgressionTrack.ROOM: STANDARD_MAX_LEVEL,
 }
 
 TRACK_TARGET_EXP: dict[ProgressionTrack, int] = {
-    ProgressionTrack.VIP: MAX_TOTAL_EXP,
-    ProgressionTrack.SVIP: MAX_TOTAL_EXP,
-    ProgressionTrack.SEND: MAX_TOTAL_EXP,
-    ProgressionTrack.RECEIVE: MAX_TOTAL_EXP,
-    ProgressionTrack.ROOM: MAX_TOTAL_EXP,
+    ProgressionTrack.VIP: VIP_MAX_TOTAL_EXP,
+    ProgressionTrack.SVIP: SVIP_MAX_TOTAL_EXP,
+    ProgressionTrack.SEND: STANDARD_MAX_TOTAL_EXP,
+    ProgressionTrack.RECEIVE: STANDARD_MAX_TOTAL_EXP,
+    ProgressionTrack.ROOM: STANDARD_MAX_TOTAL_EXP,
 }
 
 TRACK_LABELS: dict[ProgressionTrack, str] = {
@@ -46,7 +51,7 @@ TRACK_LABELS: dict[ProgressionTrack, str] = {
 }
 
 # Exponent > 1 makes level requirements get harder as level increases.
-# 2.35 gives a smooth early ramp and heavy late-game grind.
+# Same curve shape for all tracks; each track has its own max level and max cost.
 DEFAULT_CURVE_EXPONENT = 2.35
 
 
@@ -129,7 +134,7 @@ def progress_payload(
         "progress": 1.0 if is_max else into / needed,
         "is_max_level": is_max,
         "max_total_exp": max_exp_for_track(safe_track),
-        "max_rupee_value": MAX_RUPEE_VALUE,
+        "max_rupee_value": max_exp_for_track(safe_track) // INR_TO_COIN_EXP_RATE,
         "inr_to_coin_exp_rate": INR_TO_COIN_EXP_RATE,
         "curve_exponent": DEFAULT_CURVE_EXPONENT,
     }
