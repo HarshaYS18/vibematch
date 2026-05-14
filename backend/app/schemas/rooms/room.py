@@ -15,6 +15,10 @@ class RoomCreateRequest(BaseModel):
     type: str = Field(default="Chat", max_length=40)
 
 
+class RoomModeUpdateRequest(BaseModel):
+    mode: str = Field(..., min_length=2, max_length=40)
+
+
 class RoomTrendingResponse(BaseModel):
     id: str = Field(..., description="Human-readable public room ID, for example VM120451.")
     name: str
