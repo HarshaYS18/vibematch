@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/active_room_context.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_restrictions_service.dart';
 import '../../data/live_room_settings_event_bus.dart';
@@ -20,6 +21,7 @@ class LiveRoomStateController extends ChangeNotifier {
        _roomId = initialRoomId,
        _privacyMode = privacyModeFromTitle(initialModeTitle),
        _inboxUnreadCount = initialInboxUnreadCount {
+    ActiveRoomContext.setActiveRoom(roomPublicId: _roomId, roomName: _roomName);
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: _roomId,
       roomName: _roomName,
@@ -71,6 +73,7 @@ class LiveRoomStateController extends ChangeNotifier {
     LiveRoomSettingsEventBus.latestEvent.removeListener(
       _handleRealtimeSettingsEvent,
     );
+    ActiveRoomContext.clearIfMatches(_roomId);
     super.dispose();
   }
 
@@ -122,6 +125,7 @@ class LiveRoomStateController extends ChangeNotifier {
     final nextValue = value.trim();
     if (nextValue.isEmpty || nextValue == _roomName) return;
     _roomName = nextValue;
+    ActiveRoomContext.setActiveRoom(roomPublicId: _roomId, roomName: _roomName);
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: _roomId,
       roomName: _roomName,
@@ -132,7 +136,10 @@ class LiveRoomStateController extends ChangeNotifier {
   void updateRoomId(String value) {
     final nextValue = value.trim();
     if (nextValue.isEmpty || nextValue == _roomId) return;
+    final oldRoomId = _roomId;
     _roomId = nextValue;
+    ActiveRoomContext.clearIfMatches(oldRoomId);
+    ActiveRoomContext.setActiveRoom(roomPublicId: _roomId, roomName: _roomName);
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: _roomId,
       roomName: _roomName,
