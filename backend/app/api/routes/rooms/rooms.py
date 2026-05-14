@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
+from app.models.room import Room
+from app.models.room_participant import RoomParticipant
 from app.models.user import User
-from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomMemberActionRequest, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
+from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomMemberActionRequest, RoomModeUpdateRequest, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
 from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
 from app.services.rooms.room_background_service import list_room_backgrounds
@@ -20,12 +22,44 @@ from app.services.rooms.room_service import (
     list_following_rooms,
     list_room_participants,
     list_trending_rooms,
+    room_to_detail_response,
     set_room_admin,
     set_room_member,
 )
+from app.services.role_service import get_user_roles
 
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
+
+
+def _role_values(user: User) -> set[str]:
+    return {role.value if hasattr(role, "value") else str(role) for role in get_user_roles(user)}
+
+
+def _can_manage_room(db: Session, room: Room, user: User) -> bool:
+    if room.owner_user_id == user.id or bool(_role_values(user) & {"founder_owner", "owner"}):
+        return True
+    participant = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id).first()
+    return bool(participant and participant.is_room_admin)
+
+
+def _normalize_mode(value: str) -> str:
+    raw = (value or "Open").strip().lower()
+    if raw in {"locked", "lock"}:
+        return "Locked"
+    if raw in {"members only", "member only", "members_only", "member", "members"}:
+        return "Members Only"
+    if raw in {"secret vibe", "private vibe", "secret", "private_vibe", "private"}:
+        return "Secret Vibe"
+    return "Open"
+
+
+def _apply_mode(room: Room, mode: str) -> None:
+    normalized = _normalize_mode(mode)
+    room.mode = normalized
+    room.is_secret = normalized == "Secret Vibe"
+    room.is_locked = normalized == "Locked"
+    room.is_members_only = normalized == "Members Only"
 
 
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -74,6 +108,19 @@ def get_room_detail(room_public_id: str, db: Session = Depends(get_db)):
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
     return room
+
+
+@router.patch("/{room_public_id}/mode", response_model=RoomDetailResponse)
+def update_room_mode(room_public_id: str, payload: RoomModeUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room = db.query(Room).filter(Room.room_public_id == room_public_id, Room.is_active.is_(True)).first()
+    if room is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    if not _can_manage_room(db, room, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host/admin or Owner can change room mode")
+    _apply_mode(room, payload.mode)
+    db.commit()
+    db.refresh(room)
+    return room_to_detail_response(room)
 
 
 @router.post("/{room_public_id}/join", response_model=RoomJoinResponse)
