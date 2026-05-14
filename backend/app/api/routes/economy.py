@@ -92,6 +92,14 @@ def get_public_user_economy_summary(public_user_id: int, db: Session = Depends(g
     return _public_wallet_summary(db, user)
 
 
+@router.get("/users/{user_id}/summary")
+def get_user_economy_summary(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _public_wallet_summary(db, user)
+
+
 @router.post("/gifts/preview", response_model=GiftEconomyPreviewResponse)
 def preview_gift_economy(payload: GiftEconomyPreviewRequest):
     return GiftEconomyPreviewResponse(
