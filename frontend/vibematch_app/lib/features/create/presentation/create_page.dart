@@ -150,22 +150,23 @@ class _CreatePageState extends State<CreatePage> {
     final isOfficial = currentUser.canSeeOwnerControls;
 
     return SeatUser(
-      id: 'user_${currentUser.publicUserId}',
+      id: currentUser.publicUserId.toString(),
       name: currentUser.displayName ?? currentUser.username ?? 'Vibe User',
       roleLabel: 'Channel Host',
       familyName: '',
       familyLevel: 'bronze',
       relationshipText: '',
-      vipLevel: isOfficial ? 32 : 0,
-      svipLevel: isOfficial ? 3 : 0,
-      sendingLevel: isOfficial ? 52 : 1,
-      receivingLevel: isOfficial ? 44 : 1,
-      sentExp: 0,
-      receivedExp: 0,
+      vipLevel: currentUser.vip.vipLevel,
+      svipLevel: currentUser.vip.svipLevel,
+      sendingLevel: currentUser.wallet.sendLevel <= 0 ? 1 : currentUser.wallet.sendLevel,
+      receivingLevel: currentUser.wallet.receiveLevel <= 0 ? 1 : currentUser.wallet.receiveLevel,
+      sentExp: currentUser.wallet.monthlyGiftCoinsSent,
+      receivedExp: currentUser.wallet.monthlyGiftCoinsReceived,
       medals: const <String>[],
       avatarColors: isOfficial
           ? const <Color>[Color(0xFFFFC857), Color(0xFFE84C72)]
           : const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+      avatarUrl: currentUser.avatarUrl,
       isCurrentUser: true,
       isHost: true,
       isRoomAdmin: true,
