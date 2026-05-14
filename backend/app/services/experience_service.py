@@ -3,40 +3,24 @@ from sqlalchemy.orm import Session
 from app.models.experience import RoomExperienceStatus, UserExperienceStatus
 from app.models.room import Room
 from app.models.user import User
+from app.services import level_progression_service as progression
 
-MAX_EXP_LEVEL = 200
+MAX_EXP_LEVEL = progression.MAX_LEVEL
 
 
 def exp_required_for_level(level: int) -> int:
-    safe_level = max(1, min(level, MAX_EXP_LEVEL))
-    if safe_level <= 1:
-        return 0
-    return 1000 * (safe_level - 1) * safe_level // 2
+    return progression.exp_required_for_level(level, progression.ProgressionTrack.SEND)
 
 
 def level_for_exp(total_exp: int) -> int:
-    safe_exp = max(int(total_exp or 0), 0)
-    level = 1
-    while level < MAX_EXP_LEVEL and safe_exp >= exp_required_for_level(level + 1):
-        level += 1
-    return level
+    return progression.level_for_exp(total_exp, progression.ProgressionTrack.SEND)
 
 
-def progress_payload(level: int, total_exp: int) -> dict:
-    current_start = exp_required_for_level(level)
-    next_exp = exp_required_for_level(min(level + 1, MAX_EXP_LEVEL))
-    needed = max(next_exp - current_start, 1)
-    into = max(min(total_exp - current_start, needed), 0)
-    return {
-        "level": level,
-        "total_exp": total_exp,
-        "current_level_start_exp": current_start,
-        "next_level_exp": next_exp,
-        "exp_into_level": into,
-        "exp_needed_for_next_level": needed,
-        "progress": into / needed,
-        "is_max_level": level >= MAX_EXP_LEVEL,
-    }
+def progress_payload(level: int, total_exp: int, track: progression.ProgressionTrack = progression.ProgressionTrack.SEND) -> dict:
+    payload = progression.progress_payload(total_exp, track)
+    # Keep backward compatibility for callers that still pass stored level.
+    payload["stored_level"] = level
+    return payload
 
 
 def get_or_create_user_exp(db: Session, user_id: int) -> UserExperienceStatus:
@@ -74,12 +58,12 @@ def apply_gift_exp(
     receiver_status = get_or_create_user_exp(db, receiver_user_id)
 
     sender_status.send_total_exp += max(send_exp, 0)
-    sender_status.send_level = level_for_exp(sender_status.send_total_exp)
+    sender_status.send_level = progression.level_for_exp(sender_status.send_total_exp, progression.ProgressionTrack.SEND)
     sender_status.last_source_type = "GIFT_SEND"
     sender_status.last_source_id = source_id
 
     receiver_status.receive_total_exp += max(receive_exp, 0)
-    receiver_status.receive_level = level_for_exp(receiver_status.receive_total_exp)
+    receiver_status.receive_level = progression.level_for_exp(receiver_status.receive_total_exp, progression.ProgressionTrack.RECEIVE)
     receiver_status.last_source_type = "GIFT_RECEIVE"
     receiver_status.last_source_id = source_id
 
@@ -87,7 +71,7 @@ def apply_gift_exp(
     if room_id is not None and room_exp > 0:
         room_status = get_or_create_room_exp(db, room_id)
         room_status.total_exp += max(room_exp, 0)
-        room_status.level = level_for_exp(room_status.total_exp)
+        room_status.level = progression.level_for_exp(room_status.total_exp, progression.ProgressionTrack.ROOM)
         room_status.last_source_type = "GIFT_RECEIVE"
         room_status.last_source_id = source_id
 
@@ -98,11 +82,19 @@ def apply_gift_exp(
     }
 
 
+def vip_svip_payload(*, lifetime_recharge_coin_exp: int, monthly_recharge_coin_exp: int) -> dict:
+    return {
+        "vip": progression.vip_payload(lifetime_recharge_coin_exp),
+        "svip": progression.svip_payload(monthly_recharge_coin_exp),
+        "rule": "VIP uses lifetime recharge coin EXP. SVIP uses monthly recharge coin EXP. Max target equals ₹5 crore worth of coins.",
+    }
+
+
 def user_exp_payload(status: UserExperienceStatus) -> dict:
     return {
         "user_id": status.user_id,
-        "send": progress_payload(status.send_level, status.send_total_exp),
-        "receive": progress_payload(status.receive_level, status.receive_total_exp),
+        "send": progress_payload(status.send_level, status.send_total_exp, progression.ProgressionTrack.SEND),
+        "receive": progress_payload(status.receive_level, status.receive_total_exp, progression.ProgressionTrack.RECEIVE),
         "last_source_type": status.last_source_type,
         "last_source_id": status.last_source_id,
         "updated_at": status.updated_at.isoformat() if status.updated_at else None,
@@ -114,7 +106,7 @@ def room_exp_payload(status: RoomExperienceStatus | None) -> dict | None:
         return None
     return {
         "room_id": status.room_id,
-        "room": progress_payload(status.level, status.total_exp),
+        "room": progress_payload(status.level, status.total_exp, progression.ProgressionTrack.ROOM),
         "last_source_type": status.last_source_type,
         "last_source_id": status.last_source_id,
         "updated_at": status.updated_at.isoformat() if status.updated_at else None,
