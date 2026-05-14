@@ -14,6 +14,7 @@ import '../features/rooms/data/live_room_media_signaling_service.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page_modular.dart';
+import '../features/wallet/data/wallet_realtime_sync_service.dart';
 import 'app_routes.dart';
 
 class AppShell extends StatefulWidget {
@@ -50,6 +51,7 @@ class _AppShellState extends State<AppShell> {
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(_syncedUser);
     _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onUserSynced);
     _startPresenceHeartbeat();
+    unawaited(WalletRealtimeSyncService.instance.start());
   }
 
   @override
@@ -63,6 +65,8 @@ class _AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _userSyncSubscription?.cancel();
+    _presenceHeartbeatTimer?.cancel();
+    unawaited(WalletRealtimeSyncService.instance.stop());
     super.dispose();
   }
 
@@ -215,7 +219,7 @@ class _LoggedInUserBanner extends StatelessWidget {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} Â· ${activeUser.primaryRole} Â· ID ${activeUser.visibleId}',
+              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} · ${activeUser.primaryRole} · ID ${activeUser.visibleId}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w900),
@@ -327,4 +331,3 @@ class _NavItem extends StatelessWidget {
     );
   }
 }
-
