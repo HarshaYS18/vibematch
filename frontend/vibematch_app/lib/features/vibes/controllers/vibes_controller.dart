@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../../social/data/social_mock_data.dart';
 import '../data/vibes_api_service.dart';
 import '../models/vibe_models.dart';
 
@@ -86,7 +85,12 @@ class VibesController extends ChangeNotifier {
   }
 
   bool isValidMentionToken(String token) {
-    return SocialMockData.isValidMention(token);
+    final clean = token.trim();
+    if (clean == '@all') return canUseMentionAllToday;
+    if (!clean.startsWith('@')) return false;
+    final username = clean.substring(1);
+    if (username.length < 2 || username.length > 32) return false;
+    return RegExp(r'^[a-zA-Z0-9_\.]+$').hasMatch(username);
   }
 
   Future<void> publishVibe(VibeItem vibe) async {
@@ -98,9 +102,10 @@ class VibesController extends ChangeNotifier {
   }
 
   Future<void> deleteVibe(VibeItem vibe) async {
-    if (vibe.id.trim().isNotEmpty) {
-      await _apiService.deleteVibe(vibe.id);
+    if (vibe.id.trim().isEmpty) {
+      throw Exception('Cannot delete an unsynced Vibe. Refresh and try again.');
     }
+    await _apiService.deleteVibe(vibe.id);
     _vibes.removeWhere((item) => item.id == vibe.id && item.authorId == vibe.authorId);
     notifyListeners();
   }
@@ -109,10 +114,7 @@ class VibesController extends ChangeNotifier {
     final index = _vibes.indexOf(vibe);
     if (index < 0) return;
     if (vibe.id.trim().isEmpty) {
-      final liked = vibe.likedByMe;
-      _vibes[index] = vibe.copyWith(likedByMe: !liked, likes: liked ? vibe.likes - 1 : vibe.likes + 1);
-      notifyListeners();
-      return;
+      throw Exception('Vibe is not synced yet. Refresh and try again.');
     }
     final result = await _apiService.toggleLike(vibe.id);
     _vibes[index] = vibe.copyWith(likedByMe: result.likedByMe, likes: result.likesCount);
@@ -123,9 +125,7 @@ class VibesController extends ChangeNotifier {
     final index = _vibes.indexOf(vibe);
     if (index < 0) return;
     if (vibe.id.trim().isEmpty) {
-      _vibes[index] = vibe.copyWith(shares: vibe.shares + 1);
-      notifyListeners();
-      return;
+      throw Exception('Vibe is not synced yet. Refresh and try again.');
     }
     final result = await _apiService.shareVibe(vibe.id, targetPublicUserId: targetPublicUserId);
     _vibes[index] = vibe.copyWith(shares: result.sharesCount);
@@ -133,7 +133,9 @@ class VibesController extends ChangeNotifier {
   }
 
   Future<void> reportVibe(VibeItem vibe, {required String reason, String? details}) async {
-    if (vibe.id.trim().isEmpty) return;
+    if (vibe.id.trim().isEmpty) {
+      throw Exception('Vibe is not synced yet. Refresh and try again.');
+    }
     await _apiService.reportVibe(vibe.id, reason: reason, details: details);
   }
 
