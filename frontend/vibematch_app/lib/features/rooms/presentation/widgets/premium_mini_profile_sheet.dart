@@ -102,10 +102,6 @@ class UserMiniProfileSheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 7),
-                  _IdentityRow(user: user, onVipTap: onVipTap),
-                  const SizedBox(height: 7),
-                  _MetaRow(user: user),
-                  const SizedBox(height: 9),
                   FutureBuilder<MiniProfileEconomySummary>(
                     future: MiniProfileEconomyService.instance.summaryForSeatUser(user),
                     builder: (context, snapshot) {
@@ -113,6 +109,10 @@ class UserMiniProfileSheet extends StatelessWidget {
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          _IdentityRow(user: user, economy: economy, onVipTap: onVipTap),
+                          const SizedBox(height: 7),
+                          _MetaRow(user: user),
+                          const SizedBox(height: 9),
                           _StatsLine(
                             sentTotalCoins: economy.monthlyGiftCoinsSent,
                             receivedTotalCoins: economy.monthlyGiftCoinsReceived,
@@ -309,9 +309,10 @@ class _PremiumMiniProfileAvatarImage extends StatelessWidget {
 }
 
 class _IdentityRow extends StatelessWidget {
-  const _IdentityRow({required this.user, required this.onVipTap});
+  const _IdentityRow({required this.user, required this.economy, required this.onVipTap});
 
   final SeatUser user;
+  final MiniProfileEconomySummary economy;
   final VoidCallback onVipTap;
 
   @override
@@ -322,8 +323,8 @@ class _IdentityRow extends StatelessWidget {
       spacing: 6,
       runSpacing: 5,
       children: [
-        VipBadge(level: user.vipLevel, size: VipBadgeSize.small, onTap: onVipTap),
-        if (user.svipLevel > 0) _SvipPill(level: user.svipLevel, onTap: onVipTap),
+        VipBadge(level: economy.vipLevel, size: VipBadgeSize.small, onTap: onVipTap),
+        if (economy.svipLevel > 0) _SvipPill(level: economy.svipLevel, onTap: onVipTap),
         _FamilyBadge(label: user.familyName.trim().isEmpty ? 'No Family' : user.familyName),
       ],
     );
