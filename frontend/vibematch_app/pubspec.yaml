@@ -48,6 +48,8 @@ flutter:
     - assets/images/branding/
     - assets/images/vip_badges/
     - assets/images/gifts/
+    - assets/gifts/normal/
+    - assets/gifts/lucky/
     - assets/gifts/love_rocket/icon/
     - assets/gifts/love_rocket/effect/
     - assets/images/events/
