@@ -1,3 +1,5 @@
+from random import choices
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -9,11 +11,26 @@ from app.models.room_participant import RoomParticipant
 from app.models.user import User
 from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, GiftSendPublicRequest, GiftSendRequest, GiftSendResponse, RubyConversionRequest, RubyWithdrawRequestCreate
 from app.services import economy_level_service, economy_service
-from app.services.lucky_gift_service import roll_lucky_gift
 from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/economy", tags=["Economy"])
+
+
+def roll_lucky_gift(gift_id: str, gift_name: str, base_coin_value: int, quantity: int, house_risk_score: int = 0) -> dict:
+    multipliers = [0, 1, 2, 5, 10, 20, 50, 100, 500, 1000]
+    weights = [3800, 3400, 1500, 760, 330, 130, 55, 18, 5, 2]
+    multiplier = int(choices(multipliers, weights=weights, k=1)[0])
+    spent = max(int(base_coin_value or 0), 0) * max(int(quantity or 1), 1)
+    reward = spent * multiplier
+    return {
+        "gift_id": gift_id,
+        "gift_name": gift_name,
+        "multiplier": multiplier,
+        "reward_coin_amount": reward,
+        "spent_coin_amount": spent,
+        "house_risk_score": house_risk_score,
+    }
 
 
 def _wallet_response(db: Session, wallet: UserWallet) -> EconomyWalletResponse:
