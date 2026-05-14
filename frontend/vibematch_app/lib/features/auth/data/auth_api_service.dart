@@ -71,6 +71,13 @@ class AuthApiService {
     await prefs.setString(_userJsonKey, jsonEncode(user.toJson()));
   }
 
+  Future<void> persistCurrentUser(CurrentUser user) async {
+    _cachedUser = user;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_userJsonKey, jsonEncode(user.toJson()));
+    AuthUserRealtimeService.instance.publish(user);
+  }
+
   Future<AuthLoginResult> devLogin({
     required String email,
     String? username,
@@ -222,8 +229,7 @@ class AuthApiService {
     }
 
     final user = CurrentUser.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
-    _cachedUser = user;
-    AuthUserRealtimeService.instance.publish(user);
+    await persistCurrentUser(user);
     return user;
   }
 
@@ -277,4 +283,3 @@ class AuthLoginResult {
   final String tokenType;
   final CurrentUser user;
 }
-
