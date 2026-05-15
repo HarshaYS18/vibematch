@@ -45,7 +45,7 @@ class _HomePageState extends State<HomePage> {
     _scrollController.addListener(_handleScroll);
     _controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _controller.loadTrendingRooms(silent: true);
+      if (mounted) _controller.refreshAll();
     });
   }
 
@@ -71,11 +71,11 @@ class _HomePageState extends State<HomePage> {
     try {
       final primaryRole = activeUser?.primaryRole?.toString().toLowerCase();
       final roles = activeUser?.roles;
-      if (primaryRole == 'founder_owner' || primaryRole == 'super_owner') return true;
+      if (primaryRole == 'founder_owner' || primaryRole == 'super_owner' || primaryRole == 'owner') return true;
       if (roles is Iterable) {
         return roles.any((role) {
           final normalized = role.toString().toLowerCase();
-          return normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'banner_manager' || normalized == 'manage_home_banners' || normalized == 'permission_manage_home_banners';
+          return normalized == 'founder_owner' || normalized == 'owner' || normalized == 'super_owner' || normalized == 'banner_manager' || normalized == 'manage_home_banners' || normalized == 'permission_manage_home_banners';
         });
       }
     } catch (_) {
@@ -90,6 +90,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openMyRoomOrCreate() async {
+    final existingRoom = _controller.myCreatedRoom;
+    if (existingRoom != null) {
+      _enterRoom(existingRoom);
+      return;
+    }
+
     final currentUser = _activeCurrentUser;
     if (currentUser == null) {
       _toast('Login session not ready. Refresh and try again.');
@@ -150,27 +156,44 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _handleBannerTap(HomeBanner banner) {
-    VmNavigator.openEvents(context);
+    switch (banner.target) {
+      case 'event':
+        VmNavigator.openEvents(context);
+      case 'recharge':
+        VmNavigator.openWallet(context);
+      case 'promo':
+        VmNavigator.openStore(context);
+      default:
+        VmNavigator.openEvents(context);
+    }
   }
 
   void _handlePolicyBannerTap(HomeBanner banner) {
-    _toast('${banner.title} page will connect next.');
+    if (banner.target == 'policy') {
+      VmNavigator.openSettings(context);
+      return;
+    }
+    _toast(banner.title);
   }
 
   @override
   Widget build(BuildContext context) {
     final visibleRooms = _controller.visibleRooms;
+    final shouldShowPolicyBanner = _controller.policyBanners.isNotEmpty && visibleRooms.length >= 6;
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => _controller.loadTrendingRooms(),
+          onRefresh: _controller.refreshAll,
           child: CustomScrollView(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
-              SliverToBoxAdapter(child: HomeHeaderSection(myCreatedRoom: null, onMyRoomTap: _openMyRoomOrCreate, onSearchTap: () => VmNavigator.openSearch(context), onNotificationsTap: () => VmNavigator.openNotifications(context))),
-              SliverToBoxAdapter(child: HomeBannerSection(banners: _controller.banners, selectedIndex: _controller.selectedBannerIndex, canManageHomeBanners: _canManageHomeBanners, onBannerChanged: _controller.selectBanner, onBannerTap: _handleBannerTap, onManageTap: () => VmNavigator.openBannerManager(context))),
+              SliverToBoxAdapter(child: HomeHeaderSection(myCreatedRoom: _controller.myCreatedRoom, onMyRoomTap: _openMyRoomOrCreate, onSearchTap: () => VmNavigator.openSearch(context), onNotificationsTap: () => VmNavigator.openNotifications(context))),
+              if (_controller.bannerErrorMessage != null)
+                SliverToBoxAdapter(child: _HomeNetworkErrorCard(message: _controller.bannerErrorMessage!, onRetry: _controller.loadHomeChrome))
+              else if (_controller.banners.isNotEmpty)
+                SliverToBoxAdapter(child: HomeBannerSection(banners: _controller.banners, selectedIndex: _controller.selectedBannerIndex, canManageHomeBanners: _canManageHomeBanners, onBannerChanged: _controller.selectBanner, onBannerTap: _handleBannerTap, onManageTap: () => VmNavigator.openBannerManager(context))),
               SliverToBoxAdapter(child: HomeFiltersSection(categories: _controller.categories, selectedCategory: _controller.selectedCategory, selectedLanguage: _controller.selectedLanguage, onCategorySelected: _controller.selectCategory, onLanguageTap: _openLanguageSheet, onSeeAllTap: _seeAllRooms)),
               if (_controller.isLoadingRooms)
                 const SliverToBoxAdapter(child: _HomeLoadingStrip())
@@ -183,12 +206,12 @@ class _HomePageState extends State<HomePage> {
                 SliverToBoxAdapter(child: HomeEmptyState(selectedCategory: _controller.selectedCategory))
               else
                 SliverList.builder(
-                  itemCount: visibleRooms.length + (visibleRooms.length >= 6 ? 1 : 0),
+                  itemCount: visibleRooms.length + (shouldShowPolicyBanner ? 1 : 0),
                   itemBuilder: (context, index) {
-                    if (visibleRooms.length >= 6 && index == 6) {
+                    if (shouldShowPolicyBanner && index == 6) {
                       return HomePolicyBannerSection(banners: _controller.policyBanners, selectedIndex: _controller.selectedPolicyBannerIndex, canManageBanners: _canManageHomeBanners, onBannerChanged: _controller.selectPolicyBanner, onBannerTap: _handlePolicyBannerTap, onManageTap: () => VmNavigator.openBannerManager(context));
                     }
-                    final roomIndex = index > 6 ? index - 1 : index;
+                    final roomIndex = shouldShowPolicyBanner && index > 6 ? index - 1 : index;
                     final room = visibleRooms[roomIndex];
                     return HomeRoomCard(room: room, rank: roomIndex + 1, onTap: () => _openRoom(room));
                   },
