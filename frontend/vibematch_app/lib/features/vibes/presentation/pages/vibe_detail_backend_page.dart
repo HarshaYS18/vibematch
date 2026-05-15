@@ -449,7 +449,7 @@ class _CommentComposer extends StatelessWidget {
     final replyTarget = replyingTo;
     return Container(
       padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + MediaQuery.paddingOf(context).bottom),
-      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFECE2D8))),
+      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFECE2D8)))),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
