@@ -100,28 +100,45 @@ class VibesNavigationController {
   }
 
   static void openVibeActions({required BuildContext context, required VibesController controller, required VibeItem vibe}) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => VibeActionsSheet(
-        isSelfVibe: isSelfVibe(vibe),
-        onDelete: () {
-          Navigator.pop(context);
-          openVibeDetail(context: context, controller: controller, vibe: vibe);
-        },
-        onReport: () async {
-          Navigator.pop(context);
-          final reason = await openReportReasonSheet(context: context, vibe: vibe);
-          if (reason == null || reason.trim().isEmpty) return;
-          try {
-            await controller.reportVibe(vibe, reason: reason);
-            if (context.mounted) showAction(context, 'Report submitted to CS CP for review.');
-          } catch (error) {
-            if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
-          }
-        },
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: Colors.transparent,
+        pageBuilder: (routeContext, _, __) => VibeActionsPillMenu(
+          isSelfVibe: isSelfVibe(vibe),
+          onDelete: () async {
+            Navigator.pop(routeContext);
+            await _confirmAndDeleteVibe(context: context, controller: controller, vibe: vibe);
+          },
+          onReport: () async {
+            Navigator.pop(routeContext);
+            final reason = await openReportReasonSheet(context: context, vibe: vibe);
+            if (reason == null || reason.trim().isEmpty) return;
+            try {
+              await controller.reportVibe(vibe, reason: reason);
+              if (context.mounted) showAction(context, 'Report submitted to CS CP for review.');
+            } catch (error) {
+              if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
+            }
+          },
+        ),
       ),
     );
+  }
+
+  static Future<void> _confirmAndDeleteVibe({required BuildContext context, required VibesController controller, required VibeItem vibe}) async {
+    final shouldDelete = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const ConfirmDeleteVibeSheet(),
+    );
+    if (shouldDelete != true) return;
+    try {
+      await controller.deleteVibe(vibe);
+      if (context.mounted) showAction(context, 'Vibe deleted.');
+    } catch (error) {
+      if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   static Future<String?> openReportReasonSheet({required BuildContext context, required VibeItem vibe}) {
