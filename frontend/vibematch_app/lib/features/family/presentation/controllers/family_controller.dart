@@ -40,7 +40,9 @@ class FamilyController extends ChangeNotifier {
   bool isAdmin;
   bool joinRequestPending = false;
   bool loadingBackend = false;
+  bool loadingRankings = false;
   String? backendError;
+  FamilyRankingPeriod selectedRankingPeriod = FamilyRankingPeriod.weekly;
 
   FamilyInviteActorType get inviteActorType => (isOwner || isAdmin) ? FamilyInviteActorType.ownerAdmin : FamilyInviteActorType.member;
   bool get canSelectMoreInvites => selectedInviteUserIds.length < 10;
@@ -93,16 +95,32 @@ class FamilyController extends ChangeNotifier {
     }
   }
 
-  Future<void> refreshRankings({FamilyRankingPeriod period = FamilyRankingPeriod.weekly}) async {
+  Future<void> setRankingPeriod(FamilyRankingPeriod period) async {
+    if (selectedRankingPeriod == period && rankings.isNotEmpty) return;
+    selectedRankingPeriod = period;
+    notifyListeners();
+    await refreshRankings(period: period);
+  }
+
+  Future<void> refreshRankings({FamilyRankingPeriod? period}) async {
+    final activePeriod = period ?? selectedRankingPeriod;
+    selectedRankingPeriod = activePeriod;
+    loadingRankings = true;
+    notifyListeners();
     try {
-      final backendRankings = await _api.getRankings(period: period);
-      if (backendRankings.isEmpty) return;
-      rankings
-        ..clear()
-        ..addAll(backendRankings);
+      final backendRankings = await _api.getRankings(period: activePeriod);
+      if (backendRankings.isNotEmpty) {
+        rankings
+          ..clear()
+          ..addAll(backendRankings);
+      }
+      loadingRankings = false;
+      backendError = null;
       notifyListeners();
-    } catch (_) {
-      // Keep mock rankings if backend is unavailable.
+    } catch (error) {
+      loadingRankings = false;
+      backendError = error.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
     }
   }
 
