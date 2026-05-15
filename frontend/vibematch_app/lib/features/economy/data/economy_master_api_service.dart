@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
-import '../../auth/models/current_user.dart';
+import '../../profile/models/vip_wallet_models.dart';
 
 class EconomyMasterApiService {
   const EconomyMasterApiService({this.authApiService = const AuthApiService()});
