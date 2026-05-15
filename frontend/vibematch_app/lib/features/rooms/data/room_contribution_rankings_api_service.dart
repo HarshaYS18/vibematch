@@ -27,7 +27,7 @@ class RoomContributionRankingsApiService {
     final response = await http.get(
       Uri.parse(
         VmApiConfig.endpoint(
-          '/rooms/$cleanRoomId/contributions?period=${period.backendValue}&category=sent&limit=100',
+          '/rooms/$cleanRoomId/rankings/contribution?period=${period.backendValue}&category=sent&limit=100',
         ),
       ),
       headers: headers,
