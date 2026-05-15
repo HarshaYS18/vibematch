@@ -6,6 +6,7 @@ import '../controllers/vibes_controller.dart';
 import '../controllers/vibes_navigation_controller.dart';
 import '../models/vibe_models.dart';
 import 'sections/vibes_feed_section.dart';
+import 'widgets/vibe_card_modular.dart';
 import 'widgets/vibes_feed_tabs.dart';
 import 'widgets/vibes_header.dart';
 import 'widgets/vibes_status_widgets.dart';
@@ -25,6 +26,7 @@ class _VibesPageState extends State<VibesPage> {
     super.initState();
     _controller.addListener(_onControllerChanged);
     unawaited(_controller.loadFeed());
+    WidgetsBinding.instance.addPostFrameCallback((_) => VibeMediaPlaybackGate.notifyFeedScrolled());
   }
 
   @override
@@ -35,7 +37,10 @@ class _VibesPageState extends State<VibesPage> {
   }
 
   void _onControllerChanged() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) => VibeMediaPlaybackGate.notifyFeedScrolled());
+    }
   }
 
   Future<void> _toggleLike(VibeItem vibe) async {
@@ -64,6 +69,13 @@ class _VibesPageState extends State<VibesPage> {
     await _controller.loadSavedVibes();
   }
 
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification || notification is ScrollEndNotification || notification is UserScrollNotification) {
+      VibeMediaPlaybackGate.notifyFeedScrolled();
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleVibes = _controller.visibleVibes;
@@ -74,52 +86,55 @@ class _VibesPageState extends State<VibesPage> {
         child: RefreshIndicator(
           color: const Color(0xFF111015),
           onRefresh: _controller.showingSavedVibes ? _controller.loadSavedVibes : _controller.loadFeed,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-            slivers: [
-              SliverToBoxAdapter(
-                child: ColoredBox(
-                  color: Colors.white,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      VibesHeader(
-                        showingSaved: _controller.showingSavedVibes,
-                        onSavedTap: () => unawaited(_openSavedOrFeed()),
-                        onSettingsTap: () => VibesNavigationController.openSettings(context: context, controller: _controller),
-                      ),
-                      if (!_controller.showingSavedVibes)
-                        VibesFeedTabs(
-                          selectedTab: _controller.selectedTab,
-                          onChanged: _controller.selectTab,
-                        ),
-                      const SizedBox(height: 10),
-                    ],
-                  ),
-                ),
-              ),
-              if (_controller.isLoading) const SliverToBoxAdapter(child: VibesLoadingStrip()),
-              if (_controller.loadErrorMessage != null)
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _onScrollNotification,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              slivers: [
                 SliverToBoxAdapter(
-                  child: VibesErrorCard(
-                    message: _controller.loadErrorMessage!,
-                    onRetry: _controller.showingSavedVibes ? _controller.loadSavedVibes : _controller.loadFeed,
+                  child: ColoredBox(
+                    color: Colors.white,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        VibesHeader(
+                          showingSaved: _controller.showingSavedVibes,
+                          onSavedTap: () => unawaited(_openSavedOrFeed()),
+                          onSettingsTap: () => VibesNavigationController.openSettings(context: context, controller: _controller),
+                        ),
+                        if (!_controller.showingSavedVibes)
+                          VibesFeedTabs(
+                            selectedTab: _controller.selectedTab,
+                            onChanged: _controller.selectTab,
+                          ),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
                   ),
                 ),
-              VibesFeedSection(
-                vibes: visibleVibes,
-                selectedTab: _controller.selectedTab,
-                isLoading: _controller.isLoading,
-                hasError: _controller.loadErrorMessage != null,
-                onProfileTap: (vibe) => VibesNavigationController.showAction(context, '${vibe.authorName} profile will open.'),
-                onLikeTap: _toggleLike,
-                onCommentTap: (vibe) => VibesNavigationController.openVibeDetail(context: context, controller: _controller, vibe: vibe),
-                onShareTap: (vibe) => VibesNavigationController.openShareSheet(context: context, controller: _controller, vibe: vibe),
-                onSaveTap: _toggleSave,
-                onMoreTap: (vibe) => VibesNavigationController.openVibeActions(context: context, controller: _controller, vibe: vibe),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 104)),
-            ],
+                if (_controller.isLoading) const SliverToBoxAdapter(child: VibesLoadingStrip()),
+                if (_controller.loadErrorMessage != null)
+                  SliverToBoxAdapter(
+                    child: VibesErrorCard(
+                      message: _controller.loadErrorMessage!,
+                      onRetry: _controller.showingSavedVibes ? _controller.loadSavedVibes : _controller.loadFeed,
+                    ),
+                  ),
+                VibesFeedSection(
+                  vibes: visibleVibes,
+                  selectedTab: _controller.selectedTab,
+                  isLoading: _controller.isLoading,
+                  hasError: _controller.loadErrorMessage != null,
+                  onProfileTap: (vibe) => VibesNavigationController.showAction(context, '${vibe.authorName} profile will open.'),
+                  onLikeTap: _toggleLike,
+                  onCommentTap: (vibe) => VibesNavigationController.openVibeDetail(context: context, controller: _controller, vibe: vibe),
+                  onShareTap: (vibe) => VibesNavigationController.openShareSheet(context: context, controller: _controller, vibe: vibe),
+                  onSaveTap: _toggleSave,
+                  onMoreTap: (vibe) => VibesNavigationController.openVibeActions(context: context, controller: _controller, vibe: vibe),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 104)),
+              ],
+            ),
           ),
         ),
       ),
