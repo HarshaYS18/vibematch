@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../relationships/data/relationship_exp_api_service.dart';
+import '../../../relationships/presentation/relationship_rankings_sheet.dart';
 import '../../data/love_bond_realtime_service.dart';
 import '../love_bonds/widgets/love_bond_card.dart';
 import '../love_bonds/widgets/love_bond_realtime_cards.dart';
@@ -67,6 +68,10 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
     }
   }
 
+  void _openRelationshipRankings() {
+    RelationshipRankingsSheet.show(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<List<LoveBondRequest>>(
@@ -98,6 +103,8 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
                       ),
                     ),
                   ),
+                  _RankButton(onTap: _openRelationshipRankings),
+                  const SizedBox(width: 8),
                   if (_loading)
                     const SizedBox(
                       width: 16,
@@ -157,6 +164,47 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
           ),
         );
       },
+    );
+  }
+}
+
+class _RankButton extends StatelessWidget {
+  const _RankButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF5AAA).withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFFF5AAA).withValues(alpha: 0.22)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.emoji_events_rounded, size: 14, color: Color(0xFFFF5AAA)),
+              SizedBox(width: 5),
+              Text(
+                'Rank',
+                style: TextStyle(
+                  color: Color(0xFFFF5AAA),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
