@@ -30,7 +30,7 @@ class InventorySection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       sliver: SliverList.separated(
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (context, index) => const SizedBox(height: 10),
         itemBuilder: (context, index) => _InventoryCard(
           item: items[index],
           onEquip: () => onEquip(items[index]),
@@ -71,9 +71,17 @@ class _InventoryCard extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: item.imageUrl != null
-                    ? Image.network(item.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.inventory_2_rounded, color: Colors.white))
+                    ? Image.network(
+                        item.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2_rounded, color: Colors.white),
+                      )
                     : item.assetPath != null
-                        ? Image.asset(item.assetPath!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.inventory_2_rounded, color: Colors.white))
+                        ? Image.asset(
+                            item.assetPath!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2_rounded, color: Colors.white),
+                          )
                         : const Icon(Icons.inventory_2_rounded, color: Colors.white),
               ),
               const SizedBox(width: 12),
