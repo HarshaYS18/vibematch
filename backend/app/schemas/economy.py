@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class EconomyWalletResponse(BaseModel):
@@ -167,6 +167,16 @@ class GiftSendResponse(BaseModel):
     risk_level: str | None = None
     risk_score: int | None = None
     risk_action: str | None = None
+
+    @model_validator(mode="after")
+    def normalize_lucky_aliases(self):
+        if self.spent_coin_amount is None and self.spent_coins is not None:
+            self.spent_coin_amount = self.spent_coins
+        if self.reward_coin_amount is None and self.reward_coins is not None:
+            self.reward_coin_amount = self.reward_coins
+        if self.reward_coin_amount is None and self.lucky_reward_coin_amount is not None:
+            self.reward_coin_amount = self.lucky_reward_coin_amount
+        return self
 
 
 class RubyConversionRequest(BaseModel):
