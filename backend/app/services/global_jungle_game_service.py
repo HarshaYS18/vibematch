@@ -78,6 +78,8 @@ JUNGLE_UI: dict[str, Any] = {
     "layout": "global_room_overlay_70_percent",
 }
 
+PUBLIC_CANCEL_MESSAGE = "Round cancelled for settlement safety. All accepted coins have been refunded."
+
 
 def _target_by_id(target_id: int) -> dict[str, Any]:
     if target_id == LEFT_BASKET_ID:
@@ -265,6 +267,198 @@ def _evaluate_whale_risk(db: Session, user: User, amount: int, risk: dict[str, A
     return whale_adjusted, ",".join(reasons), {"daily_volume": daily_volume, "daily_loss": daily_loss, "recent_count": recent_count, "reasons": reasons, "score": score, "level": level, "probability_mode": probability_mode, "action": "ALLOW_WHALE_PROBABILITY_REDUCED" if whale_adjusted else "ALLOW"}
 
 
+def _accept_jungle_bet(
+    db: Session,
+    *,
+    round_obj: GameRound,
+    user: User,
+    target_id: int,
+    amount: int,
+    rules: dict[str, Any],
+    risk_meta: dict[str, Any],
+    whale_adjusted: bool,
+    whale_reason: str,
+    audit_reason: str,
+) -> tuple[GameBet, Any]:
+    wallet = economy_service.get_or_create_wallet(db, user.id)
+    if wallet.coin_balance < amount:
+        raise HTTPException(status_code=400, detail="Insufficient coin balance")
+
+    before = wallet.coin_balance
+    wallet.coin_balance -= amount
+    wallet.lifetime_coins_spent += amount
+    db.add(
+        WalletLedger(
+            user_id=user.id,
+            currency_type=EconomyCurrency.COIN.value,
+            direction=EconomyDirection.DEBIT.value,
+            amount=amount,
+            before_balance=before,
+            after_balance=wallet.coin_balance,
+            source_type="GAME_BET",
+            source_id=str(round_obj.id),
+            created_by_user_id=user.id,
+            reason=f"Bet on Jungle Hunt:{target_id}",
+        )
+    )
+
+    risk_level = str(risk_meta.get("level") or "LOW")
+    risk_score = int(risk_meta.get("score") or 0)
+    risk_action = str(risk_meta.get("action") or "ALLOW")
+    bet = GameBet(
+        round_id=round_obj.id,
+        user_id=user.id,
+        target_id=target_id,
+        amount=amount,
+        accepted_amount=amount,
+        risk_level=risk_level,
+        risk_score=risk_score,
+        risk_action=risk_action,
+        metadata_json=base._dumps(
+            {
+                "scope": "GLOBAL",
+                "whale_reason": whale_reason,
+                "whale_adjusted": whale_adjusted,
+                "probability_mode": risk_meta.get("probability_mode", "NORMAL"),
+                "risk": risk_meta,
+            }
+        ),
+    )
+    db.add(bet)
+    round_obj.round_pool_amount += amount
+    platform_fee = amount * int(rules.get("platform_fee_basis_points", JUNGLE_RULES["platform_fee_basis_points"])) // 10_000
+    round_obj.platform_fee_amount += platform_fee
+    round_obj.reward_pool_amount += max(amount - platform_fee, 0)
+    game_stats_service.record_game_bet(db, user_id=user.id, game_id=round_obj.game_key, amount=amount)
+    base.audit(
+        db,
+        round_obj.game_key,
+        round_obj.id,
+        user.id,
+        "BET_ACCEPTED",
+        risk_level,
+        risk_score,
+        risk_action,
+        audit_reason,
+        {"amount": amount, "target_id": target_id, "scope": "GLOBAL", "probability_mode": risk_meta.get("probability_mode", "NORMAL")},
+        user.id,
+    )
+    db.flush()
+    return bet, wallet
+
+
+def _refund_round_bets_for_cancel(db: Session, *, round_obj: GameRound, actor_user_id: int, reason: str) -> tuple[int, int]:
+    refunded_users: set[int] = set()
+    total_refunded = 0
+    bets = db.query(GameBet).filter(GameBet.round_id == round_obj.id, GameBet.accepted_amount > 0).all()
+    for bet in bets:
+        refund_source_id = f"jungle_hunt_refund:{round_obj.id}:{bet.id}"
+        existing = (
+            db.query(WalletLedger)
+            .filter(
+                WalletLedger.user_id == bet.user_id,
+                WalletLedger.source_type == "GAME_REFUND",
+                WalletLedger.source_id == refund_source_id,
+            )
+            .first()
+        )
+        if existing is not None:
+            continue
+        refund_amount = int(bet.accepted_amount or 0)
+        if refund_amount <= 0:
+            continue
+        wallet = economy_service.get_or_create_wallet(db, int(bet.user_id))
+        before = wallet.coin_balance
+        wallet.coin_balance += refund_amount
+        db.add(
+            WalletLedger(
+                user_id=int(bet.user_id),
+                currency_type=EconomyCurrency.COIN.value,
+                direction=EconomyDirection.CREDIT.value,
+                amount=refund_amount,
+                before_balance=before,
+                after_balance=wallet.coin_balance,
+                source_type="GAME_REFUND",
+                source_id=refund_source_id,
+                created_by_user_id=actor_user_id,
+                reason=reason,
+            )
+        )
+        total_refunded += refund_amount
+        refunded_users.add(int(bet.user_id))
+    return total_refunded, len(refunded_users)
+
+
+def _cancel_round_for_liability(
+    db: Session,
+    *,
+    round_obj: GameRound,
+    user: User,
+    triggering_bet: GameBet,
+    target_id: int,
+    amount: int,
+    liability_reason: str,
+    liability_metadata: dict[str, Any],
+    commit: bool,
+) -> dict[str, Any]:
+    metadata = base._loads(round_obj.metadata_json, {})
+    metadata.update(
+        {
+            "cancel_reason_public": PUBLIC_CANCEL_MESSAGE,
+            "cancel_reason_internal": liability_reason,
+            "cancel_metadata": liability_metadata,
+            "cancelled_by_user_id": user.id,
+            "triggering_bet_id": triggering_bet.id,
+            "payouts_done": False,
+            "refunds_done": True,
+        }
+    )
+    total_refunded, refunded_user_count = _refund_round_bets_for_cancel(db, round_obj=round_obj, actor_user_id=user.id, reason=PUBLIC_CANCEL_MESSAGE)
+    round_obj.metadata_json = base._dumps(metadata)
+    round_obj.status = GameRoundStatus.CANCELLED.value
+    round_obj.ended_at = datetime.utcnow()
+    round_obj.round_pool_amount = 0
+    round_obj.platform_fee_amount = 0
+    round_obj.reward_pool_amount = 0
+    base.audit(
+        db,
+        round_obj.game_key,
+        round_obj.id,
+        user.id,
+        "ROUND_CANCELLED_REFUNDED_HIGH_LIABILITY",
+        "HIGH",
+        0,
+        "CANCEL_AND_REFUND",
+        liability_reason,
+        {"target_id": target_id, "amount": amount, "total_refunded": total_refunded, "refunded_user_count": refunded_user_count, **liability_metadata},
+        user.id,
+    )
+    if commit:
+        db.commit()
+        db.refresh(triggering_bet)
+    else:
+        db.flush()
+    wallet = economy_service.get_or_create_wallet(db, user.id)
+    return {
+        "bet_id": triggering_bet.id,
+        "round_id": round_obj.id,
+        "target_id": target_id,
+        "requested_amount": amount,
+        "accepted_amount": amount,
+        "spent_coins": amount,
+        "reward_coins": 0,
+        "refund_coins": total_refunded,
+        "net_win_coins": 0,
+        "wallet_coin_balance": wallet.coin_balance,
+        "winner_coin_balance": None,
+        "risk_level": "HIGH",
+        "risk_score": 0,
+        "risk_action": "CANCEL_AND_REFUND_HIGH_LIABILITY",
+        "round_status": GameRoundStatus.CANCELLED.value,
+        "message": PUBLIC_CANCEL_MESSAGE,
+    }
+
+
 def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: int, *, commit: bool = True) -> dict[str, Any]:
     round_obj = db.query(GameRound).filter(GameRound.id == round_id).first()
     if not round_obj:
@@ -296,40 +490,58 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     multiplier = int(target_map[target_id]["multiplier"])
     target_total_after = int(db.query(func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id, GameBet.target_id == target_id).scalar() or 0) + amount
     target_liability = target_total_after * multiplier
-    if target_liability > int(rules.get("max_target_liability", JUNGLE_RULES["max_target_liability"])):
-        return _reject_bet(db, round_obj, user, target_id, amount, "HIGH_TARGET_LIABILITY", "Bet not accepted because this item liability is too high", {"target_liability": target_liability, "multiplier": multiplier})
     all_target_totals = dict(db.query(GameBet.target_id, func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id).group_by(GameBet.target_id).all())
     all_target_totals[target_id] = target_total_after
     worst_liability = 0
     for item in targets:
         worst_liability = max(worst_liability, int(all_target_totals.get(item["id"], 0)) * int(item["multiplier"]))
-    if worst_liability > int(rules.get("max_round_liability", JUNGLE_RULES["max_round_liability"])):
-        return _reject_bet(db, round_obj, user, target_id, amount, "HIGH_ROUND_LIABILITY", "Bet not accepted because round liability is too high", {"worst_liability": worst_liability})
-    wallet = economy_service.get_or_create_wallet(db, user.id)
-    if wallet.coin_balance < amount:
-        raise HTTPException(status_code=400, detail="Insufficient coin balance")
-    before = wallet.coin_balance
-    wallet.coin_balance -= amount
-    wallet.lifetime_coins_spent += amount
-    db.add(WalletLedger(user_id=user.id, currency_type=EconomyCurrency.COIN.value, direction=EconomyDirection.DEBIT.value, amount=amount, before_balance=before, after_balance=wallet.coin_balance, source_type="GAME_BET", source_id=str(round_id), created_by_user_id=user.id, reason=f"Bet on Jungle Hunt:{target_id}"))
-    risk_level = str(risk_meta.get("level") or "LOW")
-    risk_score = int(risk_meta.get("score") or 0)
-    risk_action = str(risk_meta.get("action") or "ALLOW")
-    bet = GameBet(round_id=round_id, user_id=user.id, target_id=target_id, amount=amount, accepted_amount=amount, risk_level=risk_level, risk_score=risk_score, risk_action=risk_action, metadata_json=base._dumps({"scope": "GLOBAL", "whale_reason": reason, "whale_adjusted": whale_adjusted, "probability_mode": risk_meta.get("probability_mode", "NORMAL"), "risk": risk_meta}))
-    db.add(bet)
-    round_obj.round_pool_amount += amount
-    platform_fee = amount * int(rules.get("platform_fee_basis_points", JUNGLE_RULES["platform_fee_basis_points"])) // 10_000
-    round_obj.platform_fee_amount += platform_fee
-    round_obj.reward_pool_amount += max(amount - platform_fee, 0)
-    game_stats_service.record_game_bet(db, user_id=user.id, game_id=round_obj.game_key, amount=amount)
-    base.audit(db, round_obj.game_key, round_obj.id, user.id, "BET_ACCEPTED", risk_level, risk_score, risk_action, "Bet accepted; whale tiers reduce win probability instead of blocking coins", {"amount": amount, "target_id": target_id, "scope": "GLOBAL", "probability_mode": risk_meta.get("probability_mode", "NORMAL")}, user.id)
+
+    high_target_liability = target_liability > int(rules.get("max_target_liability", JUNGLE_RULES["max_target_liability"]))
+    high_round_liability = worst_liability > int(rules.get("max_round_liability", JUNGLE_RULES["max_round_liability"]))
+    if high_target_liability or high_round_liability:
+        bet, _wallet = _accept_jungle_bet(
+            db,
+            round_obj=round_obj,
+            user=user,
+            target_id=target_id,
+            amount=amount,
+            rules=rules,
+            risk_meta={**risk_meta, "action": "ACCEPT_THEN_CANCEL_HIGH_LIABILITY", "level": "HIGH"},
+            whale_adjusted=whale_adjusted,
+            whale_reason=reason,
+            audit_reason="Bet accepted, then round cancelled/refunded because liability exceeded configured safety limits.",
+        )
+        return _cancel_round_for_liability(
+            db,
+            round_obj=round_obj,
+            user=user,
+            triggering_bet=bet,
+            target_id=target_id,
+            amount=amount,
+            liability_reason="High target liability" if high_target_liability else "High round liability",
+            liability_metadata={"target_liability": target_liability, "worst_liability": worst_liability, "multiplier": multiplier},
+            commit=commit,
+        )
+
+    bet, wallet = _accept_jungle_bet(
+        db,
+        round_obj=round_obj,
+        user=user,
+        target_id=target_id,
+        amount=amount,
+        rules=rules,
+        risk_meta=risk_meta,
+        whale_adjusted=whale_adjusted,
+        whale_reason=reason,
+        audit_reason="Bet accepted; whale tiers reduce win probability instead of blocking coins",
+    )
     if commit:
         db.commit()
         db.refresh(bet)
         db.refresh(wallet)
     else:
         db.flush()
-    return {"bet_id": bet.id, "round_id": round_id, "target_id": target_id, "requested_amount": amount, "accepted_amount": amount, "spent_coins": amount, "reward_coins": 0, "net_win_coins": -amount, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": None, "risk_level": risk_level, "risk_score": risk_score, "risk_action": risk_action, "probability_mode": risk_meta.get("probability_mode", "NORMAL"), "message": "Bet accepted"}
+    return {"bet_id": bet.id, "round_id": round_id, "target_id": target_id, "requested_amount": amount, "accepted_amount": amount, "spent_coins": amount, "reward_coins": 0, "net_win_coins": -amount, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": None, "risk_level": bet.risk_level, "risk_score": bet.risk_score, "risk_action": bet.risk_action, "probability_mode": risk_meta.get("probability_mode", "NORMAL"), "message": "Bet accepted"}
 
 
 def _payout_for_user_bets(user_bets: list[GameBet], winning_target_id: int) -> int:
@@ -425,6 +637,10 @@ def settle_round(db: Session, round_id: int, user: User, *, commit: bool = True)
         raise HTTPException(status_code=404, detail="Game round not found")
     if round_obj.game_key != JUNGLE_HUNT_KEY:
         return base.settle_round(db, round_id, user)
+    if round_obj.status == GameRoundStatus.CANCELLED.value:
+        wallet = economy_service.get_or_create_wallet(db, user.id)
+        metadata = base._loads(round_obj.metadata_json, {})
+        return {"round_id": round_id, "game_key": round_obj.game_key, "status": GameRoundStatus.CANCELLED.value, "spent_coins": 0, "reward_coins": 0, "net_win_coins": 0, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": None, "risk_level": "LOW", "risk_score": 0, "risk_action": "ROUND_CANCELLED_REFUNDED", "message": metadata.get("cancel_reason_public") or PUBLIC_CANCEL_MESSAGE, "top_winners": []}
     metadata = base._loads(round_obj.metadata_json, {})
     winning_target_id = metadata.get("winning_target_id")
     if winning_target_id is None:
