@@ -13,10 +13,7 @@ class VibesApiService {
 
   Future<List<VibeItem>> loadFeed({int limit = 30, VibesFeedTab tab = VibesFeedTab.vibes}) async {
     final path = tab == VibesFeedTab.friends ? '/vibes/friends' : '/vibes/feed';
-    final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint(path)).replace(queryParameters: {'limit': '$limit'}),
-      headers: _authHeaders(),
-    );
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint(path)).replace(queryParameters: {'limit': '$limit'}), headers: _authHeaders());
     _throwIfFailed(response, 'load Vibes feed');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final posts = decoded['posts'] as List<dynamic>? ?? const [];
@@ -33,15 +30,7 @@ class VibesApiService {
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/vibes')),
       headers: _authHeaders(contentType: true),
-      body: jsonEncode({
-        'caption': vibe.caption,
-        'media_type': _mediaTypeToApi(vibe.mediaType),
-        'media_url': vibe.mediaUrl,
-        'tag': vibe.tag,
-        'mentions': vibe.mentions,
-        'uses_mention_all': vibe.usesMentionAll,
-        'comments_enabled': vibe.commentsEnabled,
-      }),
+      body: jsonEncode({'caption': vibe.caption, 'media_type': _mediaTypeToApi(vibe.mediaType), 'media_url': vibe.mediaUrl, 'tag': vibe.tag, 'mentions': vibe.mentions, 'uses_mention_all': vibe.usesMentionAll, 'comments_enabled': vibe.commentsEnabled}),
     );
     _throwIfFailed(response, 'create Vibe');
     return _vibeFromJson(jsonDecode(response.body) as Map<String, dynamic>);
@@ -62,25 +51,32 @@ class VibesApiService {
   }
 
   Future<VibeShareResult> shareVibe(String postId, {int? targetPublicUserId, String shareChannel = 'inbox'}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/share')),
-      headers: _authHeaders(contentType: true),
-      body: jsonEncode({'target_public_user_id': targetPublicUserId, 'share_channel': shareChannel}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/share')), headers: _authHeaders(contentType: true), body: jsonEncode({'target_public_user_id': targetPublicUserId, 'share_channel': shareChannel}));
     _throwIfFailed(response, 'share Vibe');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return VibeShareResult(postId: decoded['post_id']?.toString() ?? postId, sharesCount: _int(decoded['shares_count']), shareChannel: decoded['share_channel']?.toString() ?? shareChannel, targetPublicUserId: _nullableInt(decoded['target_public_user_id']));
   }
 
   Future<VibeReportResult> reportVibe(String postId, {required String reason, String? details}) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/report')),
-      headers: _authHeaders(contentType: true),
-      body: jsonEncode({'reason': reason, 'details': details}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/report')), headers: _authHeaders(contentType: true), body: jsonEncode({'reason': reason, 'details': details}));
     _throwIfFailed(response, 'report Vibe');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return VibeReportResult(postId: decoded['post_id']?.toString() ?? postId, reportId: _int(decoded['id']), reason: decoded['reason']?.toString() ?? reason, status: decoded['status']?.toString() ?? 'PENDING');
+  }
+
+  Future<List<VibeReportQueueItem>> loadReportQueue({String status = 'PENDING', int limit = 50}) async {
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/vibes/reports')).replace(queryParameters: {'status': status, 'limit': '$limit'}), headers: _authHeaders());
+    _throwIfFailed(response, 'load Vibe report queue');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final reports = decoded['reports'] as List<dynamic>? ?? const [];
+    return reports.whereType<Map<String, dynamic>>().map(VibeReportQueueItem.fromJson).toList(growable: false);
+  }
+
+  Future<VibeReportResult> reviewReport(int reportId, {required String status, bool deletePost = false}) async {
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/reports/$reportId/review')), headers: _authHeaders(contentType: true), body: jsonEncode({'status': status, 'delete_post': deletePost}));
+    _throwIfFailed(response, 'review Vibe report');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return VibeReportResult(postId: decoded['post_id']?.toString() ?? '', reportId: _int(decoded['id']), reason: decoded['reason']?.toString() ?? '', status: decoded['status']?.toString() ?? status);
   }
 
   Future<List<VibeComment>> loadComments(String postId, {int limit = 50}) async {
@@ -143,36 +139,43 @@ class VibeReportResult {
   final String status;
 }
 
+class VibeReportQueueItem {
+  const VibeReportQueueItem({required this.id, required this.postId, required this.reporterName, required this.postAuthorName, required this.postCaption, required this.postMediaType, required this.reason, required this.status, required this.createdAtText});
+
+  final int id;
+  final int postId;
+  final String reporterName;
+  final String postAuthorName;
+  final String postCaption;
+  final String postMediaType;
+  final String reason;
+  final String status;
+  final String createdAtText;
+
+  factory VibeReportQueueItem.fromJson(Map<String, dynamic> json) {
+    final reporter = json['reporter'] is Map<String, dynamic> ? json['reporter'] as Map<String, dynamic> : <String, dynamic>{};
+    final author = json['post_author'] is Map<String, dynamic> ? json['post_author'] as Map<String, dynamic> : <String, dynamic>{};
+    return VibeReportQueueItem(
+      id: _int(json['id']),
+      postId: _int(json['post_id']),
+      reporterName: _text(reporter['display_name']) ?? _text(reporter['username']) ?? 'Reporter',
+      postAuthorName: _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User',
+      postCaption: json['post_caption']?.toString() ?? '',
+      postMediaType: json['post_media_type']?.toString() ?? 'text',
+      reason: json['reason']?.toString() ?? 'Report',
+      status: json['status']?.toString() ?? 'PENDING',
+      createdAtText: _timeAgo(json['created_at']?.toString()),
+    );
+  }
+}
+
 VibeItem _vibeFromJson(Map<String, dynamic> json) {
   final author = json['author'] is Map<String, dynamic> ? json['author'] as Map<String, dynamic> : <String, dynamic>{};
   final displayName = _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User';
   final authorPublicId = author['public_user_id']?.toString() ?? author['id']?.toString() ?? '';
   final mediaType = _mediaTypeFromApi(json['media_type']?.toString());
   final mentionsRaw = json['mentions'];
-  return VibeItem(
-    id: json['id']?.toString() ?? '',
-    authorName: displayName,
-    authorId: authorPublicId,
-    avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(),
-    timeAgo: _timeAgo(json['created_at']?.toString()),
-    mediaType: mediaType,
-    caption: json['caption']?.toString() ?? '',
-    tag: json['tag']?.toString() ?? mediaType.label,
-    likes: _int(json['likes_count']),
-    comments: _int(json['comments_count']),
-    shares: _int(json['shares_count']),
-    saves: _int(json['saves_count']),
-    views: _int(json['views_count']),
-    isFollowing: true,
-    usesMentionAll: json['uses_mention_all'] == true,
-    commentsEnabled: json['comments_enabled'] != false,
-    mentions: mentionsRaw is List ? mentionsRaw.map((item) => item.toString()).toList(growable: false) : const <String>[],
-    colors: mediaType.colors,
-    mediaUrl: _text(json['media_url']),
-    avatarUrl: _text(author['avatar_url']),
-    likedByMe: json['liked_by_me'] == true,
-    savedByMe: json['saved_by_me'] == true,
-  );
+  return VibeItem(id: json['id']?.toString() ?? '', authorName: displayName, authorId: authorPublicId, avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(), timeAgo: _timeAgo(json['created_at']?.toString()), mediaType: mediaType, caption: json['caption']?.toString() ?? '', tag: json['tag']?.toString() ?? mediaType.label, likes: _int(json['likes_count']), comments: _int(json['comments_count']), shares: _int(json['shares_count']), saves: _int(json['saves_count']), views: _int(json['views_count']), isFollowing: true, usesMentionAll: json['uses_mention_all'] == true, commentsEnabled: json['comments_enabled'] != false, mentions: mentionsRaw is List ? mentionsRaw.map((item) => item.toString()).toList(growable: false) : const <String>[], colors: mediaType.colors, mediaUrl: _text(json['media_url']), avatarUrl: _text(author['avatar_url']), likedByMe: json['liked_by_me'] == true, savedByMe: json['saved_by_me'] == true);
 }
 
 VibeComment _commentFromJson(Map<String, dynamic> json) {
