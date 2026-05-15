@@ -97,12 +97,12 @@ def _clean_numeric_lock_password(value: object, *, required: bool) -> str | None
     text = value.strip() if isinstance(value, str) else ""
     if not text:
         if required:
-            raise HTTPException(status_code=400, detail="Numeric room lock is required when locking room")
+            raise HTTPException(status_code=400, detail="4-digit room lock is required when locking room")
         return None
     if not text.isdigit():
         raise HTTPException(status_code=400, detail="Room lock must contain numbers only")
-    if len(text) < 4 or len(text) > 8:
-        raise HTTPException(status_code=400, detail="Room lock must be 4 to 8 digits")
+    if len(text) != 4:
+        raise HTTPException(status_code=400, detail="Room lock must be exactly 4 digits")
     return text
 
 
