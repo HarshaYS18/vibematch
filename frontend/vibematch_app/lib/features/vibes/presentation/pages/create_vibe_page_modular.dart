@@ -111,7 +111,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
       final mediaUrl = await _uploadSelectedMediaIfNeeded();
       final currentUser = _authApi.cachedUser;
       final visibleName = currentUser?.displayName?.trim().isNotEmpty == true ? currentUser!.displayName!.trim() : currentUser?.username?.trim().isNotEmpty == true ? currentUser!.username!.trim() : 'Vibe User';
-      await widget.onPublish(VibeItem(authorName: visibleName, authorId: currentUser?.publicUserId.toString() ?? '', avatarText: visibleName.trim().isEmpty ? 'V' : visibleName.trim()[0].toUpperCase(), timeAgo: 'Just now', mediaType: _selectedType, caption: caption, tag: _selectedType.label, likes: 0, comments: 0, shares: 0, views: 1, isFollowing: true, usesMentionAll: _captionController.usesMentionAll, mentions: _captionController.validMentions, colors: _selectedType.colors, mediaUrl: mediaUrl));
+      await widget.onPublish(VibeItem(authorName: visibleName, authorId: currentUser?.publicUserId.toString() ?? '', avatarText: visibleName.trim().isEmpty ? 'V' : visibleName.trim()[0].toUpperCase(), timeAgo: 'Just now', mediaType: _selectedType, caption: caption, tag: _selectedType.label, likes: 0, comments: 0, shares: 0, views: 1, isFollowing: true, usesMentionAll: _captionController.usesMentionAll, mentions: _captionController.validMentions, colors: _selectedType.colors, mediaUrl: mediaUrl, commentsEnabled: _commentsEnabled));
       if (mounted) Navigator.pop(context);
     } catch (error) {
       if (mounted) _showAction(error.toString().replaceFirst('Exception: ', ''));
