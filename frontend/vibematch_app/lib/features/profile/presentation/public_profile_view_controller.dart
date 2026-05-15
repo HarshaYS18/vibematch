@@ -3,6 +3,16 @@ part of 'public_profile_view_page.dart';
 extension _PublicProfileViewController on _PublicProfileViewPageState {
   int _targetPublicUserId() => widget.publicUserId ?? widget.user.publicUserId;
 
+  Future<void> _loadEconomyPublicCard() async {
+    final publicUserId = _targetPublicUserId();
+    if (publicUserId <= 0) return;
+    try {
+      final card = await _economyApi.getPublicCard(publicUserId);
+      if (!mounted) return;
+      _setProfileState(() => _economyCard = card);
+    } catch (_) {}
+  }
+
   Future<void> _syncPublicLoveBonds() async {
     final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
@@ -83,6 +93,7 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
         _backendProfile = profile;
         _relationship = profile.relationship;
       });
+      unawaited(_loadEconomyPublicCard());
     } catch (error) {
       if (!mounted) return;
       _setProfileState(
@@ -302,6 +313,7 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
 
   String _displayName() =>
       _backendProfile?.visibleName ??
+      _economyCard?.displayName ??
       widget.user.displayName ??
       widget.user.username ??
       'Vibe User';
@@ -310,7 +322,7 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
       _backendProfile?.visibleId ??
       widget.user.displayCustomId?.toString() ??
       widget.user.publicUserId.toString();
-  String? _avatarUrl() => _backendProfile?.avatarUrl ?? widget.user.avatarUrl;
+  String? _avatarUrl() => _backendProfile?.avatarUrl ?? _economyCard?.avatarUrl ?? widget.user.avatarUrl;
   bool _showOfficialTick() =>
       _backendProfile?.primaryRoleBadge?.showVerifiedTick == true ||
       widget.user.shouldShowOfficialYellowTick;
@@ -318,16 +330,22 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
       _backendProfile?.primaryRoleBadge?.badgeLabel ??
       widget.user.primaryRoleBadge?.badgeLabel ??
       MeProfileConstants.roleTagFor(widget.user.primaryRole);
-  int _vipLevel() => _backendProfile?.vip.vipLevel ?? widget.vipLevel;
-  int _svipLevel() => _backendProfile?.vip.svipLevel ?? widget.svipLevel;
+  int _vipLevel() => _economyCard?.vipLevel ?? _backendProfile?.vip.vipLevel ?? widget.vipLevel;
+  int _svipLevel() => _economyCard?.svipLevel ?? _backendProfile?.vip.svipLevel ?? widget.svipLevel;
   int _sentLevel() =>
-      _backendProfile?.wallet.sendLevel ?? widget.user.wallet.sendLevel;
+      _economyCard?.sendLevel ??
+      _backendProfile?.wallet.sendLevel ??
+      widget.user.wallet.sendLevel;
   int _receiveLevel() =>
-      _backendProfile?.wallet.receiveLevel ?? widget.user.wallet.receiveLevel;
+      _economyCard?.receiveLevel ??
+      _backendProfile?.wallet.receiveLevel ??
+      widget.user.wallet.receiveLevel;
   int _monthlyGiftCoinsSent() =>
+      _economyCard?.monthlySentCoins ??
       _backendProfile?.wallet.monthlyGiftCoinsSent ??
       widget.user.wallet.monthlyGiftCoinsSent;
   int _monthlyGiftCoinsReceived() =>
+      _economyCard?.monthlyReceivedCoins ??
       _backendProfile?.wallet.monthlyGiftCoinsReceived ??
       widget.user.wallet.monthlyGiftCoinsReceived;
   String _familyName() =>
