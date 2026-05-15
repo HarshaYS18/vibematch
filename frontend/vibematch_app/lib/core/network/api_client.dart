@@ -61,6 +61,30 @@ class ApiClient {
     );
   }
 
+  Future<Map<String, dynamic>?> getOptionalMap(
+    String path, {
+    Map<String, String?> queryParameters = const {},
+    Map<String, String> headers = const {},
+  }) async {
+    final response = await _httpClient
+        .get(
+          _buildUri(path, queryParameters: queryParameters),
+          headers: {'Accept': 'application/json', ...headers},
+        )
+        .timeout(AppConstants.receiveTimeout);
+
+    final decodedBody = _decodeResponseBody(response);
+
+    if (decodedBody == null) return null;
+    if (decodedBody is Map<String, dynamic>) return decodedBody;
+
+    throw ApiException(
+      message: 'Expected a nullable JSON object response',
+      statusCode: response.statusCode,
+      body: decodedBody,
+    );
+  }
+
   Future<List<dynamic>> getList(
     String path, {
     Map<String, String?> queryParameters = const {},
