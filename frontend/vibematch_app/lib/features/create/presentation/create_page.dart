@@ -8,9 +8,10 @@ import '../../rooms/presentation/live_room_models.dart';
 import '../../rooms/presentation/live_room_page.dart';
 
 class CreatePage extends StatefulWidget {
-  const CreatePage({super.key, required this.currentUser});
+  const CreatePage({super.key, required this.currentUser, this.onRoomCreated});
 
   final CurrentUser currentUser;
+  final ValueChanged<RealRoom>? onRoomCreated;
 
   @override
   State<CreatePage> createState() => _CreatePageState();
@@ -23,8 +24,8 @@ class _CreatePageState extends State<CreatePage> {
 
   String _selectedLanguage = 'Telugu';
   _RoomMode _selectedMode = _RoomMode.open;
-  String? _roomImageUrl;
-  bool _uploadingRoomImage = false;
+  String? _roomCoverUrl;
+  bool _uploadingRoomCover = false;
   bool _allowScreenshots = true;
   bool _creatingRoom = false;
 
@@ -58,21 +59,21 @@ class _CreatePageState extends State<CreatePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message)));
   }
 
-  Future<void> _pickAndUploadRoomImage() async {
-    if (_uploadingRoomImage || _creatingRoom) return;
-    setState(() => _uploadingRoomImage = true);
+  Future<void> _pickCropAndUploadRoomCover() async {
+    if (_uploadingRoomCover || _creatingRoom) return;
+    setState(() => _uploadingRoomCover = true);
     try {
-      final upload = await _mediaUploadService.pickAndUploadRoomAvatar();
+      final upload = await _mediaUploadService.pickCropAndUploadRoomCover(context);
       if (!mounted) return;
-      setState(() => _roomImageUrl = upload.url);
-      _toast('Room image uploaded');
+      setState(() => _roomCoverUrl = upload.url);
+      _toast('Room cover uploaded');
     } on MediaUploadCancelledException {
       return;
     } catch (error) {
       if (!mounted) return;
       _toast(error.toString().replaceFirst('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _uploadingRoomImage = false);
+      if (mounted) setState(() => _uploadingRoomCover = false);
     }
   }
 
@@ -133,8 +134,10 @@ class _CreatePageState extends State<CreatePage> {
         language: _selectedLanguage,
         mode: _selectedMode.title,
         type: 'Chat',
-        avatarUrl: _roomImageUrl,
+        avatarUrl: _roomCoverUrl,
+        coverPhotoUrl: _roomCoverUrl,
       );
+      widget.onRoomCreated?.call(room);
       if (!mounted) return;
       _showRoomReadySheet(room);
     } catch (error) {
@@ -186,17 +189,17 @@ class _CreatePageState extends State<CreatePage> {
               const _SheetHandle(),
               const SizedBox(height: 14),
               Container(
-                width: 64,
-                height: 64,
+                width: 96,
+                height: 54,
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  gradient: room.avatarUrl == null || room.avatarUrl!.trim().isEmpty ? const LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF8C5CF6), Color(0xFFE84C72)]) : null,
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: room.coverPhotoUrl == null || room.coverPhotoUrl!.trim().isEmpty ? const LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF8C5CF6), Color(0xFFE84C72)]) : null,
                   boxShadow: [BoxShadow(color: const Color(0xFF8C5CF6).withValues(alpha: 0.22), blurRadius: 18, offset: const Offset(0, 8))],
                 ),
-                child: room.avatarUrl == null || room.avatarUrl!.trim().isEmpty
+                child: room.coverPhotoUrl == null || room.coverPhotoUrl!.trim().isEmpty
                     ? const Icon(Icons.graphic_eq_rounded, color: Colors.white, size: 29)
-                    : Image.network(room.avatarUrl!, fit: BoxFit.cover),
+                    : Image.network(room.coverPhotoUrl!, fit: BoxFit.cover),
               ),
               const SizedBox(height: 12),
               const Text('Room Ready', style: TextStyle(color: Color(0xFF251538), fontSize: 21, fontWeight: FontWeight.w900)),
@@ -285,7 +288,7 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Widget _buildCreateCard() {
-    final hasImage = _roomImageUrl?.trim().isNotEmpty == true;
+    final hasCover = _roomCoverUrl?.trim().isNotEmpty == true;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       padding: const EdgeInsets.all(14),
@@ -293,30 +296,32 @@ class _CreatePageState extends State<CreatePage> {
       child: Column(
         children: [
           GestureDetector(
-            onTap: _pickAndUploadRoomImage,
-            child: Container(
-              width: 82,
-              height: 82,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(27), gradient: hasImage ? null : null, color: hasImage ? null : const Color(0xFFF4EEE7), border: Border.all(color: const Color(0xFFEDE3D7))),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (hasImage)
-                    Image.network(_roomImageUrl!, fit: BoxFit.cover)
-                  else
-                    Icon(Icons.add_photo_alternate_rounded, color: const Color(0xFF7B6A86), size: 30),
-                  if (_uploadingRoomImage)
-                    Container(
-                      color: Colors.black.withValues(alpha: 0.28),
-                      child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))),
-                    ),
-                ],
+            onTap: _pickCropAndUploadRoomCover,
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Container(
+                width: double.infinity,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: hasCover ? null : const Color(0xFFF4EEE7), border: Border.all(color: const Color(0xFFEDE3D7))),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (hasCover)
+                      Image.network(_roomCoverUrl!, fit: BoxFit.cover)
+                    else
+                      const Center(child: Icon(Icons.add_photo_alternate_rounded, color: Color(0xFF7B6A86), size: 34)),
+                    if (_uploadingRoomCover)
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.28),
+                        child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(height: 7),
-          Text(_uploadingRoomImage ? 'Uploading room image...' : hasImage ? 'Room image ready' : 'Tap to add room image', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800)),
+          Text(_uploadingRoomCover ? 'Uploading room cover...' : hasCover ? 'Room cover ready' : 'Tap to add room cover photo', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800)),
           const SizedBox(height: 13),
           TextField(
             controller: _roomNameController,
@@ -379,7 +384,7 @@ class _CreatePageState extends State<CreatePage> {
         children: [
           Icon(Icons.security_rounded, color: Color(0xFFC99A3B), size: 19),
           SizedBox(width: 10),
-          Expanded(child: Text('Room creation is now saved to backend. Locked, Members Only, and Secret Vibe modes are enforced by backend access rules.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
+          Expanded(child: Text('Room creation is saved to backend. Cover photo uses a cropped 16:9 CDN-ready image. Locked, Members Only, and Secret Vibe modes are enforced by backend access rules.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
         ],
       ),
     );
@@ -520,8 +525,8 @@ class _CreateSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(14),
-      padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 24, offset: const Offset(0, 12))]),
+      padding: EdgeInsets.fromLTRB(14, 12, 14, 16 + MediaQuery.paddingOf(context).bottom),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 24, offset: const Offset(0, 8))]),
       child: child,
     );
   }
@@ -532,7 +537,7 @@ class _SheetHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: Container(width: 38, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))));
+    return Center(child: Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(99))));
   }
 }
 
@@ -544,11 +549,15 @@ class _ReadyInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 7),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFEDE3D7))),
-      child: Row(children: [Text(label, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800)), const Spacer(), Text(value, style: const TextStyle(color: Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900))]),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Text(label, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)),
+          const Spacer(),
+          Text(value, style: const TextStyle(color: Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900)),
+        ],
+      ),
     );
   }
 }
