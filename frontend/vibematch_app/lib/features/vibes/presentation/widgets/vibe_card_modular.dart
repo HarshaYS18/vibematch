@@ -268,25 +268,27 @@ class _FallbackAvatar extends StatelessWidget {
 }
 
 class VibeMediaPlayer extends StatelessWidget {
-  const VibeMediaPlayer({super.key, required this.vibe, required this.onDoubleTap, this.respectFeedPause = true});
+  const VibeMediaPlayer({super.key, required this.vibe, required this.onDoubleTap, this.respectFeedPause = true, this.autoplay = false});
   final VibeItem vibe;
   final VoidCallback onDoubleTap;
   final bool respectFeedPause;
+  final bool autoplay;
 
   @override
   Widget build(BuildContext context) {
     final mediaUrl = vibe.mediaUrl?.trim();
     if (vibe.mediaType == VibeMediaType.text) return const SizedBox.shrink();
     if (mediaUrl == null || mediaUrl.isEmpty) return GestureDetector(onDoubleTap: onDoubleTap, child: Container(decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors)), child: Icon(vibe.mediaType == VibeMediaType.video ? Icons.play_circle_fill_rounded : Icons.photo_rounded, color: Colors.white, size: 72)));
-    if (vibe.mediaType == VibeMediaType.video) return GestureDetector(onDoubleTap: onDoubleTap, child: _NetworkVideoPlayer(url: mediaUrl, respectFeedPause: respectFeedPause));
+    if (vibe.mediaType == VibeMediaType.video) return GestureDetector(onDoubleTap: onDoubleTap, child: _NetworkVideoPlayer(url: mediaUrl, respectFeedPause: respectFeedPause, autoplay: autoplay));
     return GestureDetector(onDoubleTap: onDoubleTap, child: Image.network(mediaUrl, width: double.infinity, height: double.infinity, fit: BoxFit.cover, loadingBuilder: (context, child, loadingProgress) => loadingProgress == null ? child : _MediaLoading(colors: vibe.colors), errorBuilder: (_, _, _) => _MediaFallback(vibe: vibe)));
   }
 }
 
 class _NetworkVideoPlayer extends StatefulWidget {
-  const _NetworkVideoPlayer({required this.url, required this.respectFeedPause});
+  const _NetworkVideoPlayer({required this.url, required this.respectFeedPause, required this.autoplay});
   final String url;
   final bool respectFeedPause;
+  final bool autoplay;
   @override
   State<_NetworkVideoPlayer> createState() => _NetworkVideoPlayerState();
 }
@@ -339,6 +341,7 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   }
 
   bool _shouldAutoplayNow() {
+    if (widget.autoplay) return true;
     if (!widget.respectFeedPause) return false;
     if (VibeMediaPlaybackGate.feedPlaybackPaused.value) return false;
     final renderObject = context.findRenderObject();
