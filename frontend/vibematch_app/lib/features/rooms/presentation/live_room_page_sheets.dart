@@ -117,7 +117,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       LiveRoomSheetController.showTransparentSheet<void>(
         context: context,
         isScrollControlled: true,
-        builder: (_) => _RoomThemeStoreSheet(
+        builder: (context) => _RoomThemeStoreSheet(
           themes: themes,
           onThemePressed: (theme) async {
             try {
@@ -204,7 +204,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => VibeSyncControlSheet(
+      builder: (context) => VibeSyncControlSheet(
         state: _vibeSyncState,
         users: _roomUsers,
         canManage: _viewerCanManageRoom,
@@ -240,17 +240,11 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     );
   }
 
-  void _clearVibeSyncOverlay() {
-    _roomStateController.setVibeSyncState(
-      _vibeSyncController.clearOverlay(_vibeSyncState),
-    );
-  }
-
   void _openJoinRequestsSheet() {
     _clearRoomFocus();
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      builder: (_) => StatefulBuilder(
+      builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) => LiveRoomJoinRequestsSheet(
           users: _roomMessageController.joinRequestUsers,
           onApprove: (user) {
@@ -283,7 +277,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => LiveRoomPrivacySheet(
+      builder: (context) => LiveRoomPrivacySheet(
         currentMode: _privacyMode,
         onModeChanged: (mode) {
           _roomStateController.setPrivacyMode(mode);
@@ -304,7 +298,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     _clearRoomFocus();
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      builder: (_) => LiveRoomSeatLayoutPickerSheet(
+      builder: (context) => LiveRoomSeatLayoutPickerSheet(
         selectedLayout: _seatController.layoutId,
         onSelected: (layout) {
           _seatController.changeLayout(layout);
@@ -317,31 +311,12 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     );
   }
 
-  void _openBackgroundSheet() {
-    _clearRoomFocus();
-    LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => LiveRoomBackgroundSheet(
-        currentTheme: _selectedBackgroundTheme,
-        onThemeSelected: (theme) {
-          _roomStateController.setSelectedBackgroundTheme(theme);
-          RoomToast.show(
-            context,
-            _settingsController.backgroundAppliedToast(theme),
-          );
-        },
-        onStoreTap: () => RoomToast.show(context, 'Theme store opened'),
-      ),
-    );
-  }
-
   void _openAnnouncementSheet() {
     _clearRoomFocus();
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => LiveRoomAnnouncementSheet(
+      builder: (context) => LiveRoomAnnouncementSheet(
         controller: _announcementController,
         onSubmit: (message) {
           Navigator.pop(context);
@@ -384,7 +359,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
   void _openInfoSheet(String title, String body) {
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
-      builder: (_) => LiveRoomInfoSheet(title: title, body: body),
+      builder: (context) => LiveRoomInfoSheet(title: title, body: body),
     );
   }
 }
@@ -423,7 +398,7 @@ class _RoomThemeStoreSheet extends StatelessWidget {
             child: ListView.separated(
               physics: const BouncingScrollPhysics(),
               itemCount: themes.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final theme = themes[index];
                 final action = theme.isOwned || theme.isFree ? 'Apply' : 'Buy ${theme.priceCoins} coins';
