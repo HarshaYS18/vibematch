@@ -135,6 +135,22 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
     }
   }
 
+  Future<void> _toggleCommentLike(VibeComment comment) async {
+    if (!_hasBackendId || comment.id.trim().isEmpty) return;
+    try {
+      final result = await _api.toggleCommentLike(widget.vibe.id, comment.id);
+      if (!mounted) return;
+      setState(() {
+        final index = _comments.indexWhere((item) => item.id == result.commentId);
+        if (index >= 0) {
+          _comments[index] = _comments[index].copyWith(likedByMe: result.likedByMe, likesCount: result.likesCount);
+        }
+      });
+    } catch (error) {
+      if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
   void _startReply(VibeComment comment) {
     setState(() {
       _replyingTo = comment;
@@ -269,6 +285,7 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
                           final comment = orderedComments[index];
                           return _CommentTile(
                             comment: comment,
+                            onLikeTap: () => unawaited(_toggleCommentLike(comment)),
                             onReplyTap: () => _startReply(comment),
                             onActionsTap: () => unawaited(_openCommentActions(comment)),
                           );
@@ -390,8 +407,9 @@ class _CommentsHeader extends StatelessWidget {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment, required this.onReplyTap, required this.onActionsTap});
+  const _CommentTile({required this.comment, required this.onLikeTap, required this.onReplyTap, required this.onActionsTap});
   final VibeComment comment;
+  final VoidCallback onLikeTap;
   final VoidCallback onReplyTap;
   final VoidCallback onActionsTap;
 
@@ -415,10 +433,19 @@ class _CommentTile extends StatelessWidget {
                 if (comment.isPinned) const Padding(padding: EdgeInsets.only(bottom: 4), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 13), SizedBox(width: 4), Text('Pinned', style: TextStyle(color: Color(0xFFC99A3B), fontSize: 10.5, fontWeight: FontWeight.w900))])),
                 RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32), children: [TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)), TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600))])),
                 const SizedBox(height: 6),
-                Row(children: [Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700)), const SizedBox(width: 14), InkWell(onTap: onReplyTap, borderRadius: BorderRadius.circular(999), child: const Padding(padding: EdgeInsets.symmetric(horizontal: 2, vertical: 2), child: Text('Reply', style: TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w900))))]),
+                Row(children: [
+                  Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 14),
+                  if (comment.likesCount > 0) ...[
+                    Text('${_formatCount(comment.likesCount)} like${comment.likesCount == 1 ? '' : 's'}', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                    const SizedBox(width: 14),
+                  ],
+                  InkWell(onTap: onReplyTap, borderRadius: BorderRadius.circular(999), child: const Padding(padding: EdgeInsets.symmetric(horizontal: 2, vertical: 2), child: Text('Reply', style: TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w900))))
+                ]),
               ],
             ),
           ),
+          InkWell(onTap: onLikeTap, customBorder: const CircleBorder(), child: Padding(padding: const EdgeInsets.all(9), child: Icon(comment.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: comment.likedByMe ? const Color(0xFFE84C72) : const Color(0xFF8C8198), size: 18))),
           if (comment.canPin || comment.canDelete) IconButton(onPressed: onActionsTap, icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF8C8198), size: 20)),
         ],
       ),
