@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../gifts/presentation/lucky_gift_rankings_sheet.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../live_room_models.dart';
@@ -49,6 +50,13 @@ class LiveRoomGiftActionsModule {
           giftController.sendGift(roomUsers);
         },
         onRecharge: () => RoomToast.show(context, 'Wallet / coin recharge opened'),
+        onLuckyRankingsTap: () {
+          Navigator.pop(context);
+          Future<void>.delayed(const Duration(milliseconds: 90), () {
+            if (!context.mounted) return;
+            LuckyGiftRankingsSheet.show(context);
+          });
+        },
       ),
     );
   }

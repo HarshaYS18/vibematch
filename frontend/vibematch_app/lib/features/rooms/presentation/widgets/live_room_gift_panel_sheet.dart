@@ -19,6 +19,7 @@ class LiveRoomGiftPanelSheet extends StatefulWidget {
     required this.onComboChanged,
     required this.onSend,
     required this.onRecharge,
+    this.onLuckyRankingsTap,
   });
 
   final List<GiftItem> gifts;
@@ -35,6 +36,7 @@ class LiveRoomGiftPanelSheet extends StatefulWidget {
   final ValueChanged<int> onComboChanged;
   final VoidCallback onSend;
   final VoidCallback onRecharge;
+  final VoidCallback? onLuckyRankingsTap;
 
   @override
   State<LiveRoomGiftPanelSheet> createState() => _LiveRoomGiftPanelSheetState();
@@ -108,6 +110,7 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
       },
       onSend: widget.onSend,
       onRecharge: widget.onRecharge,
+      onLuckyRankingsTap: widget.onLuckyRankingsTap,
     );
   }
 }

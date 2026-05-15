@@ -19,7 +19,9 @@ class GiftPanelHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showLuckyRankings = selectedCategory == GiftCategory.lucky && onLuckyRankingsTap != null;
+    final showLuckyRankings =
+        selectedCategory == GiftCategory.lucky && onLuckyRankingsTap != null;
+
     return Row(
       children: [
         Expanded(

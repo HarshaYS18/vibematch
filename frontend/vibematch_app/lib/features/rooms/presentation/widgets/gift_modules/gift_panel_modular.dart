@@ -43,7 +43,8 @@ class GiftPanelModular extends StatefulWidget {
   final VoidCallback onRecharge;
   final VoidCallback? onLuckyRankingsTap;
 
-  static List<GiftItem> withMockExtras(List<GiftItem> gifts) => GiftMockExtras.mergeWith(gifts);
+  static List<GiftItem> withMockExtras(List<GiftItem> gifts) =>
+      GiftMockExtras.mergeWith(gifts);
 
   @override
   State<GiftPanelModular> createState() => _GiftPanelModularState();
@@ -55,13 +56,16 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
   @override
   void initState() {
     super.initState();
-    _categoryPageController = PageController(initialPage: GiftCategory.values.indexOf(widget.selectedCategory));
+    _categoryPageController = PageController(
+      initialPage: GiftCategory.values.indexOf(widget.selectedCategory),
+    );
   }
 
   @override
   void didUpdateWidget(covariant GiftPanelModular oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedCategory != widget.selectedCategory && _categoryPageController.hasClients) {
+    if (oldWidget.selectedCategory != widget.selectedCategory &&
+        _categoryPageController.hasClients) {
       _categoryPageController.animateToPage(
         GiftCategory.values.indexOf(widget.selectedCategory),
         duration: const Duration(milliseconds: 180),
@@ -79,14 +83,25 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
   @override
   Widget build(BuildContext context) {
     final allGifts = GiftPanelModular.withMockExtras(widget.gifts);
-    final comboOptions = widget.selectedCategory == GiftCategory.lucky ? GiftPanelConstants.luckyCombos : GiftPanelConstants.combos;
+    final comboOptions = widget.selectedCategory == GiftCategory.lucky
+        ? GiftPanelConstants.luckyCombos
+        : GiftPanelConstants.combos;
     final isLuckyPacket = widget.selectedGift?.id == 'lucky_packet';
-    final comboValue = isLuckyPacket ? 1 : (comboOptions.contains(widget.selectedCombo) ? widget.selectedCombo : comboOptions.first);
+    final comboValue = isLuckyPacket
+        ? 1
+        : (comboOptions.contains(widget.selectedCombo)
+              ? widget.selectedCombo
+              : comboOptions.first);
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.414,
       child: Container(
-        padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
+        padding: EdgeInsets.fromLTRB(
+          10,
+          7,
+          10,
+          MediaQuery.paddingOf(context).bottom + 8,
+        ),
         decoration: const BoxDecoration(
           color: Color(0xFF12101D),
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -106,7 +121,8 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
                   curve: Curves.easeOutCubic,
                 );
               },
-              onStoreTap: () => RoomToast.show(context, 'Store / inventory opened'),
+              onStoreTap: () =>
+                  RoomToast.show(context, 'Store / inventory opened'),
               onLuckyRankingsTap: widget.onLuckyRankingsTap,
             ),
             const SizedBox(height: 7),
