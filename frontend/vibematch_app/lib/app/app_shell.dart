@@ -14,7 +14,7 @@ import '../features/rooms/data/live_room_media_signaling_service.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page_modular.dart';
-import '../features/vibes/presentation/widgets/vibe_card_modular.dart';
+import '../features/vibes/presentation/widgets/vibe_media_playback_gate.dart';
 import '../features/wallet/data/wallet_realtime_sync_service.dart';
 import 'app_routes.dart';
 
