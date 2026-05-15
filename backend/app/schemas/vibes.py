@@ -22,6 +22,7 @@ class VibePostCreateRequest(BaseModel):
 
 class VibeCommentCreateRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)
+    parent_comment_id: int | None = None
 
 
 class VibeShareCreateRequest(BaseModel):
@@ -43,6 +44,7 @@ class VibeReportReviewRequest(BaseModel):
 class VibeCommentResponse(BaseModel):
     id: int
     post_id: int
+    parent_comment_id: int | None = None
     text: str
     author: VibeAuthorResponse
     is_pinned: bool = False
