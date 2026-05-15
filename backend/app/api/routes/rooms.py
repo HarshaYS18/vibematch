@@ -1,9 +1,11 @@
+import random
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
+from app.core.security import hash_password
 from app.database import get_db
 from app.models.room import Room
 from app.models.user import User
@@ -48,6 +50,12 @@ def _room_discovery_payload(room: Room) -> dict:
         "followed_friends_inside": [],
         "cover_photo_url": room.cover_photo_url or room.avatar_url,
         "avatar_url": room.avatar_url,
+        "owner_user_id": room.owner_user_id,
+        "is_active": room.is_active,
+        "is_secret": room.is_secret,
+        "is_locked": room.is_locked,
+        "is_members_only": room.is_members_only,
+        "has_lock_password": bool(room.lock_password_hash),
     }
 
 
@@ -62,6 +70,33 @@ def _is_seed_or_test_room(room: Room) -> bool:
     if public_id.startswith(("test", "demo", "seed", "sample")):
         return True
     return any(marker in subtitle for marker in ("seed", "demo", "sample", "mock"))
+
+
+def _clean_text(value: object, *, field_name: str, max_length: int, required: bool = True) -> str | None:
+    text = value.strip() if isinstance(value, str) else ""
+    if not text:
+        if required:
+            raise HTTPException(status_code=400, detail=f"{field_name} is required")
+        return None
+    if len(text) > max_length:
+        raise HTTPException(status_code=400, detail=f"{field_name} is too long")
+    return text
+
+
+def _new_room_public_id(db: Session) -> str:
+    for _ in range(30):
+        candidate = f"VM{random.randint(100000, 999999)}"
+        exists = db.query(Room.id).filter(Room.room_public_id == candidate).first()
+        if not exists:
+            return candidate
+    raise HTTPException(status_code=500, detail="Could not generate room ID")
+
+
+def _apply_mode_flags(room: Room, mode: str) -> None:
+    normalized = mode.strip().lower()
+    room.is_secret = "secret" in normalized
+    room.is_locked = "lock" in normalized
+    room.is_members_only = "member" in normalized
 
 
 def _filter_discovery_rooms(
@@ -101,6 +136,47 @@ def get_following_rooms(
 ) -> list[dict]:
     rooms = _filter_discovery_rooms(db=db, language=language, category=category, limit=limit, include_locked=True)
     return [_room_discovery_payload(room) for room in rooms]
+
+
+@router.post("")
+def create_room(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    name = _clean_text(payload.get("name"), field_name="Room name", max_length=120)
+    language = _clean_text(payload.get("language"), field_name="Room language", max_length=40)
+    mode = _clean_text(payload.get("mode") or "Open", field_name="Room mode", max_length=40)
+    room_type = _clean_text(payload.get("room_type") or payload.get("type") or "Chat", field_name="Room type", max_length=40)
+    subtitle = _clean_text(payload.get("subtitle"), field_name="Room subtitle", max_length=240, required=False)
+    avatar_url = _clean_text(payload.get("avatar_url"), field_name="Room avatar", max_length=500, required=False)
+    cover_photo_url = _clean_text(payload.get("cover_photo_url") or avatar_url, field_name="Room cover photo", max_length=500, required=False)
+    lock_password = _clean_text(payload.get("lock_password"), field_name="Lock password", max_length=80, required=False)
+
+    room = Room(
+        room_public_id=_new_room_public_id(db),
+        owner_user_id=current_user.id,
+        name=name or "Live Room",
+        subtitle=subtitle,
+        avatar_url=avatar_url,
+        cover_photo_url=cover_photo_url,
+        language=language or "English",
+        mode=mode or "Open",
+        room_type=room_type or "Chat",
+        online_count=1,
+        trending_score=0,
+        is_active=True,
+    )
+    _apply_mode_flags(room, room.mode)
+    if room.is_locked and lock_password:
+        room.lock_password_hash = hash_password(lock_password)
+        room.lock_updated_at = datetime.utcnow()
+        room.lock_updated_by_user_id = current_user.id
+
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return _room_discovery_payload(room)
 
 
 @router.get("/my-created-room")
