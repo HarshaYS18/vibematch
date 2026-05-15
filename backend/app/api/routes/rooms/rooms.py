@@ -7,6 +7,15 @@ from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
 from app.schemas.room_settings import RoomAccessSettingsUpdateRequest, RoomSettingsResponse
+from app.schemas.room_theme import (
+    CustomRoomBackgroundSubmitRequest,
+    RoomCoverPhotoUpdateRequest,
+    RoomThemeApplyRequest,
+    RoomThemePurchaseRequest,
+    RoomThemeResponse,
+    RoomThemeReviewDecisionRequest,
+    RoomThemeReviewResponse,
+)
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinRequest, RoomJoinResponse, RoomLeaveResponse, RoomMemberActionRequest, RoomModeUpdateRequest, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
 from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
@@ -28,6 +37,14 @@ from app.services.rooms.room_service import (
     room_to_detail_response,
     set_room_admin,
     set_room_member,
+)
+from app.services.rooms.room_theme_service import (
+    apply_room_theme,
+    decide_custom_background_review,
+    list_pending_custom_background_reviews,
+    list_store_room_themes,
+    purchase_room_theme,
+    submit_custom_room_background,
 )
 from app.services.role_service import get_user_roles
 
@@ -57,6 +74,7 @@ def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse
         is_members_only=False,
         allow_screenshots=True,
         has_lock_password=False,
+        cover_photo_url=None,
         background_theme_id="default",
         announcement_text=None,
         announcement_updated_at=None,
@@ -75,6 +93,7 @@ def _room_settings_response(room: Room) -> RoomSettingsResponse:
         is_members_only=room.is_members_only,
         allow_screenshots=room.allow_screenshots,
         has_lock_password=bool(room.lock_password_hash),
+        cover_photo_url=room.cover_photo_url,
         background_theme_id=room.background_theme_id or "default",
         announcement_text=room.announcement_text,
         announcement_updated_at=room.announcement_updated_at,
@@ -130,6 +149,13 @@ def _get_or_create_room_for_settings(db: Session, room_public_id: str, current_u
     return room
 
 
+def _get_room_for_update(db: Session, room_public_id: str, current_user: User) -> Room:
+    room = _get_or_create_room_for_settings(db, room_public_id, current_user)
+    if not _can_manage_room(db, room, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host/admin or Owner can update room settings")
+    return room
+
+
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_live_room(payload: RoomCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return create_room(db=db, current_user=current_user, payload=payload)
@@ -161,6 +187,34 @@ def get_room_backgrounds(mode: str = Query(default="chat_room")):
     return list_room_backgrounds(mode=mode)
 
 
+@router.get("/themes", response_model=list[RoomThemeResponse])
+def get_room_theme_store(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return list_store_room_themes(db, current_user)
+
+
+@router.post("/themes/purchase", response_model=RoomThemeResponse)
+def purchase_room_background_theme(payload: RoomThemePurchaseRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return purchase_room_theme(db, current_user, payload.theme_id)
+
+
+@router.post("/custom-backgrounds", response_model=RoomThemeReviewResponse, status_code=status.HTTP_201_CREATED)
+def submit_custom_background(payload: CustomRoomBackgroundSubmitRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room: Room | None = None
+    if payload.room_public_id:
+        room = _get_room_for_update(db, payload.room_public_id, current_user)
+    return submit_custom_room_background(db, current_user, image_url=payload.image_url, thumbnail_url=payload.thumbnail_url, room=room)
+
+
+@router.get("/custom-background-reviews", response_model=list[RoomThemeReviewResponse])
+def get_pending_custom_background_reviews(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return list_pending_custom_background_reviews(db, current_user)
+
+
+@router.post("/custom-background-reviews/{review_public_id}", response_model=RoomThemeReviewResponse)
+def decide_custom_background(review_public_id: str, payload: RoomThemeReviewDecisionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return decide_custom_background_review(db, current_user, review_public_id, payload.status, payload.review_note)
+
+
 @router.get("/{room_public_id}/settings", response_model=RoomSettingsResponse)
 def get_room_settings(room_public_id: str, db: Session = Depends(get_db)) -> RoomSettingsResponse:
     room = db.query(Room).filter(Room.room_public_id == room_public_id.strip()).first()
@@ -176,9 +230,7 @@ def update_room_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> RoomSettingsResponse:
-    room = _get_or_create_room_for_settings(db, room_public_id, current_user)
-    if not _can_manage_room(db, room, current_user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host/admin or Owner can update room settings")
+    room = _get_room_for_update(db, room_public_id, current_user)
 
     if payload.language is not None:
         room.language = payload.language.strip()
@@ -191,6 +243,23 @@ def update_room_settings(
     db.add(room)
     db.commit()
     db.refresh(room)
+    return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/cover-photo", response_model=RoomSettingsResponse)
+def update_room_cover_photo(room_public_id: str, payload: RoomCoverPhotoUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room = _get_room_for_update(db, room_public_id, current_user)
+    room.cover_photo_url = payload.cover_photo_url.strip()
+    room.is_active = True
+    db.commit()
+    db.refresh(room)
+    return _room_settings_response(room)
+
+
+@router.post("/{room_public_id}/background-theme", response_model=RoomSettingsResponse)
+def apply_room_background_theme(room_public_id: str, payload: RoomThemeApplyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room = _get_room_for_update(db, room_public_id, current_user)
+    room = apply_room_theme(db, room, current_user, payload.theme_id)
     return _room_settings_response(room)
 
 
