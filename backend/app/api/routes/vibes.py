@@ -10,11 +10,12 @@ from app.database import get_db
 from app.models.follow import UserFollow
 from app.models.inbox import InboxMessageType
 from app.models.user import User
-from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeSave, VibeShare
+from app.models.vibe import VibeComment, VibeCommentReaction, VibePost, VibeReaction, VibeReport, VibeSave, VibeShare
 from app.schemas.vibes import (
     VibeAuthorResponse,
     VibeCommentActionResponse,
     VibeCommentCreateRequest,
+    VibeCommentLikeResponse,
     VibeCommentResponse,
     VibeDeleteResponse,
     VibeFeedResponse,
@@ -74,16 +75,12 @@ def _display_name(user: User) -> str:
 
 
 def _author_response(user: User) -> VibeAuthorResponse:
-    return VibeAuthorResponse(
-        id=user.id,
-        public_user_id=user.public_user_id,
-        username=user.username,
-        display_name=user.display_name,
-        avatar_url=user.avatar_url,
-    )
+    return VibeAuthorResponse(id=user.id, public_user_id=user.public_user_id, username=user.username, display_name=user.display_name, avatar_url=user.avatar_url)
 
 
-def _comment_response(comment: VibeComment, post: VibePost, current_user: User) -> VibeCommentResponse:
+def _comment_response(db: Session, comment: VibeComment, post: VibePost, current_user: User) -> VibeCommentResponse:
+    likes_count = db.query(func.count(VibeCommentReaction.id)).filter(VibeCommentReaction.comment_id == comment.id).scalar() or 0
+    liked_by_me = db.query(VibeCommentReaction.id).filter(VibeCommentReaction.comment_id == comment.id, VibeCommentReaction.user_id == current_user.id).first() is not None
     return VibeCommentResponse(
         id=comment.id,
         post_id=comment.post_id,
@@ -93,6 +90,8 @@ def _comment_response(comment: VibeComment, post: VibePost, current_user: User) 
         is_pinned=getattr(comment, "is_pinned", False),
         can_pin=post.author_user_id == current_user.id and getattr(comment, "parent_comment_id", None) is None,
         can_delete=comment.user_id == current_user.id or post.author_user_id == current_user.id,
+        liked_by_me=liked_by_me,
+        likes_count=likes_count,
         created_at=comment.created_at,
     )
 
@@ -215,6 +214,12 @@ def list_friends_vibes_feed(limit: int = Query(default=30, ge=1, le=100), db: Se
         return VibeFeedResponse(posts=[])
     posts = db.query(VibePost).filter(VibePost.author_user_id.in_(followed_ids), VibePost.is_deleted.is_(False)).order_by(VibePost.created_at.desc()).limit(limit).all()
     return VibeFeedResponse(posts=[_post_response(db, post, current_user) for post in posts])
+
+
+@router.get("/saved", response_model=VibeFeedResponse)
+def list_saved_vibes(limit: int = Query(default=50, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    saves = db.query(VibeSave).join(VibePost, VibeSave.post_id == VibePost.id).filter(VibeSave.user_id == current_user.id, VibePost.is_deleted.is_(False)).order_by(VibeSave.created_at.desc()).limit(limit).all()
+    return VibeFeedResponse(posts=[_post_response(db, save.post, current_user) for save in saves])
 
 
 @router.get("/user/{public_user_id}", response_model=list[VibePostResponse])
@@ -342,14 +347,30 @@ def add_vibe_comment(post_id: int, payload: VibeCommentCreateRequest, db: Sessio
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    return _comment_response(comment, post, current_user)
+    return _comment_response(db, comment, post, current_user)
 
 
 @router.get("/{post_id}/comments", response_model=list[VibeCommentResponse])
 def list_vibe_comments(post_id: int, limit: int = Query(default=100, ge=1, le=200), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     post = _get_visible_post_or_404(db, post_id)
     comments = db.query(VibeComment).filter(VibeComment.post_id == post_id, VibeComment.is_deleted.is_(False)).order_by(VibeComment.is_pinned.desc(), VibeComment.parent_comment_id.asc().nullsfirst(), VibeComment.created_at.asc()).limit(limit).all()
-    return [_comment_response(item, post, current_user) for item in comments]
+    return [_comment_response(db, item, post, current_user) for item in comments]
+
+
+@router.post("/{post_id}/comments/{comment_id}/like", response_model=VibeCommentLikeResponse)
+def toggle_vibe_comment_like(post_id: int, comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _get_visible_post_or_404(db, post_id)
+    _get_visible_comment_or_404(db, post_id, comment_id)
+    existing = db.query(VibeCommentReaction).filter(VibeCommentReaction.comment_id == comment_id, VibeCommentReaction.user_id == current_user.id).first()
+    liked_by_me = False
+    if existing:
+        db.delete(existing)
+    else:
+        db.add(VibeCommentReaction(comment_id=comment_id, user_id=current_user.id, reaction_type="like"))
+        liked_by_me = True
+    db.commit()
+    likes_count = db.query(func.count(VibeCommentReaction.id)).filter(VibeCommentReaction.comment_id == comment_id).scalar() or 0
+    return VibeCommentLikeResponse(comment_id=comment_id, liked_by_me=liked_by_me, likes_count=likes_count)
 
 
 @router.patch("/{post_id}/comments/{comment_id}/pin", response_model=VibeCommentActionResponse)
