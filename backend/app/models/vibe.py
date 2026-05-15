@@ -49,6 +49,7 @@ class VibeComment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     post_id: Mapped[int] = mapped_column(ForeignKey("vibe_posts.id"), nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    parent_comment_id: Mapped[int | None] = mapped_column(ForeignKey("vibe_comments.id"), nullable=True, index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
@@ -56,6 +57,7 @@ class VibeComment(Base):
 
     post = relationship("VibePost", back_populates="comments")
     user = relationship("User")
+    parent = relationship("VibeComment", remote_side=[id], backref="replies")
 
 
 class VibeShare(Base):
