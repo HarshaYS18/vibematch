@@ -27,12 +27,14 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
   final VibesApiService _api = const VibesApiService();
   final AuthApiService _authApi = const AuthApiService();
   final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   final List<VibeComment> _comments = <VibeComment>[];
 
   bool _loadingComments = false;
   bool _sendingComment = false;
   bool _deleting = false;
   String? _error;
+  VibeComment? _replyingTo;
 
   bool get _isSelfVibe => _authApi.cachedUser?.publicUserId.toString() == widget.vibe.authorId;
   bool get _hasBackendId => widget.vibe.id.trim().isNotEmpty;
@@ -46,6 +48,7 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
 
   @override
   void dispose() {
+    _commentFocusNode.dispose();
     _commentController.dispose();
     super.dispose();
   }
@@ -53,8 +56,31 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
   void _sortComments() {
     _comments.sort((a, b) {
       if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      if (a.isReply != b.isReply) return a.isReply ? 1 : -1;
       return 0;
     });
+  }
+
+  List<VibeComment> _orderedComments() {
+    final topLevel = _comments.where((comment) => !comment.isReply).toList();
+    topLevel.sort((a, b) {
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      return 0;
+    });
+    final repliesByParent = <String, List<VibeComment>>{};
+    for (final reply in _comments.where((comment) => comment.isReply)) {
+      final parentId = reply.parentCommentId ?? '';
+      repliesByParent.putIfAbsent(parentId, () => <VibeComment>[]).add(reply);
+    }
+    final ordered = <VibeComment>[];
+    for (final comment in topLevel) {
+      ordered.add(comment);
+      ordered.addAll(repliesByParent[comment.id] ?? const <VibeComment>[]);
+    }
+    for (final reply in _comments.where((comment) => comment.isReply && !topLevel.any((parent) => parent.id == comment.parentCommentId))) {
+      ordered.add(reply);
+    }
+    return ordered;
   }
 
   Future<void> _loadComments() async {
@@ -90,14 +116,16 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
       _toast('Refresh feed and open this Vibe again.');
       return;
     }
+    final parentCommentId = _replyingTo?.parentCommentId ?? _replyingTo?.id;
     setState(() => _sendingComment = true);
     try {
-      final comment = await _api.addComment(widget.vibe.id, text);
+      final comment = await _api.addComment(widget.vibe.id, text, parentCommentId: parentCommentId);
       if (!mounted) return;
       setState(() {
-        _comments.insert(0, comment);
+        _comments.add(comment);
         _sortComments();
         _commentController.clear();
+        _replyingTo = null;
       });
       widget.onCommentAdded?.call();
     } catch (error) {
@@ -105,6 +133,22 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
     } finally {
       if (mounted) setState(() => _sendingComment = false);
     }
+  }
+
+  void _startReply(VibeComment comment) {
+    setState(() {
+      _replyingTo = comment;
+      _commentController.text = '@${comment.name} ';
+      _commentController.selection = TextSelection.fromPosition(TextPosition(offset: _commentController.text.length));
+    });
+    _commentFocusNode.requestFocus();
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingTo = null;
+      _commentController.clear();
+    });
   }
 
   Future<void> _toggleCommentPin(VibeComment comment) async {
@@ -134,7 +178,7 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
     try {
       await _api.deleteComment(widget.vibe.id, comment.id);
       if (!mounted) return;
-      setState(() => _comments.removeWhere((item) => item.id == comment.id));
+      setState(() => _comments.removeWhere((item) => item.id == comment.id || item.parentCommentId == comment.id));
       widget.onCommentAdded?.call();
       _toast('Comment deleted.');
     } catch (error) {
@@ -184,6 +228,7 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
   @override
   Widget build(BuildContext context) {
     final vibe = widget.vibe;
+    final orderedComments = _orderedComments();
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -219,15 +264,22 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
                       const SliverToBoxAdapter(child: _EmptyCommentsState())
                     else
                       SliverList.builder(
-                        itemCount: _comments.length,
-                        itemBuilder: (context, index) => _CommentTile(comment: _comments[index], onActionsTap: () => unawaited(_openCommentActions(_comments[index]))),
+                        itemCount: orderedComments.length,
+                        itemBuilder: (context, index) {
+                          final comment = orderedComments[index];
+                          return _CommentTile(
+                            comment: comment,
+                            onReplyTap: () => _startReply(comment),
+                            onActionsTap: () => unawaited(_openCommentActions(comment)),
+                          );
+                        },
                       ),
                     const SliverToBoxAdapter(child: SizedBox(height: 16)),
                   ],
                 ),
               ),
             ),
-            _CommentComposer(controller: _commentController, sending: _sendingComment, enabled: _canComment, onSend: _sendComment),
+            _CommentComposer(controller: _commentController, focusNode: _commentFocusNode, sending: _sendingComment, enabled: _canComment, replyingTo: _replyingTo, onCancelReply: _cancelReply, onSend: _sendComment),
           ],
         ),
       ),
@@ -338,14 +390,39 @@ class _CommentsHeader extends StatelessWidget {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment, required this.onActionsTap});
+  const _CommentTile({required this.comment, required this.onReplyTap, required this.onActionsTap});
   final VibeComment comment;
+  final VoidCallback onReplyTap;
   final VoidCallback onActionsTap;
 
   @override
   Widget build(BuildContext context) {
     final avatarUrl = comment.avatarUrl?.trim();
-    return Container(color: comment.isPinned ? const Color(0xFFFFFBF3) : Colors.white, padding: const EdgeInsets.fromLTRB(14, 8, 8, 8), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 34, height: 34, clipBehavior: Clip.antiAlias, decoration: const BoxDecoration(color: Color(0xFF111015), shape: BoxShape.circle), child: avatarUrl != null && avatarUrl.isNotEmpty ? Image.network(avatarUrl, fit: BoxFit.cover, errorBuilder: (_, _, _) => _CommentAvatarFallback(comment: comment)) : _CommentAvatarFallback(comment: comment)), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (comment.isPinned) const Padding(padding: EdgeInsets.only(bottom: 4), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 13), SizedBox(width: 4), Text('Pinned', style: TextStyle(color: Color(0xFFC99A3B), fontSize: 10.5, fontWeight: FontWeight.w900))])), RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32), children: [TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)), TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600))])), const SizedBox(height: 4), Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700))])), if (comment.canPin || comment.canDelete) IconButton(onPressed: onActionsTap, icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF8C8198), size: 20))]));
+    final isReply = comment.isReply;
+    return Container(
+      color: comment.isPinned ? const Color(0xFFFFFBF3) : Colors.white,
+      padding: EdgeInsets.fromLTRB(isReply ? 58 : 14, 8, 8, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isReply) Container(width: 18, height: 1, margin: const EdgeInsets.only(top: 16, right: 8), color: const Color(0xFFE0D5CB)),
+          Container(width: isReply ? 28 : 34, height: isReply ? 28 : 34, clipBehavior: Clip.antiAlias, decoration: const BoxDecoration(color: Color(0xFF111015), shape: BoxShape.circle), child: avatarUrl != null && avatarUrl.isNotEmpty ? Image.network(avatarUrl, fit: BoxFit.cover, errorBuilder: (_, _, _) => _CommentAvatarFallback(comment: comment)) : _CommentAvatarFallback(comment: comment)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (comment.isPinned) const Padding(padding: EdgeInsets.only(bottom: 4), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 13), SizedBox(width: 4), Text('Pinned', style: TextStyle(color: Color(0xFFC99A3B), fontSize: 10.5, fontWeight: FontWeight.w900))])),
+                RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32), children: [TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)), TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600))])),
+                const SizedBox(height: 6),
+                Row(children: [Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700)), const SizedBox(width: 14), InkWell(onTap: onReplyTap, borderRadius: BorderRadius.circular(999), child: const Padding(padding: EdgeInsets.symmetric(horizontal: 2, vertical: 2), child: Text('Reply', style: TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w900))))]),
+              ],
+            ),
+          ),
+          if (comment.canPin || comment.canDelete) IconButton(onPressed: onActionsTap, icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF8C8198), size: 20)),
+        ],
+      ),
+    );
   }
 }
 
@@ -357,16 +434,36 @@ class _CommentAvatarFallback extends StatelessWidget {
 }
 
 class _CommentComposer extends StatelessWidget {
-  const _CommentComposer({required this.controller, required this.sending, required this.enabled, required this.onSend});
+  const _CommentComposer({required this.controller, required this.focusNode, required this.sending, required this.enabled, required this.replyingTo, required this.onCancelReply, required this.onSend});
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool sending;
   final bool enabled;
+  final VibeComment? replyingTo;
+  final VoidCallback onCancelReply;
   final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
     final canSend = enabled && !sending;
-    return Container(padding: EdgeInsets.fromLTRB(12, 9, 12, 10 + MediaQuery.paddingOf(context).bottom), decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFECE2D8)))), child: Row(children: [Expanded(child: TextField(controller: controller, enabled: canSend, minLines: 1, maxLines: 3, decoration: InputDecoration(hintText: enabled ? 'Add a comment...' : 'Comments are off', hintStyle: const TextStyle(color: Color(0xFFAAA1AE), fontWeight: FontWeight.w600), filled: true, fillColor: const Color(0xFFF7F3EF), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11), border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none)))), const SizedBox(width: 8), InkWell(onTap: canSend ? onSend : null, borderRadius: BorderRadius.circular(999), child: Container(width: 43, height: 43, decoration: BoxDecoration(color: enabled ? const Color(0xFF111015) : const Color(0xFFE4DFE8), shape: BoxShape.circle), child: sending ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Icons.arrow_upward_rounded, color: enabled ? Colors.white : const Color(0xFF8C8198), size: 22))) ]));
+    final replyTarget = replyingTo;
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + MediaQuery.paddingOf(context).bottom),
+      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFECE2D8))),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyTarget != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: const Color(0xFFF7F3EF), borderRadius: BorderRadius.circular(999)),
+              child: Row(children: [const Icon(Icons.reply_rounded, color: Color(0xFF8C8198), size: 16), const SizedBox(width: 7), Expanded(child: Text('Replying to ${replyTarget.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 12, fontWeight: FontWeight.w900))), InkWell(onTap: onCancelReply, customBorder: const CircleBorder(), child: const Padding(padding: EdgeInsets.all(2), child: Icon(Icons.close_rounded, color: Color(0xFF8C8198), size: 17)))]),
+            ),
+          Row(children: [Expanded(child: TextField(controller: controller, focusNode: focusNode, enabled: canSend, minLines: 1, maxLines: 3, decoration: InputDecoration(hintText: enabled ? (replyTarget == null ? 'Add a comment...' : 'Add a reply...') : 'Comments are off', hintStyle: const TextStyle(color: Color(0xFFAAA1AE), fontWeight: FontWeight.w600), filled: true, fillColor: const Color(0xFFF7F3EF), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11), border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none)))), const SizedBox(width: 8), InkWell(onTap: canSend ? onSend : null, borderRadius: BorderRadius.circular(999), child: Container(width: 43, height: 43, decoration: BoxDecoration(color: enabled ? const Color(0xFF111015) : const Color(0xFFE4DFE8), shape: BoxShape.circle), child: sending ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Icons.arrow_upward_rounded, color: enabled ? Colors.white : const Color(0xFF8C8198), size: 22))) ]),
+        ],
+      ),
+    );
   }
 }
 
