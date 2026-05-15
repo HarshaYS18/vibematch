@@ -11,6 +11,7 @@ import '../features/inbox/presentation/inbox_page_modular.dart';
 import '../features/profile/presentation/me_page.dart';
 import '../features/presence/data/presence_api_service.dart';
 import '../features/rooms/data/live_room_media_signaling_service.dart';
+import '../features/rooms/data/room_api_service.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page_modular.dart';
@@ -40,6 +41,7 @@ class _AppShellState extends State<AppShell> {
   StreamSubscription<CurrentUser>? _userSyncSubscription;
   final PresenceApiService _presenceApi = const PresenceApiService();
   Timer? _presenceHeartbeatTimer;
+  int _homeRefreshNonce = 0;
 
   CurrentUser get _activeUser => _syncedUser;
 
@@ -110,13 +112,18 @@ class _AppShellState extends State<AppShell> {
     if (cached != null) _onUserSynced(cached);
   }
 
+  void _handleRoomCreated(RealRoom room) {
+    if (!mounted) return;
+    setState(() => _homeRefreshNonce += 1);
+  }
+
   List<Widget> get _pages {
     final activeUser = _activeUser;
 
     return [
-      HomePage(user: activeUser, currentUser: activeUser),
+      HomePage(key: ValueKey('home_$_homeRefreshNonce'), user: activeUser, currentUser: activeUser),
       const VibesPage(),
-      CreatePage(currentUser: activeUser),
+      CreatePage(currentUser: activeUser, onRoomCreated: _handleRoomCreated),
       const InboxPage(),
       MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser),
     ];
