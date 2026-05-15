@@ -154,6 +154,8 @@ class GiftSendResponse(BaseModel):
     rule: str
     spent_coins: int | None = None
     reward_coins: int | None = None
+    spent_coin_amount: int | None = None
+    reward_coin_amount: int | None = None
     net_win_coins: int | None = None
     winner_coin_balance: int | None = None
     wallet_coin_balance: int | None = None
@@ -161,6 +163,10 @@ class GiftSendResponse(BaseModel):
     lucky_multiplier: int | None = None
     lucky_reward_coin_amount: int | None = None
     lucky_result: dict[str, Any] | None = None
+    lucky_difficulty: str | None = None
+    risk_level: str | None = None
+    risk_score: int | None = None
+    risk_action: str | None = None
 
 
 class RubyConversionRequest(BaseModel):
