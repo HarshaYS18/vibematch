@@ -79,15 +79,20 @@ class VibesApiService {
     return VibeReportResult(postId: decoded['post_id']?.toString() ?? '', reportId: _int(decoded['id']), reason: decoded['reason']?.toString() ?? '', status: decoded['status']?.toString() ?? status);
   }
 
-  Future<List<VibeComment>> loadComments(String postId, {int limit = 50}) async {
+  Future<List<VibeComment>> loadComments(String postId, {int limit = 100}) async {
     final response = await http.get(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')).replace(queryParameters: {'limit': '$limit'}), headers: _authHeaders());
     _throwIfFailed(response, 'load Vibe comments');
     final decoded = jsonDecode(response.body) as List<dynamic>;
     return decoded.whereType<Map<String, dynamic>>().map(_commentFromJson).toList(growable: false);
   }
 
-  Future<VibeComment> addComment(String postId, String text) async {
-    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')), headers: _authHeaders(contentType: true), body: jsonEncode({'text': text.trim()}));
+  Future<VibeComment> addComment(String postId, String text, {String? parentCommentId}) async {
+    final parentId = parentCommentId == null || parentCommentId.trim().isEmpty ? null : int.tryParse(parentCommentId);
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')),
+      headers: _authHeaders(contentType: true),
+      body: jsonEncode({'text': text.trim(), if (parentId != null) 'parent_comment_id': parentId}),
+    );
     _throwIfFailed(response, 'add Vibe comment');
     return _commentFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -195,6 +200,7 @@ VibeComment _commentFromJson(Map<String, dynamic> json) {
   final displayName = _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User';
   return VibeComment(
     id: json['id']?.toString() ?? '',
+    parentCommentId: _text(json['parent_comment_id']),
     name: displayName,
     avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(),
     text: json['text']?.toString() ?? '',
