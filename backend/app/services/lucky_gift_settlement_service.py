@@ -12,8 +12,6 @@ from app.models.economy_stats import LuckyGiftTransaction, UserLuckyGiftStats
 from app.models.user import User
 from app.services import house_pool_service, lucky_gift_props_service, lucky_gift_stats_service, whale_risk_service
 
-RUBY_EARNING_BASIS_POINTS = 3000
-
 
 def _get_or_create_wallet_for_update(db: Session, user_id: int) -> UserWallet:
     wallet = db.query(UserWallet).filter(UserWallet.user_id == user_id).with_for_update().first()
@@ -92,44 +90,6 @@ def _credit_regular_coin_wallet(
     )
     db.flush()
     return wallet
-
-
-def _credit_receiver_rubies_for_lucky_gift(
-    db: Session,
-    *,
-    receiver_user_id: int | None,
-    spent_coins: int,
-    sender_user_id: int,
-    source_id: str,
-    gift_id: str,
-) -> tuple[int, UserWallet | None]:
-    if receiver_user_id is None:
-        return 0, None
-    ruby_amount = max(int(spent_coins or 0), 0) * RUBY_EARNING_BASIS_POINTS // 10_000
-    receiver_wallet = _get_or_create_wallet_for_update(db, receiver_user_id)
-    receiver_wallet.lifetime_coins_received_as_gifts += max(int(spent_coins or 0), 0)
-    if ruby_amount <= 0:
-        db.flush()
-        return 0, receiver_wallet
-    before = int(receiver_wallet.ruby_balance or 0)
-    receiver_wallet.ruby_balance = before + ruby_amount
-    receiver_wallet.lifetime_rubies_earned += ruby_amount
-    db.add(
-        WalletLedger(
-            user_id=receiver_user_id,
-            currency_type=EconomyCurrency.RUBY.value,
-            direction=EconomyDirection.CREDIT.value,
-            amount=ruby_amount,
-            before_balance=before,
-            after_balance=receiver_wallet.ruby_balance,
-            source_type="LUCKY_GIFT_RECEIVE_RUBY",
-            source_id=source_id,
-            created_by_user_id=sender_user_id,
-            reason=f"Received lucky gift {gift_id}",
-        )
-    )
-    db.flush()
-    return ruby_amount, receiver_wallet
 
 
 def roll_lucky_gift_result(db: Session, *, gift_id: str, gift_name: str, coin_value: int, quantity: int, house_risk_score: int = 0) -> dict[str, Any]:
@@ -276,16 +236,6 @@ def settle_lucky_gift_to_regular_wallet(
             lucky_result["capped_by_risk_rules"] = True
         net_win_coins = reward_coins - spent_coins
 
-        ruby_source_id = f"pending:{gift_id}:{sender.id}:{receiver_user_id or 'none'}"
-        receiver_ruby_amount, receiver_wallet = _credit_receiver_rubies_for_lucky_gift(
-            db,
-            receiver_user_id=receiver_user_id,
-            spent_coins=spent_coins,
-            sender_user_id=sender.id,
-            source_id=ruby_source_id,
-            gift_id=gift_id,
-        )
-
         credit_wallet = _credit_regular_coin_wallet(
             db,
             user_id=sender.id,
@@ -311,7 +261,8 @@ def settle_lucky_gift_to_regular_wallet(
                 "source": "regular_wallet_lucky_gift_settlement",
                 "risk": risk,
                 "lucky_result": lucky_result,
-                "receiver_ruby_amount": receiver_ruby_amount,
+                "receiver_ruby_amount": 0,
+                "ruby_rule": "Lucky gifts do not add rubies.",
                 **(metadata or {}),
             },
         )
@@ -339,11 +290,11 @@ def settle_lucky_gift_to_regular_wallet(
             "spent_coins": spent_coins,
             "reward_coins": reward_coins,
             "net_win_coins": net_win_coins,
-            "receiver_ruby_amount": receiver_ruby_amount,
-            "receiver_ruby_balance": receiver_wallet.ruby_balance if receiver_wallet is not None else 0,
-            "receiver_lifetime_gift_coin_value": receiver_wallet.lifetime_coins_received_as_gifts if receiver_wallet is not None else 0,
-            "receiver_lifetime_rubies_earned": receiver_wallet.lifetime_rubies_earned if receiver_wallet is not None else 0,
-            "ruby_rule": "Receiver rubies = lucky gift spent coin value × 30%.",
+            "receiver_ruby_amount": 0,
+            "receiver_ruby_balance": 0,
+            "receiver_lifetime_gift_coin_value": 0,
+            "receiver_lifetime_rubies_earned": 0,
+            "ruby_rule": "Lucky gifts do not add rubies.",
             "lucky_multiplier": multiplier,
             "lucky_reward_coin_amount": reward_coins,
             "lucky_result": lucky_result,
