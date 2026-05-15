@@ -13,7 +13,9 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         guestMessagesEnabled: _guestMessagesEnabled,
         applyOnlyModeEnabled: _applyOnlyModeEnabled,
         joinRequestCount: _roomMessageController.joinRequestUsers.length,
-        onBackgroundTap: _openBackgroundSheet,
+        onBackgroundTap: () => _openBackgroundStoreFromSettings(sheetContext),
+        onCoverPhotoTap: () => _changeRoomCoverPhotoFromSettings(sheetContext),
+        onCustomBackgroundTap: () => _submitCustomBackgroundFromSettings(sheetContext),
         onPrivacyTap: _openPrivacySheet,
         onSeatLayoutTap: _openSeatLayoutSheet,
         onAnnouncementTap: _openAnnouncementSheet,
@@ -50,6 +52,114 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         },
         onCloseRoom: () => _leaveRoomFromSheet(sheetContext),
       ),
+    );
+  }
+
+  Future<void> _changeRoomCoverPhotoFromSettings(BuildContext sheetContext) async {
+    if (!_viewerCanManageRoom) {
+      RoomToast.show(context, 'Only the host/admin can change the cover photo');
+      return;
+    }
+    Navigator.pop(sheetContext);
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 88);
+      if (file == null || !mounted) return;
+      RoomToast.show(context, 'Uploading room cover photo...');
+      final api = const RoomApiService();
+      final upload = await api.uploadRoomCover(file);
+      await api.updateRoomCoverPhoto(roomId: _roomId, coverPhotoUrl: upload.url);
+      if (!mounted) return;
+      RoomToast.show(context, 'Room cover photo updated');
+      _insertSystemMessage('Room cover photo updated by ${_currentUser.name}.');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _submitCustomBackgroundFromSettings(BuildContext sheetContext) async {
+    if (!_viewerCanManageRoom) {
+      RoomToast.show(context, 'Only the host/admin can submit room backgrounds');
+      return;
+    }
+    Navigator.pop(sheetContext);
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
+      if (file == null || !mounted) return;
+      RoomToast.show(context, 'Uploading custom background...');
+      final api = const RoomApiService();
+      final upload = await api.uploadRoomBackground(file);
+      final review = await api.submitCustomBackground(roomId: _roomId, imageUrl: upload.url);
+      if (!mounted) return;
+      RoomToast.show(context, 'Submitted for review: ${review.reviewPublicId}');
+      _insertSystemMessage('Custom room background submitted for review. Current background stays unchanged until approval.');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _openBackgroundStoreFromSettings(BuildContext sheetContext) async {
+    if (!_viewerCanManageRoom) {
+      RoomToast.show(context, 'Only the host/admin can change room background');
+      return;
+    }
+    Navigator.pop(sheetContext);
+    RoomToast.show(context, 'Loading room backgrounds...');
+    try {
+      final api = const RoomApiService();
+      final themes = await api.listRoomThemes();
+      if (!mounted) return;
+      if (themes.isEmpty) {
+        RoomToast.show(context, 'No backgrounds available yet');
+        return;
+      }
+      LiveRoomSheetController.showTransparentSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => _RoomThemeStoreSheet(
+          themes: themes,
+          onThemePressed: (theme) async {
+            try {
+              var selectedTheme = theme;
+              if (!selectedTheme.isOwned && !selectedTheme.isFree) {
+                RoomToast.show(context, 'Purchasing ${selectedTheme.name}...');
+                selectedTheme = await api.purchaseRoomTheme(selectedTheme.themeId);
+              }
+              await api.applyRoomTheme(roomId: _roomId, themeId: selectedTheme.themeId);
+              if (!mounted) return;
+              Navigator.pop(context);
+              _roomStateController.setSelectedBackgroundTheme(
+                _themeFromDto(selectedTheme),
+              );
+              RoomToast.show(context, '${selectedTheme.name} applied');
+              _insertSystemMessage('${selectedTheme.name} background applied by ${_currentUser.name}.');
+            } catch (error) {
+              if (!mounted) return;
+              RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+            }
+          },
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  RoomBackgroundTheme _themeFromDto(RoomThemeDto theme) {
+    return RoomBackgroundTheme(
+      id: theme.themeId,
+      name: theme.name,
+      imageUrl: theme.imageUrl,
+      assetPath: theme.assetPath,
+      accent: RoomColors.aqua,
+      sourceType: RoomBackgroundSourceType.store,
+      unlockType: theme.isFree ? RoomBackgroundUnlockType.free : RoomBackgroundUnlockType.storePurchase,
+      ownershipType: theme.isFree ? RoomBackgroundOwnershipType.free : RoomBackgroundOwnershipType.permanent,
+      isDefault: theme.isDefault,
+      overlayOpacity: 0.42,
+      fallbackColors: const [RoomColors.deep, RoomColors.plum],
     );
   }
 
@@ -275,6 +385,96 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       builder: (_) => LiveRoomInfoSheet(title: title, body: body),
+    );
+  }
+}
+
+class _RoomThemeStoreSheet extends StatelessWidget {
+  const _RoomThemeStoreSheet({required this.themes, required this.onThemePressed});
+
+  final List<RoomThemeDto> themes;
+  final ValueChanged<RoomThemeDto> onThemePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.70,
+      padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 14),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SheetHandle(width: 44),
+          const SizedBox(height: 14),
+          const Text(
+            'Room Background Store',
+            style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Buy, apply, or use approved custom backgrounds.',
+            style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: ListView.separated(
+              physics: const BouncingScrollPhysics(),
+              itemCount: themes.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final theme = themes[index];
+                final action = theme.isOwned || theme.isFree ? 'Apply' : 'Buy ${theme.priceCoins} coins';
+                return Material(
+                  color: RoomColors.pearl,
+                  borderRadius: BorderRadius.circular(20),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => onThemePressed(theme),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 58,
+                            height: 58,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              gradient: const LinearGradient(colors: [RoomColors.deep, RoomColors.violet]),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: theme.imageUrl == null
+                                ? const Icon(Icons.wallpaper_rounded, color: Colors.white)
+                                : Image.network(theme.imageUrl!, fit: BoxFit.cover),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(theme.name, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
+                                const SizedBox(height: 3),
+                                Text(theme.isOwned ? 'Owned' : theme.isFree ? 'Free' : 'Store background', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w800)),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            decoration: BoxDecoration(color: RoomColors.plum, borderRadius: BorderRadius.circular(999)),
+                            child: Text(action, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
