@@ -16,6 +16,8 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.applyOnlyModeEnabled,
     required this.joinRequestCount,
     required this.onBackgroundTap,
+    required this.onCoverPhotoTap,
+    required this.onCustomBackgroundTap,
     required this.onPrivacyTap,
     required this.onSeatLayoutTap,
     required this.onToggleRoomImages,
@@ -42,6 +44,8 @@ class RoomSettingsSheet extends StatelessWidget {
   final bool applyOnlyModeEnabled;
   final int joinRequestCount;
   final VoidCallback onBackgroundTap;
+  final VoidCallback onCoverPhotoTap;
+  final VoidCallback onCustomBackgroundTap;
   final VoidCallback onPrivacyTap;
   final VoidCallback onSeatLayoutTap;
   final ValueChanged<bool> onToggleRoomImages;
@@ -64,7 +68,7 @@ class RoomSettingsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.52,
+      height: MediaQuery.sizeOf(context).height * 0.58,
       child: Container(
         padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 10),
         decoration: const BoxDecoration(
@@ -93,6 +97,8 @@ class RoomSettingsSheet extends StatelessWidget {
                     privacyMode: privacyMode,
                     joinRequestCount: joinRequestCount,
                     onBackgroundTap: onBackgroundTap,
+                    onCoverPhotoTap: onCoverPhotoTap,
+                    onCustomBackgroundTap: onCustomBackgroundTap,
                     onPrivacyTap: onPrivacyTap,
                     onSeatLayoutTap: onSeatLayoutTap,
                     onAnnouncementTap: onAnnouncementTap,
