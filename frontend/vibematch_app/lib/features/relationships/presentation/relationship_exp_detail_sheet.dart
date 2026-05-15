@@ -38,6 +38,7 @@ class _RelationshipExpDetailSheetState extends State<RelationshipExpDetailSheet>
   final RelationshipExpApiService _api = const RelationshipExpApiService();
 
   RelationshipExpSummary? _summary;
+  RelationshipExpMaster? _master;
   List<RelationshipExpHistoryEntry> _history = const <RelationshipExpHistoryEntry>[];
   bool _loading = false;
   String? _error;
@@ -61,11 +62,13 @@ class _RelationshipExpDetailSheetState extends State<RelationshipExpDetailSheet>
       final results = await Future.wait<Object>([
         _api.getUserSummary(publicUserId: widget.publicUserId),
         _api.getHistory(otherPublicUserId: widget.publicUserId, limit: 50),
+        _api.getMaster(),
       ]);
       if (!mounted) return;
       setState(() {
         _summary = results[0] as RelationshipExpSummary;
         _history = results[1] as List<RelationshipExpHistoryEntry>;
+        _master = results[2] as RelationshipExpMaster;
         _loading = false;
         _error = null;
       });
@@ -75,6 +78,17 @@ class _RelationshipExpDetailSheetState extends State<RelationshipExpDetailSheet>
         _loading = false;
         _error = error.toString().replaceFirst('Exception: ', '');
       });
+      unawaited(_loadMasterOnly());
+    }
+  }
+
+  Future<void> _loadMasterOnly() async {
+    try {
+      final master = await _api.getMaster();
+      if (!mounted) return;
+      setState(() => _master = master);
+    } catch (_) {
+      // Config preview is optional and must not block the sheet.
     }
   }
 
@@ -131,6 +145,8 @@ class _RelationshipExpDetailSheetState extends State<RelationshipExpDetailSheet>
                   historyCount: _history.length,
                   onRefresh: () => unawaited(_load()),
                 ),
+                const SizedBox(height: 12),
+                _RulesPreview(master: _master),
                 const SizedBox(height: 12),
                 const Text(
                   'Relationship EXP history',
@@ -438,6 +454,92 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
+class _RulesPreview extends StatelessWidget {
+  const _RulesPreview({required this.master});
+
+  final RelationshipExpMaster? master;
+
+  @override
+  Widget build(BuildContext context) {
+    final rules = master?.rules ?? const <String, dynamic>{};
+    final enabled = master?.enabled ?? true;
+    final maxLevel = master?.maxLevel ?? 100;
+    final giftExp = _ruleValue(rules, const ['gift_exp_per_coin', 'gift_coin_exp_rate', 'gift']);
+    final roomTime = _ruleValue(rules, const ['room_time_exp_per_minute', 'time_exp_per_minute', 'time']);
+    final interaction = _ruleValue(rules, const ['interaction_exp', 'daily_interaction_exp', 'interaction']);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.tune_rounded, color: Color(0xFFFF5AAA), size: 16),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  enabled ? 'EXP rules · max Lv.$maxLevel' : 'Relationship EXP disabled',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              _RuleChip(label: 'Gift', value: giftExp),
+              _RuleChip(label: 'Room time', value: roomTime),
+              _RuleChip(label: 'Interact', value: interaction),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RuleChip extends StatelessWidget {
+  const _RuleChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.72),
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 class _HistoryTile extends StatelessWidget {
   const _HistoryTile({required this.entry});
 
@@ -543,4 +645,14 @@ String _dateLabel(DateTime? value) {
   if (diff.inHours < 24) return '${diff.inHours}h ago';
   if (diff.inDays < 7) return '${diff.inDays}d ago';
   return '${local.day}/${local.month}/${local.year}';
+}
+
+String _ruleValue(Map<String, dynamic> rules, List<String> keys) {
+  for (final key in keys) {
+    final value = rules[key];
+    if (value == null) continue;
+    final text = value.toString().trim();
+    if (text.isNotEmpty) return text;
+  }
+  return '--';
 }
