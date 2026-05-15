@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
+from app.models.room_theme import UserRoomThemeInventory
 from app.models.store import StoreItem, StoreItemCategory, UserStoreInventory
 from app.models.user import User
 from app.schemas.store import InventoryItemResponse, InventoryResponse, StoreCatalogResponse, StoreItemResponse
@@ -140,6 +141,12 @@ def _inventory_for_item(db: Session, user_id: int, item_id: str) -> UserStoreInv
     return db.query(UserStoreInventory).filter(UserStoreInventory.user_id == user_id, UserStoreInventory.item_id == item_id).first()
 
 
+def _grant_linked_room_theme_inventory(db: Session, *, user_id: int, theme_id: str) -> None:
+    existing = db.query(UserRoomThemeInventory).filter(UserRoomThemeInventory.user_id == user_id, UserRoomThemeInventory.theme_id == theme_id).first()
+    if existing is None:
+        db.add(UserRoomThemeInventory(user_id=user_id, theme_id=theme_id, source="store_purchase"))
+
+
 def _item_payload(db: Session, item: StoreItem, user_id: int) -> StoreItemResponse:
     inventory = _inventory_for_item(db, user_id, item.item_id)
     is_owned = inventory is not None or item.price_coins <= 0
@@ -179,10 +186,6 @@ def purchase(db: Session, user: User, item_id: str) -> StoreItemResponse:
     if existing is not None:
         return _item_payload(db, item, user.id)
 
-    # Room backgrounds share the room-theme ownership table so Room Settings can apply them immediately.
-    if item.category == StoreItemCategory.ROOM_BACKGROUND.value and item.linked_theme_id:
-        room_theme_service.purchase_room_theme(db, user, item.linked_theme_id)
-
     wallet = _wallet_for_update(db, user.id)
     price = int(item.price_coins or 0)
     if price > 0:
@@ -205,6 +208,10 @@ def purchase(db: Session, user: User, item_id: str) -> StoreItemResponse:
                 reason=f"Purchased store item {item.name}",
             )
         )
+
+    if item.category == StoreItemCategory.ROOM_BACKGROUND.value and item.linked_theme_id:
+        _grant_linked_room_theme_inventory(db, user_id=user.id, theme_id=item.linked_theme_id)
+
     db.add(UserStoreInventory(user_id=user.id, item_id=item.item_id, category=item.category, source="purchase"))
     db.commit()
     return _item_payload(db, item, user.id)
