@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -86,6 +86,7 @@ class _AppShellState extends State<AppShell> {
       // Heartbeat should never block app navigation. Auth/API errors are handled elsewhere.
     }
   }
+
   void _onUserSynced(CurrentUser user) {
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(user);
     if (!mounted) return;
@@ -117,18 +118,11 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final activeUser = _activeUser;
-
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: Stack(
         children: [
-          Column(
-            children: [
-              _LoggedInUserBanner(activeUser: activeUser),
-              Expanded(child: IndexedStack(index: _selectedTab.tabIndex, children: _pages)),
-            ],
-          ),
+          IndexedStack(index: _selectedTab.tabIndex, children: _pages),
           const _LiveRoomMiniBubbleLayer(),
         ],
       ),
@@ -182,64 +176,6 @@ class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
         );
         _service.updateOffset(nextOffset);
       },
-    );
-  }
-}
-
-class _LoggedInUserBanner extends StatelessWidget {
-  const _LoggedInUserBanner({required this.activeUser});
-
-  final CurrentUser activeUser;
-
-  @override
-  Widget build(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top;
-    final isFounderOrOwner = activeUser.canSeeOwnerControls;
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(12, topPadding + 6, 12, 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.98),
-        border: const Border(bottom: BorderSide(color: Color(0xFFECE2D8))),
-        boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.045), blurRadius: 12, offset: const Offset(0, 5))],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(13),
-              gradient: LinearGradient(
-                colors: isFounderOrOwner ? const [Color(0xFFFFC857), Color(0xFFE84C72), Color(0xFF8C5CF6)] : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-              ),
-            ),
-            child: Icon(isFounderOrOwner ? VMIcons.admin : VMIcons.profile, color: Colors.white, size: 19),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              '${activeUser.displayName ?? activeUser.username ?? 'Vibe User'} · ${activeUser.primaryRole} · ID ${activeUser.visibleId}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: isFounderOrOwner ? const Color(0xFF251538) : const Color(0xFFFAF7F1),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: isFounderOrOwner ? const Color(0xFF251538) : const Color(0xFFECE2D8)),
-            ),
-            child: Text(
-              isFounderOrOwner ? 'Official' : 'User',
-              style: TextStyle(color: isFounderOrOwner ? Colors.white : const Color(0xFF4A2A63), fontSize: 10.5, fontWeight: FontWeight.w900),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
