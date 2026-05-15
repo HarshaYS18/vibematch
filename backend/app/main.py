@@ -47,6 +47,7 @@ from app.api.routes import (
     room_music_media,
     room_realtime,
     social,
+    store,
     super_owner,
     users,
     vibes,
@@ -89,6 +90,7 @@ from app.models import (
     RoomExperienceStatus,
     RubyWithdrawRequest,
     SpecialPermission,
+    StoreItem,
     User,
     UserBan,
     UserBlock,
@@ -97,6 +99,7 @@ from app.models import (
     UserNotification,
     UserRoomPresence,
     UserRole,
+    UserStoreInventory,
     UserVipStatus,
     VibeComment,
     VibePost,
@@ -199,6 +202,7 @@ app.include_router(games_master.router)
 app.include_router(game_settlements.router)
 app.include_router(lucky_gifts.router)
 app.include_router(lucky_coins.router)
+app.include_router(store.router)
 app.include_router(rankings.router)
 app.include_router(coin_sales.router)
 app.include_router(vip_admin.router)
