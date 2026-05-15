@@ -58,6 +58,21 @@ class VibeComment(Base):
     post = relationship("VibePost", back_populates="comments")
     user = relationship("User")
     parent = relationship("VibeComment", remote_side=[id], backref="replies")
+    likes = relationship("VibeCommentReaction", back_populates="comment", cascade="all, delete-orphan")
+
+
+class VibeCommentReaction(Base):
+    __tablename__ = "vibe_comment_reactions"
+    __table_args__ = (UniqueConstraint("comment_id", "user_id", name="uq_vibe_comment_reaction_comment_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    comment_id: Mapped[int] = mapped_column(ForeignKey("vibe_comments.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    reaction_type: Mapped[str] = mapped_column(String(20), default="like", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    comment = relationship("VibeComment", back_populates="likes")
+    user = relationship("User")
 
 
 class VibeShare(Base):
