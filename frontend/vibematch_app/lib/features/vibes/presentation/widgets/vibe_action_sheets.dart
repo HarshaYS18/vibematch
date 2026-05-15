@@ -2,6 +2,109 @@ import 'package:flutter/material.dart';
 
 import '../../models/vibe_models.dart';
 
+class VibeActionsPillMenu extends StatelessWidget {
+  const VibeActionsPillMenu({
+    super.key,
+    required this.isSelfVibe,
+    required this.onDelete,
+    required this.onReport,
+  });
+
+  final bool isSelfVibe;
+  final VoidCallback onDelete;
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                behavior: HitTestBehavior.translucent,
+              ),
+            ),
+            Positioned(
+              top: 148,
+              right: 18,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFFECE2D8)),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 22, offset: const Offset(0, 10))],
+                ),
+                child: isSelfVibe
+                    ? _PillAction(icon: Icons.delete_outline_rounded, label: 'Delete Vibe', color: const Color(0xFFE84C72), onTap: onDelete)
+                    : _PillAction(icon: Icons.report_gmailerrorred_rounded, label: 'Report Vibe', color: const Color(0xFFC99A3B), onTap: onReport),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PillAction extends StatelessWidget {
+  const _PillAction({required this.icon, required this.label, required this.color, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 19),
+            const SizedBox(width: 7),
+            Text(label, style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ConfirmDeleteVibeSheet extends StatelessWidget {
+  const ConfirmDeleteVibeSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.all(14),
+        padding: EdgeInsets.fromLTRB(18, 16, 18, 18 + MediaQuery.paddingOf(context).bottom),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Delete this Vibe?', style: TextStyle(color: Color(0xFF111015), fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            const Text('This removes the Vibe from the feed.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel'))),
+                const SizedBox(width: 10),
+                Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE84C72), foregroundColor: Colors.white), onPressed: () => Navigator.pop(context, true), child: const Text('Delete'))),
+              ],
+            ),
+          ],
+        ),
+      );
+}
+
 class VibeActionsSheet extends StatelessWidget {
   const VibeActionsSheet({
     super.key,
