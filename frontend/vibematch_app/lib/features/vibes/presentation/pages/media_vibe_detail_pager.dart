@@ -26,7 +26,6 @@ class MediaVibeDetailPager extends StatefulWidget {
 class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   final VibesApiService _api = const VibesApiService();
   late final PageController _pageController;
-  late int _activeIndex;
   final Map<String, VibeItem> _stateById = <String, VibeItem>{};
 
   List<VibeItem> get _vibes => widget.vibes.where((item) => item.mediaType != VibeMediaType.text).toList(growable: false);
@@ -35,8 +34,8 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   void initState() {
     super.initState();
     VibeMediaPlaybackGate.feedPlaybackPaused.value = true;
-    _activeIndex = widget.initialIndex.clamp(0, _vibes.isEmpty ? 0 : _vibes.length - 1);
-    _pageController = PageController(initialPage: _activeIndex);
+    final initialPage = widget.initialIndex.clamp(0, _vibes.isEmpty ? 0 : _vibes.length - 1);
+    _pageController = PageController(initialPage: initialPage);
     for (final vibe in _vibes) {
       _stateById[_key(vibe)] = vibe;
     }
@@ -149,7 +148,6 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
         controller: _pageController,
         scrollDirection: Axis.vertical,
         itemCount: _vibes.length,
-        onPageChanged: (index) => setState(() => _activeIndex = index),
         itemBuilder: (context, index) {
           final vibe = _stateFor(_vibes[index]);
           return VibeReelPage(
