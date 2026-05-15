@@ -96,7 +96,7 @@ class _MetaPanel extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(0, isTextVibe ? 4 : 0, 0, 14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            if (isTextVibe && caption.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(14, 4, 14, 10), child: _PlainCaption(caption: caption, fontSize: 16, lineHeight: 1.35)),
+            if (caption.isNotEmpty) Padding(padding: EdgeInsets.fromLTRB(14, isTextVibe ? 4 : 2, 14, isTextVibe ? 10 : 2), child: _PlainCaption(caption: caption, fontSize: isTextVibe ? 16 : 13.3, lineHeight: isTextVibe ? 1.35 : 1.32)),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: Row(children: [
@@ -108,7 +108,6 @@ class _MetaPanel extends StatelessWidget {
               ]),
             ),
             Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 4), child: Text(_likesText(vibe.likes), style: const TextStyle(color: Color(0xFF111015), fontSize: 13, fontWeight: FontWeight.w900))),
-            if (!isTextVibe && caption.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(14, 2, 14, 2), child: _Caption(authorName: vibe.authorName, caption: caption)),
             if (vibe.comments > 0) InkWell(onTap: onCommentTap, child: Padding(padding: const EdgeInsets.fromLTRB(14, 5, 14, 2), child: Text('View all ${_formatCount(vibe.comments)} comments', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 13, fontWeight: FontWeight.w700)))),
             Padding(padding: const EdgeInsets.fromLTRB(14, 5, 14, 0), child: Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2))),
           ]),
@@ -212,27 +211,6 @@ class _IconAction extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => IconButton(onPressed: onTap, icon: Icon(icon, color: color, size: 27));
-}
-
-class _Caption extends StatelessWidget {
-  const _Caption({required this.authorName, required this.caption, this.fontSize = 13.3, this.lineHeight = 1.32});
-  final String authorName;
-  final String caption;
-  final double fontSize;
-  final double lineHeight;
-  static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
-  @override
-  Widget build(BuildContext context) {
-    final spans = <TextSpan>[TextSpan(text: '$authorName ', style: const TextStyle(color: Color(0xFF111015), fontWeight: FontWeight.w900))];
-    var index = 0;
-    for (final match in _mentionPattern.allMatches(caption)) {
-      if (match.start > index) spans.add(TextSpan(text: caption.substring(index, match.start)));
-      spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w900)));
-      index = match.end;
-    }
-    if (index < caption.length) spans.add(TextSpan(text: caption.substring(index)));
-    return RichText(text: TextSpan(style: TextStyle(color: const Color(0xFF111015), fontSize: fontSize, height: lineHeight, fontWeight: FontWeight.w600), children: spans));
-  }
 }
 
 class _PlainCaption extends StatelessWidget {
