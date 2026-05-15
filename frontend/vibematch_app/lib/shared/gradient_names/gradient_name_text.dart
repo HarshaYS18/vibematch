@@ -139,9 +139,10 @@ List<_GradientNameSegment> _splitGradientNameText(String text) {
   bool? currentIsEmoji;
 
   void flush() {
-    if (buffer.isEmpty || currentIsEmoji == null) return;
+    final isEmoji = currentIsEmoji;
+    if (buffer.isEmpty || isEmoji == null) return;
     segments.add(
-      _GradientNameSegment(text: buffer.toString(), isEmoji: currentIsEmoji!),
+      _GradientNameSegment(text: buffer.toString(), isEmoji: isEmoji),
     );
     buffer.clear();
   }
