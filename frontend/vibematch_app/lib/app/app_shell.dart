@@ -5,13 +5,11 @@ import 'package:flutter/material.dart';
 import '../core/icons/vm_icons.dart';
 import '../features/auth/data/auth_api_service.dart';
 import '../features/auth/models/current_user.dart';
-import '../features/create/presentation/create_page.dart';
 import '../features/home/presentation/home_page_modular.dart';
 import '../features/inbox/presentation/inbox_page_modular.dart';
 import '../features/profile/presentation/me_page.dart';
 import '../features/presence/data/presence_api_service.dart';
 import '../features/rooms/data/live_room_media_signaling_service.dart';
-import '../features/rooms/data/room_api_service.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page_modular.dart';
@@ -112,18 +110,12 @@ class _AppShellState extends State<AppShell> {
     if (cached != null) _onUserSynced(cached);
   }
 
-  void _handleRoomCreated(RealRoom room) {
-    if (!mounted) return;
-    setState(() => _homeRefreshNonce += 1);
-  }
-
   List<Widget> get _pages {
     final activeUser = _activeUser;
 
     return [
       HomePage(key: ValueKey('home_$_homeRefreshNonce'), user: activeUser, currentUser: activeUser),
       const VibesPage(),
-      CreatePage(currentUser: activeUser, onRoomCreated: _handleRoomCreated),
       const InboxPage(),
       MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser),
     ];
@@ -131,7 +123,10 @@ class _AppShellState extends State<AppShell> {
 
   void _selectTab(VmMainTab tab) {
     if (_selectedTab == tab) return;
-    setState(() => _selectedTab = tab);
+    setState(() {
+      _selectedTab = tab;
+      if (tab == VmMainTab.home) _homeRefreshNonce += 1;
+    });
     _syncVibesPlaybackWithActiveTab();
   }
 
@@ -209,8 +204,6 @@ class _VibeBottomNav extends StatelessWidget {
   static const Color deepPlum = Color(0xFF251538);
   static const Color softBorder = Color(0xFFECE2D8);
   static const Color aqua = Color(0xFF12C7B7);
-  static const Color violet = Color(0xFF6D5DF6);
-  static const Color coral = Color(0xFFE84C72);
 
   @override
   Widget build(BuildContext context) {
@@ -226,24 +219,10 @@ class _VibeBottomNav extends StatelessWidget {
           boxShadow: [BoxShadow(color: deepPlum.withValues(alpha: 0.08), blurRadius: 22, offset: const Offset(0, 8))],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(icon: VMIcons.home, label: VmMainTab.home.label, active: selectedTab == VmMainTab.home, onTap: () => onTabSelected(VmMainTab.home)),
             _NavItem(icon: VMIcons.vibes, label: VmMainTab.vibes.label, active: selectedTab == VmMainTab.vibes, onTap: () => onTabSelected(VmMainTab.vibes)),
-            GestureDetector(
-              onTap: () => onTabSelected(VmMainTab.create),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                height: 48,
-                width: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(colors: [aqua, violet, coral], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  boxShadow: [BoxShadow(color: violet.withValues(alpha: selectedTab == VmMainTab.create ? 0.44 : 0.34), blurRadius: selectedTab == VmMainTab.create ? 23 : 18, offset: const Offset(0, 7))],
-                ),
-                child: const Icon(VMIcons.create, color: Colors.white, size: 30),
-              ),
-            ),
             _NavItem(icon: VMIcons.inbox, label: VmMainTab.inbox.label, active: selectedTab == VmMainTab.inbox, onTap: () => onTabSelected(VmMainTab.inbox)),
             _NavItem(icon: isTestingAsFounder ? VMIcons.admin : VMIcons.profile, label: VmMainTab.me.label, active: selectedTab == VmMainTab.me, onTap: () => onTabSelected(VmMainTab.me)),
           ],
@@ -272,7 +251,7 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.11) : Colors.transparent, borderRadius: BorderRadius.circular(18)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
