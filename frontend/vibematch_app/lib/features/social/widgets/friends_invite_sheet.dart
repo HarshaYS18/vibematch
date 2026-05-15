@@ -12,6 +12,7 @@ class FriendsInviteSheet extends StatefulWidget {
     this.actionLabel = 'Invite',
     this.completedLabel = 'Invited',
     this.onlineOnly = true,
+    this.sendRoomInvite = true,
     this.socialApiService = const SocialApiService(),
   });
 
@@ -20,6 +21,7 @@ class FriendsInviteSheet extends StatefulWidget {
   final String actionLabel;
   final String completedLabel;
   final bool onlineOnly;
+  final bool sendRoomInvite;
   final SocialApiService socialApiService;
 
   @override
@@ -81,19 +83,21 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
     setState(() => _sendingIds.add(user.id));
 
     try {
-      final publicUserId = user.publicUserId ?? int.tryParse(user.id);
-      if (publicUserId != null && publicUserId > 0) {
-        await widget.socialApiService.sendRoomInvite(
-          targetPublicUserId: publicUserId,
-          roomName: _roomName,
-        );
+      if (widget.sendRoomInvite) {
+        final publicUserId = user.publicUserId ?? int.tryParse(user.id);
+        if (publicUserId != null && publicUserId > 0) {
+          await widget.socialApiService.sendRoomInvite(
+            targetPublicUserId: publicUserId,
+            roomName: _roomName,
+          );
+        }
       }
+      widget.onInvite(user);
       if (!mounted) return;
       setState(() {
         _sendingIds.remove(user.id);
         _completedIds.add(user.id);
       });
-      widget.onInvite(user);
     } catch (error) {
       if (!mounted) return;
       setState(() => _sendingIds.remove(user.id));
@@ -103,7 +107,7 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
           SnackBar(
             behavior: SnackBarBehavior.floating,
             backgroundColor: const Color(0xFF251538),
-            content: Text('Invite failed: $error', style: const TextStyle(fontWeight: FontWeight.w800)),
+            content: Text('Action failed: $error', style: const TextStyle(fontWeight: FontWeight.w800)),
           ),
         );
     }
