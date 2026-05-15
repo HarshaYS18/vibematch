@@ -12,25 +12,28 @@ class VibesHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Text(
-              'Vibes',
-              style: TextStyle(
-                color: Color(0xFF111015),
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.8,
+    return ColoredBox(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Vibes',
+                style: TextStyle(
+                  color: Color(0xFF111015),
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.8,
+                ),
               ),
             ),
-          ),
-          _HeaderIconButton(icon: Icons.refresh_rounded, onTap: onRefreshTap),
-          const SizedBox(width: 8),
-          _HeaderIconButton(icon: Icons.settings_rounded, onTap: onSettingsTap),
-        ],
+            _HeaderIconButton(icon: Icons.refresh_rounded, onTap: onRefreshTap),
+            const SizedBox(width: 8),
+            _HeaderIconButton(icon: Icons.settings_rounded, onTap: onSettingsTap),
+          ],
+        ),
       ),
     );
   }
