@@ -292,8 +292,9 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
             else
               SliverList.separated(
                 itemCount: _profileVibes.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 14),
+                separatorBuilder: (context, index) => const SizedBox(height: 14),
                 itemBuilder: (context, index) {
+                  final vibe = _publicVibeItemFromDto(_profileVibes[index]);
                   return Padding(
                     padding: EdgeInsets.fromLTRB(
                       18,
@@ -302,7 +303,11 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                       index == _profileVibes.length - 1 ? 28 : 0,
                     ),
                     child: PublicVibeCard(
-                      item: _publicVibeItemFromDto(_profileVibes[index]),
+                      vibe: vibe,
+                      onTap: () => _showAction(context, 'Open this Vibe.'),
+                      onLikeTap: () => _showAction(context, 'Like synced.'),
+                      onCommentTap: () => _showAction(context, 'Comments will open.'),
+                      onShareTap: () => _showAction(context, 'Share sheet will open.'),
                     ),
                   );
                 },
