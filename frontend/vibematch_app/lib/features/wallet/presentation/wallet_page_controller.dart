@@ -23,6 +23,14 @@ extension _WalletPageController on _WalletPageModularState {
     });
   }
 
+  Future<void> _syncEconomyMasterSilently() async {
+    try {
+      await _economyMasterApi.getMyMasterEconomy();
+    } catch (_) {
+      // Wallet remains usable if the master sync endpoint is temporarily unavailable.
+    }
+  }
+
   Future<void> _loadWallet() async {
     _setWalletState(() {
       _loading = true;
@@ -30,6 +38,7 @@ extension _WalletPageController on _WalletPageModularState {
     });
     try {
       final wallet = await _walletApi.getWallet();
+      await _syncEconomyMasterSilently();
       final ledger = await _walletApi.getLedger(limit: 40);
       if (!mounted) return;
       _setWalletState(() {
@@ -51,6 +60,7 @@ extension _WalletPageController on _WalletPageModularState {
     _setWalletState(() => _working = true);
     try {
       final wallet = await _walletApi.recharge(amountInr: amountInr);
+      await _syncEconomyMasterSilently();
       final ledger = await _walletApi.getLedger(limit: 40);
       if (!mounted) return;
       _setWalletState(() {
@@ -77,6 +87,7 @@ extension _WalletPageController on _WalletPageModularState {
     _setWalletState(() => _working = true);
     try {
       final wallet = await _walletApi.convertRuby(rubyAmount: amount);
+      await _syncEconomyMasterSilently();
       final ledger = await _walletApi.getLedger(limit: 40);
       if (!mounted) return;
       _setWalletState(() {
