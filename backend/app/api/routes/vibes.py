@@ -87,10 +87,11 @@ def _comment_response(comment: VibeComment, post: VibePost, current_user: User) 
     return VibeCommentResponse(
         id=comment.id,
         post_id=comment.post_id,
+        parent_comment_id=getattr(comment, "parent_comment_id", None),
         text=comment.text,
         author=_author_response(comment.user),
         is_pinned=getattr(comment, "is_pinned", False),
-        can_pin=post.author_user_id == current_user.id,
+        can_pin=post.author_user_id == current_user.id and getattr(comment, "parent_comment_id", None) is None,
         can_delete=comment.user_id == current_user.id or post.author_user_id == current_user.id,
         created_at=comment.created_at,
     )
@@ -98,15 +99,10 @@ def _comment_response(comment: VibeComment, post: VibePost, current_user: User) 
 
 def _role_names(user: User) -> set[str]:
     names: set[str] = set()
-
     for user_role in getattr(user, "roles", []) or []:
-        raw_role = getattr(user_role, "role", None)
-        if raw_role is None:
-            raw_role = getattr(user_role, "role_name", None)
-        if raw_role is None:
-            continue
-        names.add(raw_role.value if hasattr(raw_role, "value") else str(raw_role))
-
+        raw_role = getattr(user_role, "role", None) or getattr(user_role, "role_name", None)
+        if raw_role is not None:
+            names.add(raw_role.value if hasattr(raw_role, "value") else str(raw_role))
     return names
 
 
@@ -137,40 +133,11 @@ def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostR
     reports_count = db.query(func.count(VibeReport.id)).filter(VibeReport.post_id == post.id).scalar() or 0
     liked_by_me = db.query(VibeReaction.id).filter(VibeReaction.post_id == post.id, VibeReaction.user_id == current_user.id).first() is not None
     saved_by_me = db.query(VibeSave.id).filter(VibeSave.post_id == post.id, VibeSave.user_id == current_user.id).first() is not None
-    return VibePostResponse(
-        id=post.id,
-        caption=post.caption,
-        media_type=post.media_type,
-        media_url=post.media_url,
-        tag=post.tag,
-        mentions=_csv_to_mentions(post.mentions_csv),
-        uses_mention_all=post.uses_mention_all,
-        comments_enabled=getattr(post, "comments_enabled", True),
-        author=_author_response(post.author),
-        likes_count=likes_count,
-        comments_count=comments_count,
-        shares_count=shares_count,
-        saves_count=saves_count,
-        reports_count=reports_count,
-        liked_by_me=liked_by_me,
-        saved_by_me=saved_by_me,
-        created_at=post.created_at,
-    )
+    return VibePostResponse(id=post.id, caption=post.caption, media_type=post.media_type, media_url=post.media_url, tag=post.tag, mentions=_csv_to_mentions(post.mentions_csv), uses_mention_all=post.uses_mention_all, comments_enabled=getattr(post, "comments_enabled", True), author=_author_response(post.author), likes_count=likes_count, comments_count=comments_count, shares_count=shares_count, saves_count=saves_count, reports_count=reports_count, liked_by_me=liked_by_me, saved_by_me=saved_by_me, created_at=post.created_at)
 
 
 def _report_queue_item(report: VibeReport) -> VibeReportQueueItemResponse:
-    return VibeReportQueueItemResponse(
-        id=report.id,
-        post_id=report.post_id,
-        reporter=_author_response(report.reporter),
-        post_author=_author_response(report.post.author),
-        post_caption=report.post.caption,
-        post_media_type=report.post.media_type,
-        reason=report.reason,
-        details=report.details,
-        status=report.status,
-        created_at=report.created_at,
-    )
+    return VibeReportQueueItemResponse(id=report.id, post_id=report.post_id, reporter=_author_response(report.reporter), post_author=_author_response(report.post.author), post_caption=report.post.caption, post_media_type=report.post.media_type, reason=report.reason, details=report.details, status=report.status, created_at=report.created_at)
 
 
 def _check_mention_all_limit(db: Session, current_user: User) -> None:
@@ -367,7 +334,11 @@ def add_vibe_comment(post_id: int, payload: VibeCommentCreateRequest, db: Sessio
     post = _get_visible_post_or_404(db, post_id)
     if not getattr(post, "comments_enabled", True) and post.author_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Comments are disabled for this Vibe")
-    comment = VibeComment(post_id=post_id, user_id=current_user.id, text=payload.text.strip())
+    parent_comment_id = payload.parent_comment_id
+    if parent_comment_id is not None:
+        parent = _get_visible_comment_or_404(db, post_id, parent_comment_id)
+        parent_comment_id = parent.parent_comment_id or parent.id
+    comment = VibeComment(post_id=post_id, user_id=current_user.id, parent_comment_id=parent_comment_id, text=payload.text.strip())
     db.add(comment)
     db.commit()
     db.refresh(comment)
@@ -375,9 +346,9 @@ def add_vibe_comment(post_id: int, payload: VibeCommentCreateRequest, db: Sessio
 
 
 @router.get("/{post_id}/comments", response_model=list[VibeCommentResponse])
-def list_vibe_comments(post_id: int, limit: int = Query(default=50, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_vibe_comments(post_id: int, limit: int = Query(default=100, ge=1, le=200), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     post = _get_visible_post_or_404(db, post_id)
-    comments = db.query(VibeComment).filter(VibeComment.post_id == post_id, VibeComment.is_deleted.is_(False)).order_by(VibeComment.is_pinned.desc(), VibeComment.created_at.asc()).limit(limit).all()
+    comments = db.query(VibeComment).filter(VibeComment.post_id == post_id, VibeComment.is_deleted.is_(False)).order_by(VibeComment.is_pinned.desc(), VibeComment.parent_comment_id.asc().nullsfirst(), VibeComment.created_at.asc()).limit(limit).all()
     return [_comment_response(item, post, current_user) for item in comments]
 
 
@@ -387,6 +358,8 @@ def toggle_vibe_comment_pin(post_id: int, comment_id: int, db: Session = Depends
     if post.author_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the Vibe author can pin comments")
     comment = _get_visible_comment_or_404(db, post_id, comment_id)
+    if getattr(comment, "parent_comment_id", None) is not None:
+        raise HTTPException(status_code=400, detail="Only top-level comments can be pinned")
     comment.is_pinned = not getattr(comment, "is_pinned", False)
     db.commit()
     db.refresh(comment)
