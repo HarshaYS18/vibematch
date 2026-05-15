@@ -152,54 +152,14 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     }
   }
 
-  Future<void> _saveMode(RoomPrivacyMode mode) async {
-    if (_saving) return;
-    final roomId = _roomId;
-    if (roomId.isEmpty) {
-      RoomToast.show(context, 'Room ID missing. Re-enter room and try again.');
-      return;
-    }
-    final lockText = _passwordController.text.trim();
-    if (mode == RoomPrivacyMode.locked && lockText.isEmpty) {
-      setState(() => _mode = mode);
-      RoomToast.show(context, 'Enter a room lock before locking the room.');
-      return;
-    }
-
-    setState(() {
-      _saving = true;
-      _mode = mode;
-    });
-
-    try {
-      final updated = await _roomApi.updateRoomMode(
-        roomId: roomId,
-        mode: _backendModeName(mode),
-        lockPassword: mode == RoomPrivacyMode.locked ? lockText : null,
-      );
-      if (!mounted) return;
-      final confirmedMode = privacyModeFromTitle(updated.mode);
-      setState(() => _mode = confirmedMode);
-      _publishSettingsEvent(
-        modeTitle: updated.mode,
-        language: updated.language,
-        allowScreenshots: updated.allowScreenshots,
-      );
-      widget.onModeChanged(confirmedMode);
-      RoomToast.show(context, _successMessage(confirmedMode: confirmedMode, mode: confirmedMode));
-      Navigator.pop(context);
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _mode = widget.currentMode);
-      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  void _publishSettingsEvent({String? modeTitle, String? language, bool? allowScreenshots}) {
+  void _publishSettingsEvent({
+    String? modeTitle,
+    String? language,
+    bool? allowScreenshots,
+  }) {
     final roomId = _roomId;
     if (roomId.isEmpty) return;
+
     LiveRoomSettingsEventBus.publish(
       LiveRoomSettingsEvent(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -210,7 +170,6 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
       ),
     );
   }
-
   String _backendModeName(RoomPrivacyMode mode) {
     switch (mode) {
       case RoomPrivacyMode.open:
@@ -416,7 +375,7 @@ class _SettingsTile extends StatelessWidget {
                 Text(subtitle, style: const TextStyle(color: Color(0xFF82758E), fontSize: 10.8, fontWeight: FontWeight.w700)),
               ]),
             ),
-            if (trailing != null) trailing!,
+            ?trailing,
           ],
         ),
       ),

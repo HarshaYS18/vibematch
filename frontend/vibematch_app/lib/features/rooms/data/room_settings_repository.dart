@@ -21,10 +21,10 @@ class RoomSettingsRepository {
     final response = await _apiClient.patchMap(
       '/rooms/$roomPublicId/settings',
       body: {
-        if (language != null) 'language': language,
-        if (mode != null) 'mode': mode,
+        'language': ?language,
+        'mode': ?mode,
         if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
-        if (allowScreenshots != null) 'allow_screenshots': allowScreenshots,
+        'allow_screenshots': ?allowScreenshots,
       },
     );
     return RoomSettingsDto.fromJson(response);
