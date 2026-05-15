@@ -5,7 +5,16 @@ import '../../../auth/data/auth_api_service.dart';
 import '../../models/vibe_models.dart';
 
 class VibeCardModular extends StatefulWidget {
-  const VibeCardModular({super.key, required this.vibe, required this.onProfileTap, required this.onLikeTap, required this.onCommentTap, required this.onShareTap, required this.onSaveTap, required this.onMoreTap});
+  const VibeCardModular({
+    super.key,
+    required this.vibe,
+    required this.onProfileTap,
+    required this.onLikeTap,
+    required this.onCommentTap,
+    required this.onShareTap,
+    required this.onSaveTap,
+    required this.onMoreTap,
+  });
 
   final VibeItem vibe;
   final VoidCallback onProfileTap;
@@ -20,7 +29,9 @@ class VibeCardModular extends StatefulWidget {
 }
 
 class _VibeCardModularState extends State<VibeCardModular> {
-  bool _showActionPill = false;
+  static final ValueNotifier<String?> _openActionPillKey = ValueNotifier<String?>(null);
+
+  String get _pillKey => widget.vibe.id.trim().isNotEmpty ? widget.vibe.id : '${widget.vibe.authorId}-${widget.vibe.caption.hashCode}';
 
   bool get _isSelfVibe {
     final publicId = const AuthApiService().cachedUser?.publicUserId.toString();
@@ -41,41 +52,79 @@ class _VibeCardModularState extends State<VibeCardModular> {
   }
 
   void _toggleActionPill() {
-    setState(() => _showActionPill = !_showActionPill);
+    _openActionPillKey.value = _openActionPillKey.value == _pillKey ? null : _pillKey;
+  }
+
+  void _hideActionPill() {
+    if (_openActionPillKey.value == _pillKey) _openActionPillKey.value = null;
   }
 
   void _runAction() {
-    setState(() => _showActionPill = false);
+    _hideActionPill();
     widget.onMoreTap();
+  }
+
+  void _handleDoubleTap() {
+    _hideActionPill();
+    widget.onLikeTap();
+  }
+
+  void _handleOutsideTap() {
+    _hideActionPill();
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context).width;
     final isTextVibe = widget.vibe.mediaType == VibeMediaType.text;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ColoredBox(
-          color: Colors.white,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _AuthorRow(vibe: widget.vibe, onProfileTap: widget.onProfileTap, onMoreTap: _toggleActionPill),
-              if (!isTextVibe) SizedBox(width: size, height: size, child: ClipRect(child: VibeMediaPlayer(vibe: widget.vibe, onDoubleTap: widget.onLikeTap))),
-              _MetaPanel(vibe: widget.vibe, caption: _caption, onLikeTap: widget.onLikeTap, onCommentTap: widget.onCommentTap, onShareTap: widget.onShareTap, onSaveTap: widget.onSaveTap, isTextVibe: isTextVibe),
-              const Divider(height: 1, color: Color(0xFFECE2D8)),
-            ],
-          ),
-        ),
-        if (_showActionPill)
-          Positioned(
-            top: 46,
-            right: 28,
-            child: _InlineVibeActionPill(isSelfVibe: _isSelfVibe, onTap: _runAction),
-          ),
-      ],
+
+    return ValueListenableBuilder<String?>(
+      valueListenable: _openActionPillKey,
+      builder: (context, openKey, _) {
+        final showActionPill = openKey == _pillKey;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _handleOutsideTap,
+              onDoubleTap: _handleDoubleTap,
+              child: ColoredBox(
+                color: Colors.white,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _AuthorRow(vibe: widget.vibe, onProfileTap: widget.onProfileTap, onMoreTap: _toggleActionPill),
+                    if (!isTextVibe)
+                      SizedBox(
+                        width: size,
+                        height: size,
+                        child: ClipRect(child: VibeMediaPlayer(vibe: widget.vibe, onDoubleTap: _handleDoubleTap)),
+                      ),
+                    _MetaPanel(
+                      vibe: widget.vibe,
+                      caption: _caption,
+                      onLikeTap: widget.onLikeTap,
+                      onCommentTap: widget.onCommentTap,
+                      onShareTap: widget.onShareTap,
+                      onSaveTap: widget.onSaveTap,
+                      isTextVibe: isTextVibe,
+                    ),
+                    const Divider(height: 1, color: Color(0xFFECE2D8)),
+                  ],
+                ),
+              ),
+            ),
+            if (showActionPill)
+              Positioned(
+                top: 46,
+                right: 28,
+                child: _InlineVibeActionPill(isSelfVibe: _isSelfVibe, onTap: _runAction),
+              ),
+          ],
+        );
+      },
     );
   }
 }
