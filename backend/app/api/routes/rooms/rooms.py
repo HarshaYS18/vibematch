@@ -48,6 +48,23 @@ def _can_manage_room(db: Session, room: Room, user: User) -> bool:
     return bool(participant and participant.is_room_admin)
 
 
+def _clean_room_lock_password(value: object, *, required: bool) -> str | None:
+    text = value.strip() if isinstance(value, str) else ""
+    if not text:
+        if required:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="4-digit room lock password is required when locking room",
+            )
+        return None
+    if not text.isdigit() or len(text) != 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Room lock password must be exactly 4 digits",
+        )
+    return text
+
+
 def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse:
     return RoomSettingsResponse(
         room_public_id=room_public_id.strip(),
@@ -186,12 +203,17 @@ def update_room_settings(
         room.allow_screenshots = payload.allow_screenshots
     if payload.mode is not None:
         _apply_settings_mode_flags(room, payload.mode)
-        if room.is_locked and payload.lock_password:
-            from app.core.security import hash_password
+        if room.is_locked:
+            lock_password = _clean_room_lock_password(
+                payload.lock_password,
+                required=not bool(room.lock_password_hash),
+            )
+            if lock_password is not None:
+                from app.core.security import hash_password
 
-            room.lock_password_hash = hash_password(payload.lock_password)
-            room.lock_updated_at = datetime.utcnow()
-            room.lock_updated_by_user_id = current_user.id
+                room.lock_password_hash = hash_password(lock_password)
+                room.lock_updated_at = datetime.utcnow()
+                room.lock_updated_by_user_id = current_user.id
 
     db.add(room)
     db.commit()
