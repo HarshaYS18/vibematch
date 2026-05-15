@@ -11,9 +11,10 @@ class VibesApiService {
 
   final AuthApiService authApiService;
 
-  Future<List<VibeItem>> loadFeed({int limit = 30}) async {
+  Future<List<VibeItem>> loadFeed({int limit = 30, VibesFeedTab tab = VibesFeedTab.vibes}) async {
+    final path = tab == VibesFeedTab.friends ? '/vibes/friends' : '/vibes/feed';
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/vibes/feed')).replace(queryParameters: {'limit': '$limit'}),
+      Uri.parse(VmApiConfig.endpoint(path)).replace(queryParameters: {'limit': '$limit'}),
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'load Vibes feed');
@@ -53,6 +54,17 @@ class VibesApiService {
       postId: decoded['post_id']?.toString() ?? postId,
       likedByMe: decoded['liked_by_me'] == true,
       likesCount: _int(decoded['likes_count']),
+    );
+  }
+
+  Future<VibeSaveResult> toggleSave(String postId) async {
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/save')), headers: _authHeaders());
+    _throwIfFailed(response, 'toggle Vibe save');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return VibeSaveResult(
+      postId: decoded['post_id']?.toString() ?? postId,
+      savedByMe: decoded['saved_by_me'] == true,
+      savesCount: _int(decoded['saves_count']),
     );
   }
 
@@ -144,6 +156,14 @@ class VibeLikeResult {
   final int likesCount;
 }
 
+class VibeSaveResult {
+  const VibeSaveResult({required this.postId, required this.savedByMe, required this.savesCount});
+
+  final String postId;
+  final bool savedByMe;
+  final int savesCount;
+}
+
 class VibeShareResult {
   const VibeShareResult({required this.postId, required this.sharesCount, required this.shareChannel, required this.targetPublicUserId});
 
@@ -180,13 +200,16 @@ VibeItem _vibeFromJson(Map<String, dynamic> json) {
     likes: _int(json['likes_count']),
     comments: _int(json['comments_count']),
     shares: _int(json['shares_count']),
+    saves: _int(json['saves_count']),
     views: _int(json['views_count']),
     isFollowing: true,
     usesMentionAll: json['uses_mention_all'] == true,
     mentions: mentionsRaw is List ? mentionsRaw.map((item) => item.toString()).toList(growable: false) : const <String>[],
     colors: mediaType.colors,
     mediaUrl: _text(json['media_url']),
+    avatarUrl: _text(author['avatar_url']),
     likedByMe: json['liked_by_me'] == true,
+    savedByMe: json['saved_by_me'] == true,
   );
 }
 
@@ -224,8 +247,9 @@ String _timeAgo(String? raw) {
   if (diff.inMinutes < 1) return 'Just now';
   if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
   if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays < 7) return '${diff.inDays}d ago';
-  return '${(diff.inDays / 7).floor()}w ago';
+  if (diff.inDays < 30) return '${diff.inDays}d ago';
+  if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}mo ago';
+  return '${(diff.inDays / 365).floor()}y ago';
 }
 
 String? _text(dynamic value) {
