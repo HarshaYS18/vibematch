@@ -46,6 +46,7 @@ import 'widgets/live_room_seat_layout_picker_sheet.dart';
 import 'widgets/live_room_settings_sheet_module.dart';
 import 'widgets/live_room_users_sheet.dart';
 import 'widgets/room_contribution_rankings_sheet.dart';
+import 'widgets/room_level_sheet.dart';
 import 'widgets/room_seats.dart';
 import 'widgets/room_theme.dart';
 import 'widgets/vibesync_room_module.dart';
