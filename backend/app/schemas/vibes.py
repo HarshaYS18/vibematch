@@ -17,6 +17,7 @@ class VibePostCreateRequest(BaseModel):
     tag: str | None = Field(default=None, max_length=50)
     mentions: list[str] = Field(default_factory=list, max_length=50)
     uses_mention_all: bool = False
+    comments_enabled: bool = True
 
 
 class VibeCommentCreateRequest(BaseModel):
@@ -55,6 +56,7 @@ class VibePostResponse(BaseModel):
     tag: str | None = None
     mentions: list[str]
     uses_mention_all: bool
+    comments_enabled: bool = True
     author: VibeAuthorResponse
     likes_count: int
     comments_count: int
