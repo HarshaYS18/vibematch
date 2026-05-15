@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/security/screenshot_guard_service.dart';
 import '../../data/active_room_context.dart';
+import '../../data/live_room_settings_event_bus.dart';
 import '../../data/room_api_service.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
@@ -83,6 +84,11 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
         _allowScreenshots = settings.allowScreenshots;
         _mode = settings.mode?.trim().isNotEmpty == true ? privacyModeFromTitle(settings.mode!) : _mode;
       });
+      _publishSettingsEvent(
+        modeTitle: settings.mode,
+        language: settings.language,
+        allowScreenshots: settings.allowScreenshots,
+      );
     } catch (_) {
       // Settings sheet can still operate from current room state.
     } finally {
@@ -129,6 +135,11 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
         _allowScreenshots = settings.allowScreenshots;
         _mode = confirmedMode;
       });
+      _publishSettingsEvent(
+        modeTitle: settings.mode,
+        language: settings.language,
+        allowScreenshots: settings.allowScreenshots,
+      );
       if (mode != null) widget.onModeChanged(confirmedMode);
       RoomToast.show(context, _successMessage(language: language, mode: mode, allowScreenshots: allowScreenshots, confirmedMode: confirmedMode));
       if (mode != null) Navigator.pop(context);
@@ -169,6 +180,11 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
       if (!mounted) return;
       final confirmedMode = privacyModeFromTitle(updated.mode);
       setState(() => _mode = confirmedMode);
+      _publishSettingsEvent(
+        modeTitle: updated.mode,
+        language: updated.language,
+        allowScreenshots: updated.allowScreenshots,
+      );
       widget.onModeChanged(confirmedMode);
       RoomToast.show(context, _successMessage(confirmedMode: confirmedMode, mode: confirmedMode));
       Navigator.pop(context);
@@ -179,6 +195,20 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _publishSettingsEvent({String? modeTitle, String? language, bool? allowScreenshots}) {
+    final roomId = _roomId;
+    if (roomId.isEmpty) return;
+    LiveRoomSettingsEventBus.publish(
+      LiveRoomSettingsEvent(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        roomId: roomId,
+        privacyModeTitle: modeTitle ?? _backendModeName(_mode),
+        allowScreenshots: allowScreenshots ?? _allowScreenshots,
+        language: language ?? _selectedLanguage,
+      ),
+    );
   }
 
   String _backendModeName(RoomPrivacyMode mode) {
@@ -203,7 +233,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
       case RoomPrivacyMode.locked:
         return 'Room is now Locked. Host/admins and invited/approved users can enter; visitors must type the lock.';
       case RoomPrivacyMode.membersOnly:
-        return 'Room is now Members Only. Only approved members/admins can enter.';
+        return 'Room is now Members Only. Only approved chatroom members, room admins, host, and Owner roles can enter.';
       case RoomPrivacyMode.privateVibe:
         return 'Secret Vibe enabled. Room is hidden from public discovery.';
     }
