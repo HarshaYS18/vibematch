@@ -39,21 +39,42 @@ class CoinGameRankingsSheet extends StatefulWidget {
 }
 
 class _CoinGameRankingsSheetState extends State<CoinGameRankingsSheet> {
+  static const List<CoinGameInfo> _fallbackGames = <CoinGameInfo>[
+    CoinGameInfo(id: 'jungle-hunt', name: 'Jungle Hunt', enabled: true),
+    CoinGameInfo(id: 'crystal-hunt', name: 'Crystal Hunt', enabled: true),
+  ];
+
   final CoinGameRankingsApiService _api = const CoinGameRankingsApiService();
 
   late CoinGameRankingType _type = widget.initialType;
   late CoinGameRankingPeriod _period = widget.initialPeriod;
-  List<CoinGameInfo> _games = const <CoinGameInfo>[];
+  List<CoinGameInfo> _games = _fallbackGames;
   String? _selectedGameId;
   List<CoinGameRankingEntry> _entries = const <CoinGameRankingEntry>[];
   bool _loading = false;
   String? _error;
+  bool _gameListApiMissing = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedGameId = widget.initialGameId;
+    _selectedGameId = widget.initialGameId?.trim().isNotEmpty == true
+        ? widget.initialGameId!.trim()
+        : _fallbackGames.first.id;
     unawaited(_load());
+  }
+
+  Future<List<CoinGameInfo>> _loadGamesSafely() async {
+    if (_gameListApiMissing) return _games.isEmpty ? _fallbackGames : _games;
+    try {
+      final backendGames = await _api.getGames();
+      if (backendGames.isEmpty) return _games.isEmpty ? _fallbackGames : _games;
+      return backendGames;
+    } catch (error) {
+      final message = error.toString();
+      if (message.contains('404')) _gameListApiMissing = true;
+      return _games.isEmpty ? _fallbackGames : _games;
+    }
   }
 
   Future<void> _load() async {
@@ -64,10 +85,10 @@ class _CoinGameRankingsSheetState extends State<CoinGameRankingsSheet> {
       });
     }
     try {
-      final games = _games.isEmpty ? await _api.getGames() : _games;
+      final games = await _loadGamesSafely();
       final selectedGameId = _selectedGameId?.trim().isNotEmpty == true
           ? _selectedGameId!.trim()
-          : (games.isNotEmpty ? games.first.id : 'crystal-hunt');
+          : (games.isNotEmpty ? games.first.id : _fallbackGames.first.id);
       final entries = await _api.getRankings(
         gameId: selectedGameId,
         type: _type,
@@ -76,7 +97,7 @@ class _CoinGameRankingsSheetState extends State<CoinGameRankingsSheet> {
       );
       if (!mounted) return;
       setState(() {
-        _games = games;
+        _games = games.isEmpty ? _fallbackGames : games;
         _selectedGameId = selectedGameId;
         _entries = entries;
         _loading = false;
@@ -123,7 +144,8 @@ class _CoinGameRankingsSheetState extends State<CoinGameRankingsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final gameName = _games
+    final activeGames = _games.isEmpty ? _fallbackGames : _games;
+    final gameName = activeGames
         .where((game) => game.id == _selectedGameId)
         .map((game) => game.name)
         .firstOrNull ??
@@ -167,19 +189,20 @@ class _CoinGameRankingsSheetState extends State<CoinGameRankingsSheet> {
                 const SizedBox(height: 14),
                 _Header(gameName: gameName, onClose: () => Navigator.pop(context)),
                 const SizedBox(height: 12),
-                if (_games.isNotEmpty) _GameTabs(games: _games, selectedGameId: _selectedGameId, onChanged: _changeGame),
-                if (_games.isNotEmpty) const SizedBox(height: 10),
+                _GameTabs(games: activeGames, selectedGameId: _selectedGameId, onChanged: _changeGame),
+                const SizedBox(height: 10),
                 _TypeTabs(selected: _type, onChanged: _changeType),
                 const SizedBox(height: 10),
                 _PeriodTabs(selected: _period, onChanged: _changePeriod),
                 const SizedBox(height: 12),
                 _StatusPill(
-                  gameId: _selectedGameId ?? 'crystal-hunt',
+                  gameId: _selectedGameId ?? _fallbackGames.first.id,
                   type: _type,
                   period: _period,
                   count: _entries.length,
                   loading: _loading,
                   error: _error,
+                  gameListApiMissing: _gameListApiMissing,
                   onRefresh: () => unawaited(_load()),
                 ),
                 const SizedBox(height: 12),
@@ -368,7 +391,7 @@ class _PeriodTabs extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.gameId, required this.type, required this.period, required this.count, required this.loading, required this.error, required this.onRefresh});
+  const _StatusPill({required this.gameId, required this.type, required this.period, required this.count, required this.loading, required this.error, required this.gameListApiMissing, required this.onRefresh});
 
   final String gameId;
   final CoinGameRankingType type;
@@ -376,12 +399,17 @@ class _StatusPill extends StatelessWidget {
   final int count;
   final bool loading;
   final String? error;
+  final bool gameListApiMissing;
   final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final path = '/games/$gameId/rankings/${type.backendValue}?period=${period.backendValue}';
-    final status = loading ? 'syncing live...' : error == null ? 'live backend data' : 'fallback: $error';
+    final status = loading
+        ? 'syncing live...'
+        : error == null
+            ? (gameListApiMissing ? 'using built-in game list' : 'live backend data')
+            : 'fallback: $error';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
