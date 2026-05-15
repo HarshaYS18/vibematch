@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.follow import UserFollow
 from app.models.inbox import InboxMessageType
 from app.models.user import User
-from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeShare
+from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeSave, VibeShare
 from app.schemas.vibes import (
     VibeAuthorResponse,
     VibeCommentCreateRequest,
@@ -25,6 +25,7 @@ from app.schemas.vibes import (
     VibeReportQueueResponse,
     VibeReportResponse,
     VibeReportReviewRequest,
+    VibeSaveResponse,
     VibeShareCreateRequest,
     VibeShareResponse,
 )
@@ -113,8 +114,10 @@ def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostR
     likes_count = db.query(func.count(VibeReaction.id)).filter(VibeReaction.post_id == post.id).scalar() or 0
     comments_count = db.query(func.count(VibeComment.id)).filter(VibeComment.post_id == post.id, VibeComment.is_deleted.is_(False)).scalar() or 0
     shares_count = db.query(func.count(VibeShare.id)).filter(VibeShare.post_id == post.id).scalar() or 0
+    saves_count = db.query(func.count(VibeSave.id)).filter(VibeSave.post_id == post.id).scalar() or 0
     reports_count = db.query(func.count(VibeReport.id)).filter(VibeReport.post_id == post.id).scalar() or 0
     liked_by_me = db.query(VibeReaction.id).filter(VibeReaction.post_id == post.id, VibeReaction.user_id == current_user.id).first() is not None
+    saved_by_me = db.query(VibeSave.id).filter(VibeSave.post_id == post.id, VibeSave.user_id == current_user.id).first() is not None
     return VibePostResponse(
         id=post.id,
         caption=post.caption,
@@ -127,8 +130,10 @@ def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostR
         likes_count=likes_count,
         comments_count=comments_count,
         shares_count=shares_count,
+        saves_count=saves_count,
         reports_count=reports_count,
         liked_by_me=liked_by_me,
+        saved_by_me=saved_by_me,
         created_at=post.created_at,
     )
 
@@ -214,6 +219,15 @@ def list_vibes_feed(limit: int = Query(default=30, ge=1, le=100), db: Session = 
     return VibeFeedResponse(posts=[_post_response(db, post, current_user) for post in posts])
 
 
+@router.get("/friends", response_model=VibeFeedResponse)
+def list_friends_vibes_feed(limit: int = Query(default=30, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    followed_ids = [row[0] for row in db.query(UserFollow.followed_user_id).filter(UserFollow.follower_user_id == current_user.id).all()]
+    if not followed_ids:
+        return VibeFeedResponse(posts=[])
+    posts = db.query(VibePost).filter(VibePost.author_user_id.in_(followed_ids), VibePost.is_deleted.is_(False)).order_by(VibePost.created_at.desc()).limit(limit).all()
+    return VibeFeedResponse(posts=[_post_response(db, post, current_user) for post in posts])
+
+
 @router.get("/user/{public_user_id}", response_model=list[VibePostResponse])
 def list_public_user_vibes(public_user_id: int, limit: int = Query(default=30, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     user = db.query(User).filter(User.public_user_id == public_user_id).first()
@@ -283,6 +297,21 @@ def toggle_vibe_like(post_id: int, db: Session = Depends(get_db), current_user: 
     return VibeLikeResponse(post_id=post_id, liked_by_me=liked_by_me, likes_count=likes_count)
 
 
+@router.post("/{post_id}/save", response_model=VibeSaveResponse)
+def toggle_vibe_save(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _get_visible_post_or_404(db, post_id)
+    existing = db.query(VibeSave).filter(VibeSave.post_id == post_id, VibeSave.user_id == current_user.id).first()
+    saved_by_me = False
+    if existing:
+        db.delete(existing)
+    else:
+        db.add(VibeSave(post_id=post_id, user_id=current_user.id))
+        saved_by_me = True
+    db.commit()
+    saves_count = db.query(func.count(VibeSave.id)).filter(VibeSave.post_id == post_id).scalar() or 0
+    return VibeSaveResponse(post_id=post_id, saved_by_me=saved_by_me, saves_count=saves_count)
+
+
 @router.post("/{post_id}/share", response_model=VibeShareResponse)
 def share_vibe(post_id: int, payload: VibeShareCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _get_visible_post_or_404(db, post_id)
@@ -336,4 +365,3 @@ def delete_vibe(post_id: int, db: Session = Depends(get_db), current_user: User 
     post.is_deleted = True
     db.commit()
     return VibeDeleteResponse(post_id=post_id, deleted=True)
-
