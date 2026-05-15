@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import '../../../social/widgets/friends_invite_sheet.dart';
 import '../../data/vibes_api_service.dart';
 import '../../models/vibe_models.dart';
-import '../widgets/vibe_card_modular.dart';
+import '../widgets/vibe_media_playback_gate.dart';
+import '../widgets/vibe_media_player.dart';
+import '../widgets/vibe_reel_action_rail.dart';
+import '../widgets/vibe_reel_overlay_widgets.dart';
 
 class MediaVibeDetailPager extends StatefulWidget {
   const MediaVibeDetailPager({
@@ -117,13 +120,17 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.35),
-      builder: (_) => _ReelCommentsSheet(vibe: _stateFor(vibe), api: _api, onCommentAdded: () {
-        if (!mounted) return;
-        setState(() {
-          final current = _stateFor(vibe);
-          _stateById[_key(vibe)] = current.copyWith(comments: current.comments + 1);
-        });
-      }),
+      builder: (_) => _ReelCommentsSheet(
+        vibe: _stateFor(vibe),
+        api: _api,
+        onCommentAdded: () {
+          if (!mounted) return;
+          setState(() {
+            final current = _stateFor(vibe);
+            _stateById[_key(vibe)] = current.copyWith(comments: current.comments + 1);
+          });
+        },
+      ),
     );
   }
 
@@ -187,16 +194,16 @@ class _MediaVibeReelPage extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         GestureDetector(onDoubleTap: onLike, child: VibeMediaPlayer(vibe: vibe, onDoubleTap: onLike, respectFeedPause: false, autoplay: true)),
-        const _ReelGradientOverlay(),
+        const VibeReelGradientOverlay(),
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 10, 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Expanded(child: _ReelAuthorCaption(vibe: vibe, caption: _caption)),
+                Expanded(child: VibeReelAuthorCaption(vibe: vibe, caption: _caption)),
                 const SizedBox(width: 12),
-                _ReelActionRail(vibe: vibe, onLike: onLike, onComments: onComments, onShare: onShare, onSave: onSave),
+                VibeReelActionRail(vibe: vibe, onLike: onLike, onComments: onComments, onShare: onShare, onSave: onSave),
               ],
             ),
           ),
@@ -206,89 +213,9 @@ class _MediaVibeReelPage extends StatelessWidget {
   }
 }
 
-class _ReelGradientOverlay extends StatelessWidget {
-  const _ReelGradientOverlay();
-
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.black.withValues(alpha: 0.20), Colors.transparent, Colors.black.withValues(alpha: 0.78)],
-              stops: const [0, 0.45, 1],
-            ),
-          ),
-        ),
-      );
-}
-
-class _ReelAuthorCaption extends StatelessWidget {
-  const _ReelAuthorCaption({required this.vibe, required this.caption});
-  final VibeItem vibe;
-  final String caption;
-
-  @override
-  Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            VibeAvatar(vibe: vibe, size: 38),
-            const SizedBox(width: 10),
-            Expanded(child: Text(vibe.authorName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900))),
-            Text(vibe.timeAgo, style: TextStyle(color: Colors.white.withValues(alpha: 0.76), fontSize: 11, fontWeight: FontWeight.w800)),
-          ]),
-          if (caption.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(caption, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13.4, height: 1.35, fontWeight: FontWeight.w700)),
-          ],
-        ],
-      );
-}
-
-class _ReelActionRail extends StatelessWidget {
-  const _ReelActionRail({required this.vibe, required this.onLike, required this.onComments, required this.onShare, required this.onSave});
-
-  final VibeItem vibe;
-  final VoidCallback onLike;
-  final VoidCallback onComments;
-  final VoidCallback onShare;
-  final VoidCallback onSave;
-
-  @override
-  Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _RailButton(icon: vibe.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: vibe.likedByMe ? const Color(0xFFE84C72) : Colors.white, label: _formatCount(vibe.likes), onTap: onLike),
-          _RailButton(icon: Icons.mode_comment_rounded, label: _formatCount(vibe.comments), onTap: onComments),
-          _RailButton(icon: Icons.send_rounded, label: _formatCount(vibe.shares), onTap: onShare),
-          _RailButton(icon: vibe.savedByMe ? Icons.bookmark_rounded : Icons.bookmark_border_rounded, label: _formatCount(vibe.saves), onTap: onSave),
-        ],
-      );
-}
-
-class _RailButton extends StatelessWidget {
-  const _RailButton({required this.icon, required this.label, required this.onTap, this.color = Colors.white});
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 18),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
-          child: Column(children: [Icon(icon, color: color, size: 31), const SizedBox(height: 4), Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900))]),
-        ),
-      );
-}
-
 class _ReelCommentsSheet extends StatefulWidget {
   const _ReelCommentsSheet({required this.vibe, required this.api, required this.onCommentAdded});
+
   final VibeItem vibe;
   final VibesApiService api;
   final VoidCallback onCommentAdded;
@@ -385,18 +312,28 @@ class _ReelCommentsSheetState extends State<_ReelCommentsSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => DraggableScrollableSheet(
-        initialChildSize: 0.72,
-        minChildSize: 0.42,
-        maxChildSize: 0.94,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-          child: Column(children: [
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.72,
+      minChildSize: 0.42,
+      maxChildSize: 0.94,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        child: Column(
+          children: [
             const SizedBox(height: 10),
             Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 8, 8),
-              child: Row(children: [Expanded(child: Text('Comments  ${_formatCount(_comments.length)}', style: const TextStyle(color: Color(0xFF111015), fontSize: 17, fontWeight: FontWeight.w900))), if (_loading) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF111015))) else IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded, color: Color(0xFF111015), size: 20))]),
+              child: Row(
+                children: [
+                  Expanded(child: Text('Comments  ${_formatCount(_comments.length)}', style: const TextStyle(color: Color(0xFF111015), fontSize: 17, fontWeight: FontWeight.w900))),
+                  if (_loading)
+                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF111015)))
+                  else
+                    IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded, color: Color(0xFF111015), size: 20)),
+                ],
+              ),
             ),
             if (_error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6), child: Text(_error!, style: const TextStyle(color: Color(0xFFE84C72), fontSize: 12, fontWeight: FontWeight.w800))),
             Expanded(
@@ -409,14 +346,27 @@ class _ReelCommentsSheetState extends State<_ReelCommentsSheet> {
                       itemBuilder: (context, index) => _CommentTile(comment: _comments[index], onLike: () => unawaited(_toggleLike(_comments[index])), onReply: () => _reply(_comments[index])),
                     ),
             ),
-            _Composer(controller: _controller, focusNode: _focusNode, sending: _sending, replyingTo: _replyingTo, onCancelReply: () => setState(() { _replyingTo = null; _controller.clear(); }), onSend: () => unawaited(_send())),
-          ]),
+            _Composer(
+              controller: _controller,
+              focusNode: _focusNode,
+              sending: _sending,
+              replyingTo: _replyingTo,
+              onCancelReply: () => setState(() {
+                _replyingTo = null;
+                _controller.clear();
+              }),
+              onSend: () => unawaited(_send()),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _CommentTile extends StatelessWidget {
   const _CommentTile({required this.comment, required this.onLike, required this.onReply});
+
   final VibeComment comment;
   final VoidCallback onLike;
   final VoidCallback onReply;
@@ -426,18 +376,61 @@ class _CommentTile extends StatelessWidget {
     final avatarUrl = comment.avatarUrl?.trim();
     return Padding(
       padding: EdgeInsets.fromLTRB(comment.isReply ? 54 : 14, 8, 8, 8),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        CircleAvatar(radius: comment.isReply ? 14 : 17, backgroundColor: const Color(0xFF111015), backgroundImage: avatarUrl == null || avatarUrl.isEmpty ? null : NetworkImage(avatarUrl), child: avatarUrl == null || avatarUrl.isEmpty ? Text(comment.avatarText, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)) : null),
-        const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32), children: [TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)), TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600))])), const SizedBox(height: 6), Row(children: [Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700)), const SizedBox(width: 14), if (comment.likesCount > 0) ...[Text('${_formatCount(comment.likesCount)} likes', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800)), const SizedBox(width: 14)], InkWell(onTap: onReply, child: const Text('Reply', style: TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w900)))])])),
-        InkWell(onTap: onLike, customBorder: const CircleBorder(), child: Padding(padding: const EdgeInsets.all(9), child: Icon(comment.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: comment.likedByMe ? const Color(0xFFE84C72) : const Color(0xFF8C8198), size: 18))),
-      ]),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: comment.isReply ? 14 : 17,
+            backgroundColor: const Color(0xFF111015),
+            backgroundImage: avatarUrl == null || avatarUrl.isEmpty ? null : NetworkImage(avatarUrl),
+            child: avatarUrl == null || avatarUrl.isEmpty ? Text(comment.avatarText, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)) : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32),
+                    children: [
+                      TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)),
+                      TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 14),
+                    if (comment.likesCount > 0) ...[
+                      Text('${_formatCount(comment.likesCount)} likes', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                      const SizedBox(width: 14),
+                    ],
+                    InkWell(onTap: onReply, child: const Text('Reply', style: TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w900))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          InkWell(
+            onTap: onLike,
+            customBorder: const CircleBorder(),
+            child: Padding(
+              padding: const EdgeInsets.all(9),
+              child: Icon(comment.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: comment.likedByMe ? const Color(0xFFE84C72) : const Color(0xFF8C8198), size: 18),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _Composer extends StatelessWidget {
   const _Composer({required this.controller, required this.focusNode, required this.sending, required this.replyingTo, required this.onCancelReply, required this.onSend});
+
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool sending;
@@ -446,14 +439,60 @@ class _Composer extends StatelessWidget {
   final VoidCallback onSend;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + MediaQuery.paddingOf(context).bottom),
-        decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFECE2D8)))),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          if (replyingTo != null) Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(color: const Color(0xFFF7F3EF), borderRadius: BorderRadius.circular(999)), child: Row(children: [Expanded(child: Text('Replying to ${replyingTo!.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 12, fontWeight: FontWeight.w900))), InkWell(onTap: onCancelReply, customBorder: const CircleBorder(), child: const Icon(Icons.close_rounded, color: Color(0xFF8C8198), size: 17))])),
-          Row(children: [Expanded(child: TextField(controller: controller, focusNode: focusNode, enabled: !sending, minLines: 1, maxLines: 3, decoration: InputDecoration(hintText: replyingTo == null ? 'Add a comment...' : 'Add a reply...', filled: true, fillColor: const Color(0xFFF7F3EF), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11), border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none)))), const SizedBox(width: 8), InkWell(onTap: sending ? null : onSend, borderRadius: BorderRadius.circular(999), child: Container(width: 43, height: 43, decoration: const BoxDecoration(color: Color(0xFF111015), shape: BoxShape.circle), child: sending ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22)))])
-        ]),
-      );
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + MediaQuery.paddingOf(context).bottom),
+      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFECE2D8)))),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyingTo != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: const Color(0xFFF7F3EF), borderRadius: BorderRadius.circular(999)),
+              child: Row(
+                children: [
+                  Expanded(child: Text('Replying to ${replyingTo!.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 12, fontWeight: FontWeight.w900))),
+                  InkWell(onTap: onCancelReply, customBorder: const CircleBorder(), child: const Icon(Icons.close_rounded, color: Color(0xFF8C8198), size: 17)),
+                ],
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  enabled: !sending,
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: replyingTo == null ? 'Add a comment...' : 'Add a reply...',
+                    filled: true,
+                    fillColor: const Color(0xFFF7F3EF),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: sending ? null : onSend,
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  width: 43,
+                  height: 43,
+                  decoration: const BoxDecoration(color: Color(0xFF111015), shape: BoxShape.circle),
+                  child: sending ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String _formatCount(int value) {
