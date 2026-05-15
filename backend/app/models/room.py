@@ -63,6 +63,12 @@ class Room(Base):
     is_secret: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_members_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    allow_screenshots: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="true",
+    )
 
     # Locked room access. Store only a hash, never the plain lock/password.
     lock_password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
