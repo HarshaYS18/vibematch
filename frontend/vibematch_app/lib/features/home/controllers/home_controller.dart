@@ -60,15 +60,33 @@ class HomeController extends ChangeNotifier {
 
   bool get usingBackendRooms => _backendRooms.isNotEmpty && !hasNetworkError;
 
+  bool _isOpenActiveRoom(HomeRoom room) {
+    final normalizedMode = room.mode.trim().toLowerCase();
+    final isOpen = normalizedMode == 'open';
+    final hasActiveUsers = room.onlineCount > 0;
+    return isOpen && hasActiveUsers;
+  }
+
   List<HomeRoom> get filteredRooms {
     if (hasNetworkError) return const [];
 
     final filtered = rooms.where((room) {
       final languageMatch = selectedLanguage == 'All' || room.language == selectedLanguage;
-      return languageMatch;
+      if (!languageMatch) return false;
+
+      // Product rule: Trending/Home room list should show only public Open rooms
+      // that currently have at least one active/online participant in the chatroom.
+      if (selectedCategory == 'Trending') {
+        return _isOpenActiveRoom(room);
+      }
+      return true;
     }).toList();
 
-    filtered.sort((a, b) => b.trendingScore.compareTo(a.trendingScore));
+    filtered.sort((a, b) {
+      final onlineCompare = b.onlineCount.compareTo(a.onlineCount);
+      if (onlineCompare != 0) return onlineCompare;
+      return b.trendingScore.compareTo(a.trendingScore);
+    });
     return filtered;
   }
 
