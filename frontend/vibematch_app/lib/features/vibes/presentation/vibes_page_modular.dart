@@ -48,8 +48,9 @@ class _VibesPageState extends State<VibesPage> {
 
   Future<void> _toggleSave(VibeItem vibe) async {
     try {
+      final wasSaved = vibe.savedByMe;
       await _controller.toggleSave(vibe);
-      if (mounted) VibesNavigationController.showAction(context, vibe.savedByMe ? 'Removed from saved Vibes.' : 'Saved Vibe.');
+      if (mounted) VibesNavigationController.showAction(context, wasSaved ? 'Removed from saved Vibes.' : 'Saved Vibe.');
     } catch (error) {
       if (mounted) VibesNavigationController.showAction(context, error.toString().replaceFirst('Exception: ', ''));
     }
@@ -69,15 +70,22 @@ class _VibesPageState extends State<VibesPage> {
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
               SliverToBoxAdapter(
-                child: VibesHeader(
-                  onRefreshTap: () => _controller.loadFeed(),
-                  onSettingsTap: () => VibesNavigationController.openSettings(context: context, controller: _controller),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: VibesFeedTabs(
-                  selectedTab: _controller.selectedTab,
-                  onChanged: _controller.selectTab,
+                child: ColoredBox(
+                  color: Colors.white,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      VibesHeader(
+                        onRefreshTap: () => _controller.loadFeed(),
+                        onSettingsTap: () => VibesNavigationController.openSettings(context: context, controller: _controller),
+                      ),
+                      VibesFeedTabs(
+                        selectedTab: _controller.selectedTab,
+                        onChanged: _controller.selectTab,
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
                 ),
               ),
               if (_controller.isLoading) const SliverToBoxAdapter(child: VibesLoadingStrip()),
