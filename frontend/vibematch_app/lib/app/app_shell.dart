@@ -14,6 +14,7 @@ import '../features/rooms/data/live_room_media_signaling_service.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page_modular.dart';
+import '../features/vibes/presentation/widgets/vibe_card_modular.dart';
 import '../features/wallet/data/wallet_realtime_sync_service.dart';
 import 'app_routes.dart';
 
@@ -48,6 +49,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _syncedUser = widget.currentUser;
+    _syncVibesPlaybackWithActiveTab();
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(_syncedUser);
     _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onUserSynced);
     _startPresenceHeartbeat();
@@ -64,10 +66,19 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    VibeMediaPlaybackGate.feedPlaybackPaused.value = true;
     _userSyncSubscription?.cancel();
     _presenceHeartbeatTimer?.cancel();
     unawaited(WalletRealtimeSyncService.instance.stop());
     super.dispose();
+  }
+
+  void _syncVibesPlaybackWithActiveTab() {
+    final isVibesTabActive = _selectedTab == VmMainTab.vibes;
+    VibeMediaPlaybackGate.feedPlaybackPaused.value = !isVibesTabActive;
+    if (isVibesTabActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => VibeMediaPlaybackGate.notifyFeedScrolled());
+    }
   }
 
   void _startPresenceHeartbeat() {
@@ -114,6 +125,7 @@ class _AppShellState extends State<AppShell> {
   void _selectTab(VmMainTab tab) {
     if (_selectedTab == tab) return;
     setState(() => _selectedTab = tab);
+    _syncVibesPlaybackWithActiveTab();
   }
 
   @override
