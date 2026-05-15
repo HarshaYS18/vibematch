@@ -25,6 +25,7 @@ class VibePost(Base):
     comments = relationship("VibeComment", back_populates="post", cascade="all, delete-orphan")
     reactions = relationship("VibeReaction", back_populates="post", cascade="all, delete-orphan")
     shares = relationship("VibeShare", back_populates="post", cascade="all, delete-orphan")
+    saves = relationship("VibeSave", back_populates="post", cascade="all, delete-orphan")
     reports = relationship("VibeReport", back_populates="post", cascade="all, delete-orphan")
 
 
@@ -69,6 +70,19 @@ class VibeShare(Base):
     post = relationship("VibePost", back_populates="shares")
     sender = relationship("User", foreign_keys=[sender_user_id])
     target = relationship("User", foreign_keys=[target_user_id])
+
+
+class VibeSave(Base):
+    __tablename__ = "vibe_saves"
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="uq_vibe_save_post_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("vibe_posts.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    post = relationship("VibePost", back_populates="saves")
+    user = relationship("User")
 
 
 class VibeReport(Base):
