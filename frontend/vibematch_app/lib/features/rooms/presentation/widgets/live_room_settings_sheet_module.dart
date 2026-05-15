@@ -16,6 +16,8 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
     required this.applyOnlyModeEnabled,
     required this.joinRequestCount,
     required this.onBackgroundTap,
+    required this.onCoverPhotoTap,
+    required this.onCustomBackgroundTap,
     required this.onPrivacyTap,
     required this.onSeatLayoutTap,
     required this.onAnnouncementTap,
@@ -40,6 +42,8 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   final int joinRequestCount;
 
   final VoidCallback onBackgroundTap;
+  final VoidCallback onCoverPhotoTap;
+  final VoidCallback onCustomBackgroundTap;
   final VoidCallback onPrivacyTap;
   final VoidCallback onSeatLayoutTap;
   final VoidCallback onAnnouncementTap;
@@ -80,6 +84,8 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       applyOnlyModeEnabled: applyOnlyModeEnabled,
       joinRequestCount: joinRequestCount,
       onBackgroundTap: onBackgroundTap,
+      onCoverPhotoTap: onCoverPhotoTap,
+      onCustomBackgroundTap: onCustomBackgroundTap,
       onPrivacyTap: onPrivacyTap,
       onSeatLayoutTap: onSeatLayoutTap,
       onAnnouncementTap: onAnnouncementTap,
