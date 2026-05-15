@@ -121,7 +121,7 @@ class VibeItem {
 
 class VibeComment {
   const VibeComment({
-    required this.id,
+    this.id = '',
     required this.name,
     required this.avatarText,
     required this.text,
