@@ -18,8 +18,10 @@ class VibeCardModular extends StatelessWidget {
     final caption = vibe.caption.trim();
     final extras = <String>[];
     for (final raw in vibe.mentions) {
-      final token = raw.trim().startsWith('@') ? raw.trim() : '@${raw.trim()}';
-      if (token.length > 1 && !caption.toLowerCase().contains(token.toLowerCase()) && !extras.contains(token)) extras.add(token);
+      final clean = raw.trim();
+      if (clean.isEmpty) continue;
+      final token = clean.startsWith('@') ? clean : '@$clean';
+      if (!caption.toLowerCase().contains(token.toLowerCase()) && !extras.contains(token)) extras.add(token);
     }
     if (vibe.usesMentionAll && !caption.toLowerCase().contains('@all')) extras.add('@all');
     return extras.isEmpty ? caption : '$caption ${extras.join(' ')}';
@@ -28,6 +30,7 @@ class VibeCardModular extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context).width;
+    final isTextVibe = vibe.mediaType == VibeMediaType.text;
     return ColoredBox(
       color: Colors.white,
       child: Column(
@@ -35,8 +38,8 @@ class VibeCardModular extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _AuthorRow(vibe: vibe, onProfileTap: onProfileTap, onMoreTap: onMoreTap),
-          SizedBox(width: size, height: size, child: ClipRect(child: VibeMediaPlayer(vibe: vibe, onDoubleTap: onLikeTap))),
-          _MetaPanel(vibe: vibe, caption: _caption, onLikeTap: onLikeTap, onCommentTap: onCommentTap, onShareTap: onShareTap, onSaveTap: onSaveTap),
+          if (!isTextVibe) SizedBox(width: size, height: size, child: ClipRect(child: VibeMediaPlayer(vibe: vibe, onDoubleTap: onLikeTap))),
+          _MetaPanel(vibe: vibe, caption: _caption, onLikeTap: onLikeTap, onCommentTap: onCommentTap, onShareTap: onShareTap, onSaveTap: onSaveTap, isTextVibe: isTextVibe),
           const Divider(height: 1, color: Color(0xFFECE2D8)),
         ],
       ),
@@ -78,20 +81,22 @@ class _AuthorRow extends StatelessWidget {
 }
 
 class _MetaPanel extends StatelessWidget {
-  const _MetaPanel({required this.vibe, required this.caption, required this.onLikeTap, required this.onCommentTap, required this.onShareTap, required this.onSaveTap});
+  const _MetaPanel({required this.vibe, required this.caption, required this.onLikeTap, required this.onCommentTap, required this.onShareTap, required this.onSaveTap, required this.isTextVibe});
   final VibeItem vibe;
   final String caption;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
   final VoidCallback onShareTap;
   final VoidCallback onSaveTap;
+  final bool isTextVibe;
 
   @override
   Widget build(BuildContext context) => ColoredBox(
         color: Colors.white,
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 14),
+          padding: EdgeInsets.fromLTRB(0, isTextVibe ? 4 : 0, 0, 14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            if (isTextVibe && caption.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(14, 4, 14, 10), child: _Caption(authorName: vibe.authorName, caption: caption, fontSize: 16, lineHeight: 1.35)),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: Row(children: [
@@ -103,7 +108,7 @@ class _MetaPanel extends StatelessWidget {
               ]),
             ),
             Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 4), child: Text(_likesText(vibe.likes), style: const TextStyle(color: Color(0xFF111015), fontSize: 13, fontWeight: FontWeight.w900))),
-            if (caption.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(14, 2, 14, 2), child: _Caption(authorName: vibe.authorName, caption: caption)),
+            if (!isTextVibe && caption.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(14, 2, 14, 2), child: _Caption(authorName: vibe.authorName, caption: caption)),
             if (vibe.comments > 0) InkWell(onTap: onCommentTap, child: Padding(padding: const EdgeInsets.fromLTRB(14, 5, 14, 2), child: Text('View all ${_formatCount(vibe.comments)} comments', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 13, fontWeight: FontWeight.w700)))),
             Padding(padding: const EdgeInsets.fromLTRB(14, 5, 14, 0), child: Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2))),
           ]),
@@ -137,7 +142,7 @@ class VibeMediaPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaUrl = vibe.mediaUrl?.trim();
-    if (vibe.mediaType == VibeMediaType.text) return GestureDetector(onDoubleTap: onDoubleTap, child: Container(width: double.infinity, height: double.infinity, padding: const EdgeInsets.all(26), decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors)), child: Center(child: Text(vibe.caption, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, height: 1.25, fontWeight: FontWeight.w900)))));
+    if (vibe.mediaType == VibeMediaType.text) return const SizedBox.shrink();
     if (mediaUrl == null || mediaUrl.isEmpty) return GestureDetector(onDoubleTap: onDoubleTap, child: Container(decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors)), child: Icon(vibe.mediaType == VibeMediaType.video ? Icons.play_circle_fill_rounded : Icons.photo_rounded, color: Colors.white, size: 72)));
     if (vibe.mediaType == VibeMediaType.video) return GestureDetector(onDoubleTap: onDoubleTap, child: _NetworkVideoPlayer(url: mediaUrl));
     return GestureDetector(onDoubleTap: onDoubleTap, child: Image.network(mediaUrl, width: double.infinity, height: double.infinity, fit: BoxFit.cover, loadingBuilder: (context, child, loadingProgress) => loadingProgress == null ? child : _MediaLoading(colors: vibe.colors), errorBuilder: (_, _, _) => _MediaFallback(vibe: vibe)));
@@ -210,9 +215,11 @@ class _IconAction extends StatelessWidget {
 }
 
 class _Caption extends StatelessWidget {
-  const _Caption({required this.authorName, required this.caption});
+  const _Caption({required this.authorName, required this.caption, this.fontSize = 13.3, this.lineHeight = 1.32});
   final String authorName;
   final String caption;
+  final double fontSize;
+  final double lineHeight;
   static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
   @override
   Widget build(BuildContext context) {
@@ -224,7 +231,7 @@ class _Caption extends StatelessWidget {
       index = match.end;
     }
     if (index < caption.length) spans.add(TextSpan(text: caption.substring(index)));
-    return RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.3, height: 1.32, fontWeight: FontWeight.w600), children: spans));
+    return RichText(text: TextSpan(style: TextStyle(color: const Color(0xFF111015), fontSize: fontSize, height: lineHeight, fontWeight: FontWeight.w600), children: spans));
   }
 }
 
