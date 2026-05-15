@@ -5,4 +5,8 @@ class ApiEndpoints {
 
   static const String roomsTrending = '/rooms/trending';
   static const String roomsFollowing = '/rooms/following';
+  static const String myCreatedRoom = '/rooms/my-created-room';
+
+  static const String homeBanners = '/home-banners';
+  static const String homeBannersManage = '/home-banners/manage';
 }
