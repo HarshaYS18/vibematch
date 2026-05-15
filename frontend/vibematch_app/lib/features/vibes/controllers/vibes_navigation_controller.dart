@@ -64,10 +64,14 @@ class VibesNavigationController {
   }
 
   static void openVibeDetail({required BuildContext context, required VibesController controller, required VibeItem vibe}) {
+    final mediaVibes = controller.visibleVibes.where((item) => item.mediaType != VibeMediaType.text).toList(growable: false);
+    final initialIndex = mediaVibes.indexWhere((item) => item.id == vibe.id && item.id.trim().isNotEmpty);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => VibeDetailBackendPage(
           vibe: vibe,
+          mediaVibes: mediaVibes.isEmpty ? null : mediaVibes,
+          initialMediaIndex: initialIndex < 0 ? 0 : initialIndex,
           onCommentAdded: () => controller.incrementCommentCount(vibe),
           onDeleteVibe: () => controller.deleteVibe(vibe),
         ),
