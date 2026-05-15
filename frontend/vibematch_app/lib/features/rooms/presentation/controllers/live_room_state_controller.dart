@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/security/screenshot_guard_service.dart';
 import '../../data/active_room_context.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_restrictions_service.dart';
@@ -41,6 +42,7 @@ class LiveRoomStateController extends ChangeNotifier {
   bool _roomImagesEnabled = true;
   bool _guestMessagesEnabled = true;
   bool _applyOnlyModeEnabled = false;
+  bool _allowScreenshots = true;
   bool _minimized = false;
   bool _allowRoomPop = false;
   bool _leaveSheetOpen = false;
@@ -58,6 +60,7 @@ class LiveRoomStateController extends ChangeNotifier {
   bool get roomImagesEnabled => _roomImagesEnabled;
   bool get guestMessagesEnabled => _guestMessagesEnabled;
   bool get applyOnlyModeEnabled => _applyOnlyModeEnabled;
+  bool get allowScreenshots => _allowScreenshots;
   bool get minimized => _minimized;
   bool get allowRoomPop => _allowRoomPop;
   bool get leaveSheetOpen => _leaveSheetOpen;
@@ -74,6 +77,7 @@ class LiveRoomStateController extends ChangeNotifier {
       _handleRealtimeSettingsEvent,
     );
     ActiveRoomContext.clearIfMatches(_roomId);
+    ScreenshotGuardService.clear();
     super.dispose();
   }
 
@@ -150,6 +154,13 @@ class LiveRoomStateController extends ChangeNotifier {
   void setPrivacyMode(RoomPrivacyMode value) {
     if (value == _privacyMode) return;
     _privacyMode = value;
+    notifyListeners();
+  }
+
+  void setAllowScreenshots(bool value) {
+    if (value == _allowScreenshots) return;
+    _allowScreenshots = value;
+    ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: value);
     notifyListeners();
   }
 
@@ -260,8 +271,26 @@ class LiveRoomStateController extends ChangeNotifier {
         changed = true;
       }
 
+      final mode = settings.mode;
+      if (mode != null && mode.trim().isNotEmpty) {
+        final nextPrivacy = privacyModeFromTitle(mode);
+        if (nextPrivacy != _privacyMode) {
+          _privacyMode = nextPrivacy;
+          changed = true;
+        }
+      }
+
+      if (settings.allowScreenshots != _allowScreenshots) {
+        _allowScreenshots = settings.allowScreenshots;
+        ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: _allowScreenshots);
+        changed = true;
+      } else {
+        ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: _allowScreenshots);
+      }
+
       if (changed) notifyListeners();
     } catch (_) {
+      ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: _allowScreenshots);
       // Room settings are non-critical for room entry.
     }
   }
