@@ -50,6 +50,8 @@ class VibeCommentResponse(BaseModel):
     is_pinned: bool = False
     can_pin: bool = False
     can_delete: bool = False
+    liked_by_me: bool = False
+    likes_count: int = 0
     created_at: datetime
 
 
@@ -58,6 +60,12 @@ class VibeCommentActionResponse(BaseModel):
     post_id: int
     is_pinned: bool = False
     deleted: bool = False
+
+
+class VibeCommentLikeResponse(BaseModel):
+    comment_id: int
+    liked_by_me: bool
+    likes_count: int
 
 
 class VibePostResponse(BaseModel):
