@@ -121,7 +121,7 @@ def join_live_room(room_public_id: str, payload: RoomJoinRequest | None = None, 
 
 @router.post("/{room_public_id}/heartbeat", response_model=RoomJoinResponse)
 def heartbeat_live_room(room_public_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    joined = heartbeat_room(db=db, room_public_id, current_user=current_user)
+    joined = heartbeat_room(db=db, room_public_id=room_public_id, current_user=current_user)
     if joined is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found or not accessible")
     return joined
