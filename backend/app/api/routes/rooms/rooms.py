@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -6,6 +8,7 @@ from app.database import get_db
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
+from app.schemas.room_settings import RoomAccessSettingsUpdateRequest, RoomSettingsResponse
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinRequest, RoomJoinResponse, RoomLeaveResponse, RoomMemberActionRequest, RoomModeUpdateRequest, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
 from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
@@ -45,6 +48,88 @@ def _can_manage_room(db: Session, room: Room, user: User) -> bool:
     return bool(participant and participant.is_room_admin)
 
 
+def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse:
+    return RoomSettingsResponse(
+        room_public_id=room_public_id.strip(),
+        name="Live Room",
+        language="English",
+        mode="Open",
+        is_secret=False,
+        is_locked=False,
+        is_members_only=False,
+        allow_screenshots=True,
+        has_lock_password=False,
+        background_theme_id="default",
+        announcement_text=None,
+        announcement_updated_at=None,
+        announcement_updated_by_user_id=None,
+    )
+
+
+def _room_settings_response(room: Room) -> RoomSettingsResponse:
+    return RoomSettingsResponse(
+        room_public_id=room.room_public_id,
+        name=room.name,
+        language=room.language,
+        mode=room.mode,
+        is_secret=room.is_secret,
+        is_locked=room.is_locked,
+        is_members_only=room.is_members_only,
+        allow_screenshots=room.allow_screenshots,
+        has_lock_password=bool(room.lock_password_hash),
+        background_theme_id=room.background_theme_id or "default",
+        announcement_text=room.announcement_text,
+        announcement_updated_at=room.announcement_updated_at,
+        announcement_updated_by_user_id=room.announcement_updated_by_user_id,
+    )
+
+
+def _get_or_create_room_for_settings(db: Session, room_public_id: str, current_user: User | None = None) -> Room:
+    clean_room_public_id = room_public_id.strip()
+    if not clean_room_public_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Room ID is required")
+
+    room = db.query(Room).filter(Room.room_public_id == clean_room_public_id).first()
+    if room is not None:
+        return room
+
+    room = Room(
+        room_public_id=clean_room_public_id,
+        owner_user_id=current_user.id if current_user is not None else None,
+        name="Live Room",
+        subtitle=None,
+        avatar_url=None,
+        cover_photo_url=None,
+        language="English",
+        mode="Open",
+        room_type="Chat",
+        online_count=0,
+        trending_score=0,
+        is_active=True,
+        is_secret=False,
+        is_locked=False,
+        is_members_only=False,
+        allow_screenshots=True,
+        background_theme_id="default",
+    )
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return room
+
+
+def _apply_settings_mode_flags(room: Room, mode: str) -> None:
+    normalized = mode.strip().lower()
+    room.mode = mode.strip() or "Open"
+    room.is_secret = "secret" in normalized or "private" in normalized
+    room.is_locked = "lock" in normalized
+    room.is_members_only = "member" in normalized
+    if not room.is_locked:
+        room.lock_password_hash = None
+        room.lock_updated_at = None
+        room.lock_updated_by_user_id = None
+
+
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_live_room(payload: RoomCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return create_room(db=db, current_user=current_user, payload=payload)
@@ -74,6 +159,44 @@ def get_following_rooms(language: str | None = Query(default=None), category: st
 @router.get("/backgrounds", response_model=list[RoomBackgroundConfigResponse])
 def get_room_backgrounds(mode: str = Query(default="chat_room")):
     return list_room_backgrounds(mode=mode)
+
+
+@router.get("/{room_public_id}/settings", response_model=RoomSettingsResponse)
+def get_room_settings(room_public_id: str, db: Session = Depends(get_db)) -> RoomSettingsResponse:
+    room = db.query(Room).filter(Room.room_public_id == room_public_id.strip()).first()
+    if room is None:
+        return _default_room_settings_response(room_public_id)
+    return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/settings", response_model=RoomSettingsResponse)
+def update_room_settings(
+    room_public_id: str,
+    payload: RoomAccessSettingsUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RoomSettingsResponse:
+    room = _get_or_create_room_for_settings(db, room_public_id, current_user)
+    if not _can_manage_room(db, room, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host/admin or Owner can update room settings")
+
+    if payload.language is not None:
+        room.language = payload.language.strip()
+    if payload.allow_screenshots is not None:
+        room.allow_screenshots = payload.allow_screenshots
+    if payload.mode is not None:
+        _apply_settings_mode_flags(room, payload.mode)
+        if room.is_locked and payload.lock_password:
+            from app.core.security import hash_password
+
+            room.lock_password_hash = hash_password(payload.lock_password)
+            room.lock_updated_at = datetime.utcnow()
+            room.lock_updated_by_user_id = current_user.id
+
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return _room_settings_response(room)
 
 
 @router.get("/{room_public_id}/contributions")
