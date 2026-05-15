@@ -93,6 +93,19 @@ def _clean_text(value: object, *, field_name: str, max_length: int, required: bo
     return text
 
 
+def _clean_numeric_lock_password(value: object, *, required: bool) -> str | None:
+    text = value.strip() if isinstance(value, str) else ""
+    if not text:
+        if required:
+            raise HTTPException(status_code=400, detail="Numeric room lock is required when locking room")
+        return None
+    if not text.isdigit():
+        raise HTTPException(status_code=400, detail="Room lock must contain numbers only")
+    if len(text) < 4 or len(text) > 8:
+        raise HTTPException(status_code=400, detail="Room lock must be 4 to 8 digits")
+    return text
+
+
 def _new_room_public_id(db: Session) -> str:
     for _ in range(30):
         candidate = f"VM{random.randint(100000, 999999)}"
@@ -180,7 +193,6 @@ def create_room(
     subtitle = _clean_text(payload.get("subtitle"), field_name="Room subtitle", max_length=240, required=False)
     avatar_url = _clean_text(payload.get("avatar_url"), field_name="Room avatar", max_length=500, required=False)
     cover_photo_url = _clean_text(payload.get("cover_photo_url") or avatar_url, field_name="Room cover photo", max_length=500, required=False)
-    lock_password = _clean_text(payload.get("lock_password"), field_name="Lock password", max_length=80, required=False)
     allow_screenshots = payload.get("allow_screenshots")
 
     existing_room = _find_lifetime_user_room(db, current_user.id)
@@ -195,10 +207,12 @@ def create_room(
         if allow_screenshots is not None:
             existing_room.allow_screenshots = bool(allow_screenshots)
         _apply_mode_flags(existing_room, mode or existing_room.mode)
-        if existing_room.is_locked and lock_password:
-            existing_room.lock_password_hash = hash_password(lock_password)
-            existing_room.lock_updated_at = datetime.utcnow()
-            existing_room.lock_updated_by_user_id = current_user.id
+        if existing_room.is_locked:
+            lock_password = _clean_numeric_lock_password(payload.get("lock_password"), required=not bool(existing_room.lock_password_hash))
+            if lock_password:
+                existing_room.lock_password_hash = hash_password(lock_password)
+                existing_room.lock_updated_at = datetime.utcnow()
+                existing_room.lock_updated_by_user_id = current_user.id
         existing_room.is_active = True
         db.add(existing_room)
         db.commit()
@@ -221,10 +235,12 @@ def create_room(
         allow_screenshots=bool(allow_screenshots) if allow_screenshots is not None else True,
     )
     _apply_mode_flags(room, room.mode)
-    if room.is_locked and lock_password:
-        room.lock_password_hash = hash_password(lock_password)
-        room.lock_updated_at = datetime.utcnow()
-        room.lock_updated_by_user_id = current_user.id
+    if room.is_locked:
+        lock_password = _clean_numeric_lock_password(payload.get("lock_password"), required=True)
+        if lock_password:
+            room.lock_password_hash = hash_password(lock_password)
+            room.lock_updated_at = datetime.utcnow()
+            room.lock_updated_by_user_id = current_user.id
 
     db.add(room)
     db.commit()
@@ -271,13 +287,11 @@ def update_room_access_settings(
     if payload.mode is not None:
         _apply_mode_flags(room, payload.mode)
         if room.is_locked:
-            lock_password = (payload.lock_password or "").strip()
+            lock_password = _clean_numeric_lock_password(payload.lock_password, required=not bool(room.lock_password_hash))
             if lock_password:
                 room.lock_password_hash = hash_password(lock_password)
                 room.lock_updated_at = datetime.utcnow()
                 room.lock_updated_by_user_id = current_user.id
-            elif not room.lock_password_hash:
-                raise HTTPException(status_code=400, detail="Lock password is required when locking room")
     db.add(room)
     db.commit()
     db.refresh(room)
@@ -295,15 +309,13 @@ def update_room_mode(
     if room.owner_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the room owner can update room mode")
     mode = _clean_text(payload.get("mode"), field_name="Room mode", max_length=40)
-    lock_password = _clean_text(payload.get("lock_password"), field_name="Lock password", max_length=80, required=False)
     _apply_mode_flags(room, mode or "Open")
     if room.is_locked:
+        lock_password = _clean_numeric_lock_password(payload.get("lock_password"), required=not bool(room.lock_password_hash))
         if lock_password:
             room.lock_password_hash = hash_password(lock_password)
             room.lock_updated_at = datetime.utcnow()
             room.lock_updated_by_user_id = current_user.id
-        elif not room.lock_password_hash:
-            raise HTTPException(status_code=400, detail="Lock password is required when locking room")
     db.add(room)
     db.commit()
     db.refresh(room)
