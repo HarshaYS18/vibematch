@@ -159,12 +159,16 @@ class _HomePageState extends State<HomePage> {
     switch (banner.target) {
       case 'event':
         VmNavigator.openEvents(context);
+        return;
       case 'recharge':
         VmNavigator.openWallet(context);
+        return;
       case 'promo':
         VmNavigator.openStore(context);
+        return;
       default:
         VmNavigator.openEvents(context);
+        return;
     }
   }
 
