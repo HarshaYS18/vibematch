@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.economy import EconomyCurrency, EconomyDirection, GameRound, GameRoundStatus, WalletLedger
 from app.models.game import GameBet, GameDefinition
 from app.models.user import User
-from app.services import economy_service
+from app.services import economy_service, game_stats_service
 from app.services import game_service as base
 
 JUNGLE_HUNT_KEY = base.JUNGLE_HUNT_KEY
@@ -213,7 +213,7 @@ def _reject_bet(db: Session, round_obj: GameRound, user: User, target_id: int, a
     wallet = economy_service.get_or_create_wallet(db, user.id)
     base.audit(db, round_obj.game_key, round_obj.id, user.id, "BET_REJECTED", "HIGH", 0, action, message, {"requested_amount": amount, "target_id": target_id, **(metadata or {})}, user.id)
     db.commit()
-    return {"bet_id": None, "round_id": round_obj.id, "target_id": target_id, "requested_amount": amount, "accepted_amount": 0, "wallet_coin_balance": wallet.coin_balance, "risk_level": "HIGH", "risk_score": 0, "risk_action": action, "message": message}
+    return {"bet_id": None, "round_id": round_obj.id, "target_id": target_id, "requested_amount": amount, "accepted_amount": 0, "spent_coins": 0, "reward_coins": 0, "net_win_coins": 0, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": None, "risk_level": "HIGH", "risk_score": 0, "risk_action": action, "message": message}
 
 
 def _evaluate_whale_risk(db: Session, user: User, amount: int, risk: dict[str, Any]) -> tuple[bool, str, dict[str, Any]]:
@@ -240,7 +240,7 @@ def _evaluate_whale_risk(db: Session, user: User, amount: int, risk: dict[str, A
     return blocked, ",".join(reasons), {"daily_volume": daily_volume, "daily_loss": daily_loss, "recent_count": recent_count, "reasons": reasons}
 
 
-def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: int) -> dict[str, Any]:
+def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: int, *, commit: bool = True) -> dict[str, Any]:
     round_obj = db.query(GameRound).filter(GameRound.id == round_id).first()
     if not round_obj:
         raise HTTPException(status_code=404, detail="Game round not found")
@@ -295,11 +295,15 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     platform_fee = amount * int(rules.get("platform_fee_basis_points", JUNGLE_RULES["platform_fee_basis_points"])) // 10_000
     round_obj.platform_fee_amount += platform_fee
     round_obj.reward_pool_amount += max(amount - platform_fee, 0)
+    game_stats_service.record_game_bet(db, user_id=user.id, game_id=round_obj.game_key, amount=amount)
     base.audit(db, round_obj.game_key, round_obj.id, user.id, "BET_ACCEPTED", "LOW", 0, "ALLOW", "Bet accepted after strict whale and liability checks", {"amount": amount, "target_id": target_id, "scope": "GLOBAL"}, user.id)
-    db.commit()
-    db.refresh(bet)
-    db.refresh(wallet)
-    return {"bet_id": bet.id, "round_id": round_id, "target_id": target_id, "requested_amount": amount, "accepted_amount": amount, "wallet_coin_balance": wallet.coin_balance, "risk_level": "LOW", "risk_score": 0, "risk_action": "ALLOW", "message": "Bet accepted"}
+    if commit:
+        db.commit()
+        db.refresh(bet)
+        db.refresh(wallet)
+    else:
+        db.flush()
+    return {"bet_id": bet.id, "round_id": round_id, "target_id": target_id, "requested_amount": amount, "accepted_amount": amount, "spent_coins": amount, "reward_coins": 0, "net_win_coins": -amount, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": None, "risk_level": "LOW", "risk_score": 0, "risk_action": "ALLOW", "message": "Bet accepted"}
 
 
 def _payout_for_user_bets(user_bets: list[GameBet], winning_target_id: int) -> int:
@@ -348,7 +352,7 @@ def _choose_outcome(db: Session, round_obj: GameRound) -> int:
     return base._choose_winner(round_obj, JUNGLE_TARGETS)
 
 
-def settle_round(db: Session, round_id: int, user: User) -> dict[str, Any]:
+def settle_round(db: Session, round_id: int, user: User, *, commit: bool = True) -> dict[str, Any]:
     round_obj = db.query(GameRound).filter(GameRound.id == round_id).first()
     if not round_obj:
         raise HTTPException(status_code=404, detail="Game round not found")
@@ -359,23 +363,31 @@ def settle_round(db: Session, round_id: int, user: User) -> dict[str, Any]:
     if winning_target_id is None:
         winning_target_id = int(_choose_outcome(db, round_obj))
         winning_target = _target_by_id(winning_target_id)
-        user_ids = [row[0] for row in db.query(GameBet.user_id).filter(GameBet.round_id == round_id, GameBet.target_id.in_(_basket_target_ids(winning_target_id))).distinct().all()]
-        for user_id in user_ids:
-            user_bets = db.query(GameBet).filter(GameBet.round_id == round_id, GameBet.user_id == int(user_id)).all()
+        all_user_ids = [row[0] for row in db.query(GameBet.user_id).filter(GameBet.round_id == round_id).distinct().all()]
+        settlement_multiplier = max(int(_target_by_id(target_id)["multiplier"]) for target_id in _basket_target_ids(winning_target_id))
+        for user_id in all_user_ids:
+            safe_user_id = int(user_id)
+            user_bets = db.query(GameBet).filter(GameBet.round_id == round_id, GameBet.user_id == safe_user_id).all()
+            total_bet = sum(int(bet.accepted_amount or 0) for bet in user_bets)
             payout = _payout_for_user_bets(user_bets, winning_target_id)
             if payout <= 0:
+                game_stats_service.record_game_settlement(db, user_id=safe_user_id, game_id=round_obj.game_key, spent_coins=total_bet, reward_coins=0, multiplier=0)
                 continue
-            wallet = economy_service.get_or_create_wallet(db, int(user_id))
+            wallet = economy_service.get_or_create_wallet(db, safe_user_id)
             before = wallet.coin_balance
             wallet.coin_balance += payout
-            db.add(WalletLedger(user_id=int(user_id), currency_type=EconomyCurrency.COIN.value, direction=EconomyDirection.CREDIT.value, amount=payout, before_balance=before, after_balance=wallet.coin_balance, source_type="GAME_WIN", source_id=str(round_id), created_by_user_id=user.id, reason=f"Jungle Hunt win outcome {winning_target_id}"))
+            db.add(WalletLedger(user_id=safe_user_id, currency_type=EconomyCurrency.COIN.value, direction=EconomyDirection.CREDIT.value, amount=payout, before_balance=before, after_balance=wallet.coin_balance, source_type="GAME_WIN", source_id=str(round_id), created_by_user_id=user.id, reason=f"Jungle Hunt win outcome {winning_target_id}"))
+            game_stats_service.record_game_settlement(db, user_id=safe_user_id, game_id=round_obj.game_key, spent_coins=total_bet, reward_coins=payout, multiplier=settlement_multiplier)
         top_winners = _round_top_winners(db, round_id, winning_target_id)
         metadata.update({"winning_target_id": winning_target_id, "multiplier": int(winning_target["multiplier"]), "basket_target_ids": _basket_target_ids(winning_target_id), "top_winners": top_winners, "payouts_done": True})
         round_obj.metadata_json = base._dumps(metadata)
         round_obj.status = GameRoundStatus.COMPLETED.value
         round_obj.ended_at = datetime.utcnow()
         base.audit(db, round_obj.game_key, round_obj.id, user.id, "GLOBAL_ROUND_SETTLED", "LOW", 0, "AUDIT", "Jungle Hunt round settled with single target or rare basket outcome.", {"winning_target_id": winning_target_id, "basket_target_ids": _basket_target_ids(winning_target_id), "top_winners": top_winners}, user.id)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     else:
         winning_target_id = int(winning_target_id)
         top_winners = metadata.get("top_winners") or _round_top_winners(db, round_id, winning_target_id)
@@ -383,4 +395,4 @@ def settle_round(db: Session, round_id: int, user: User) -> dict[str, Any]:
     total_user_bet = sum(item.accepted_amount for item in user_bets)
     total_user_winnings = _payout_for_user_bets(user_bets, int(winning_target_id))
     wallet = economy_service.get_or_create_wallet(db, user.id)
-    return {"round_id": round_id, "game_key": round_obj.game_key, "status": GameRoundStatus.COMPLETED.value, "winning_target_id": int(winning_target_id), "multiplier": int(_target_by_id(int(winning_target_id))["multiplier"]), "total_user_bet": total_user_bet, "total_user_winnings": total_user_winnings, "wallet_coin_balance": wallet.coin_balance, "risk_level": "LOW", "risk_score": 0, "risk_action": "AUDIT", "audit_message": "Payout uses only bets included in the winning outcome. Basket outcomes pay each selected basket item by its own multiplier.", "top_winners": top_winners}
+    return {"round_id": round_id, "game_key": round_obj.game_key, "status": GameRoundStatus.COMPLETED.value, "winning_target_id": int(winning_target_id), "multiplier": int(_target_by_id(int(winning_target_id))["multiplier"]), "total_user_bet": total_user_bet, "total_user_winnings": total_user_winnings, "spent_coins": total_user_bet, "reward_coins": total_user_winnings, "net_win_coins": total_user_winnings - total_user_bet, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": wallet.coin_balance if total_user_winnings > 0 else None, "risk_level": "LOW", "risk_score": 0, "risk_action": "AUDIT", "audit_message": "Payout uses only bets included in the winning outcome. Basket outcomes pay each selected basket item by its own multiplier.", "top_winners": top_winners}

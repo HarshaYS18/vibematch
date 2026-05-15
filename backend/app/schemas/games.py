@@ -103,7 +103,11 @@ class GameBetResponse(BaseModel):
     target_id: int
     requested_amount: int
     accepted_amount: int
+    spent_coins: int = 0
+    reward_coins: int = 0
+    net_win_coins: int = 0
     wallet_coin_balance: int
+    winner_coin_balance: int | None = None
     risk_level: str
     risk_score: int
     risk_action: str
@@ -118,7 +122,11 @@ class GameRoundResultResponse(BaseModel):
     multiplier: int
     total_user_bet: int
     total_user_winnings: int
+    spent_coins: int = 0
+    reward_coins: int = 0
+    net_win_coins: int = 0
     wallet_coin_balance: int
+    winner_coin_balance: int | None = None
     risk_level: str
     risk_score: int
     risk_action: str

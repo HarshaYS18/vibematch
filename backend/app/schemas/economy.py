@@ -152,6 +152,12 @@ class GiftSendResponse(BaseModel):
     experience_updates: dict[str, Any] = Field(default_factory=dict)
     ruby_rule: str | None = None
     rule: str
+    spent_coins: int | None = None
+    reward_coins: int | None = None
+    net_win_coins: int | None = None
+    winner_coin_balance: int | None = None
+    wallet_coin_balance: int | None = None
+    lucky_gift_transaction_id: int | None = None
     lucky_multiplier: int | None = None
     lucky_reward_coin_amount: int | None = None
     lucky_result: dict[str, Any] | None = None

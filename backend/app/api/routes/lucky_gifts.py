@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from random import choices
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -7,15 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
+from app.models.economy import UserWallet
 from app.models.economy_stats import LuckyGiftTransaction, UserLuckyGiftStats
 from app.models.room import Room
 from app.models.user import User
-from app.services import gift_catalog_service
+from app.services import gift_catalog_service, lucky_gift_props_service, lucky_gift_stats_service
 
 router = APIRouter(prefix="/lucky-gifts", tags=["Lucky Gifts"])
 
-MULTIPLIERS = [0, 1, 2, 5, 10, 20, 50, 100, 500, 1000]
-WEIGHTS = [3800, 3400, 1500, 760, 330, 130, 55, 18, 5, 2]
+MULTIPLIERS = [1, 2, 5, 10, 20, 50, 100, 500, 1000]
 
 
 class LuckyGiftPreviewRequest(BaseModel):
@@ -67,38 +66,44 @@ def _receiver_id(db: Session, public_user_id: int | None) -> int | None:
 
 
 def _get_or_create_stats(db: Session, user_id: int) -> UserLuckyGiftStats:
-    row = db.query(UserLuckyGiftStats).filter(UserLuckyGiftStats.user_id == user_id).first()
-    if row:
-        return row
-    row = UserLuckyGiftStats(user_id=user_id)
-    db.add(row)
-    db.flush()
-    return row
+    return lucky_gift_stats_service.get_or_create_stats(db, user_id)
 
 
 def _update_stats(row: UserLuckyGiftStats, *, spent: int, reward: int, net: int, multiplier: int) -> None:
-    for prefix in ["daily", "weekly", "monthly", "yearly", "all_time"]:
-        setattr(row, f"{prefix}_spent_coins", getattr(row, f"{prefix}_spent_coins") + spent)
-        setattr(row, f"{prefix}_reward_coins", getattr(row, f"{prefix}_reward_coins") + reward)
-        setattr(row, f"{prefix}_net_win_coins", getattr(row, f"{prefix}_net_win_coins") + net)
-        setattr(row, f"{prefix}_best_multiplier", max(getattr(row, f"{prefix}_best_multiplier"), multiplier))
-        setattr(row, f"{prefix}_biggest_reward", max(getattr(row, f"{prefix}_biggest_reward"), reward))
-        setattr(row, f"{prefix}_rounds", getattr(row, f"{prefix}_rounds") + 1)
+    lucky_gift_stats_service.update_stats(row, spent=spent, reward=reward, net=net, multiplier=multiplier)
 
 
 def _stats_payload(row: UserLuckyGiftStats | None) -> dict:
-    def part(prefix: str) -> dict:
-        if row is None:
-            return {"spent_coins": 0, "reward_coins": 0, "net_coins": 0, "best_multiplier": 0, "biggest_reward": 0, "rounds": 0}
-        return {
-            "spent_coins": getattr(row, f"{prefix}_spent_coins"),
-            "reward_coins": getattr(row, f"{prefix}_reward_coins"),
-            "net_coins": getattr(row, f"{prefix}_net_win_coins"),
-            "best_multiplier": getattr(row, f"{prefix}_best_multiplier"),
-            "biggest_reward": getattr(row, f"{prefix}_biggest_reward"),
-            "rounds": getattr(row, f"{prefix}_rounds"),
-        }
-    return {"today": part("daily"), "weekly": part("weekly"), "monthly": part("monthly"), "yearly": part("yearly"), "all_time": part("all_time")}
+    return lucky_gift_stats_service.stats_payload(row)
+
+
+def _wallet_coin_balance(db: Session, user_id: int) -> int:
+    wallet = db.query(UserWallet).filter(UserWallet.user_id == user_id).first()
+    return int(wallet.coin_balance) if wallet else 0
+
+
+def _recent_matching_transaction(
+    db: Session,
+    *,
+    sender_user_id: int,
+    receiver_user_id: int | None,
+    room_id: int | None,
+    payload: LuckyGiftResultRecordRequest,
+) -> LuckyGiftTransaction | None:
+    since = datetime.utcnow() - timedelta(minutes=2)
+    query = db.query(LuckyGiftTransaction).filter(
+        LuckyGiftTransaction.sender_user_id == sender_user_id,
+        LuckyGiftTransaction.gift_id == payload.gift_id,
+        LuckyGiftTransaction.quantity == payload.quantity,
+        LuckyGiftTransaction.spent_coins == payload.spent_coins,
+        LuckyGiftTransaction.multiplier == payload.multiplier,
+        LuckyGiftTransaction.reward_coins == payload.reward_coins,
+        LuckyGiftTransaction.net_win_coins == payload.net_win_coins,
+        LuckyGiftTransaction.created_at >= since,
+    )
+    query = query.filter(LuckyGiftTransaction.receiver_user_id == receiver_user_id) if receiver_user_id is not None else query.filter(LuckyGiftTransaction.receiver_user_id.is_(None))
+    query = query.filter(LuckyGiftTransaction.room_id == room_id) if room_id is not None else query.filter(LuckyGiftTransaction.room_id.is_(None))
+    return query.order_by(LuckyGiftTransaction.id.desc()).first()
 
 
 def _score_field(ranking_type: str, period: str):
@@ -118,8 +123,9 @@ def _score_field(ranking_type: str, period: str):
 
 
 @router.get("/master")
-def get_lucky_gift_master():
-    return {"enabled": True, "currency": "coins", "multipliers": [{"multiplier": multiplier, "weight": weight, "public_display": multiplier >= 5} for multiplier, weight in zip(MULTIPLIERS, WEIGHTS)], "rules": {"min_quantity": 1, "max_quantity": 999, "broadcast_min_reward": 10000, "big_win_min_multiplier": 100, "ranking_periods": ["daily", "weekly", "monthly", "yearly"]}}
+def get_lucky_gift_master(db: Session = Depends(get_db)):
+    props = lucky_gift_props_service.get_props(db)
+    return {"enabled": True, "currency": "coins", "multipliers": [{"multiplier": int(item["multiplier"]), "weight": int(item["weight"]), "difficulty": item.get("difficulty"), "public_display": int(item["multiplier"]) >= 5} for item in props["multipliers"]], "rules": {"min_quantity": 1, "max_quantity": 999, "broadcast_min_reward": props["broadcast_min_reward"], "big_win_min_multiplier": props["big_win_min_multiplier"], "ranking_periods": ["daily", "weekly", "monthly", "yearly"]}}
 
 
 @router.get("/catalog")
@@ -139,25 +145,51 @@ def preview_lucky_gift(payload: LuckyGiftPreviewRequest, current_user: User = De
 
 @router.post("/results/record")
 def record_lucky_gift_result(payload: LuckyGiftResultRecordRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    row = LuckyGiftTransaction(
-        sender_user_id=current_user.id,
-        receiver_user_id=_receiver_id(db, payload.receiver_public_user_id),
-        room_id=_room_id(db, payload.room_public_id),
-        gift_id=payload.gift_id,
-        gift_name=payload.gift_id.replace("_", " ").title(),
-        quantity=payload.quantity,
-        spent_coins=payload.spent_coins,
-        multiplier=payload.multiplier,
-        reward_coins=payload.reward_coins,
-        net_win_coins=payload.net_win_coins,
-        is_big_win=1 if payload.multiplier >= 100 or payload.reward_coins >= 10000 else 0,
-    )
-    db.add(row)
-    stats = _get_or_create_stats(db, current_user.id)
-    _update_stats(stats, spent=payload.spent_coins, reward=payload.reward_coins, net=payload.net_win_coins, multiplier=payload.multiplier)
-    db.commit()
-    db.refresh(row)
-    return {"status": "recorded", "transaction_id": row.id, "stats": _stats_payload(stats)}
+    receiver_id = _receiver_id(db, payload.receiver_public_user_id)
+    room_id = _room_id(db, payload.room_public_id)
+    duplicate = _recent_matching_transaction(db, sender_user_id=current_user.id, receiver_user_id=receiver_id, room_id=room_id, payload=payload)
+    if duplicate is not None:
+        stats = db.query(UserLuckyGiftStats).filter(UserLuckyGiftStats.user_id == current_user.id).first()
+        return {
+            "status": "recorded",
+            "transaction_id": duplicate.id,
+            "deduplicated": True,
+            "spent_coins": duplicate.spent_coins,
+            "reward_coins": duplicate.reward_coins,
+            "net_win_coins": duplicate.net_win_coins,
+            "wallet_coin_balance": _wallet_coin_balance(db, current_user.id),
+            "stats": _stats_payload(stats),
+        }
+    try:
+        row, stats = lucky_gift_stats_service.record_lucky_gift_result(
+            db,
+            sender_user_id=current_user.id,
+            receiver_user_id=receiver_id,
+            room_id=room_id,
+            gift_id=payload.gift_id,
+            gift_name=payload.gift_id.replace("_", " ").title(),
+            coin_value=payload.spent_coins // max(payload.quantity, 1),
+            quantity=payload.quantity,
+            spent_coins=payload.spent_coins,
+            multiplier=payload.multiplier,
+            reward_coins=payload.reward_coins,
+            net_win_coins=payload.net_win_coins,
+        )
+        db.commit()
+        db.refresh(row)
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "status": "recorded",
+        "transaction_id": row.id,
+        "deduplicated": False,
+        "spent_coins": row.spent_coins,
+        "reward_coins": row.reward_coins,
+        "net_win_coins": row.net_win_coins,
+        "wallet_coin_balance": _wallet_coin_balance(db, current_user.id),
+        "stats": _stats_payload(stats),
+    }
 
 
 @router.get("/history")
@@ -200,6 +232,6 @@ def get_lucky_gift_ranking(ranking_type: str, period: str = Query(default="daily
 
 
 @router.get("/roll-preview")
-def roll_preview_only(total_coin_value: int = Query(default=0, ge=0)):
-    multiplier = int(choices(MULTIPLIERS, weights=WEIGHTS, k=1)[0])
-    return {"multiplier": multiplier, "reward_coin_amount": total_coin_value * multiplier, "preview_only": True}
+def roll_preview_only(total_coin_value: int = Query(default=0, ge=0), db: Session = Depends(get_db)):
+    result = lucky_gift_props_service.roll_lucky_gift(db, gift_id="preview", gift_name="Preview", base_coin_value=total_coin_value, quantity=1)
+    return {"multiplier": result["multiplier"], "difficulty": result["difficulty"], "reward_coin_amount": result["reward_coin_amount"], "preview_only": True}

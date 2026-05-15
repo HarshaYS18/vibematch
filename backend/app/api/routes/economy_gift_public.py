@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -6,7 +8,7 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.room import Room
 from app.models.user import User
-from app.services import economy_level_service, economy_service, gift_catalog_service
+from app.services import economy_level_service, economy_service, gift_catalog_service, lucky_gift_house_service, lucky_gift_props_service, lucky_gift_stats_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/economy/gifts", tags=["Economy"])
@@ -163,36 +165,83 @@ async def send_lucky_gift_by_public_ids(
 
     receiver, room_id = _resolve_receiver_and_room(db, payload)
 
-    lucky_result = gift_catalog_service.roll_lucky_multiplier(
-        gift_id=payload.gift_id,
-        total_coin_value=payload.coin_value * payload.quantity,
-        house_risk_score=payload.house_risk_score,
-    )
+    try:
+        spent_preview = int(payload.coin_value) * int(payload.quantity)
+        risk_result = lucky_gift_props_service.evaluate_whale_risk(db, user_id=current_user.id, spend_amount=spent_preview)
+        if risk_result.get("action") != "ALLOW":
+            raise HTTPException(status_code=429, detail={"message": "Lucky gift blocked by whale detection", "risk": risk_result})
+        result = economy_service.send_gift(
+            db=db,
+            sender=current_user,
+            receiver_user_id=receiver.id,
+            gift_id=payload.gift_id,
+            coin_value=payload.coin_value,
+            quantity=payload.quantity,
+            room_id=room_id,
+            relationship_id=payload.relationship_id,
+            is_relationship_gift=payload.is_relationship_gift,
+            commit=False,
+        )
 
-    result = economy_service.send_gift(
-        db=db,
-        sender=current_user,
-        receiver_user_id=receiver.id,
-        gift_id=payload.gift_id,
-        coin_value=payload.coin_value,
-        quantity=payload.quantity,
-        room_id=room_id,
-        relationship_id=payload.relationship_id,
-        is_relationship_gift=payload.is_relationship_gift,
-    )
+        spent_coins = int(result["total_coin_value"])
+        lucky_gift_house_service.record_spend_income(db, amount=spent_coins, actor=current_user, source_id=f"lucky_gift:{result['gift_transaction_id']}", user_id=current_user.id, metadata={"gift_id": payload.gift_id, "receiver_user_id": receiver.id})
+        lucky_result = lucky_gift_props_service.roll_lucky_gift(
+            db,
+            gift_id=payload.gift_id,
+            gift_name=str(gift.get("name") or payload.gift_id.replace("_", " ").title()),
+            base_coin_value=payload.coin_value,
+            quantity=payload.quantity,
+            house_risk_score=payload.house_risk_score,
+        )
+        reward_coins = int(lucky_result["reward_coin_amount"])
+        multiplier = int(lucky_result["multiplier"])
+        house_result = lucky_gift_house_service.validate_payout_exposure(db, payout_amount=reward_coins)
+        lucky_gift_house_service.record_payout(db, amount=reward_coins, actor=current_user, source_id=f"lucky_gift:{result['gift_transaction_id']}", user_id=current_user.id, metadata={"gift_id": payload.gift_id, "multiplier": multiplier})
 
-    reward_wallet = economy_service.credit_lucky_gift_reward(
-        db=db,
-        user_id=current_user.id,
-        reward_coin_amount=int(lucky_result["reward_coin_amount"]),
-        source_id=f"lucky_gift:{result['gift_transaction_id']}",
-        created_by_user_id=current_user.id,
-    )
+        reward_wallet = economy_service.credit_lucky_gift_reward(
+            db=db,
+            user_id=current_user.id,
+            reward_coin_amount=reward_coins,
+            source_id=f"lucky_gift:{result['gift_transaction_id']}",
+            created_by_user_id=current_user.id,
+            commit=False,
+        )
+        lucky_tx, _ = lucky_gift_stats_service.record_lucky_gift_result(
+            db,
+            sender_user_id=current_user.id,
+            receiver_user_id=receiver.id,
+            room_id=room_id,
+            gift_id=payload.gift_id,
+            gift_name=str(gift.get("name") or payload.gift_id.replace("_", " ").title()),
+            coin_value=payload.coin_value,
+            quantity=payload.quantity,
+            spent_coins=spent_coins,
+            multiplier=multiplier,
+            reward_coins=reward_coins,
+            net_win_coins=reward_coins - spent_coins,
+            metadata_json=json.dumps({"gift_transaction_id": result["gift_transaction_id"], "source": "send_lucky_public", "lucky_result": lucky_result, "risk": risk_result, "house": house_result}, separators=(",", ":")),
+        )
+        db.commit()
+        db.refresh(reward_wallet)
+        db.refresh(lucky_tx)
+    except Exception:
+        db.rollback()
+        raise
 
     result["lucky_result"] = lucky_result
     result["sender_coin_balance"] = reward_wallet.coin_balance
-    result["lucky_reward_coin_amount"] = lucky_result["reward_coin_amount"]
-    result["lucky_multiplier"] = lucky_result["multiplier"]
+    result["lucky_reward_coin_amount"] = reward_coins
+    result["lucky_multiplier"] = multiplier
+    result["lucky_difficulty"] = lucky_result.get("difficulty")
+    result["risk_level"] = risk_result.get("level")
+    result["risk_score"] = risk_result.get("score")
+    result["risk_action"] = risk_result.get("action")
+    result["lucky_gift_transaction_id"] = lucky_tx.id
+    result["spent_coins"] = spent_coins
+    result["reward_coins"] = reward_coins
+    result["net_win_coins"] = reward_coins - spent_coins
+    result["winner_coin_balance"] = reward_wallet.coin_balance
+    result["wallet_coin_balance"] = reward_wallet.coin_balance
 
     await _broadcast_gift_experience_updates(
         db=db,

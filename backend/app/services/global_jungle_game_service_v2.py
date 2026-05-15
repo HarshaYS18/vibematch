@@ -129,24 +129,32 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
             "target_id": target_id,
             "requested_amount": amount,
             "accepted_amount": 0,
+            "spent_coins": 0,
+            "reward_coins": 0,
+            "net_win_coins": 0,
             "wallet_coin_balance": wallet.coin_balance,
+            "winner_coin_balance": None,
             "risk_level": "HIGH",
             "risk_score": 0,
             "risk_action": reason,
             "message": "Bet not accepted because game house pool exposure is too high",
         }
 
-    result = old.place_bet(db, round_id, user, target_id, amount)
-    if int(result.get("accepted_amount") or 0) > 0:
-        game_pool_service.record_bet_income(
-            db=db,
-            game_key=JUNGLE_HUNT_KEY,
-            round_id=round_id,
-            user_id=user.id,
-            amount=int(result["accepted_amount"]),
-            actor=user,
-        )
-        db.commit()
+    try:
+        result = old.place_bet(db, round_id, user, target_id, amount, commit=False)
+        if int(result.get("accepted_amount") or 0) > 0:
+            game_pool_service.record_bet_income(
+                db=db,
+                game_key=JUNGLE_HUNT_KEY,
+                round_id=round_id,
+                user_id=user.id,
+                amount=int(result["accepted_amount"]),
+                actor=user,
+            )
+            db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return result
 
 
@@ -168,21 +176,26 @@ def settle_round(db: Session, round_id: int, user: User) -> dict[str, Any]:
     if not round_obj or round_obj.game_key != JUNGLE_HUNT_KEY:
         return old.settle_round(db, round_id, user)
 
+    game_pool_service.ensure_main_and_game_pools(db, JUNGLE_HUNT_KEY)
     metadata_before = old.base._loads(round_obj.metadata_json, {})
     was_unsettled = metadata_before.get("winning_target_id") is None
-    result = old.settle_round(db, round_id, user)
+    try:
+        result = old.settle_round(db, round_id, user, commit=False)
 
-    if was_unsettled:
-        winning_target_id = int(result["winning_target_id"])
-        for winner_user_id, payout in _payouts_by_user(db, round_id, winning_target_id).items():
-            game_pool_service.record_payout(
-                db=db,
-                game_key=JUNGLE_HUNT_KEY,
-                round_id=round_id,
-                user_id=winner_user_id,
-                amount=payout,
-                actor=user,
-            )
-        db.commit()
+        if was_unsettled:
+            winning_target_id = int(result["winning_target_id"])
+            for winner_user_id, payout in _payouts_by_user(db, round_id, winning_target_id).items():
+                game_pool_service.record_payout(
+                    db=db,
+                    game_key=JUNGLE_HUNT_KEY,
+                    round_id=round_id,
+                    user_id=winner_user_id,
+                    amount=payout,
+                    actor=user,
+                )
+            db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return result
