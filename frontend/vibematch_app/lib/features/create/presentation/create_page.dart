@@ -457,7 +457,7 @@ class _LockPasswordField extends StatelessWidget {
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.done,
             maxLength: 8,
-            inputFormatters: const <TextInputFormatter>[
+            inputFormatters: <TextInputFormatter>[
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(8),
             ],
