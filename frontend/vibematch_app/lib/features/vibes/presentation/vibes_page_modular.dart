@@ -56,6 +56,14 @@ class _VibesPageState extends State<VibesPage> {
     }
   }
 
+  Future<void> _openSavedOrFeed() async {
+    if (_controller.showingSavedVibes) {
+      await _controller.loadFeed();
+      return;
+    }
+    await _controller.loadSavedVibes();
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleVibes = _controller.visibleVibes;
@@ -65,7 +73,7 @@ class _VibesPageState extends State<VibesPage> {
       body: SafeArea(
         child: RefreshIndicator(
           color: const Color(0xFF111015),
-          onRefresh: _controller.loadFeed,
+          onRefresh: _controller.showingSavedVibes ? _controller.loadSavedVibes : _controller.loadFeed,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
@@ -76,13 +84,15 @@ class _VibesPageState extends State<VibesPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       VibesHeader(
-                        onRefreshTap: () => _controller.loadFeed(),
+                        showingSaved: _controller.showingSavedVibes,
+                        onSavedTap: () => unawaited(_openSavedOrFeed()),
                         onSettingsTap: () => VibesNavigationController.openSettings(context: context, controller: _controller),
                       ),
-                      VibesFeedTabs(
-                        selectedTab: _controller.selectedTab,
-                        onChanged: _controller.selectTab,
-                      ),
+                      if (!_controller.showingSavedVibes)
+                        VibesFeedTabs(
+                          selectedTab: _controller.selectedTab,
+                          onChanged: _controller.selectTab,
+                        ),
                       const SizedBox(height: 10),
                     ],
                   ),
@@ -93,7 +103,7 @@ class _VibesPageState extends State<VibesPage> {
                 SliverToBoxAdapter(
                   child: VibesErrorCard(
                     message: _controller.loadErrorMessage!,
-                    onRetry: _controller.loadFeed,
+                    onRetry: _controller.showingSavedVibes ? _controller.loadSavedVibes : _controller.loadFeed,
                   ),
                 ),
               VibesFeedSection(
