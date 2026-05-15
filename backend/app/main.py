@@ -12,12 +12,15 @@ from app.api.routes import (
     economy,
     economy_admin,
     economy_gift_public,
+    economy_master,
     experience,
     experience_room_public,
     families,
+    families_economy,
     game_pool_admin,
     game_props_admin,
     games,
+    games_master,
     gift_catalog,
     home_banners,
     inbox,
@@ -25,6 +28,8 @@ from app.api.routes import (
     inbox_ws,
     internal_test,
     love_bonds,
+    lucky_coin_placeholders,
+    lucky_gifts,
     media,
     moderation,
     mvp_core,
@@ -34,7 +39,10 @@ from app.api.routes import (
     mvp_social,
     notifications,
     presence,
+    rankings,
+    relationship_exp,
     role_badges,
+    room_levels,
     room_music_media,
     room_realtime,
     social,
@@ -155,12 +163,15 @@ app.include_router(super_owner.router)
 app.include_router(game_pool_admin.router)
 app.include_router(game_props_admin.router)
 app.include_router(rooms.router)
+app.include_router(room_levels.router)
 app.include_router(cricket.router)
 app.include_router(families.router)
+app.include_router(families_economy.router)
 app.include_router(home_banners.router)
 app.include_router(inbox.router)
 app.include_router(inbox_backup_google.router)
 app.include_router(love_bonds.router)
+app.include_router(relationship_exp.router)
 app.include_router(inbox_ws.router)
 app.include_router(room_realtime.router)
 app.include_router(experience.router)
@@ -178,10 +189,15 @@ app.include_router(mvp_operations.router)
 app.include_router(mvp_room_modes.router)
 app.include_router(internal_test.router)
 app.include_router(economy.router)
+app.include_router(economy_master.router)
 app.include_router(economy_gift_public.router)
 app.include_router(gift_catalog.router)
 app.include_router(economy_admin.router)
 app.include_router(games.router)
+app.include_router(games_master.router)
+app.include_router(lucky_gifts.router)
+app.include_router(lucky_coin_placeholders.router)
+app.include_router(rankings.router)
 app.include_router(coin_sales.router)
 app.include_router(vip_admin.router)
 app.include_router(wallet.router)
