@@ -19,6 +19,7 @@ from app.api.routes import (
     game_props_admin,
     games,
     gift_catalog,
+    home_banners,
     inbox,
     inbox_backup_google,
     inbox_ws,
@@ -62,6 +63,7 @@ from app.models import (
     GameRound,
     GameRoundPlayer,
     GiftTransaction,
+    HomeBanner,
     InboxBackupJob,
     InboxBackupSetting,
     InboxConversation,
@@ -107,8 +109,8 @@ def _ensure_runtime_schema() -> None:
     """Small dev/beta schema guard for existing local Postgres tables.
 
     create_all creates new tables but does not add columns to existing tables.
-    This keeps local closed-beta testing from crashing when the room lock fields
-    are introduced before a formal Alembic migration pipeline is added.
+    This keeps local closed-beta testing from crashing when room fields are
+    introduced before a formal Alembic migration pipeline is added.
     """
     statements = [
         "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_password_hash VARCHAR(255)",
@@ -156,6 +158,7 @@ app.include_router(game_props_admin.router)
 app.include_router(rooms.router)
 app.include_router(cricket.router)
 app.include_router(families.router)
+app.include_router(home_banners.router)
 app.include_router(inbox.router)
 app.include_router(inbox_backup_google.router)
 app.include_router(love_bonds.router)
