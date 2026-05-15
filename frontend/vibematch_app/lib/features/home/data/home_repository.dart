@@ -1,6 +1,7 @@
-import '../../auth/data/auth_api_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../auth/data/auth_api_service.dart';
+import '../models/home_banner.dart';
 import '../models/home_room.dart';
 import 'models/home_room_dto.dart';
 
@@ -11,6 +12,35 @@ class HomeRepository {
 
   final ApiClient _apiClient;
   final AuthApiService _authApiService;
+
+  Map<String, String> _authHeaders() {
+    final token = _authApiService.cachedAccessToken;
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Please login again.');
+    }
+    return {'Authorization': 'Bearer $token'};
+  }
+
+  Future<HomeRoom?> fetchMyCreatedRoom() async {
+    final response = await _apiClient.getMap(
+      ApiEndpoints.myCreatedRoom,
+      headers: _authHeaders(),
+    );
+    if (response.isEmpty) return null;
+    return HomeRoomDto.fromJson(response).toDomain();
+  }
+
+  Future<List<HomeBanner>> fetchHomeBanners({required String placement}) async {
+    final response = await _apiClient.getList(
+      ApiEndpoints.homeBanners,
+      queryParameters: {'placement': placement},
+    );
+    return response
+        .whereType<Map<String, dynamic>>()
+        .map(HomeBanner.fromJson)
+        .where((banner) => banner.imageUrl != null && banner.imageUrl!.trim().isNotEmpty)
+        .toList(growable: false);
+  }
 
   Future<List<HomeRoom>> fetchTrendingRooms({
     String? language,
@@ -38,11 +68,6 @@ class HomeRepository {
     String? category,
     int limit = 30,
   }) async {
-    final token = _authApiService.cachedAccessToken;
-    if (token == null || token.trim().isEmpty) {
-      throw Exception('Please login again before loading following rooms.');
-    }
-
     final response = await _apiClient.getList(
       ApiEndpoints.roomsFollowing,
       queryParameters: {
@@ -50,7 +75,7 @@ class HomeRepository {
         'category': category,
         'limit': limit.toString(),
       },
-      headers: {'Authorization': 'Bearer $token'},
+      headers: _authHeaders(),
     );
 
     return response
