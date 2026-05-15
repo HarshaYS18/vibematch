@@ -165,7 +165,13 @@ class _MetaPanel extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(0, isTextVibe ? 4 : 0, 0, 14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            if (caption.isNotEmpty) Padding(padding: EdgeInsets.fromLTRB(14, isTextVibe ? 4 : 2, 14, isTextVibe ? 10 : 2), child: _CaptionWithAuthor(authorName: vibe.authorName, caption: caption, fontSize: isTextVibe ? 16 : 13.3, lineHeight: isTextVibe ? 1.35 : 1.32)),
+            if (caption.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(14, isTextVibe ? 4 : 2, 14, isTextVibe ? 10 : 2),
+                child: isTextVibe
+                    ? _PlainCaption(caption: caption, fontSize: 16, lineHeight: 1.35)
+                    : _CaptionWithAuthor(authorName: vibe.authorName, caption: caption, fontSize: 13.3, lineHeight: 1.32),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: Row(children: [
@@ -282,8 +288,28 @@ class _IconAction extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(onPressed: onTap, icon: Icon(icon, color: color, size: 27));
 }
 
+class _PlainCaption extends StatelessWidget {
+  const _PlainCaption({required this.caption, this.fontSize = 16, this.lineHeight = 1.35});
+  final String caption;
+  final double fontSize;
+  final double lineHeight;
+  static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
+  @override
+  Widget build(BuildContext context) {
+    final spans = <TextSpan>[];
+    var index = 0;
+    for (final match in _mentionPattern.allMatches(caption)) {
+      if (match.start > index) spans.add(TextSpan(text: caption.substring(index, match.start)));
+      spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w900)));
+      index = match.end;
+    }
+    if (index < caption.length) spans.add(TextSpan(text: caption.substring(index)));
+    return RichText(text: TextSpan(style: TextStyle(color: const Color(0xFF111015), fontSize: fontSize, height: lineHeight, fontWeight: FontWeight.w600), children: spans));
+  }
+}
+
 class _CaptionWithAuthor extends StatelessWidget {
-  const _CaptionWithAuthor({required this.authorName, required this.caption, this.fontSize = 16, this.lineHeight = 1.35});
+  const _CaptionWithAuthor({required this.authorName, required this.caption, this.fontSize = 13.3, this.lineHeight = 1.32});
   final String authorName;
   final String caption;
   final double fontSize;
