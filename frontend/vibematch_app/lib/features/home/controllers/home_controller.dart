@@ -28,10 +28,6 @@ class HomeController extends ChangeNotifier {
   final List<String> categories = const [
     'Trending',
     'Following',
-    'Music',
-    'Gaming',
-    'Chat',
-    'PK',
   ];
 
   final List<String> languages = const [
@@ -68,9 +64,8 @@ class HomeController extends ChangeNotifier {
     if (hasNetworkError) return const [];
 
     final filtered = rooms.where((room) {
-      final categoryMatch = selectedCategory == 'Trending' || selectedCategory == 'Following' || room.type == selectedCategory;
       final languageMatch = selectedLanguage == 'All' || room.language == selectedLanguage;
-      return categoryMatch && languageMatch;
+      return languageMatch;
     }).toList();
 
     filtered.sort((a, b) => b.trendingScore.compareTo(a.trendingScore));
@@ -128,20 +123,17 @@ class HomeController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final categoryForBackend = selectedCategory == 'Trending' || selectedCategory == 'Following'
-          ? null
-          : selectedCategory;
       final languageForBackend = selectedLanguage == 'All' ? null : selectedLanguage;
 
       final fetchedRooms = selectedCategory == 'Following'
           ? await _repository.fetchFollowingRooms(
               language: languageForBackend,
-              category: categoryForBackend,
+              category: null,
               limit: 50,
             )
           : await _repository.fetchTrendingRooms(
               language: languageForBackend,
-              category: categoryForBackend,
+              category: null,
               limit: 50,
             );
 
