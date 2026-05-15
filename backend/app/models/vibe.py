@@ -16,6 +16,7 @@ class VibePost(Base):
     media_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     tag: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     uses_mention_all: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    comments_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     mentions_csv: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
