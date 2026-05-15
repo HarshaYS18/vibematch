@@ -27,8 +27,6 @@ import '../love_bonds/love_bonds_page.dart';
 import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
 import '../profile_qr/profile_qr_pages.dart';
-import '../profile_rooms_page.dart';
-import '../profile_visitors_page.dart';
 import '../public_profile_view_page.dart';
 import '../settings/account_settings_page.dart';
 import '../store/store_page.dart';
@@ -61,6 +59,18 @@ class _MePageContentState extends State<MePageContent> {
 
   CurrentUser get user => _freshUser ?? widget.user;
 
+  bool get _isOfficialOrPanelUser {
+    final role = user.primaryRole.name.toLowerCase();
+    return user.canSeeOwnerControls || <String>{'founder_owner', 'owner', 'superadmin', 'admin', 'monitor', 'cs', 'agency_owner', 'bd', 'coin_seller', 'merchant', 'reseller'}.contains(role);
+  }
+
+  bool get _isOwnerToolsUser => user.canSeeOwnerControls;
+
+  bool get _isMerchantPanelUser {
+    final role = user.primaryRole.name.toLowerCase();
+    return _isOwnerToolsUser || <String>{'coin_seller', 'merchant', 'reseller'}.contains(role);
+  }
+
   SeatUser get _viewerSeatUser => SeatUser(
         id: 'user_${user.publicUserId}',
         name: _displayName,
@@ -70,10 +80,10 @@ class _MePageContentState extends State<MePageContent> {
         relationshipText: '',
         vipLevel: _vipLevel,
         svipLevel: _svipLevel,
-        sendingLevel: 0,
-        receivingLevel: 0,
-        sentExp: 0,
-        receivedExp: 0,
+        sendingLevel: user.wallet.sendLevel,
+        receivingLevel: user.wallet.receiveLevel,
+        sentExp: user.wallet.monthlyGiftCoinsSent,
+        receivedExp: user.wallet.monthlyGiftCoinsReceived,
         medals: const [],
         avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
         avatarUrl: user.avatarUrl,
@@ -117,58 +127,26 @@ class _MePageContentState extends State<MePageContent> {
   String get _coverPhotoStatus => user.coverPhotoUrls.isEmpty ? 'No cover photo' : '${user.coverPhotoUrls.length} active';
 
   @override
-  void initState() {
-    super.initState();
-    unawaited(_loadRealData());
-  }
-
+  void initState() { super.initState(); unawaited(_loadRealData()); }
   @override
-  void didUpdateWidget(covariant MePageContent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.user.publicUserId != widget.user.publicUserId) {
-      _freshUser = null;
-      unawaited(_loadRealData());
-    }
-  }
+  void didUpdateWidget(covariant MePageContent oldWidget) { super.didUpdateWidget(oldWidget); if (oldWidget.user.publicUserId != widget.user.publicUserId) { _freshUser = null; unawaited(_loadRealData()); } }
 
   Future<void> _loadRealData() async {
-    setState(() {
-      _loadingRealData = true;
-      _loadError = null;
-    });
+    setState(() { _loadingRealData = true; _loadError = null; });
     try {
       final freshUser = await _profileApi.getMe(forceRefresh: true);
       final results = await Future.wait<Object?>([_walletApi.getWallet(), _presenceApi.getPublicPresence(freshUser.publicUserId), _profileApi.getMyFamily()]);
       if (!mounted) return;
-      setState(() {
-        _freshUser = freshUser;
-        _wallet = results[0] as VmWallet;
-        _presence = results[1] as PresenceDto;
-        _family = results[2] as FamilySummaryDto;
-        _loadingRealData = false;
-      });
+      setState(() { _freshUser = freshUser; _wallet = results[0] as VmWallet; _presence = results[1] as PresenceDto; _family = results[2] as FamilySummaryDto; _loadingRealData = false; });
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _loadError = error.toString().replaceFirst('Exception: ', '');
-        _loadingRealData = false;
-      });
+      setState(() { _loadError = error.toString().replaceFirst('Exception: ', ''); _loadingRealData = false; });
     }
   }
 
-  void _showAction(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
-  }
-
-  Future<void> _refreshAll() async {
-    await widget.onRefreshPressed();
-    await _loadRealData();
-  }
-
-  Future<void> _endSession(BuildContext context) async {
-    final shouldEnd = await showMeSessionSheet(context);
-    if (shouldEnd == true) await widget.onLogoutPressed();
-  }
+  void _showAction(BuildContext context, String message) { ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538))); }
+  Future<void> _refreshAll() async { await widget.onRefreshPressed(); await _loadRealData(); }
+  Future<void> _endSession(BuildContext context) async { final shouldEnd = await showMeSessionSheet(context); if (shouldEnd == true) await widget.onLogoutPressed(); }
 
   void _openEditProfile(BuildContext context) => Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => EditProfilePage(user: user))).then((changed) { if (changed == true) unawaited(_refreshAll()); });
   void _openProfileQrActions(BuildContext context) => ProfileQrActionsSheet.show(context, user: user);
@@ -178,12 +156,11 @@ class _MePageContentState extends State<MePageContent> {
   void _openStore(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VmStorePage()));
   void _openLoveBonds(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoveBondsPage()));
   void _openWallet(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletPageModular())).then((_) => _loadRealData());
-  void _openControlCentre(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ControlCenterHubPage())).then((_) => _refreshAll());
-
-  void _openVipSvipAdmin(BuildContext context) { if (!user.canSeeOwnerControls) { _showAction(context, 'Only Owner/Super Owner can adjust VIP/SVIP levels.'); return; } Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VipSvipAdminPage())).then((_) => _refreshAll()); }
-  void _openCoinSupplyGrant(BuildContext context) { if (!user.canSeeOwnerControls) { _showAction(context, 'Only Owner/Super Owner can grant coin supply.'); return; } Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage())).then((_) => _refreshAll()); }
-  void _openGameTest(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GameTestPage()));
-  void _openMerchantSellerPanel(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MerchantSellerPanelPage())).then((_) => _refreshAll());
+  void _openControlCentre(BuildContext context) { if (!_isOfficialOrPanelUser) { _showAction(context, 'Control Center is available only for assigned roles.'); return; } Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ControlCenterHubPage())).then((_) => _refreshAll()); }
+  void _openVipSvipAdmin(BuildContext context) { if (!_isOwnerToolsUser) { _showAction(context, 'Only Owner/Super Owner can adjust VIP/SVIP levels.'); return; } Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VipSvipAdminPage())).then((_) => _refreshAll()); }
+  void _openCoinSupplyGrant(BuildContext context) { if (!_isOwnerToolsUser) { _showAction(context, 'Only Owner/Super Owner can grant coin supply.'); return; } Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage())).then((_) => _refreshAll()); }
+  void _openGameTest(BuildContext context) { if (!_isOwnerToolsUser) { _showAction(context, 'Game backend test is available only for Owner/Super Owner.'); return; } Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GameTestPage())); }
+  void _openMerchantSellerPanel(BuildContext context) { if (!_isMerchantPanelUser) { _showAction(context, 'Merchant/Seller panel is available only for assigned roles.'); return; } Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MerchantSellerPanelPage())).then((_) => _refreshAll()); }
 
   void _openFamily(BuildContext context) {
     final family = _family;
@@ -191,21 +168,20 @@ class _MePageContentState extends State<MePageContent> {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => FamilyModularPage(openCurrentFamily: true, initialFamilyProfile: FamilyProfileUiModel(id: family.safeId, name: family.safeName, minimumVipLabel: 'VIP 0', memberCount: family.memberCount, maxMembers: family.memberCount > 0 ? family.memberCount : 1, rankLabel: 'Family Lv. ${family.level}', ownerUserId: family.ownerPublicUserId?.toString() ?? '', quarterCarryExp: family.totalExp, giftCoinsThisQuarter: family.totalExp, timeMinutesToday: 0)))).then((_) => _loadRealData());
   }
 
-  void _openProfile(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => PublicProfileViewPage(user: user, publicUserId: user.publicUserId, vipLevel: _vipLevel, svipLevel: _svipLevel, presenceLabel: _lastSeenText, currentRoomName: _currentRoomName, relationshipLabel: '', familyName: _family?.shouldShow == true ? _family!.safeName : '', familyLevel: _family?.level ?? 0)));
-  }
-
+  void _openProfile(BuildContext context) { Navigator.of(context).push(MaterialPageRoute(builder: (_) => PublicProfileViewPage(user: user, publicUserId: user.publicUserId, vipLevel: _vipLevel, svipLevel: _svipLevel, presenceLabel: _lastSeenText, currentRoomName: _currentRoomName, relationshipLabel: '', familyName: _family?.shouldShow == true ? _family!.safeName : '', familyLevel: _family?.level ?? 0))); }
   void _openVipProgram(BuildContext context, {int initialTabIndex = 0}) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VipProgramPage(initialTabIndex: initialTabIndex, vipLevel: _vipLevel, svipLevel: _svipLevel, lifetimeRechargeCoins: _lifetimeRechargeCoins, monthlyRechargeCoins: _monthlyRechargeCoins)));
   void _openBondDetail(BuildContext context, LoveBondCardData bond) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)));
   void _openFollowersFollowed(BuildContext context, {required int initialTabIndex}) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => FollowersFollowedPage(user: _viewerSeatUser, users: _socialPreviewUsers, initialTabIndex: initialTabIndex)));
-  void _openVisitors(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProfileVisitorsPage(profileOwnerUserId: user.id)));
-  void _openRooms(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProfileRoomsPage(userId: user.id, publicUserId: user.publicUserId)));
+  void _openCurrentRoom(BuildContext context) { final roomName = _currentRoomName; final roomId = _currentRoomId; if (roomName == null || roomName.trim().isEmpty || roomId == null || roomId.trim().isEmpty) { _showAction(context, 'No active room right now.'); return; } Navigator.of(context).push(MaterialPageRoute(builder: (_) => LiveRoomPage(roomName: roomName, roomId: roomId, language: 'English', modeTitle: _presence?.roomMode ?? 'Open', onlineCount: 1))); }
 
-  void _openCurrentRoom(BuildContext context) {
-    final roomName = _currentRoomName;
-    final roomId = _currentRoomId;
-    if (roomName == null || roomName.trim().isEmpty || roomId == null || roomId.trim().isEmpty) { _showAction(context, 'No active room right now.'); return; }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => LiveRoomPage(roomName: roomName, roomId: roomId, language: 'English', modeTitle: _presence?.roomMode ?? 'Open', onlineCount: 1)));
+  bool _shouldShowItem(MeActionItem item) {
+    if (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant' || item.action == 'game_test') return _isOwnerToolsUser;
+    if (item.title == 'Control Center') return _isOfficialOrPanelUser;
+    if (item.title == 'Merchant & Seller Panel') return _isMerchantPanelUser;
+    if (!_isOfficialOrPanelUser && !_isMerchantPanelUser) {
+      return <String>{'Edit Profile', 'VIP / SVIP Center', 'Love & Bonds', 'Family', 'Store & Inventory', 'Settings', 'Help Centre', 'Logout'}.contains(item.title);
+    }
+    return true;
   }
 
   @override
@@ -253,13 +229,13 @@ class _MePageContentState extends State<MePageContent> {
             onRoomTap: () => _openCurrentRoom(context),
           ),
           const SizedBox(height: 14),
-          MeStatsRow(userId: user.id, publicUserId: user.publicUserId, onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1), onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0), onRoomsTap: () => _openRooms(context), onVisitorsTap: () => _openVisitors(context)),
+          MeStatsRow(userId: user.id, publicUserId: user.publicUserId, onFollowingTap: () => _openFollowersFollowed(context, initialTabIndex: 1), onFollowersTap: () => _openFollowersFollowed(context, initialTabIndex: 0), onRoomsTap: () {}, onVisitorsTap: () {}),
           const SizedBox(height: 14),
           MeRelationshipPanel(publicUserId: user.publicUserId, relationshipLabel: '', onBondTap: (bond) => _openBondDetail(context, bond)),
           const SizedBox(height: 18),
           const Text('Account', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
           const SizedBox(height: 12),
-          ...items.where((item) => (item.action == 'vip_svip_admin' || item.action == 'coin_supply_grant') ? user.canSeeOwnerControls : true).map((item) => Padding(padding: const EdgeInsets.only(bottom: 12), child: MeAccountCard(item: item, onTap: () async {
+          ...items.where(_shouldShowItem).map((item) => Padding(padding: const EdgeInsets.only(bottom: 12), child: MeAccountCard(item: item, onTap: () async {
             if (item.action == 'edit_profile') { _openEditProfile(context); }
             else if (item.action == 'edit_cover_photos') { await _openEditCoverPhotos(context); }
             else if (item.action == 'vip_svip_admin') { _openVipSvipAdmin(context); }
@@ -308,4 +284,3 @@ class _MeLoveBondBackendSyncGateState extends State<_MeLoveBondBackendSyncGate> 
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
-
