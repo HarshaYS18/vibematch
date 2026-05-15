@@ -2,12 +2,21 @@ package com.example.vibematch_app
 
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
+import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var screenshotBlocked = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        applyScreenshotPolicy()
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -25,6 +34,25 @@ class MainActivity : FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SCREENSHOT_GUARD_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setScreenshotBlocked" -> {
+                    screenshotBlocked = call.argument<Boolean>("blocked") == true
+                    applyScreenshotPolicy()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun applyScreenshotPolicy() {
+        if (screenshotBlocked) {
+            window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 
@@ -46,5 +74,6 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val LIVE_ROOM_SERVICE_CHANNEL = "vibematch/live_room_service"
+        private const val SCREENSHOT_GUARD_CHANNEL = "vibematch/screenshot_guard"
     }
 }
