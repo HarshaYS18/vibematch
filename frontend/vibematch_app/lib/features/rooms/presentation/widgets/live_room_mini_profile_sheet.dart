@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../economy/data/economy_master_api_service.dart';
 import '../../../profile/data/profile_api_service.dart';
 import '../../../social/data/social_api_service.dart';
 import '../live_room_models.dart';
@@ -74,6 +75,7 @@ class LiveRoomMiniProfileSheet extends StatefulWidget {
 class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
   late MiniProfileSocialRelation _relation = widget.initialRelation;
   bool _relationBusy = false;
+  EconomyPublicCardSnapshot? _economyCard;
   StreamSubscription<ProfileRelationshipRealtimeEvent>? _relationshipRealtimeSub;
 
   int? get _targetPublicUserId => publicUserIdFromRoomUserId(widget.user.id);
@@ -84,12 +86,40 @@ class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
     super.initState();
     _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen(_onRelationshipRealtimeEvent);
     unawaited(_refreshRelationFromBackend(showBusy: true));
+    unawaited(_loadEconomyPublicCard());
   }
 
   @override
   void dispose() {
     _relationshipRealtimeSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadEconomyPublicCard() async {
+    final publicUserId = _targetPublicUserId;
+    if (publicUserId == null || publicUserId <= 0) return;
+    try {
+      final card = await const EconomyMasterApiService().getPublicCard(publicUserId);
+      if (!mounted) return;
+      setState(() => _economyCard = card);
+    } catch (_) {
+      // Keep existing room snapshot values if the economy card is unavailable.
+    }
+  }
+
+  SeatUser _effectiveUser() {
+    final card = _economyCard;
+    if (card == null) return widget.user;
+    return widget.user.copyWith(
+      name: card.displayName.trim().isEmpty ? widget.user.name : card.displayName,
+      avatarUrl: card.avatarUrl,
+      vipLevel: card.vipLevel,
+      svipLevel: card.svipLevel,
+      sendingLevel: card.sendLevel,
+      receivingLevel: card.receiveLevel,
+      sentExp: card.monthlySentCoins,
+      receivedExp: card.monthlyReceivedCoins,
+    );
   }
 
   void _onRelationshipRealtimeEvent(ProfileRelationshipRealtimeEvent event) {
@@ -137,8 +167,9 @@ class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveUser = _effectiveUser();
     return UserMiniProfileSheet(
-      user: widget.user,
+      user: effectiveUser,
       currentUser: widget.currentUser,
       canModerate: widget.canModerate,
       relation: _relation,
