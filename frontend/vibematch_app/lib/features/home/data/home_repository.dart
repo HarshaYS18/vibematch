@@ -22,11 +22,11 @@ class HomeRepository {
   }
 
   Future<HomeRoom?> fetchMyCreatedRoom() async {
-    final response = await _apiClient.getMap(
+    final response = await _apiClient.getOptionalMap(
       ApiEndpoints.myCreatedRoom,
       headers: _authHeaders(),
     );
-    if (response.isEmpty) return null;
+    if (response == null || response.isEmpty) return null;
     return HomeRoomDto.fromJson(response).toDomain();
   }
 
