@@ -217,15 +217,19 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                 children: [
                   _ActionRow(
                     icon: lockStatus.isEnabled ? Icons.lock_rounded : Icons.lock_open_rounded,
-                    title: lockStatus.isEnabled ? 'Inbox lock active' : 'Set up Inbox lock',
-                    subtitle: lockStatus.isEnabled ? 'Mock OTP recovery is enabled for testing.' : 'Generate a mock OTP, verify it, and create a private lock.',
+                    title: lockStatus.isEnabled ? 'Change Inbox lock' : 'Set up Inbox lock',
+                    subtitle: lockStatus.isEnabled
+                        ? 'Use your current lock to set a new one. If Owner reset it, enter 1234 as the current lock.'
+                        : 'Create your first Inbox lock. No phone number or OTP required.',
                     onTap: lockStatus.isEnabled ? _openChangeLock : _openLockSetup,
                   ),
                   const Divider(color: Color(0xFFECE2D8)),
                   _ActionRow(
-                    icon: Icons.lock_reset_rounded,
-                    title: lockStatus.isEnabled ? 'Recover Inbox lock' : 'Recovery setup',
-                    subtitle: lockStatus.recoveryRequested ? 'Recovery request submitted to CS.' : 'Recover by mock OTP or contact CS for review.',
+                    icon: Icons.support_agent_rounded,
+                    title: 'Forgot Inbox lock?',
+                    subtitle: lockStatus.recoveryRequested
+                        ? 'Recovery request submitted. Contact Vibe Match Team / CS.'
+                        : 'Recovery is handled by CS. Owner/Super Owner can reset verified accounts to 1234.',
                     onTap: _openRecovery,
                   ),
                 ],
