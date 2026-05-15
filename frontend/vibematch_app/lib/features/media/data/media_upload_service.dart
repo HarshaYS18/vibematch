@@ -75,6 +75,27 @@ class MediaUploadService {
     return _uploadBytes(bytes: cropped, filename: 'vibematch_cover.jpg', endpointPath: '/media/profile-cover', failedMessage: 'Failed to upload cover');
   }
 
+  Future<MediaUploadResult> pickCropAndUploadRoomCover(BuildContext context) async {
+    final file = await pickImage(maxWidth: 2400, maxHeight: 1800, imageQuality: 96);
+    if (file == null) throw const MediaUploadCancelledException();
+    final bytes = await file.readAsBytes();
+    final crop = await Navigator.of(context).push<ManualImageCropResult>(
+      MaterialPageRoute(
+        builder: (_) => ManualImageCropPage(
+          imageBytes: bytes,
+          title: 'Crop Room Cover',
+          aspectRatio: 16 / 9,
+          outputWidth: 1280,
+          outputHeight: 720,
+          helpText: 'Move and pinch zoom the image inside the grid. Chatroom cover photos use a 16:9 crop and save as 1280×720 for home cards and live room previews.',
+        ),
+      ),
+    );
+    if (crop == null) throw const MediaUploadCancelledException();
+    final cropped = _manualCropJpeg(bytes: bytes, crop: crop);
+    return _uploadBytes(bytes: cropped, filename: 'vibematch_room_cover.jpg', endpointPath: '/media/room-avatar', failedMessage: 'Failed to upload room cover');
+  }
+
   Future<MediaUploadResult> pickCropAndUploadHomeBanner(
     BuildContext context, {
     required String title,
