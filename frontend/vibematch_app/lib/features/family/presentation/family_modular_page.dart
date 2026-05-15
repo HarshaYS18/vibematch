@@ -196,7 +196,10 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     if (!_controller.hasFamily) {
       return FamilyRankingModule(
         rankings: _controller.rankings,
+        selectedPeriod: _controller.selectedRankingPeriod,
+        loading: _controller.loadingRankings,
         joinRequestPending: _controller.joinRequestPending,
+        onPeriodChanged: _controller.setRankingPeriod,
         onOpenFamily: _openRankedFamily,
         onJoinFamily: _requestJoinRankedFamily,
         onCreateFamily: _openCreateFamily,
