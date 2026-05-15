@@ -29,17 +29,19 @@ class LuckyGiftsApiService {
     int? receiverPublicUserId,
     String? roomPublicId,
   }) async {
+    final body = <String, dynamic>{
+      'gift_id': giftId,
+      'quantity': quantity,
+    };
+    if (receiverPublicUserId != null) {
+      body['receiver_public_user_id'] = receiverPublicUserId;
+    }
     final cleanRoomPublicId = roomPublicId?.trim();
-    final json = await _postMap(
-      '/lucky-gifts/preview',
-      body: <String, dynamic>{
-        'gift_id': giftId,
-        'quantity': quantity,
-        ?'receiver_public_user_id': receiverPublicUserId,
-        if (cleanRoomPublicId != null && cleanRoomPublicId.isNotEmpty)
-          'room_public_id': cleanRoomPublicId,
-      },
-    );
+    if (cleanRoomPublicId != null && cleanRoomPublicId.isNotEmpty) {
+      body['room_public_id'] = cleanRoomPublicId;
+    }
+
+    final json = await _postMap('/lucky-gifts/preview', body: body);
     return LuckyGiftPreview.fromJson(json);
   }
 
@@ -53,21 +55,23 @@ class LuckyGiftsApiService {
     int rewardCoins = 0,
     int netWinCoins = 0,
   }) async {
+    final body = <String, dynamic>{
+      'gift_id': giftId,
+      'quantity': quantity,
+      'spent_coins': spentCoins,
+      'multiplier': multiplier,
+      'reward_coins': rewardCoins,
+      'net_win_coins': netWinCoins,
+    };
+    if (receiverPublicUserId != null) {
+      body['receiver_public_user_id'] = receiverPublicUserId;
+    }
     final cleanRoomPublicId = roomPublicId?.trim();
-    final json = await _postMap(
-      '/lucky-gifts/results/record',
-      body: <String, dynamic>{
-        'gift_id': giftId,
-        'quantity': quantity,
-        ?'receiver_public_user_id': receiverPublicUserId,
-        if (cleanRoomPublicId != null && cleanRoomPublicId.isNotEmpty)
-          'room_public_id': cleanRoomPublicId,
-        'spent_coins': spentCoins,
-        'multiplier': multiplier,
-        'reward_coins': rewardCoins,
-        'net_win_coins': netWinCoins,
-      },
-    );
+    if (cleanRoomPublicId != null && cleanRoomPublicId.isNotEmpty) {
+      body['room_public_id'] = cleanRoomPublicId;
+    }
+
+    final json = await _postMap('/lucky-gifts/results/record', body: body);
     return LuckyGiftRecordResult.fromJson(json);
   }
 
