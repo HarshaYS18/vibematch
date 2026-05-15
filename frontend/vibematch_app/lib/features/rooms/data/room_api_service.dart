@@ -19,6 +19,7 @@ class RoomApiService {
     String? avatarUrl,
     String? coverPhotoUrl,
     String? lockPassword,
+    bool? allowScreenshots,
   }) async {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -40,6 +41,7 @@ class RoomApiService {
         'mode': mode.trim(),
         'type': type.trim(),
         if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
+        if (allowScreenshots != null) 'allow_screenshots': allowScreenshots,
       }),
     );
 
@@ -194,6 +196,7 @@ class RealRoom {
     this.isSecret = false,
     this.isLocked = false,
     this.isMembersOnly = false,
+    this.allowScreenshots = true,
     this.hasLockPassword = false,
   });
 
@@ -213,6 +216,7 @@ class RealRoom {
   final bool isSecret;
   final bool isLocked;
   final bool isMembersOnly;
+  final bool allowScreenshots;
   final bool hasLockPassword;
 
   factory RealRoom.fromJson(Map<String, dynamic> json) {
@@ -234,6 +238,7 @@ class RealRoom {
       isSecret: json['is_secret'] == true,
       isLocked: json['is_locked'] == true,
       isMembersOnly: json['is_members_only'] == true,
+      allowScreenshots: json['allow_screenshots'] != false,
       hasLockPassword: json['has_lock_password'] == true,
     );
   }
