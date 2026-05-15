@@ -51,6 +51,7 @@ class VibeItem {
     this.avatarUrl,
     this.likedByMe = false,
     this.savedByMe = false,
+    this.commentsEnabled = true,
     this.saves = 0,
   });
 
@@ -74,6 +75,7 @@ class VibeItem {
   final String? avatarUrl;
   final bool likedByMe;
   final bool savedByMe;
+  final bool commentsEnabled;
   final int saves;
 
   bool get hasMediaUrl => mediaUrl != null && mediaUrl!.trim().isNotEmpty;
@@ -88,6 +90,7 @@ class VibeItem {
     String? avatarUrl,
     bool? likedByMe,
     bool? savedByMe,
+    bool? commentsEnabled,
   }) {
     return VibeItem(
       id: id,
@@ -110,6 +113,7 @@ class VibeItem {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       likedByMe: likedByMe ?? this.likedByMe,
       savedByMe: savedByMe ?? this.savedByMe,
+      commentsEnabled: commentsEnabled ?? this.commentsEnabled,
       saves: saves ?? this.saves,
     );
   }
