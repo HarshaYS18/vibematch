@@ -1,23 +1,23 @@
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from app.api.routes.users import get_current_user
+from app.database import get_db
+from app.models.room import Room
+from app.models.user import User
 from app.schemas.room_settings import (
     RoomAnnouncementUpdateRequest,
     RoomBackgroundUpdateRequest,
     RoomSettingsResponse,
 )
-from app.models.room import Room
-from app.database import get_db
-from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, Query
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
 
 
 def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
-    room = (
-        db.query(Room)
-        .filter(Room.room_public_id == room_public_id)
-        .first()
-    )
+    room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
     return room
@@ -51,6 +51,19 @@ def _room_discovery_payload(room: Room) -> dict:
     }
 
 
+def _is_seed_or_test_room(room: Room) -> bool:
+    name = (room.name or "").strip().lower()
+    subtitle = (room.subtitle or "").strip().lower()
+    public_id = (room.room_public_id or "").strip().lower()
+    if name in {"test room", "demo room", "sample room", "seed room"}:
+        return True
+    if name.startswith("test ") or name.startswith("demo ") or name.startswith("seed "):
+        return True
+    if public_id.startswith(("test", "demo", "seed", "sample")):
+        return True
+    return any(marker in subtitle for marker in ("seed", "demo", "sample", "mock"))
+
+
 def _filter_discovery_rooms(
     db: Session,
     language: str | None,
@@ -65,11 +78,7 @@ def _filter_discovery_rooms(
         query = query.filter(Room.language == language.strip())
     if category and category.strip() and category.strip().lower() != "all":
         query = query.filter(Room.room_type == category.strip())
-    return (
-        query.order_by(Room.trending_score.desc(), Room.online_count.desc(), Room.updated_at.desc())
-        .limit(max(1, min(limit, 100)))
-        .all()
-    )
+    return query.order_by(Room.trending_score.desc(), Room.online_count.desc(), Room.updated_at.desc()).limit(max(1, min(limit, 100))).all()
 
 
 @router.get("/trending")
@@ -79,13 +88,7 @@ def get_trending_rooms(
     limit: int = Query(default=30, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    rooms = _filter_discovery_rooms(
-        db=db,
-        language=language,
-        category=category,
-        limit=limit,
-        include_locked=False,
-    )
+    rooms = _filter_discovery_rooms(db=db, language=language, category=category, limit=limit, include_locked=False)
     return [_room_discovery_payload(room) for room in rooms]
 
 
@@ -96,24 +99,30 @@ def get_following_rooms(
     limit: int = Query(default=30, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    # TODO: once UserFollow room-presence mapping is fully wired, filter by followed users inside.
-    # For now this endpoint keeps the same production payload shape and allows locked/member rooms
-    # because followed-user discovery is allowed to surface them without exposing Secret Vibe rooms.
-    rooms = _filter_discovery_rooms(
-        db=db,
-        language=language,
-        category=category,
-        limit=limit,
-        include_locked=True,
-    )
+    rooms = _filter_discovery_rooms(db=db, language=language, category=category, limit=limit, include_locked=True)
     return [_room_discovery_payload(room) for room in rooms]
 
 
-@router.get("/{room_public_id}/settings", response_model=RoomSettingsResponse)
-def get_room_settings(
-    room_public_id: str,
+@router.get("/my-created-room")
+def get_my_created_room(
     db: Session = Depends(get_db),
-) -> RoomSettingsResponse:
+    current_user: User = Depends(get_current_user),
+) -> dict | None:
+    rooms = (
+        db.query(Room)
+        .filter(Room.owner_user_id == current_user.id, Room.is_active.is_(True))
+        .order_by(Room.updated_at.desc(), Room.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    for room in rooms:
+        if not _is_seed_or_test_room(room):
+            return _room_discovery_payload(room)
+    return None
+
+
+@router.get("/{room_public_id}/settings", response_model=RoomSettingsResponse)
+def get_room_settings(room_public_id: str, db: Session = Depends(get_db)) -> RoomSettingsResponse:
     room = _get_room_by_public_id(db, room_public_id)
     return _room_settings_response(room)
 
@@ -142,7 +151,6 @@ def update_room_announcement(
     text = payload.announcement_text.strip()
     room.announcement_text = text if text else None
     room.announcement_updated_at = datetime.utcnow()
-    # TODO: replace with authenticated user id when room permissions are wired.
     room.announcement_updated_by_user_id = room.owner_user_id
     db.add(room)
     db.commit()
