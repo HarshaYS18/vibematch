@@ -19,6 +19,7 @@ from app.api.routes import (
     families_economy,
     game_pool_admin,
     game_props_admin,
+    game_settlements,
     games,
     games_master,
     gift_catalog,
@@ -28,7 +29,7 @@ from app.api.routes import (
     inbox_ws,
     internal_test,
     love_bonds,
-    lucky_coin_placeholders,
+    lucky_coins,
     lucky_gifts,
     media,
     moderation,
@@ -195,8 +196,9 @@ app.include_router(gift_catalog.router)
 app.include_router(economy_admin.router)
 app.include_router(games.router)
 app.include_router(games_master.router)
+app.include_router(game_settlements.router)
 app.include_router(lucky_gifts.router)
-app.include_router(lucky_coin_placeholders.router)
+app.include_router(lucky_coins.router)
 app.include_router(rankings.router)
 app.include_router(coin_sales.router)
 app.include_router(vip_admin.router)
