@@ -86,19 +86,40 @@ class LiveRoomStateController extends ChangeNotifier {
     if (event == null) return;
     if (event.roomId.trim().isNotEmpty && event.roomId != _roomId) return;
     var changed = false;
+    var restrictionsChanged = false;
 
-    if (event.applyOnlyModeEnabled != _applyOnlyModeEnabled) {
-      _applyOnlyModeEnabled = event.applyOnlyModeEnabled;
+    final nextApplyOnlyModeEnabled = event.applyOnlyModeEnabled;
+    if (nextApplyOnlyModeEnabled != null && nextApplyOnlyModeEnabled != _applyOnlyModeEnabled) {
+      _applyOnlyModeEnabled = nextApplyOnlyModeEnabled;
       changed = true;
     }
 
-    if (event.roomImagesEnabled != _roomImagesEnabled) {
-      _roomImagesEnabled = event.roomImagesEnabled;
+    final nextRoomImagesEnabled = event.roomImagesEnabled;
+    if (nextRoomImagesEnabled != null && nextRoomImagesEnabled != _roomImagesEnabled) {
+      _roomImagesEnabled = nextRoomImagesEnabled;
       changed = true;
+      restrictionsChanged = true;
     }
 
-    if (event.guestMessagesEnabled != _guestMessagesEnabled) {
-      _guestMessagesEnabled = event.guestMessagesEnabled;
+    final nextGuestMessagesEnabled = event.guestMessagesEnabled;
+    if (nextGuestMessagesEnabled != null && nextGuestMessagesEnabled != _guestMessagesEnabled) {
+      _guestMessagesEnabled = nextGuestMessagesEnabled;
+      changed = true;
+      restrictionsChanged = true;
+    }
+
+    if (event.privacyModeTitle.trim().isNotEmpty) {
+      final nextPrivacyMode = privacyModeFromTitle(event.privacyModeTitle);
+      if (nextPrivacyMode != _privacyMode) {
+        _privacyMode = nextPrivacyMode;
+        changed = true;
+      }
+    }
+
+    final nextAllowScreenshots = event.allowScreenshots;
+    if (nextAllowScreenshots != null && nextAllowScreenshots != _allowScreenshots) {
+      _allowScreenshots = nextAllowScreenshots;
+      ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: _allowScreenshots);
       changed = true;
     }
 
@@ -111,16 +132,18 @@ class LiveRoomStateController extends ChangeNotifier {
       }
     }
 
-    if (event.announcementText != _announcementText) {
+    if (event.announcementText != _announcementText && event.announcementText.trim().isNotEmpty) {
       _announcementText = event.announcementText;
       changed = true;
     }
 
     if (changed) {
-      LiveRoomRestrictionsService.update(
-        roomImagesEnabled: _roomImagesEnabled,
-        guestMessagesEnabled: _guestMessagesEnabled,
-      );
+      if (restrictionsChanged) {
+        LiveRoomRestrictionsService.update(
+          roomImagesEnabled: _roomImagesEnabled,
+          guestMessagesEnabled: _guestMessagesEnabled,
+        );
+      }
       notifyListeners();
     }
   }
