@@ -16,6 +16,7 @@ from app.services.rooms.room_service import (
     apply_room_mode,
     cleanup_stale_room_participants,
     create_room,
+    get_my_created_room,
     get_room_by_public_id,
     heartbeat_room,
     join_room,
@@ -47,6 +48,11 @@ def _can_manage_room(db: Session, room: Room, user: User) -> bool:
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_live_room(payload: RoomCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return create_room(db=db, current_user=current_user, payload=payload)
+
+
+@router.get("/my-created-room", response_model=RoomDetailResponse | None)
+def get_my_live_room(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return get_my_created_room(db=db, current_user=current_user)
 
 
 @router.post("/cleanup-stale")
@@ -115,7 +121,7 @@ def join_live_room(room_public_id: str, payload: RoomJoinRequest | None = None, 
 
 @router.post("/{room_public_id}/heartbeat", response_model=RoomJoinResponse)
 def heartbeat_live_room(room_public_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    joined = heartbeat_room(db=db, room_public_id=room_public_id, current_user=current_user)
+    joined = heartbeat_room(db=db, room_public_id, current_user=current_user)
     if joined is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found or not accessible")
     return joined
