@@ -226,7 +226,7 @@ class _PostInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(padding: EdgeInsets.fromLTRB(14, isTextVibe ? 4 : 12, 14, 14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (caption.isNotEmpty) ...[isTextVibe ? _PlainCaption(caption: caption, fontSize: 16, lineHeight: 1.35) : _Caption(authorName: vibe.authorName, caption: caption), SizedBox(height: isTextVibe ? 14 : 10)], Row(children: [_Metric(icon: Icons.favorite_rounded, value: vibe.likes), const SizedBox(width: 14), _Metric(icon: Icons.mode_comment_rounded, value: vibe.comments), const SizedBox(width: 14), _Metric(icon: Icons.send_rounded, value: vibe.shares), const SizedBox(width: 14), _Metric(icon: Icons.bookmark_rounded, value: vibe.saves)]), const SizedBox(height: 8), Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2))]));
+    return Padding(padding: EdgeInsets.fromLTRB(14, isTextVibe ? 4 : 12, 14, 14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (caption.isNotEmpty) ...[_CaptionWithAuthor(authorName: vibe.authorName, caption: caption, fontSize: isTextVibe ? 16 : 13.5, lineHeight: 1.35), SizedBox(height: isTextVibe ? 14 : 10)], Row(children: [_Metric(icon: Icons.favorite_rounded, value: vibe.likes), const SizedBox(width: 14), _Metric(icon: Icons.mode_comment_rounded, value: vibe.comments), const SizedBox(width: 14), _Metric(icon: Icons.send_rounded, value: vibe.shares), const SizedBox(width: 14), _Metric(icon: Icons.bookmark_rounded, value: vibe.saves)]), const SizedBox(height: 8), Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2))]));
   }
 }
 
@@ -238,8 +238,8 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: const Color(0xFF111015), size: 19), const SizedBox(width: 5), Text(_formatCount(value), style: const TextStyle(color: Color(0xFF111015), fontSize: 12.5, fontWeight: FontWeight.w900))]);
 }
 
-class _Caption extends StatelessWidget {
-  const _Caption({required this.authorName, required this.caption, this.fontSize = 13.5, this.lineHeight = 1.35});
+class _CaptionWithAuthor extends StatelessWidget {
+  const _CaptionWithAuthor({required this.authorName, required this.caption, this.fontSize = 13.5, this.lineHeight = 1.35});
   final String authorName;
   final String caption;
   final double fontSize;
@@ -247,27 +247,7 @@ class _Caption extends StatelessWidget {
   static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
   @override
   Widget build(BuildContext context) {
-    final spans = <TextSpan>[TextSpan(text: '$authorName ', style: const TextStyle(color: Color(0xFF111015), fontWeight: FontWeight.w900))];
-    var index = 0;
-    for (final match in _mentionPattern.allMatches(caption)) {
-      if (match.start > index) spans.add(TextSpan(text: caption.substring(index, match.start)));
-      spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w900)));
-      index = match.end;
-    }
-    if (index < caption.length) spans.add(TextSpan(text: caption.substring(index)));
-    return RichText(text: TextSpan(style: TextStyle(color: const Color(0xFF111015), fontSize: fontSize, height: lineHeight, fontWeight: FontWeight.w600), children: spans));
-  }
-}
-
-class _PlainCaption extends StatelessWidget {
-  const _PlainCaption({required this.caption, this.fontSize = 16, this.lineHeight = 1.35});
-  final String caption;
-  final double fontSize;
-  final double lineHeight;
-  static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
-  @override
-  Widget build(BuildContext context) {
-    final spans = <TextSpan>[];
+    final spans = <TextSpan>[TextSpan(text: '$authorName  ', style: const TextStyle(color: Color(0xFF8C5CF6), fontWeight: FontWeight.w900))];
     var index = 0;
     for (final match in _mentionPattern.allMatches(caption)) {
       if (match.start > index) spans.add(TextSpan(text: caption.substring(index, match.start)));
