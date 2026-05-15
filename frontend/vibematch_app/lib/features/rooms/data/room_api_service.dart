@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
@@ -26,23 +27,25 @@ class RoomApiService {
       throw Exception('Please login again before creating a room.');
     }
 
+    final body = <String, dynamic>{
+      'name': name.trim(),
+      'subtitle': subtitle?.trim(),
+      'avatar_url': avatarUrl?.trim(),
+      'cover_photo_url': coverPhotoUrl?.trim() ?? avatarUrl?.trim(),
+      'language': language.trim(),
+      'mode': mode.trim(),
+      'type': type.trim(),
+      if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
+      if (allowScreenshots != null) 'allow_screenshots': allowScreenshots,
+    };
+
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/rooms')),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({
-        'name': name.trim(),
-        'subtitle': subtitle?.trim(),
-        'avatar_url': avatarUrl?.trim(),
-        'cover_photo_url': coverPhotoUrl?.trim() ?? avatarUrl?.trim(),
-        'language': language.trim(),
-        'mode': mode.trim(),
-        'type': type.trim(),
-        if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
-        'allow_screenshots': ?allowScreenshots,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -151,6 +154,90 @@ class RoomApiService {
     return items.whereType<Map<String, dynamic>>().map(RoomParticipantDto.fromJson).toList(growable: false);
   }
 
+  Future<MediaUploadResult> uploadRoomCover(XFile file) {
+    return _uploadMedia('/media/room-cover', file);
+  }
+
+  Future<MediaUploadResult> uploadRoomBackground(XFile file) {
+    return _uploadMedia('/media/room-background', file);
+  }
+
+  Future<MediaUploadResult> _uploadMedia(String path, XFile file) async {
+    final token = authApiService.cachedAccessToken;
+    if (token == null || token.trim().isEmpty) throw Exception('Please login again.');
+    final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(path)));
+    request.headers['Authorization'] = 'Bearer $token';
+    final bytes = await file.readAsBytes();
+    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: file.name));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_errorMessage(response, fallback: 'Upload failed'));
+    }
+    return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<RoomSettingsDto> updateRoomCoverPhoto({required String roomId, required String coverPhotoUrl}) async {
+    final response = await http.patch(
+      Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/cover-photo')),
+      headers: _authHeaders(),
+      body: jsonEncode({'cover_photo_url': coverPhotoUrl.trim()}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_errorMessage(response, fallback: 'Failed to update cover photo'));
+    }
+    return RoomSettingsDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<List<RoomThemeDto>> listRoomThemes() async {
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/rooms/themes')), headers: _authHeaders());
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_errorMessage(response, fallback: 'Failed to load room backgrounds'));
+    }
+    final decoded = jsonDecode(response.body) as List<dynamic>;
+    return decoded.whereType<Map<String, dynamic>>().map(RoomThemeDto.fromJson).toList(growable: false);
+  }
+
+  Future<RoomThemeDto> purchaseRoomTheme(String themeId) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/rooms/themes/purchase')),
+      headers: _authHeaders(),
+      body: jsonEncode({'theme_id': themeId}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_errorMessage(response, fallback: 'Failed to purchase background'));
+    }
+    return RoomThemeDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<RoomSettingsDto> applyRoomTheme({required String roomId, required String themeId}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/rooms/$roomId/background-theme')),
+      headers: _authHeaders(),
+      body: jsonEncode({'theme_id': themeId}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_errorMessage(response, fallback: 'Failed to apply background'));
+    }
+    return RoomSettingsDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<CustomBackgroundReviewDto> submitCustomBackground({required String roomId, required String imageUrl, String? thumbnailUrl}) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/rooms/custom-backgrounds')),
+      headers: _authHeaders(),
+      body: jsonEncode({
+        'room_public_id': roomId,
+        'image_url': imageUrl.trim(),
+        if (thumbnailUrl != null && thumbnailUrl.trim().isNotEmpty) 'thumbnail_url': thumbnailUrl.trim(),
+      }),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_errorMessage(response, fallback: 'Failed to submit custom background'));
+    }
+    return CustomBackgroundReviewDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Map<String, String> _authHeaders() {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -168,8 +255,9 @@ class RoomApiService {
     try {
       final decoded = jsonDecode(body);
       if (decoded is Map<String, dynamic>) {
-        final detail = decoded['detail']?.toString().trim();
-        if (detail != null && detail.isNotEmpty) return detail;
+        final detail = decoded['detail'];
+        if (detail is String && detail.trim().isNotEmpty) return detail.trim();
+        if (detail != null) return detail.toString();
       }
     } catch (_) {
       return body;
@@ -294,6 +382,84 @@ class RoomParticipantDto {
       isOwner: json['is_owner'] == true,
       isMember: json['is_member'] == true,
       isRoomAdmin: json['is_room_admin'] == true,
+    );
+  }
+}
+
+class MediaUploadResult {
+  const MediaUploadResult({required this.url, required this.mediaType, required this.contentType, required this.sizeBytes});
+
+  final String url;
+  final String mediaType;
+  final String contentType;
+  final int sizeBytes;
+
+  factory MediaUploadResult.fromJson(Map<String, dynamic> json) {
+    return MediaUploadResult(
+      url: json['url']?.toString() ?? '',
+      mediaType: json['media_type']?.toString() ?? 'image',
+      contentType: json['content_type']?.toString() ?? '',
+      sizeBytes: int.tryParse(json['size_bytes']?.toString() ?? '') ?? 0,
+    );
+  }
+}
+
+class RoomSettingsDto {
+  const RoomSettingsDto({required this.roomPublicId, this.coverPhotoUrl, this.backgroundThemeId = 'default'});
+
+  final String roomPublicId;
+  final String? coverPhotoUrl;
+  final String backgroundThemeId;
+
+  factory RoomSettingsDto.fromJson(Map<String, dynamic> json) {
+    return RoomSettingsDto(
+      roomPublicId: json['room_public_id']?.toString() ?? '',
+      coverPhotoUrl: _nullableString(json['cover_photo_url']),
+      backgroundThemeId: json['background_theme_id']?.toString() ?? 'default',
+    );
+  }
+}
+
+class RoomThemeDto {
+  const RoomThemeDto({required this.themeId, required this.name, required this.ownershipType, required this.priceCoins, required this.isOwned, required this.isDefault, this.imageUrl, this.assetPath});
+
+  final String themeId;
+  final String name;
+  final String ownershipType;
+  final int priceCoins;
+  final bool isOwned;
+  final bool isDefault;
+  final String? imageUrl;
+  final String? assetPath;
+
+  bool get isFree => ownershipType == 'free' || priceCoins <= 0;
+
+  factory RoomThemeDto.fromJson(Map<String, dynamic> json) {
+    return RoomThemeDto(
+      themeId: json['theme_id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Room Background',
+      ownershipType: json['ownership_type']?.toString() ?? 'free',
+      priceCoins: int.tryParse(json['price_coins']?.toString() ?? '') ?? 0,
+      isOwned: json['is_owned'] == true,
+      isDefault: json['is_default'] == true,
+      imageUrl: _nullableString(json['image_url']),
+      assetPath: _nullableString(json['asset_path']),
+    );
+  }
+}
+
+class CustomBackgroundReviewDto {
+  const CustomBackgroundReviewDto({required this.reviewPublicId, required this.status, required this.proposedThemeId});
+
+  final String reviewPublicId;
+  final String status;
+  final String proposedThemeId;
+
+  factory CustomBackgroundReviewDto.fromJson(Map<String, dynamic> json) {
+    return CustomBackgroundReviewDto(
+      reviewPublicId: json['review_public_id']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending',
+      proposedThemeId: json['proposed_theme_id']?.toString() ?? '',
     );
   }
 }
