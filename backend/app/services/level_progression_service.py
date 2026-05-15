@@ -12,14 +12,14 @@ class ProgressionTrack(str, Enum):
 
 
 # Product rules:
-# ₹100 recharge gives 1,00,000 coins, so ₹1 worth of coins = 1,000 coin EXP units.
-# VIP max: VIP 50 costs 40,000,000,000 lifetime recharge coins total.
+# Rs 100 recharge gives 1,00,000 coins, so Rs 1 worth of coins = 1,000 coin EXP units.
+# VIP max: VIP 50 costs 50,000,000,000 lifetime recharge coins total.
 # SVIP max: SVIP 10 costs 2,000,000,000 monthly recharge coins total.
 INR_TO_COIN_EXP_RATE = 1_000
 VIP_MAX_LEVEL = 50
 SVIP_MAX_LEVEL = 10
 STANDARD_MAX_LEVEL = 100
-VIP_MAX_TOTAL_EXP = 40_000_000_000
+VIP_MAX_TOTAL_EXP = 50_000_000_000
 SVIP_MAX_TOTAL_EXP = 2_000_000_000
 STANDARD_MAX_TOTAL_EXP = VIP_MAX_TOTAL_EXP
 MAX_RUPEE_VALUE = VIP_MAX_TOTAL_EXP // INR_TO_COIN_EXP_RATE
@@ -91,6 +91,8 @@ def exp_needed_for_level(level: int, track: str | ProgressionTrack = Progression
 def level_for_exp(total_exp: int, track: str | ProgressionTrack = ProgressionTrack.SEND) -> int:
     safe_track = _track(track)
     safe_exp = max(int(total_exp or 0), 0)
+    if safe_exp <= 0:
+        return 0
     max_level = max_level_for_track(safe_track)
     if safe_exp >= max_exp_for_track(safe_track):
         return max_level
@@ -114,6 +116,25 @@ def progress_payload(
     safe_exp = max(int(total_exp or 0), 0)
     max_level = max_level_for_track(safe_track)
     level = level_for_exp(safe_exp, safe_track)
+    if level <= 0:
+        next_exp = 1
+        return {
+            "track": safe_track.value,
+            "label": TRACK_LABELS[safe_track],
+            "level": 0,
+            "max_level": max_level,
+            "total_exp": safe_exp,
+            "current_level_start_exp": 0,
+            "next_level_exp": next_exp,
+            "exp_into_level": 0,
+            "exp_needed_for_next_level": max(next_exp, 1),
+            "progress": 0.0,
+            "is_max_level": False,
+            "max_total_exp": max_exp_for_track(safe_track),
+            "max_rupee_value": max_exp_for_track(safe_track) // INR_TO_COIN_EXP_RATE,
+            "inr_to_coin_exp_rate": INR_TO_COIN_EXP_RATE,
+            "curve_exponent": DEFAULT_CURVE_EXPONENT,
+        }
     current_start = exp_required_for_level(level, safe_track)
     next_level = min(level + 1, max_level)
     next_exp = exp_required_for_level(next_level, safe_track)

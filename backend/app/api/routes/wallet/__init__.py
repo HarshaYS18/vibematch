@@ -20,7 +20,7 @@ COINS_PER_RUPEE = 1_000
 PRICE_PER_LAKH_COINS_INR = 100
 VIP_MAX_LEVEL = 50
 SVIP_MAX_LEVEL = 10
-VIP_MAX_LIFETIME_RECHARGE_COINS = 40_000_000_000
+VIP_MAX_LIFETIME_RECHARGE_COINS = 50_000_000_000
 SVIP_MAX_MONTHLY_RECHARGE_COINS = 2_000_000_000
 
 
@@ -171,7 +171,7 @@ def _wallet_response(db: Session, user: User) -> WalletResponse:
         vip_level=status.vip_level,
         svip_level=status.svip_level,
         svip_expires_at=status.svip_expires_at,
-        coin_price_text=f"1 lakh coins = ₹{PRICE_PER_LAKH_COINS_INR}",
+        coin_price_text=f"1 lakh coins = Rs {PRICE_PER_LAKH_COINS_INR}",
         vip_max_level=int(vip_progress.get("max_level") or VIP_MAX_LEVEL),
         svip_max_level=int(svip_progress.get("max_level") or SVIP_MAX_LEVEL),
         vip_max_lifetime_recharge_coins=int(vip_progress.get("max_total_exp") or VIP_MAX_LIFETIME_RECHARGE_COINS),
@@ -264,7 +264,7 @@ async def recharge_wallet(payload: RechargeRequest, current_user: User = Depends
             source_type="RECHARGE",
             source_id=payload.provider_reference,
             created_by_user_id=current_user.id,
-            reason=f"Recharge ₹{payload.amount_inr}",
+            reason=f"Recharge Rs {payload.amount_inr}",
         )
     )
     db.flush()

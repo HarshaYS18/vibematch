@@ -165,6 +165,11 @@ def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, sourc
     _debit_coin_pool(db, source, coin_amount, "SELLER_COIN_SALE", seller.id, "Coins sold to user", target_user_id=buyer_user_id)
     wallet = get_or_create_wallet(db, buyer_user_id)
     _credit_wallet(db, wallet, EconomyCurrency.COIN, coin_amount, "SELLER_COIN_SALE", str(order.id), seller.id, "Coins delivered from seller pool")
+    db.flush()
+    from app.services import economy_level_service
+
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    economy_level_service.sync_vip_status(db, buyer_user_id, levels)
     db.commit()
     db.refresh(order)
     return order

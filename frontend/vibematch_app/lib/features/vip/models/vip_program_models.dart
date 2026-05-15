@@ -110,6 +110,13 @@ class VipProgramSnapshot {
   final List<VipRewardConfig> svipRewards;
 
   VipLevelConfig get currentVipLevel {
+    if (vipLevel <= 0) {
+      return const VipLevelConfig(
+        level: 0,
+        requiredRechargeCoins: 0,
+        difficulty: VipProgressDifficulty.easy,
+      );
+    }
     return vipLevels.lastWhere(
       (level) => level.level <= vipLevel,
       orElse: () => vipLevels.first,

@@ -1,9 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../models/vip_program_models.dart';
 
 class VipProgramMockRepository {
   const VipProgramMockRepository();
+
+  static const int _vipMaxRequiredCoins = 50000000000;
+  static const int _svipMaxRequiredCoins = 2000000000;
+  static const double _curveExponent = 2.35;
 
   VipProgramSnapshot loadSnapshot({
     int vipLevel = 25,
@@ -274,18 +280,33 @@ class VipProgramMockRepository {
 
   static int _defaultVipRequiredCoins(int level) {
     if (level <= 0) return 0;
-    if (level <= 10) return level * 1000;
-    if (level <= 20) return 10000 + ((level - 10) * 3500);
-    if (level <= 30) return 45000 + ((level - 20) * 9000);
-    if (level <= 40) return 135000 + ((level - 30) * 22000);
-    return 355000 + ((level - 40) * 58000);
+    if (level == 1) return 1;
+    if (level >= 50) return _vipMaxRequiredCoins;
+    return _curvedRequiredCoins(
+      level: level,
+      maxLevel: 50,
+      maxRequiredCoins: _vipMaxRequiredCoins,
+    );
   }
 
   static int _defaultSvipRequiredCoins(int level) {
     if (level <= 0) return 0;
-    if (level <= 3) return level * 15000;
-    if (level <= 6) return 45000 + ((level - 3) * 35000);
-    if (level <= 8) return 150000 + ((level - 6) * 70000);
-    return 290000 + ((level - 8) * 150000);
+    if (level == 1) return 1;
+    if (level >= 10) return _svipMaxRequiredCoins;
+    return _curvedRequiredCoins(
+      level: level,
+      maxLevel: 10,
+      maxRequiredCoins: _svipMaxRequiredCoins,
+    );
+  }
+
+  static int _curvedRequiredCoins({
+    required int level,
+    required int maxLevel,
+    required int maxRequiredCoins,
+  }) {
+    if (level <= 1) return 0;
+    final ratio = (level - 1) / (maxLevel - 1);
+    return (maxRequiredCoins * math.pow(ratio, _curveExponent)).round();
   }
 }

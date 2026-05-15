@@ -198,6 +198,11 @@ def sell_to_user(db: Session, seller: User, target_identifier: int | str, coin_a
         created_by_user_id=seller.id,
         reason=reason,
     ))
+    db.flush()
+    from app.services import economy_level_service
+
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    economy_level_service.sync_vip_status(db, buyer.id, levels)
     db.commit()
     db.refresh(order)
     db.refresh(source)

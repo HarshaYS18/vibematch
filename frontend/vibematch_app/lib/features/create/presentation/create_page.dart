@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/navigation/vm_navigator.dart';
 import '../../auth/models/current_user.dart';
 import '../../media/data/media_upload_service.dart';
-import '../../rooms/data/live_room_media_signaling_service.dart';
 import '../../rooms/data/room_api_service.dart';
-import '../../rooms/presentation/live_room_models.dart';
-import '../../rooms/presentation/live_room_page.dart';
 
 class CreatePage extends StatefulWidget {
   const CreatePage({super.key, required this.currentUser, this.onRoomCreated});
@@ -159,40 +157,12 @@ class _CreatePageState extends State<CreatePage> {
     }
   }
 
-  SeatUser _createdRoomHostSeatUser() {
-    final currentUser = widget.currentUser;
-    final isOfficial = currentUser.canSeeOwnerControls;
-
-    return SeatUser(
-      id: currentUser.publicUserId.toString(),
-      name: currentUser.displayName ?? currentUser.username ?? 'Vibe User',
-      roleLabel: 'Channel Host',
-      familyName: '',
-      familyLevel: 'bronze',
-      relationshipText: '',
-      vipLevel: currentUser.vip.vipLevel,
-      svipLevel: currentUser.vip.svipLevel,
-      sendingLevel: currentUser.wallet.sendLevel <= 0 ? 1 : currentUser.wallet.sendLevel,
-      receivingLevel: currentUser.wallet.receiveLevel <= 0 ? 1 : currentUser.wallet.receiveLevel,
-      sentExp: currentUser.wallet.monthlyGiftCoinsSent,
-      receivedExp: currentUser.wallet.monthlyGiftCoinsReceived,
-      medals: const <String>[],
-      avatarColors: isOfficial
-          ? const <Color>[Color(0xFFFFC857), Color(0xFFE84C72)]
-          : const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-      avatarUrl: currentUser.avatarUrl,
-      isCurrentUser: true,
-      isHost: true,
-      isRoomAdmin: true,
-    );
-  }
-
   void _showRoomReadySheet(RealRoom room) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (sheetContext) {
         return _CreateSheet(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -231,21 +201,16 @@ class _CreatePageState extends State<CreatePage> {
                       text: 'Enter Room',
                       icon: Icons.login_rounded,
                       onTap: () {
-                        final mediaService = LiveRoomMediaSignalingService.instance;
-                        mediaService.configureRoom(roomId: room.id, roomName: room.name);
-                        mediaService.seedActiveRoomSeatUser(_createdRoomHostSeatUser());
-                        Navigator.pop(context);
-                        Navigator.push(
+                        Navigator.pop(sheetContext);
+                        if (!mounted) return;
+                        VmNavigator.openLiveRoom(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => LiveRoomPage(
-                              roomName: room.name,
-                              roomId: room.id,
-                              language: room.language,
-                              modeTitle: room.mode,
-                              onlineCount: room.onlineCount,
-                            ),
-                          ),
+                          roomName: room.name,
+                          roomId: room.id,
+                          language: room.language,
+                          modeTitle: room.mode,
+                          onlineCount: room.onlineCount,
+                          currentUser: widget.currentUser,
                         );
                         _toast(room.allowScreenshots ? 'Screenshots allowed for this room' : 'Screenshots denied for this room');
                       },

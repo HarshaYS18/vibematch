@@ -65,6 +65,35 @@ def _normalize_mode(value: str | None) -> str:
     return "Open"
 
 
+def _is_seed_or_test_room(room: Room) -> bool:
+    name = (room.name or "").strip().lower()
+    subtitle = (room.subtitle or "").strip().lower()
+    public_id = (room.room_public_id or "").strip().lower()
+    if name in {"test room", "demo room", "sample room", "seed room"}:
+        return True
+    if name.startswith(("test ", "demo ", "seed ", "sample ")):
+        return True
+    if public_id.startswith(("test", "demo", "seed", "sample")):
+        return True
+    return any(marker in subtitle for marker in ("seed", "demo", "sample", "mock"))
+
+
+def _find_user_created_room(db: Session, user_id: int, *, active_only: bool) -> Room | None:
+    query = db.query(Room).filter(Room.owner_user_id == user_id)
+    if active_only:
+        query = query.filter(Room.is_active.is_(True))
+
+    rooms = (
+        query.order_by(Room.updated_at.desc(), Room.created_at.desc(), Room.id.desc())
+        .limit(50)
+        .all()
+    )
+    for room in rooms:
+        if not _is_seed_or_test_room(room):
+            return room
+    return None
+
+
 def _clean_lock_password(value: str | None) -> str | None:
     text = (value or "").strip()
     return text or None
@@ -88,7 +117,9 @@ def _clean_room_lock_password(value: str | None, *, required: bool) -> str | Non
 
 
 def _set_room_lock_password(room: Room, lock_password: str | None, actor_user_id: int | None) -> None:
-    clean_password = _clean_room_lock_password(lock_password, required=True)
+    clean_password = _clean_room_lock_password(lock_password, required=not bool(room.lock_password_hash))
+    if clean_password is None:
+        return
     room.lock_password_hash = hash_password(clean_password)
     room.lock_updated_at = datetime.utcnow()
     room.lock_updated_by_user_id = actor_user_id
@@ -319,7 +350,7 @@ def active_participants(db: Session, room: Room) -> list[RoomParticipant]:
 
 def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> RoomDetailResponse:
     if not _can_create_unlimited_rooms(current_user):
-        existing_room = db.query(Room).filter(Room.owner_user_id == current_user.id).order_by(Room.created_at.asc()).first()
+        existing_room = _find_user_created_room(db, current_user.id, active_only=False)
         if existing_room is not None:
             _apply_room_payload(existing_room, payload)
             _upsert_active_participant(db, existing_room, current_user)
@@ -344,9 +375,10 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
 
 
 def get_my_created_room(db: Session, current_user: User) -> RoomDetailResponse | None:
-    room = db.query(Room).filter(Room.owner_user_id == current_user.id, Room.is_active.is_(True)).order_by(Room.created_at.asc()).first()
+    room = _find_user_created_room(db, current_user.id, active_only=False)
     if room is None:
         return None
+    room.is_active = True
     _refresh_room_online_count(db, room)
     db.commit()
     db.refresh(room)
@@ -475,15 +507,22 @@ def list_trending_rooms(db: Session, language: str | None = None, category: str 
         _refresh_room_online_count(db, room)
     db.commit()
 
-    query = db.query(Room).filter(Room.is_active.is_(True), Room.is_secret.is_(False), Room.is_locked.is_(False), Room.is_members_only.is_(False), Room.mode == "Open", Room.online_count > 0)
+    query = db.query(Room).filter(Room.is_active.is_(True), Room.is_secret.is_(False), Room.is_locked.is_(False), Room.is_members_only.is_(False), Room.mode == "Open")
 
     if language and language != "All":
         query = query.filter(Room.language == language)
     if category and category not in {"All", "Trending", "Following"}:
         query = query.filter(Room.room_type == category)
 
-    rooms = query.order_by(Room.online_count.desc(), Room.trending_score.desc(), Room.created_at.desc()).limit(limit).all()
-    return [room_to_trending_response(room) for room in rooms]
+    rooms = query.order_by(Room.online_count.desc(), Room.trending_score.desc(), Room.updated_at.desc(), Room.created_at.desc()).limit(max(limit * 3, limit)).all()
+    visible_rooms: list[Room] = []
+    for room in rooms:
+        if _is_seed_or_test_room(room):
+            continue
+        visible_rooms.append(room)
+        if len(visible_rooms) >= limit:
+            break
+    return [room_to_trending_response(room) for room in visible_rooms]
 
 
 def list_following_rooms(db: Session, current_user: User, language: str | None = None, category: str | None = None, limit: int = 30) -> list[RoomTrendingResponse]:
@@ -502,6 +541,13 @@ def list_following_rooms(db: Session, current_user: User, language: str | None =
     if category and category not in {"All", "Trending", "Following"}:
         query = query.filter(Room.room_type == category)
 
-    rooms = query.order_by(Room.online_count.desc(), Room.trending_score.desc(), Room.created_at.desc()).limit(limit).all()
+    rooms = query.order_by(Room.online_count.desc(), Room.trending_score.desc(), Room.updated_at.desc(), Room.created_at.desc()).limit(max(limit * 3, limit)).all()
     followed_users = {user.id: (user.display_name or user.username or str(user.public_user_id)) for user in db.query(User).filter(User.id.in_(followed_ids)).all()}
-    return [room_to_trending_response(room, [followed_users.get(room.owner_user_id, "Friend")]) for room in rooms]
+    visible_rooms: list[Room] = []
+    for room in rooms:
+        if _is_seed_or_test_room(room):
+            continue
+        visible_rooms.append(room)
+        if len(visible_rooms) >= limit:
+            break
+    return [room_to_trending_response(room, [followed_users.get(room.owner_user_id, "Friend")]) for room in visible_rooms]

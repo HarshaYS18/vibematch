@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -46,23 +44,6 @@ def _can_manage_room(db: Session, room: Room, user: User) -> bool:
         return True
     participant = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id).first()
     return bool(participant and participant.is_room_admin)
-
-
-def _clean_room_lock_password(value: object, *, required: bool) -> str | None:
-    text = value.strip() if isinstance(value, str) else ""
-    if not text:
-        if required:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="4-digit room lock password is required when locking room",
-            )
-        return None
-    if not text.isdigit() or len(text) != 4:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Room lock password must be exactly 4 digits",
-        )
-    return text
 
 
 def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse:
@@ -149,18 +130,6 @@ def _get_or_create_room_for_settings(db: Session, room_public_id: str, current_u
     return room
 
 
-def _apply_settings_mode_flags(room: Room, mode: str) -> None:
-    normalized = mode.strip().lower()
-    room.mode = mode.strip() or "Open"
-    room.is_secret = "secret" in normalized or "private" in normalized
-    room.is_locked = "lock" in normalized
-    room.is_members_only = "member" in normalized
-    if not room.is_locked:
-        room.lock_password_hash = None
-        room.lock_updated_at = None
-        room.lock_updated_by_user_id = None
-
-
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_live_room(payload: RoomCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return create_room(db=db, current_user=current_user, payload=payload)
@@ -216,18 +185,8 @@ def update_room_settings(
     if payload.allow_screenshots is not None:
         room.allow_screenshots = payload.allow_screenshots
     if payload.mode is not None:
-        _apply_settings_mode_flags(room, payload.mode)
-        if room.is_locked:
-            lock_password = _clean_room_lock_password(
-                payload.lock_password,
-                required=not bool(room.lock_password_hash),
-            )
-            if lock_password is not None:
-                from app.core.security import hash_password
-
-                room.lock_password_hash = hash_password(lock_password)
-                room.lock_updated_at = datetime.utcnow()
-                room.lock_updated_by_user_id = current_user.id
+        apply_room_mode(room, mode=payload.mode, actor_user_id=current_user.id, lock_password=payload.lock_password)
+    room.is_active = True
 
     db.add(room)
     db.commit()
