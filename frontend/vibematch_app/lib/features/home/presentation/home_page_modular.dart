@@ -11,6 +11,7 @@ import 'sections/home_room_section_header.dart';
 import 'widgets/home_backend_connected_strip.dart';
 import 'widgets/home_loading_strip.dart';
 import 'widgets/home_network_error_card.dart';
+import 'widgets/home_official_banner_manage_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -87,6 +88,12 @@ class _HomePageState extends State<HomePage> {
                   onNotificationsTap: () => VmNavigator.openNotifications(context),
                 ),
               ),
+              if (_canManageHomeBanners)
+                SliverToBoxAdapter(
+                  child: HomeOfficialBannerManageCard(
+                    onTap: () => VmNavigator.openBannerManager(context),
+                  ),
+                ),
               if (_controller.bannerErrorMessage != null)
                 SliverToBoxAdapter(
                   child: HomeNetworkErrorCard(
@@ -112,7 +119,6 @@ class _HomePageState extends State<HomePage> {
                   selectedLanguage: _controller.selectedLanguage,
                   onCategorySelected: _controller.selectCategory,
                   onLanguageTap: () => HomeNavigationController.openLanguageSheet(context: context, controller: _controller),
-                  onSeeAllTap: () => HomeNavigationController.seeAllRooms(context: context, controller: _controller),
                 ),
               ),
               if (_controller.isLoadingRooms)
