@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/security/screenshot_guard_service.dart';
 import '../../data/active_room_context.dart';
 import '../../data/room_api_service.dart';
 import '../../data/room_settings_repository.dart';
@@ -75,6 +76,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     setState(() => _loadingSettings = true);
     try {
       final settings = await _settingsRepository.fetchRoomSettings(roomId);
+      await ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: settings.allowScreenshots);
       if (!mounted) return;
       setState(() {
         _selectedLanguage = settings.language?.trim().isNotEmpty == true ? settings.language!.trim() : _selectedLanguage;
@@ -119,6 +121,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
         lockPassword: mode == RoomPrivacyMode.locked ? lockText : null,
         allowScreenshots: allowScreenshots,
       );
+      await ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: settings.allowScreenshots);
       if (!mounted) return;
       final confirmedMode = settings.mode?.trim().isNotEmpty == true ? privacyModeFromTitle(settings.mode!) : _mode;
       setState(() {
