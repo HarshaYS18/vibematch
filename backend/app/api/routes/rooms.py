@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.room import Room
 from app.models.user import User
 from app.schemas.room_settings import (
+    RoomAccessSettingsUpdateRequest,
     RoomAnnouncementUpdateRequest,
     RoomBackgroundUpdateRequest,
     RoomSettingsResponse,
@@ -28,6 +29,14 @@ def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
 def _room_settings_response(room: Room) -> RoomSettingsResponse:
     return RoomSettingsResponse(
         room_public_id=room.room_public_id,
+        name=room.name,
+        language=room.language,
+        mode=room.mode,
+        is_secret=room.is_secret,
+        is_locked=room.is_locked,
+        is_members_only=room.is_members_only,
+        allow_screenshots=room.allow_screenshots,
+        has_lock_password=bool(room.lock_password_hash),
         background_theme_id=room.background_theme_id or "default",
         announcement_text=room.announcement_text,
         announcement_updated_at=room.announcement_updated_at,
@@ -55,6 +64,7 @@ def _room_discovery_payload(room: Room) -> dict:
         "is_secret": room.is_secret,
         "is_locked": room.is_locked,
         "is_members_only": room.is_members_only,
+        "allow_screenshots": room.allow_screenshots,
         "has_lock_password": bool(room.lock_password_hash),
     }
 
@@ -94,9 +104,14 @@ def _new_room_public_id(db: Session) -> str:
 
 def _apply_mode_flags(room: Room, mode: str) -> None:
     normalized = mode.strip().lower()
-    room.is_secret = "secret" in normalized
+    room.mode = mode.strip() or "Open"
+    room.is_secret = "secret" in normalized or "private" in normalized
     room.is_locked = "lock" in normalized
     room.is_members_only = "member" in normalized
+    if not room.is_locked:
+        room.lock_password_hash = None
+        room.lock_updated_at = None
+        room.lock_updated_by_user_id = None
 
 
 def _find_lifetime_user_room(db: Session, user_id: int) -> Room | None:
@@ -166,14 +181,24 @@ def create_room(
     avatar_url = _clean_text(payload.get("avatar_url"), field_name="Room avatar", max_length=500, required=False)
     cover_photo_url = _clean_text(payload.get("cover_photo_url") or avatar_url, field_name="Room cover photo", max_length=500, required=False)
     lock_password = _clean_text(payload.get("lock_password"), field_name="Lock password", max_length=80, required=False)
+    allow_screenshots = payload.get("allow_screenshots")
 
     existing_room = _find_lifetime_user_room(db, current_user.id)
     if existing_room is not None:
         existing_room.name = name or existing_room.name
+        existing_room.language = language or existing_room.language
+        existing_room.subtitle = subtitle if subtitle is not None else existing_room.subtitle
         if avatar_url is not None:
             existing_room.avatar_url = avatar_url
         if cover_photo_url is not None:
             existing_room.cover_photo_url = cover_photo_url
+        if allow_screenshots is not None:
+            existing_room.allow_screenshots = bool(allow_screenshots)
+        _apply_mode_flags(existing_room, mode or existing_room.mode)
+        if existing_room.is_locked and lock_password:
+            existing_room.lock_password_hash = hash_password(lock_password)
+            existing_room.lock_updated_at = datetime.utcnow()
+            existing_room.lock_updated_by_user_id = current_user.id
         existing_room.is_active = True
         db.add(existing_room)
         db.commit()
@@ -193,6 +218,7 @@ def create_room(
         online_count=1,
         trending_score=0,
         is_active=True,
+        allow_screenshots=bool(allow_screenshots) if allow_screenshots is not None else True,
     )
     _apply_mode_flags(room, room.mode)
     if room.is_locked and lock_password:
@@ -226,6 +252,62 @@ def get_my_created_room(
 def get_room_settings(room_public_id: str, db: Session = Depends(get_db)) -> RoomSettingsResponse:
     room = _get_room_by_public_id(db, room_public_id)
     return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/settings", response_model=RoomSettingsResponse)
+def update_room_access_settings(
+    room_public_id: str,
+    payload: RoomAccessSettingsUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RoomSettingsResponse:
+    room = _get_room_by_public_id(db, room_public_id)
+    if room.owner_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the room owner can update room settings")
+    if payload.language is not None:
+        room.language = payload.language.strip()
+    if payload.allow_screenshots is not None:
+        room.allow_screenshots = payload.allow_screenshots
+    if payload.mode is not None:
+        _apply_mode_flags(room, payload.mode)
+        if room.is_locked:
+            lock_password = (payload.lock_password or "").strip()
+            if lock_password:
+                room.lock_password_hash = hash_password(lock_password)
+                room.lock_updated_at = datetime.utcnow()
+                room.lock_updated_by_user_id = current_user.id
+            elif not room.lock_password_hash:
+                raise HTTPException(status_code=400, detail="Lock password is required when locking room")
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/mode")
+def update_room_mode(
+    room_public_id: str,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    room = _get_room_by_public_id(db, room_public_id)
+    if room.owner_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the room owner can update room mode")
+    mode = _clean_text(payload.get("mode"), field_name="Room mode", max_length=40)
+    lock_password = _clean_text(payload.get("lock_password"), field_name="Lock password", max_length=80, required=False)
+    _apply_mode_flags(room, mode or "Open")
+    if room.is_locked:
+        if lock_password:
+            room.lock_password_hash = hash_password(lock_password)
+            room.lock_updated_at = datetime.utcnow()
+            room.lock_updated_by_user_id = current_user.id
+        elif not room.lock_password_hash:
+            raise HTTPException(status_code=400, detail="Lock password is required when locking room")
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return _room_discovery_payload(room)
 
 
 @router.patch("/{room_public_id}/background", response_model=RoomSettingsResponse)
