@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../app/app_routes.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
 import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_membership_service.dart';
