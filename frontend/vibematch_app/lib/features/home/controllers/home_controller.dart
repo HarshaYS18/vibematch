@@ -16,10 +16,14 @@ class HomeController extends ChangeNotifier {
   String selectedCategory = 'Trending';
   String selectedLanguage = 'All';
   bool isLoadingRooms = false;
+  bool isLoadingHomeChrome = false;
   String? loadErrorMessage;
+  String? bannerErrorMessage;
   HomeRoom? myCreatedRoom;
 
   List<HomeRoom> _backendRooms = const [];
+  List<HomeBanner> _eventBanners = const [];
+  List<HomeBanner> _policyBanners = const [];
 
   final List<String> categories = const [
     'Trending',
@@ -50,41 +54,9 @@ class HomeController extends ChangeNotifier {
     'Other',
   ];
 
-  final List<HomeBanner> banners = const [
-    HomeBanner(
-      id: 'event_weekend_001',
-      title: 'Weekend Event',
-      fallbackIcon: Icons.celebration_rounded,
-      fallbackGradient: [Color(0xFFE84C72), Color(0xFF8C5CF6)],
-    ),
-    HomeBanner(
-      id: 'promo_recharge_001',
-      title: 'Recharge Promo',
-      fallbackIcon: Icons.bolt_rounded,
-      fallbackGradient: [Color(0xFFC99A3B), Color(0xFFE84C72)],
-    ),
-    HomeBanner(
-      id: 'event_vibes_001',
-      title: 'Vibes Event',
-      fallbackIcon: Icons.auto_awesome_rounded,
-      fallbackGradient: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-    ),
-  ];
+  List<HomeBanner> get banners => _eventBanners;
 
-  final List<HomeBanner> policyBanners = const [
-    HomeBanner(
-      id: 'policy_rules_001',
-      title: 'Rules & Regulations',
-      fallbackIcon: Icons.rule_rounded,
-      fallbackGradient: [Color(0xFF251538), Color(0xFF4A2A63)],
-    ),
-    HomeBanner(
-      id: 'policy_safety_001',
-      title: 'Safety Policy',
-      fallbackIcon: Icons.verified_user_rounded,
-      fallbackGradient: [Color(0xFF4A2A63), Color(0xFF12C7B7)],
-    ),
-  ];
+  List<HomeBanner> get policyBanners => _policyBanners;
 
   List<HomeRoom> get rooms => _backendRooms;
 
@@ -110,14 +82,39 @@ class HomeController extends ChangeNotifier {
     return rooms.take(visibleRoomCount.clamp(0, rooms.length)).toList();
   }
 
-  Future<void> refreshAfterRoomCreation() async {
-    myCreatedRoom = null;
-    await loadRooms();
+  Future<void> loadHomeChrome() async {
+    if (isLoadingHomeChrome) return;
+    isLoadingHomeChrome = true;
+    bannerErrorMessage = null;
+    notifyListeners();
+
+    try {
+      final results = await Future.wait<Object?>([
+        _repository.fetchMyCreatedRoom(),
+        _repository.fetchHomeBanners(placement: 'event'),
+        _repository.fetchHomeBanners(placement: 'policy_rules'),
+      ]);
+
+      myCreatedRoom = results[0] as HomeRoom?;
+      _eventBanners = (results[1] as List<HomeBanner>?) ?? const [];
+      _policyBanners = (results[2] as List<HomeBanner>?) ?? const [];
+      selectedBannerIndex = selectedBannerIndex.clamp(0, _eventBanners.isEmpty ? 0 : _eventBanners.length - 1);
+      selectedPolicyBannerIndex = selectedPolicyBannerIndex.clamp(0, _policyBanners.isEmpty ? 0 : _policyBanners.length - 1);
+      bannerErrorMessage = null;
+    } catch (_) {
+      myCreatedRoom = null;
+      _eventBanners = const [];
+      _policyBanners = const [];
+      bannerErrorMessage = 'Could not load home banners or created room. Pull to refresh.';
+    } finally {
+      isLoadingHomeChrome = false;
+      notifyListeners();
+    }
   }
 
-  void ensureMockCreatedRoom() {
-    myCreatedRoom = null;
-    notifyListeners();
+  Future<void> refreshAfterRoomCreation() async {
+    await loadHomeChrome();
+    await loadRooms();
   }
 
   Future<void> loadTrendingRooms({bool silent = false}) => loadRooms(silent: silent);
@@ -159,6 +156,10 @@ class HomeController extends ChangeNotifier {
       visibleRoomCount = 6;
       notifyListeners();
     }
+  }
+
+  Future<void> refreshAll() async {
+    await Future.wait([loadHomeChrome(), loadRooms()]);
   }
 
   void onScrollNearBottom(ScrollController scrollController) {
