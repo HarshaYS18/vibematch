@@ -13,6 +13,7 @@ from app.models.user import User
 from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeSave, VibeShare
 from app.schemas.vibes import (
     VibeAuthorResponse,
+    VibeCommentActionResponse,
     VibeCommentCreateRequest,
     VibeCommentResponse,
     VibeDeleteResponse,
@@ -82,6 +83,19 @@ def _author_response(user: User) -> VibeAuthorResponse:
     )
 
 
+def _comment_response(comment: VibeComment, post: VibePost, current_user: User) -> VibeCommentResponse:
+    return VibeCommentResponse(
+        id=comment.id,
+        post_id=comment.post_id,
+        text=comment.text,
+        author=_author_response(comment.user),
+        is_pinned=getattr(comment, "is_pinned", False),
+        can_pin=post.author_user_id == current_user.id,
+        can_delete=comment.user_id == current_user.id or post.author_user_id == current_user.id,
+        created_at=comment.created_at,
+    )
+
+
 def _role_names(user: User) -> set[str]:
     names: set[str] = set()
 
@@ -106,6 +120,13 @@ def _get_visible_post_or_404(db: Session, post_id: int) -> VibePost:
     if not post:
         raise HTTPException(status_code=404, detail="Vibe not found")
     return post
+
+
+def _get_visible_comment_or_404(db: Session, post_id: int, comment_id: int) -> VibeComment:
+    comment = db.query(VibeComment).filter(VibeComment.id == comment_id, VibeComment.post_id == post_id, VibeComment.is_deleted.is_(False)).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Vibe comment not found")
+    return comment
 
 
 def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostResponse:
@@ -350,14 +371,37 @@ def add_vibe_comment(post_id: int, payload: VibeCommentCreateRequest, db: Sessio
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    return VibeCommentResponse(id=comment.id, post_id=post_id, text=comment.text, author=_author_response(current_user), created_at=comment.created_at)
+    return _comment_response(comment, post, current_user)
 
 
 @router.get("/{post_id}/comments", response_model=list[VibeCommentResponse])
 def list_vibe_comments(post_id: int, limit: int = Query(default=50, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _get_visible_post_or_404(db, post_id)
-    comments = db.query(VibeComment).filter(VibeComment.post_id == post_id, VibeComment.is_deleted.is_(False)).order_by(VibeComment.created_at.asc()).limit(limit).all()
-    return [VibeCommentResponse(id=item.id, post_id=post_id, text=item.text, author=_author_response(item.user), created_at=item.created_at) for item in comments]
+    post = _get_visible_post_or_404(db, post_id)
+    comments = db.query(VibeComment).filter(VibeComment.post_id == post_id, VibeComment.is_deleted.is_(False)).order_by(VibeComment.is_pinned.desc(), VibeComment.created_at.asc()).limit(limit).all()
+    return [_comment_response(item, post, current_user) for item in comments]
+
+
+@router.patch("/{post_id}/comments/{comment_id}/pin", response_model=VibeCommentActionResponse)
+def toggle_vibe_comment_pin(post_id: int, comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    post = _get_visible_post_or_404(db, post_id)
+    if post.author_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the Vibe author can pin comments")
+    comment = _get_visible_comment_or_404(db, post_id, comment_id)
+    comment.is_pinned = not getattr(comment, "is_pinned", False)
+    db.commit()
+    db.refresh(comment)
+    return VibeCommentActionResponse(id=comment.id, post_id=post_id, is_pinned=comment.is_pinned, deleted=False)
+
+
+@router.delete("/{post_id}/comments/{comment_id}", response_model=VibeCommentActionResponse)
+def delete_vibe_comment(post_id: int, comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    post = _get_visible_post_or_404(db, post_id)
+    comment = _get_visible_comment_or_404(db, post_id, comment_id)
+    if comment.user_id != current_user.id and post.author_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the comment author or Vibe author can delete this comment")
+    comment.is_deleted = True
+    db.commit()
+    return VibeCommentActionResponse(id=comment.id, post_id=post_id, is_pinned=getattr(comment, "is_pinned", False), deleted=True)
 
 
 @router.delete("/{post_id}", response_model=VibeDeleteResponse)
