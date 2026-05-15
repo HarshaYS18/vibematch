@@ -265,7 +265,12 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
 
   void _openRoomLevelPage() {
     _clearRoomFocus();
-    Navigator.pushNamed(context, VmRoutes.roomLevel);
+    RoomLevelSheet.show(
+      context,
+      roomName: _roomName,
+      roomPublicId: _roomId,
+      fallbackLevel: 1,
+    );
   }
 
   void _sendMessage() {
