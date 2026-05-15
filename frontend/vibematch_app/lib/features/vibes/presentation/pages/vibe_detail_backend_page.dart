@@ -117,7 +117,13 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF111015)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF111015),
+        ),
+      );
   }
 
   @override
@@ -129,7 +135,10 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.white,
-        leading: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF111015), size: 26)),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF111015), size: 26),
+        ),
         title: const Text('Vibe', style: TextStyle(color: Color(0xFF111015), fontSize: 18, fontWeight: FontWeight.w900)),
         actions: [
           if (_isSelfVibe)
@@ -138,10 +147,16 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
               icon: Icon(_deleting ? Icons.hourglass_top_rounded : Icons.delete_outline_rounded, color: const Color(0xFFE84C72), size: 24),
             )
           else
-            IconButton(onPressed: () => _toast('Use feed report menu to report this Vibe.'), icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF111015), size: 26)),
+            IconButton(
+              onPressed: () => _toast('Use feed report menu to report this Vibe.'),
+              icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF111015), size: 26),
+            ),
           const SizedBox(width: 6),
         ],
-        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: Color(0xFFECE2D8))),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: Color(0xFFECE2D8)),
+        ),
       ),
       body: SafeArea(
         child: Column(
@@ -226,11 +241,15 @@ class _AuthorRow extends StatelessWidget {
             VibeAvatar(vibe: vibe, size: 38),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(vibe.authorName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF111015), fontSize: 14, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 2),
-                Text(vibe.timeAgo, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11.5, fontWeight: FontWeight.w700)),
-              ]),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(vibe.authorName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF111015), fontSize: 14, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  Text(vibe.timeAgo, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                ],
+              ),
             ),
           ],
         ),
@@ -248,21 +267,26 @@ class _PostInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          _Metric(icon: Icons.favorite_rounded, value: vibe.likes),
-          const SizedBox(width: 14),
-          _Metric(icon: Icons.mode_comment_rounded, value: vibe.comments),
-          const SizedBox(width: 14),
-          _Metric(icon: Icons.send_rounded, value: vibe.shares),
-          const SizedBox(width: 14),
-          _Metric(icon: Icons.bookmark_rounded, value: vibe.saves),
-        ]),
-        const SizedBox(height: 10),
-        if (caption.isNotEmpty) _Caption(authorName: vibe.authorName, caption: caption),
-        const SizedBox(height: 8),
-        Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _Metric(icon: Icons.favorite_rounded, value: vibe.likes),
+              const SizedBox(width: 14),
+              _Metric(icon: Icons.mode_comment_rounded, value: vibe.comments),
+              const SizedBox(width: 14),
+              _Metric(icon: Icons.send_rounded, value: vibe.shares),
+              const SizedBox(width: 14),
+              _Metric(icon: Icons.bookmark_rounded, value: vibe.saves),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (caption.isNotEmpty) _Caption(authorName: vibe.authorName, caption: caption),
+          const SizedBox(height: 8),
+          Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+        ],
+      ),
     );
   }
 }
@@ -271,8 +295,16 @@ class _Metric extends StatelessWidget {
   const _Metric({required this.icon, required this.value});
   final IconData icon;
   final int value;
+
   @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: const Color(0xFF111015), size: 19), const SizedBox(width: 5), Text(_formatCount(value), style: const TextStyle(color: Color(0xFF111015), fontSize: 12.5, fontWeight: FontWeight.w900))]);
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFF111015), size: 19),
+          const SizedBox(width: 5),
+          Text(_formatCount(value), style: const TextStyle(color: Color(0xFF111015), fontSize: 12.5, fontWeight: FontWeight.w900)),
+        ],
+      );
 }
 
 class _Caption extends StatelessWidget {
@@ -306,11 +338,16 @@ class _CommentsHeader extends StatelessWidget {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(14, 14, 8, 8),
-      child: Row(children: [
-        const Expanded(child: Text('Comments', style: TextStyle(color: Color(0xFF111015), fontSize: 17, fontWeight: FontWeight.w900))),
-        if (loading) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF111015))) else Text('$count', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 12.5, fontWeight: FontWeight.w900)),
-        IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded, color: Color(0xFF111015), size: 20)),
-      ]),
+      child: Row(
+        children: [
+          const Expanded(child: Text('Comments', style: TextStyle(color: Color(0xFF111015), fontSize: 17, fontWeight: FontWeight.w900))),
+          if (loading)
+            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF111015)))
+          else
+            Text('$count', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 12.5, fontWeight: FontWeight.w900)),
+          IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded, color: Color(0xFF111015), size: 20)),
+        ],
+      ),
     );
   }
 }
@@ -324,17 +361,31 @@ class _CommentTile extends StatelessWidget {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        CircleAvatar(radius: 17, backgroundColor: const Color(0xFF111015), child: Text(comment.avatarText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900))),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32), children: [TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)), TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600))])),
-            const SizedBox(height: 4),
-            Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700)),
-          ]),
-        ),
-      ]),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(radius: 17, backgroundColor: const Color(0xFF111015), child: Text(comment.avatarText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900))),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32),
+                    children: [
+                      TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)),
+                      TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -349,53 +400,103 @@ class _CommentComposer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(12, 9, 12, 10 + MediaQuery.paddingOf(context).bottom),
-      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFECE2D8))),
-      child: Row(children: [
-        Expanded(
-          child: TextField(
-            controller: controller,
-            enabled: !sending,
-            minLines: 1,
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Add a comment...',
-              hintStyle: const TextStyle(color: Color(0xFFAAA1AE), fontWeight: FontWeight.w600),
-              filled: true,
-              fillColor: const Color(0xFFF7F3EF),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFECE2D8))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              enabled: !sending,
+              minLines: 1,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Add a comment...',
+                hintStyle: const TextStyle(color: Color(0xFFAAA1AE), fontWeight: FontWeight.w600),
+                filled: true,
+                fillColor: const Color(0xFFF7F3EF),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        InkWell(
-          onTap: sending ? null : onSend,
-          borderRadius: BorderRadius.circular(999),
-          child: Container(width: 43, height: 43, decoration: const BoxDecoration(color: Color(0xFF111015), shape: BoxShape.circle), child: sending ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22)),
-        ),
-      ]),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: sending ? null : onSend,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              width: 43,
+              height: 43,
+              decoration: const BoxDecoration(color: Color(0xFF111015), shape: BoxShape.circle),
+              child: sending
+                  ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _EmptyCommentsState extends StatelessWidget {
   const _EmptyCommentsState();
+
   @override
-  Widget build(BuildContext context) => const Padding(padding: EdgeInsets.fromLTRB(14, 24, 14, 28), child: Center(child: Text('No comments yet. Be the first to comment.', style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w800))));
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.fromLTRB(14, 24, 14, 28),
+        child: Center(child: Text('No comments yet. Be the first to comment.', style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w800))),
+      );
 }
 
 class _ErrorCard extends StatelessWidget {
   const _ErrorCard({required this.message, required this.onRetry});
   final String message;
   final VoidCallback onRetry;
+
   @override
-  Widget build(BuildContext context) => Container(margin: const EdgeInsets.fromLTRB(14, 4, 14, 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFFFF8E8), borderRadius: BorderRadius.circular(14)), child: Row(children: [const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19), const SizedBox(width: 9), Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))), TextButton(onPressed: onRetry, child: const Text('Retry'))]));
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: const Color(0xFFFFF8E8), borderRadius: BorderRadius.circular(14)),
+        child: Row(
+          children: [
+            const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 19),
+            const SizedBox(width: 9),
+            Expanded(child: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      );
 }
 
 class _ConfirmDeleteSheet extends StatelessWidget {
   const _ConfirmDeleteSheet();
+
   @override
-  Widget build(BuildContext context) => Container(margin: const EdgeInsets.all(14), padding: EdgeInsets.fromLTRB(18, 16, 18, 18 + MediaQuery.paddingOf(context).bottom), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Delete this Vibe?', style: TextStyle(color: Color(0xFF111015), fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), const Text('This removes the Vibe from the feed.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w700)), const SizedBox(height: 16), Row(children: [Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel'))), const SizedBox(width: 10), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE84C72), foregroundColor: Colors.white), onPressed: () => Navigator.pop(context, true), child: const Text('Delete')))])]));
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.all(14),
+        padding: EdgeInsets.fromLTRB(18, 16, 18, 18 + MediaQuery.paddingOf(context).bottom),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Delete this Vibe?', style: TextStyle(color: Color(0xFF111015), fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            const Text('This removes the Vibe from the feed.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel'))),
+                const SizedBox(width: 10),
+                Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE84C72), foregroundColor: Colors.white), onPressed: () => Navigator.pop(context, true), child: const Text('Delete'))),
+              ],
+            ),
+          ],
+        ),
+      );
 }
 
 String _formatCount(int value) {
