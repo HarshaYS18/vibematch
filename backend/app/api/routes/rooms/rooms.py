@@ -101,6 +101,15 @@ def _room_settings_response(room: Room) -> RoomSettingsResponse:
     )
 
 
+def _latest_user_room(db: Session, user_id: int) -> Room | None:
+    return (
+        db.query(Room)
+        .filter(Room.owner_user_id == user_id)
+        .order_by(Room.updated_at.desc(), Room.created_at.desc(), Room.id.desc())
+        .first()
+    )
+
+
 def _get_or_create_room_for_settings(db: Session, room_public_id: str, current_user: User | None = None) -> Room:
     clean_room_public_id = room_public_id.strip()
     if not clean_room_public_id:
@@ -109,6 +118,11 @@ def _get_or_create_room_for_settings(db: Session, room_public_id: str, current_u
     room = db.query(Room).filter(Room.room_public_id == clean_room_public_id).first()
     if room is not None:
         return room
+
+    if current_user is not None:
+        existing_user_room = _latest_user_room(db, current_user.id)
+        if existing_user_room is not None:
+            return existing_user_room
 
     room = Room(
         room_public_id=clean_room_public_id,
