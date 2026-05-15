@@ -1,0 +1,492 @@
+part of 'live_room_page.dart';
+
+extension _LiveRoomPageActions on _LiveRoomPageState {
+  void _onSeatTap(int index) {
+    final seat = _seatController.seats[index];
+    if (seat.locked) {
+      if (_viewerCanManageRoom) {
+        _seatController.toggleSelectedSeat(index);
+      } else {
+        RoomToast.show(context, 'This seat is locked');
+      }
+      return;
+    }
+
+    if (seat.user == null && !_viewerCanManageRoom) {
+      if (_applyOnlyModeEnabled) {
+        _applyForSeat(index);
+      } else {
+        _seatController.occupySeat(index);
+      }
+      return;
+    }
+
+    if (seat.user == null && _viewerCanManageRoom) {
+      _seatController.toggleSelectedSeat(index);
+    }
+  }
+
+  void _onUserTap(int index) {
+    final user = _seatController.seats[index].user;
+    if (user == null) return;
+    _openMiniProfile(user, index);
+  }
+
+  void _approveSeatApplication(ChatEntry entry) {
+    _seatController.approveSeatApplication(
+      entry: entry,
+      messages: _roomMessageController.messages,
+      allRoomUsers: _allRoomUsers,
+    );
+
+    final requesterId = entry.senderId;
+    if (requesterId != null && requesterId.trim().isNotEmpty) {
+      LiveRoomMembershipService.markMember(
+        roomId: _roomId,
+        userId: requesterId,
+      );
+    }
+  }
+
+  void _rejectSeatApplication(ChatEntry entry) {
+    _seatController.rejectSeatApplication(
+      entry: entry,
+      messages: _roomMessageController.messages,
+    );
+
+    final requesterId = entry.senderId;
+    if (requesterId != null && requesterId.trim().isNotEmpty) {
+      LiveRoomMembershipService.markGuest(roomId: _roomId, userId: requesterId);
+    }
+  }
+
+  void _applyForSeat(int index) => _seatController.applyForSeat(
+    index: index,
+    messages: _roomMessageController.messages,
+  );
+
+  void _inviteSeat(int index) {
+    _seatController.clearSelectedSeat();
+    _openSeatInviteSheet(index);
+  }
+
+  void _openSeatInviteSheet(int seatIndex) {
+    _clearRoomFocus();
+    final inviteUsers = _usersController.buildSeatInviteUsers(
+      allRoomUsers: _allRoomUsers,
+      seatedUsers: _roomUsers,
+    );
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (_) => LiveRoomInviteSheet(
+        seatIndex: seatIndex,
+        users: inviteUsers,
+        onInvite: (user) =>
+            _sendSeatInvite(seatIndex: seatIndex, invitedUser: user),
+      ),
+    );
+  }
+
+  void _sendSeatInvite({
+    required int seatIndex,
+    required SeatUser invitedUser,
+  }) {
+    Navigator.pop(context);
+    _clearRoomFocus();
+
+    _seatInviteAutoHideTimer?.cancel();
+
+    _setRoomState(() {
+      _pendingSeatInvite = _PendingSeatInvite(
+        inviterName: _currentUser.name,
+        invitedUser: invitedUser,
+        seatIndex: seatIndex,
+      );
+    });
+
+    _seatInviteAutoHideTimer = Timer(const Duration(seconds: 15), () {
+      if (!mounted) return;
+      final activeInvite = _pendingSeatInvite;
+      if (activeInvite == null ||
+          activeInvite.invitedUser.id != invitedUser.id ||
+          activeInvite.seatIndex != seatIndex) {
+        return;
+      }
+
+      _setRoomState(() {
+        _pendingSeatInvite = null;
+      });
+    });
+
+    RoomToast.show(
+      context,
+      '${_currentUser.name} invited ${invitedUser.name} to seat ${seatIndex + 1}',
+    );
+  }
+
+  void _rejectSeatInvite() {
+    final invite = _pendingSeatInvite;
+    if (invite == null) return;
+
+    _seatInviteAutoHideTimer?.cancel();
+    _seatInviteAutoHideTimer = null;
+
+    _setRoomState(() {
+      _pendingSeatInvite = null;
+    });
+
+    RoomToast.show(
+      context,
+      '${invite.invitedUser.name} rejected the seat invite',
+    );
+  }
+
+  void _acceptSeatInvite() {
+    final invite = _pendingSeatInvite;
+    if (invite == null) return;
+
+    final accepted = _seatController.inviteUserToSeat(
+      seatIndex: invite.seatIndex,
+      invitedUser: invite.invitedUser,
+    );
+
+    if (!accepted) {
+      _seatInviteAutoHideTimer?.cancel();
+      _seatInviteAutoHideTimer = null;
+
+      _setRoomState(() {
+        _pendingSeatInvite = null;
+      });
+      return;
+    }
+
+    _seatInviteAutoHideTimer?.cancel();
+    _seatInviteAutoHideTimer = null;
+
+    _setRoomState(() {
+      _pendingSeatInvite = null;
+    });
+  }
+
+  void _openRoomShareSheet() {
+    _clearRoomFocus();
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FriendsInviteSheet(
+        title: 'Invite friends to $_roomName',
+        actionLabel: 'Invite',
+        completedLabel: 'Sent',
+        onInvite: (friend) => _sendRoomInviteToInbox(friend.displayName),
+      ),
+    );
+  }
+
+  void _sendRoomInviteToInbox(String friendName) {
+    RoomToast.show(context, 'Room invite sent to $friendName\'s Inbox');
+  }
+
+  void _dismissRoomOverlays() {
+    dismissRoomSeatActionPill();
+    _clearRoomFocus();
+  }
+
+  void _insertSystemMessage(String message) =>
+      _roomMessageController.insertSystemMessage(message);
+
+  void _clearRoomFocus() {
+    _messageFocusNode.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _toggleMic() {
+    _clearRoomFocus();
+    _seatController.toggleMic();
+  }
+
+  void _handleJoinRoom() {
+    _clearRoomFocus();
+
+    if (_currentUserIsMember) {
+      RoomToast.show(context, 'You are already a member of $_roomName');
+      return;
+    }
+
+    if (_joinRequestPending) {
+      RoomToast.show(context, 'Your member request is already pending.');
+      return;
+    }
+
+    LiveRoomMembershipService.markPending(
+      roomId: _roomId,
+      userId: _currentUser.id,
+    );
+
+    _roomMessageController.requestJoin();
+
+    _openInfoSheet(
+      'Request sent',
+      'Your request to become a member of $_roomName has been sent to the channel host. The + button will stay hidden until the host accepts or rejects it.',
+    );
+  }
+
+  void _openRoomUsersSheet() {
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => LiveRoomUsersSheet(
+        users: _allRoomUsers,
+        onUserTap: (user) {
+          Navigator.pop(context);
+          Future<void>.delayed(const Duration(milliseconds: 80), () {
+            if (mounted) _openMiniProfileForUser(user);
+          });
+        },
+      ),
+    );
+  }
+
+  void _openRoomRankingsSheet() {
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => RoomContributionRankingsSheet(
+        roomName: _roomName,
+        users: _allRoomUsers,
+        onUserTap: (user) {
+          Navigator.pop(context);
+          Future<void>.delayed(const Duration(milliseconds: 80), () {
+            if (mounted) _openMiniProfileForUser(user);
+          });
+        },
+      ),
+    );
+  }
+
+  void _openRoomLevelPage() {
+    _clearRoomFocus();
+    Navigator.pushNamed(context, VmRoutes.roomLevel);
+  }
+
+  void _sendMessage() {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+    _roomMessageController.sendMessage(text);
+    _messageController.clear();
+  }
+
+  void _openMiniProfileFromChat(ChatEntry entry) {
+    if (entry.senderId == null || entry.senderId == 'system') return;
+    _openMiniProfileForUser(
+      _usersController.resolveUserFromChatEntry(
+        entry: entry,
+        allRoomUsers: _allRoomUsers,
+      ),
+    );
+  }
+
+  void _openMiniProfileForUser(SeatUser user) {
+    final liveUser = _allRoomUsers.firstWhere(
+      (item) => item.id == user.id,
+      orElse: () => user,
+    );
+    final seatIndex = _seatController.seats.indexWhere(
+      (seat) => seat.user?.id == liveUser.id,
+    );
+    _openMiniProfile(liveUser, seatIndex);
+  }
+
+  void _openMiniProfile(SeatUser user, int seatIndex) {
+    _clearRoomFocus();
+    LiveRoomMiniProfileLauncher.open(
+      context: context,
+      user: user,
+      seatIndex: seatIndex,
+      currentUser: _currentUser,
+      canModerate: _viewerCanManageRoom,
+      allRoomUsers: _allRoomUsers,
+      privacyMode: _privacyMode,
+      roomName: _roomName,
+      roomId: _roomId,
+      onMentionTap: _mentionUser,
+      onSetAdminTap: _setUserAsAdmin,
+      onRemoveAdminTap: _removeUserAsAdmin,
+      onReportTap: _openReportForUser,
+      onKickOutDurationSelected: _canKickOutUser(user)
+          ? (duration) => _kickOutUser(user: user, duration: duration)
+          : null,
+      onLeaveAndLock: (targetSeatIndex) {
+        Navigator.pop(context);
+        _seatController.leaveAndLockSeat(targetSeatIndex);
+      },
+      onLeaveSeatOnly: (targetSeatIndex) {
+        Navigator.pop(context);
+        final seatedUser =
+            targetSeatIndex >= 0 &&
+                targetSeatIndex < _seatController.seats.length
+            ? _seatController.seats[targetSeatIndex].user
+            : null;
+        if (seatedUser?.id == _currentUser.id) {
+          _seatController.leaveAndLockSeat(targetSeatIndex);
+        } else {
+          _seatController.leaveSeatOnly(targetSeatIndex);
+        }
+      },
+      onSelfMuteToggle: (userId) {
+        Navigator.pop(context);
+        _seatController.toggleSelfMute(userId);
+      },
+      onAdminMuteToggle: (userId) {
+        Navigator.pop(context);
+        _seatController.toggleAdminMute(userId);
+      },
+      onGiftTap: (userId) {
+        Navigator.pop(context);
+        _setRoomState(() {
+          _giftController.selectedReceiverIds
+            ..clear()
+            ..add(userId);
+        });
+        _openGiftPanel();
+      },
+    );
+  }
+
+  bool _canKickOutUser(SeatUser target) {
+    return _moderationController.canKickOutUser(
+      target: target,
+      canManageRoom: _viewerCanManageRoom,
+    );
+  }
+
+  Future<void> _kickOutUser({
+    required SeatUser user,
+    required RoomKickoutDuration duration,
+  }) async {
+    final result = await _moderationController.kickOutUser(
+      roomId: _roomId,
+      target: user,
+      duration: duration,
+      canManageRoom: _viewerCanManageRoom,
+    );
+    if (!mounted) return;
+    final systemMessage = result.systemMessage;
+    if (systemMessage != null) _insertSystemMessage(systemMessage);
+    final removedUserId = result.removedUserId;
+    if (removedUserId != null) {
+      _seatController.removeUserFromRoom(removedUserId);
+    }
+    final toastMessage = result.toastMessage;
+    if (toastMessage != null) RoomToast.show(context, toastMessage);
+  }
+
+  void _mentionUser(SeatUser user) {
+    Navigator.pop(context);
+
+    _messageController.insertMention(user.name);
+
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
+      if (!mounted) return;
+      _openMessageComposerWithMention();
+    });
+  }
+
+  void _openMentionedUserProfile(String mentionName) {
+    final cleanMention = mentionName.trim().toLowerCase();
+    if (cleanMention.isEmpty) return;
+
+    final user = _allRoomUsers.where((item) {
+      final cleanName = item.name.trim().toLowerCase();
+      final cleanUsername = cleanName.replaceAll(' ', '_');
+      return cleanName == cleanMention ||
+          cleanUsername == cleanMention ||
+          cleanName.replaceAll(' ', '') == cleanMention.replaceAll('_', '');
+    }).firstOrNull;
+
+    if (user == null) {
+      RoomToast.show(context, '@$mentionName profile not found in this room');
+      return;
+    }
+
+    LiveRoomProfileNavigator.openExistingPublicProfile(
+      context: context,
+      user: user,
+      privacyMode: _privacyMode,
+      roomName: _roomName,
+    );
+  }
+
+  void _openMessageComposerWithMention() {
+    _clearRoomFocus();
+    LiveRoomMessageActionsModule.openComposer(
+      context: context,
+      controller: _messageController,
+      focusNode: _messageFocusNode,
+      imagesEnabled: _roomImagesEnabled,
+      onSendText: _sendMessage,
+      onImageTap: () =>
+          RoomToast.show(context, 'Image message picker will connect here'),
+      onSendFloatingText: _sendMessage,
+    );
+  }
+
+  void _setUserAsAdmin(String userId) {
+    Navigator.pop(context);
+    _seatController.setUserAsAdmin(userId);
+    _clearRoomFocus();
+  }
+
+  void _removeUserAsAdmin(String userId) {
+    Navigator.pop(context);
+    _seatController.removeUserAsAdmin(userId);
+    _clearRoomFocus();
+  }
+
+  void _addRoomAdminFromInfo(SeatUser user) {
+    _seatController.setUserAsAdmin(user.id);
+    _clearRoomFocus();
+  }
+
+  void _removeRoomAdminFromInfo(SeatUser user) {
+    _seatController.removeUserAsAdmin(user.id);
+    _clearRoomFocus();
+  }
+
+  void _openReportForUser(SeatUser user) {
+    Navigator.pop(context);
+    _openInfoSheet(
+      'Report submitted',
+      '${user.name} has been sent to the room safety review queue.',
+    );
+  }
+
+  void _openGiftPanel() {
+    _clearRoomFocus();
+    LiveRoomGiftActionsModule.openGiftPanel(
+      context: context,
+      giftController: _giftController,
+      roomUsers: _allRoomUsers,
+    );
+  }
+
+  void _openInboxPage() {
+    _clearRoomFocus();
+    LiveRoomInboxActionsModule.openInboxSheet(
+      context: context,
+      roomStateController: _roomStateController,
+    );
+  }
+
+  void _openInboxPageFromSheet(BuildContext sheetContext) {
+    LiveRoomInboxActionsModule.openInboxSheetAfterClosingCurrentSheet(
+      pageContext: context,
+      sheetContext: sheetContext,
+      roomStateController: _roomStateController,
+    );
+  }
+
+  void _openEmojiTray() {
+    _clearRoomFocus();
+    LiveRoomEmojiActionsModule.openEmojiTray(context: context);
+  }
+}
