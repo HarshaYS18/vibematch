@@ -193,7 +193,7 @@ VibeMediaType _mediaTypeFromApi(String? value) {
 }
 
 String _timeAgo(String? raw) {
-  final created = raw == null ? null : DateTime.tryParse(raw)?.toLocal();
+  final created = _parseBackendUtcTimestamp(raw);
   if (created == null) return 'Just now';
   final diff = DateTime.now().difference(created);
   if (diff.inMinutes < 1) return 'Just now';
@@ -202,6 +202,14 @@ String _timeAgo(String? raw) {
   if (diff.inDays < 30) return '${diff.inDays}d ago';
   if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}mo ago';
   return '${(diff.inDays / 365).floor()}y ago';
+}
+
+DateTime? _parseBackendUtcTimestamp(String? raw) {
+  final value = raw?.trim();
+  if (value == null || value.isEmpty) return null;
+  final hasTimezone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$').hasMatch(value);
+  final normalized = hasTimezone ? value : '${value}Z';
+  return DateTime.tryParse(normalized)?.toLocal();
 }
 
 String? _text(dynamic value) {
