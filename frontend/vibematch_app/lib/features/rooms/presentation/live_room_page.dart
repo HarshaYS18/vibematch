@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../social/widgets/friends_invite_sheet.dart';
 import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_membership_service.dart';
+import '../data/room_api_service.dart';
 import '../data/room_moderation_repository.dart';
 import '../data/room_music_controller.dart';
 import 'controllers/live_room_gift_controller.dart';
@@ -258,39 +260,31 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   Widget build(BuildContext context) {
     if (_minimized) {
       return PopScope<void>(
-        canPop: _allowRoomPop,
+        canPop: false,
         onPopInvokedWithResult: (didPop, result) {
-          if (_navigationController.shouldBlockBackAction(
-            allowRoomPop: _allowRoomPop,
-            didPop: didPop,
-          )) {
-            dismissRoomSeatActionPill();
-            _openLeaveSheet();
-          }
+          if (didPop) return;
+          _roomStateController.setMinimized(false);
         },
         child: Scaffold(
-          backgroundColor: Colors.transparent,
+          backgroundColor: RoomColors.pearl,
           body: Stack(
             children: [
-              Positioned.fill(
-                child: RoomBackground(theme: _selectedBackgroundTheme),
-              ),
-              LiveRoomMinimizedBubble(
-                offset: _bubbleOffset,
-                onRestore: () {
-                  dismissRoomSeatActionPill();
-                  _roomStateController.setMinimized(false);
-                },
-                onDrag: (details) {
-                  dismissRoomSeatActionPill();
-                  _roomStateController.setBubbleOffset(
-                    _navigationController.nextBubbleOffset(
-                      currentOffset: _bubbleOffset,
-                      dragDelta: details.delta,
-                      screenSize: MediaQuery.sizeOf(context),
-                    ),
-                  );
-                },
+              Positioned(
+                left: _bubbleOffset.dx,
+                top: _bubbleOffset.dy,
+                child: LiveRoomMinimizedBubble(
+                  offset: _bubbleOffset,
+                  onRestore: () => _roomStateController.setMinimized(false),
+                  onDrag: (details) {
+                    final size = MediaQuery.sizeOf(context);
+                    _roomStateController.setBubbleOffset(
+                      Offset(
+                        (_bubbleOffset.dx + details.delta.dx).clamp(8.0, size.width - 86),
+                        (_bubbleOffset.dy + details.delta.dy).clamp(40.0, size.height - 110),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -298,109 +292,22 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       );
     }
 
-    return PopScope<void>(
-      canPop: _allowRoomPop,
-      onPopInvokedWithResult: (didPop, result) {
-        if (_navigationController.shouldBlockBackAction(
-          allowRoomPop: _allowRoomPop,
-          didPop: didPop,
-        )) {
-          dismissRoomSeatActionPill();
-          _openLeaveSheet();
-        }
-      },
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        backgroundColor: RoomColors.deep,
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: RoomBackground(theme: _selectedBackgroundTheme),
-            ),
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _dismissRoomOverlays,
-                child: const SizedBox.expand(),
+    return RoomMusicOverlayHost(
+      child: RoomMusicOverlay(
+        child: LiveRoomGiftOverlay(
+          giftController: _giftController,
+          roomUsers: _roomUsers,
+          child: LiveRoomRemoteAudioRenderers(
+            child: PopScope<void>(
+              canPop: _allowRoomPop,
+              onPopInvokedWithResult: _handleRoomBackInvoked,
+              child: Scaffold(
+                resizeToAvoidBottomInset: false,
+                backgroundColor: RoomColors.deep,
+                body: LiveRoomBody(state: this),
               ),
             ),
-            LiveRoomBody(
-              roomName: _roomName,
-              roomId: _roomId,
-              privacyMode: _privacyMode,
-              onlineCount: _safeOnlineCount,
-              seats: _seatController.seats,
-              layoutId: _seatController.layoutId,
-              selectedSeatIndex: _seatController.selectedSeatIndex,
-              canManageSeats: _viewerCanManageRoom,
-              applyOnlyModeEnabled: _applyOnlyModeEnabled,
-              currentUserIsMember: _currentUserIsMember,
-              joinRequestPending: _joinRequestPending,
-              admins: _roomAdmins,
-              availableAdminUsers: _availableAdminUsers,
-              onAddAdmin: _addRoomAdminFromInfo,
-              onRemoveAdmin: _removeRoomAdminFromInfo,
-              messages: _roomMessageController.messages,
-              canManageSeatApplications: _viewerCanManageRoom,
-              messageController: _messageController,
-              messageFocusNode: _messageFocusNode,
-              micMuted: _seatController.micMuted,
-              inboxUnreadCount: _inboxUnreadCount,
-              imagesEnabled: _roomImagesEnabled,
-              onBack: _openLeaveSheet,
-              onJoinTap: _handleJoinRoom,
-              onShare: _openRoomShareSheet,
-              onAnnouncement: _openAnnouncementSheet,
-              onSettings: _openSettingsSheet,
-              onUsersTap: _openRoomUsersSheet,
-              onRoomRankingsTap: _openRoomRankingsSheet,
-              onRoomLevelTap: _openRoomLevelPage,
-              onSeatTap: _onSeatTap,
-              onUserTap: _onUserTap,
-              onInvite: _inviteSeat,
-              onSwitch: _seatController.switchSeat,
-              onLock: _seatController.lockSeat,
-              onUnlock: _seatController.unlockSeat,
-              onApplySeat: _applyForSeat,
-              onApproveSeatApplication: _approveSeatApplication,
-              onRejectSeatApplication: _rejectSeatApplication,
-              onSenderTap: _openMiniProfileFromChat,
-              onMentionTap: _openMentionedUserProfile,
-              onDismissOverlays: _dismissRoomOverlays,
-              onInboxTap: _openInboxPage,
-              onEmojiTap: _openEmojiTray,
-              onSendTap: _sendMessage,
-              onMicTap: _toggleMic,
-              onGamesTap: _openGamesSheet,
-              onGiftTap: _openGiftPanel,
-            ),
-            VibeSyncRoomOverlay(
-              state: _vibeSyncState,
-              onDismiss: _clearVibeSyncOverlay,
-            ),
-            LiveRoomGiftOverlay(
-              slides: _giftController.giftSlides,
-              activeComboSlide: _giftController.activeComboSlide,
-              bottomPadding: MediaQuery.of(context).padding.bottom,
-              onComboTap: _giftController.tapGiftCombo,
-              onVideoGiftFinished: _giftController.finishVideoGift,
-              onComboButtonTap: () {
-                dismissRoomSeatActionPill();
-                final slide = _giftController.activeComboSlide;
-                if (slide != null) _giftController.tapGiftCombo(slide);
-              },
-            ),
-            if (_pendingSeatInvite != null)
-              LiveRoomSeatInviteNotification(
-                inviterName: _pendingSeatInvite!.inviterName,
-                invitedUser: _pendingSeatInvite!.invitedUser,
-                seatIndex: _pendingSeatInvite!.seatIndex,
-                onReject: _rejectSeatInvite,
-                onAccept: _acceptSeatInvite,
-              ),
-            const RoomMusicOverlayHost(),
-            const LiveRoomRemoteAudioRenderers(),
-          ],
+          ),
         ),
       ),
     );
