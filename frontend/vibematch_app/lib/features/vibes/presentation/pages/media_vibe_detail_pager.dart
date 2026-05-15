@@ -27,7 +27,6 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   final Map<String, VibeItem> _stateById = <String, VibeItem>{};
 
   List<VibeItem> get _vibes => widget.vibes.where((item) => item.mediaType != VibeMediaType.text).toList(growable: false);
-  VibeItem get _activeVibe => _vibes[_activeIndex.clamp(0, _vibes.length - 1)];
 
   @override
   void initState() {
