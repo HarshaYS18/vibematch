@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../games/presentation/coin_game_rankings_sheet.dart';
 import '../../../games/presentation/jungle_hunt_global_game_page.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../widgets/live_room_games_sheet.dart';
@@ -26,6 +27,10 @@ class LiveRoomGamesActionsModule {
               child: JungleHuntGlobalGamePage(embeddedInRoom: true),
             ),
           );
+        },
+        onCoinGameRankingsTap: () {
+          Navigator.pop(context);
+          CoinGameRankingsSheet.show(context);
         },
       ),
     );
