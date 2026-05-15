@@ -14,6 +14,7 @@ class RoomCreateRequest(BaseModel):
     mode: str = Field(default="Open", max_length=40)
     type: str = Field(default="Chat", max_length=40)
     lock_password: str | None = Field(default=None, min_length=1, max_length=64)
+    allow_screenshots: bool = True
 
 
 class RoomModeUpdateRequest(BaseModel):
@@ -37,6 +38,7 @@ class RoomTrendingResponse(BaseModel):
     online_count: int
     trending_score: int
     followed_friends_inside: list[str] = Field(default_factory=list)
+    allow_screenshots: bool = True
 
 
 class RoomDetailResponse(RoomTrendingResponse):
