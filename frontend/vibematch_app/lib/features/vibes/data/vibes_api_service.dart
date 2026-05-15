@@ -92,6 +92,18 @@ class VibesApiService {
     return _commentFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
+  Future<bool> toggleCommentPin(String postId, String commentId) async {
+    final response = await http.patch(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments/$commentId/pin')), headers: _authHeaders());
+    _throwIfFailed(response, 'pin Vibe comment');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return decoded['is_pinned'] == true;
+  }
+
+  Future<void> deleteComment(String postId, String commentId) async {
+    final response = await http.delete(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments/$commentId')), headers: _authHeaders());
+    _throwIfFailed(response, 'delete Vibe comment');
+  }
+
   Future<void> deleteVibe(String postId) async {
     final response = await http.delete(Uri.parse(VmApiConfig.endpoint('/vibes/$postId')), headers: _authHeaders());
     _throwIfFailed(response, 'delete Vibe');
@@ -181,7 +193,17 @@ VibeItem _vibeFromJson(Map<String, dynamic> json) {
 VibeComment _commentFromJson(Map<String, dynamic> json) {
   final author = json['author'] is Map<String, dynamic> ? json['author'] as Map<String, dynamic> : <String, dynamic>{};
   final displayName = _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User';
-  return VibeComment(name: displayName, avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(), text: json['text']?.toString() ?? '', time: _timeAgo(json['created_at']?.toString()));
+  return VibeComment(
+    id: json['id']?.toString() ?? '',
+    name: displayName,
+    avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(),
+    text: json['text']?.toString() ?? '',
+    time: _timeAgo(json['created_at']?.toString()),
+    avatarUrl: _text(author['avatar_url']),
+    isPinned: json['is_pinned'] == true,
+    canPin: json['can_pin'] == true,
+    canDelete: json['can_delete'] == true,
+  );
 }
 
 String _mediaTypeToApi(VibeMediaType type) {
