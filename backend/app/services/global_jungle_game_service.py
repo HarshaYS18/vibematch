@@ -49,6 +49,9 @@ JUNGLE_RULES: dict[str, Any] = {
     "max_target_liability": 45_000_000,
     "rare_basket_probability_basis_points": 120,
     "platform_fee_basis_points": 500,
+    "whale_medium_target_weight_basis_points": 1000,
+    "whale_high_target_weight_basis_points": 250,
+    "whale_block_target_weight_basis_points": 50,
     "targets": JUNGLE_TARGETS,
     "rare_baskets": [
         {"id": LEFT_BASKET_ID, "side": "left", "target_ids": LEFT_BASKET_TARGET_IDS},
@@ -65,6 +68,7 @@ JUNGLE_RISK: dict[str, Any] = {
     "whale_daily_volume": 4_000_000,
     "whale_single_bet": 500_000,
     "whale_recent_bet_count": 8,
+    "whale_probability_mode_enabled": True,
 }
 
 JUNGLE_UI: dict[str, Any] = {
@@ -218,7 +222,7 @@ def _reject_bet(db: Session, round_obj: GameRound, user: User, target_id: int, a
 
 def _evaluate_whale_risk(db: Session, user: User, amount: int, risk: dict[str, Any]) -> tuple[bool, str, dict[str, Any]]:
     if risk.get("testing_mode_enabled") is True:
-        return False, "testing_mode_bypass", {"testing_mode_enabled": True}
+        return False, "testing_mode_bypass", {"testing_mode_enabled": True, "score": 0, "level": "LOW", "probability_mode": "NORMAL", "reasons": ["testing_mode_enabled"]}
 
     since_day = datetime.utcnow() - timedelta(hours=24)
     since_recent = datetime.utcnow() - timedelta(minutes=5)
@@ -227,17 +231,38 @@ def _evaluate_whale_risk(db: Session, user: User, amount: int, risk: dict[str, A
     credits = int(db.query(func.coalesce(func.sum(WalletLedger.amount), 0)).filter(WalletLedger.user_id == user.id, WalletLedger.source_type == "GAME_WIN", WalletLedger.created_at >= since_day).scalar() or 0)
     recent_count = db.query(GameBet).filter(GameBet.user_id == user.id, GameBet.created_at >= since_recent).count()
     daily_loss = max(debits - credits, 0)
+    score = 0
     reasons: list[str] = []
     if amount >= int(risk.get("whale_single_bet", JUNGLE_RISK["whale_single_bet"])):
+        score += 35
         reasons.append("large_single_bet")
+    if daily_volume + amount > int(risk.get("whale_daily_volume", JUNGLE_RISK["whale_daily_volume"])):
+        score += 35
+        reasons.append("whale_daily_volume")
     if daily_volume + amount > int(risk.get("max_daily_bet_volume", JUNGLE_RISK["max_daily_bet_volume"])):
+        score += 55
         reasons.append("daily_volume_limit")
     if daily_loss > int(risk.get("max_daily_loss", JUNGLE_RISK["max_daily_loss"])):
+        score += 45
         reasons.append("daily_loss_limit")
     if recent_count >= int(risk.get("whale_recent_bet_count", JUNGLE_RISK["whale_recent_bet_count"])):
+        score += 35
         reasons.append("high_velocity")
-    blocked = "daily_volume_limit" in reasons or "daily_loss_limit" in reasons or len(reasons) >= 2
-    return blocked, ",".join(reasons), {"daily_volume": daily_volume, "daily_loss": daily_loss, "recent_count": recent_count, "reasons": reasons}
+
+    if score >= int(risk.get("block_score", JUNGLE_RISK["block_score"])):
+        level = "WHALE_BLOCK_TIER"
+        probability_mode = "VERY_LOW_WHALE"
+    elif score >= int(risk.get("manual_review_score", JUNGLE_RISK["manual_review_score"])):
+        level = "WHALE_HIGH_TIER"
+        probability_mode = "LOW_WHALE"
+    elif score >= 35:
+        level = "WHALE_MEDIUM_TIER"
+        probability_mode = "MEDIUM_WHALE"
+    else:
+        level = "LOW"
+        probability_mode = "NORMAL"
+    whale_adjusted = probability_mode != "NORMAL"
+    return whale_adjusted, ",".join(reasons), {"daily_volume": daily_volume, "daily_loss": daily_loss, "recent_count": recent_count, "reasons": reasons, "score": score, "level": level, "probability_mode": probability_mode, "action": "ALLOW_WHALE_PROBABILITY_REDUCED" if whale_adjusted else "ALLOW"}
 
 
 def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: int, *, commit: bool = True) -> dict[str, Any]:
@@ -267,9 +292,7 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     existing_total = int(db.query(func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id, GameBet.user_id == user.id).scalar() or 0)
     if existing_total + amount > int(rules.get("max_total_bet_per_round", JUNGLE_RULES["max_total_bet_per_round"])):
         return _reject_bet(db, round_obj, user, target_id, amount, "ROUND_USER_LIMIT", "Round bet limit reached")
-    blocked, reason, risk_meta = _evaluate_whale_risk(db, user, amount, risk)
-    if blocked:
-        return _reject_bet(db, round_obj, user, target_id, amount, "REJECT_WHALE_RISK", "Bet rejected by strict whale detection", risk_meta)
+    whale_adjusted, reason, risk_meta = _evaluate_whale_risk(db, user, amount, risk)
     multiplier = int(target_map[target_id]["multiplier"])
     target_total_after = int(db.query(func.coalesce(func.sum(GameBet.accepted_amount), 0)).filter(GameBet.round_id == round_id, GameBet.target_id == target_id).scalar() or 0) + amount
     target_liability = target_total_after * multiplier
@@ -289,21 +312,24 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     wallet.coin_balance -= amount
     wallet.lifetime_coins_spent += amount
     db.add(WalletLedger(user_id=user.id, currency_type=EconomyCurrency.COIN.value, direction=EconomyDirection.DEBIT.value, amount=amount, before_balance=before, after_balance=wallet.coin_balance, source_type="GAME_BET", source_id=str(round_id), created_by_user_id=user.id, reason=f"Bet on Jungle Hunt:{target_id}"))
-    bet = GameBet(round_id=round_id, user_id=user.id, target_id=target_id, amount=amount, accepted_amount=amount, risk_level="LOW", risk_score=0, risk_action="ALLOW", metadata_json=base._dumps({"scope": "GLOBAL", "whale_reason": reason}))
+    risk_level = str(risk_meta.get("level") or "LOW")
+    risk_score = int(risk_meta.get("score") or 0)
+    risk_action = str(risk_meta.get("action") or "ALLOW")
+    bet = GameBet(round_id=round_id, user_id=user.id, target_id=target_id, amount=amount, accepted_amount=amount, risk_level=risk_level, risk_score=risk_score, risk_action=risk_action, metadata_json=base._dumps({"scope": "GLOBAL", "whale_reason": reason, "whale_adjusted": whale_adjusted, "probability_mode": risk_meta.get("probability_mode", "NORMAL"), "risk": risk_meta}))
     db.add(bet)
     round_obj.round_pool_amount += amount
     platform_fee = amount * int(rules.get("platform_fee_basis_points", JUNGLE_RULES["platform_fee_basis_points"])) // 10_000
     round_obj.platform_fee_amount += platform_fee
     round_obj.reward_pool_amount += max(amount - platform_fee, 0)
     game_stats_service.record_game_bet(db, user_id=user.id, game_id=round_obj.game_key, amount=amount)
-    base.audit(db, round_obj.game_key, round_obj.id, user.id, "BET_ACCEPTED", "LOW", 0, "ALLOW", "Bet accepted after strict whale and liability checks", {"amount": amount, "target_id": target_id, "scope": "GLOBAL"}, user.id)
+    base.audit(db, round_obj.game_key, round_obj.id, user.id, "BET_ACCEPTED", risk_level, risk_score, risk_action, "Bet accepted; whale tiers reduce win probability instead of blocking coins", {"amount": amount, "target_id": target_id, "scope": "GLOBAL", "probability_mode": risk_meta.get("probability_mode", "NORMAL")}, user.id)
     if commit:
         db.commit()
         db.refresh(bet)
         db.refresh(wallet)
     else:
         db.flush()
-    return {"bet_id": bet.id, "round_id": round_id, "target_id": target_id, "requested_amount": amount, "accepted_amount": amount, "spent_coins": amount, "reward_coins": 0, "net_win_coins": -amount, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": None, "risk_level": "LOW", "risk_score": 0, "risk_action": "ALLOW", "message": "Bet accepted"}
+    return {"bet_id": bet.id, "round_id": round_id, "target_id": target_id, "requested_amount": amount, "accepted_amount": amount, "spent_coins": amount, "reward_coins": 0, "net_win_coins": -amount, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": None, "risk_level": risk_level, "risk_score": risk_score, "risk_action": risk_action, "probability_mode": risk_meta.get("probability_mode", "NORMAL"), "message": "Bet accepted"}
 
 
 def _payout_for_user_bets(user_bets: list[GameBet], winning_target_id: int) -> int:
@@ -340,16 +366,57 @@ def _candidate_payout(db: Session, round_id: int, outcome_id: int) -> int:
     return total
 
 
+def _bet_probability_mode(bet: GameBet) -> str:
+    metadata = base._loads(bet.metadata_json, {})
+    return str(metadata.get("probability_mode") or "NORMAL")
+
+
+def _outcome_probability_mode(db: Session, round_id: int, outcome_id: int) -> str:
+    severity = {"NORMAL": 0, "MEDIUM_WHALE": 1, "LOW_WHALE": 2, "VERY_LOW_WHALE": 3}
+    selected = "NORMAL"
+    rows = db.query(GameBet).filter(GameBet.round_id == round_id, GameBet.target_id.in_(_basket_target_ids(outcome_id))).all()
+    for bet in rows:
+        mode = _bet_probability_mode(bet)
+        if severity.get(mode, 0) > severity.get(selected, 0):
+            selected = mode
+    return selected
+
+
+def _mode_weight_scale_basis_points(mode: str, rules: dict[str, Any]) -> int:
+    if mode == "VERY_LOW_WHALE":
+        return max(int(rules.get("whale_block_target_weight_basis_points", 50)), 0)
+    if mode == "LOW_WHALE":
+        return max(int(rules.get("whale_high_target_weight_basis_points", 250)), 0)
+    if mode == "MEDIUM_WHALE":
+        return max(int(rules.get("whale_medium_target_weight_basis_points", 1000)), 0)
+    return 10_000
+
+
 def _choose_outcome(db: Session, round_obj: GameRound) -> int:
-    seed = f"{round_obj.id}:{round_obj.game_key}:{round_obj.created_at.isoformat()}:{round_obj.round_pool_amount}:basket-v1"
+    metadata = base._loads(round_obj.metadata_json, {})
+    rules = {**JUNGLE_RULES, **(metadata.get("rules") or {})}
+    seed = f"{round_obj.id}:{round_obj.game_key}:{round_obj.created_at.isoformat()}:{round_obj.round_pool_amount}:basket-v2-whale-adjusted"
     rng = random.Random(int(hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16], 16))
-    max_liability = int(JUNGLE_RULES["max_round_liability"])
+    max_liability = int(rules.get("max_round_liability", JUNGLE_RULES["max_round_liability"]))
+    rare_basis_points = int(rules.get("rare_basket_probability_basis_points", JUNGLE_RULES["rare_basket_probability_basis_points"]))
+    basket = LEFT_BASKET_ID if rng.random() < 0.5 else RIGHT_BASKET_ID
+    basket_mode = _outcome_probability_mode(db, round_obj.id, basket)
+    basket_scale = _mode_weight_scale_basis_points(basket_mode, rules)
+    adjusted_rare_basis_points = max(1, rare_basis_points * basket_scale // 10_000)
     rare_roll = rng.randint(1, 10_000)
-    if rare_roll <= int(JUNGLE_RULES["rare_basket_probability_basis_points"]):
-        basket = LEFT_BASKET_ID if rng.random() < 0.5 else RIGHT_BASKET_ID
-        if _candidate_payout(db, round_obj.id, basket) <= max_liability:
-            return basket
-    return base._choose_winner(round_obj, JUNGLE_TARGETS)
+    if rare_roll <= adjusted_rare_basis_points and _candidate_payout(db, round_obj.id, basket) <= max_liability:
+        return basket
+
+    weighted: list[int] = []
+    for target in JUNGLE_TARGETS:
+        target_id = int(target["id"])
+        multiplier = max(int(target.get("multiplier", 5)), 1)
+        base_weight = max(1, 120 // multiplier)
+        mode = _outcome_probability_mode(db, round_obj.id, target_id)
+        scale = _mode_weight_scale_basis_points(mode, rules)
+        weight = max(1, base_weight * scale // 10_000)
+        weighted.extend([target_id] * weight)
+    return rng.choice(weighted) if weighted else base._choose_winner(round_obj, JUNGLE_TARGETS)
 
 
 def settle_round(db: Session, round_id: int, user: User, *, commit: bool = True) -> dict[str, Any]:
@@ -363,6 +430,7 @@ def settle_round(db: Session, round_id: int, user: User, *, commit: bool = True)
     if winning_target_id is None:
         winning_target_id = int(_choose_outcome(db, round_obj))
         winning_target = _target_by_id(winning_target_id)
+        winning_probability_mode = _outcome_probability_mode(db, round_obj.id, winning_target_id)
         all_user_ids = [row[0] for row in db.query(GameBet.user_id).filter(GameBet.round_id == round_id).distinct().all()]
         settlement_multiplier = max(int(_target_by_id(target_id)["multiplier"]) for target_id in _basket_target_ids(winning_target_id))
         for user_id in all_user_ids:
@@ -379,11 +447,11 @@ def settle_round(db: Session, round_id: int, user: User, *, commit: bool = True)
             db.add(WalletLedger(user_id=safe_user_id, currency_type=EconomyCurrency.COIN.value, direction=EconomyDirection.CREDIT.value, amount=payout, before_balance=before, after_balance=wallet.coin_balance, source_type="GAME_WIN", source_id=str(round_id), created_by_user_id=user.id, reason=f"Jungle Hunt win outcome {winning_target_id}"))
             game_stats_service.record_game_settlement(db, user_id=safe_user_id, game_id=round_obj.game_key, spent_coins=total_bet, reward_coins=payout, multiplier=settlement_multiplier)
         top_winners = _round_top_winners(db, round_id, winning_target_id)
-        metadata.update({"winning_target_id": winning_target_id, "multiplier": int(winning_target["multiplier"]), "basket_target_ids": _basket_target_ids(winning_target_id), "top_winners": top_winners, "payouts_done": True})
+        metadata.update({"winning_target_id": winning_target_id, "multiplier": int(winning_target["multiplier"]), "basket_target_ids": _basket_target_ids(winning_target_id), "top_winners": top_winners, "payouts_done": True, "whale_probability_mode": winning_probability_mode, "whale_probability_rule": "Whale bets are accepted, but targets with whale exposure receive reduced outcome probability."})
         round_obj.metadata_json = base._dumps(metadata)
         round_obj.status = GameRoundStatus.COMPLETED.value
         round_obj.ended_at = datetime.utcnow()
-        base.audit(db, round_obj.game_key, round_obj.id, user.id, "GLOBAL_ROUND_SETTLED", "LOW", 0, "AUDIT", "Jungle Hunt round settled with single target or rare basket outcome.", {"winning_target_id": winning_target_id, "basket_target_ids": _basket_target_ids(winning_target_id), "top_winners": top_winners}, user.id)
+        base.audit(db, round_obj.game_key, round_obj.id, user.id, "GLOBAL_ROUND_SETTLED", "LOW", 0, "AUDIT", "Jungle Hunt round settled with whale probability adjustment instead of whale bet blocking.", {"winning_target_id": winning_target_id, "basket_target_ids": _basket_target_ids(winning_target_id), "top_winners": top_winners, "whale_probability_mode": winning_probability_mode}, user.id)
         if commit:
             db.commit()
         else:
@@ -395,4 +463,4 @@ def settle_round(db: Session, round_id: int, user: User, *, commit: bool = True)
     total_user_bet = sum(item.accepted_amount for item in user_bets)
     total_user_winnings = _payout_for_user_bets(user_bets, int(winning_target_id))
     wallet = economy_service.get_or_create_wallet(db, user.id)
-    return {"round_id": round_id, "game_key": round_obj.game_key, "status": GameRoundStatus.COMPLETED.value, "winning_target_id": int(winning_target_id), "multiplier": int(_target_by_id(int(winning_target_id))["multiplier"]), "total_user_bet": total_user_bet, "total_user_winnings": total_user_winnings, "spent_coins": total_user_bet, "reward_coins": total_user_winnings, "net_win_coins": total_user_winnings - total_user_bet, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": wallet.coin_balance if total_user_winnings > 0 else None, "risk_level": "LOW", "risk_score": 0, "risk_action": "AUDIT", "audit_message": "Payout uses only bets included in the winning outcome. Basket outcomes pay each selected basket item by its own multiplier.", "top_winners": top_winners}
+    return {"round_id": round_id, "game_key": round_obj.game_key, "status": GameRoundStatus.COMPLETED.value, "winning_target_id": int(winning_target_id), "multiplier": int(_target_by_id(int(winning_target_id))["multiplier"]), "total_user_bet": total_user_bet, "total_user_winnings": total_user_winnings, "spent_coins": total_user_bet, "reward_coins": total_user_winnings, "net_win_coins": total_user_winnings - total_user_bet, "wallet_coin_balance": wallet.coin_balance, "winner_coin_balance": wallet.coin_balance if total_user_winnings > 0 else None, "risk_level": "LOW", "risk_score": 0, "risk_action": "AUDIT", "audit_message": "Payout uses only bets included in the winning outcome. Basket outcomes pay each selected basket item by its own multiplier. Whale tiers reduce probability instead of blocking accepted coins.", "top_winners": top_winners}
