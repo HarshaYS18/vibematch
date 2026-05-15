@@ -9,6 +9,7 @@ import '../../../media/data/media_upload_api_service.dart';
 import '../../../social/widgets/social_mention_picker.dart';
 import '../../controllers/vibe_mention_controller.dart';
 import '../../models/vibe_models.dart';
+import '../widgets/create_vibe_form_widgets.dart';
 import '../widgets/create_vibe_media_picker.dart';
 
 class CreateVibePageModular extends StatefulWidget {
@@ -49,13 +50,18 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   @override
   void initState() {
     super.initState();
-    _captionController.addListener(() => setState(() {}));
+    _captionController.addListener(_onCaptionChanged);
   }
 
   @override
   void dispose() {
+    _captionController.removeListener(_onCaptionChanged);
     _captionController.dispose();
     super.dispose();
+  }
+
+  void _onCaptionChanged() {
+    if (mounted) setState(() {});
   }
 
   void _showAction(String message) {
@@ -157,16 +163,16 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
     }
   }
 
-  void _selectMode(_CreateVibeMode mode) {
+  void _selectMode(CreateVibeMode mode) {
     setState(() {
-      _selectedType = mode == _CreateVibeMode.text
+      _selectedType = mode == CreateVibeMode.text
           ? VibeMediaType.text
           : (_selectedMediaFile == null
               ? VibeMediaType.photo
               : _selectedType == VibeMediaType.text
                   ? VibeMediaType.photo
                   : _selectedType);
-      if (mode == _CreateVibeMode.text) {
+      if (mode == CreateVibeMode.text) {
         _selectedMediaFile = null;
         _uploadedMediaUrl = null;
         _selectedMediaName = null;
@@ -187,6 +193,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
 
   @override
   Widget build(BuildContext context) {
+    final busy = _publishing || _uploadingMedia;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -199,7 +206,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
           TextButton(
             onPressed: _canPublish ? () => unawaited(_publish()) : null,
             child: Text(
-              _publishing || _uploadingMedia ? 'Posting...' : 'Share',
+              busy ? 'Posting...' : 'Share',
               style: TextStyle(color: _canPublish ? const Color(0xFF1A5BEA) : const Color(0xFFB7AFBD), fontSize: 15, fontWeight: FontWeight.w900),
             ),
           ),
@@ -211,7 +218,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 26),
           children: [
-            _TypeTabs(selectedMode: _isTextMode ? _CreateVibeMode.text : _CreateVibeMode.media, onSelected: _selectMode),
+            CreateVibeTypeTabs(selectedMode: _isTextMode ? CreateVibeMode.text : CreateVibeMode.media, onSelected: _selectMode),
             CreateVibeMediaPicker(
               type: _selectedType,
               selectedFile: _selectedMediaFile,
@@ -222,146 +229,16 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
               onTap: () => unawaited(_pickMedia()),
               onClear: _clearMedia,
             ),
-            _CaptionBox(controller: _captionController, commentsEnabled: _commentsEnabled, onToggleComments: () => setState(() => _commentsEnabled = !_commentsEnabled)),
-            if (_captionController.hasMentionTrigger) Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: SocialMentionPicker(query: _captionController.activeMentionQuery, onSelected: (user) => setState(() => _captionController.insertMention(user.username)))),
-            _MentionRow(usesMentionAll: _captionController.usesMentionAll, mentions: _captionController.validMentions, commentsEnabled: _commentsEnabled, canUseMentionAllToday: widget.canUseMentionAllToday),
-            Padding(padding: const EdgeInsets.fromLTRB(14, 16, 14, 0), child: _ShareButton(enabled: _canPublish, busy: _publishing || _uploadingMedia, onTap: () => unawaited(_publish()))),
+            CreateVibeCaptionBox(controller: _captionController, commentsEnabled: _commentsEnabled, onToggleComments: () => setState(() => _commentsEnabled = !_commentsEnabled)),
+            if (_captionController.hasMentionTrigger)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: SocialMentionPicker(query: _captionController.activeMentionQuery, onSelected: (user) => setState(() => _captionController.insertMention(user.username))),
+              ),
+            CreateVibeMentionRow(usesMentionAll: _captionController.usesMentionAll, mentions: _captionController.validMentions, commentsEnabled: _commentsEnabled, canUseMentionAllToday: widget.canUseMentionAllToday),
+            Padding(padding: const EdgeInsets.fromLTRB(14, 16, 14, 0), child: CreateVibeShareButton(enabled: _canPublish, busy: busy, onTap: () => unawaited(_publish()))),
           ],
         ),
-      ),
-    );
-  }
-}
-
-enum _CreateVibeMode { media, text }
-
-class _TypeTabs extends StatelessWidget {
-  const _TypeTabs({required this.selectedMode, required this.onSelected});
-
-  final _CreateVibeMode selectedMode;
-  final ValueChanged<_CreateVibeMode> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [_CreateVibeMode.media, _CreateVibeMode.text];
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      margin: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: items.map((mode) {
-          final selected = mode == selectedMode;
-          final label = mode == _CreateVibeMode.media ? 'Media' : 'Text';
-          return Expanded(
-            child: InkWell(
-              onTap: () => onSelected(mode),
-              borderRadius: BorderRadius.circular(999),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(color: selected ? const Color(0xFF111015) : const Color(0xFFF7F3EF), borderRadius: BorderRadius.circular(999)),
-                child: Center(child: Text(label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF111015), fontSize: 12.5, fontWeight: FontWeight.w900))),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class _CaptionBox extends StatelessWidget {
-  const _CaptionBox({required this.controller, required this.commentsEnabled, required this.onToggleComments});
-
-  final VibeMentionTextController controller;
-  final bool commentsEnabled;
-  final VoidCallback onToggleComments;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-      decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: Color(0xFFECE2D8)))),
-      child: Column(
-        children: [
-          TextField(
-            controller: controller,
-            maxLines: 5,
-            minLines: 3,
-            style: const TextStyle(color: Color(0xFF111015), fontSize: 15, fontWeight: FontWeight.w600, height: 1.35),
-            decoration: const InputDecoration(hintText: 'Write a caption... use @name or @all', hintStyle: TextStyle(color: Color(0xFFAAA1AE), fontWeight: FontWeight.w600), border: InputBorder.none),
-          ),
-          Row(
-            children: [
-              const Icon(Icons.mode_comment_outlined, color: Color(0xFF111015), size: 18),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('Allow comments', style: TextStyle(color: Color(0xFF111015), fontSize: 13, fontWeight: FontWeight.w900))),
-              Switch(value: commentsEnabled, onChanged: (_) => onToggleComments(), activeThumbColor: const Color(0xFF111015)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MentionRow extends StatelessWidget {
-  const _MentionRow({required this.usesMentionAll, required this.mentions, required this.commentsEnabled, required this.canUseMentionAllToday});
-
-  final bool usesMentionAll;
-  final List<String> mentions;
-  final bool commentsEnabled;
-  final bool canUseMentionAllToday;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          if (usesMentionAll) _SmallChip(text: canUseMentionAllToday ? '@all' : '@all limit reached'),
-          ...mentions.map((mention) => _SmallChip(text: '@$mention')),
-          _SmallChip(text: commentsEnabled ? 'Comments on' : 'Comments off'),
-        ],
-      ),
-    );
-  }
-}
-
-class _SmallChip extends StatelessWidget {
-  const _SmallChip({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(color: const Color(0xFFF2EEF4), borderRadius: BorderRadius.circular(999)),
-      child: Text(text, style: const TextStyle(color: Color(0xFF111015), fontSize: 11, fontWeight: FontWeight.w900)),
-    );
-  }
-}
-
-class _ShareButton extends StatelessWidget {
-  const _ShareButton({required this.enabled, required this.busy, required this.onTap});
-
-  final bool enabled;
-  final bool busy;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 48,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: enabled ? const Color(0xFF111015) : const Color(0xFFE4DFE8), borderRadius: BorderRadius.circular(14)),
-        child: busy ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2)) : Text('Share Vibe', style: TextStyle(color: enabled ? Colors.white : const Color(0xFF8C8198), fontWeight: FontWeight.w900)),
       ),
     );
   }
