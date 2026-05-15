@@ -185,9 +185,8 @@ def preview_gift_economy(coin_value: int, quantity: int, room_id: int | None, re
 
 
 def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, coin_value: int, quantity: int, room_id: int | None, relationship_id: int | None, is_relationship_gift: bool, *, commit: bool = True) -> dict:
-    if sender.id == receiver_user_id:
-        raise HTTPException(status_code=400, detail="Sender and receiver cannot be the same user")
-
+    # Self gifting is allowed by product rule. The sender still pays normal coins,
+    # and the receiving side still earns rubies/receive EXP like any other gift.
     receiver = db.query(User).filter(User.id == receiver_user_id).first()
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver not found")
@@ -224,7 +223,7 @@ def send_gift(db: Session, sender: User, receiver_user_id: int, gift_id: str, co
     else:
         db.flush()
 
-    return {"gift_transaction_id": gift_tx.id, "sender_user_id": sender.id, "receiver_user_id": receiver_user_id, "total_coin_value": total_coin_value, "receiver_ruby_amount": receiver_ruby_amount, "platform_share_coin_value": platform_share_coin_value, "send_exp_amount": total_coin_value, "receive_exp_amount": total_coin_value, "room_exp_amount": room_exp_amount, "love_score_amount": love_score_amount, "sender_coin_balance": sender_wallet.coin_balance, "receiver_ruby_balance": receiver_wallet.ruby_balance, "receiver_lifetime_gift_coin_value": receiver_wallet.lifetime_coins_received_as_gifts, "receiver_lifetime_rubies_earned": receiver_wallet.lifetime_rubies_earned, "experience_updates": exp_updates, "ruby_rule": "Receiver rubies = total gift coin value × 30%.", "rule": "Gift send committed. Sender coins debited; receiver rubies credited at 30%; Send/Receive/Room EXP updated instantly."}
+    return {"gift_transaction_id": gift_tx.id, "sender_user_id": sender.id, "receiver_user_id": receiver_user_id, "total_coin_value": total_coin_value, "receiver_ruby_amount": receiver_ruby_amount, "platform_share_coin_value": platform_share_coin_value, "send_exp_amount": total_coin_value, "receive_exp_amount": total_coin_value, "room_exp_amount": room_exp_amount, "love_score_amount": love_score_amount, "sender_coin_balance": sender_wallet.coin_balance, "receiver_ruby_balance": receiver_wallet.ruby_balance, "receiver_lifetime_gift_coin_value": receiver_wallet.lifetime_coins_received_as_gifts, "receiver_lifetime_rubies_earned": receiver_wallet.lifetime_rubies_earned, "experience_updates": exp_updates, "ruby_rule": "Receiver rubies = total gift coin value × 30%.", "rule": "Gift send committed. Sender coins debited; receiver rubies credited at 30%; Send/Receive/Room EXP updated instantly. Self gifting is allowed."}
 
 
 def convert_rubies_to_coins(db: Session, user: User, ruby_amount: int) -> UserWallet:
