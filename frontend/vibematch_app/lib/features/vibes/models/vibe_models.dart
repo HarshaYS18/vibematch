@@ -121,14 +121,40 @@ class VibeItem {
 
 class VibeComment {
   const VibeComment({
+    required this.id,
     required this.name,
     required this.avatarText,
     required this.text,
     required this.time,
+    this.avatarUrl,
+    this.isPinned = false,
+    this.canPin = false,
+    this.canDelete = false,
   });
 
+  final String id;
   final String name;
   final String avatarText;
   final String text;
   final String time;
+  final String? avatarUrl;
+  final bool isPinned;
+  final bool canPin;
+  final bool canDelete;
+
+  bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+
+  VibeComment copyWith({bool? isPinned}) {
+    return VibeComment(
+      id: id,
+      name: name,
+      avatarText: avatarText,
+      text: text,
+      time: time,
+      avatarUrl: avatarUrl,
+      isPinned: isPinned ?? this.isPinned,
+      canPin: canPin,
+      canDelete: canDelete,
+    );
+  }
 }
