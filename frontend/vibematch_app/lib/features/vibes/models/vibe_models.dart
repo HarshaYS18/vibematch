@@ -122,6 +122,7 @@ class VibeItem {
 class VibeComment {
   const VibeComment({
     this.id = '',
+    this.parentCommentId,
     required this.name,
     required this.avatarText,
     required this.text,
@@ -133,6 +134,7 @@ class VibeComment {
   });
 
   final String id;
+  final String? parentCommentId;
   final String name;
   final String avatarText;
   final String text;
@@ -143,10 +145,12 @@ class VibeComment {
   final bool canDelete;
 
   bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+  bool get isReply => parentCommentId != null && parentCommentId!.trim().isNotEmpty;
 
   VibeComment copyWith({bool? isPinned}) {
     return VibeComment(
       id: id,
+      parentCommentId: parentCommentId,
       name: name,
       avatarText: avatarText,
       text: text,
