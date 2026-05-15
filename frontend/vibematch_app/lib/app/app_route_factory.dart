@@ -17,6 +17,7 @@ import '../features/rooms/presentation/routes/live_room_route_args.dart';
 import '../features/rooms/presentation/routes/live_room_routes.dart';
 import '../features/search/presentation/search_page.dart';
 import '../features/settings/presentation/settings_page.dart';
+import '../features/store/presentation/inventory_page.dart';
 import '../features/store/presentation/store_page.dart';
 import '../features/vip/presentation/vip_page.dart';
 import '../features/wallet/presentation/models/wallet_models.dart';
@@ -84,6 +85,8 @@ class AppRouteFactory {
         return _buildRoute(settings, const WalletPageModular(initialSection: WalletSection.ruby));
       case VmRoutes.store:
         return _buildRoute(settings, const StorePage());
+      case VmRoutes.inventory:
+        return _buildRoute(settings, const InventoryPage());
       case VmRoutes.settings:
         return _buildRoute(settings, const SettingsPage());
       case VmRoutes.family:
@@ -105,8 +108,6 @@ class AppRouteFactory {
         return _buildRoute(settings, const VmSkeletonPage(title: 'Agency', subtitle: 'Agency Owner, Agency Admin, Hosts, BD hierarchy, commission, leave requests, and agency performance.', icon: Icons.groups_2_rounded, highlights: ['Agency Owner can invite, approve, remove hosts, and appoint up to 2 admins.', 'Agency Admin can invite and approve hosts but cannot remove hosts or manage admins.', 'Future backend: agency membership, host rewards, commissions, and audit logs.']));
       case VmRoutes.gifts:
         return _buildRoute(settings, const VmSkeletonPage(title: 'Gifts', subtitle: 'Gift catalog, normal gifts, lucky gifts, relationship gifts, premium animations, combo history, and received gifts.', icon: Icons.card_giftcard_rounded, highlights: ['Gift catalog must come from backend before production testing.', 'Gift sending must be wallet-ledger and WebSocket controlled.', 'Future backend: gift catalog, send gift, combo, received gift, and lucky gift APIs.']));
-      case VmRoutes.inventory:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Inventory', subtitle: 'Owned avatar frames, entrance effects, chat bubbles, room backgrounds, badges, and equipped cosmetics.', icon: Icons.inventory_2_rounded, highlights: ['Inventory should separate owned, expired, equipped, and pending-review items.', 'Custom room backgrounds require official approval before activation.', 'Future backend: inventory, equip, unequip, expiry, and review status APIs.']));
 
       case VmRoutes.admin:
         return _buildRoute(settings, const VmSkeletonPage(title: 'Admin', subtitle: 'Admin routes for users, roles, bans, device bans, audit logs, login history, reports, and reviews.', icon: Icons.shield_rounded, highlights: ['Admin tools must be backend role/permission enforced.', 'Every sensitive action must be audit logged.', 'Future: split into users, roles, audit logs, bans, device bans, reports, and review pages.']));
