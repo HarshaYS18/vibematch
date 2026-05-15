@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
-import '../../../../core/icons/vm_icons.dart';
 import '../../models/vibe_models.dart';
 
 class VibeCardModular extends StatelessWidget {
@@ -11,6 +11,7 @@ class VibeCardModular extends StatelessWidget {
     required this.onLikeTap,
     required this.onCommentTap,
     required this.onShareTap,
+    required this.onSaveTap,
     required this.onMoreTap,
   });
 
@@ -19,6 +20,7 @@ class VibeCardModular extends StatelessWidget {
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
   final VoidCallback onShareTap;
+  final VoidCallback onSaveTap;
   final VoidCallback onMoreTap;
 
   String get _captionWithInlineMentions {
@@ -44,159 +46,336 @@ class VibeCardModular extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _VibeAuthorRow(vibe: vibe, onProfileTap: onProfileTap, onMoreTap: onMoreTap),
+          VibeMediaPlayer(vibe: vibe, onDoubleTap: onLikeTap),
+          _VibeActionsRow(vibe: vibe, onLikeTap: onLikeTap, onCommentTap: onCommentTap, onShareTap: onShareTap, onSaveTap: onSaveTap),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+            child: Text(_likesText(vibe.likes), style: const TextStyle(color: Color(0xFF111015), fontSize: 13, fontWeight: FontWeight.w900)),
+          ),
+          if (_captionWithInlineMentions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
+              child: _MentionCaption(authorName: vibe.authorName, caption: _captionWithInlineMentions),
+            ),
+          if (vibe.comments > 0)
+            InkWell(
+              onTap: onCommentTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 5, 14, 2),
+                child: Text('View all ${_formatCount(vibe.comments)} comments', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 5, 14, 14),
+            child: Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+          ),
+          const Divider(height: 1, color: Color(0xFFECE2D8)),
+        ],
+      ),
+    );
+  }
+
+  String _likesText(int likes) {
+    if (likes <= 0) return 'Be the first to like this';
+    if (likes == 1) return '1 like';
+    return '${_formatCount(likes)} likes';
+  }
+}
+
+class _VibeAuthorRow extends StatelessWidget {
+  const _VibeAuthorRow({required this.vibe, required this.onProfileTap, required this.onMoreTap});
+
+  final VibeItem vibe;
+  final VoidCallback onProfileTap;
+  final VoidCallback onMoreTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      child: Row(
+        children: [
+          InkWell(onTap: onProfileTap, customBorder: const CircleBorder(), child: VibeAvatar(vibe: vibe, size: 38)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: InkWell(
+              onTap: onProfileTap,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(vibe.authorName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF111015), fontSize: 14, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 1),
+                  Text(vibe.timeAgo, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+          IconButton(onPressed: onMoreTap, icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF111015))),
+        ],
+      ),
+    );
+  }
+}
+
+class VibeAvatar extends StatelessWidget {
+  const VibeAvatar({super.key, required this.vibe, required this.size});
+
+  final VibeItem vibe;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarUrl = vibe.avatarUrl?.trim();
+    return Container(
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: vibe.colors)),
+      child: avatarUrl != null && avatarUrl.isNotEmpty
+          ? Image.network(avatarUrl, fit: BoxFit.cover, errorBuilder: (_, _, _) => _FallbackAvatar(vibe: vibe))
+          : _FallbackAvatar(vibe: vibe),
+    );
+  }
+}
+
+class _FallbackAvatar extends StatelessWidget {
+  const _FallbackAvatar({required this.vibe});
+
+  final VibeItem vibe;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Text(vibe.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)));
+  }
+}
+
+class VibeMediaPlayer extends StatelessWidget {
+  const VibeMediaPlayer({super.key, required this.vibe, required this.onDoubleTap});
+
+  final VibeItem vibe;
+  final VoidCallback onDoubleTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaUrl = vibe.mediaUrl?.trim();
     final isTextOnly = vibe.mediaType == VibeMediaType.text;
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: onCommentTap,
+    if (isTextOnly) {
+      return GestureDetector(
+        onDoubleTap: onDoubleTap,
         child: Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: const Color(0xFFECE2D8)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF251538).withValues(alpha: 0.05),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
+          margin: const EdgeInsets.only(top: 0),
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 230),
+          padding: const EdgeInsets.all(26),
+          decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
+          child: Center(
+            child: Text(vibe.caption, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, height: 1.25, fontWeight: FontWeight.w900)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  InkWell(
-                    onTap: onProfileTap,
-                    customBorder: const CircleBorder(),
-                    child: _AvatarBubble(text: vibe.avatarText, colors: vibe.colors, size: 48),
-                  ),
-                  const SizedBox(width: 11),
-                  Expanded(
-                    child: InkWell(
-                      onTap: onProfileTap,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            vibe.authorName,
-                            style: const TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'ID ${vibe.authorId} • ${vibe.timeAgo}',
-                            style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  _VibeTag(label: vibe.tag, color: vibe.colors.first),
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: onMoreTap,
-                    borderRadius: BorderRadius.circular(99),
-                    child: const Padding(
-                      padding: EdgeInsets.all(5),
-                      child: Icon(VMIcons.more, color: Color(0xFF8C8198)),
-                    ),
-                  ),
-                ],
-              ),
-              if (!isTextOnly) ...[
-                const SizedBox(height: 13),
-                _VibeMediaPreview(vibe: vibe),
-                const SizedBox(height: 13),
-              ] else
-                const SizedBox(height: 12),
-              _MentionRichText(
-                text: _captionWithInlineMentions,
-                baseStyle: TextStyle(
-                  color: const Color(0xFF5E526B),
-                  fontSize: isTextOnly ? 14 : 13,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 13),
-              Row(
-                children: [
-                  _ActionPill(
-                    icon: vibe.likedByMe ? VMIcons.heart : Icons.favorite_border_rounded,
-                    label: _formatCount(vibe.likes),
-                    color: const Color(0xFFE84C72),
-                    onTap: onLikeTap,
-                  ),
-                  const SizedBox(width: 9),
-                  _ActionPill(icon: Icons.chat_bubble_rounded, label: _formatCount(vibe.comments), color: const Color(0xFF6D5DF6), onTap: onCommentTap),
-                  const Spacer(),
-                  _ActionPill(icon: Icons.ios_share_rounded, label: _formatCount(vibe.shares), color: const Color(0xFF12C7B7), onTap: onShareTap),
-                ],
-              ),
-            ],
+        ),
+      );
+    }
+
+    if (mediaUrl == null || mediaUrl.isEmpty) {
+      return GestureDetector(
+        onDoubleTap: onDoubleTap,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: Container(
+            decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
+            child: Icon(vibe.mediaType == VibeMediaType.video ? Icons.play_circle_fill_rounded : Icons.photo_rounded, color: Colors.white, size: 72),
           ),
+        ),
+      );
+    }
+
+    if (vibe.mediaType == VibeMediaType.video) {
+      return GestureDetector(onDoubleTap: onDoubleTap, child: _NetworkVideoPlayer(url: mediaUrl));
+    }
+
+    return GestureDetector(
+      onDoubleTap: onDoubleTap,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Image.network(
+          mediaUrl,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) => loadingProgress == null ? child : _MediaLoading(colors: vibe.colors),
+          errorBuilder: (_, _, _) => _MediaFallback(vibe: vibe),
         ),
       ),
     );
   }
 }
 
-class _VibeMediaPreview extends StatelessWidget {
-  const _VibeMediaPreview({required this.vibe});
-  final VibeItem vibe;
+class _NetworkVideoPlayer extends StatefulWidget {
+  const _NetworkVideoPlayer({required this.url});
+
+  final String url;
+
+  @override
+  State<_NetworkVideoPlayer> createState() => _NetworkVideoPlayerState();
+}
+
+class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _isReady = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..setLooping(true)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _isReady = true);
+      }).catchError((_) {
+        if (!mounted) return;
+        setState(() => _hasError = true);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayback() {
+    final controller = _controller;
+    if (controller == null || !_isReady) return;
+    setState(() {
+      controller.value.isPlaying ? controller.pause() : controller.play();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isVideo = vibe.mediaType == VibeMediaType.video;
-    final mediaUrl = vibe.mediaUrl?.trim();
+    final controller = _controller;
+    if (_hasError) {
+      return const AspectRatio(aspectRatio: 1, child: Center(child: Icon(Icons.broken_image_rounded, size: 44, color: Color(0xFF8C8198))));
+    }
+    if (controller == null || !_isReady) {
+      return const AspectRatio(aspectRatio: 1, child: Center(child: CircularProgressIndicator(color: Color(0xFF111015), strokeWidth: 2.6)));
+    }
 
-    return Container(
-      height: 190,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: vibe.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [BoxShadow(color: vibe.colors.first.withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9))],
-      ),
+    return AspectRatio(
+      aspectRatio: 1,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (mediaUrl != null && mediaUrl.isNotEmpty && !isVideo)
-            Image.network(
-              mediaUrl,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) => progress == null ? child : _MediaLoading(colors: vibe.colors),
-              errorBuilder: (context, error, stackTrace) => _MediaFallback(vibe: vibe),
-            )
-          else
-            _MediaFallback(vibe: vibe),
-          if (isVideo)
-            Center(
-              child: Container(
-                height: 62,
-                width: 62,
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.35), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.50))),
-                child: const Icon(VMIcons.play, color: Colors.white, size: 42),
+          FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
+            ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _togglePlayback,
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: controller.value.isPlaying ? 0 : 1,
+                  duration: const Duration(milliseconds: 180),
+                  child: Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.36), shape: BoxShape.circle),
+                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 46),
+                  ),
+                ),
               ),
             ),
-          if (mediaUrl != null && mediaUrl.isNotEmpty)
-            Positioned(
-              left: 10,
-              bottom: 10,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.42), borderRadius: BorderRadius.circular(999)),
-                child: Text(isVideo ? 'Uploaded video' : 'Uploaded photo', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)),
-              ),
+          ),
+          Positioned(
+            left: 12,
+            bottom: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.46), borderRadius: BorderRadius.circular(999)),
+              child: Text(controller.value.isPlaying ? 'Playing' : 'Tap to play', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)),
             ),
+          ),
         ],
       ),
     );
+  }
+}
+
+class _VibeActionsRow extends StatelessWidget {
+  const _VibeActionsRow({required this.vibe, required this.onLikeTap, required this.onCommentTap, required this.onShareTap, required this.onSaveTap});
+
+  final VibeItem vibe;
+  final VoidCallback onLikeTap;
+  final VoidCallback onCommentTap;
+  final VoidCallback onShareTap;
+  final VoidCallback onSaveTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 5, 8, 2),
+      child: Row(
+        children: [
+          _IconAction(icon: vibe.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: vibe.likedByMe ? const Color(0xFFE84C72) : const Color(0xFF111015), onTap: onLikeTap),
+          _IconAction(icon: Icons.mode_comment_outlined, color: const Color(0xFF111015), onTap: onCommentTap),
+          _IconAction(icon: Icons.send_outlined, color: const Color(0xFF111015), onTap: onShareTap),
+          const Spacer(),
+          _IconAction(icon: vibe.savedByMe ? Icons.bookmark_rounded : Icons.bookmark_border_rounded, color: const Color(0xFF111015), onTap: onSaveTap),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconAction extends StatelessWidget {
+  const _IconAction({required this.icon, required this.color, required this.onTap});
+
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(onPressed: onTap, icon: Icon(icon, color: color, size: 27));
+  }
+}
+
+class _MentionCaption extends StatelessWidget {
+  const _MentionCaption({required this.authorName, required this.caption});
+
+  final String authorName;
+  final String caption;
+
+  static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = <TextSpan>[
+      TextSpan(text: '$authorName ', style: const TextStyle(color: Color(0xFF111015), fontWeight: FontWeight.w900)),
+    ];
+    var currentIndex = 0;
+
+    for (final match in _mentionPattern.allMatches(caption)) {
+      if (match.start > currentIndex) {
+        spans.add(TextSpan(text: caption.substring(currentIndex, match.start)));
+      }
+      spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w900)));
+      currentIndex = match.end;
+    }
+    if (currentIndex < caption.length) spans.add(TextSpan(text: caption.substring(currentIndex)));
+
+    return RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.3, height: 1.32, fontWeight: FontWeight.w600), children: spans));
   }
 }
 
@@ -206,10 +385,7 @@ class _MediaLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-      child: const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.6)),
-    );
+    return Container(decoration: BoxDecoration(gradient: LinearGradient(colors: colors)), child: const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.6)));
   }
 }
 
@@ -219,109 +395,7 @@ class _MediaFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isVideo = vibe.mediaType == VibeMediaType.video;
-    return Container(
-      decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-      child: Center(
-        child: Container(
-          height: 62,
-          width: 62,
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
-          child: Icon(isVideo ? VMIcons.play : VMIcons.photo, color: Colors.white, size: isVideo ? 42 : 32),
-        ),
-      ),
-    );
-  }
-}
-
-class _AvatarBubble extends StatelessWidget {
-  const _AvatarBubble({required this.text, required this.colors, required this.size});
-  final String text;
-  final List<Color> colors;
-  final double size;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: size,
-      width: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: colors)),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-    );
-  }
-}
-
-class _VibeTag extends StatelessWidget {
-  const _VibeTag({required this.label, required this.color});
-  final String label;
-  final Color color;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-      child: Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
-    );
-  }
-}
-
-class _MentionRichText extends StatelessWidget {
-  const _MentionRichText({required this.text, required this.baseStyle});
-
-  final String text;
-  final TextStyle baseStyle;
-
-  static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
-
-  @override
-  Widget build(BuildContext context) {
-    final spans = <TextSpan>[];
-    var currentIndex = 0;
-
-    for (final match in _mentionPattern.allMatches(text)) {
-      if (match.start > currentIndex) {
-        spans.add(TextSpan(text: text.substring(currentIndex, match.start)));
-      }
-
-      spans.add(
-        TextSpan(
-          text: text.substring(match.start, match.end),
-          style: const TextStyle(
-            color: Color(0xFF6D5DF6),
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      );
-      currentIndex = match.end;
-    }
-
-    if (currentIndex < text.length) {
-      spans.add(TextSpan(text: text.substring(currentIndex)));
-    }
-
-    return RichText(
-      text: TextSpan(style: baseStyle, children: spans),
-    );
-  }
-}
-
-class _ActionPill extends StatelessWidget {
-  const _ActionPill({required this.icon, required this.label, required this.color, required this.onTap});
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(999)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 17, color: color), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900))]),
-      ),
-    );
+    return Container(decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors)), child: Center(child: Icon(vibe.mediaType == VibeMediaType.video ? Icons.play_circle_fill_rounded : Icons.photo_rounded, color: Colors.white, size: 72)));
   }
 }
 
