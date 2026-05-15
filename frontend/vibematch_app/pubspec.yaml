@@ -47,6 +47,8 @@ flutter:
     - assets/icons/
     - assets/images/branding/
     - assets/images/vip_badges/
+    - assets/images/vip_tags/
+    - assets/images/svip_tags/
     - assets/images/gifts/
     - assets/gifts/normal/
     - assets/gifts/lucky/
