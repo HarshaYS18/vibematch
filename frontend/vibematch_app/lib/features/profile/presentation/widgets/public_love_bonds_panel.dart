@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../relationships/data/relationship_exp_api_service.dart';
+import '../../../relationships/presentation/relationship_exp_detail_sheet.dart';
 import '../../../relationships/presentation/relationship_rankings_sheet.dart';
 import '../../data/love_bond_realtime_service.dart';
 import '../love_bonds/widgets/love_bond_card.dart';
@@ -72,6 +73,14 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
     RelationshipRankingsSheet.show(context);
   }
 
+  void _openRelationshipDetails() {
+    RelationshipExpDetailSheet.show(
+      context,
+      publicUserId: widget.publicUserId,
+      initialSummary: _summary,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<List<LoveBondRequest>>(
@@ -115,19 +124,22 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
                       ),
                     )
                   else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFAF7F1),
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: const Color(0xFFECE2D8)),
-                      ),
-                      child: Text(
-                        summary == null ? 'Public view' : 'Bond Lv.${summary.level}',
-                        style: const TextStyle(
-                          color: Color(0xFF7A6B86),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
+                    GestureDetector(
+                      onTap: _openRelationshipDetails,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFAF7F1),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(color: const Color(0xFFECE2D8)),
+                        ),
+                        child: Text(
+                          summary == null ? 'Public view' : 'Bond Lv.${summary.level}',
+                          style: const TextStyle(
+                            color: Color(0xFF7A6B86),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
@@ -135,7 +147,10 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
               ),
               if (summary != null) ...[
                 const SizedBox(height: 10),
-                _RelationshipExpBar(summary: summary),
+                GestureDetector(
+                  onTap: _openRelationshipDetails,
+                  child: _RelationshipExpBar(summary: summary),
+                ),
               ] else if (_error != null) ...[
                 const SizedBox(height: 10),
                 _RelationshipErrorPill(
