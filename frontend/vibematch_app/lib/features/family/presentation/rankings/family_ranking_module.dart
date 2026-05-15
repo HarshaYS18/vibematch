@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/family_api_service.dart';
 import '../../models/family_ui_models.dart';
 import '../widgets/family_redesign_shared.dart';
 
@@ -11,6 +12,9 @@ class FamilyRankingModule extends StatelessWidget {
     required this.onOpenFamily,
     required this.onJoinFamily,
     required this.onCreateFamily,
+    this.selectedPeriod = FamilyRankingPeriod.weekly,
+    this.loading = false,
+    this.onPeriodChanged,
   });
 
   final List<FamilyRankUiModel> rankings;
@@ -18,6 +22,9 @@ class FamilyRankingModule extends StatelessWidget {
   final ValueChanged<FamilyRankUiModel> onOpenFamily;
   final ValueChanged<FamilyRankUiModel> onJoinFamily;
   final VoidCallback onCreateFamily;
+  final FamilyRankingPeriod selectedPeriod;
+  final bool loading;
+  final ValueChanged<FamilyRankingPeriod>? onPeriodChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +38,14 @@ class FamilyRankingModule extends StatelessWidget {
             CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(child: _RankingHeader(totalFamilies: sortedRankings.length)),
+                SliverToBoxAdapter(
+                  child: _RankingHeader(
+                    totalFamilies: sortedRankings.length,
+                    selectedPeriod: selectedPeriod,
+                    loading: loading,
+                    onPeriodChanged: onPeriodChanged,
+                  ),
+                ),
                 SliverToBoxAdapter(child: _TopFamilyPodium(rankings: sortedRankings.take(3).toList(), onOpenFamily: onOpenFamily, onJoinFamily: onJoinFamily)),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
@@ -66,26 +80,114 @@ class FamilyRankingModule extends StatelessWidget {
 }
 
 class _RankingHeader extends StatelessWidget {
-  const _RankingHeader({required this.totalFamilies});
+  const _RankingHeader({
+    required this.totalFamilies,
+    required this.selectedPeriod,
+    required this.loading,
+    required this.onPeriodChanged,
+  });
 
   final int totalFamilies;
+  final FamilyRankingPeriod selectedPeriod;
+  final bool loading;
+  final ValueChanged<FamilyRankingPeriod>? onPeriodChanged;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-      child: Row(
+      child: Column(
         children: [
-          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: FamilyRedesignColors.ink)),
-          const Expanded(child: Text('Family Rankings', style: TextStyle(color: FamilyRedesignColors.ink, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -0.4))),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: FamilyRedesignColors.line)),
-            child: Text('$totalFamilies families', style: const TextStyle(color: FamilyRedesignColors.soft, fontSize: 12, fontWeight: FontWeight.w900)),
+          Row(
+            children: [
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: FamilyRedesignColors.ink)),
+              const Expanded(child: Text('Family Rankings', style: TextStyle(color: FamilyRedesignColors.ink, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -0.4))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: FamilyRedesignColors.line)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (loading) ...[
+                      const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: FamilyRedesignColors.gold)),
+                      const SizedBox(width: 6),
+                    ],
+                    Text('$totalFamilies families', style: const TextStyle(color: FamilyRedesignColors.soft, fontSize: 12, fontWeight: FontWeight.w900)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _FamilyPeriodSelector(
+            selectedPeriod: selectedPeriod,
+            onChanged: onPeriodChanged,
           ),
         ],
       ),
     );
+  }
+}
+
+class _FamilyPeriodSelector extends StatelessWidget {
+  const _FamilyPeriodSelector({
+    required this.selectedPeriod,
+    required this.onChanged,
+  });
+
+  final FamilyRankingPeriod selectedPeriod;
+  final ValueChanged<FamilyRankingPeriod>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: FamilyRankingPeriod.values.map((period) {
+        final selected = selectedPeriod == period;
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: InkWell(
+              onTap: onChanged == null ? null : () => onChanged!(period),
+              borderRadius: BorderRadius.circular(999),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected ? const Color(0xFF100A18) : Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: selected ? FamilyRedesignColors.gold : FamilyRedesignColors.line,
+                  ),
+                  boxShadow: selected
+                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 16, offset: const Offset(0, 6))]
+                      : null,
+                ),
+                child: Text(
+                  _periodLabel(period),
+                  style: TextStyle(
+                    color: selected ? Colors.white : FamilyRedesignColors.soft,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(growable: false),
+    );
+  }
+
+  String _periodLabel(FamilyRankingPeriod period) {
+    switch (period) {
+      case FamilyRankingPeriod.daily:
+        return 'Today';
+      case FamilyRankingPeriod.weekly:
+        return 'This week';
+      case FamilyRankingPeriod.monthly:
+        return 'This month';
+    }
   }
 }
 
