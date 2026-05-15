@@ -4,8 +4,10 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
+from app.database import get_db
 from app.models.user import User
 
 router = APIRouter(prefix="/media", tags=["Media"])
@@ -14,6 +16,8 @@ UPLOAD_ROOT = Path("static/uploads")
 MAX_AVATAR_BYTES = 10 * 1024 * 1024
 MAX_PROFILE_COVER_BYTES = 10 * 1024 * 1024
 MAX_ROOM_AVATAR_BYTES = 10 * 1024 * 1024
+MAX_ROOM_COVER_BYTES = 10 * 1024 * 1024
+MAX_ROOM_BACKGROUND_BYTES = 15 * 1024 * 1024
 MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_HOME_BANNER_BYTES = 10 * 1024 * 1024
 MAX_VIBE_MEDIA_BYTES = 20 * 1024 * 1024
@@ -99,8 +103,17 @@ async def _save_upload(file: UploadFile, *, folder: str, max_size: int, allowed_
 
 
 @router.post("/avatar", response_model=MediaUploadResponse)
-async def upload_avatar(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
-    return await _save_upload(file, folder=f"avatars/user_{current_user.id}", max_size=MAX_AVATAR_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
+async def upload_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    result = await _save_upload(file, folder=f"avatars/user_{current_user.id}", max_size=MAX_AVATAR_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
+    current_user.avatar_url = result.url
+    db.commit()
+    db.refresh(current_user)
+    return result
 
 
 @router.post("/profile-cover", response_model=MediaUploadResponse)
@@ -111,6 +124,16 @@ async def upload_profile_cover(request: Request, file: UploadFile = File(...), c
 @router.post("/room-avatar", response_model=MediaUploadResponse)
 async def upload_room_avatar(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
     return await _save_upload(file, folder=f"room_avatars/user_{current_user.id}", max_size=MAX_ROOM_AVATAR_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
+
+
+@router.post("/room-cover", response_model=MediaUploadResponse)
+async def upload_room_cover(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    return await _save_upload(file, folder=f"room_covers/user_{current_user.id}", max_size=MAX_ROOM_COVER_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
+
+
+@router.post("/room-background", response_model=MediaUploadResponse)
+async def upload_room_background(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    return await _save_upload(file, folder=f"room_backgrounds/user_{current_user.id}", max_size=MAX_ROOM_BACKGROUND_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
 
 
 @router.post("/home-banner", response_model=MediaUploadResponse)
