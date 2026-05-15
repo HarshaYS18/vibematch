@@ -56,20 +56,35 @@ class HomeNavigationController {
     required HomeController controller,
     required CurrentUser? currentUser,
   }) async {
-    final existingRoom = controller.myCreatedRoom;
-    if (existingRoom != null) {
-      enterRoom(context: context, room: existingRoom, currentUser: currentUser);
+    if (currentUser == null) {
+      showToast(context, 'Login session not ready. Refresh and try again.');
       return;
     }
 
-    if (currentUser == null) {
-      showToast(context, 'Login session not ready. Refresh and try again.');
+    var existingRoom = controller.myCreatedRoom;
+    if (existingRoom == null) {
+      showToast(context, 'Checking your room...');
+      await controller.loadHomeChrome();
+      if (!context.mounted) return;
+      existingRoom = controller.myCreatedRoom;
+    }
+
+    if (existingRoom != null) {
+      enterRoom(context: context, room: existingRoom, currentUser: currentUser);
       return;
     }
 
     await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => CreatePage(currentUser: currentUser)));
     if (!context.mounted) return;
     await controller.refreshAfterRoomCreation();
+    if (!context.mounted) return;
+
+    final createdRoom = controller.myCreatedRoom;
+    if (createdRoom != null) {
+      enterRoom(context: context, room: createdRoom, currentUser: currentUser);
+      return;
+    }
+    showToast(context, 'Room saved. Pull to refresh if it does not appear.');
   }
 
   static void openRoom({
