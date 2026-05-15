@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../auth/data/auth_api_service.dart';
 import '../../models/vibe_models.dart';
 
-class VibeCardModular extends StatelessWidget {
+class VibeCardModular extends StatefulWidget {
   const VibeCardModular({super.key, required this.vibe, required this.onProfileTap, required this.onLikeTap, required this.onCommentTap, required this.onShareTap, required this.onSaveTap, required this.onMoreTap});
 
   final VibeItem vibe;
@@ -14,35 +15,67 @@ class VibeCardModular extends StatelessWidget {
   final VoidCallback onSaveTap;
   final VoidCallback onMoreTap;
 
+  @override
+  State<VibeCardModular> createState() => _VibeCardModularState();
+}
+
+class _VibeCardModularState extends State<VibeCardModular> {
+  bool _showActionPill = false;
+
+  bool get _isSelfVibe {
+    final publicId = const AuthApiService().cachedUser?.publicUserId.toString();
+    return publicId != null && publicId == widget.vibe.authorId;
+  }
+
   String get _caption {
-    final caption = vibe.caption.trim();
+    final caption = widget.vibe.caption.trim();
     final extras = <String>[];
-    for (final raw in vibe.mentions) {
+    for (final raw in widget.vibe.mentions) {
       final clean = raw.trim();
       if (clean.isEmpty) continue;
       final token = clean.startsWith('@') ? clean : '@$clean';
       if (!caption.toLowerCase().contains(token.toLowerCase()) && !extras.contains(token)) extras.add(token);
     }
-    if (vibe.usesMentionAll && !caption.toLowerCase().contains('@all')) extras.add('@all');
+    if (widget.vibe.usesMentionAll && !caption.toLowerCase().contains('@all')) extras.add('@all');
     return extras.isEmpty ? caption : '$caption ${extras.join(' ')}';
+  }
+
+  void _toggleActionPill() {
+    setState(() => _showActionPill = !_showActionPill);
+  }
+
+  void _runAction() {
+    setState(() => _showActionPill = false);
+    widget.onMoreTap();
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context).width;
-    final isTextVibe = vibe.mediaType == VibeMediaType.text;
-    return ColoredBox(
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _AuthorRow(vibe: vibe, onProfileTap: onProfileTap, onMoreTap: onMoreTap),
-          if (!isTextVibe) SizedBox(width: size, height: size, child: ClipRect(child: VibeMediaPlayer(vibe: vibe, onDoubleTap: onLikeTap))),
-          _MetaPanel(vibe: vibe, caption: _caption, onLikeTap: onLikeTap, onCommentTap: onCommentTap, onShareTap: onShareTap, onSaveTap: onSaveTap, isTextVibe: isTextVibe),
-          const Divider(height: 1, color: Color(0xFFECE2D8)),
-        ],
-      ),
+    final isTextVibe = widget.vibe.mediaType == VibeMediaType.text;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ColoredBox(
+          color: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _AuthorRow(vibe: widget.vibe, onProfileTap: widget.onProfileTap, onMoreTap: _toggleActionPill),
+              if (!isTextVibe) SizedBox(width: size, height: size, child: ClipRect(child: VibeMediaPlayer(vibe: widget.vibe, onDoubleTap: widget.onLikeTap))),
+              _MetaPanel(vibe: widget.vibe, caption: _caption, onLikeTap: widget.onLikeTap, onCommentTap: widget.onCommentTap, onShareTap: widget.onShareTap, onSaveTap: widget.onSaveTap, isTextVibe: isTextVibe),
+              const Divider(height: 1, color: Color(0xFFECE2D8)),
+            ],
+          ),
+        ),
+        if (_showActionPill)
+          Positioned(
+            top: 46,
+            right: 28,
+            child: _InlineVibeActionPill(isSelfVibe: _isSelfVibe, onTap: _runAction),
+          ),
+      ],
     );
   }
 }
@@ -78,6 +111,42 @@ class _AuthorRow extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _InlineVibeActionPill extends StatelessWidget {
+  const _InlineVibeActionPill({required this.isSelfVibe, required this.onTap});
+
+  final bool isSelfVibe;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isSelfVibe ? const Color(0xFFE84C72) : const Color(0xFFC99A3B);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFECE2D8)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 20, offset: const Offset(0, 9))],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(isSelfVibe ? Icons.delete_outline_rounded : Icons.report_gmailerrorred_rounded, color: color, size: 19),
+              const SizedBox(width: 8),
+              Text(isSelfVibe ? 'Delete Vibe' : 'Report Vibe', style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _MetaPanel extends StatelessWidget {
