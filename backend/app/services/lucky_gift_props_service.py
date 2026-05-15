@@ -31,6 +31,9 @@ DEFAULT_RULES: dict[str, Any] = {
     "broadcast_min_reward": 10000,
     "big_win_min_multiplier": 100,
     "payout_pool_safe_ratio_basis_points": 6500,
+    "whale_medium_multiplier_weight_basis_points": 1000,
+    "whale_high_multiplier_weight_basis_points": 250,
+    "whale_block_multiplier_weight_basis_points": 50,
     "multipliers": DEFAULT_MULTIPLIERS,
 }
 
@@ -44,6 +47,7 @@ DEFAULT_RISK: dict[str, Any] = {
     "whale_recent_window_minutes": 5,
     "manual_review_score": 70,
     "block_score": 95,
+    "whale_probability_mode_enabled": True,
 }
 
 
@@ -122,6 +126,34 @@ def _normalized_multiplier_rows(raw: Any) -> list[dict[str, Any]]:
     if not rows or sum(int(item["weight"]) for item in rows) <= 0:
         return [dict(item) for item in DEFAULT_MULTIPLIERS]
     return sorted(rows, key=lambda item: int(item["multiplier"]))
+
+
+def _whale_weight_scale_basis_points(rules: dict[str, Any], risk_score: int) -> tuple[int, str]:
+    safe_score = max(int(risk_score or 0), 0)
+    if safe_score >= 95:
+        return max(int(rules.get("whale_block_multiplier_weight_basis_points", 50)), 0), "VERY_LOW_WHALE"
+    if safe_score >= 70:
+        return max(int(rules.get("whale_high_multiplier_weight_basis_points", 250)), 0), "LOW_WHALE"
+    if safe_score >= 35:
+        return max(int(rules.get("whale_medium_multiplier_weight_basis_points", 1000)), 0), "MEDIUM_WHALE"
+    return 10_000, "NORMAL"
+
+
+def _apply_whale_probability_reduction(rows: list[dict[str, Any]], rules: dict[str, Any], risk_score: int) -> tuple[list[dict[str, Any]], str, int]:
+    scale_bp, mode = _whale_weight_scale_basis_points(rules, risk_score)
+    if mode == "NORMAL":
+        return rows, mode, scale_bp
+
+    adjusted: list[dict[str, Any]] = []
+    for item in rows:
+        multiplier = int(item["multiplier"])
+        weight = int(item["weight"])
+        if multiplier >= 10:
+            weight = max(1, weight * scale_bp // 10_000)
+        elif multiplier >= 5 and scale_bp <= 250:
+            weight = max(1, weight * 1000 // 10_000)
+        adjusted.append({**item, "weight": weight})
+    return adjusted, mode, scale_bp
 
 
 def get_or_create_definition(db: Session, actor: User | None = None) -> GameDefinition:
@@ -204,11 +236,14 @@ def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str,
 
     for key in ["broadcast_min_reward", "big_win_min_multiplier", "payout_pool_safe_ratio_basis_points"]:
         rules[key] = _as_int(payload, key, int(current[key]))
+    for key in ["whale_medium_multiplier_weight_basis_points", "whale_high_multiplier_weight_basis_points", "whale_block_multiplier_weight_basis_points"]:
+        rules[key] = _as_int(payload, key, int(rules.get(key, DEFAULT_RULES[key])))
     rules["min_multiplier"] = 1
     rules["max_multiplier"] = 1000
     rules["multipliers"] = _normalized_multiplier_rows(payload.get("multipliers", current["multipliers"]))
 
     risk["testing_mode_enabled"] = _as_bool(payload, "testing_mode_enabled", bool(current["testing_mode_enabled"]))
+    risk["whale_probability_mode_enabled"] = _as_bool(payload, "whale_probability_mode_enabled", bool(risk.get("whale_probability_mode_enabled", True)))
     if "reason" in payload:
         risk["testing_mode_reason"] = str(payload.get("reason") or "Super Owner lucky gift props update")
     for key in [
@@ -240,7 +275,9 @@ def roll_lucky_gift(
     quantity: int,
     house_risk_score: int = 0,
 ) -> dict[str, Any]:
-    rows = _normalized_multiplier_rows(load_rules(db).get("multipliers"))
+    rules = load_rules(db)
+    rows = _normalized_multiplier_rows(rules.get("multipliers"))
+    rows, probability_mode, whale_weight_scale_basis_points = _apply_whale_probability_reduction(rows, rules, house_risk_score)
     multiplier = int(choices([item["multiplier"] for item in rows], weights=[item["weight"] for item in rows], k=1)[0])
     selected = next((item for item in rows if int(item["multiplier"]) == multiplier), {"difficulty": _difficulty_for_multiplier(multiplier)})
     spent = max(int(base_coin_value or 0), 0) * max(int(quantity or 1), 1)
@@ -253,13 +290,15 @@ def roll_lucky_gift(
         "reward_coin_amount": reward,
         "spent_coin_amount": spent,
         "house_risk_score": house_risk_score,
+        "probability_mode": probability_mode,
+        "whale_weight_scale_basis_points": whale_weight_scale_basis_points,
     }
 
 
 def evaluate_whale_risk(db: Session, *, user_id: int, spend_amount: int) -> dict[str, Any]:
     risk = load_risk(db)
     if risk.get("testing_mode_enabled") is True:
-        return {"level": "LOW", "score": 0, "action": "ALLOW", "reasons": ["testing_mode_enabled"]}
+        return {"level": "LOW", "score": 0, "action": "ALLOW", "probability_mode": "NORMAL", "reasons": ["testing_mode_enabled"]}
 
     from datetime import datetime, timedelta
 
@@ -292,23 +331,28 @@ def evaluate_whale_risk(db: Session, *, user_id: int, spend_amount: int) -> dict
     block_score = int(risk.get("block_score", DEFAULT_RISK["block_score"]))
     manual_score = int(risk.get("manual_review_score", DEFAULT_RISK["manual_review_score"]))
     if score >= block_score:
-        action = "REJECT_WHALE_RISK"
-        level = "BLOCKED"
+        level = "WHALE_BLOCK_TIER"
+        probability_mode = "VERY_LOW_WHALE"
     elif score >= manual_score:
-        action = "REJECT_REVIEW"
-        level = "HIGH"
+        level = "WHALE_HIGH_TIER"
+        probability_mode = "LOW_WHALE"
+    elif score >= 35:
+        level = "WHALE_MEDIUM_TIER"
+        probability_mode = "MEDIUM_WHALE"
     else:
-        action = "ALLOW"
         level = "LOW"
+        probability_mode = "NORMAL"
 
     return {
         "level": level,
         "score": score,
-        "action": action,
+        "action": "ALLOW",
+        "probability_mode": probability_mode,
         "reasons": reasons,
         "daily_spent": daily_spent,
         "daily_reward": daily_reward,
         "projected_spend": projected_spend,
         "projected_loss": projected_loss,
         "recent_count": recent_count,
+        "rule": "Whale behavior accepts coins but reduces high-multiplier probability instead of blocking the send.",
     }
