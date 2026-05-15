@@ -40,6 +40,7 @@ class VibesApiService {
         'tag': vibe.tag,
         'mentions': vibe.mentions,
         'uses_mention_all': vibe.usesMentionAll,
+        'comments_enabled': vibe.commentsEnabled,
       }),
     );
     _throwIfFailed(response, 'create Vibe');
@@ -50,78 +51,47 @@ class VibesApiService {
     final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/like')), headers: _authHeaders());
     _throwIfFailed(response, 'toggle Vibe like');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    return VibeLikeResult(
-      postId: decoded['post_id']?.toString() ?? postId,
-      likedByMe: decoded['liked_by_me'] == true,
-      likesCount: _int(decoded['likes_count']),
-    );
+    return VibeLikeResult(postId: decoded['post_id']?.toString() ?? postId, likedByMe: decoded['liked_by_me'] == true, likesCount: _int(decoded['likes_count']));
   }
 
   Future<VibeSaveResult> toggleSave(String postId) async {
     final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/save')), headers: _authHeaders());
     _throwIfFailed(response, 'toggle Vibe save');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    return VibeSaveResult(
-      postId: decoded['post_id']?.toString() ?? postId,
-      savedByMe: decoded['saved_by_me'] == true,
-      savesCount: _int(decoded['saves_count']),
-    );
+    return VibeSaveResult(postId: decoded['post_id']?.toString() ?? postId, savedByMe: decoded['saved_by_me'] == true, savesCount: _int(decoded['saves_count']));
   }
 
   Future<VibeShareResult> shareVibe(String postId, {int? targetPublicUserId, String shareChannel = 'inbox'}) async {
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/vibes/$postId/share')),
       headers: _authHeaders(contentType: true),
-      body: jsonEncode({
-        'target_public_user_id': targetPublicUserId,
-        'share_channel': shareChannel,
-      }),
+      body: jsonEncode({'target_public_user_id': targetPublicUserId, 'share_channel': shareChannel}),
     );
     _throwIfFailed(response, 'share Vibe');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    return VibeShareResult(
-      postId: decoded['post_id']?.toString() ?? postId,
-      sharesCount: _int(decoded['shares_count']),
-      shareChannel: decoded['share_channel']?.toString() ?? shareChannel,
-      targetPublicUserId: _nullableInt(decoded['target_public_user_id']),
-    );
+    return VibeShareResult(postId: decoded['post_id']?.toString() ?? postId, sharesCount: _int(decoded['shares_count']), shareChannel: decoded['share_channel']?.toString() ?? shareChannel, targetPublicUserId: _nullableInt(decoded['target_public_user_id']));
   }
 
   Future<VibeReportResult> reportVibe(String postId, {required String reason, String? details}) async {
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/vibes/$postId/report')),
       headers: _authHeaders(contentType: true),
-      body: jsonEncode({
-        'reason': reason,
-        'details': details,
-      }),
+      body: jsonEncode({'reason': reason, 'details': details}),
     );
     _throwIfFailed(response, 'report Vibe');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    return VibeReportResult(
-      postId: decoded['post_id']?.toString() ?? postId,
-      reportId: _int(decoded['id']),
-      reason: decoded['reason']?.toString() ?? reason,
-      status: decoded['status']?.toString() ?? 'PENDING',
-    );
+    return VibeReportResult(postId: decoded['post_id']?.toString() ?? postId, reportId: _int(decoded['id']), reason: decoded['reason']?.toString() ?? reason, status: decoded['status']?.toString() ?? 'PENDING');
   }
 
   Future<List<VibeComment>> loadComments(String postId, {int limit = 50}) async {
-    final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')).replace(queryParameters: {'limit': '$limit'}),
-      headers: _authHeaders(),
-    );
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')).replace(queryParameters: {'limit': '$limit'}), headers: _authHeaders());
     _throwIfFailed(response, 'load Vibe comments');
     final decoded = jsonDecode(response.body) as List<dynamic>;
     return decoded.whereType<Map<String, dynamic>>().map(_commentFromJson).toList(growable: false);
   }
 
   Future<VibeComment> addComment(String postId, String text) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')),
-      headers: _authHeaders(contentType: true),
-      body: jsonEncode({'text': text.trim()}),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')), headers: _authHeaders(contentType: true), body: jsonEncode({'text': text.trim()}));
     _throwIfFailed(response, 'add Vibe comment');
     return _commentFromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -133,13 +103,8 @@ class VibesApiService {
 
   Map<String, String> _authHeaders({bool contentType = false}) {
     final token = authApiService.cachedAccessToken;
-    if (token == null || token.trim().isEmpty) {
-      throw Exception('Please login again before using Vibes.');
-    }
-    return {
-      if (contentType) 'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+    if (token == null || token.trim().isEmpty) throw Exception('Please login again before using Vibes.');
+    return {if (contentType) 'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
   }
 
   void _throwIfFailed(http.Response response, String action) {
@@ -150,7 +115,6 @@ class VibesApiService {
 
 class VibeLikeResult {
   const VibeLikeResult({required this.postId, required this.likedByMe, required this.likesCount});
-
   final String postId;
   final bool likedByMe;
   final int likesCount;
@@ -158,7 +122,6 @@ class VibeLikeResult {
 
 class VibeSaveResult {
   const VibeSaveResult({required this.postId, required this.savedByMe, required this.savesCount});
-
   final String postId;
   final bool savedByMe;
   final int savesCount;
@@ -166,7 +129,6 @@ class VibeSaveResult {
 
 class VibeShareResult {
   const VibeShareResult({required this.postId, required this.sharesCount, required this.shareChannel, required this.targetPublicUserId});
-
   final String postId;
   final int sharesCount;
   final String shareChannel;
@@ -175,7 +137,6 @@ class VibeShareResult {
 
 class VibeReportResult {
   const VibeReportResult({required this.postId, required this.reportId, required this.reason, required this.status});
-
   final String postId;
   final int reportId;
   final String reason;
@@ -204,6 +165,7 @@ VibeItem _vibeFromJson(Map<String, dynamic> json) {
     views: _int(json['views_count']),
     isFollowing: true,
     usesMentionAll: json['uses_mention_all'] == true,
+    commentsEnabled: json['comments_enabled'] != false,
     mentions: mentionsRaw is List ? mentionsRaw.map((item) => item.toString()).toList(growable: false) : const <String>[],
     colors: mediaType.colors,
     mediaUrl: _text(json['media_url']),
@@ -216,28 +178,15 @@ VibeItem _vibeFromJson(Map<String, dynamic> json) {
 VibeComment _commentFromJson(Map<String, dynamic> json) {
   final author = json['author'] is Map<String, dynamic> ? json['author'] as Map<String, dynamic> : <String, dynamic>{};
   final displayName = _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User';
-  return VibeComment(
-    name: displayName,
-    avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(),
-    text: json['text']?.toString() ?? '',
-    time: _timeAgo(json['created_at']?.toString()),
-  );
+  return VibeComment(name: displayName, avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(), text: json['text']?.toString() ?? '', time: _timeAgo(json['created_at']?.toString()));
 }
 
 String _mediaTypeToApi(VibeMediaType type) {
-  return switch (type) {
-    VibeMediaType.photo => 'photo',
-    VibeMediaType.video => 'video',
-    VibeMediaType.text => 'text',
-  };
+  return switch (type) { VibeMediaType.photo => 'photo', VibeMediaType.video => 'video', VibeMediaType.text => 'text' };
 }
 
 VibeMediaType _mediaTypeFromApi(String? value) {
-  return switch (value?.toLowerCase()) {
-    'video' => VibeMediaType.video,
-    'text' => VibeMediaType.text,
-    _ => VibeMediaType.photo,
-  };
+  return switch (value?.toLowerCase()) { 'video' => VibeMediaType.video, 'text' => VibeMediaType.text, _ => VibeMediaType.photo };
 }
 
 String _timeAgo(String? raw) {
