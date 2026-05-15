@@ -4,6 +4,11 @@ import 'package:video_player/video_player.dart';
 import '../../../auth/data/auth_api_service.dart';
 import '../../models/vibe_models.dart';
 
+class VibeMediaPlaybackGate {
+  const VibeMediaPlaybackGate._();
+  static final ValueNotifier<bool> feedPlaybackPaused = ValueNotifier<bool>(false);
+}
+
 class VibeCardModular extends StatefulWidget {
   const VibeCardModular({
     super.key,
@@ -258,23 +263,25 @@ class _FallbackAvatar extends StatelessWidget {
 }
 
 class VibeMediaPlayer extends StatelessWidget {
-  const VibeMediaPlayer({super.key, required this.vibe, required this.onDoubleTap});
+  const VibeMediaPlayer({super.key, required this.vibe, required this.onDoubleTap, this.respectFeedPause = true});
   final VibeItem vibe;
   final VoidCallback onDoubleTap;
+  final bool respectFeedPause;
 
   @override
   Widget build(BuildContext context) {
     final mediaUrl = vibe.mediaUrl?.trim();
     if (vibe.mediaType == VibeMediaType.text) return const SizedBox.shrink();
     if (mediaUrl == null || mediaUrl.isEmpty) return GestureDetector(onDoubleTap: onDoubleTap, child: Container(decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors)), child: Icon(vibe.mediaType == VibeMediaType.video ? Icons.play_circle_fill_rounded : Icons.photo_rounded, color: Colors.white, size: 72)));
-    if (vibe.mediaType == VibeMediaType.video) return GestureDetector(onDoubleTap: onDoubleTap, child: _NetworkVideoPlayer(url: mediaUrl));
+    if (vibe.mediaType == VibeMediaType.video) return GestureDetector(onDoubleTap: onDoubleTap, child: _NetworkVideoPlayer(url: mediaUrl, respectFeedPause: respectFeedPause));
     return GestureDetector(onDoubleTap: onDoubleTap, child: Image.network(mediaUrl, width: double.infinity, height: double.infinity, fit: BoxFit.cover, loadingBuilder: (context, child, loadingProgress) => loadingProgress == null ? child : _MediaLoading(colors: vibe.colors), errorBuilder: (_, _, _) => _MediaFallback(vibe: vibe)));
   }
 }
 
 class _NetworkVideoPlayer extends StatefulWidget {
-  const _NetworkVideoPlayer({required this.url});
+  const _NetworkVideoPlayer({required this.url, required this.respectFeedPause});
   final String url;
+  final bool respectFeedPause;
   @override
   State<_NetworkVideoPlayer> createState() => _NetworkVideoPlayerState();
 }
@@ -288,6 +295,7 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   @override
   void initState() {
     super.initState();
+    if (widget.respectFeedPause) VibeMediaPlaybackGate.feedPlaybackPaused.addListener(_handleFeedPauseChanged);
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..setLooping(true)
       ..initialize().then((_) {
@@ -299,8 +307,17 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
 
   @override
   void dispose() {
+    if (widget.respectFeedPause) VibeMediaPlaybackGate.feedPlaybackPaused.removeListener(_handleFeedPauseChanged);
     _controller?.dispose();
     super.dispose();
+  }
+
+  void _handleFeedPauseChanged() {
+    if (!widget.respectFeedPause || !VibeMediaPlaybackGate.feedPlaybackPaused.value) return;
+    final controller = _controller;
+    if (controller == null || !_isReady || !controller.value.isPlaying) return;
+    controller.pause();
+    if (mounted) setState(() => _showPlayButton = true);
   }
 
   void _togglePlayback() {
