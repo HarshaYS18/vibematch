@@ -89,10 +89,8 @@ def _role_names(user: User) -> set[str]:
         raw_role = getattr(user_role, "role", None)
         if raw_role is None:
             raw_role = getattr(user_role, "role_name", None)
-
         if raw_role is None:
             continue
-
         names.add(raw_role.value if hasattr(raw_role, "value") else str(raw_role))
 
     return names
@@ -126,6 +124,7 @@ def _post_response(db: Session, post: VibePost, current_user: User) -> VibePostR
         tag=post.tag,
         mentions=_csv_to_mentions(post.mentions_csv),
         uses_mention_all=post.uses_mention_all,
+        comments_enabled=getattr(post, "comments_enabled", True),
         author=_author_response(post.author),
         likes_count=likes_count,
         comments_count=comments_count,
@@ -197,8 +196,10 @@ def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, me
     caption_preview = post.caption[:160].strip()
     if len(post.caption) > 160:
         caption_preview += "..."
+
     def create_vibe_notification(user: User, notification_type: str, title: str, body: str) -> None:
         notification_service.create_notification(db, recipient=user, actor=current_user, notification_type=notification_type, title=title, body=body, target_type="vibe", target_id=str(post.id), metadata={"post_id": post.id, "author_public_user_id": current_user.public_user_id, "author_name": author_name, "media_type": post.media_type})
+
     for user in _resolve_mentioned_users(db, current_user, mentions):
         if user.id in notified_user_ids:
             continue
@@ -267,7 +268,7 @@ def create_vibe(payload: VibePostCreateRequest, db: Session = Depends(get_db), c
     if payload.uses_mention_all:
         _check_mention_all_limit(db, current_user)
     normalized_mentions = [mention for mention in (_normalize_mention(item) for item in payload.mentions) if mention and mention != "all"]
-    post = VibePost(author_user_id=current_user.id, caption=payload.caption.strip(), media_type=payload.media_type, media_url=payload.media_url.strip() if payload.media_url else None, tag=payload.tag.strip() if payload.tag else None, mentions_csv=_mentions_to_csv(normalized_mentions), uses_mention_all=payload.uses_mention_all)
+    post = VibePost(author_user_id=current_user.id, caption=payload.caption.strip(), media_type=payload.media_type, media_url=payload.media_url.strip() if payload.media_url else None, tag=payload.tag.strip() if payload.tag else None, mentions_csv=_mentions_to_csv(normalized_mentions), uses_mention_all=payload.uses_mention_all, comments_enabled=payload.comments_enabled)
     db.add(post)
     db.commit()
     db.refresh(post)
@@ -342,7 +343,9 @@ def report_vibe(post_id: int, payload: VibeReportCreateRequest, db: Session = De
 
 @router.post("/{post_id}/comments", response_model=VibeCommentResponse)
 def add_vibe_comment(post_id: int, payload: VibeCommentCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _get_visible_post_or_404(db, post_id)
+    post = _get_visible_post_or_404(db, post_id)
+    if not getattr(post, "comments_enabled", True) and post.author_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Comments are disabled for this Vibe")
     comment = VibeComment(post_id=post_id, user_id=current_user.id, text=payload.text.strip())
     db.add(comment)
     db.commit()
