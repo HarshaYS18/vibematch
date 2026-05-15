@@ -88,10 +88,12 @@ class VibesApiService {
 
   Future<VibeComment> addComment(String postId, String text, {String? parentCommentId}) async {
     final parentId = parentCommentId == null || parentCommentId.trim().isEmpty ? null : int.tryParse(parentCommentId);
+    final payload = <String, dynamic>{'text': text.trim()};
+    if (parentId != null) payload['parent_comment_id'] = parentId;
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')),
       headers: _authHeaders(contentType: true),
-      body: jsonEncode({'text': text.trim(), if (parentId != null) 'parent_comment_id': parentId}),
+      body: jsonEncode(payload),
     );
     _throwIfFailed(response, 'add Vibe comment');
     return _commentFromJson(jsonDecode(response.body) as Map<String, dynamic>);
