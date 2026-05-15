@@ -10,6 +10,8 @@ class RoomSettingsMainSection extends StatelessWidget {
     required this.privacyMode,
     required this.joinRequestCount,
     required this.onBackgroundTap,
+    required this.onCoverPhotoTap,
+    required this.onCustomBackgroundTap,
     required this.onPrivacyTap,
     required this.onSeatLayoutTap,
     required this.onJoinRequestsTap,
@@ -24,6 +26,8 @@ class RoomSettingsMainSection extends StatelessWidget {
   final RoomPrivacyMode privacyMode;
   final int joinRequestCount;
   final VoidCallback onBackgroundTap;
+  final VoidCallback onCoverPhotoTap;
+  final VoidCallback onCustomBackgroundTap;
   final VoidCallback onPrivacyTap;
   final VoidCallback onSeatLayoutTap;
   final VoidCallback onJoinRequestsTap;
@@ -39,7 +43,9 @@ class RoomSettingsMainSection extends StatelessWidget {
     return RoomSettingsSection(
       title: 'Room Settings',
       children: [
-        RoomSettingsCard(icon: Icons.wallpaper_rounded, title: 'Background', onTap: onBackgroundTap),
+        RoomSettingsCard(icon: Icons.wallpaper_rounded, title: 'Background Store', onTap: onBackgroundTap),
+        RoomSettingsCard(icon: Icons.photo_size_select_actual_rounded, title: 'Change Cover Photo', onTap: onCoverPhotoTap),
+        RoomSettingsCard(icon: Icons.add_photo_alternate_rounded, title: 'Upload Custom Background', badge: 'Review', onTap: onCustomBackgroundTap),
         RoomSettingsCard(icon: privacyMode.icon, title: 'Privacy', badge: privacyMode.shortLabel, onTap: onPrivacyTap),
         RoomSettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
         RoomSettingsCard(icon: Icons.campaign_rounded, title: 'Notice', onTap: onAnnouncementTap),
