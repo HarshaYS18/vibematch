@@ -1,10 +1,13 @@
 import '../../../core/network/api_client.dart';
+import '../../auth/data/auth_local_storage.dart';
 
 class RoomSettingsRepository {
-  RoomSettingsRepository({ApiClient? apiClient})
-    : _apiClient = apiClient ?? ApiClient();
+  RoomSettingsRepository({ApiClient? apiClient, AuthLocalStorage? authStorage})
+    : _apiClient = apiClient ?? ApiClient(),
+      _authStorage = authStorage ?? AuthLocalStorage();
 
   final ApiClient _apiClient;
+  final AuthLocalStorage _authStorage;
 
   Future<RoomSettingsDto> fetchRoomSettings(String roomPublicId) async {
     final response = await _apiClient.getMap('/rooms/$roomPublicId/settings');
@@ -20,6 +23,7 @@ class RoomSettingsRepository {
   }) async {
     final response = await _apiClient.patchMap(
       '/rooms/$roomPublicId/settings',
+      headers: await _authHeaders(),
       body: {
         'language': ?language,
         'mode': ?mode,
@@ -36,6 +40,7 @@ class RoomSettingsRepository {
   }) async {
     final response = await _apiClient.patchMap(
       '/rooms/$roomPublicId/background',
+      headers: await _authHeaders(),
       body: {'background_theme_id': backgroundThemeId},
     );
     return RoomSettingsDto.fromJson(response);
@@ -47,9 +52,16 @@ class RoomSettingsRepository {
   }) async {
     final response = await _apiClient.patchMap(
       '/rooms/$roomPublicId/announcement',
+      headers: await _authHeaders(),
       body: {'announcement_text': announcementText},
     );
     return RoomSettingsDto.fromJson(response);
+  }
+
+  Future<Map<String, String>> _authHeaders() async {
+    final token = await _authStorage.getAccessToken();
+    if (token == null || token.trim().isEmpty) return const <String, String>{};
+    return <String, String>{'Authorization': 'Bearer ${token.trim()}'};
   }
 
   void close() => _apiClient.close();
