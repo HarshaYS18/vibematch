@@ -60,14 +60,14 @@ class _MePageContentState extends State<MePageContent> {
   CurrentUser get user => _freshUser ?? widget.user;
 
   bool get _isOfficialOrPanelUser {
-    final role = user.primaryRole.name.toLowerCase();
+    final role = user.primaryRole.toLowerCase();
     return user.canSeeOwnerControls || <String>{'founder_owner', 'owner', 'superadmin', 'admin', 'monitor', 'cs', 'agency_owner', 'bd', 'coin_seller', 'merchant', 'reseller'}.contains(role);
   }
 
   bool get _isOwnerToolsUser => user.canSeeOwnerControls;
 
   bool get _isMerchantPanelUser {
-    final role = user.primaryRole.name.toLowerCase();
+    final role = user.primaryRole.toLowerCase();
     return _isOwnerToolsUser || <String>{'coin_seller', 'merchant', 'reseller'}.contains(role);
   }
 
