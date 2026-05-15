@@ -63,7 +63,6 @@ from app.models import (
     GameRound,
     GameRoundPlayer,
     GiftTransaction,
-    HomeBanner,
     InboxBackupJob,
     InboxBackupSetting,
     InboxConversation,
