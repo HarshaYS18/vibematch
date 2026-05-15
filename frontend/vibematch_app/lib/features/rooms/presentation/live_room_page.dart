@@ -32,7 +32,6 @@ import 'modules/live_room_leave_actions_module.dart';
 import 'modules/live_room_message_actions_module.dart';
 import 'modules/room_music_overlay.dart';
 import 'widgets/live_room_announcement_sheet.dart';
-import 'widgets/live_room_background_sheet.dart';
 import 'widgets/live_room_body.dart';
 import 'widgets/live_room_gift_overlay.dart';
 import 'widgets/live_room_info_sheet.dart';
