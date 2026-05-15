@@ -164,20 +164,16 @@ class VibeMediaPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaUrl = vibe.mediaUrl?.trim();
-    final isTextOnly = vibe.mediaType == VibeMediaType.text;
 
-    if (isTextOnly) {
+    if (vibe.mediaType == VibeMediaType.text) {
       return GestureDetector(
         onDoubleTap: onDoubleTap,
         child: Container(
-          margin: const EdgeInsets.only(top: 0),
           width: double.infinity,
           constraints: const BoxConstraints(minHeight: 230),
           padding: const EdgeInsets.all(26),
           decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-          child: Center(
-            child: Text(vibe.caption, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, height: 1.25, fontWeight: FontWeight.w900)),
-          ),
+          child: Center(child: Text(vibe.caption, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, height: 1.25, fontWeight: FontWeight.w900))),
         ),
       );
     }
@@ -271,13 +267,10 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          Container(color: Colors.black),
           FittedBox(
             fit: BoxFit.cover,
-            child: SizedBox(
-              width: controller.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
-            ),
+            child: SizedBox(width: controller.value.size.width, height: controller.value.size.height, child: VideoPlayer(controller)),
           ),
           Material(
             color: Colors.transparent,
@@ -288,22 +281,13 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
                   opacity: controller.value.isPlaying ? 0 : 1,
                   duration: const Duration(milliseconds: 180),
                   child: Container(
-                    width: 66,
-                    height: 66,
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.36), shape: BoxShape.circle),
-                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 46),
+                    width: 62,
+                    height: 62,
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.34), shape: BoxShape.circle),
+                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
                   ),
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            left: 12,
-            bottom: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.46), borderRadius: BorderRadius.circular(999)),
-              child: Text(controller.value.isPlaying ? 'Playing' : 'Tap to play', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)),
             ),
           ),
         ],
@@ -361,15 +345,11 @@ class _MentionCaption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spans = <TextSpan>[
-      TextSpan(text: '$authorName ', style: const TextStyle(color: Color(0xFF111015), fontWeight: FontWeight.w900)),
-    ];
+    final spans = <TextSpan>[TextSpan(text: '$authorName ', style: const TextStyle(color: Color(0xFF111015), fontWeight: FontWeight.w900))];
     var currentIndex = 0;
 
     for (final match in _mentionPattern.allMatches(caption)) {
-      if (match.start > currentIndex) {
-        spans.add(TextSpan(text: caption.substring(currentIndex, match.start)));
-      }
+      if (match.start > currentIndex) spans.add(TextSpan(text: caption.substring(currentIndex, match.start)));
       spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w900)));
       currentIndex = match.end;
     }
