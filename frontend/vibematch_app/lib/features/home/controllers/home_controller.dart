@@ -79,7 +79,8 @@ class HomeController extends ChangeNotifier {
 
   List<HomeRoom> get visibleRooms {
     final rooms = filteredRooms;
-    return rooms.take(visibleRoomCount.clamp(0, rooms.length)).toList();
+    final count = _clampCount(visibleRoomCount, rooms.length);
+    return rooms.take(count).toList();
   }
 
   Future<void> loadHomeChrome() async {
@@ -98,8 +99,8 @@ class HomeController extends ChangeNotifier {
       myCreatedRoom = results[0] as HomeRoom?;
       _eventBanners = (results[1] as List<HomeBanner>?) ?? const [];
       _policyBanners = (results[2] as List<HomeBanner>?) ?? const [];
-      selectedBannerIndex = selectedBannerIndex.clamp(0, _eventBanners.isEmpty ? 0 : _eventBanners.length - 1);
-      selectedPolicyBannerIndex = selectedPolicyBannerIndex.clamp(0, _policyBanners.isEmpty ? 0 : _policyBanners.length - 1);
+      selectedBannerIndex = _clampIndex(selectedBannerIndex, _eventBanners.length);
+      selectedPolicyBannerIndex = _clampIndex(selectedPolicyBannerIndex, _policyBanners.length);
       bannerErrorMessage = null;
     } catch (_) {
       myCreatedRoom = null;
@@ -166,18 +167,19 @@ class HomeController extends ChangeNotifier {
     if (!scrollController.hasClients || hasNetworkError) return;
     final nearBottom = scrollController.position.pixels > scrollController.position.maxScrollExtent - 420;
     if (nearBottom && visibleRoomCount < filteredRooms.length) {
-      visibleRoomCount = (visibleRoomCount + 4).clamp(0, filteredRooms.length);
+      final nextCount = visibleRoomCount + 4;
+      visibleRoomCount = nextCount > filteredRooms.length ? filteredRooms.length : nextCount;
       notifyListeners();
     }
   }
 
   void selectBanner(int index) {
-    selectedBannerIndex = index;
+    selectedBannerIndex = _clampIndex(index, _eventBanners.length);
     notifyListeners();
   }
 
   void selectPolicyBanner(int index) {
-    selectedPolicyBannerIndex = index;
+    selectedPolicyBannerIndex = _clampIndex(index, _policyBanners.length);
     notifyListeners();
   }
 
@@ -202,6 +204,18 @@ class HomeController extends ChangeNotifier {
 
   Future<void> retryLoadingRooms() {
     return loadRooms();
+  }
+
+  int _clampIndex(int value, int length) {
+    if (length <= 0) return 0;
+    if (value < 0) return 0;
+    if (value >= length) return length - 1;
+    return value;
+  }
+
+  int _clampCount(int value, int max) {
+    if (max <= 0 || value <= 0) return 0;
+    return value > max ? max : value;
   }
 
   @override
