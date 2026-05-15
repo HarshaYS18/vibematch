@@ -7,14 +7,15 @@ import '../controllers/home_controller.dart';
 import '../models/home_banner.dart';
 import '../models/home_room.dart';
 import 'sections/home_banner_section.dart';
-import 'sections/home_empty_state.dart';
 import 'sections/home_filters_section.dart';
 import 'sections/home_header_section.dart';
-import 'sections/home_policy_banner_section.dart';
+import 'sections/home_room_list_section.dart';
 import 'sections/home_room_section_header.dart';
+import 'widgets/home_backend_connected_strip.dart';
 import 'widgets/home_language_sheet.dart';
+import 'widgets/home_loading_strip.dart';
 import 'widgets/home_locked_room_sheet.dart';
-import 'widgets/home_room_card.dart';
+import 'widgets/home_network_error_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -142,7 +143,14 @@ class _HomePageState extends State<HomePage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => HomeLanguageSheet(languages: _controller.languages, selectedLanguage: _controller.selectedLanguage, onLanguageSelected: (language) { _controller.selectLanguage(language); Navigator.pop(context); }),
+      builder: (_) => HomeLanguageSheet(
+        languages: _controller.languages,
+        selectedLanguage: _controller.selectedLanguage,
+        onLanguageSelected: (language) {
+          _controller.selectLanguage(language);
+          Navigator.pop(context);
+        },
+      ),
     );
   }
 
@@ -183,7 +191,6 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final visibleRooms = _controller.visibleRooms;
-    final shouldShowPolicyBanner = _controller.policyBanners.isNotEmpty && visibleRooms.length >= 6;
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
@@ -195,91 +202,34 @@ class _HomePageState extends State<HomePage> {
             slivers: [
               SliverToBoxAdapter(child: HomeHeaderSection(myCreatedRoom: _controller.myCreatedRoom, onMyRoomTap: _openMyRoomOrCreate, onSearchTap: () => VmNavigator.openSearch(context), onNotificationsTap: () => VmNavigator.openNotifications(context))),
               if (_controller.bannerErrorMessage != null)
-                SliverToBoxAdapter(child: _HomeNetworkErrorCard(message: _controller.bannerErrorMessage!, onRetry: _controller.loadHomeChrome))
+                SliverToBoxAdapter(child: HomeNetworkErrorCard(message: _controller.bannerErrorMessage!, onRetry: _controller.loadHomeChrome))
               else if (_controller.banners.isNotEmpty)
                 SliverToBoxAdapter(child: HomeBannerSection(banners: _controller.banners, selectedIndex: _controller.selectedBannerIndex, canManageHomeBanners: _canManageHomeBanners, onBannerChanged: _controller.selectBanner, onBannerTap: _handleBannerTap, onManageTap: () => VmNavigator.openBannerManager(context))),
               SliverToBoxAdapter(child: HomeFiltersSection(categories: _controller.categories, selectedCategory: _controller.selectedCategory, selectedLanguage: _controller.selectedLanguage, onCategorySelected: _controller.selectCategory, onLanguageTap: _openLanguageSheet, onSeeAllTap: _seeAllRooms)),
               if (_controller.isLoadingRooms)
-                const SliverToBoxAdapter(child: _HomeLoadingStrip())
+                const SliverToBoxAdapter(child: HomeLoadingStrip())
               else if (_controller.loadErrorMessage != null)
-                SliverToBoxAdapter(child: _HomeNetworkErrorCard(message: _controller.loadErrorMessage!, onRetry: _controller.retryLoadingRooms))
+                SliverToBoxAdapter(child: HomeNetworkErrorCard(message: _controller.loadErrorMessage!, onRetry: _controller.retryLoadingRooms))
               else if (_controller.usingBackendRooms)
-                const SliverToBoxAdapter(child: _HomeBackendConnectedStrip()),
+                const SliverToBoxAdapter(child: HomeBackendConnectedStrip()),
               SliverToBoxAdapter(child: HomeRoomSectionHeader(selectedCategory: _controller.selectedCategory, totalRooms: _controller.filteredRooms.length)),
-              if (visibleRooms.isEmpty && _controller.loadErrorMessage == null)
-                SliverToBoxAdapter(child: HomeEmptyState(selectedCategory: _controller.selectedCategory))
-              else
-                SliverList.builder(
-                  itemCount: visibleRooms.length + (shouldShowPolicyBanner ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (shouldShowPolicyBanner && index == 6) {
-                      return HomePolicyBannerSection(banners: _controller.policyBanners, selectedIndex: _controller.selectedPolicyBannerIndex, canManageBanners: _canManageHomeBanners, onBannerChanged: _controller.selectPolicyBanner, onBannerTap: _handlePolicyBannerTap, onManageTap: () => VmNavigator.openBannerManager(context));
-                    }
-                    final roomIndex = shouldShowPolicyBanner && index > 6 ? index - 1 : index;
-                    final room = visibleRooms[roomIndex];
-                    return HomeRoomCard(room: room, rank: roomIndex + 1, onTap: () => _openRoom(room));
-                  },
-                ),
+              HomeRoomListSection(
+                visibleRooms: visibleRooms,
+                selectedCategory: _controller.selectedCategory,
+                hasLoadError: _controller.loadErrorMessage != null,
+                policyBanners: _controller.policyBanners,
+                selectedPolicyBannerIndex: _controller.selectedPolicyBannerIndex,
+                canManageBanners: _canManageHomeBanners,
+                onRoomTap: _openRoom,
+                onPolicyBannerChanged: _controller.selectPolicyBanner,
+                onPolicyBannerTap: _handlePolicyBannerTap,
+                onManageBannersTap: () => VmNavigator.openBannerManager(context),
+              ),
               const SliverToBoxAdapter(child: SizedBox(height: 110)),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class _HomeLoadingStrip extends StatelessWidget {
-  const _HomeLoadingStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(padding: EdgeInsets.fromLTRB(18, 0, 18, 12), child: LinearProgressIndicator(minHeight: 3, color: Color(0xFF12C7B7), backgroundColor: Color(0xFFECE2D8)));
-  }
-}
-
-class _HomeNetworkErrorCard extends StatelessWidget {
-  const _HomeNetworkErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE8C77C)), boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))]),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: const Color(0xFFFFF7E8), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 23)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Network error', style: TextStyle(color: Color(0xFF251538), fontSize: 15, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 5),
-              Text(message, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.2, fontWeight: FontWeight.w700, height: 1.25)),
-              const SizedBox(height: 12),
-              Align(alignment: Alignment.centerLeft, child: FilledButton.icon(onPressed: onRetry, style: FilledButton.styleFrom(backgroundColor: const Color(0xFF251538), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))), icon: const Icon(Icons.refresh_rounded, size: 17), label: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900)))),
-            ]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeBackendConnectedStrip extends StatelessWidget {
-  const _HomeBackendConnectedStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: const Color(0xFFE8FAF7), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFB7EFE6))),
-      child: const Row(children: [Icon(Icons.cloud_done_rounded, color: Color(0xFF12C7B7), size: 18), SizedBox(width: 8), Expanded(child: Text('Live room list loaded from backend.', style: TextStyle(color: Color(0xFF4A2A63), fontSize: 11.5, fontWeight: FontWeight.w800)))]),
     );
   }
 }
