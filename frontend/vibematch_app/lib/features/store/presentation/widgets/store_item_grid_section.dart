@@ -81,9 +81,17 @@ class _StoreItemCard extends StatelessWidget {
                   ),
                 ),
                 if (item.imageUrl != null)
-                  Image.network(item.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())
+                  Image.network(
+                    item.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                  )
                 else if (item.assetPath != null)
-                  Image.asset(item.assetPath!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())
+                  Image.asset(
+                    item.assetPath!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                  )
                 else
                   const Center(child: Icon(Icons.storefront_rounded, color: Colors.white, size: 42)),
                 if (item.isFeatured)
