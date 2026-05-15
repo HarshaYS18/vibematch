@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../auth/models/current_user.dart';
 import '../../media/data/media_upload_service.dart';
@@ -19,6 +20,7 @@ class CreatePage extends StatefulWidget {
 
 class _CreatePageState extends State<CreatePage> {
   final TextEditingController _roomNameController = TextEditingController();
+  final TextEditingController _lockPasswordController = TextEditingController();
   final RoomApiService _roomApiService = const RoomApiService();
   final MediaUploadService _mediaUploadService = const MediaUploadService();
 
@@ -28,6 +30,7 @@ class _CreatePageState extends State<CreatePage> {
   bool _uploadingRoomCover = false;
   bool _allowScreenshots = true;
   bool _creatingRoom = false;
+  bool _obscureLockPassword = true;
 
   final List<String> _languages = const [
     'Telugu',
@@ -51,6 +54,7 @@ class _CreatePageState extends State<CreatePage> {
   @override
   void dispose() {
     _roomNameController.dispose();
+    _lockPasswordController.dispose();
     super.dispose();
   }
 
@@ -120,8 +124,13 @@ class _CreatePageState extends State<CreatePage> {
 
   Future<void> _createRoom() async {
     final roomName = _roomNameController.text.trim();
+    final lockPassword = _lockPasswordController.text.trim();
     if (roomName.isEmpty) {
       _toast('Enter a room name');
+      return;
+    }
+    if (_selectedMode == _RoomMode.locked && lockPassword.length < 4) {
+      _toast('Enter a numeric room lock with at least 4 digits');
       return;
     }
     if (_creatingRoom) return;
@@ -137,6 +146,7 @@ class _CreatePageState extends State<CreatePage> {
         avatarUrl: _roomCoverUrl,
         coverPhotoUrl: _roomCoverUrl,
         allowScreenshots: _allowScreenshots,
+        lockPassword: _selectedMode == _RoomMode.locked ? lockPassword : null,
       );
       widget.onRoomCreated?.call(room);
       if (!mounted) return;
@@ -370,6 +380,14 @@ class _CreatePageState extends State<CreatePage> {
         children: [
           const Padding(padding: EdgeInsets.only(left: 2, bottom: 9), child: Text('Room mode', style: TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900))),
           ..._RoomMode.values.map((mode) => _ModeCard(mode: mode, selected: mode == _selectedMode, onTap: () => setState(() => _selectedMode = mode))),
+          if (_selectedMode == _RoomMode.locked) ...[
+            const SizedBox(height: 4),
+            _LockPasswordField(
+              controller: _lockPasswordController,
+              obscureText: _obscureLockPassword,
+              onToggleObscure: () => setState(() => _obscureLockPassword = !_obscureLockPassword),
+            ),
+          ],
         ],
       ),
     );
@@ -385,7 +403,7 @@ class _CreatePageState extends State<CreatePage> {
         children: [
           Icon(Icons.security_rounded, color: Color(0xFFC99A3B), size: 19),
           SizedBox(width: 10),
-          Expanded(child: Text('This lifetime room keeps the same room ID, admins, members, level, and contribution data. Saving here only updates name, cover/avatar, language, screenshot permission, and access mode.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
+          Expanded(child: Text('This lifetime room keeps the same room ID, admins, members, level, and contribution data. Saving here only updates name, cover/avatar, language, screenshot permission, and access mode. Locked mode requires a numeric room lock.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
         ],
       ),
     );
@@ -394,7 +412,7 @@ class _CreatePageState extends State<CreatePage> {
 
 enum _RoomMode {
   open(title: 'Open', subtitle: 'Anyone can enter and join the vibe', icon: Icons.public_rounded, color: Color(0xFF12C7B7)),
-  locked(title: 'Locked', subtitle: 'Users need a password or invite', icon: Icons.lock_rounded, color: Color(0xFFC99A3B)),
+  locked(title: 'Locked', subtitle: 'Users need a numeric password or invite', icon: Icons.lock_rounded, color: Color(0xFFC99A3B)),
   secretVibe(title: 'Secret Vibe', subtitle: 'Private room presence hidden from public UI', icon: Icons.visibility_off_rounded, color: Color(0xFF8C5CF6)),
   membersOnly(title: 'Members Only', subtitle: 'Only approved room members can chat', icon: Icons.workspace_premium_rounded, color: Color(0xFF4A2A63));
 
@@ -404,6 +422,67 @@ enum _RoomMode {
   final String subtitle;
   final IconData icon;
   final Color color;
+}
+
+class _LockPasswordField extends StatelessWidget {
+  const _LockPasswordField({
+    required this.controller,
+    required this.obscureText,
+    required this.onToggleObscure,
+  });
+
+  final TextEditingController controller;
+  final bool obscureText;
+  final VoidCallback onToggleObscure;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(color: const Color(0xFFFFF9EA), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFFFE4A8))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.pin_rounded, color: Color(0xFFC99A3B), size: 18),
+              SizedBox(width: 7),
+              Text('Numeric room lock', style: TextStyle(color: Color(0xFF251538), fontSize: 12.8, fontWeight: FontWeight.w900)),
+            ],
+          ),
+          const SizedBox(height: 7),
+          TextField(
+            controller: controller,
+            obscureText: obscureText,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            maxLength: 8,
+            inputFormatters: const <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(8),
+            ],
+            style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+            decoration: InputDecoration(
+              counterText: '',
+              hintText: 'Enter 4–8 digit lock',
+              hintStyle: const TextStyle(color: Color(0xFF9B8FA3), fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0),
+              prefixIcon: const Icon(Icons.lock_rounded, color: Color(0xFFC99A3B), size: 18),
+              suffixIcon: IconButton(
+                onPressed: onToggleObscure,
+                icon: Icon(obscureText ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: const Color(0xFF7B6A86), size: 18),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text('Users who are not invited/admin/member must enter this lock to join.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 10.8, height: 1.25, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
 }
 
 class _ScreenshotToggle extends StatelessWidget {
