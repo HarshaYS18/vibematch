@@ -129,8 +129,8 @@ class _CreatePageState extends State<CreatePage> {
       _toast('Enter a room name');
       return;
     }
-    if (_selectedMode == _RoomMode.locked && lockPassword.length < 4) {
-      _toast('Enter a numeric room lock with at least 4 digits');
+    if (_selectedMode == _RoomMode.locked && lockPassword.length != 4) {
+      _toast('Enter the 4-digit room lock');
       return;
     }
     if (_creatingRoom) return;
@@ -403,7 +403,7 @@ class _CreatePageState extends State<CreatePage> {
         children: [
           Icon(Icons.security_rounded, color: Color(0xFFC99A3B), size: 19),
           SizedBox(width: 10),
-          Expanded(child: Text('This lifetime room keeps the same room ID, admins, members, level, and contribution data. Saving here only updates name, cover/avatar, language, screenshot permission, and access mode. Locked mode requires a numeric room lock.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
+          Expanded(child: Text('This lifetime room keeps the same room ID, admins, members, level, and contribution data. Saving here only updates name, cover/avatar, language, screenshot permission, and access mode. Locked mode requires a 4-digit room lock.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
         ],
       ),
     );
@@ -412,7 +412,7 @@ class _CreatePageState extends State<CreatePage> {
 
 enum _RoomMode {
   open(title: 'Open', subtitle: 'Anyone can enter and join the vibe', icon: Icons.public_rounded, color: Color(0xFF12C7B7)),
-  locked(title: 'Locked', subtitle: 'Users need a numeric password or invite', icon: Icons.lock_rounded, color: Color(0xFFC99A3B)),
+  locked(title: 'Locked', subtitle: 'Users need a 4-digit password or invite', icon: Icons.lock_rounded, color: Color(0xFFC99A3B)),
   secretVibe(title: 'Secret Vibe', subtitle: 'Private room presence hidden from public UI', icon: Icons.visibility_off_rounded, color: Color(0xFF8C5CF6)),
   membersOnly(title: 'Members Only', subtitle: 'Only approved room members can chat', icon: Icons.workspace_premium_rounded, color: Color(0xFF4A2A63));
 
@@ -424,7 +424,7 @@ enum _RoomMode {
   final Color color;
 }
 
-class _LockPasswordField extends StatelessWidget {
+class _LockPasswordField extends StatefulWidget {
   const _LockPasswordField({
     required this.controller,
     required this.obscureText,
@@ -436,49 +436,107 @@ class _LockPasswordField extends StatelessWidget {
   final VoidCallback onToggleObscure;
 
   @override
+  State<_LockPasswordField> createState() => _LockPasswordFieldState();
+}
+
+class _LockPasswordFieldState extends State<_LockPasswordField> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_refresh);
+  }
+
+  @override
+  void didUpdateWidget(covariant _LockPasswordField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_refresh);
+      widget.controller.addListener(_refresh);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_refresh);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final value = widget.controller.text;
     return Container(
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(color: const Color(0xFFFFF9EA), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFFFE4A8))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.pin_rounded, color: Color(0xFFC99A3B), size: 18),
-              SizedBox(width: 7),
-              Text('Numeric room lock', style: TextStyle(color: Color(0xFF251538), fontSize: 12.8, fontWeight: FontWeight.w900)),
+              const Icon(Icons.pin_rounded, color: Color(0xFFC99A3B), size: 18),
+              const SizedBox(width: 7),
+              const Expanded(child: Text('4-digit room lock', style: TextStyle(color: Color(0xFF251538), fontSize: 12.8, fontWeight: FontWeight.w900))),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: widget.onToggleObscure,
+                icon: Icon(widget.obscureText ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: const Color(0xFF7B6A86), size: 18),
+              ),
             ],
           ),
           const SizedBox(height: 7),
-          TextField(
-            controller: controller,
-            obscureText: obscureText,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            maxLength: 8,
-            inputFormatters: <TextInputFormatter>[
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(8),
-            ],
-            style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2),
-            decoration: InputDecoration(
-              counterText: '',
-              hintText: 'Enter 4–8 digit lock',
-              hintStyle: const TextStyle(color: Color(0xFF9B8FA3), fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0),
-              prefixIcon: const Icon(Icons.lock_rounded, color: Color(0xFFC99A3B), size: 18),
-              suffixIcon: IconButton(
-                onPressed: onToggleObscure,
-                icon: Icon(obscureText ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: const Color(0xFF7B6A86), size: 18),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          GestureDetector(
+            onTap: () => _focusNode.requestFocus(),
+            child: Stack(
+              children: [
+                Row(
+                  children: List.generate(4, (index) {
+                    final filled = index < value.length;
+                    final text = filled ? (widget.obscureText ? '•' : value[index]) : '';
+                    return Expanded(
+                      child: Container(
+                        height: 54,
+                        margin: EdgeInsets.only(right: index == 3 ? 0 : 8),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: filled ? const Color(0xFFC99A3B) : const Color(0xFFE8DDCF), width: filled ? 1.5 : 1),
+                          boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: filled ? 0.06 : 0.025), blurRadius: 10, offset: const Offset(0, 5))],
+                        ),
+                        child: Text(text, style: const TextStyle(color: Color(0xFF251538), fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                      ),
+                    );
+                  }),
+                ),
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: 0.01,
+                    child: TextField(
+                      controller: widget.controller,
+                      focusNode: _focusNode,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.done,
+                      maxLength: 4,
+                      autofocus: true,
+                      inputFormatters: <TextInputFormatter>[
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(4),
+                      ],
+                      decoration: const InputDecoration(counterText: '', border: InputBorder.none),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 6),
-          const Text('Users who are not invited/admin/member must enter this lock to join.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 10.8, height: 1.25, fontWeight: FontWeight.w700)),
+          const Text('Users who are not invited/admin/member must enter these 4 digits to join.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 10.8, height: 1.25, fontWeight: FontWeight.w700)),
         ],
       ),
     );
