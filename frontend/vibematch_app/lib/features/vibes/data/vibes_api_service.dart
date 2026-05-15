@@ -15,9 +15,13 @@ class VibesApiService {
     final path = tab == VibesFeedTab.friends ? '/vibes/friends' : '/vibes/feed';
     final response = await http.get(Uri.parse(VmApiConfig.endpoint(path)).replace(queryParameters: {'limit': '$limit'}), headers: _authHeaders());
     _throwIfFailed(response, 'load Vibes feed');
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final posts = decoded['posts'] as List<dynamic>? ?? const [];
-    return posts.whereType<Map<String, dynamic>>().map(_vibeFromJson).toList(growable: false);
+    return _postsFromResponse(response.body);
+  }
+
+  Future<List<VibeItem>> loadSavedVibes({int limit = 50}) async {
+    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/vibes/saved')).replace(queryParameters: {'limit': '$limit'}), headers: _authHeaders());
+    _throwIfFailed(response, 'load saved Vibes');
+    return _postsFromResponse(response.body);
   }
 
   Future<VibeItem> getVibe(String postId) async {
@@ -90,13 +94,16 @@ class VibesApiService {
     final parentId = parentCommentId == null || parentCommentId.trim().isEmpty ? null : int.tryParse(parentCommentId);
     final payload = <String, dynamic>{'text': text.trim()};
     if (parentId != null) payload['parent_comment_id'] = parentId;
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')),
-      headers: _authHeaders(contentType: true),
-      body: jsonEncode(payload),
-    );
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments')), headers: _authHeaders(contentType: true), body: jsonEncode(payload));
     _throwIfFailed(response, 'add Vibe comment');
     return _commentFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<VibeCommentLikeResult> toggleCommentLike(String postId, String commentId) async {
+    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/vibes/$postId/comments/$commentId/like')), headers: _authHeaders());
+    _throwIfFailed(response, 'toggle comment like');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return VibeCommentLikeResult(commentId: decoded['comment_id']?.toString() ?? commentId, likedByMe: decoded['liked_by_me'] == true, likesCount: _int(decoded['likes_count']));
   }
 
   Future<bool> toggleCommentPin(String postId, String commentId) async {
@@ -135,6 +142,13 @@ class VibeLikeResult {
   final int likesCount;
 }
 
+class VibeCommentLikeResult {
+  const VibeCommentLikeResult({required this.commentId, required this.likedByMe, required this.likesCount});
+  final String commentId;
+  final bool likedByMe;
+  final int likesCount;
+}
+
 class VibeSaveResult {
   const VibeSaveResult({required this.postId, required this.savedByMe, required this.savesCount});
   final String postId;
@@ -160,7 +174,6 @@ class VibeReportResult {
 
 class VibeReportQueueItem {
   const VibeReportQueueItem({required this.id, required this.postId, required this.reporterName, required this.postAuthorName, required this.postCaption, required this.postMediaType, required this.reason, required this.status, required this.createdAtText});
-
   final int id;
   final int postId;
   final String reporterName;
@@ -174,18 +187,14 @@ class VibeReportQueueItem {
   factory VibeReportQueueItem.fromJson(Map<String, dynamic> json) {
     final reporter = json['reporter'] is Map<String, dynamic> ? json['reporter'] as Map<String, dynamic> : <String, dynamic>{};
     final author = json['post_author'] is Map<String, dynamic> ? json['post_author'] as Map<String, dynamic> : <String, dynamic>{};
-    return VibeReportQueueItem(
-      id: _int(json['id']),
-      postId: _int(json['post_id']),
-      reporterName: _text(reporter['display_name']) ?? _text(reporter['username']) ?? 'Reporter',
-      postAuthorName: _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User',
-      postCaption: json['post_caption']?.toString() ?? '',
-      postMediaType: json['post_media_type']?.toString() ?? 'text',
-      reason: json['reason']?.toString() ?? 'Report',
-      status: json['status']?.toString() ?? 'PENDING',
-      createdAtText: _timeAgo(json['created_at']?.toString()),
-    );
+    return VibeReportQueueItem(id: _int(json['id']), postId: _int(json['post_id']), reporterName: _text(reporter['display_name']) ?? _text(reporter['username']) ?? 'Reporter', postAuthorName: _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User', postCaption: json['post_caption']?.toString() ?? '', postMediaType: json['post_media_type']?.toString() ?? 'text', reason: json['reason']?.toString() ?? 'Report', status: json['status']?.toString() ?? 'PENDING', createdAtText: _timeAgo(json['created_at']?.toString()));
   }
+}
+
+List<VibeItem> _postsFromResponse(String body) {
+  final decoded = jsonDecode(body) as Map<String, dynamic>;
+  final posts = decoded['posts'] as List<dynamic>? ?? const [];
+  return posts.whereType<Map<String, dynamic>>().map(_vibeFromJson).toList(growable: false);
 }
 
 VibeItem _vibeFromJson(Map<String, dynamic> json) {
@@ -200,27 +209,11 @@ VibeItem _vibeFromJson(Map<String, dynamic> json) {
 VibeComment _commentFromJson(Map<String, dynamic> json) {
   final author = json['author'] is Map<String, dynamic> ? json['author'] as Map<String, dynamic> : <String, dynamic>{};
   final displayName = _text(author['display_name']) ?? _text(author['username']) ?? 'Vibe User';
-  return VibeComment(
-    id: json['id']?.toString() ?? '',
-    parentCommentId: _text(json['parent_comment_id']),
-    name: displayName,
-    avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(),
-    text: json['text']?.toString() ?? '',
-    time: _timeAgo(json['created_at']?.toString()),
-    avatarUrl: _text(author['avatar_url']),
-    isPinned: json['is_pinned'] == true,
-    canPin: json['can_pin'] == true,
-    canDelete: json['can_delete'] == true,
-  );
+  return VibeComment(id: json['id']?.toString() ?? '', parentCommentId: _text(json['parent_comment_id']), name: displayName, avatarText: displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase(), text: json['text']?.toString() ?? '', time: _timeAgo(json['created_at']?.toString()), avatarUrl: _text(author['avatar_url']), isPinned: json['is_pinned'] == true, canPin: json['can_pin'] == true, canDelete: json['can_delete'] == true, likedByMe: json['liked_by_me'] == true, likesCount: _int(json['likes_count']));
 }
 
-String _mediaTypeToApi(VibeMediaType type) {
-  return switch (type) { VibeMediaType.photo => 'photo', VibeMediaType.video => 'video', VibeMediaType.text => 'text' };
-}
-
-VibeMediaType _mediaTypeFromApi(String? value) {
-  return switch (value?.toLowerCase()) { 'video' => VibeMediaType.video, 'text' => VibeMediaType.text, _ => VibeMediaType.photo };
-}
+String _mediaTypeToApi(VibeMediaType type) => switch (type) { VibeMediaType.photo => 'photo', VibeMediaType.video => 'video', VibeMediaType.text => 'text' };
+VibeMediaType _mediaTypeFromApi(String? value) => switch (value?.toLowerCase()) { 'video' => VibeMediaType.video, 'text' => VibeMediaType.text, _ => VibeMediaType.photo };
 
 String _timeAgo(String? raw) {
   final created = _parseBackendUtcTimestamp(raw);
@@ -243,8 +236,7 @@ DateTime? _parseBackendUtcTimestamp(String? raw) {
   final value = raw?.trim();
   if (value == null || value.isEmpty) return null;
   final hasTimezone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$').hasMatch(value);
-  final normalized = hasTimezone ? value : '${value}Z';
-  return DateTime.tryParse(normalized)?.toLocal();
+  return DateTime.tryParse(hasTimezone ? value : '${value}Z')?.toLocal();
 }
 
 String? _text(dynamic value) {
