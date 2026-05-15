@@ -50,6 +50,13 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
     super.dispose();
   }
 
+  void _sortComments() {
+    _comments.sort((a, b) {
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      return 0;
+    });
+  }
+
   Future<void> _loadComments() async {
     if (!_hasBackendId || _loadingComments) return;
     setState(() {
@@ -63,6 +70,7 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
         _comments
           ..clear()
           ..addAll(comments);
+        _sortComments();
       });
     } catch (error) {
       if (mounted) setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
@@ -88,6 +96,7 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
       if (!mounted) return;
       setState(() {
         _comments.insert(0, comment);
+        _sortComments();
         _commentController.clear();
       });
       widget.onCommentAdded?.call();
@@ -95,6 +104,57 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
       if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _sendingComment = false);
+    }
+  }
+
+  Future<void> _toggleCommentPin(VibeComment comment) async {
+    if (!_hasBackendId || !comment.canPin || comment.id.trim().isEmpty) return;
+    try {
+      final isPinned = await _api.toggleCommentPin(widget.vibe.id, comment.id);
+      if (!mounted) return;
+      setState(() {
+        final index = _comments.indexWhere((item) => item.id == comment.id);
+        if (index >= 0) _comments[index] = _comments[index].copyWith(isPinned: isPinned);
+        _sortComments();
+      });
+      _toast(isPinned ? 'Comment pinned.' : 'Comment unpinned.');
+    } catch (error) {
+      if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _deleteComment(VibeComment comment) async {
+    if (!_hasBackendId || !comment.canDelete || comment.id.trim().isEmpty) return;
+    final shouldDelete = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ConfirmDeleteCommentSheet(),
+    );
+    if (shouldDelete != true || !mounted) return;
+    try {
+      await _api.deleteComment(widget.vibe.id, comment.id);
+      if (!mounted) return;
+      setState(() => _comments.removeWhere((item) => item.id == comment.id));
+      widget.onCommentAdded?.call();
+      _toast('Comment deleted.');
+    } catch (error) {
+      if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _openCommentActions(VibeComment comment) async {
+    if (!comment.canPin && !comment.canDelete) return;
+    final action = await showModalBottomSheet<_CommentAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CommentActionsSheet(comment: comment),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _CommentAction.pin:
+        await _toggleCommentPin(comment);
+      case _CommentAction.delete:
+        await _deleteComment(comment);
     }
   }
 
@@ -158,7 +218,10 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
                     if (_comments.isEmpty && !_loadingComments && _error == null)
                       const SliverToBoxAdapter(child: _EmptyCommentsState())
                     else
-                      SliverList.builder(itemCount: _comments.length, itemBuilder: (context, index) => _CommentTile(comment: _comments[index])),
+                      SliverList.builder(
+                        itemCount: _comments.length,
+                        itemBuilder: (context, index) => _CommentTile(comment: _comments[index], onActionsTap: () => unawaited(_openCommentActions(_comments[index]))),
+                      ),
                     const SliverToBoxAdapter(child: SizedBox(height: 16)),
                   ],
                 ),
@@ -275,10 +338,22 @@ class _CommentsHeader extends StatelessWidget {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment});
+  const _CommentTile({required this.comment, required this.onActionsTap});
+  final VibeComment comment;
+  final VoidCallback onActionsTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarUrl = comment.avatarUrl?.trim();
+    return Container(color: comment.isPinned ? const Color(0xFFFFFBF3) : Colors.white, padding: const EdgeInsets.fromLTRB(14, 8, 8, 8), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 34, height: 34, clipBehavior: Clip.antiAlias, decoration: const BoxDecoration(color: Color(0xFF111015), shape: BoxShape.circle), child: avatarUrl != null && avatarUrl.isNotEmpty ? Image.network(avatarUrl, fit: BoxFit.cover, errorBuilder: (_, _, _) => _CommentAvatarFallback(comment: comment)) : _CommentAvatarFallback(comment: comment)), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (comment.isPinned) const Padding(padding: EdgeInsets.only(bottom: 4), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 13), SizedBox(width: 4), Text('Pinned', style: TextStyle(color: Color(0xFFC99A3B), fontSize: 10.5, fontWeight: FontWeight.w900))])), RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32), children: [TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)), TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600))])), const SizedBox(height: 4), Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700))])), if (comment.canPin || comment.canDelete) IconButton(onPressed: onActionsTap, icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF8C8198), size: 20))]));
+  }
+}
+
+class _CommentAvatarFallback extends StatelessWidget {
+  const _CommentAvatarFallback({required this.comment});
   final VibeComment comment;
   @override
-  Widget build(BuildContext context) => Container(color: Colors.white, padding: const EdgeInsets.fromLTRB(14, 8, 14, 8), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [CircleAvatar(radius: 17, backgroundColor: const Color(0xFF111015), child: Text(comment.avatarText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900))), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [RichText(text: TextSpan(style: const TextStyle(color: Color(0xFF111015), fontSize: 13.2, height: 1.32), children: [TextSpan(text: '${comment.name} ', style: const TextStyle(fontWeight: FontWeight.w900)), TextSpan(text: comment.text, style: const TextStyle(fontWeight: FontWeight.w600))])), const SizedBox(height: 4), Text(comment.time, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w700))]))]));
+  Widget build(BuildContext context) => Center(child: Text(comment.avatarText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)));
 }
 
 class _CommentComposer extends StatelessWidget {
@@ -313,6 +388,31 @@ class _ConfirmDeleteSheet extends StatelessWidget {
   const _ConfirmDeleteSheet();
   @override
   Widget build(BuildContext context) => Container(margin: const EdgeInsets.all(14), padding: EdgeInsets.fromLTRB(18, 16, 18, 18 + MediaQuery.paddingOf(context).bottom), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Delete this Vibe?', style: TextStyle(color: Color(0xFF111015), fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), const Text('This removes the Vibe from the feed.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w700)), const SizedBox(height: 16), Row(children: [Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel'))), const SizedBox(width: 10), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE84C72), foregroundColor: Colors.white), onPressed: () => Navigator.pop(context, true), child: const Text('Delete')))])]));
+}
+
+class _ConfirmDeleteCommentSheet extends StatelessWidget {
+  const _ConfirmDeleteCommentSheet();
+  @override
+  Widget build(BuildContext context) => Container(margin: const EdgeInsets.all(14), padding: EdgeInsets.fromLTRB(18, 16, 18, 18 + MediaQuery.paddingOf(context).bottom), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Delete this comment?', style: TextStyle(color: Color(0xFF111015), fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), const Text('This removes the comment from this Vibe.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w700)), const SizedBox(height: 16), Row(children: [Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel'))), const SizedBox(width: 10), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE84C72), foregroundColor: Colors.white), onPressed: () => Navigator.pop(context, true), child: const Text('Delete')))])]));
+}
+
+enum _CommentAction { pin, delete }
+
+class _CommentActionsSheet extends StatelessWidget {
+  const _CommentActionsSheet({required this.comment});
+  final VibeComment comment;
+  @override
+  Widget build(BuildContext context) => Container(margin: const EdgeInsets.all(14), padding: EdgeInsets.fromLTRB(14, 12, 14, 14 + MediaQuery.paddingOf(context).bottom), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 24, offset: const Offset(0, 10))]), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))), const SizedBox(height: 12), if (comment.canPin) _CommentActionTile(icon: comment.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: comment.isPinned ? 'Unpin comment' : 'Pin comment', color: const Color(0xFFC99A3B), onTap: () => Navigator.pop(context, _CommentAction.pin)), if (comment.canDelete) _CommentActionTile(icon: Icons.delete_outline_rounded, title: 'Delete comment', color: const Color(0xFFE84C72), onTap: () => Navigator.pop(context, _CommentAction.delete))]));
+}
+
+class _CommentActionTile extends StatelessWidget {
+  const _CommentActionTile({required this.icon, required this.title, required this.color, required this.onTap});
+  final IconData icon;
+  final String title;
+  final Color color;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18)), child: Row(children: [Icon(icon, color: color, size: 21), const SizedBox(width: 10), Expanded(child: Text(title, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w900))), const Icon(Icons.chevron_right_rounded, color: Color(0xFF8C8198))])));
 }
 
 String _formatCount(int value) {
