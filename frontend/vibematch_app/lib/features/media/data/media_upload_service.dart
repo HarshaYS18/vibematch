@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
+import '../presentation/manual_image_crop_page.dart';
 import '../presentation/profile_image_crop_page.dart';
 
 class MediaUploadService {
@@ -74,6 +75,33 @@ class MediaUploadService {
     return _uploadBytes(bytes: cropped, filename: 'vibematch_cover.jpg', endpointPath: '/media/profile-cover', failedMessage: 'Failed to upload cover');
   }
 
+  Future<MediaUploadResult> pickCropAndUploadHomeBanner(
+    BuildContext context, {
+    required String title,
+    required double aspectRatio,
+    required int outputWidth,
+    required int outputHeight,
+  }) async {
+    final file = await pickImage(maxWidth: 2600, maxHeight: 1800, imageQuality: 96);
+    if (file == null) throw const MediaUploadCancelledException();
+    final bytes = await file.readAsBytes();
+    final crop = await Navigator.of(context).push<ManualImageCropResult>(
+      MaterialPageRoute(
+        builder: (_) => ManualImageCropPage(
+          imageBytes: bytes,
+          title: title,
+          aspectRatio: aspectRatio,
+          outputWidth: outputWidth,
+          outputHeight: outputHeight,
+          helpText: 'Move and pinch zoom the image inside the grid. The final crop is saved as ${outputWidth}×$outputHeight for crisp CDN-ready home banners.',
+        ),
+      ),
+    );
+    if (crop == null) throw const MediaUploadCancelledException();
+    final cropped = _manualCropJpeg(bytes: bytes, crop: crop);
+    return _uploadBytes(bytes: cropped, filename: 'vibematch_home_banner.jpg', endpointPath: '/media/home-banner', failedMessage: 'Failed to upload home banner');
+  }
+
   Future<MediaUploadResult> pickAndUploadAvatar() async {
     final file = await pickImage(maxWidth: 1200, maxHeight: 1200, imageQuality: 90);
     if (file == null) throw const MediaUploadCancelledException();
@@ -126,6 +154,18 @@ class MediaUploadService {
     final y = max(0, ((source.height - cropHeight) / 2).round());
     final cropped = img.copyCrop(source, x: x, y: y, width: cropWidth, height: cropHeight);
     final resized = img.copyResize(cropped, width: outputWidth, height: outputHeight, interpolation: img.Interpolation.cubic);
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
+  }
+
+  Uint8List _manualCropJpeg({required Uint8List bytes, required ManualImageCropResult crop}) {
+    final source = img.decodeImage(bytes);
+    if (source == null) throw Exception('Selected image could not be decoded.');
+    final safeX = crop.x.clamp(0, max(0, source.width - 1));
+    final safeY = crop.y.clamp(0, max(0, source.height - 1));
+    final safeWidth = crop.width.clamp(1, source.width - safeX);
+    final safeHeight = crop.height.clamp(1, source.height - safeY);
+    final cropped = img.copyCrop(source, x: safeX, y: safeY, width: safeWidth, height: safeHeight);
+    final resized = img.copyResize(cropped, width: crop.outputWidth, height: crop.outputHeight, interpolation: img.Interpolation.cubic);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
   }
 
