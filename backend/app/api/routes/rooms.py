@@ -26,6 +26,63 @@ def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
     return room
 
 
+def _get_or_create_room_for_settings(
+    db: Session,
+    room_public_id: str,
+    current_user: User | None = None,
+) -> Room:
+    clean_room_public_id = room_public_id.strip()
+    if not clean_room_public_id:
+        raise HTTPException(status_code=400, detail="Room ID is required")
+
+    room = db.query(Room).filter(Room.room_public_id == clean_room_public_id).first()
+    if room is not None:
+        return room
+
+    owner_user_id = current_user.id if current_user is not None else None
+    room = Room(
+        room_public_id=clean_room_public_id,
+        owner_user_id=owner_user_id,
+        name="Live Room",
+        subtitle=None,
+        avatar_url=None,
+        cover_photo_url=None,
+        language="English",
+        mode="Open",
+        room_type="Chat",
+        online_count=0,
+        trending_score=0,
+        is_active=True,
+        is_secret=False,
+        is_locked=False,
+        is_members_only=False,
+        allow_screenshots=True,
+        background_theme_id="default",
+    )
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return room
+
+
+def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse:
+    return RoomSettingsResponse(
+        room_public_id=room_public_id.strip(),
+        name="Live Room",
+        language="English",
+        mode="Open",
+        is_secret=False,
+        is_locked=False,
+        is_members_only=False,
+        allow_screenshots=True,
+        has_lock_password=False,
+        background_theme_id="default",
+        announcement_text=None,
+        announcement_updated_at=None,
+        announcement_updated_by_user_id=None,
+    )
+
+
 def _room_settings_response(room: Room) -> RoomSettingsResponse:
     return RoomSettingsResponse(
         room_public_id=room.room_public_id,
@@ -266,7 +323,9 @@ def get_my_created_room(
 
 @router.get("/{room_public_id}/settings", response_model=RoomSettingsResponse)
 def get_room_settings(room_public_id: str, db: Session = Depends(get_db)) -> RoomSettingsResponse:
-    room = _get_room_by_public_id(db, room_public_id)
+    room = db.query(Room).filter(Room.room_public_id == room_public_id.strip()).first()
+    if room is None:
+        return _default_room_settings_response(room_public_id)
     return _room_settings_response(room)
 
 
@@ -277,9 +336,11 @@ def update_room_access_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> RoomSettingsResponse:
-    room = _get_room_by_public_id(db, room_public_id)
-    if room.owner_user_id != current_user.id:
+    room = _get_or_create_room_for_settings(db, room_public_id, current_user)
+    if room.owner_user_id is not None and room.owner_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the room owner can update room settings")
+    if room.owner_user_id is None:
+        room.owner_user_id = current_user.id
     if payload.language is not None:
         room.language = payload.language.strip()
     if payload.allow_screenshots is not None:
@@ -328,7 +389,7 @@ def update_room_background(
     payload: RoomBackgroundUpdateRequest,
     db: Session = Depends(get_db),
 ) -> RoomSettingsResponse:
-    room = _get_room_by_public_id(db, room_public_id)
+    room = _get_or_create_room_for_settings(db, room_public_id)
     room.background_theme_id = payload.background_theme_id.strip() or "default"
     db.add(room)
     db.commit()
@@ -342,7 +403,7 @@ def update_room_announcement(
     payload: RoomAnnouncementUpdateRequest,
     db: Session = Depends(get_db),
 ) -> RoomSettingsResponse:
-    room = _get_room_by_public_id(db, room_public_id)
+    room = _get_or_create_room_for_settings(db, room_public_id)
     text = payload.announcement_text.strip()
     room.announcement_text = text if text else None
     room.announcement_updated_at = datetime.utcnow()
