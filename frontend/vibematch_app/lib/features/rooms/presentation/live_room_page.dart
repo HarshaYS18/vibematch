@@ -239,6 +239,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _hostSeatOneRetryTimer?.cancel();
     unawaited(_presenceController.leave());
     _presenceController.dispose();
+    _seatController.dispose();
     _roomStateController.removeListener(_onRoomStateChanged);
     final membershipListener = _roomMembershipListener;
     if (membershipListener != null) {
@@ -255,6 +256,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _setRoomState(VoidCallback update) => setState(update);
+
+  void _handleRoomBackInvoked(bool didPop, Object? result) {
+    if (didPop) return;
+    _openLeaveSheet();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -292,24 +298,96 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       );
     }
 
-    return RoomMusicOverlayHost(
-      child: RoomMusicOverlay(
-        child: LiveRoomGiftOverlay(
-          giftController: _giftController,
-          roomUsers: _roomUsers,
-          child: LiveRoomRemoteAudioRenderers(
-            child: PopScope<void>(
-              canPop: _allowRoomPop,
-              onPopInvokedWithResult: _handleRoomBackInvoked,
-              child: Scaffold(
-                resizeToAvoidBottomInset: false,
-                backgroundColor: RoomColors.deep,
-                body: LiveRoomBody(state: this),
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+    final pendingInvite = _pendingSeatInvite;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        LiveRoomRemoteAudioRenderers(
+          child: PopScope<void>(
+            canPop: _allowRoomPop,
+            onPopInvokedWithResult: _handleRoomBackInvoked,
+            child: Scaffold(
+              resizeToAvoidBottomInset: false,
+              backgroundColor: RoomColors.deep,
+              body: LiveRoomBody(
+                roomName: _roomName,
+                roomId: _roomId,
+                privacyMode: _privacyMode,
+                onlineCount: _safeOnlineCount,
+                seats: _seatController.seats,
+                layoutId: _seatController.layoutId,
+                selectedSeatIndex: _seatController.selectedSeatIndex,
+                canManageSeats: _viewerCanManageRoom,
+                applyOnlyModeEnabled: _applyOnlyModeEnabled,
+                currentUserIsMember: _currentUserIsMember,
+                joinRequestPending: _joinRequestPending,
+                admins: _roomAdmins,
+                availableAdminUsers: _availableAdminUsers,
+                onAddAdmin: _addRoomAdminFromInfo,
+                onRemoveAdmin: _removeRoomAdminFromInfo,
+                messages: _roomMessageController.messages,
+                canManageSeatApplications: _viewerCanManageRoom,
+                messageController: _messageController,
+                messageFocusNode: _messageFocusNode,
+                micMuted: _seatController.micMuted,
+                inboxUnreadCount: _inboxUnreadCount,
+                imagesEnabled: _roomImagesEnabled,
+                onBack: _openLeaveSheet,
+                onJoinTap: _handleJoinRoom,
+                onShare: _openRoomShareSheet,
+                onAnnouncement: _openAnnouncementSheet,
+                onSettings: _openSettingsSheet,
+                onUsersTap: _openRoomUsersSheet,
+                onRoomRankingsTap: _openRoomRankingsSheet,
+                onRoomLevelTap: _openRoomLevelPage,
+                onSeatTap: _onSeatTap,
+                onUserTap: _onUserTap,
+                onInvite: _inviteSeat,
+                onSwitch: _seatController.switchToSeat,
+                onLock: _seatController.lockSeat,
+                onUnlock: _seatController.unlockSeat,
+                onApplySeat: _applyForSeat,
+                onApproveSeatApplication: _approveSeatApplication,
+                onRejectSeatApplication: _rejectSeatApplication,
+                onSenderTap: _openMiniProfileFromChat,
+                onMentionTap: _openMentionedUserProfile,
+                onDismissOverlays: _dismissRoomOverlays,
+                onInboxTap: _openInboxPage,
+                onEmojiTap: _openEmojiTray,
+                onSendTap: _sendMessage,
+                onMicTap: _toggleMic,
+                onGamesTap: _openGamesSheet,
+                onGiftTap: _openGiftPanel,
               ),
             ),
           ),
         ),
-      ),
+        LiveRoomGiftOverlay(
+          slides: _giftController.giftSlides,
+          activeComboSlide: _giftController.activeComboSlide,
+          activeLuckyPacket: _giftController.activeLuckyPacket,
+          bottomPadding: bottomPadding,
+          onComboTap: _giftController.tapGiftCombo,
+          onComboButtonTap: () {
+            final slide = _giftController.activeComboSlide;
+            if (slide != null) _giftController.tapGiftCombo(slide);
+          },
+          onVideoGiftFinished: _giftController.finishVideoGift,
+          onLuckyPacketGetTap: () => _giftController.claimLuckyPacket(_allRoomUsers),
+          onLuckyPacketResultsDismiss: _giftController.dismissLuckyPacketResults,
+        ),
+        if (pendingInvite != null)
+          LiveRoomSeatInviteNotification(
+            inviterName: pendingInvite.inviterName,
+            invitedUser: pendingInvite.invitedUser,
+            seatIndex: pendingInvite.seatIndex,
+            onReject: _rejectSeatInvite,
+            onAccept: _acceptSeatInvite,
+          ),
+        const RoomMusicOverlayHost(),
+      ],
     );
   }
 }
