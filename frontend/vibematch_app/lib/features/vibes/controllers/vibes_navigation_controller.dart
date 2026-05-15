@@ -116,7 +116,7 @@ class VibesNavigationController {
             if (reason == null || reason.trim().isEmpty) return;
             try {
               await controller.reportVibe(vibe, reason: reason);
-              if (context.mounted) showAction(context, 'Report submitted to CS CP for review.');
+              if (context.mounted) showAction(context, 'Vibe submitted for official review.');
             } catch (error) {
               if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
             }
