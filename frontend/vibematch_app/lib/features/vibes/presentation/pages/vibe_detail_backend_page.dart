@@ -411,7 +411,7 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
-              SliverToBoxAdapter(child: _DetailPost(vibe: widget.vibe, caption: _caption, likes: _likesCount, comments: _commentsCount, shares: _sharesCount, saves: _savesCount)),
+              SliverToBoxAdapter(child: _DetailPost(caption: _caption, timeAgo: widget.vibe.timeAgo, likes: _likesCount, comments: _commentsCount, shares: _sharesCount, saves: _savesCount)),
               if (!widget.vibe.commentsEnabled) const SliverToBoxAdapter(child: _CommentsOffNotice()),
               SliverToBoxAdapter(child: _CommentsHeader(count: _commentsCount, loading: _loadingComments, onRefresh: _loadComments)),
               if (_error != null) SliverToBoxAdapter(child: _ErrorCard(message: _error!, onRetry: _loadComments)),
@@ -544,35 +544,28 @@ class _CommentsOverlaySheet extends StatelessWidget {
 }
 
 class _DetailPost extends StatelessWidget {
-  const _DetailPost({required this.vibe, required this.caption, required this.likes, required this.comments, required this.shares, required this.saves});
-  final VibeItem vibe;
+  const _DetailPost({required this.caption, required this.timeAgo, required this.likes, required this.comments, required this.shares, required this.saves});
   final String caption;
+  final String timeAgo;
   final int likes;
   final int comments;
   final int shares;
   final int saves;
 
   @override
-  Widget build(BuildContext context) => ColoredBox(color: Colors.white, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [_AuthorRow(vibe: vibe), _PostInfo(vibe: vibe, caption: caption, likes: likes, comments: comments, shares: shares, saves: saves), const Divider(height: 1, color: Color(0xFFECE2D8))]));
-}
-
-class _AuthorRow extends StatelessWidget {
-  const _AuthorRow({required this.vibe});
-  final VibeItem vibe;
-  @override
-  Widget build(BuildContext context) => SizedBox(height: 58, child: Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 8), child: Row(children: [VibeAvatar(vibe: vibe, size: 38), const SizedBox(width: 10), Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [Text(vibe.authorName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF111015), fontSize: 14, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(vibe.timeAgo, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11.5, fontWeight: FontWeight.w700))]))])));
+  Widget build(BuildContext context) => ColoredBox(color: Colors.white, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [_PostInfo(caption: caption, timeAgo: timeAgo, likes: likes, comments: comments, shares: shares, saves: saves), const Divider(height: 1, color: Color(0xFFECE2D8))]));
 }
 
 class _PostInfo extends StatelessWidget {
-  const _PostInfo({required this.vibe, required this.caption, required this.likes, required this.comments, required this.shares, required this.saves});
-  final VibeItem vibe;
+  const _PostInfo({required this.caption, required this.timeAgo, required this.likes, required this.comments, required this.shares, required this.saves});
   final String caption;
+  final String timeAgo;
   final int likes;
   final int comments;
   final int shares;
   final int saves;
   @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.fromLTRB(14, 6, 14, 14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (caption.isNotEmpty) ...[_CaptionText(caption: caption, color: const Color(0xFF111015), mentionColor: const Color(0xFF3859D6), fontSize: 16), const SizedBox(height: 14)], Row(children: [_Metric(icon: Icons.favorite_rounded, value: likes), const SizedBox(width: 14), _Metric(icon: Icons.mode_comment_rounded, value: comments), const SizedBox(width: 14), _Metric(icon: Icons.send_rounded, value: shares), const SizedBox(width: 14), _Metric(icon: Icons.bookmark_rounded, value: saves)]), const SizedBox(height: 8), Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2))]));
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.fromLTRB(14, 18, 14, 14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (caption.isNotEmpty) ...[_CaptionText(caption: caption, color: const Color(0xFF111015), mentionColor: const Color(0xFF3859D6), fontSize: 16), const SizedBox(height: 14)], Row(children: [_Metric(icon: Icons.favorite_rounded, value: likes), const SizedBox(width: 14), _Metric(icon: Icons.mode_comment_rounded, value: comments), const SizedBox(width: 14), _Metric(icon: Icons.send_rounded, value: shares), const SizedBox(width: 14), _Metric(icon: Icons.bookmark_rounded, value: saves)]), const SizedBox(height: 8), Text(timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2))]));
 }
 
 class _Metric extends StatelessWidget {
