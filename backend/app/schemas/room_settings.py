@@ -13,6 +13,7 @@ class RoomSettingsResponse(BaseModel):
     is_members_only: bool = False
     allow_screenshots: bool = True
     has_lock_password: bool = False
+    cover_photo_url: str | None = None
     background_theme_id: str = "default"
     announcement_text: str | None = None
     announcement_updated_at: datetime | None = None
