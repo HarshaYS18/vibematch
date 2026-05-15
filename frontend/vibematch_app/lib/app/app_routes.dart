@@ -11,18 +11,13 @@ enum VmMainTab {
     route: VmRoutes.vibes,
     label: 'Vibes',
   ),
-  create(
-    tabIndex: 2,
-    route: VmRoutes.create,
-    label: 'Create',
-  ),
   inbox(
-    tabIndex: 3,
+    tabIndex: 2,
     route: VmRoutes.inbox,
     label: 'Inbox',
   ),
   me(
-    tabIndex: 4,
+    tabIndex: 3,
     route: VmRoutes.me,
     label: 'Me',
   );
