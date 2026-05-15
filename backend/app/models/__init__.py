@@ -8,6 +8,7 @@ from app.models.device_ban import DeviceBan
 from app.models.room import Room, RoomMode, RoomType
 from app.models.room_participant import RoomParticipant
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
+from app.models.room_theme import RoomTheme, RoomThemeOwnershipType, RoomThemeReview, RoomThemeReviewStatus, UserRoomThemeInventory
 from app.models.home_banner import HomeBanner, HomeBannerPlacement, HomeBannerTarget
 from app.models.cricket import (
     CricketMatch,
