@@ -3,6 +3,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../models/home_banner.dart';
 import '../models/home_room.dart';
+import 'models/home_banner_dto.dart';
 import 'models/home_room_dto.dart';
 
 class HomeRepository {
@@ -37,7 +38,8 @@ class HomeRepository {
     );
     return response
         .whereType<Map<String, dynamic>>()
-        .map(HomeBanner.fromJson)
+        .map(HomeBannerDto.fromJson)
+        .map((dto) => dto.toDomain())
         .where((banner) => banner.imageUrl != null && banner.imageUrl!.trim().isNotEmpty)
         .toList(growable: false);
   }
