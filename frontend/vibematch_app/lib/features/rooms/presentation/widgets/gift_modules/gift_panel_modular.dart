@@ -25,6 +25,7 @@ class GiftPanelModular extends StatefulWidget {
     required this.onComboChanged,
     required this.onSend,
     required this.onRecharge,
+    this.onLuckyRankingsTap,
   });
 
   final List<GiftItem> gifts;
@@ -40,6 +41,7 @@ class GiftPanelModular extends StatefulWidget {
   final ValueChanged<int> onComboChanged;
   final VoidCallback onSend;
   final VoidCallback onRecharge;
+  final VoidCallback? onLuckyRankingsTap;
 
   static List<GiftItem> withMockExtras(List<GiftItem> gifts) => GiftMockExtras.mergeWith(gifts);
 
@@ -105,6 +107,7 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
                 );
               },
               onStoreTap: () => RoomToast.show(context, 'Store / inventory opened'),
+              onLuckyRankingsTap: widget.onLuckyRankingsTap,
             ),
             const SizedBox(height: 7),
             GiftTargetsRow(
