@@ -6,9 +6,11 @@ class LiveRoomGamesSheet extends StatelessWidget {
   const LiveRoomGamesSheet({
     super.key,
     required this.onJungleHuntTap,
+    required this.onCoinGameRankingsTap,
   });
 
   final VoidCallback onJungleHuntTap;
+  final VoidCallback onCoinGameRankingsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +54,13 @@ class LiveRoomGamesSheet extends StatelessWidget {
             label: 'Jungle Hunt',
             subtitle: 'Coin game • backend result',
             onTap: onJungleHuntTap,
+          ),
+          const SizedBox(height: 9),
+          _MiniGameChip(
+            icon: Icons.emoji_events_rounded,
+            label: 'Coin Game Rankings',
+            subtitle: 'Winnings • bidding • losses',
+            onTap: onCoinGameRankingsTap,
           ),
         ],
       ),
