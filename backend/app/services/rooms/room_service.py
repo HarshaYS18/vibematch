@@ -304,6 +304,16 @@ def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> 
     return room_to_detail_response(room)
 
 
+def get_my_created_room(db: Session, current_user: User) -> RoomDetailResponse | None:
+    room = db.query(Room).filter(Room.owner_user_id == current_user.id, Room.is_active.is_(True)).order_by(Room.created_at.asc()).first()
+    if room is None:
+        return None
+    _refresh_room_online_count(db, room)
+    db.commit()
+    db.refresh(room)
+    return room_to_detail_response(room)
+
+
 def get_room_model_by_public_id(db: Session, room_public_id: str) -> Room | None:
     return db.query(Room).filter(Room.room_public_id == room_public_id, Room.is_active.is_(True)).first()
 
