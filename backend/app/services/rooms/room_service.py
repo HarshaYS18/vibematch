@@ -11,7 +11,7 @@ from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
-from app.services import profile_service
+from app.services import economy_level_service, profile_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
 
@@ -249,12 +249,38 @@ def participant_to_response(db: Session, participant: RoomParticipant, room: Roo
     user = participant.user
     user_roles = get_user_roles(user)
     primary_role = get_primary_role(user)
+    wallet = economy_level_service.get_or_create_wallet(db, user.id)
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    economy_level_service.sync_vip_status(db, user.id, levels)
     is_online = bool(participant.is_active)
     is_owner = room.owner_user_id == user.id
     is_admin = participant.is_room_admin or is_owner
     is_member = participant.is_member or is_admin
     section = "owner" if is_owner else ("admin" if is_admin else ("member" if is_member else "visitor"))
-    return RoomParticipantUserResponse(public_user_id=user.public_user_id, display_custom_id=user.display_custom_id, username=user.username, display_name=user.display_name, avatar_url=user.avatar_url, primary_role=primary_role.value, primary_role_badge=get_primary_role_badge(primary_role), role_badges=get_role_badges(user_roles), vip=profile_service.vip_summary(db, user), is_owner=is_owner, is_member=is_member, is_room_admin=is_admin, is_online=is_online, list_section=section, joined_at=participant.joined_at, last_seen_at=participant.last_seen_at)
+    return RoomParticipantUserResponse(
+        public_user_id=user.public_user_id,
+        display_custom_id=user.display_custom_id,
+        username=user.username,
+        display_name=user.display_name,
+        avatar_url=user.avatar_url,
+        primary_role=primary_role.value,
+        primary_role_badge=get_primary_role_badge(primary_role),
+        role_badges=get_role_badges(user_roles),
+        vip=profile_service.vip_summary(db, user),
+        sending_level=int(levels["sent"].get("level") or 0),
+        receiving_level=int(levels["received"].get("level") or 0),
+        sent_exp=levels["monthly_gift_coins_sent"],
+        received_exp=levels["monthly_gift_coins_received"],
+        monthly_gift_coins_sent=levels["monthly_gift_coins_sent"],
+        monthly_gift_coins_received=levels["monthly_gift_coins_received"],
+        is_owner=is_owner,
+        is_member=is_member,
+        is_room_admin=is_admin,
+        is_online=is_online,
+        list_section=section,
+        joined_at=participant.joined_at,
+        last_seen_at=participant.last_seen_at,
+    )
 
 
 def _ensure_owner_participant(db: Session, room: Room) -> None:

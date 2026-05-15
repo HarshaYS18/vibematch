@@ -13,14 +13,14 @@ class ProgressionTrack(str, Enum):
 
 # Product rules:
 # ₹100 recharge gives 1,00,000 coins, so ₹1 worth of coins = 1,000 coin EXP units.
-# VIP max: VIP 50 costs 50,000,000,000 coins total.
-# SVIP max: highest SVIP costs 200,000,000 monthly recharge coins total.
+# VIP max: VIP 50 costs 40,000,000,000 lifetime recharge coins total.
+# SVIP max: SVIP 10 costs 2,000,000,000 monthly recharge coins total.
 INR_TO_COIN_EXP_RATE = 1_000
 VIP_MAX_LEVEL = 50
-SVIP_MAX_LEVEL = 50
+SVIP_MAX_LEVEL = 10
 STANDARD_MAX_LEVEL = 100
-VIP_MAX_TOTAL_EXP = 50_000_000_000
-SVIP_MAX_TOTAL_EXP = 200_000_000
+VIP_MAX_TOTAL_EXP = 40_000_000_000
+SVIP_MAX_TOTAL_EXP = 2_000_000_000
 STANDARD_MAX_TOTAL_EXP = VIP_MAX_TOTAL_EXP
 MAX_RUPEE_VALUE = VIP_MAX_TOTAL_EXP // INR_TO_COIN_EXP_RATE
 MAX_TOTAL_EXP = VIP_MAX_TOTAL_EXP

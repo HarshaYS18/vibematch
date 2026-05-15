@@ -60,6 +60,12 @@ class RoomParticipantUserResponse(BaseModel):
     primary_role_badge: RoleBadgeResponse | None = None
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
     vip: UserVipSummaryResponse
+    sending_level: int = 0
+    receiving_level: int = 0
+    sent_exp: int = 0
+    received_exp: int = 0
+    monthly_gift_coins_sent: int = 0
+    monthly_gift_coins_received: int = 0
     is_owner: bool = False
     is_member: bool = False
     is_room_admin: bool = False

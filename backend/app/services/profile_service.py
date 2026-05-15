@@ -3,9 +3,8 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.economy import UserWallet
 from app.models.user import User
-from app.services import role_badge_service, role_service, vip_status_service
+from app.services import economy_level_service, role_badge_service, role_service
 
 SVIP_NAME_GRADIENTS: dict[int, dict[str, object]] = {
     1: {"key": "svip_1_aqua_violet", "colors": ["#20E3B2", "#7C4DFF", "#E040FB"]},
@@ -28,7 +27,7 @@ def _gradient_for_svip(svip_level: int, is_active: bool) -> dict[str, object]:
 
 
 def vip_summary(db: Session, user: User) -> dict:
-    status = vip_status_service.get_or_create_vip_status(db, user)
+    status = economy_level_service.sync_vip_status(db, user.id)
     gradient = _gradient_for_svip(status.svip_level, status.svip_is_active)
     return {
         "vip_level": status.vip_level,
@@ -38,18 +37,33 @@ def vip_summary(db: Session, user: User) -> dict:
         "svip_expires_at": status.svip_expires_at,
         "name_gradient_key": str(gradient["key"]),
         "name_gradient_colors": list(gradient["colors"]),
-    }
+}
 
 
-def wallet_summary(db: Session, user: User) -> dict:
-    wallet = db.query(UserWallet).filter(UserWallet.user_id == user.id).first()
-    if not wallet:
-        return {"coin_balance": 0, "ruby_balance": 0, "lifetime_coins_spent": 0, "lifetime_rubies_earned": 0}
+def wallet_summary(db: Session, user: User, *, include_private_balances: bool = True) -> dict:
+    wallet = economy_level_service.get_or_create_wallet(db, user.id)
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    economy_level_service.sync_vip_status(db, user.id, levels)
+    coin_balance = wallet.coin_balance if include_private_balances else 0
+    ruby_balance = wallet.ruby_balance if include_private_balances else 0
     return {
-        "coin_balance": wallet.coin_balance,
-        "ruby_balance": wallet.ruby_balance,
+        "coin_balance": coin_balance,
+        "ruby_balance": ruby_balance,
         "lifetime_coins_spent": wallet.lifetime_coins_spent,
+        "lifetime_coins_received_as_gifts": wallet.lifetime_coins_received_as_gifts,
         "lifetime_rubies_earned": wallet.lifetime_rubies_earned,
+        "monthly_gift_coins_sent": levels["monthly_gift_coins_sent"],
+        "monthly_gift_coins_received": levels["monthly_gift_coins_received"],
+        "lifetime_send_exp": levels["lifetime_send_exp"],
+        "lifetime_receive_exp": levels["lifetime_receive_exp"],
+        "sent_level": levels["sent"].get("level", 0),
+        "receive_level": levels["received"].get("level", 0),
+        "vip_level": levels["vip"].get("level", 0),
+        "svip_level": levels["svip"].get("level", 0),
+        "sent": levels["sent"],
+        "received": levels["received"],
+        "vip": levels["vip"],
+        "svip": levels["svip"],
     }
 
 
@@ -81,6 +95,7 @@ def public_profile_payload(db: Session, public_user_id: int) -> dict:
         "primary_role_badge": role_badge_service.get_primary_role_badge(primary_role),
         "role_badges": role_badge_service.get_role_badges(user_roles),
         "vip": vip_summary(db, user),
+        "wallet": wallet_summary(db, user, include_private_balances=False),
         "is_online": is_online,
         "last_seen_at": user.last_seen_at,
         "created_at": user.created_at,

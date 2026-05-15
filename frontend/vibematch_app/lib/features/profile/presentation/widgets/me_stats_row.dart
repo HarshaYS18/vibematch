@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -11,6 +11,10 @@ class MeStatsRow extends StatefulWidget {
     super.key,
     required this.userId,
     required this.publicUserId,
+    required this.monthlyGiftCoinsSent,
+    required this.monthlyGiftCoinsReceived,
+    required this.sendLevel,
+    required this.receiveLevel,
     required this.onFollowingTap,
     required this.onFollowersTap,
     required this.onRoomsTap,
@@ -19,6 +23,10 @@ class MeStatsRow extends StatefulWidget {
 
   final int userId;
   final int publicUserId;
+  final int monthlyGiftCoinsSent;
+  final int monthlyGiftCoinsReceived;
+  final int sendLevel;
+  final int receiveLevel;
   final VoidCallback onFollowingTap;
   final VoidCallback onFollowersTap;
   final VoidCallback onRoomsTap;
@@ -30,23 +38,28 @@ class MeStatsRow extends StatefulWidget {
 
 class _MeStatsRowState extends State<MeStatsRow> {
   final SocialApiService _socialApiService = const SocialApiService();
-  StreamSubscription<ProfileRelationshipRealtimeEvent>? _relationshipRealtimeSub;
+  StreamSubscription<ProfileRelationshipRealtimeEvent>?
+  _relationshipRealtimeSub;
   int? _followingCount;
   int? _followersCount;
 
   @override
   void initState() {
     super.initState();
-    _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen((_) {
-      unawaited(_loadFollowStats());
-    });
+    _relationshipRealtimeSub = ProfileRelationshipRealtimeService
+        .instance
+        .events
+        .listen((_) {
+          unawaited(_loadFollowStats());
+        });
     unawaited(_loadFollowStats());
   }
 
   @override
   void didUpdateWidget(covariant MeStatsRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.userId != widget.userId || oldWidget.publicUserId != widget.publicUserId) {
+    if (oldWidget.userId != widget.userId ||
+        oldWidget.publicUserId != widget.publicUserId) {
       unawaited(_loadFollowStats());
     }
   }
@@ -79,31 +92,51 @@ class _MeStatsRowState extends State<MeStatsRow> {
 
   String _compactCount(int? value) {
     if (value == null) return '...';
-    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+    if (value >= 1000000)
+      return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+    if (value >= 1000)
+      return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
     return value.toString();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: MeProfileStat(
-            label: 'Following',
-            value: _compactCount(_followingCount),
-            icon: Icons.people_alt_rounded,
-            onTap: widget.onFollowingTap,
-          ),
+        Row(
+          children: [
+            MeProfileStat(
+              label: 'Following',
+              value: _compactCount(_followingCount),
+              icon: Icons.people_alt_rounded,
+              onTap: widget.onFollowingTap,
+            ),
+            const SizedBox(width: 9),
+            MeProfileStat(
+              label: 'Followers',
+              value: _compactCount(_followersCount),
+              icon: Icons.favorite_rounded,
+              onTap: widget.onFollowersTap,
+            ),
+          ],
         ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: MeProfileStat(
-            label: 'Followers',
-            value: _compactCount(_followersCount),
-            icon: Icons.favorite_rounded,
-            onTap: widget.onFollowersTap,
-          ),
+        const SizedBox(height: 9),
+        Row(
+          children: [
+            MeProfileStat(
+              label: 'Sent Lv ${widget.sendLevel}',
+              value: _compactCount(widget.monthlyGiftCoinsSent),
+              icon: Icons.send_rounded,
+              onTap: widget.onRoomsTap,
+            ),
+            const SizedBox(width: 9),
+            MeProfileStat(
+              label: 'Receive Lv ${widget.receiveLevel}',
+              value: _compactCount(widget.monthlyGiftCoinsReceived),
+              icon: Icons.volunteer_activism_rounded,
+              onTap: widget.onVisitorsTap,
+            ),
+          ],
         ),
       ],
     );

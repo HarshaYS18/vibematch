@@ -25,6 +25,7 @@ def _pool_response(pool: CoinSupplyPool) -> EconomyPoolResponse:
 
 def _wallet_response(db: Session, wallet):
     levels = economy_level_service.wallet_level_payload(db, wallet)
+    economy_level_service.sync_vip_status(db, wallet.user_id, levels)
     return {
         "user_id": wallet.user_id,
         "coin_balance": wallet.coin_balance,

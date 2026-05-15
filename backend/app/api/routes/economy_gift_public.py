@@ -6,7 +6,7 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.room import Room
 from app.models.user import User
-from app.services import economy_service, gift_catalog_service
+from app.services import economy_level_service, economy_service, gift_catalog_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/economy/gifts", tags=["Economy"])
@@ -28,6 +28,7 @@ class PublicLuckyGiftSendRequest(PublicGiftSendRequest):
 
 async def _broadcast_gift_experience_updates(
     *,
+    db: Session,
     current_user_id: int,
     receiver_user_id: int,
     result: dict,
@@ -56,6 +57,49 @@ async def _broadcast_gift_experience_updates(
             [current_user_id, receiver_user_id],
             {"event": "room_experience_updated", "payload": exp_updates.get("room")},
         )
+    await _broadcast_all_levels(db=db, user_ids=[current_user_id, receiver_user_id])
+
+
+def _level_payload_for_user(db: Session, user: User) -> tuple[dict, dict]:
+    wallet = economy_level_service.get_or_create_wallet(db, user.id)
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    economy_level_service.sync_vip_status(db, user.id, levels)
+    public_summary = {
+        "user_id": user.id,
+        "public_user_id": user.public_user_id,
+        "display_name": user.display_name or user.username,
+        "avatar_url": user.avatar_url,
+        "monthly_gift_coins_sent": levels["monthly_gift_coins_sent"],
+        "monthly_gift_coins_received": levels["monthly_gift_coins_received"],
+        "lifetime_send_exp": levels["lifetime_send_exp"],
+        "lifetime_receive_exp": levels["lifetime_receive_exp"],
+        "sent_level": levels["sent"].get("level", 0),
+        "receive_level": levels["received"].get("level", 0),
+        "vip_level": levels["vip"].get("level", 0),
+        "svip_level": levels["svip"].get("level", 0),
+        "sent": levels["sent"],
+        "received": levels["received"],
+        "vip": levels["vip"],
+        "svip": levels["svip"],
+    }
+    private_wallet = {
+        **public_summary,
+        "coin_balance": wallet.coin_balance,
+        "ruby_balance": wallet.ruby_balance,
+        "withdrawable_rubies": max(wallet.ruby_balance - wallet.locked_ruby_balance, 0),
+        "pending_withdraw_rubies": wallet.pending_withdraw_rubies,
+        "lifetime_coins_spent": wallet.lifetime_coins_spent,
+        "lifetime_coins_received_as_gifts": wallet.lifetime_coins_received_as_gifts,
+        "lifetime_rubies_earned": wallet.lifetime_rubies_earned,
+    }
+    return public_summary, private_wallet
+
+
+async def _broadcast_all_levels(*, db: Session, user_ids: list[int]) -> None:
+    users = db.query(User).filter(User.id.in_(list(dict.fromkeys(user_ids)))).all()
+    for user in users:
+        economy, wallet = _level_payload_for_user(db, user)
+        await inbox_ws_manager.send_to_user(user.id, {"event": "all_levels_updated", "payload": {"economy": economy, "wallet": wallet}})
 
 
 def _resolve_receiver_and_room(db: Session, payload: PublicGiftSendRequest) -> tuple[User, int | None]:
@@ -94,6 +138,7 @@ async def send_gift_by_public_ids(
     )
 
     await _broadcast_gift_experience_updates(
+        db=db,
         current_user_id=current_user.id,
         receiver_user_id=receiver.id,
         result=result,
@@ -150,6 +195,7 @@ async def send_lucky_gift_by_public_ids(
     result["lucky_multiplier"] = lucky_result["multiplier"]
 
     await _broadcast_gift_experience_updates(
+        db=db,
         current_user_id=current_user.id,
         receiver_user_id=receiver.id,
         result=result,

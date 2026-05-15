@@ -19,7 +19,20 @@ class UserWalletSummaryResponse(BaseModel):
     coin_balance: int = 0
     ruby_balance: int = 0
     lifetime_coins_spent: int = 0
+    lifetime_coins_received_as_gifts: int = 0
     lifetime_rubies_earned: int = 0
+    monthly_gift_coins_sent: int = 0
+    monthly_gift_coins_received: int = 0
+    lifetime_send_exp: int = 0
+    lifetime_receive_exp: int = 0
+    sent_level: int = 0
+    receive_level: int = 0
+    vip_level: int = 0
+    svip_level: int = 0
+    sent: dict = Field(default_factory=dict)
+    received: dict = Field(default_factory=dict)
+    vip: dict = Field(default_factory=dict)
+    svip: dict = Field(default_factory=dict)
 
 
 class UserProfileUpdateRequest(BaseModel):
@@ -102,6 +115,7 @@ class PublicUserProfileResponse(BaseModel):
     primary_role_badge: RoleBadgeResponse | None = None
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
     vip: UserVipSummaryResponse
+    wallet: UserWalletSummaryResponse | None = None
     is_online: bool
     last_seen_at: datetime | None = None
     created_at: datetime

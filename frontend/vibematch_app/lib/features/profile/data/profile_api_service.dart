@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -40,18 +40,26 @@ class ProfileApiService {
         'display_name': safeName,
         'bio': bio?.trim() ?? '',
         if (avatarUrl != null) 'avatar_url': avatarUrl.trim(),
-        'cover_photo_urls': coverPhotoUrls.map((item) => item.trim()).where((item) => item.isNotEmpty).toList(growable: false),
+        'cover_photo_urls': coverPhotoUrls
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false),
         'date_of_birth': dateOfBirth == null ? null : _dateOnly(dateOfBirth),
         'gender': gender,
         'profession': profession?.trim(),
         'marital_status': maritalStatus,
         'friend_gender_preference': friendGenderPreference,
         'friend_marital_preference': friendMaritalPreference,
-        'interests': interests.map((item) => item.trim()).where((item) => item.isNotEmpty).toList(growable: false),
+        'interests': interests
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false),
       }),
     );
     _throwIfFailed(response, 'update profile');
-    final user = CurrentUser.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    final user = CurrentUser.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
     AuthUserRealtimeService.instance.publish(user);
     return user;
   }
@@ -74,12 +82,19 @@ class ProfileApiService {
   }
 
   Future<PublicUserProfile> getPublicProfile(int publicUserId) async {
-    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/users/public/$publicUserId')), headers: _authHeaders());
+    final response = await http.get(
+      Uri.parse(VmApiConfig.endpoint('/users/public/$publicUserId')),
+      headers: _authHeaders(),
+    );
     _throwIfFailed(response, 'load public profile');
-    return PublicUserProfile.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return PublicUserProfile.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
-  Future<List<ProfileVisitorDto>> listMyProfileVisitors({int limit = 50}) async {
+  Future<List<ProfileVisitorDto>> listMyProfileVisitors({
+    int limit = 50,
+  }) async {
     final response = await http.get(
       Uri.parse(VmApiConfig.endpoint('/users/me/visitors?limit=$limit')),
       headers: _authHeaders(),
@@ -88,7 +103,10 @@ class ProfileApiService {
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final visitors = decoded['visitors'] as List<dynamic>? ?? const [];
-    return visitors.whereType<Map<String, dynamic>>().map(ProfileVisitorDto.fromJson).toList(growable: false);
+    return visitors
+        .whereType<Map<String, dynamic>>()
+        .map(ProfileVisitorDto.fromJson)
+        .toList(growable: false);
   }
 
   Future<FamilySummaryDto> getMyFamily() async {
@@ -97,7 +115,9 @@ class ProfileApiService {
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'load my family');
-    return FamilySummaryDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return FamilySummaryDto.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<FamilySummaryDto> getPublicFamily(int publicUserId) async {
@@ -106,7 +126,9 @@ class ProfileApiService {
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'load public family');
-    return FamilySummaryDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return FamilySummaryDto.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<List<ProfileVibeDto>> listMyVibes({int limit = 30}) async {
@@ -118,7 +140,10 @@ class ProfileApiService {
     return _parseVibesResponse(response.body);
   }
 
-  Future<List<ProfileVibeDto>> listPublicUserVibes(int publicUserId, {int limit = 30}) async {
+  Future<List<ProfileVibeDto>> listPublicUserVibes(
+    int publicUserId, {
+    int limit = 30,
+  }) async {
     final response = await http.get(
       Uri.parse(VmApiConfig.endpoint('/vibes/user/$publicUserId?limit=$limit')),
       headers: _authHeaders(),
@@ -132,33 +157,56 @@ class ProfileApiService {
     final posts = decoded is List<dynamic>
         ? decoded
         : decoded is Map<String, dynamic>
-            ? decoded['posts'] as List<dynamic>? ?? const []
-            : const [];
-    return posts.whereType<Map<String, dynamic>>().map(ProfileVibeDto.fromJson).toList(growable: false);
+        ? decoded['posts'] as List<dynamic>? ?? const []
+        : const [];
+    return posts
+        .whereType<Map<String, dynamic>>()
+        .map(ProfileVibeDto.fromJson)
+        .toList(growable: false);
   }
 
   Future<UserRelationship> getRelationship(int publicUserId) async {
-    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/relationship')), headers: _authHeaders());
+    final response = await http.get(
+      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/relationship')),
+      headers: _authHeaders(),
+    );
     _throwIfFailed(response, 'load relationship');
-    return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return UserRelationship.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<UserRelationship> followUser(int publicUserId) async {
-    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')), headers: _authHeaders());
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')),
+      headers: _authHeaders(),
+    );
     _throwIfFailed(response, 'follow user');
-    return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return UserRelationship.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<UserRelationship> unfollowUser(int publicUserId) async {
-    final response = await http.delete(Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')), headers: _authHeaders());
+    final response = await http.delete(
+      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')),
+      headers: _authHeaders(),
+    );
     _throwIfFailed(response, 'unfollow user');
-    return UserRelationship.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return UserRelationship.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Map<String, String> _authHeaders() {
     final access = authApiService.cachedAccessToken;
-    if (access == null || access.trim().isEmpty) throw Exception('Please login again.');
-    return {'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': 'Bearer $access'};
+    if (access == null || access.trim().isEmpty)
+      throw Exception('Please login again.');
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $access',
+    };
   }
 
   void _throwIfFailed(http.Response response, String action) {
@@ -176,11 +224,20 @@ class ProfileApiService {
     throw Exception('Failed to $action (${response.statusCode})');
   }
 
-  String _dateOnly(DateTime value) => '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+  String _dateOnly(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }
 
 class FamilyMemberSummaryDto {
-  const FamilyMemberSummaryDto({required this.userId, required this.publicUserId, required this.displayName, required this.role, required this.contributionExp, required this.joinedAt, this.avatarUrl});
+  const FamilyMemberSummaryDto({
+    required this.userId,
+    required this.publicUserId,
+    required this.displayName,
+    required this.role,
+    required this.contributionExp,
+    required this.joinedAt,
+    this.avatarUrl,
+  });
 
   final int userId;
   final int publicUserId;
@@ -191,12 +248,33 @@ class FamilyMemberSummaryDto {
   final String? avatarUrl;
 
   factory FamilyMemberSummaryDto.fromJson(Map<String, dynamic> json) {
-    return FamilyMemberSummaryDto(userId: _int(json['user_id'], fallback: 0), publicUserId: _int(json['public_user_id'], fallback: 0), displayName: _nullableText(json['display_name']) ?? 'Vibe User', avatarUrl: _nullableText(json['avatar_url']), role: _nullableText(json['role']) ?? 'member', contributionExp: _int(json['contribution_exp'], fallback: 0), joinedAt: _date(json['joined_at']) ?? DateTime.now());
+    return FamilyMemberSummaryDto(
+      userId: _int(json['user_id'], fallback: 0),
+      publicUserId: _int(json['public_user_id'], fallback: 0),
+      displayName: _nullableText(json['display_name']) ?? 'Vibe User',
+      avatarUrl: _nullableText(json['avatar_url']),
+      role: _nullableText(json['role']) ?? 'member',
+      contributionExp: _int(json['contribution_exp'], fallback: 0),
+      joinedAt: _date(json['joined_at']) ?? DateTime.now(),
+    );
   }
 }
 
 class FamilySummaryDto {
-  const FamilySummaryDto({required this.hasFamily, required this.level, required this.totalExp, required this.memberCount, required this.members, this.id, this.name, this.bio, this.avatarUrl, this.ownerPublicUserId, this.ownerDisplayName, this.myRole});
+  const FamilySummaryDto({
+    required this.hasFamily,
+    required this.level,
+    required this.totalExp,
+    required this.memberCount,
+    required this.members,
+    this.id,
+    this.name,
+    this.bio,
+    this.avatarUrl,
+    this.ownerPublicUserId,
+    this.ownerDisplayName,
+    this.myRole,
+  });
 
   final bool hasFamily;
   final String? id;
@@ -212,18 +290,27 @@ class FamilySummaryDto {
   final List<FamilyMemberSummaryDto> members;
 
   bool get shouldShow => hasFamily && (name?.trim().isNotEmpty ?? false);
-  String get safeName => name?.trim().isNotEmpty == true ? name!.trim() : 'Family';
+  String get safeName =>
+      name?.trim().isNotEmpty == true ? name!.trim() : 'Family';
   String get safeId => id?.trim().isNotEmpty == true ? id!.trim() : 'family';
-  String get safeRole => myRole?.trim().isNotEmpty == true ? myRole!.trim() : 'Member';
+  String get safeRole =>
+      myRole?.trim().isNotEmpty == true ? myRole!.trim() : 'Member';
 
   factory FamilySummaryDto.empty() {
-    return const FamilySummaryDto(hasFamily: false, level: 0, totalExp: 0, memberCount: 0, members: []);
+    return const FamilySummaryDto(
+      hasFamily: false,
+      level: 0,
+      totalExp: 0,
+      memberCount: 0,
+      members: [],
+    );
   }
 
   factory FamilySummaryDto.fromJson(Map<String, dynamic> json) {
     final membersJson = json['members'] as List<dynamic>? ?? const [];
     final hasFamily = json['has_family'] == true || json['should_show'] == true;
-    final name = _nullableText(json['name']) ?? _nullableText(json['family_name']);
+    final name =
+        _nullableText(json['name']) ?? _nullableText(json['family_name']);
     return FamilySummaryDto(
       hasFamily: hasFamily,
       id: _nullableText(json['id']) ?? _nullableText(json['family_id']),
@@ -236,13 +323,22 @@ class FamilySummaryDto {
       ownerDisplayName: _nullableText(json['owner_display_name']),
       memberCount: _int(json['member_count'], fallback: 0),
       myRole: _nullableText(json['my_role']) ?? _nullableText(json['role']),
-      members: membersJson.whereType<Map<String, dynamic>>().map(FamilyMemberSummaryDto.fromJson).toList(growable: false),
+      members: membersJson
+          .whereType<Map<String, dynamic>>()
+          .map(FamilyMemberSummaryDto.fromJson)
+          .toList(growable: false),
     );
   }
 }
 
 class ProfileVibeAuthorDto {
-  const ProfileVibeAuthorDto({required this.id, required this.publicUserId, this.username, this.displayName, this.avatarUrl});
+  const ProfileVibeAuthorDto({
+    required this.id,
+    required this.publicUserId,
+    this.username,
+    this.displayName,
+    this.avatarUrl,
+  });
 
   final int id;
   final int publicUserId;
@@ -250,15 +346,41 @@ class ProfileVibeAuthorDto {
   final String? displayName;
   final String? avatarUrl;
 
-  String get visibleName => displayName?.trim().isNotEmpty == true ? displayName!.trim() : username?.trim().isNotEmpty == true ? username!.trim() : 'Vibe User';
+  String get visibleName => displayName?.trim().isNotEmpty == true
+      ? displayName!.trim()
+      : username?.trim().isNotEmpty == true
+      ? username!.trim()
+      : 'Vibe User';
 
   factory ProfileVibeAuthorDto.fromJson(Map<String, dynamic> json) {
-    return ProfileVibeAuthorDto(id: _int(json['id'], fallback: 0), publicUserId: _int(json['public_user_id'], fallback: 0), username: _nullableText(json['username']), displayName: _nullableText(json['display_name']), avatarUrl: _nullableText(json['avatar_url']));
+    return ProfileVibeAuthorDto(
+      id: _int(json['id'], fallback: 0),
+      publicUserId: _int(json['public_user_id'], fallback: 0),
+      username: _nullableText(json['username']),
+      displayName: _nullableText(json['display_name']),
+      avatarUrl: _nullableText(json['avatar_url']),
+    );
   }
 }
 
 class ProfileVibeDto {
-  const ProfileVibeDto({required this.id, required this.caption, required this.mediaType, required this.mentions, required this.usesMentionAll, required this.author, required this.likesCount, required this.commentsCount, required this.sharesCount, required this.reportsCount, required this.viewsCount, required this.likedByMe, required this.createdAt, this.mediaUrl, this.tag});
+  const ProfileVibeDto({
+    required this.id,
+    required this.caption,
+    required this.mediaType,
+    required this.mentions,
+    required this.usesMentionAll,
+    required this.author,
+    required this.likesCount,
+    required this.commentsCount,
+    required this.sharesCount,
+    required this.reportsCount,
+    required this.viewsCount,
+    required this.likedByMe,
+    required this.createdAt,
+    this.mediaUrl,
+    this.tag,
+  });
 
   final int id;
   final String caption;
@@ -298,7 +420,9 @@ class ProfileVibeDto {
 
   factory ProfileVibeDto.fromJson(Map<String, dynamic> json) {
     final mentionsJson = json['mentions'] as List<dynamic>? ?? const [];
-    final authorJson = json['author'] is Map<String, dynamic> ? json['author'] as Map<String, dynamic> : const <String, dynamic>{};
+    final authorJson = json['author'] is Map<String, dynamic>
+        ? json['author'] as Map<String, dynamic>
+        : const <String, dynamic>{};
 
     return ProfileVibeDto(
       id: _int(json['id'], fallback: 0),
@@ -306,7 +430,10 @@ class ProfileVibeDto {
       mediaType: (_nullableText(json['media_type']) ?? 'text').toLowerCase(),
       mediaUrl: _nullableText(json['media_url']),
       tag: _nullableText(json['tag']),
-      mentions: mentionsJson.map((item) => item.toString()).where((item) => item.trim().isNotEmpty).toList(growable: false),
+      mentions: mentionsJson
+          .map((item) => item.toString())
+          .where((item) => item.trim().isNotEmpty)
+          .toList(growable: false),
       usesMentionAll: json['uses_mention_all'] == true,
       author: ProfileVibeAuthorDto.fromJson(authorJson),
       likesCount: _int(json['likes_count'], fallback: 0),
@@ -321,13 +448,26 @@ class ProfileVibeDto {
 }
 
 String _compactCount(int value) {
-  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-  if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+  if (value >= 1000000)
+    return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+  if (value >= 1000)
+    return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
   return value.toString();
 }
 
 class ProfileVisitorDto {
-  const ProfileVisitorDto({required this.id, required this.visitorUserId, required this.visitorPublicUserId, required this.visitorVisibleId, required this.visitorDisplayName, required this.visitorRoleLabel, required this.visitedAt, required this.visitCount, this.visitorUsername, this.visitorAvatarUrl});
+  const ProfileVisitorDto({
+    required this.id,
+    required this.visitorUserId,
+    required this.visitorPublicUserId,
+    required this.visitorVisibleId,
+    required this.visitorDisplayName,
+    required this.visitorRoleLabel,
+    required this.visitedAt,
+    required this.visitCount,
+    this.visitorUsername,
+    this.visitorAvatarUrl,
+  });
 
   final String id;
   final int visitorUserId;
@@ -340,36 +480,93 @@ class ProfileVisitorDto {
   final String? visitorUsername;
   final String? visitorAvatarUrl;
 
-  String get displayName => visitorDisplayName.trim().isEmpty ? 'Vibe User' : visitorDisplayName;
-  String get visibleId => visitorVisibleId.trim().isEmpty ? visitorPublicUserId.toString() : visitorVisibleId;
-  String get roleLabel => visitorRoleLabel.trim().isEmpty ? 'User' : visitorRoleLabel;
+  String get displayName =>
+      visitorDisplayName.trim().isEmpty ? 'Vibe User' : visitorDisplayName;
+  String get visibleId => visitorVisibleId.trim().isEmpty
+      ? visitorPublicUserId.toString()
+      : visitorVisibleId;
+  String get roleLabel =>
+      visitorRoleLabel.trim().isEmpty ? 'User' : visitorRoleLabel;
 
   factory ProfileVisitorDto.fromJson(Map<String, dynamic> json) {
-    return ProfileVisitorDto(id: json['id']?.toString() ?? '', visitorUserId: _int(json['visitor_user_id'], fallback: 0), visitorPublicUserId: _int(json['visitor_public_user_id'], fallback: 0), visitorVisibleId: json['visitor_visible_id']?.toString() ?? '', visitorDisplayName: json['visitor_display_name']?.toString() ?? 'Vibe User', visitorUsername: _nullableText(json['visitor_username']), visitorAvatarUrl: _nullableText(json['visitor_avatar_url']), visitorRoleLabel: json['visitor_role_label']?.toString() ?? 'User', visitedAt: _date(json['visited_at']) ?? DateTime.now(), visitCount: _int(json['visit_count'], fallback: 1));
+    return ProfileVisitorDto(
+      id: json['id']?.toString() ?? '',
+      visitorUserId: _int(json['visitor_user_id'], fallback: 0),
+      visitorPublicUserId: _int(json['visitor_public_user_id'], fallback: 0),
+      visitorVisibleId: json['visitor_visible_id']?.toString() ?? '',
+      visitorDisplayName:
+          json['visitor_display_name']?.toString() ?? 'Vibe User',
+      visitorUsername: _nullableText(json['visitor_username']),
+      visitorAvatarUrl: _nullableText(json['visitor_avatar_url']),
+      visitorRoleLabel: json['visitor_role_label']?.toString() ?? 'User',
+      visitedAt: _date(json['visited_at']) ?? DateTime.now(),
+      visitCount: _int(json['visit_count'], fallback: 1),
+    );
   }
 }
 
 class ProfileRelationshipRealtimeEvent {
-  const ProfileRelationshipRealtimeEvent({required this.viewerPublicUserId, required this.targetPublicUserId, required this.action});
+  const ProfileRelationshipRealtimeEvent({
+    required this.viewerPublicUserId,
+    required this.targetPublicUserId,
+    required this.action,
+  });
   final int viewerPublicUserId;
   final int targetPublicUserId;
   final String action;
-  bool touchesProfile(int publicUserId) => viewerPublicUserId == publicUserId || targetPublicUserId == publicUserId;
+  bool touchesProfile(int publicUserId) =>
+      viewerPublicUserId == publicUserId || targetPublicUserId == publicUserId;
 }
 
 class ProfileRelationshipRealtimeService {
   ProfileRelationshipRealtimeService._();
-  static final ProfileRelationshipRealtimeService instance = ProfileRelationshipRealtimeService._();
-  final StreamController<ProfileRelationshipRealtimeEvent> _controller = StreamController<ProfileRelationshipRealtimeEvent>.broadcast();
+  static final ProfileRelationshipRealtimeService instance =
+      ProfileRelationshipRealtimeService._();
+  final StreamController<ProfileRelationshipRealtimeEvent> _controller =
+      StreamController<ProfileRelationshipRealtimeEvent>.broadcast();
   Stream<ProfileRelationshipRealtimeEvent> get events => _controller.stream;
-  void publish({required int viewerPublicUserId, required int targetPublicUserId, required String action}) {
+  void publish({
+    required int viewerPublicUserId,
+    required int targetPublicUserId,
+    required String action,
+  }) {
     if (viewerPublicUserId <= 0 || targetPublicUserId <= 0) return;
-    _controller.add(ProfileRelationshipRealtimeEvent(viewerPublicUserId: viewerPublicUserId, targetPublicUserId: targetPublicUserId, action: action));
+    _controller.add(
+      ProfileRelationshipRealtimeEvent(
+        viewerPublicUserId: viewerPublicUserId,
+        targetPublicUserId: targetPublicUserId,
+        action: action,
+      ),
+    );
   }
 }
 
 class PublicUserProfile {
-  const PublicUserProfile({required this.publicUserId, required this.displayCustomId, required this.username, required this.displayName, required this.avatarUrl, required this.bio, required this.coverPhotoUrls, required this.dateOfBirth, required this.gender, required this.profession, required this.maritalStatus, required this.friendGenderPreference, required this.friendMaritalPreference, required this.interests, required this.primaryRole, required this.primaryRoleBadge, required this.roleBadges, required this.vip, required this.isOnline, required this.lastSeenAt, required this.createdAt, required this.relationship});
+  const PublicUserProfile({
+    required this.publicUserId,
+    required this.displayCustomId,
+    required this.username,
+    required this.displayName,
+    required this.avatarUrl,
+    required this.bio,
+    required this.coverPhotoUrls,
+    required this.dateOfBirth,
+    required this.gender,
+    required this.profession,
+    required this.maritalStatus,
+    required this.friendGenderPreference,
+    required this.friendMaritalPreference,
+    required this.interests,
+    required this.primaryRole,
+    required this.primaryRoleBadge,
+    required this.roleBadges,
+    required this.vip,
+    required this.wallet,
+    required this.isOnline,
+    required this.lastSeenAt,
+    required this.createdAt,
+    required this.relationship,
+  });
 
   final int publicUserId;
   final int? displayCustomId;
@@ -389,6 +586,7 @@ class PublicUserProfile {
   final RoleBadge? primaryRoleBadge;
   final List<RoleBadge> roleBadges;
   final UserVipSummary vip;
+  final UserWalletSummary wallet;
   final bool isOnline;
   final DateTime? lastSeenAt;
   final DateTime createdAt;
@@ -415,13 +613,31 @@ class PublicUserProfile {
       friendMaritalPreference: _nullableText(json['friend_marital_preference']),
       interests: _stringList(json['interests']),
       primaryRole: primaryRole,
-      primaryRoleBadge: primaryBadgeJson is Map<String, dynamic> ? RoleBadge.fromJson(primaryBadgeJson) : RoleBadge.fromRole(primaryRole),
-      roleBadges: roleBadgesJson is List ? roleBadgesJson.whereType<Map<String, dynamic>>().map(RoleBadge.fromJson).toList(growable: false) : <RoleBadge>[RoleBadge.fromRole(primaryRole)],
-      vip: UserVipSummary.fromJson(json['vip'] is Map<String, dynamic> ? json['vip'] as Map<String, dynamic> : null),
+      primaryRoleBadge: primaryBadgeJson is Map<String, dynamic>
+          ? RoleBadge.fromJson(primaryBadgeJson)
+          : RoleBadge.fromRole(primaryRole),
+      roleBadges: roleBadgesJson is List
+          ? roleBadgesJson
+                .whereType<Map<String, dynamic>>()
+                .map(RoleBadge.fromJson)
+                .toList(growable: false)
+          : <RoleBadge>[RoleBadge.fromRole(primaryRole)],
+      vip: UserVipSummary.fromJson(
+        json['vip'] is Map<String, dynamic>
+            ? json['vip'] as Map<String, dynamic>
+            : null,
+      ),
+      wallet: UserWalletSummary.fromJson(
+        json['wallet'] is Map<String, dynamic>
+            ? json['wallet'] as Map<String, dynamic>
+            : null,
+      ),
       isOnline: json['is_online'] == true,
       lastSeenAt: _date(json['last_seen_at']),
       createdAt: _date(json['created_at']) ?? DateTime.now(),
-      relationship: relationshipJson is Map<String, dynamic> ? UserRelationship.fromJson(relationshipJson) : null,
+      relationship: relationshipJson is Map<String, dynamic>
+          ? UserRelationship.fromJson(relationshipJson)
+          : null,
     );
   }
 
@@ -430,17 +646,31 @@ class PublicUserProfile {
     if (dob == null) return null;
     final today = DateTime.now();
     var computed = today.year - dob.year;
-    final birthdayPassed = today.month > dob.month || (today.month == dob.month && today.day >= dob.day);
+    final birthdayPassed =
+        today.month > dob.month ||
+        (today.month == dob.month && today.day >= dob.day);
     if (!birthdayPassed) computed--;
     return computed.clamp(0, 120);
   }
 
   String get visibleName => displayName ?? username ?? 'Vibe User';
-  String get visibleId => displayCustomId?.toString() ?? publicUserId.toString();
+  String get visibleId =>
+      displayCustomId?.toString() ?? publicUserId.toString();
 }
 
 class UserRelationship {
-  const UserRelationship({required this.publicUserId, required this.isFollowing, required this.followsMe, required this.isFriend, required this.blockedByMe, required this.blockedMe, required this.canFollow, required this.followBlockReason, required this.followersCount, required this.followingCount});
+  const UserRelationship({
+    required this.publicUserId,
+    required this.isFollowing,
+    required this.followsMe,
+    required this.isFriend,
+    required this.blockedByMe,
+    required this.blockedMe,
+    required this.canFollow,
+    required this.followBlockReason,
+    required this.followersCount,
+    required this.followingCount,
+  });
   final int publicUserId;
   final bool isFollowing;
   final bool followsMe;
@@ -451,12 +681,59 @@ class UserRelationship {
   final String? followBlockReason;
   final int followersCount;
   final int followingCount;
-  factory UserRelationship.fromJson(Map<String, dynamic> json) => UserRelationship(publicUserId: _int(json['public_user_id'], fallback: 0), isFollowing: json['is_following'] == true, followsMe: json['follows_me'] == true, isFriend: json['is_friend'] == true, blockedByMe: json['blocked_by_me'] == true, blockedMe: json['blocked_me'] == true, canFollow: json['can_follow'] != false, followBlockReason: _nullableText(json['follow_block_reason']), followersCount: _int(json['followers_count'], fallback: 0), followingCount: _int(json['following_count'], fallback: 0));
+  factory UserRelationship.fromJson(Map<String, dynamic> json) =>
+      UserRelationship(
+        publicUserId: _int(json['public_user_id'], fallback: 0),
+        isFollowing: json['is_following'] == true,
+        followsMe: json['follows_me'] == true,
+        isFriend: json['is_friend'] == true,
+        blockedByMe: json['blocked_by_me'] == true,
+        blockedMe: json['blocked_me'] == true,
+        canFollow: json['can_follow'] != false,
+        followBlockReason: _nullableText(json['follow_block_reason']),
+        followersCount: _int(json['followers_count'], fallback: 0),
+        followingCount: _int(json['following_count'], fallback: 0),
+      );
 }
 
-dynamic _tryDecodeJson(String body) { try { return jsonDecode(body); } catch (_) { return null; } }
-int _int(dynamic value, {required int fallback}) { if (value is int) return value; if (value is num) return value.toInt(); if (value is String) return int.tryParse(value) ?? fallback; return fallback; }
-int? _nullableInt(dynamic value) { if (value == null) return null; if (value is int) return value; if (value is num) return value.toInt(); if (value is String) return int.tryParse(value); return null; }
-String? _nullableText(dynamic value) { if (value == null) return null; final text = value.toString().trim(); return text.isEmpty ? null : text; }
-List<String> _stringList(dynamic value) => value is List ? value.map((item) => item.toString().trim()).where((item) => item.isNotEmpty).toList(growable: false) : const [];
-DateTime? _date(dynamic value) { if (value is DateTime) return value; if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value); return null; }
+dynamic _tryDecodeJson(String body) {
+  try {
+    return jsonDecode(body);
+  } catch (_) {
+    return null;
+  }
+}
+
+int _int(dynamic value, {required int fallback}) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? fallback;
+  return fallback;
+}
+
+int? _nullableInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+String? _nullableText(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+List<String> _stringList(dynamic value) => value is List
+    ? value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false)
+    : const [];
+DateTime? _date(dynamic value) {
+  if (value is DateTime) return value;
+  if (value is String && value.trim().isNotEmpty)
+    return DateTime.tryParse(value);
+  return null;
+}

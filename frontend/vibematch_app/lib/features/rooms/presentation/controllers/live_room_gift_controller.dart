@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Alignment, Color;
 
+import '../../../auth/data/auth_api_service.dart';
+import '../../../auth/models/current_user.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../data/active_room_context.dart';
 import '../../data/gift_api_service.dart';
@@ -66,11 +68,15 @@ class LuckyPacketRoomEvent {
 class LuckyPacketRoomBus {
   const LuckyPacketRoomBus._();
 
-  static final ValueNotifier<LuckyPacketRoomEvent?> packet = ValueNotifier<LuckyPacketRoomEvent?>(null);
+  static final ValueNotifier<LuckyPacketRoomEvent?> packet =
+      ValueNotifier<LuckyPacketRoomEvent?>(null);
   static LiveRoomGiftController? _controller;
   static List<SeatUser> _roomUsers = const <SeatUser>[];
 
-  static void bind({required LiveRoomGiftController controller, required List<SeatUser> roomUsers}) {
+  static void bind({
+    required LiveRoomGiftController controller,
+    required List<SeatUser> roomUsers,
+  }) {
     _controller = controller;
     _roomUsers = roomUsers;
     packet.value = controller.activeLuckyPacket;
@@ -102,7 +108,11 @@ class LiveRoomGiftController {
     required this.onChanged,
     required this.onFinalGiftMessage,
     required this.onToast,
-  }) : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser) {
+  }) : currentUser = LiveRoomMediaSignalingService.instance
+           .effectiveCurrentUser(currentUser) {
+    _userRealtimeSub = AuthUserRealtimeService.instance.users.listen(
+      _handleRealtimeUser,
+    );
     unawaited(refreshCoinBalance());
   }
 
@@ -114,6 +124,7 @@ class LiveRoomGiftController {
   final ValueChangedLike<String> onToast;
   final WalletApiService _walletApi = const WalletApiService();
   final GiftApiService _giftApi = const GiftApiService();
+  StreamSubscription<CurrentUser>? _userRealtimeSub;
 
   GiftCategory selectedCategory = GiftCategory.premium;
   GiftItem? selectedGift = mockGiftItems.isEmpty ? null : mockGiftItems.first;
@@ -126,7 +137,8 @@ class LiveRoomGiftController {
   final List<GiftSlide> giftSlides = <GiftSlide>[];
   final Map<String, Timer> _giftTimers = <String, Timer>{};
   final Set<String> _finishedGiftMessageIds = <String>{};
-  final Map<String, _LuckyComboContext> _luckyComboContexts = <String, _LuckyComboContext>{};
+  final Map<String, _LuckyComboContext> _luckyComboContexts =
+      <String, _LuckyComboContext>{};
   final Set<String> _luckyComboProcessingSlideIds = <String>{};
   final Set<String> _luckyComboProcessingKeys = <String>{};
 
@@ -135,7 +147,9 @@ class LiveRoomGiftController {
   final Random _random = Random();
 
   bool get selectedGiftIsLuckyPacket => selectedGift?.id == 'lucky_packet';
-  bool get selectedGiftIsFromPremiumSection => selectedCategory == GiftCategory.premium || selectedGift?.category == GiftCategory.premium;
+  bool get selectedGiftIsFromPremiumSection =>
+      selectedCategory == GiftCategory.premium ||
+      selectedGift?.category == GiftCategory.premium;
 
   Future<void> refreshCoinBalance() async {
     try {
@@ -147,19 +161,37 @@ class LiveRoomGiftController {
     }
   }
 
+  void _handleRealtimeUser(CurrentUser user) {
+    final currentPublicUserId = _publicUserIdFromSeatUser(currentUser);
+    if (currentPublicUserId == null || currentPublicUserId != user.publicUserId)
+      return;
+    final nextBalance = user.wallet.coinBalance;
+    if (coinBalance == nextBalance) return;
+    coinBalance = nextBalance;
+    onChanged();
+  }
+
   GiftSlide? get activeComboSlide {
-    final normalSlides = giftSlides.where((slide) => !slide.isVideoGift && slide.giftName != 'Lucky Packet').toList(growable: false);
+    final normalSlides = giftSlides
+        .where(
+          (slide) => !slide.isVideoGift && slide.giftName != 'Lucky Packet',
+        )
+        .toList(growable: false);
     return normalSlides.isEmpty ? null : normalSlides.first;
   }
 
   void ensureDefaultReceiver(List<SeatUser> roomUsers) {
-    if (selectedReceiverIds.isEmpty && roomUsers.isNotEmpty) selectedReceiverIds.add(roomUsers.first.id);
-    if (selectedGift == null && mockGiftItems.isNotEmpty) selectedGift = mockGiftItems.first;
+    if (selectedReceiverIds.isEmpty && roomUsers.isNotEmpty)
+      selectedReceiverIds.add(roomUsers.first.id);
+    if (selectedGift == null && mockGiftItems.isNotEmpty)
+      selectedGift = mockGiftItems.first;
   }
 
   void selectCategory(GiftCategory category) {
     selectedCategory = category;
-    final categoryGifts = mockGiftItems.where((gift) => gift.category == category).toList();
+    final categoryGifts = mockGiftItems
+        .where((gift) => gift.category == category)
+        .toList();
     selectedGift = categoryGifts.isNotEmpty ? categoryGifts.first : null;
     selectedCombo = category == GiftCategory.lucky ? 9 : 1;
     if (selectedGiftIsLuckyPacket) selectedCombo = 1;
@@ -169,7 +201,9 @@ class LiveRoomGiftController {
   void selectGift(GiftItem gift) {
     selectedGift = gift;
     selectedCategory = gift.category;
-    selectedCombo = gift.id == 'lucky_packet' ? 1 : (gift.category == GiftCategory.lucky ? 9 : 1);
+    selectedCombo = gift.id == 'lucky_packet'
+        ? 1
+        : (gift.category == GiftCategory.lucky ? 9 : 1);
     onChanged();
   }
 
@@ -213,7 +247,9 @@ class LiveRoomGiftController {
       onToast('Choose Lucky Packet amount first');
       return;
     }
-    final receivers = roomUsers.where((user) => selectedReceiverIds.contains(user.id)).toList();
+    final receivers = roomUsers
+        .where((user) => selectedReceiverIds.contains(user.id))
+        .toList();
     if (receivers.isEmpty) {
       onToast('Select a receiver');
       return;
@@ -227,11 +263,25 @@ class LiveRoomGiftController {
     }
 
     if (gift.category == GiftCategory.lucky) {
-      unawaited(_sendLuckyGift(gift: gift, receivers: receivers, roomUsers: roomUsers, effectiveCombo: effectiveCombo));
+      unawaited(
+        _sendLuckyGift(
+          gift: gift,
+          receivers: receivers,
+          roomUsers: roomUsers,
+          effectiveCombo: effectiveCombo,
+        ),
+      );
       return;
     }
 
-    unawaited(_sendNormalGift(gift: gift, receivers: receivers, roomUsers: roomUsers, effectiveCombo: effectiveCombo));
+    unawaited(
+      _sendNormalGift(
+        gift: gift,
+        receivers: receivers,
+        roomUsers: roomUsers,
+        effectiveCombo: effectiveCombo,
+      ),
+    );
   }
 
   Future<void> _sendNormalGift({
@@ -249,8 +299,13 @@ class LiveRoomGiftController {
 
     try {
       final shouldPublishPremiumBroadcast = selectedGiftIsFromPremiumSection;
-      final sentToAll = !gift.isVideoGift && receivers.length == roomUsers.length && roomUsers.isNotEmpty;
-      final deliveredCombo = sentToAll ? effectiveCombo * receivers.length : effectiveCombo;
+      final sentToAll =
+          !gift.isVideoGift &&
+          receivers.length == roomUsers.length &&
+          roomUsers.isNotEmpty;
+      final deliveredCombo = sentToAll
+          ? effectiveCombo * receivers.length
+          : effectiveCombo;
 
       for (final receiver in receivers) {
         final receiverPublicUserId = _publicUserIdFromSeatUser(receiver);
@@ -269,7 +324,9 @@ class LiveRoomGiftController {
         coinBalance = result.senderCoinBalance;
       }
 
-      final targets = sentToAll ? <SeatUser?>[null] : receivers.cast<SeatUser?>();
+      final targets = sentToAll
+          ? <SeatUser?>[null]
+          : receivers.cast<SeatUser?>();
       for (final receiver in targets) {
         _showCommittedGiftSlide(
           gift: gift,
@@ -365,8 +422,12 @@ class LiveRoomGiftController {
           roomPublicId: ActiveRoomContext.roomPublicId,
         );
 
-        final multiplier = result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
-        final rewardCoinAmount = result.luckyRewardCoinAmount ?? result.luckyResult?.rewardCoinAmount ?? 0;
+        final multiplier =
+            result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
+        final rewardCoinAmount =
+            result.luckyRewardCoinAmount ??
+            result.luckyResult?.rewardCoinAmount ??
+            0;
         coinBalance = result.senderCoinBalance;
         final slide = _createLuckySlide(
           gift: gift,
@@ -403,7 +464,12 @@ class LiveRoomGiftController {
     }
   }
 
-  bool sendLuckyPacket({required int coinAmount, required int winnerCount, required String message, required List<SeatUser> roomUsers}) {
+  bool sendLuckyPacket({
+    required int coinAmount,
+    required int winnerCount,
+    required String message,
+    required List<SeatUser> roomUsers,
+  }) {
     LuckyPacketRoomBus.bind(controller: this, roomUsers: roomUsers);
     if (coinBalance < coinAmount) {
       onToast('Not enough coins');
@@ -411,10 +477,35 @@ class LiveRoomGiftController {
       return false;
     }
     coinBalance -= coinAmount;
-    _setLuckyPacket(LuckyPacketRoomEvent(id: 'lucky-packet-${DateTime.now().microsecondsSinceEpoch}', senderName: currentUser.name, coinAmount: coinAmount, winnerCount: winnerCount, message: message.trim(), phase: LuckyPacketPhase.countdown, remainingSeconds: 30));
+    _setLuckyPacket(
+      LuckyPacketRoomEvent(
+        id: 'lucky-packet-${DateTime.now().microsecondsSinceEpoch}',
+        senderName: currentUser.name,
+        coinAmount: coinAmount,
+        winnerCount: winnerCount,
+        message: message.trim(),
+        phase: LuckyPacketPhase.countdown,
+        remainingSeconds: 30,
+      ),
+    );
     _luckyPacketTimer?.cancel();
-    _luckyPacketTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tickLuckyPacket(roomUsers));
-    onFinalGiftMessage(ChatEntry(senderName: currentUser.name, senderId: currentUser.id, senderAvatarUrl: currentUser.avatarUrl, message: 'sent a Lucky Packet worth $coinAmount coins for $winnerCount people${message.trim().isEmpty ? '' : ': ${message.trim()}'}', vipLevel: currentUser.vipLevel, sendingLevel: currentUser.sendingLevel, receivingLevel: currentUser.receivingLevel, isGift: true));
+    _luckyPacketTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _tickLuckyPacket(roomUsers),
+    );
+    onFinalGiftMessage(
+      ChatEntry(
+        senderName: currentUser.name,
+        senderId: currentUser.id,
+        senderAvatarUrl: currentUser.avatarUrl,
+        message:
+            'sent a Lucky Packet worth $coinAmount coins for $winnerCount people${message.trim().isEmpty ? '' : ': ${message.trim()}'}',
+        vipLevel: currentUser.vipLevel,
+        sendingLevel: currentUser.sendingLevel,
+        receivingLevel: currentUser.receivingLevel,
+        isGift: true,
+      ),
+    );
     onToast('Regional Lucky Packet broadcast sent');
     onChanged();
     return true;
@@ -422,11 +513,24 @@ class LiveRoomGiftController {
 
   void claimLuckyPacket(List<SeatUser> roomUsers) {
     final packet = activeLuckyPacket;
-    if (packet == null || packet.phase != LuckyPacketPhase.claim || packet.claimedByCurrentUser) return;
-    final distributions = packet.distributions.isEmpty ? _buildLuckyPacketDistributions(packet: packet, roomUsers: roomUsers) : Map<String, int>.from(packet.distributions);
-    final reward = distributions[currentUser.name] ?? _fallbackCurrentUserReward(distributions);
+    if (packet == null ||
+        packet.phase != LuckyPacketPhase.claim ||
+        packet.claimedByCurrentUser)
+      return;
+    final distributions = packet.distributions.isEmpty
+        ? _buildLuckyPacketDistributions(packet: packet, roomUsers: roomUsers)
+        : Map<String, int>.from(packet.distributions);
+    final reward =
+        distributions[currentUser.name] ??
+        _fallbackCurrentUserReward(distributions);
     distributions[currentUser.name] = reward;
-    _setLuckyPacket(packet.copyWith(claimedByCurrentUser: true, currentUserReward: reward, distributions: distributions));
+    _setLuckyPacket(
+      packet.copyWith(
+        claimedByCurrentUser: true,
+        currentUserReward: reward,
+        distributions: distributions,
+      ),
+    );
     onChanged();
   }
 
@@ -454,9 +558,14 @@ class LiveRoomGiftController {
     onChanged();
   }
 
-  Future<void> _triggerLuckyCombo({required GiftSlide slide, required _LuckyComboContext context}) async {
-    final comboKey = '${context.receiverPublicUserId}:${context.gift.id}:${context.baseCombo}';
-    if (_luckyComboProcessingSlideIds.contains(slide.id) || _luckyComboProcessingKeys.contains(comboKey)) {
+  Future<void> _triggerLuckyCombo({
+    required GiftSlide slide,
+    required _LuckyComboContext context,
+  }) async {
+    final comboKey =
+        '${context.receiverPublicUserId}:${context.gift.id}:${context.baseCombo}';
+    if (_luckyComboProcessingSlideIds.contains(slide.id) ||
+        _luckyComboProcessingKeys.contains(comboKey)) {
       onToast('Lucky combo is processing');
       return;
     }
@@ -472,11 +581,17 @@ class LiveRoomGiftController {
         quantity: context.baseCombo,
         roomPublicId: ActiveRoomContext.roomPublicId,
       );
-      final multiplier = result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
-      final rewardCoinAmount = result.luckyRewardCoinAmount ?? result.luckyResult?.rewardCoinAmount ?? 0;
+      final multiplier =
+          result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
+      final rewardCoinAmount =
+          result.luckyRewardCoinAmount ??
+          result.luckyResult?.rewardCoinAmount ??
+          0;
       coinBalance = result.senderCoinBalance;
 
-      final existingLuckySlideIndex = giftSlides.indexWhere((item) => _luckyComboContexts.containsKey(item.id));
+      final existingLuckySlideIndex = giftSlides.indexWhere(
+        (item) => _luckyComboContexts.containsKey(item.id),
+      );
       if (existingLuckySlideIndex != -1) {
         final oldSlide = giftSlides.removeAt(existingLuckySlideIndex);
         _giftTimers.remove(oldSlide.id)?.cancel();
@@ -537,17 +652,32 @@ class LiveRoomGiftController {
       return;
     }
     if (packet.remainingSeconds > 0) {
-      _setLuckyPacket(packet.copyWith(remainingSeconds: packet.remainingSeconds - 1));
+      _setLuckyPacket(
+        packet.copyWith(remainingSeconds: packet.remainingSeconds - 1),
+      );
       onChanged();
       return;
     }
     switch (packet.phase) {
       case LuckyPacketPhase.countdown:
-        _setLuckyPacket(packet.copyWith(phase: LuckyPacketPhase.claim, remainingSeconds: 20));
+        _setLuckyPacket(
+          packet.copyWith(phase: LuckyPacketPhase.claim, remainingSeconds: 20),
+        );
         onChanged();
         return;
       case LuckyPacketPhase.claim:
-        _setLuckyPacket(packet.copyWith(phase: LuckyPacketPhase.results, remainingSeconds: 6, distributions: packet.distributions.isEmpty ? _buildLuckyPacketDistributions(packet: packet, roomUsers: roomUsers) : packet.distributions));
+        _setLuckyPacket(
+          packet.copyWith(
+            phase: LuckyPacketPhase.results,
+            remainingSeconds: 6,
+            distributions: packet.distributions.isEmpty
+                ? _buildLuckyPacketDistributions(
+                    packet: packet,
+                    roomUsers: roomUsers,
+                  )
+                : packet.distributions,
+          ),
+        );
         onChanged();
         return;
       case LuckyPacketPhase.results:
@@ -559,10 +689,21 @@ class LiveRoomGiftController {
     }
   }
 
-  int _fallbackCurrentUserReward(Map<String, int> distributions) => distributions.isEmpty ? 0 : distributions.values.first;
+  int _fallbackCurrentUserReward(Map<String, int> distributions) =>
+      distributions.isEmpty ? 0 : distributions.values.first;
 
-  Map<String, int> _buildLuckyPacketDistributions({required LuckyPacketRoomEvent packet, required List<SeatUser> roomUsers}) {
-    final names = <String>[currentUser.name, ...roomUsers.map((user) => user.name), ...List<String>.generate(packet.winnerCount, (index) => 'Vibe User ${index + 1}')];
+  Map<String, int> _buildLuckyPacketDistributions({
+    required LuckyPacketRoomEvent packet,
+    required List<SeatUser> roomUsers,
+  }) {
+    final names = <String>[
+      currentUser.name,
+      ...roomUsers.map((user) => user.name),
+      ...List<String>.generate(
+        packet.winnerCount,
+        (index) => 'Vibe User ${index + 1}',
+      ),
+    ];
     final uniqueNames = <String>[];
     final seen = <String>{};
     for (final name in names) {
@@ -575,7 +716,9 @@ class LiveRoomGiftController {
     for (var i = 0; i < uniqueNames.length; i++) {
       final slotsLeft = uniqueNames.length - i;
       final minForRest = slotsLeft - 1;
-      final reward = slotsLeft == 1 ? remaining : 1 + _random.nextInt(max(1, remaining - minForRest));
+      final reward = slotsLeft == 1
+          ? remaining
+          : 1 + _random.nextInt(max(1, remaining - minForRest));
       result[uniqueNames[i]] = reward;
       remaining -= reward;
     }
@@ -607,14 +750,29 @@ class LiveRoomGiftController {
         onChanged();
         return;
       }
-      giftSlides[index] = active.copyWith(remainingSeconds: active.remainingSeconds - 1);
+      giftSlides[index] = active.copyWith(
+        remainingSeconds: active.remainingSeconds - 1,
+      );
       onChanged();
     });
   }
 
   void _insertFinalGiftMessage(GiftSlide slide) {
     if (!_finishedGiftMessageIds.add(slide.id)) return;
-    onFinalGiftMessage(ChatEntry(senderName: slide.senderName, senderId: currentUser.id, senderAvatarUrl: currentUser.avatarUrl, message: 'sent to ${slide.receiverName} ${slide.giftName} x${slide.combo}', vipLevel: currentUser.vipLevel, sendingLevel: currentUser.sendingLevel, receivingLevel: currentUser.receivingLevel, isGift: true, giftAssetPath: slide.giftAssetPath));
+    onFinalGiftMessage(
+      ChatEntry(
+        senderName: slide.senderName,
+        senderId: currentUser.id,
+        senderAvatarUrl: currentUser.avatarUrl,
+        message:
+            'sent to ${slide.receiverName} ${slide.giftName} x${slide.combo}',
+        vipLevel: currentUser.vipLevel,
+        sendingLevel: currentUser.sendingLevel,
+        receivingLevel: currentUser.receivingLevel,
+        isGift: true,
+        giftAssetPath: slide.giftAssetPath,
+      ),
+    );
   }
 
   GiftSlide _createLuckySlide({
@@ -690,7 +848,10 @@ class LiveRoomGiftController {
     return int.tryParse(match.group(1) ?? '');
   }
 
-  List<Color> _slideColorsForMultiplier(List<Color> baseColors, int? multiplier) {
+  List<Color> _slideColorsForMultiplier(
+    List<Color> baseColors,
+    int? multiplier,
+  ) {
     final value = multiplier ?? 0;
     if (value >= 1000) return const [Color(0xFF8B5CF6), Color(0xFF22D3EE)];
     if (value >= 500) return const [Color(0xFFFF2D95), Color(0xFF00E5FF)];
@@ -699,17 +860,24 @@ class LiveRoomGiftController {
   }
 
   Alignment _receiverAlignment(SeatUser? receiver, List<SeatUser> roomUsers) {
-    if (receiver == null || roomUsers.isEmpty) return const Alignment(0.0, -0.20);
+    if (receiver == null || roomUsers.isEmpty)
+      return const Alignment(0.0, -0.20);
     final index = roomUsers.indexWhere((user) => user.id == receiver.id);
     if (index < 0) return const Alignment(0.68, -0.16);
     final column = index % 4;
     final row = index ~/ 4;
     final x = [-0.72, -0.24, 0.24, 0.72][column];
-    final y = row == 0 ? -0.36 : row == 1 ? -0.02 : 0.22;
+    final y = row == 0
+        ? -0.36
+        : row == 1
+        ? -0.02
+        : 0.22;
     return Alignment(x, y);
   }
 
   void dispose() {
+    _userRealtimeSub?.cancel();
+    _userRealtimeSub = null;
     for (final timer in _giftTimers.values) {
       timer.cancel();
     }

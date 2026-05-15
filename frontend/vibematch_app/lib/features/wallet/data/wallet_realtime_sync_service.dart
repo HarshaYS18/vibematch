@@ -10,7 +10,8 @@ import '../../profile/models/vip_wallet_models.dart';
 class WalletRealtimeSyncService {
   WalletRealtimeSyncService._();
 
-  static final WalletRealtimeSyncService instance = WalletRealtimeSyncService._();
+  static final WalletRealtimeSyncService instance =
+      WalletRealtimeSyncService._();
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
@@ -28,7 +29,9 @@ class WalletRealtimeSyncService {
       return;
     }
 
-    final wsUrl = _webSocketUrl('/ws/inbox?token=${Uri.encodeQueryComponent(token)}');
+    final wsUrl = _webSocketUrl(
+      '/ws/inbox?token=${Uri.encodeQueryComponent(token)}',
+    );
     try {
       final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       _channel = channel;
@@ -82,6 +85,10 @@ class WalletRealtimeSyncService {
         _handleAllLevelsUpdated(_map(decoded['payload']));
         return;
       }
+      if (event == 'experience_updated') {
+        _handleExperienceUpdated(decoded);
+        return;
+      }
     } catch (_) {
       // Ignore malformed realtime events. Full refresh still works through /users/me.
     }
@@ -99,59 +106,186 @@ class WalletRealtimeSyncService {
     final vipProgress = _map(walletJson['vip']);
     final svipProgress = _map(walletJson['svip']);
     final nextVip = UserVipSummary(
-      vipLevel: _int(vipProgress['level']),
-      svipLevel: _int(svipProgress['level']),
-      vipIsActive: true,
-      svipIsActive: _int(svipProgress['level']) > 0,
+      vipLevel: _firstPositive([
+        walletJson['vip_level'],
+        vipProgress['level'],
+        currentUser.vip.vipLevel,
+      ]),
+      svipLevel: _firstPositive([
+        walletJson['svip_level'],
+        svipProgress['level'],
+        currentUser.vip.svipLevel,
+      ]),
+      vipIsActive:
+          _firstPositive([
+            walletJson['vip_level'],
+            vipProgress['level'],
+            currentUser.vip.vipLevel,
+          ]) >
+          0,
+      svipIsActive:
+          _firstPositive([
+            walletJson['svip_level'],
+            svipProgress['level'],
+            currentUser.vip.svipLevel,
+          ]) >
+          0,
       svipExpiresAt: currentUser.vip.svipExpiresAt,
       nameGradientKey: currentUser.vip.nameGradientKey,
       nameGradientColors: currentUser.vip.nameGradientColors,
     );
 
-    AuthUserRealtimeService.instance.publish(
-      currentUser.copyWith(wallet: nextWallet, vip: nextVip, updatedAt: DateTime.now()),
+    auth.persistCurrentUser(
+      currentUser.copyWith(
+        wallet: nextWallet,
+        vip: nextVip,
+        updatedAt: DateTime.now(),
+      ),
     );
   }
 
   void _handleAllLevelsUpdated(Map<String, dynamic> payload) {
     final economy = _map(payload['economy']);
     if (economy.isEmpty) return;
+    final walletJson = _map(payload['wallet']);
+    final merged = <String, dynamic>{...economy, ...walletJson};
 
     final auth = const AuthApiService();
     final currentUser = auth.cachedUser;
     if (currentUser == null) return;
 
-    final sent = _map(economy['sent']);
-    final received = _map(economy['received']);
-    final vip = _map(economy['vip']);
-    final svip = _map(economy['svip']);
+    final sent = _map(merged['sent']);
+    final received = _map(merged['received']);
+    final vip = _map(merged['vip']);
+    final svip = _map(merged['svip']);
 
     final nextWallet = UserWalletSummary(
-      coinBalance: currentUser.wallet.coinBalance,
-      rubyBalance: currentUser.wallet.rubyBalance,
-      lifetimeCoinsSpent: currentUser.wallet.lifetimeCoinsSpent,
-      lifetimeCoinsReceivedAsGifts: currentUser.wallet.lifetimeCoinsReceivedAsGifts,
-      lifetimeRubiesEarned: currentUser.wallet.lifetimeRubiesEarned,
-      monthlyGiftCoinsSent: _int(economy['monthly_gift_coins_sent']),
-      monthlyGiftCoinsReceived: _int(economy['monthly_gift_coins_received']),
-      lifetimeSendExp: _firstPositive([economy['lifetime_send_exp'], sent['total_exp'], currentUser.wallet.lifetimeSendExp]),
-      lifetimeReceiveExp: _firstPositive([economy['lifetime_receive_exp'], received['total_exp'], currentUser.wallet.lifetimeReceiveExp]),
-      sendLevel: _firstPositive([economy['sent_level'], sent['level'], currentUser.wallet.sendLevel]),
-      receiveLevel: _firstPositive([economy['receive_level'], received['level'], currentUser.wallet.receiveLevel]),
+      coinBalance: walletJson.containsKey('coin_balance')
+          ? _int(walletJson['coin_balance'])
+          : currentUser.wallet.coinBalance,
+      rubyBalance: walletJson.containsKey('ruby_balance')
+          ? _int(walletJson['ruby_balance'])
+          : currentUser.wallet.rubyBalance,
+      lifetimeCoinsSpent: merged.containsKey('lifetime_coins_spent')
+          ? _int(merged['lifetime_coins_spent'])
+          : currentUser.wallet.lifetimeCoinsSpent,
+      lifetimeCoinsReceivedAsGifts:
+          merged.containsKey('lifetime_coins_received_as_gifts')
+          ? _int(merged['lifetime_coins_received_as_gifts'])
+          : currentUser.wallet.lifetimeCoinsReceivedAsGifts,
+      lifetimeRubiesEarned: merged.containsKey('lifetime_rubies_earned')
+          ? _int(merged['lifetime_rubies_earned'])
+          : currentUser.wallet.lifetimeRubiesEarned,
+      monthlyGiftCoinsSent: _int(merged['monthly_gift_coins_sent']),
+      monthlyGiftCoinsReceived: _int(merged['monthly_gift_coins_received']),
+      lifetimeSendExp: _firstPositive([
+        merged['lifetime_send_exp'],
+        sent['total_exp'],
+        currentUser.wallet.lifetimeSendExp,
+      ]),
+      lifetimeReceiveExp: _firstPositive([
+        merged['lifetime_receive_exp'],
+        received['total_exp'],
+        currentUser.wallet.lifetimeReceiveExp,
+      ]),
+      sendLevel: _firstPositive([
+        merged['sent_level'],
+        sent['level'],
+        currentUser.wallet.sendLevel,
+      ]),
+      receiveLevel: _firstPositive([
+        merged['receive_level'],
+        received['level'],
+        currentUser.wallet.receiveLevel,
+      ]),
     );
 
     final nextVip = UserVipSummary(
-      vipLevel: _firstPositive([economy['vip_level'], vip['level'], currentUser.vip.vipLevel]),
-      svipLevel: _firstPositive([economy['svip_level'], svip['level'], currentUser.vip.svipLevel]),
-      vipIsActive: true,
-      svipIsActive: _firstPositive([economy['svip_level'], svip['level'], currentUser.vip.svipLevel]) > 0,
+      vipLevel: _firstPositive([
+        merged['vip_level'],
+        vip['level'],
+        currentUser.vip.vipLevel,
+      ]),
+      svipLevel: _firstPositive([
+        merged['svip_level'],
+        svip['level'],
+        currentUser.vip.svipLevel,
+      ]),
+      vipIsActive:
+          _firstPositive([
+            merged['vip_level'],
+            vip['level'],
+            currentUser.vip.vipLevel,
+          ]) >
+          0,
+      svipIsActive:
+          _firstPositive([
+            merged['svip_level'],
+            svip['level'],
+            currentUser.vip.svipLevel,
+          ]) >
+          0,
       svipExpiresAt: currentUser.vip.svipExpiresAt,
       nameGradientKey: currentUser.vip.nameGradientKey,
       nameGradientColors: currentUser.vip.nameGradientColors,
     );
 
-    final nextUser = currentUser.copyWith(wallet: nextWallet, vip: nextVip, updatedAt: DateTime.now());
+    final nextUser = currentUser.copyWith(
+      wallet: nextWallet,
+      vip: nextVip,
+      updatedAt: DateTime.now(),
+    );
     auth.persistCurrentUser(nextUser);
+  }
+
+  void _handleExperienceUpdated(Map<String, dynamic> decoded) {
+    final auth = const AuthApiService();
+    final currentUser = auth.cachedUser;
+    if (currentUser == null) return;
+
+    final scope = decoded['scope']?.toString();
+    final payload = _map(decoded['payload']);
+    final ruby = _map(decoded['ruby']);
+    final send = _map(payload['send']);
+    final received = _map(payload['receive']);
+
+    final nextWallet = UserWalletSummary(
+      coinBalance: currentUser.wallet.coinBalance,
+      rubyBalance: ruby.containsKey('balance')
+          ? _int(ruby['balance'])
+          : currentUser.wallet.rubyBalance,
+      lifetimeCoinsSpent: currentUser.wallet.lifetimeCoinsSpent,
+      lifetimeCoinsReceivedAsGifts: ruby.containsKey('lifetime_gift_coin_value')
+          ? _int(ruby['lifetime_gift_coin_value'])
+          : currentUser.wallet.lifetimeCoinsReceivedAsGifts,
+      lifetimeRubiesEarned: ruby.containsKey('lifetime_rubies_earned')
+          ? _int(ruby['lifetime_rubies_earned'])
+          : currentUser.wallet.lifetimeRubiesEarned,
+      monthlyGiftCoinsSent: currentUser.wallet.monthlyGiftCoinsSent,
+      monthlyGiftCoinsReceived: currentUser.wallet.monthlyGiftCoinsReceived,
+      lifetimeSendExp: scope == 'send'
+          ? _firstPositive([
+              send['total_exp'],
+              currentUser.wallet.lifetimeSendExp,
+            ])
+          : currentUser.wallet.lifetimeSendExp,
+      lifetimeReceiveExp: scope == 'receive'
+          ? _firstPositive([
+              received['total_exp'],
+              currentUser.wallet.lifetimeReceiveExp,
+            ])
+          : currentUser.wallet.lifetimeReceiveExp,
+      sendLevel: scope == 'send'
+          ? _firstPositive([send['level'], currentUser.wallet.sendLevel])
+          : currentUser.wallet.sendLevel,
+      receiveLevel: scope == 'receive'
+          ? _firstPositive([received['level'], currentUser.wallet.receiveLevel])
+          : currentUser.wallet.receiveLevel,
+    );
+
+    auth.persistCurrentUser(
+      currentUser.copyWith(wallet: nextWallet, updatedAt: DateTime.now()),
+    );
   }
 
   String _webSocketUrl(String path) {

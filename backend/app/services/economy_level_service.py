@@ -6,15 +6,18 @@ from sqlalchemy.orm import Session
 
 from app.models.economy import EconomyCurrency, EconomyDirection, GiftTransaction, UserWallet, WalletLedger
 from app.models.user import User
+from app.models.vip_status import UserVipStatus
 from app.services import experience_service
 from app.services import level_progression_service as progression
 
 OFFICIAL_RECHARGE_SOURCE_TYPES = {
+    "RECHARGE",
     "OFFICIAL_RECHARGE",
     "SELLER_COIN_SALE",
     "MERCHANT_COIN_SALE",
     "OWNER_RECHARGE",
     "FOUNDER_RECHARGE",
+    "ROLE_COIN_SALE",
 }
 
 
@@ -66,6 +69,37 @@ def recharge_exp_totals(db: Session, user_id: int) -> dict[str, int]:
         or 0
     )
     return {"lifetime": lifetime, "monthly": monthly}
+
+
+def _next_month_start() -> datetime:
+    now = datetime.utcnow()
+    year = now.year + (1 if now.month == 12 else 0)
+    month = 1 if now.month == 12 else now.month + 1
+    return datetime(year, month, 1)
+
+
+def sync_vip_status(db: Session, user_id: int, levels: dict | None = None) -> UserVipStatus:
+    safe_levels = levels
+    if safe_levels is None:
+        wallet = get_or_create_wallet(db, user_id)
+        safe_levels = wallet_level_payload(db, wallet)
+
+    vip_level = int((safe_levels.get("vip") or {}).get("level") or 0)
+    svip_level = int((safe_levels.get("svip") or {}).get("level") or 0)
+
+    status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user_id).first()
+    if status is None:
+        status = UserVipStatus(user_id=user_id)
+        db.add(status)
+
+    status.vip_level = vip_level
+    status.svip_level = svip_level
+    status.vip_is_active = vip_level > 0
+    status.svip_is_active = svip_level > 0
+    status.svip_expires_at = _next_month_start() if svip_level > 0 else None
+    status.update_reason = "Recharge ledger VIP/SVIP sync"
+    db.flush()
+    return status
 
 
 def wallet_level_payload(db: Session, wallet: UserWallet) -> dict:
@@ -130,10 +164,13 @@ def credit_official_recharge(
     )
     db.commit()
     db.refresh(wallet)
+    levels = wallet_level_payload(db, wallet)
+    sync_vip_status(db, target.id, levels)
+    db.commit()
     return {
         "target": target,
         "wallet": wallet,
-        "levels": wallet_level_payload(db, wallet),
+        "levels": levels,
         "payment_amount": payment_amount,
         "payment_currency": payment_currency,
     }

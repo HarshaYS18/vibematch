@@ -73,6 +73,7 @@ def _pool_response(pool: CoinSupplyPool | GamePool | None) -> EconomyPoolRespons
 def _public_wallet_summary(db: Session, user: User) -> dict:
     wallet = economy_level_service.get_or_create_wallet(db, user.id)
     levels = economy_level_service.wallet_level_payload(db, wallet)
+    economy_level_service.sync_vip_status(db, user.id, levels)
     return {
         "user_id": user.id,
         "public_user_id": user.public_user_id,
@@ -92,6 +93,14 @@ def _public_wallet_summary(db: Session, user: User) -> dict:
         "svip": levels["svip"],
         "rule": "Mini profile Sent/Received are current-month gift coin totals. Sent Lv/Receive Lv use lifetime gift EXP.",
     }
+
+
+def _private_wallet_payload(db: Session, user: User) -> dict:
+    wallet = economy_level_service.get_or_create_wallet(db, user.id)
+    payload = _wallet_response(db, wallet)
+    if hasattr(payload, "model_dump"):
+        return payload.model_dump(mode="json")
+    return payload.dict()
 
 
 def _active_room_user_ids(db: Session, room_id: int, sender_user_id: int, receiver_user_id: int) -> list[int]:
@@ -122,9 +131,9 @@ async def _broadcast_user_level_updates(db: Session, sender_user_id: int, receiv
     sender = db.query(User).filter(User.id == sender_user_id).first()
     receiver = db.query(User).filter(User.id == receiver_user_id).first()
     if sender is not None:
-        await inbox_ws_manager.send_to_user(sender_user_id, {"event": "all_levels_updated", "payload": {"economy": _public_wallet_summary(db, sender)}})
+        await inbox_ws_manager.send_to_user(sender_user_id, {"event": "all_levels_updated", "payload": {"economy": _public_wallet_summary(db, sender), "wallet": _private_wallet_payload(db, sender)}})
     if receiver is not None:
-        await inbox_ws_manager.send_to_user(receiver_user_id, {"event": "all_levels_updated", "payload": {"economy": _public_wallet_summary(db, receiver)}})
+        await inbox_ws_manager.send_to_user(receiver_user_id, {"event": "all_levels_updated", "payload": {"economy": _public_wallet_summary(db, receiver), "wallet": _private_wallet_payload(db, receiver)}})
 
 
 async def _broadcast_room_level_and_rankings(db: Session, room_id: int | None, sender_user_id: int, receiver_user_id: int, exp_updates: dict) -> None:
