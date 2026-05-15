@@ -7,6 +7,11 @@ import '../../models/vibe_models.dart';
 class VibeMediaPlaybackGate {
   const VibeMediaPlaybackGate._();
   static final ValueNotifier<bool> feedPlaybackPaused = ValueNotifier<bool>(false);
+  static final ValueNotifier<int> feedScrollTick = ValueNotifier<int>(0);
+
+  static void notifyFeedScrolled() {
+    feedScrollTick.value += 1;
+  }
 }
 
 class VibeCardModular extends StatefulWidget {
@@ -295,29 +300,83 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    if (widget.respectFeedPause) VibeMediaPlaybackGate.feedPlaybackPaused.addListener(_handleFeedPauseChanged);
+    if (widget.respectFeedPause) {
+      VibeMediaPlaybackGate.feedPlaybackPaused.addListener(_handlePlaybackGateChanged);
+      VibeMediaPlaybackGate.feedScrollTick.addListener(_handleScrollTick);
+    }
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..setLooping(true)
       ..initialize().then((_) {
-        if (mounted) setState(() => _isReady = true);
+        if (!mounted) return;
+        setState(() => _isReady = true);
+        _syncAutoplayWithVisibility();
       }).catchError((_) {
         if (mounted) setState(() => _hasError = true);
       });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncAutoplayWithVisibility());
   }
 
   @override
   void dispose() {
-    if (widget.respectFeedPause) VibeMediaPlaybackGate.feedPlaybackPaused.removeListener(_handleFeedPauseChanged);
+    if (widget.respectFeedPause) {
+      VibeMediaPlaybackGate.feedPlaybackPaused.removeListener(_handlePlaybackGateChanged);
+      VibeMediaPlaybackGate.feedScrollTick.removeListener(_handleScrollTick);
+    }
     _controller?.dispose();
     super.dispose();
   }
 
-  void _handleFeedPauseChanged() {
-    if (!widget.respectFeedPause || !VibeMediaPlaybackGate.feedPlaybackPaused.value) return;
+  void _handlePlaybackGateChanged() {
+    if (VibeMediaPlaybackGate.feedPlaybackPaused.value) {
+      _pauseForVisibility();
+      return;
+    }
+    _syncAutoplayWithVisibility();
+  }
+
+  void _handleScrollTick() {
+    _syncAutoplayWithVisibility();
+  }
+
+  bool _shouldAutoplayNow() {
+    if (!widget.respectFeedPause) return false;
+    if (VibeMediaPlaybackGate.feedPlaybackPaused.value) return false;
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return false;
+    final topLeft = renderObject.localToGlobal(Offset.zero);
+    final height = renderObject.size.height;
+    if (height <= 0) return false;
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery == null) return false;
+    final viewportTop = mediaQuery.padding.top;
+    final viewportBottom = mediaQuery.size.height - mediaQuery.padding.bottom - 92;
+    final visibleTop = topLeft.dy.clamp(viewportTop, viewportBottom);
+    final visibleBottom = (topLeft.dy + height).clamp(viewportTop, viewportBottom);
+    final visibleHeight = visibleBottom - visibleTop;
+    if (visibleHeight <= 0) return false;
+    final visibleRatio = visibleHeight / height;
+    final itemCenter = topLeft.dy + height / 2;
+    final viewportCenter = (viewportTop + viewportBottom) / 2;
+    final distanceFromCenter = (itemCenter - viewportCenter).abs();
+    return visibleRatio >= 0.58 && distanceFromCenter < height * 0.72;
+  }
+
+  void _syncAutoplayWithVisibility() {
     final controller = _controller;
-    if (controller == null || !_isReady || !controller.value.isPlaying) return;
-    controller.pause();
-    if (mounted) setState(() => _showPlayButton = true);
+    if (!mounted || controller == null || !_isReady) return;
+    if (_shouldAutoplayNow()) {
+      if (!controller.value.isPlaying) controller.play();
+      if (_showPlayButton) setState(() => _showPlayButton = false);
+    } else {
+      _pauseForVisibility();
+    }
+  }
+
+  void _pauseForVisibility() {
+    final controller = _controller;
+    if (controller == null || !_isReady) return;
+    if (controller.value.isPlaying) controller.pause();
+    if (!_showPlayButton && mounted) setState(() => _showPlayButton = true);
   }
 
   void _togglePlayback() {
