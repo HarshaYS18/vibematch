@@ -4,6 +4,8 @@ import '../../../../app/app_routes.dart';
 import '../../../experience/presentation/experience_detail_page.dart';
 import '../../../inbox/data/inbox_api_service.dart';
 import '../../../inbox/presentation/inbox_page_modular.dart';
+import '../../../rankings/data/global_rankings_api_service.dart';
+import '../../../rankings/presentation/global_rankings_sheet.dart';
 import '../../../social/data/social_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/room_moderation_repository.dart';
@@ -83,17 +85,13 @@ class LiveRoomMiniProfileLauncher {
           kind: ExperienceDetailKind.received,
           title: 'Received Lv',
         ),
-        onSentRankingTap: () => _openExperienceDetailPage(
+        onSentRankingTap: () => _openGlobalRankingsSheet(
           context: context,
-          user: user,
-          kind: ExperienceDetailKind.sent,
-          title: 'Sent Lv',
+          type: GlobalRankingType.sent,
         ),
-        onReceivedRankingTap: () => _openExperienceDetailPage(
+        onReceivedRankingTap: () => _openGlobalRankingsSheet(
           context: context,
-          user: user,
-          kind: ExperienceDetailKind.received,
-          title: 'Received Lv',
+          type: GlobalRankingType.received,
         ),
         onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
           context: context,
@@ -218,6 +216,17 @@ class LiveRoomMiniProfileLauncher {
           title: title,
         ),
       );
+    });
+  }
+
+  static void _openGlobalRankingsSheet({
+    required BuildContext context,
+    required GlobalRankingType type,
+  }) {
+    Navigator.pop(context);
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!context.mounted) return;
+      GlobalRankingsSheet.show(context, initialType: type);
     });
   }
 
