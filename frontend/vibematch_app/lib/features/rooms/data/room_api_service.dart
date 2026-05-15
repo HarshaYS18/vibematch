@@ -41,7 +41,7 @@ class RoomApiService {
         'mode': mode.trim(),
         'type': type.trim(),
         if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
-        if (allowScreenshots != null) 'allow_screenshots': allowScreenshots,
+        'allow_screenshots': ?allowScreenshots,
       }),
     );
 
