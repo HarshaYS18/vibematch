@@ -13,6 +13,7 @@ class VibesController extends ChangeNotifier {
   VibePrivacyAudience whoCanComment = VibePrivacyAudience.followers;
   int mentionAllPostsToday = 0;
   bool isLoading = false;
+  bool showingSavedVibes = false;
   String? loadErrorMessage;
 
   final List<VibeItem> _vibes = <VibeItem>[];
@@ -24,6 +25,7 @@ class VibesController extends ChangeNotifier {
   Future<void> loadFeed({bool silent = false}) async {
     if (isLoading) return;
     isLoading = true;
+    showingSavedVibes = false;
     if (!silent) loadErrorMessage = null;
     notifyListeners();
     try {
@@ -41,9 +43,31 @@ class VibesController extends ChangeNotifier {
     }
   }
 
+  Future<void> loadSavedVibes() async {
+    if (isLoading) return;
+    isLoading = true;
+    showingSavedVibes = true;
+    loadErrorMessage = null;
+    notifyListeners();
+    try {
+      final savedVibes = await _apiService.loadSavedVibes(limit: 50);
+      _vibes
+        ..clear()
+        ..addAll(savedVibes);
+      loadErrorMessage = null;
+    } catch (error) {
+      _vibes.clear();
+      loadErrorMessage = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   void selectTab(VibesFeedTab tab) {
-    if (selectedTab == tab) return;
+    if (selectedTab == tab && !showingSavedVibes) return;
     selectedTab = tab;
+    showingSavedVibes = false;
     _vibes.clear();
     notifyListeners();
     loadFeed();
@@ -71,6 +95,7 @@ class VibesController extends ChangeNotifier {
   Future<void> publishVibe(VibeItem vibe) async {
     final created = await _apiService.createVibe(vibe);
     if (created.usesMentionAll) mentionAllPostsToday += 1;
+    showingSavedVibes = false;
     if (selectedTab == VibesFeedTab.vibes) {
       _vibes.insert(0, created);
     } else {
@@ -110,6 +135,9 @@ class VibesController extends ChangeNotifier {
     }
     final result = await _apiService.toggleSave(vibe.id);
     _vibes[index] = vibe.copyWith(savedByMe: result.savedByMe, saves: result.savesCount);
+    if (showingSavedVibes && !result.savedByMe) {
+      _vibes.removeWhere((item) => item.id == vibe.id);
+    }
     notifyListeners();
   }
 
