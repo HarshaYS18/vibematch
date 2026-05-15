@@ -8,46 +8,17 @@ class VibesController extends ChangeNotifier {
 
   final VibesApiService _apiService;
 
-  String selectedFilter = 'All';
+  VibesFeedTab selectedTab = VibesFeedTab.vibes;
   VibePrivacyAudience whoCanMention = VibePrivacyAudience.followers;
   VibePrivacyAudience whoCanComment = VibePrivacyAudience.followers;
   int mentionAllPostsToday = 0;
   bool isLoading = false;
   String? loadErrorMessage;
 
-  final List<String> filters = const [
-    'All',
-    'Following',
-    'Photos',
-    'Videos',
-    'Mentions',
-    'Trending',
-  ];
-
   final List<VibeItem> _vibes = <VibeItem>[];
 
   List<VibeItem> get vibes => List.unmodifiable(_vibes);
-
-  List<VibeItem> get visibleVibes {
-    if (selectedFilter == 'Following') {
-      return _vibes.where((vibe) => vibe.isFollowing).toList();
-    }
-    if (selectedFilter == 'Photos') {
-      return _vibes.where((vibe) => vibe.mediaType == VibeMediaType.photo).toList();
-    }
-    if (selectedFilter == 'Videos') {
-      return _vibes.where((vibe) => vibe.mediaType == VibeMediaType.video).toList();
-    }
-    if (selectedFilter == 'Mentions') {
-      return _vibes.where((vibe) => vibe.usesMentionAll || vibe.mentions.isNotEmpty).toList();
-    }
-    if (selectedFilter == 'Trending') {
-      final sorted = [..._vibes]..sort((a, b) => b.views.compareTo(a.views));
-      return sorted;
-    }
-    return _vibes;
-  }
-
+  List<VibeItem> get visibleVibes => vibes;
   bool get canUseMentionAllToday => mentionAllPostsToday < 2;
 
   Future<void> loadFeed({bool silent = false}) async {
@@ -56,12 +27,13 @@ class VibesController extends ChangeNotifier {
     if (!silent) loadErrorMessage = null;
     notifyListeners();
     try {
-      final backendVibes = await _apiService.loadFeed(limit: 50);
+      final backendVibes = await _apiService.loadFeed(limit: 50, tab: selectedTab);
       _vibes
         ..clear()
         ..addAll(backendVibes);
       loadErrorMessage = null;
     } catch (error) {
+      _vibes.clear();
       loadErrorMessage = error.toString().replaceFirst('Exception: ', '');
     } finally {
       isLoading = false;
@@ -69,9 +41,12 @@ class VibesController extends ChangeNotifier {
     }
   }
 
-  void selectFilter(String filter) {
-    selectedFilter = filter;
+  void selectTab(VibesFeedTab tab) {
+    if (selectedTab == tab) return;
+    selectedTab = tab;
+    _vibes.clear();
     notifyListeners();
+    loadFeed();
   }
 
   void setWhoCanMention(VibePrivacyAudience audience) {
@@ -96,8 +71,14 @@ class VibesController extends ChangeNotifier {
   Future<void> publishVibe(VibeItem vibe) async {
     final created = await _apiService.createVibe(vibe);
     if (created.usesMentionAll) mentionAllPostsToday += 1;
-    _vibes.insert(0, created);
-    selectedFilter = 'All';
+    if (selectedTab == VibesFeedTab.vibes) {
+      _vibes.insert(0, created);
+    } else {
+      selectedTab = VibesFeedTab.vibes;
+      _vibes
+        ..clear()
+        ..add(created);
+    }
     notifyListeners();
   }
 
@@ -118,6 +99,17 @@ class VibesController extends ChangeNotifier {
     }
     final result = await _apiService.toggleLike(vibe.id);
     _vibes[index] = vibe.copyWith(likedByMe: result.likedByMe, likes: result.likesCount);
+    notifyListeners();
+  }
+
+  Future<void> toggleSave(VibeItem vibe) async {
+    final index = _vibes.indexOf(vibe);
+    if (index < 0) return;
+    if (vibe.id.trim().isEmpty) {
+      throw Exception('Vibe is not synced yet. Refresh and try again.');
+    }
+    final result = await _apiService.toggleSave(vibe.id);
+    _vibes[index] = vibe.copyWith(savedByMe: result.savedByMe, saves: result.savesCount);
     notifyListeners();
   }
 
