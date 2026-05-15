@@ -24,14 +24,14 @@ class StoreCategoryTabs extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final category = categories[index];
           final selected = category == selectedCategory;
           return ChoiceChip(
             selected: selected,
             label: Text(storeCategoryLabel(category)),
-            onSelected: (_) => onSelected(category),
+            onSelected: (selected) => onSelected(category),
             selectedColor: const Color(0x3312C7B7),
             backgroundColor: Colors.white,
             side: BorderSide(
