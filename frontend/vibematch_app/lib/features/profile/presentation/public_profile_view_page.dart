@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
+import '../../economy/data/economy_master_api_service.dart';
 import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
 import '../../presence/data/presence_api_service.dart';
@@ -54,6 +55,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   final ProfileApiService _profileApi = const ProfileApiService();
   final AuthApiService _authApi = const AuthApiService();
   final PresenceApiService _presenceApi = const PresenceApiService();
+  final EconomyMasterApiService _economyApi = const EconomyMasterApiService();
   Timer? _coverTimer;
   Timer? _presenceTimer;
   StreamSubscription<ProfileRelationshipRealtimeEvent>?
@@ -64,6 +66,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   String? _profileError;
   CurrentUser? _viewer;
   PublicUserProfile? _backendProfile;
+  EconomyPublicCardSnapshot? _economyCard;
   UserRelationship? _relationship;
   PresenceDto? _presence;
   FamilySummaryDto? _familySummary;
@@ -95,6 +98,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     unawaited(_loadBackendProfile());
     unawaited(_syncPublicLoveBonds());
     unawaited(_loadRealFamilyAndVibes());
+    unawaited(_loadEconomyPublicCard());
   }
 
   @override
@@ -258,60 +262,50 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                         'My Vibes (${_profileVibes.length})',
                         style: const TextStyle(
                           color: Color(0xFF251538),
-                          fontSize: 23,
+                          fontSize: 18,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
                         ),
                       ),
                     ),
+                    if (_loadingVibes)
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF12C7B7),
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
-            if (_loadingVibes)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(18, 0, 18, 28),
-                  child: LinearProgressIndicator(
-                    minHeight: 3,
-                    color: Color(0xFF6D5DF6),
-                    backgroundColor: Color(0xFFECE2D8),
-                  ),
-                ),
-              )
-            else if (_vibesError != null)
+            if (_vibesError != null)
               SliverToBoxAdapter(
                 child: _PublicProfileBackendError(
                   message: _vibesError!,
                   onRetry: () => _loadPublicVibes(_targetPublicUserId()),
                 ),
               )
-            else if (_profileVibes.isEmpty)
+            else if (_profileVibes.isEmpty && !_loadingVibes)
               const SliverToBoxAdapter(child: _PublicVibesEmptyState())
             else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
-                sliver: SliverList.separated(
-                  itemCount: _profileVibes.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 14),
-                  itemBuilder: (context, index) {
-                    final vibe = _publicVibeItemFromDto(_profileVibes[index]);
-                    return PublicVibeCard(
-                      vibe: vibe,
-                      onTap: () =>
-                          _showAction(context, 'Vibe details will open.'),
-                      onLikeTap: () => _showAction(
-                        context,
-                        'Like action will sync with Vibes backend soon.',
-                      ),
-                      onCommentTap: () =>
-                          _showAction(context, 'Comments will open.'),
-                      onShareTap: () =>
-                          _showAction(context, 'Share this Vibe.'),
-                    );
-                  },
-                ),
+              SliverList.separated(
+                itemCount: _profileVibes.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 14),
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      18,
+                      index == 0 ? 0 : 0,
+                      18,
+                      index == _profileVibes.length - 1 ? 28 : 0,
+                    ),
+                    child: PublicVibeCard(
+                      item: _publicVibeItemFromDto(_profileVibes[index]),
+                    ),
+                  );
+                },
               ),
           ],
         ),
