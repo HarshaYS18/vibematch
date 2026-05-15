@@ -45,7 +45,17 @@ class VibeCommentResponse(BaseModel):
     post_id: int
     text: str
     author: VibeAuthorResponse
+    is_pinned: bool = False
+    can_pin: bool = False
+    can_delete: bool = False
     created_at: datetime
+
+
+class VibeCommentActionResponse(BaseModel):
+    id: int
+    post_id: int
+    is_pinned: bool = False
+    deleted: bool = False
 
 
 class VibePostResponse(BaseModel):
