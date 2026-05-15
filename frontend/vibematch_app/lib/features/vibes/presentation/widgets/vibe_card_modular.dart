@@ -165,7 +165,7 @@ class _MetaPanel extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(0, isTextVibe ? 4 : 0, 0, 14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            if (caption.isNotEmpty) Padding(padding: EdgeInsets.fromLTRB(14, isTextVibe ? 4 : 2, 14, isTextVibe ? 10 : 2), child: _PlainCaption(caption: caption, fontSize: isTextVibe ? 16 : 13.3, lineHeight: isTextVibe ? 1.35 : 1.32)),
+            if (caption.isNotEmpty) Padding(padding: EdgeInsets.fromLTRB(14, isTextVibe ? 4 : 2, 14, isTextVibe ? 10 : 2), child: _CaptionWithAuthor(authorName: vibe.authorName, caption: caption, fontSize: isTextVibe ? 16 : 13.3, lineHeight: isTextVibe ? 1.35 : 1.32)),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: Row(children: [
@@ -282,15 +282,18 @@ class _IconAction extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(onPressed: onTap, icon: Icon(icon, color: color, size: 27));
 }
 
-class _PlainCaption extends StatelessWidget {
-  const _PlainCaption({required this.caption, this.fontSize = 16, this.lineHeight = 1.35});
+class _CaptionWithAuthor extends StatelessWidget {
+  const _CaptionWithAuthor({required this.authorName, required this.caption, this.fontSize = 16, this.lineHeight = 1.35});
+  final String authorName;
   final String caption;
   final double fontSize;
   final double lineHeight;
   static final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
   @override
   Widget build(BuildContext context) {
-    final spans = <TextSpan>[];
+    final spans = <TextSpan>[
+      TextSpan(text: '$authorName  ', style: const TextStyle(color: Color(0xFF8C5CF6), fontWeight: FontWeight.w900)),
+    ];
     var index = 0;
     for (final match in _mentionPattern.allMatches(caption)) {
       if (match.start > index) spans.add(TextSpan(text: caption.substring(index, match.start)));
