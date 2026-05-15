@@ -99,31 +99,20 @@ class VibesNavigationController {
     );
   }
 
-  static void openVibeActions({required BuildContext context, required VibesController controller, required VibeItem vibe}) {
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: false,
-        barrierColor: Colors.transparent,
-        pageBuilder: (routeContext, _, __) => VibeActionsPillMenu(
-          isSelfVibe: isSelfVibe(vibe),
-          onDelete: () async {
-            Navigator.pop(routeContext);
-            await _confirmAndDeleteVibe(context: context, controller: controller, vibe: vibe);
-          },
-          onReport: () async {
-            Navigator.pop(routeContext);
-            final reason = await openReportReasonSheet(context: context, vibe: vibe);
-            if (reason == null || reason.trim().isEmpty) return;
-            try {
-              await controller.reportVibe(vibe, reason: reason);
-              if (context.mounted) showAction(context, 'Vibe submitted for official review.');
-            } catch (error) {
-              if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
-            }
-          },
-        ),
-      ),
-    );
+  static Future<void> openVibeActions({required BuildContext context, required VibesController controller, required VibeItem vibe}) async {
+    if (isSelfVibe(vibe)) {
+      await _confirmAndDeleteVibe(context: context, controller: controller, vibe: vibe);
+      return;
+    }
+
+    final reason = await openReportReasonSheet(context: context, vibe: vibe);
+    if (reason == null || reason.trim().isEmpty) return;
+    try {
+      await controller.reportVibe(vibe, reason: reason);
+      if (context.mounted) showAction(context, 'Vibe submitted for official review.');
+    } catch (error) {
+      if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   static Future<void> _confirmAndDeleteVibe({required BuildContext context, required VibesController controller, required VibeItem vibe}) async {
