@@ -93,7 +93,7 @@ class MediaUploadService {
           aspectRatio: aspectRatio,
           outputWidth: outputWidth,
           outputHeight: outputHeight,
-          helpText: 'Move and pinch zoom the image inside the grid. The final crop is saved as ${outputWidth}×$outputHeight for crisp CDN-ready home banners.',
+          helpText: 'Move and pinch zoom the image inside the grid. The final crop is saved as $outputWidth×$outputHeight for crisp CDN-ready home banners.',
         ),
       ),
     );
@@ -160,10 +160,10 @@ class MediaUploadService {
   Uint8List _manualCropJpeg({required Uint8List bytes, required ManualImageCropResult crop}) {
     final source = img.decodeImage(bytes);
     if (source == null) throw Exception('Selected image could not be decoded.');
-    final safeX = crop.x.clamp(0, max(0, source.width - 1));
-    final safeY = crop.y.clamp(0, max(0, source.height - 1));
-    final safeWidth = crop.width.clamp(1, source.width - safeX);
-    final safeHeight = crop.height.clamp(1, source.height - safeY);
+    final safeX = crop.x.clamp(0, max(0, source.width - 1)).toInt();
+    final safeY = crop.y.clamp(0, max(0, source.height - 1)).toInt();
+    final safeWidth = crop.width.clamp(1, source.width - safeX).toInt();
+    final safeHeight = crop.height.clamp(1, source.height - safeY).toInt();
     final cropped = img.copyCrop(source, x: safeX, y: safeY, width: safeWidth, height: safeHeight);
     final resized = img.copyResize(cropped, width: crop.outputWidth, height: crop.outputHeight, interpolation: img.Interpolation.cubic);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
