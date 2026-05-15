@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 
+enum VibesFeedTab {
+  vibes('Vibes'),
+  friends('Friends');
+
+  const VibesFeedTab(this.label);
+  final String label;
+}
+
 enum VibeMediaType {
   photo('Photo', Icons.photo_rounded, [Color(0xFF6D5DF6), Color(0xFFE84C72)]),
   video('Video', Icons.play_circle_fill_rounded, [Color(0xFF12C7B7), Color(0xFF6D5DF6)]),
@@ -40,7 +48,10 @@ class VibeItem {
     required this.mentions,
     required this.colors,
     this.mediaUrl,
+    this.avatarUrl,
     this.likedByMe = false,
+    this.savedByMe = false,
+    this.saves = 0,
   });
 
   final String id;
@@ -60,16 +71,23 @@ class VibeItem {
   final List<String> mentions;
   final List<Color> colors;
   final String? mediaUrl;
+  final String? avatarUrl;
   final bool likedByMe;
+  final bool savedByMe;
+  final int saves;
 
   bool get hasMediaUrl => mediaUrl != null && mediaUrl!.trim().isNotEmpty;
+  bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
 
   VibeItem copyWith({
     int? likes,
     int? comments,
     int? shares,
+    int? saves,
     String? mediaUrl,
+    String? avatarUrl,
     bool? likedByMe,
+    bool? savedByMe,
   }) {
     return VibeItem(
       id: id,
@@ -89,7 +107,10 @@ class VibeItem {
       mentions: mentions,
       colors: colors,
       mediaUrl: mediaUrl ?? this.mediaUrl,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       likedByMe: likedByMe ?? this.likedByMe,
+      savedByMe: savedByMe ?? this.savedByMe,
+      saves: saves ?? this.saves,
     );
   }
 }
