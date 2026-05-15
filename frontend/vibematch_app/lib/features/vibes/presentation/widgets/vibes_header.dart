@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 class VibesHeader extends StatelessWidget {
   const VibesHeader({
     super.key,
-    required this.onRefreshTap,
+    required this.onSavedTap,
     required this.onSettingsTap,
+    this.showingSaved = false,
   });
 
-  final VoidCallback onRefreshTap;
+  final VoidCallback onSavedTap;
   final VoidCallback onSettingsTap;
+  final bool showingSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -18,10 +20,10 @@ class VibesHeader extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
         child: Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Vibes',
-                style: TextStyle(
+                showingSaved ? 'Saved Vibes' : 'Vibes',
+                style: const TextStyle(
                   color: Color(0xFF111015),
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
@@ -29,7 +31,7 @@ class VibesHeader extends StatelessWidget {
                 ),
               ),
             ),
-            _HeaderIconButton(icon: Icons.refresh_rounded, onTap: onRefreshTap),
+            _HeaderIconButton(icon: showingSaved ? Icons.dynamic_feed_rounded : Icons.bookmarks_rounded, onTap: onSavedTap),
             const SizedBox(width: 8),
             _HeaderIconButton(icon: Icons.settings_rounded, onTap: onSettingsTap),
           ],
