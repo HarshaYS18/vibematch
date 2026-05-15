@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../social/widgets/friends_invite_sheet.dart';
 import '../../data/vibes_api_service.dart';
 import '../../models/vibe_models.dart';
 import '../widgets/vibe_card_modular.dart';
@@ -78,19 +79,35 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
     }
   }
 
-  Future<void> _share(VibeItem vibe) async {
+  Future<void> _openShareSheet(VibeItem vibe) async {
     if (vibe.id.trim().isEmpty) return;
-    try {
-      final result = await _api.shareVibe(vibe.id, shareChannel: 'detail_reel');
-      if (!mounted) return;
-      setState(() {
-        final current = _stateFor(vibe);
-        _stateById[_key(vibe)] = current.copyWith(shares: result.sharesCount);
-      });
-      _toast('Vibe shared.');
-    } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''));
-    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      builder: (_) => FriendsInviteSheet(
+        title: 'Share ${vibe.authorName}\'s Vibe',
+        actionLabel: 'Send',
+        completedLabel: 'Sent',
+        sendRoomInvite: false,
+        onInvite: (friend) async {
+          try {
+            final publicUserId = friend.publicUserId ?? int.tryParse(friend.id);
+            final result = await _api.shareVibe(vibe.id, targetPublicUserId: publicUserId);
+            if (!mounted) return;
+            setState(() {
+              final current = _stateFor(vibe);
+              _stateById[_key(vibe)] = current.copyWith(shares: result.sharesCount);
+            });
+            _toast('Vibe sent to ${friend.displayName}');
+          } catch (error) {
+            _toast(error.toString().replaceFirst('Exception: ', ''));
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _openComments(VibeItem vibe) async {
@@ -133,7 +150,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
             vibe: vibe,
             onLike: () => unawaited(_toggleLike(vibe)),
             onComments: () => unawaited(_openComments(vibe)),
-            onShare: () => unawaited(_share(vibe)),
+            onShare: () => unawaited(_openShareSheet(vibe)),
             onSave: () => unawaited(_toggleSave(vibe)),
           );
         },
@@ -169,7 +186,7 @@ class _MediaVibeReelPage extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        GestureDetector(onDoubleTap: onLike, child: VibeMediaPlayer(vibe: vibe, onDoubleTap: onLike, respectFeedPause: false)),
+        GestureDetector(onDoubleTap: onLike, child: VibeMediaPlayer(vibe: vibe, onDoubleTap: onLike, respectFeedPause: false, autoplay: true)),
         const _ReelGradientOverlay(),
         SafeArea(
           child: Padding(
