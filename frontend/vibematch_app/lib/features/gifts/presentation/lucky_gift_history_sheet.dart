@@ -271,7 +271,15 @@ class _MasterPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final multipliers = master?.multipliers.map((rule) => '${rule.multiplier}x').take(8).join(' · ');
+    final currentMaster = master;
+    final multipliers = currentMaster?.multipliers
+        .map((rule) => '${rule.multiplier}x')
+        .take(8)
+        .join(' · ');
+    final label = currentMaster == null
+        ? 'Lucky gift master config loading...'
+        : '${currentMaster.enabled ? 'Enabled' : 'Disabled'} · ${currentMaster.currency} · ${multipliers?.isEmpty == false ? multipliers : 'no multiplier rules'}';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(11),
@@ -286,9 +294,7 @@ class _MasterPreview extends StatelessWidget {
           const SizedBox(width: 7),
           Expanded(
             child: Text(
-              master == null
-                  ? 'Lucky gift master config loading...'
-                  : '${master.enabled ? 'Enabled' : 'Disabled'} · ${master.currency} · ${multipliers?.isEmpty == false ? multipliers : 'no multiplier rules'}',
+              label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900),
