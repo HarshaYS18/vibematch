@@ -136,6 +136,7 @@ class _CreatePageState extends State<CreatePage> {
         type: 'Chat',
         avatarUrl: _roomCoverUrl,
         coverPhotoUrl: _roomCoverUrl,
+        allowScreenshots: _allowScreenshots,
       );
       widget.onRoomCreated?.call(room);
       if (!mounted) return;
@@ -209,7 +210,7 @@ class _CreatePageState extends State<CreatePage> {
               _ReadyInfoRow(label: 'Room ID', value: room.id),
               _ReadyInfoRow(label: 'Mode', value: room.mode),
               _ReadyInfoRow(label: 'Language', value: room.language),
-              _ReadyInfoRow(label: 'Screenshots', value: _allowScreenshots ? 'Allowed' : 'Denied'),
+              _ReadyInfoRow(label: 'Screenshots', value: room.allowScreenshots ? 'Allowed' : 'Denied'),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -236,7 +237,7 @@ class _CreatePageState extends State<CreatePage> {
                             ),
                           ),
                         );
-                        _toast(_allowScreenshots ? 'Screenshots allowed for this room' : 'Screenshots denied for this room');
+                        _toast(room.allowScreenshots ? 'Screenshots allowed for this room' : 'Screenshots denied for this room');
                       },
                     ),
                   ),
@@ -279,7 +280,7 @@ class _CreatePageState extends State<CreatePage> {
                 },
               ),
               const SizedBox(height: 8),
-              _PrimaryButton(text: _creatingRoom ? 'Creating...' : 'Create Room', icon: Icons.add_circle_rounded, onTap: _createRoom),
+              _PrimaryButton(text: _creatingRoom ? 'Saving Room' : 'Save Room', icon: Icons.add_circle_rounded, onTap: _createRoom),
             ],
           ),
         ),
@@ -384,7 +385,7 @@ class _CreatePageState extends State<CreatePage> {
         children: [
           Icon(Icons.security_rounded, color: Color(0xFFC99A3B), size: 19),
           SizedBox(width: 10),
-          Expanded(child: Text('Room creation is saved to backend. Cover photo uses a cropped 16:9 CDN-ready image. Locked, Members Only, and Secret Vibe modes are enforced by backend access rules.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
+          Expanded(child: Text('This lifetime room keeps the same room ID, admins, members, level, and contribution data. Saving here only updates name, cover/avatar, language, screenshot permission, and access mode.', style: TextStyle(color: Color(0xFF6A4E18), fontSize: 11.5, height: 1.28, fontWeight: FontWeight.w700))),
         ],
       ),
     );
