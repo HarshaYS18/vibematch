@@ -11,11 +11,7 @@ import '../../controllers/vibe_mention_controller.dart';
 import '../../models/vibe_models.dart';
 
 class CreateVibePageModular extends StatefulWidget {
-  const CreateVibePageModular({
-    super.key,
-    required this.canUseMentionAllToday,
-    required this.onPublish,
-  });
+  const CreateVibePageModular({super.key, required this.canUseMentionAllToday, required this.onPublish});
 
   final bool canUseMentionAllToday;
   final Future<void> Function(VibeItem) onPublish;
@@ -40,45 +36,39 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   String? _selectedMediaName;
   int? _selectedMediaBytes;
 
+  bool get _canPublish {
+    final hasCaption = _captionController.text.trim().isNotEmpty;
+    final hasMedia = _selectedType == VibeMediaType.text || _selectedMediaFile != null;
+    return hasCaption && hasMedia && !_publishing && !_uploadingMedia;
+  }
+
   @override
   void initState() {
     super.initState();
-    _captionController.addListener(_handleCaptionChanged);
+    _captionController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _captionController.removeListener(_handleCaptionChanged);
     _captionController.dispose();
     super.dispose();
   }
 
-  void _handleCaptionChanged() => setState(() {});
-
   void _showAction(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF111015)));
   }
 
   Future<void> _pickMedia() async {
     if (_selectedType == VibeMediaType.text || _pickingMedia || _uploadingMedia || _publishing) return;
     setState(() => _pickingMedia = true);
     try {
-      final picked = _selectedType == VibeMediaType.video
-          ? await _picker.pickVideo(source: ImageSource.gallery)
-          : await _picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
+      final picked = _selectedType == VibeMediaType.video ? await _picker.pickVideo(source: ImageSource.gallery) : await _picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
       if (picked == null) return;
       final file = File(picked.path);
       final size = await file.length();
-      final maxSize = 20 * 1024 * 1024;
-      if (size > maxSize) {
+      if (size > 20 * 1024 * 1024) {
         _showAction('Vibe media must be 20 MB or smaller.');
         return;
       }
@@ -95,31 +85,10 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
     }
   }
 
-  void _clearMedia() {
-    setState(() {
-      _selectedMediaFile = null;
-      _uploadedMediaUrl = null;
-      _selectedMediaName = null;
-      _selectedMediaBytes = null;
-    });
-  }
-
-  void _changeType(VibeMediaType type) {
-    setState(() {
-      _selectedType = type;
-      _selectedMediaFile = null;
-      _uploadedMediaUrl = null;
-      _selectedMediaName = null;
-      _selectedMediaBytes = null;
-    });
-  }
-
   Future<String?> _uploadSelectedMediaIfNeeded() async {
     final file = _selectedMediaFile;
     if (_selectedType == VibeMediaType.text || file == null) return null;
-    final existingUrl = _uploadedMediaUrl;
-    if (existingUrl != null && existingUrl.trim().isNotEmpty) return existingUrl;
-
+    if (_uploadedMediaUrl != null && _uploadedMediaUrl!.trim().isNotEmpty) return _uploadedMediaUrl;
     setState(() => _uploadingMedia = true);
     try {
       final result = await _uploadApi.uploadVibeMedia(file);
@@ -133,54 +102,16 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
 
   Future<void> _publish() async {
     final caption = _captionController.text.trim();
-    if (caption.isEmpty) {
-      _showAction('Write a caption before publishing.');
-      return;
-    }
-
-    if (_captionController.usesMentionAll && !widget.canUseMentionAllToday) {
-      _showAction('@all is limited to 2 posts per day.');
-      return;
-    }
-
-    if (_selectedType != VibeMediaType.text && _selectedMediaFile == null) {
-      _showAction('Choose a ${_selectedType.label.toLowerCase()} before publishing.');
-      return;
-    }
-
+    if (caption.isEmpty) return _showAction('Write a caption before sharing.');
+    if (_captionController.usesMentionAll && !widget.canUseMentionAllToday) return _showAction('@all is limited to 2 posts per day.');
+    if (_selectedType != VibeMediaType.text && _selectedMediaFile == null) return _showAction('Choose a ${_selectedType.label.toLowerCase()} before sharing.');
     if (_publishing || _uploadingMedia) return;
     setState(() => _publishing = true);
-
     try {
       final mediaUrl = await _uploadSelectedMediaIfNeeded();
       final currentUser = _authApi.cachedUser;
-      final visibleName = currentUser?.displayName?.trim().isNotEmpty == true
-          ? currentUser!.displayName!.trim()
-          : currentUser?.username?.trim().isNotEmpty == true
-              ? currentUser!.username!.trim()
-              : 'Vibe User';
-
-      await widget.onPublish(
-        VibeItem(
-          authorName: visibleName,
-          authorId: currentUser?.publicUserId.toString() ?? '',
-          avatarText: visibleName.trim().isEmpty ? 'V' : visibleName.trim()[0].toUpperCase(),
-          timeAgo: 'Just now',
-          mediaType: _selectedType,
-          caption: caption,
-          tag: _selectedType.label,
-          likes: 0,
-          comments: 0,
-          shares: 0,
-          views: 1,
-          isFollowing: true,
-          usesMentionAll: _captionController.usesMentionAll,
-          mentions: _captionController.validMentions,
-          colors: _selectedType.colors,
-          mediaUrl: mediaUrl,
-        ),
-      );
-
+      final visibleName = currentUser?.displayName?.trim().isNotEmpty == true ? currentUser!.displayName!.trim() : currentUser?.username?.trim().isNotEmpty == true ? currentUser!.username!.trim() : 'Vibe User';
+      await widget.onPublish(VibeItem(authorName: visibleName, authorId: currentUser?.publicUserId.toString() ?? '', avatarText: visibleName.trim().isEmpty ? 'V' : visibleName.trim()[0].toUpperCase(), timeAgo: 'Just now', mediaType: _selectedType, caption: caption, tag: _selectedType.label, likes: 0, comments: 0, shares: 0, views: 1, isFollowing: true, usesMentionAll: _captionController.usesMentionAll, mentions: _captionController.validMentions, colors: _selectedType.colors, mediaUrl: mediaUrl));
       if (mounted) Navigator.pop(context);
     } catch (error) {
       if (mounted) _showAction(error.toString().replaceFirst('Exception: ', ''));
@@ -189,91 +120,48 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
     }
   }
 
+  void _selectType(VibeMediaType type) {
+    setState(() {
+      _selectedType = type;
+      _selectedMediaFile = null;
+      _uploadedMediaUrl = null;
+      _selectedMediaName = null;
+      _selectedMediaBytes = null;
+    });
+  }
+
+  void _clearMedia() {
+    setState(() {
+      _selectedMediaFile = null;
+      _uploadedMediaUrl = null;
+      _selectedMediaName = null;
+      _selectedMediaBytes = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final captionNotEmpty = _captionController.text.trim().isNotEmpty;
-    final canPublish = captionNotEmpty && !_publishing && !_uploadingMedia && (_selectedType == VibeMediaType.text || _selectedMediaFile != null);
-
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F1),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.white,
+        leading: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Color(0xFF111015), size: 28)),
+        title: const Text('New Vibe', style: TextStyle(color: Color(0xFF111015), fontSize: 18, fontWeight: FontWeight.w900)),
+        actions: [TextButton(onPressed: _canPublish ? () => unawaited(_publish()) : null, child: Text(_publishing || _uploadingMedia ? 'Posting...' : 'Share', style: TextStyle(color: _canPublish ? const Color(0xFF1A5BEA) : const Color(0xFFB7AFBD), fontSize: 15, fontWeight: FontWeight.w900))), const SizedBox(width: 8)],
+        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: Color(0xFFECE2D8))),
+      ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 26),
+          padding: const EdgeInsets.only(bottom: 26),
           children: [
-            Row(
-              children: [
-                _RoundIconButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.pop(context)),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Create Vibe',
-                    style: TextStyle(
-                      color: Color(0xFF251538),
-                      fontSize: 25,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ),
-                InkWell(
-                  onTap: canPublish ? () => unawaited(_publish()) : null,
-                  borderRadius: BorderRadius.circular(18),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
-                    decoration: BoxDecoration(
-                      color: canPublish ? const Color(0xFF251538) : const Color(0xFFE2D9CF),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Text(
-                      _publishing || _uploadingMedia ? 'Wait...' : 'Publish',
-                      style: TextStyle(
-                        color: canPublish ? Colors.white : const Color(0xFF8C8198),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _CreateTypePicker(
-              selectedType: _selectedType,
-              onSelected: _changeType,
-            ),
-            const SizedBox(height: 16),
-            _CreateMediaBox(
-              type: _selectedType,
-              selectedFile: _selectedMediaFile,
-              selectedName: _selectedMediaName,
-              selectedBytes: _selectedMediaBytes,
-              picking: _pickingMedia,
-              uploading: _uploadingMedia,
-              uploadedUrl: _uploadedMediaUrl,
-              onTap: () => unawaited(_pickMedia()),
-              onClear: _clearMedia,
-            ),
-            const SizedBox(height: 16),
-            _CaptionComposer(
-              controller: _captionController,
-              commentsEnabled: _commentsEnabled,
-              onToggleComments: () => setState(() => _commentsEnabled = !_commentsEnabled),
-            ),
-            if (_captionController.hasMentionTrigger)
-              SocialMentionPicker(
-                query: _captionController.activeMentionQuery,
-                onSelected: (user) => setState(() => _captionController.insertMention(user.username)),
-              ),
-            const SizedBox(height: 14),
-            _MentionPreview(
-              usesMentionAll: _captionController.usesMentionAll,
-              mentions: _captionController.validMentions,
-              commentsEnabled: _commentsEnabled,
-              canUseMentionAllToday: widget.canUseMentionAllToday,
-            ),
-            const SizedBox(height: 18),
-            _PublishWideButton(enabled: canPublish, busy: _publishing || _uploadingMedia, onTap: () => unawaited(_publish())),
+            _TypeTabs(selectedType: _selectedType, onSelected: _selectType),
+            _MediaPicker(type: _selectedType, selectedFile: _selectedMediaFile, selectedName: _selectedMediaName, selectedBytes: _selectedMediaBytes, picking: _pickingMedia, uploading: _uploadingMedia, uploadedUrl: _uploadedMediaUrl, onTap: () => unawaited(_pickMedia()), onClear: _clearMedia),
+            _CaptionBox(controller: _captionController, commentsEnabled: _commentsEnabled, onToggleComments: () => setState(() => _commentsEnabled = !_commentsEnabled)),
+            if (_captionController.hasMentionTrigger) Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: SocialMentionPicker(query: _captionController.activeMentionQuery, onSelected: (user) => setState(() => _captionController.insertMention(user.username)))),
+            _MentionRow(usesMentionAll: _captionController.usesMentionAll, mentions: _captionController.validMentions, commentsEnabled: _commentsEnabled, canUseMentionAllToday: widget.canUseMentionAllToday),
+            Padding(padding: const EdgeInsets.fromLTRB(14, 16, 14, 0), child: _ShareButton(enabled: _canPublish, busy: _publishing || _uploadingMedia, onTap: () => unawaited(_publish()))),
           ],
         ),
       ),
@@ -281,51 +169,19 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   }
 }
 
-class _CreateTypePicker extends StatelessWidget {
-  const _CreateTypePicker({required this.selectedType, required this.onSelected});
+class _TypeTabs extends StatelessWidget {
+  const _TypeTabs({required this.selectedType, required this.onSelected});
   final VibeMediaType selectedType;
   final ValueChanged<VibeMediaType> onSelected;
-
   @override
   Widget build(BuildContext context) {
     final items = [VibeMediaType.photo, VibeMediaType.video, VibeMediaType.text];
-    return Row(
-      children: items.map((type) {
-        final selected = type == selectedType;
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(right: type == items.last ? 0 : 9),
-            child: InkWell(
-              onTap: () => onSelected(type),
-              borderRadius: BorderRadius.circular(22),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: selected ? LinearGradient(colors: type.colors, begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
-                  color: selected ? null : Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: selected ? Colors.transparent : const Color(0xFFECE2D8)),
-                  boxShadow: [BoxShadow(color: type.colors.first.withValues(alpha: selected ? 0.18 : 0.04), blurRadius: 16, offset: const Offset(0, 8))],
-                ),
-                child: Column(
-                  children: [
-                    Icon(type.icon, color: selected ? Colors.white : type.colors.first, size: 24),
-                    const SizedBox(height: 6),
-                    Text(type.label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
+    return Container(height: 48, padding: const EdgeInsets.symmetric(horizontal: 14), margin: const EdgeInsets.symmetric(vertical: 12), child: Row(children: items.map((type) { final selected = type == selectedType; return Expanded(child: InkWell(onTap: () => onSelected(type), borderRadius: BorderRadius.circular(999), child: AnimatedContainer(duration: const Duration(milliseconds: 160), margin: const EdgeInsets.symmetric(horizontal: 3), decoration: BoxDecoration(color: selected ? const Color(0xFF111015) : const Color(0xFFF7F3EF), borderRadius: BorderRadius.circular(999)), child: Center(child: Text(type.label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF111015), fontSize: 12.5, fontWeight: FontWeight.w900)))))); }).toList()));
   }
 }
 
-class _CreateMediaBox extends StatelessWidget {
-  const _CreateMediaBox({required this.type, required this.selectedFile, required this.selectedName, required this.selectedBytes, required this.picking, required this.uploading, required this.uploadedUrl, required this.onTap, required this.onClear});
+class _MediaPicker extends StatelessWidget {
+  const _MediaPicker({required this.type, required this.selectedFile, required this.selectedName, required this.selectedBytes, required this.picking, required this.uploading, required this.uploadedUrl, required this.onTap, required this.onClear});
   final VibeMediaType type;
   final File? selectedFile;
   final String? selectedName;
@@ -335,200 +191,65 @@ class _CreateMediaBox extends StatelessWidget {
   final String? uploadedUrl;
   final VoidCallback onTap;
   final VoidCallback onClear;
-
   @override
   Widget build(BuildContext context) {
     final isText = type == VibeMediaType.text;
     final hasFile = selectedFile != null;
-    return InkWell(
-      onTap: isText || uploading ? null : onTap,
-      borderRadius: BorderRadius.circular(28),
-      child: Container(
-        height: isText ? 104 : 202,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFECE2D8)),
-        ),
-        child: isText
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(type.icon, color: type.colors.first, size: 34),
-                    const SizedBox(height: 8),
-                    const Text('Text Vibe selected', style: TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800)),
-                  ],
-                ),
-              )
-            : Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (hasFile && type == VibeMediaType.photo)
-                    Image.file(selectedFile!, fit: BoxFit.cover)
-                  else
-                    Container(
-                      decoration: BoxDecoration(gradient: LinearGradient(colors: type.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (picking || uploading)
-                              const SizedBox(width: 34, height: 34, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.6))
-                            else
-                              Icon(type == VibeMediaType.video && hasFile ? Icons.movie_creation_rounded : type.icon, color: Colors.white, size: 42),
-                            const SizedBox(height: 9),
-                            Text(
-                              hasFile ? selectedName ?? '${type.label} selected' : 'Tap to choose ${type.label.toLowerCase()}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                            ),
-                            if (selectedBytes != null) ...[
-                              const SizedBox(height: 4),
-                              Text(_formatBytes(selectedBytes!), style: TextStyle(color: Colors.white.withValues(alpha: 0.74), fontSize: 11, fontWeight: FontWeight.w800)),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  if (hasFile)
-                    Positioned(
-                      right: 10,
-                      top: 10,
-                      child: InkWell(
-                        onTap: uploading ? null : onClear,
-                        borderRadius: BorderRadius.circular(999),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.46), shape: BoxShape.circle),
-                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                        ),
-                      ),
-                    ),
-                  if (uploadedUrl != null && uploadedUrl!.trim().isNotEmpty)
-                    Positioned(
-                      left: 10,
-                      bottom: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        decoration: BoxDecoration(color: const Color(0xFF12C7B7).withValues(alpha: 0.92), borderRadius: BorderRadius.circular(999)),
-                        child: const Text('Uploaded', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
-                      ),
-                    ),
-                ],
-              ),
-      ),
-    );
+    return InkWell(onTap: isText || uploading ? null : onTap, child: AspectRatio(aspectRatio: 1, child: Container(color: const Color(0xFFF6F2EE), child: isText ? const Center(child: Text('Text Vibe', style: TextStyle(color: Color(0xFF111015), fontSize: 18, fontWeight: FontWeight.w900))) : Stack(fit: StackFit.expand, children: [if (hasFile && type == VibeMediaType.photo) Image.file(selectedFile!, fit: BoxFit.cover) else _MediaPrompt(type: type, hasFile: hasFile, picking: picking, uploading: uploading, selectedName: selectedName, selectedBytes: selectedBytes), if (hasFile) Positioned(right: 12, top: 12, child: InkWell(onTap: uploading ? null : onClear, borderRadius: BorderRadius.circular(999), child: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.46), shape: BoxShape.circle), child: const Icon(Icons.close_rounded, color: Colors.white, size: 18)))), if (uploadedUrl != null && uploadedUrl!.trim().isNotEmpty) Positioned(left: 12, bottom: 12, child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: const Color(0xFF111015).withValues(alpha: 0.80), borderRadius: BorderRadius.circular(999)), child: const Text('Uploaded', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900))))]))));
   }
 }
 
-class _CaptionComposer extends StatelessWidget {
-  const _CaptionComposer({required this.controller, required this.commentsEnabled, required this.onToggleComments});
+class _MediaPrompt extends StatelessWidget {
+  const _MediaPrompt({required this.type, required this.hasFile, required this.picking, required this.uploading, required this.selectedName, required this.selectedBytes});
+  final VibeMediaType type;
+  final bool hasFile;
+  final bool picking;
+  final bool uploading;
+  final String? selectedName;
+  final int? selectedBytes;
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [if (picking || uploading) const SizedBox(width: 34, height: 34, child: CircularProgressIndicator(color: Color(0xFF111015), strokeWidth: 2.6)) else Icon(type == VibeMediaType.video && hasFile ? Icons.movie_creation_rounded : type.icon, color: const Color(0xFF111015), size: 44), const SizedBox(height: 10), Text(hasFile ? selectedName ?? '${type.label} selected' : 'Tap to choose ${type.label.toLowerCase()}', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF111015), fontWeight: FontWeight.w900)), if (selectedBytes != null) ...[const SizedBox(height: 4), Text(_formatBytes(selectedBytes!), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w800))]]));
+  }
+}
+
+class _CaptionBox extends StatelessWidget {
+  const _CaptionBox({required this.controller, required this.commentsEnabled, required this.onToggleComments});
   final VibeMentionTextController controller;
   final bool commentsEnabled;
   final VoidCallback onToggleComments;
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFECE2D8))),
-      child: Column(
-        children: [
-          TextField(
-            controller: controller,
-            maxLines: 5,
-            minLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'Write caption with @name or @all...',
-              border: InputBorder.none,
-            ),
-          ),
-          const Divider(color: Color(0xFFECE2D8)),
-          Row(
-            children: [
-              const Icon(Icons.mode_comment_rounded, color: Color(0xFF8C5CF6), size: 18),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('Allow comments', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900))),
-              Switch(value: commentsEnabled, onChanged: (_) => onToggleComments(), activeThumbColor: const Color(0xFF12C7B7)),
-            ],
-          ),
-        ],
-      ),
-    );
+    return Container(padding: const EdgeInsets.fromLTRB(14, 12, 14, 6), decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: Color(0xFFECE2D8)))), child: Column(children: [TextField(controller: controller, maxLines: 5, minLines: 3, style: const TextStyle(color: Color(0xFF111015), fontSize: 15, fontWeight: FontWeight.w600, height: 1.35), decoration: const InputDecoration(hintText: 'Write a caption... use @name or @all', hintStyle: TextStyle(color: Color(0xFFAAA1AE), fontWeight: FontWeight.w600), border: InputBorder.none)), Row(children: [const Icon(Icons.mode_comment_outlined, color: Color(0xFF111015), size: 18), const SizedBox(width: 8), const Expanded(child: Text('Allow comments', style: TextStyle(color: Color(0xFF111015), fontSize: 13, fontWeight: FontWeight.w900))), Switch(value: commentsEnabled, onChanged: (_) => onToggleComments(), activeThumbColor: const Color(0xFF111015))])]));
   }
 }
 
-class _MentionPreview extends StatelessWidget {
-  const _MentionPreview({required this.usesMentionAll, required this.mentions, required this.commentsEnabled, required this.canUseMentionAllToday});
+class _MentionRow extends StatelessWidget {
+  const _MentionRow({required this.usesMentionAll, required this.mentions, required this.commentsEnabled, required this.canUseMentionAllToday});
   final bool usesMentionAll;
   final List<String> mentions;
   final bool commentsEnabled;
   final bool canUseMentionAllToday;
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        if (usesMentionAll)
-          _Chip(text: canUseMentionAllToday ? '@ all' : '@all limit reached', color: canUseMentionAllToday ? const Color(0xFFC99A3B) : const Color(0xFFE84C72)),
-        ...mentions.map((mention) => _Chip(text: '@ $mention', color: const Color(0xFF6D5DF6))),
-        _Chip(text: commentsEnabled ? 'Comments on' : 'Comments off', color: commentsEnabled ? const Color(0xFF12C7B7) : const Color(0xFFE84C72)),
-      ],
-    );
+    return Padding(padding: const EdgeInsets.fromLTRB(14, 12, 14, 0), child: Wrap(spacing: 8, runSpacing: 8, children: [if (usesMentionAll) _SmallChip(text: canUseMentionAllToday ? '@all' : '@all limit reached'), ...mentions.map((mention) => _SmallChip(text: '@$mention')), _SmallChip(text: commentsEnabled ? 'Comments on' : 'Comments off')]));
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({required this.text, required this.color});
+class _SmallChip extends StatelessWidget {
+  const _SmallChip({required this.text});
   final String text;
-  final Color color;
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(999)),
-      child: Text(text, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900)),
-    );
-  }
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: const Color(0xFFF2EEF4), borderRadius: BorderRadius.circular(999)), child: Text(text, style: const TextStyle(color: Color(0xFF111015), fontSize: 11, fontWeight: FontWeight.w900)));
 }
 
-class _PublishWideButton extends StatelessWidget {
-  const _PublishWideButton({required this.enabled, required this.busy, required this.onTap});
+class _ShareButton extends StatelessWidget {
+  const _ShareButton({required this.enabled, required this.busy, required this.onTap});
   final bool enabled;
   final bool busy;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        height: 52,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: enabled ? const Color(0xFF251538) : const Color(0xFFE2D9CF), borderRadius: BorderRadius.circular(20)),
-        child: busy
-            ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2))
-            : Text('Publish Vibe', style: TextStyle(color: enabled ? Colors.white : const Color(0xFF8C8198), fontWeight: FontWeight.w900)),
-      ),
-    );
-  }
-}
-
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon, required this.onTap});
-  final IconData icon;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))), child: Icon(icon, color: const Color(0xFF251538))),
-    );
-  }
+  Widget build(BuildContext context) => InkWell(onTap: enabled ? onTap : null, borderRadius: BorderRadius.circular(14), child: Container(height: 48, alignment: Alignment.center, decoration: BoxDecoration(color: enabled ? const Color(0xFF111015) : const Color(0xFFE4DFE8), borderRadius: BorderRadius.circular(14)), child: busy ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2)) : Text('Share Vibe', style: TextStyle(color: enabled ? Colors.white : const Color(0xFF8C8198), fontWeight: FontWeight.w900))));
 }
 
 String _formatBytes(int bytes) {
