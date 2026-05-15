@@ -7,6 +7,7 @@ import 'package:flutter/material.dart' show Alignment, Color;
 import '../../../auth/data/auth_api_service.dart';
 import '../../../auth/models/current_user.dart';
 import '../../../gifts/data/lucky_gifts_api_service.dart';
+import '../../../relationships/data/relationship_exp_api_service.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../data/active_room_context.dart';
 import '../../data/gift_api_service.dart';
@@ -126,6 +127,8 @@ class LiveRoomGiftController {
   final WalletApiService _walletApi = const WalletApiService();
   final GiftApiService _giftApi = const GiftApiService();
   final LuckyGiftsApiService _luckyGiftsApi = const LuckyGiftsApiService();
+  final RelationshipExpApiService _relationshipExpApi =
+      const RelationshipExpApiService();
   StreamSubscription<CurrentUser>? _userRealtimeSub;
 
   GiftCategory selectedCategory = GiftCategory.premium;
@@ -165,8 +168,9 @@ class LiveRoomGiftController {
 
   void _handleRealtimeUser(CurrentUser user) {
     final currentPublicUserId = _publicUserIdFromSeatUser(currentUser);
-    if (currentPublicUserId == null || currentPublicUserId != user.publicUserId)
+    if (currentPublicUserId == null || currentPublicUserId != user.publicUserId) {
       return;
+    }
     final nextBalance = user.wallet.coinBalance;
     if (coinBalance == nextBalance) return;
     coinBalance = nextBalance;
@@ -183,10 +187,12 @@ class LiveRoomGiftController {
   }
 
   void ensureDefaultReceiver(List<SeatUser> roomUsers) {
-    if (selectedReceiverIds.isEmpty && roomUsers.isNotEmpty)
+    if (selectedReceiverIds.isEmpty && roomUsers.isNotEmpty) {
       selectedReceiverIds.add(roomUsers.first.id);
-    if (selectedGift == null && mockGiftItems.isNotEmpty)
+    }
+    if (selectedGift == null && mockGiftItems.isNotEmpty) {
       selectedGift = mockGiftItems.first;
+    }
   }
 
   void selectCategory(GiftCategory category) {
@@ -324,6 +330,14 @@ class LiveRoomGiftController {
           roomPublicId: ActiveRoomContext.roomPublicId,
         );
         coinBalance = result.senderCoinBalance;
+        unawaited(
+          _recordRelationshipGiftExpSilently(
+            gift: gift,
+            quantity: effectiveCombo,
+            receiverPublicUserId: receiverPublicUserId,
+            eventType: 'gift_sent',
+          ),
+        );
       }
 
       final targets = sentToAll
@@ -440,6 +454,14 @@ class LiveRoomGiftController {
             rewardCoinAmount: rewardCoinAmount,
           ),
         );
+        unawaited(
+          _recordRelationshipGiftExpSilently(
+            gift: gift,
+            quantity: effectiveCombo,
+            receiverPublicUserId: receiverPublicUserId,
+            eventType: 'lucky_gift_sent',
+          ),
+        );
         final slide = _createLuckySlide(
           gift: gift,
           receiverName: receiver.name,
@@ -526,8 +548,9 @@ class LiveRoomGiftController {
     final packet = activeLuckyPacket;
     if (packet == null ||
         packet.phase != LuckyPacketPhase.claim ||
-        packet.claimedByCurrentUser)
+        packet.claimedByCurrentUser) {
       return;
+    }
     final distributions = packet.distributions.isEmpty
         ? _buildLuckyPacketDistributions(packet: packet, roomUsers: roomUsers)
         : Map<String, int>.from(packet.distributions);
@@ -606,6 +629,14 @@ class LiveRoomGiftController {
           receiverPublicUserId: context.receiverPublicUserId,
           multiplier: multiplier,
           rewardCoinAmount: rewardCoinAmount,
+        ),
+      );
+      unawaited(
+        _recordRelationshipGiftExpSilently(
+          gift: context.gift,
+          quantity: context.baseCombo,
+          receiverPublicUserId: context.receiverPublicUserId,
+          eventType: 'lucky_gift_combo_sent',
         ),
       );
 
@@ -769,6 +800,24 @@ class LiveRoomGiftController {
     }
   }
 
+  Future<void> _recordRelationshipGiftExpSilently({
+    required GiftItem gift,
+    required int quantity,
+    required int receiverPublicUserId,
+    required String eventType,
+  }) async {
+    try {
+      await _relationshipExpApi.recordExpEvent(
+        eventType: eventType,
+        otherPublicUserId: receiverPublicUserId,
+        coinValue: gift.coins * quantity,
+        roomPublicId: ActiveRoomContext.roomPublicId,
+      );
+    } catch (_) {
+      // Relationship EXP sync should never block the gift send flow.
+    }
+  }
+
   void _startGiftSlide(GiftSlide slide) {
     giftSlides.insert(0, slide);
     onChanged();
@@ -904,8 +953,7 @@ class LiveRoomGiftController {
   }
 
   Alignment _receiverAlignment(SeatUser? receiver, List<SeatUser> roomUsers) {
-    if (receiver == null || roomUsers.isEmpty)
-      return const Alignment(0.0, -0.20);
+    if (receiver == null || roomUsers.isEmpty) return const Alignment(0.0, -0.20);
     final index = roomUsers.indexWhere((user) => user.id == receiver.id);
     if (index < 0) return const Alignment(0.68, -0.16);
     final column = index % 4;
