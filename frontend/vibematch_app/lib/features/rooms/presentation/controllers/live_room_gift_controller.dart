@@ -6,6 +6,7 @@ import 'package:flutter/material.dart' show Alignment, Color;
 
 import '../../../auth/data/auth_api_service.dart';
 import '../../../auth/models/current_user.dart';
+import '../../../gifts/data/lucky_gifts_api_service.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../data/active_room_context.dart';
 import '../../data/gift_api_service.dart';
@@ -124,6 +125,7 @@ class LiveRoomGiftController {
   final ValueChangedLike<String> onToast;
   final WalletApiService _walletApi = const WalletApiService();
   final GiftApiService _giftApi = const GiftApiService();
+  final LuckyGiftsApiService _luckyGiftsApi = const LuckyGiftsApiService();
   StreamSubscription<CurrentUser>? _userRealtimeSub;
 
   GiftCategory selectedCategory = GiftCategory.premium;
@@ -429,6 +431,15 @@ class LiveRoomGiftController {
             result.luckyResult?.rewardCoinAmount ??
             0;
         coinBalance = result.senderCoinBalance;
+        unawaited(
+          _recordLuckyGiftResultSilently(
+            gift: gift,
+            quantity: effectiveCombo,
+            receiverPublicUserId: receiverPublicUserId,
+            multiplier: multiplier,
+            rewardCoinAmount: rewardCoinAmount,
+          ),
+        );
         final slide = _createLuckySlide(
           gift: gift,
           receiverName: receiver.name,
@@ -588,6 +599,15 @@ class LiveRoomGiftController {
           result.luckyResult?.rewardCoinAmount ??
           0;
       coinBalance = result.senderCoinBalance;
+      unawaited(
+        _recordLuckyGiftResultSilently(
+          gift: context.gift,
+          quantity: context.baseCombo,
+          receiverPublicUserId: context.receiverPublicUserId,
+          multiplier: multiplier,
+          rewardCoinAmount: rewardCoinAmount,
+        ),
+      );
 
       final existingLuckySlideIndex = giftSlides.indexWhere(
         (item) => _luckyComboContexts.containsKey(item.id),
@@ -723,6 +743,30 @@ class LiveRoomGiftController {
       remaining -= reward;
     }
     return result;
+  }
+
+  Future<void> _recordLuckyGiftResultSilently({
+    required GiftItem gift,
+    required int quantity,
+    required int receiverPublicUserId,
+    required int multiplier,
+    required int rewardCoinAmount,
+  }) async {
+    try {
+      final spentCoins = gift.coins * quantity;
+      await _luckyGiftsApi.recordResult(
+        giftId: gift.id,
+        quantity: quantity,
+        receiverPublicUserId: receiverPublicUserId,
+        roomPublicId: ActiveRoomContext.roomPublicId,
+        spentCoins: spentCoins,
+        multiplier: multiplier,
+        rewardCoins: rewardCoinAmount,
+        netWinCoins: rewardCoinAmount - spentCoins,
+      );
+    } catch (_) {
+      // Lucky gift stats should never block the live room send flow.
+    }
   }
 
   void _startGiftSlide(GiftSlide slide) {
