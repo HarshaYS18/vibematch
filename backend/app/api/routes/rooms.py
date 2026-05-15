@@ -99,6 +99,20 @@ def _apply_mode_flags(room: Room, mode: str) -> None:
     room.is_members_only = "member" in normalized
 
 
+def _find_lifetime_user_room(db: Session, user_id: int) -> Room | None:
+    rooms = (
+        db.query(Room)
+        .filter(Room.owner_user_id == user_id)
+        .order_by(Room.created_at.asc(), Room.id.asc())
+        .limit(20)
+        .all()
+    )
+    for room in rooms:
+        if not _is_seed_or_test_room(room):
+            return room
+    return None
+
+
 def _filter_discovery_rooms(
     db: Session,
     language: str | None,
@@ -153,6 +167,19 @@ def create_room(
     cover_photo_url = _clean_text(payload.get("cover_photo_url") or avatar_url, field_name="Room cover photo", max_length=500, required=False)
     lock_password = _clean_text(payload.get("lock_password"), field_name="Lock password", max_length=80, required=False)
 
+    existing_room = _find_lifetime_user_room(db, current_user.id)
+    if existing_room is not None:
+        existing_room.name = name or existing_room.name
+        if avatar_url is not None:
+            existing_room.avatar_url = avatar_url
+        if cover_photo_url is not None:
+            existing_room.cover_photo_url = cover_photo_url
+        existing_room.is_active = True
+        db.add(existing_room)
+        db.commit()
+        db.refresh(existing_room)
+        return _room_discovery_payload(existing_room)
+
     room = Room(
         room_public_id=_new_room_public_id(db),
         owner_user_id=current_user.id,
@@ -184,17 +211,15 @@ def get_my_created_room(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict | None:
-    rooms = (
-        db.query(Room)
-        .filter(Room.owner_user_id == current_user.id, Room.is_active.is_(True))
-        .order_by(Room.updated_at.desc(), Room.created_at.desc())
-        .limit(20)
-        .all()
-    )
-    for room in rooms:
-        if not _is_seed_or_test_room(room):
-            return _room_discovery_payload(room)
-    return None
+    room = _find_lifetime_user_room(db, current_user.id)
+    if room is None:
+        return None
+    if not room.is_active:
+        room.is_active = True
+        db.add(room)
+        db.commit()
+        db.refresh(room)
+    return _room_discovery_payload(room)
 
 
 @router.get("/{room_public_id}/settings", response_model=RoomSettingsResponse)
