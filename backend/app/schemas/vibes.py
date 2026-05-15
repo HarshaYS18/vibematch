@@ -59,9 +59,11 @@ class VibePostResponse(BaseModel):
     likes_count: int
     comments_count: int
     shares_count: int = 0
+    saves_count: int = 0
     reports_count: int = 0
     views_count: int = 0
     liked_by_me: bool = False
+    saved_by_me: bool = False
     created_at: datetime
 
 
@@ -73,6 +75,12 @@ class VibeLikeResponse(BaseModel):
     post_id: int
     liked_by_me: bool
     likes_count: int
+
+
+class VibeSaveResponse(BaseModel):
+    post_id: int
+    saved_by_me: bool
+    saves_count: int
 
 
 class VibeShareResponse(BaseModel):
