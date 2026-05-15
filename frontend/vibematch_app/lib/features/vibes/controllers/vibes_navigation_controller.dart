@@ -4,6 +4,7 @@ import '../../auth/data/auth_api_service.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
 import '../models/vibe_models.dart';
 import '../presentation/pages/create_vibe_page_modular.dart';
+import '../presentation/pages/media_vibe_detail_pager.dart';
 import '../presentation/pages/vibe_detail_backend_page.dart';
 import '../presentation/pages/vibes_settings_page.dart';
 import '../presentation/widgets/vibe_action_sheets.dart';
@@ -64,14 +65,25 @@ class VibesNavigationController {
   }
 
   static void openVibeDetail({required BuildContext context, required VibesController controller, required VibeItem vibe}) {
-    final mediaVibes = controller.visibleVibes.where((item) => item.mediaType != VibeMediaType.text).toList(growable: false);
-    final initialIndex = mediaVibes.indexWhere((item) => item.id == vibe.id && item.id.trim().isNotEmpty);
+    if (vibe.mediaType != VibeMediaType.text) {
+      final mediaVibes = controller.visibleVibes.where((item) => item.mediaType != VibeMediaType.text).toList(growable: false);
+      final idIndex = mediaVibes.indexWhere((item) => item.id.trim().isNotEmpty && item.id == vibe.id);
+      final fallbackIndex = mediaVibes.indexOf(vibe);
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MediaVibeDetailPager(
+            vibes: mediaVibes.isEmpty ? <VibeItem>[vibe] : mediaVibes,
+            initialIndex: idIndex >= 0 ? idIndex : (fallbackIndex >= 0 ? fallbackIndex : 0),
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => VibeDetailBackendPage(
           vibe: vibe,
-          mediaVibes: mediaVibes.isEmpty ? null : mediaVibes,
-          initialMediaIndex: initialIndex < 0 ? 0 : initialIndex,
           onCommentAdded: () => controller.incrementCommentCount(vibe),
           onDeleteVibe: () => controller.deleteVibe(vibe),
         ),
