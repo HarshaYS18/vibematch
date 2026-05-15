@@ -131,6 +131,8 @@ class VibeComment {
     this.isPinned = false,
     this.canPin = false,
     this.canDelete = false,
+    this.likedByMe = false,
+    this.likesCount = 0,
   });
 
   final String id;
@@ -143,11 +145,13 @@ class VibeComment {
   final bool isPinned;
   final bool canPin;
   final bool canDelete;
+  final bool likedByMe;
+  final int likesCount;
 
   bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
   bool get isReply => parentCommentId != null && parentCommentId!.trim().isNotEmpty;
 
-  VibeComment copyWith({bool? isPinned}) {
+  VibeComment copyWith({bool? isPinned, bool? likedByMe, int? likesCount}) {
     return VibeComment(
       id: id,
       parentCommentId: parentCommentId,
@@ -159,6 +163,8 @@ class VibeComment {
       isPinned: isPinned ?? this.isPinned,
       canPin: canPin,
       canDelete: canDelete,
+      likedByMe: likedByMe ?? this.likedByMe,
+      likesCount: likesCount ?? this.likesCount,
     );
   }
 }
