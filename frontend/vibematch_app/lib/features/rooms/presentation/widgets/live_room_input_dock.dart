@@ -97,23 +97,23 @@ class RoomInputDock extends StatelessWidget {
           final tiny = constraints.maxWidth < 340;
           final compact = constraints.maxWidth < 380;
           final buttonSize = tiny
-              ? 36.0
+              ? 32.0
               : compact
-              ? 38.0
-              : 40.0;
+              ? 34.0
+              : 36.0;
           final iconSize = tiny
-              ? 18.0
+              ? 15.5
               : compact
-              ? 19.0
-              : 20.0;
-          final gap = tiny ? 6.0 : 8.0;
-          final horizontalPadding = tiny ? 10.0 : 12.0;
+              ? 16.5
+              : 17.0;
+          final gap = tiny ? 4.0 : 6.0;
+          final horizontalPadding = tiny ? 8.0 : 10.0;
           return Container(
             padding: EdgeInsets.fromLTRB(
               horizontalPadding,
-              7,
+              5,
               horizontalPadding,
-              8,
+              7,
             ),
             decoration: const BoxDecoration(color: Colors.transparent),
             child: Row(
@@ -185,8 +185,8 @@ class _DockButton extends StatelessWidget {
     this.active = false,
     this.muted = false,
     this.badgeCount = 0,
-    this.size = 36,
-    this.iconSize = 19,
+    this.size = 34,
+    this.iconSize = 16.5,
   });
 
   final IconData icon;
@@ -224,14 +224,14 @@ class _DockButton extends StatelessWidget {
             ),
             if (badgeCount > 0)
               Positioned(
-                right: -2,
-                top: -3,
+                right: -1,
+                top: -2,
                 child: Container(
                   constraints: const BoxConstraints(
-                    minWidth: 16,
-                    minHeight: 16,
+                    minWidth: 14,
+                    minHeight: 14,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: RoomColors.coral,
@@ -242,7 +242,7 @@ class _DockButton extends StatelessWidget {
                     badgeCount > 99 ? '99+' : '$badgeCount',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 8.5,
+                      fontSize: 7.5,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
