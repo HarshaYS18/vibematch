@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/vm_gradient_name_text.dart';
 import '../../../auth/models/role_badge.dart';
 import '../models/public_profile_models.dart';
 import 'official_role_badge_pill.dart';
@@ -40,6 +41,7 @@ class PublicProfileHeader extends StatelessWidget {
     required this.onFamilyTap,
     required this.onVipTap,
     required this.onSvipTap,
+    this.nameGradientColors = const <String>[],
     this.avatarUrl,
     this.showSocialActions = true,
     this.showOwnerActions = false,
@@ -80,6 +82,7 @@ class PublicProfileHeader extends StatelessWidget {
   final VoidCallback onFamilyTap;
   final VoidCallback onVipTap;
   final VoidCallback onSvipTap;
+  final List<String> nameGradientColors;
   final String? avatarUrl;
   final bool showSocialActions;
   final bool showOwnerActions;
@@ -250,8 +253,9 @@ class PublicProfileHeader extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Flexible(
-                                child: Text(
-                                  displayName,
+                                child: VmGradientNameText(
+                                  text: displayName,
+                                  gradientColors: nameGradientColors,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -531,43 +535,6 @@ class _PublicAvatar extends StatelessWidget {
                 ),
         ),
       ),
-    );
-  }
-}
-
-class _PresenceLine extends StatelessWidget {
-  const _PresenceLine({
-    required this.presenceLabel,
-    required this.currentRoomName,
-    required this.onRoomTap,
-  });
-  final String presenceLabel;
-  final String? currentRoomName;
-  final VoidCallback onRoomTap;
-  @override
-  Widget build(BuildContext context) {
-    final roomName = currentRoomName;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        PublicTinyStatusChip(
-          icon: Icons.circle,
-          label: presenceLabel,
-          color: const Color(0xFF12C7B7),
-        ),
-        if (roomName != null)
-          InkWell(
-            onTap: onRoomTap,
-            borderRadius: BorderRadius.circular(99),
-            child: PublicTinyStatusChip(
-              icon: Icons.graphic_eq_rounded,
-              label: 'In chatroom: $roomName',
-              color: const Color(0xFF6D5DF6),
-            ),
-          ),
-      ],
     );
   }
 }
