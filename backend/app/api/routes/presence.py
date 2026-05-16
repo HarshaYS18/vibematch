@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.presence import UserRoomPresence
-from app.models.room import RoomMode
+from app.models.room import Room
 from app.models.user import User
 from app.schemas.presence import (
     PresenceBatchRequest,
@@ -40,6 +40,52 @@ def _active_room_presence(db: Session, user_id: int) -> UserRoomPresence | None:
     )
 
 
+def _active_room_count(db: Session, room_public_id: str) -> int:
+    cutoff = _now() - timedelta(seconds=_ROOM_ACTIVE_WINDOW_SECONDS)
+    return (
+        db.query(UserRoomPresence.id)
+        .filter(
+            UserRoomPresence.room_public_id == room_public_id,
+            UserRoomPresence.is_active.is_(True),
+            UserRoomPresence.is_secret.is_(False),
+            UserRoomPresence.last_heartbeat_at >= cutoff,
+        )
+        .count()
+    )
+
+
+def _sync_room_discovery_state(
+    db: Session,
+    *,
+    room_public_id: str,
+    room_name: str,
+    room_mode: str | None,
+    is_secret: bool,
+    owner_user_id: int | None = None,
+) -> None:
+    room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+    if room is None:
+        return
+
+    active_count = _active_room_count(db, room_public_id)
+    room.name = room_name or room.name
+    if room_mode:
+        room.mode = room_mode
+        normalized = room_mode.strip().lower()
+        room.is_secret = is_secret or "secret" in normalized or "private" in normalized
+        room.is_locked = "lock" in normalized
+        room.is_members_only = "member" in normalized
+    else:
+        room.is_secret = is_secret
+    if owner_user_id is not None and room.owner_user_id is None:
+        room.owner_user_id = owner_user_id
+    room.is_active = True
+    room.online_count = max(active_count, 1)
+    room.trending_score = max(int(room.trending_score or 0), room.online_count)
+    room.updated_at = _now()
+    db.add(room)
+
+
 def _close_other_active_room_presence(db: Session, user_id: int, except_room_public_id: str | None = None) -> None:
     active_items = (
         db.query(UserRoomPresence)
@@ -50,11 +96,21 @@ def _close_other_active_room_presence(db: Session, user_id: int, except_room_pub
         .all()
     )
     now = _now()
+    changed_room_ids: set[str] = set()
     for item in active_items:
         if except_room_public_id is not None and item.room_public_id == except_room_public_id:
             continue
         item.is_active = False
         item.left_at = now
+        changed_room_ids.add(item.room_public_id)
+
+    for room_public_id in changed_room_ids:
+        room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+        if room is None:
+            continue
+        room.online_count = _active_room_count(db, room_public_id)
+        room.updated_at = now
+        db.add(room)
 
 
 def _presence_payload(user: User, room: UserRoomPresence | None, viewer: User | None = None) -> PresenceResponse:
@@ -84,6 +140,60 @@ def _touch_user(db: Session, user: User) -> None:
     db.add(user)
 
 
+def _upsert_room_presence(
+    *,
+    db: Session,
+    current_user: User,
+    room_public_id: str,
+    room_name: str,
+    room_mode: str | None,
+    is_secret: bool,
+) -> UserRoomPresence:
+    _close_other_active_room_presence(db, current_user.id, except_room_public_id=room_public_id)
+
+    room = (
+        db.query(UserRoomPresence)
+        .filter(
+            UserRoomPresence.user_id == current_user.id,
+            UserRoomPresence.room_public_id == room_public_id,
+            UserRoomPresence.is_active.is_(True),
+        )
+        .first()
+    )
+
+    now = _now()
+    if room is None:
+        room = UserRoomPresence(
+            user_id=current_user.id,
+            room_public_id=room_public_id,
+            room_name=room_name,
+            room_mode=room_mode,
+            is_secret=is_secret,
+            is_active=True,
+            entered_at=now,
+            last_heartbeat_at=now,
+        )
+        db.add(room)
+        db.flush()
+    else:
+        room.room_name = room_name
+        room.room_mode = room_mode
+        room.is_secret = is_secret
+        room.last_heartbeat_at = now
+        db.add(room)
+        db.flush()
+
+    _sync_room_discovery_state(
+        db,
+        room_public_id=room_public_id,
+        room_name=room_name,
+        room_mode=room_mode,
+        is_secret=is_secret,
+        owner_user_id=current_user.id,
+    )
+    return room
+
+
 @router.post("/heartbeat", response_model=PresenceResponse)
 def heartbeat(
     payload: PresenceHeartbeatRequest,
@@ -98,37 +208,14 @@ def heartbeat(
         room_name = payload.room_name.strip()
 
         if room_public_id and room_name:
-            _close_other_active_room_presence(db, current_user.id, except_room_public_id=room_public_id)
-
-            room = (
-                db.query(UserRoomPresence)
-                .filter(
-                    UserRoomPresence.user_id == current_user.id,
-                    UserRoomPresence.room_public_id == room_public_id,
-                    UserRoomPresence.is_active.is_(True),
-                )
-                .first()
+            room = _upsert_room_presence(
+                db=db,
+                current_user=current_user,
+                room_public_id=room_public_id,
+                room_name=room_name,
+                room_mode=payload.room_mode,
+                is_secret=payload.is_secret,
             )
-
-            now = _now()
-            if room is None:
-                room = UserRoomPresence(
-                    user_id=current_user.id,
-                    room_public_id=room_public_id,
-                    room_name=room_name,
-                    room_mode=payload.room_mode,
-                    is_secret=payload.is_secret,
-                    is_active=True,
-                    entered_at=now,
-                    last_heartbeat_at=now,
-                )
-                db.add(room)
-            else:
-                room.room_name = room_name
-                room.room_mode = payload.room_mode
-                room.is_secret = payload.is_secret
-                room.last_heartbeat_at = now
-                db.add(room)
 
     db.commit()
     db.refresh(current_user)
@@ -149,36 +236,14 @@ def enter_room_presence(
         raise HTTPException(status_code=400, detail="Room id and name are required")
 
     _touch_user(db, current_user)
-    _close_other_active_room_presence(db, current_user.id, except_room_public_id=room_public_id)
-
-    now = _now()
-    room = (
-        db.query(UserRoomPresence)
-        .filter(
-            UserRoomPresence.user_id == current_user.id,
-            UserRoomPresence.room_public_id == room_public_id,
-            UserRoomPresence.is_active.is_(True),
-        )
-        .first()
+    room = _upsert_room_presence(
+        db=db,
+        current_user=current_user,
+        room_public_id=room_public_id,
+        room_name=room_name,
+        room_mode=payload.room_mode,
+        is_secret=payload.is_secret,
     )
-    if room is None:
-        room = UserRoomPresence(
-            user_id=current_user.id,
-            room_public_id=room_public_id,
-            room_name=room_name,
-            room_mode=payload.room_mode,
-            is_secret=payload.is_secret,
-            is_active=True,
-            entered_at=now,
-            last_heartbeat_at=now,
-        )
-        db.add(room)
-    else:
-        room.room_name = room_name
-        room.room_mode = payload.room_mode
-        room.is_secret = payload.is_secret
-        room.last_heartbeat_at = now
-        db.add(room)
 
     db.commit()
     db.refresh(current_user)
