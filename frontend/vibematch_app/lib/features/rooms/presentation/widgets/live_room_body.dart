@@ -148,7 +148,7 @@ class LiveRoomBody extends StatelessWidget {
         );
         final cricketModeActive = cricketController.active;
         final currentUser = media.activeLoggedInSeatUser;
-        final scorerVisible = cricketModeActive &&
+        final canManageCricket = cricketModeActive &&
             currentUser != null &&
             CricketRoomModeModule.canScore(
               seats: seats,
@@ -258,23 +258,22 @@ class LiveRoomBody extends StatelessWidget {
                   builder: (context, child) {
                     return CricketRoomControlsModule(
                       controller: cricketController,
-                      visible: scorerVisible,
-                      onEvent: (event) {
-                        RoomToast.show(context, event.label);
-                      },
+                      canManage: canManageCricket,
+                      onEndMode: () => CricketRoomModeSignal.deactivate(roomId),
                     );
                   },
                 ),
-              if (joinRequestPending)
+              if (joinRequestPending && currentUser != null)
                 Positioned(
                   top: 76,
                   left: 16,
                   right: 16,
                   child: LiveRoomSeatInviteNotification(
-                    title: 'Join request pending',
-                    message: 'Waiting for host approval before you can chat as a member.',
+                    inviterName: 'Room host',
+                    invitedUser: currentUser,
+                    seatIndex: selectedSeatIndex ?? 0,
+                    onReject: () {},
                     onAccept: () {},
-                    onDecline: () {},
                   ),
                 ),
             ],
