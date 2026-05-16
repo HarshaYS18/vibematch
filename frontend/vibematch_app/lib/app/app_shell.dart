@@ -220,8 +220,8 @@ class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
 
     final size = MediaQuery.sizeOf(context);
     final bottomSafeArea = MediaQuery.paddingOf(context).bottom;
-    final maxX = size.width - 86;
-    final maxY = size.height - bottomSafeArea - 96;
+    final maxX = size.width - 78;
+    final maxY = size.height - bottomSafeArea - 88;
 
     return LiveRoomMinimizedBubble(
       offset: _service.offset,
@@ -253,13 +253,13 @@ class _VibeBottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(14, 4, 14, 10),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        margin: const EdgeInsets.fromLTRB(12, 3, 12, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: softBorder),
-          boxShadow: [BoxShadow(color: deepPlum.withValues(alpha: 0.08), blurRadius: 22, offset: const Offset(0, 8))],
+          boxShadow: [BoxShadow(color: deepPlum.withValues(alpha: 0.07), blurRadius: 18, offset: const Offset(0, 7))],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -290,18 +290,26 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(15),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.11) : Colors.transparent, borderRadius: BorderRadius.circular(18)),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.1) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 22, color: active ? deepPlum : muted),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 10, fontWeight: active ? FontWeight.w800 : FontWeight.w600, color: active ? deepPlum : muted)),
+            Icon(icon, size: 18, color: active ? deepPlum : muted),
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 9,
+                height: 1.0,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                color: active ? deepPlum : muted,
+              ),
+            ),
           ],
         ),
       ),
