@@ -1,5 +1,5 @@
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -20,8 +20,23 @@ from app.schemas.room_settings import (
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
 _ROOM_ACTIVE_WINDOW_SECONDS = 150
-_NEW_ROOM_DISCOVERY_GRACE_SECONDS = 180
+# Keep a newly created/reopened room discoverable long enough for the mobile
+# client to finish entering the room and start heartbeats. Heartbeats keep
+# updated_at fresh, so active rooms continue to appear; dead rooms age out.
+_NEW_ROOM_DISCOVERY_GRACE_SECONDS = 900
 _ALLOWED_SEAT_LAYOUT_IDS = {"4x2", "5x2", "4x3", "5x3", "host_4x2", "host_5x2", "host_4x3", "host_5x3"}
+
+
+def _now() -> datetime:
+    return datetime.utcnow()
+
+
+def _as_naive_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
@@ -39,7 +54,7 @@ def _clean_seat_layout_id(value: str | None) -> str:
 
 
 def _active_room_count(db: Session, room_public_id: str) -> int:
-    cutoff = datetime.utcnow() - timedelta(seconds=_ROOM_ACTIVE_WINDOW_SECONDS)
+    cutoff = _now() - timedelta(seconds=_ROOM_ACTIVE_WINDOW_SECONDS)
     return (
         db.query(UserRoomPresence.id)
         .filter(
@@ -230,26 +245,33 @@ def _find_lifetime_user_room(db: Session, user_id: int) -> Room | None:
 
 
 def _room_is_in_discovery_grace(room: Room) -> bool:
-    now = datetime.utcnow()
-    candidates = [getattr(room, "updated_at", None), getattr(room, "created_at", None)]
-    for value in candidates:
-        if value is None:
-            continue
-        try:
-            if now - value <= timedelta(seconds=_NEW_ROOM_DISCOVERY_GRACE_SECONDS):
-                return True
-        except TypeError:
-            continue
-    return False
+    now = _now()
+    candidates = [_as_naive_utc(getattr(room, "updated_at", None)), _as_naive_utc(getattr(room, "created_at", None))]
+    return any(value is not None and now - value <= timedelta(seconds=_NEW_ROOM_DISCOVERY_GRACE_SECONDS) for value in candidates)
 
 
 def _activate_room_for_discovery(room: Room) -> None:
-    now = datetime.utcnow()
+    now = _now()
     room.is_active = True
     room.online_count = max(int(room.online_count or 0), 1)
-    room.trending_score = max(int(room.trending_score or 0), 1)
-    if hasattr(room, "updated_at"):
-        room.updated_at = now
+    room.trending_score = max(int(room.trending_score or 0), room.online_count, 1)
+    room.updated_at = now
+
+
+def _discovery_count_for_room(db: Session, room: Room) -> int:
+    active_count = _active_room_count(db, room.room_public_id)
+    stored_count = max(int(room.online_count or 0), 0)
+
+    if active_count > 0:
+        return active_count
+
+    # Robust fallback: create-room / room-enter can reach the discovery table
+    # before the first heartbeat row is visible, or after a process restart.
+    # Keep recently touched active rooms visible using the stored room state.
+    if room.is_active and not room.is_secret and _room_is_in_discovery_grace(room):
+        return max(stored_count, 1)
+
+    return 0
 
 
 def _filter_discovery_rooms(
@@ -269,29 +291,26 @@ def _filter_discovery_rooms(
         query = query.filter(Room.room_type == category.strip())
 
     candidates = (
-        query.order_by(Room.trending_score.desc(), Room.online_count.desc(), Room.updated_at.desc())
-        .limit(min(max(safe_limit * 4, safe_limit), 300))
+        query.order_by(Room.updated_at.desc(), Room.trending_score.desc(), Room.online_count.desc())
+        .limit(min(max(safe_limit * 8, safe_limit), 500))
         .all()
     )
 
     visible_rooms: list[tuple[Room, int]] = []
-    stale_rooms: list[Room] = []
+    changed_rooms: list[Room] = []
     for room in candidates:
-        active_count = _active_room_count(db, room.room_public_id)
-        discovery_count = active_count
-        if active_count <= 0 and _room_is_in_discovery_grace(room):
-            discovery_count = max(int(room.online_count or 0), 1)
+        discovery_count = _discovery_count_for_room(db, room)
         if room.online_count != discovery_count:
             room.online_count = discovery_count
-            stale_rooms.append(room)
+            changed_rooms.append(room)
         if discovery_count <= 0:
             continue
         visible_rooms.append((room, discovery_count))
         if len(visible_rooms) >= safe_limit:
             break
 
-    if stale_rooms:
-        for room in stale_rooms:
+    if changed_rooms:
+        for room in changed_rooms:
             db.add(room)
         db.commit()
 
@@ -354,7 +373,7 @@ def create_room(
             lock_password = _clean_numeric_lock_password(payload.get("lock_password"), required=not bool(existing_room.lock_password_hash))
             if lock_password:
                 existing_room.lock_password_hash = hash_password(lock_password)
-                existing_room.lock_updated_at = datetime.utcnow()
+                existing_room.lock_updated_at = _now()
                 existing_room.lock_updated_by_user_id = current_user.id
         _activate_room_for_discovery(existing_room)
         db.add(existing_room)
@@ -383,7 +402,7 @@ def create_room(
         lock_password = _clean_numeric_lock_password(payload.get("lock_password"), required=True)
         if lock_password:
             room.lock_password_hash = hash_password(lock_password)
-            room.lock_updated_at = datetime.utcnow()
+            room.lock_updated_at = _now()
             room.lock_updated_by_user_id = current_user.id
     _activate_room_for_discovery(room)
 
@@ -439,7 +458,7 @@ def update_room_access_settings(
             lock_password = _clean_numeric_lock_password(payload.lock_password, required=not bool(room.lock_password_hash))
             if lock_password:
                 room.lock_password_hash = hash_password(lock_password)
-                room.lock_updated_at = datetime.utcnow()
+                room.lock_updated_at = _now()
                 room.lock_updated_by_user_id = current_user.id
     db.add(room)
     db.commit()
@@ -463,8 +482,9 @@ def update_room_mode(
         lock_password = _clean_numeric_lock_password(payload.get("lock_password"), required=not bool(room.lock_password_hash))
         if lock_password:
             room.lock_password_hash = hash_password(lock_password)
-            room.lock_updated_at = datetime.utcnow()
+            room.lock_updated_at = _now()
             room.lock_updated_by_user_id = current_user.id
+    _activate_room_for_discovery(room)
     db.add(room)
     db.commit()
     db.refresh(room)
@@ -513,7 +533,7 @@ def update_room_announcement(
     room = _get_or_create_room_for_settings(db, room_public_id)
     text = payload.announcement_text.strip()
     room.announcement_text = text if text else None
-    room.announcement_updated_at = datetime.utcnow()
+    room.announcement_updated_at = _now()
     room.announcement_updated_by_user_id = room.owner_user_id
     db.add(room)
     db.commit()
