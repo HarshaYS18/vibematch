@@ -34,7 +34,7 @@ class StoreItemGridSection extends StatelessWidget {
           crossAxisCount: 2,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 0.78,
+          childAspectRatio: 0.66,
         ),
         itemBuilder: (context, index) => _StoreItemCard(
           item: items[index],
@@ -53,7 +53,10 @@ class _StoreItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final buttonText = item.isOwned ? 'Owned' : item.isFree ? 'Claim' : '${compactCoins(item.priceCoins)} coins';
+    final priceLabel = item.isFree ? 'Free' : '${compactCoins(item.priceCoins)} coins';
+    final validityLabel = item.isTimed ? '${item.durationDays} days validity' : 'Permanent validity';
+    final buttonText = item.isOwned ? 'Owned' : item.isFree ? 'Claim free' : 'Buy now';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -89,7 +92,7 @@ class _StoreItemCard extends StatelessWidget {
                 else if (item.assetPath != null)
                   Image.asset(
                     item.assetPath!,
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
                   )
                 else
@@ -104,6 +107,15 @@ class _StoreItemCard extends StatelessWidget {
                       child: const Text('HOT', style: TextStyle(color: Color(0xFF251538), fontSize: 10, fontWeight: FontWeight.w900)),
                     ),
                   ),
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.42), borderRadius: BorderRadius.circular(999)),
+                    child: Text(storeCategoryShortLabel(item.category), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                  ),
+                ),
               ],
             ),
           ),
@@ -118,13 +130,14 @@ class _StoreItemCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.description ?? storeCategoryLabel(item.category),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, height: 1.2, fontWeight: FontWeight.w700),
-                ),
+                const SizedBox(height: 7),
+                _InfoPill(icon: Icons.paid_rounded, label: priceLabel),
+                const SizedBox(height: 6),
+                _InfoPill(icon: Icons.event_available_rounded, label: validityLabel),
+                if (item.isOwned && item.expiresAt != null) ...[
+                  const SizedBox(height: 6),
+                  _InfoPill(icon: Icons.hourglass_bottom_rounded, label: expiryLabel(item.expiresAt)),
+                ],
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
@@ -141,6 +154,40 @@ class _StoreItemCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF7F1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEDE3D7)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF7B6A86)),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
             ),
           ),
         ],
