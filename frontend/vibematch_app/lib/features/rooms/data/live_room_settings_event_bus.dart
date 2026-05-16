@@ -65,8 +65,6 @@ class LiveRoomSettingsEvent {
       seatLayoutId:
           json['seat_layout_id']?.toString() ??
           json['seatLayoutId']?.toString() ??
-          roomMap['seat_layout_id']?.toString() ??
-          roomMap['seatLayoutId']?.toString() ??
           '',
       announcementText:
           json['announcement_text']?.toString() ??
