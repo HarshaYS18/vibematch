@@ -424,7 +424,7 @@ class _RoomThemeStoreSheet extends StatelessWidget {
           Expanded(
             child: ListView.separated(
               itemCount: themes.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final theme = themes[index];
                 final priceLabel = theme.isFree ? 'Free' : theme.isOwned ? 'Owned' : '${theme.priceCoins} coins';
@@ -484,10 +484,10 @@ class _StoreThemePreview extends StatelessWidget {
     final imageUrl = theme.imageUrl?.trim();
     final assetPath = theme.assetPath?.trim();
     if (imageUrl != null && imageUrl.isNotEmpty) {
-      return Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+      return Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink());
     }
     if (assetPath != null && assetPath.isNotEmpty) {
-      return Image.asset(assetPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+      return Image.asset(assetPath, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink());
     }
     return const SizedBox.shrink();
   }
