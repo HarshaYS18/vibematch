@@ -127,6 +127,7 @@ def _ensure_runtime_schema() -> None:
         "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_password_hash VARCHAR(255)",
         "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_updated_at TIMESTAMP",
         "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_updated_by_user_id INTEGER",
+        "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS seat_layout_id VARCHAR(24) DEFAULT '5x2' NOT NULL",
     ]
     with engine.begin() as connection:
         for statement in statements:
