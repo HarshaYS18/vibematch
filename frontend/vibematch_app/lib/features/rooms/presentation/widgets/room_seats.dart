@@ -72,7 +72,9 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   @override
   void didUpdateWidget(covariant RoomSeatLayout oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedSeatIndex != widget.selectedSeatIndex) _hiddenMenuSeat = null;
+    if (oldWidget.selectedSeatIndex != widget.selectedSeatIndex) {
+      _hiddenMenuSeat = null;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncOverlayMenu());
   }
 
@@ -107,7 +109,11 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
       _removeOverlayMenu();
       return;
     }
-    if (_overlaySeatIndex == selectedSeat.index && _overlaySeatLocked == selectedSeat.locked && _overlayApplyOnly == widget.applyOnlyModeEnabled && _overlayCanManage == widget.canManageSeats && _menuEntry != null) {
+    if (_overlaySeatIndex == selectedSeat.index &&
+        _overlaySeatLocked == selectedSeat.locked &&
+        _overlayApplyOnly == widget.applyOnlyModeEnabled &&
+        _overlayCanManage == widget.canManageSeats &&
+        _menuEntry != null) {
       _menuEntry!.markNeedsBuild();
       return;
     }
@@ -116,9 +122,9 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null || !renderBox.hasSize) return;
     final seatTopLeft = _seatOffset(selectedSeat.index, spec, layoutSize.width);
-    final localLeft = seatTopLeft.dx - (menuWidth / 2);
-    final localTop = seatTopLeft.dy + seatHeight + 2;
-    final globalPosition = renderBox.localToGlobal(Offset(localLeft, localTop));
+    final globalPosition = renderBox.localToGlobal(
+      Offset(seatTopLeft.dx - (menuWidth / 2), seatTopLeft.dy + seatHeight + 2),
+    );
     final screenWidth = MediaQuery.sizeOf(context).width;
     final left = globalPosition.dx.clamp(6.0, screenWidth - menuWidth - 6);
     final top = globalPosition.dy;
@@ -132,7 +138,9 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
         top: top,
         width: menuWidth,
         child: _SeatMenu(
-          key: ValueKey('seat-menu-${selectedSeat.index}-${selectedSeat.locked}-${widget.applyOnlyModeEnabled}-${widget.canManageSeats}'),
+          key: ValueKey(
+            'seat-menu-${selectedSeat.index}-${selectedSeat.locked}-${widget.applyOnlyModeEnabled}-${widget.canManageSeats}',
+          ),
           locked: selectedSeat.locked,
           applyOnlyModeEnabled: widget.applyOnlyModeEnabled,
           canManageSeats: widget.canManageSeats,
@@ -155,8 +163,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   @override
   Widget build(BuildContext context) {
     final spec = SeatLayoutSpec.parse(widget.layoutId);
-    final topRows = spec.hasHostSeats ? 1 : 0;
-    final totalRows = topRows + spec.rows;
+    final totalRows = (spec.hasHostSeats ? 1 : 0) + spec.rows;
     final layoutHeight = totalRows * rowHeight;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -167,35 +174,43 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
         final children = <Widget>[];
         for (var index = 0; index < widget.seats.length; index++) {
           final offset = _seatOffset(index, spec, width);
-          children.add(Positioned(
-            left: offset.dx - (seatWidth / 2),
-            top: offset.dy,
-            width: seatWidth,
-            height: seatHeight,
-            child: _SeatTile(
-              seat: widget.seats[index],
-              selected: widget.selectedSeatIndex == index && _hiddenMenuSeat != index,
-              onTap: () {
-                final seat = widget.seats[index];
-                final user = seat.user;
-                if (user == null) {
-                  if (widget.applyOnlyModeEnabled && !widget.canManageSeats && !seat.locked) {
-                    dismissRoomSeatActionPill();
-                    widget.onApply(index);
-                    return;
-                  }
-                  widget.onSeatTap(index);
-                } else {
-                  dismissRoomSeatActionPill();
-                  widget.onUserTap(index);
-                }
-              },
+          children.add(
+            Positioned(
+              left: offset.dx - (seatWidth / 2),
+              top: offset.dy,
+              width: seatWidth,
+              height: seatHeight,
+              child: _SeatTile(
+                seat: widget.seats[index],
+                selected: widget.selectedSeatIndex == index && _hiddenMenuSeat != index,
+                onTap: () => _handleSeatTap(index),
+              ),
             ),
-          ));
+          );
         }
-        return SizedBox(height: layoutHeight, width: width, child: Stack(clipBehavior: Clip.none, children: children));
+        return SizedBox(
+          height: layoutHeight,
+          width: width,
+          child: Stack(clipBehavior: Clip.none, children: children),
+        );
       },
     );
+  }
+
+  void _handleSeatTap(int index) {
+    final seat = widget.seats[index];
+    final user = seat.user;
+    if (user == null) {
+      if (widget.applyOnlyModeEnabled && !widget.canManageSeats && !seat.locked) {
+        dismissRoomSeatActionPill();
+        widget.onApply(index);
+        return;
+      }
+      widget.onSeatTap(index);
+    } else {
+      dismissRoomSeatActionPill();
+      widget.onUserTap(index);
+    }
   }
 
   RoomSeat? get _selectedSeat {
@@ -225,29 +240,46 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
 
 class _SeatTile extends StatelessWidget {
   const _SeatTile({required this.seat, required this.selected, required this.onTap});
+
   final RoomSeat seat;
   final bool selected;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     final user = seat.user;
-    return GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: Column(mainAxisSize: MainAxisSize.min, children: [
-      _SeatAvatar(seat: seat, selected: selected),
-      const SizedBox(height: 3),
-      SizedBox(height: 19, child: user == null ? _EmptySeatLabel(index: seat.index) : _UserSeatLabel(user: user, index: seat.index)),
-    ]));
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SeatAvatar(seat: seat, selected: selected),
+          const SizedBox(height: 3),
+          SizedBox(
+            height: 19,
+            child: user == null
+                ? _EmptySeatLabel(index: seat.index)
+                : _UserSeatLabel(user: user, index: seat.index),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class _SeatAvatar extends StatelessWidget {
   const _SeatAvatar({required this.seat, required this.selected});
+
   final RoomSeat seat;
   final bool selected;
+
   @override
   Widget build(BuildContext context) {
     final user = seat.user;
     final avatarUrl = user?.avatarUrl?.trim();
     final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+    final speaking = user != null && user.isSpeaking && !user.selfMuted && !user.adminMuted;
     final equippedFrame = user == null
         ? null
         : equippedStoreAvatarFrame(
@@ -255,77 +287,214 @@ class _SeatAvatar extends StatelessWidget {
             assetPath: user.equippedAvatarFrameAssetPath,
             imageUrl: user.equippedAvatarFrameImageUrl,
           );
-    return SizedBox(width: _RoomSeatLayoutState.avatarSize + 11, height: _RoomSeatLayoutState.avatarSize + 11, child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
-      if (selected) Container(width: _RoomSeatLayoutState.avatarSize + 6, height: _RoomSeatLayoutState.avatarSize + 6, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 1.15))),
-      RoomAvatarFrameHost(
-        frame: user == null ? null : (equippedFrame ?? defaultStaticAvatarFrame),
-        size: _RoomSeatLayoutState.avatarSize,
-        framePadding: equippedFrame == null ? 6 : 16,
-        child: Container(
-          width: _RoomSeatLayoutState.avatarSize,
-          height: _RoomSeatLayoutState.avatarSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.08 : 0.12) : null,
-            gradient: user == null || hasAvatar ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
-            border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.84) : Colors.white.withValues(alpha: 0.16), width: selected ? 1.15 : 0.95),
+
+    final avatarFrame = RoomAvatarFrameHost(
+      frame: user == null ? null : (equippedFrame ?? defaultStaticAvatarFrame),
+      size: _RoomSeatLayoutState.avatarSize,
+      framePadding: equippedFrame == null ? 6 : 16,
+      child: Container(
+        width: _RoomSeatLayoutState.avatarSize,
+        height: _RoomSeatLayoutState.avatarSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: user == null
+              ? Colors.white.withValues(alpha: seat.locked ? 0.08 : 0.12)
+              : null,
+          gradient: user == null || hasAvatar
+              ? null
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: user.avatarColors,
+                ),
+          border: Border.all(
+            color: selected
+                ? Colors.white.withValues(alpha: 0.84)
+                : Colors.white.withValues(alpha: 0.16),
+            width: selected ? 1.15 : 0.95,
           ),
-          clipBehavior: Clip.antiAlias,
-          child: user == null
-              ? Center(child: Icon(seat.locked ? Icons.lock_rounded : Icons.add_rounded, color: Colors.white70, size: seat.locked ? 17 : 21))
-              : hasAvatar
-                  ? Image.network(
-                      avatarUrl,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                      filterQuality: FilterQuality.high,
-                      errorBuilder: (context, error, stackTrace) => _SeatAvatarFallback(user: user),
-                    )
-                  : _SeatAvatarFallback(user: user),
         ),
+        clipBehavior: Clip.antiAlias,
+        child: user == null
+            ? Center(
+                child: Icon(
+                  seat.locked ? Icons.lock_rounded : Icons.add_rounded,
+                  color: Colors.white70,
+                  size: seat.locked ? 17 : 21,
+                ),
+              )
+            : hasAvatar
+                ? Image.network(
+                    avatarUrl,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (context, error, stackTrace) => _SeatAvatarFallback(user: user),
+                  )
+                : _SeatAvatarFallback(user: user),
       ),
-      if (user?.selfMuted ?? false) Positioned(right: 1, bottom: 4, child: Container(width: 17, height: 17, decoration: BoxDecoration(color: RoomColors.selfMute, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.0)), child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 8.8))),
-      if (user?.adminMuted ?? false) Positioned(right: 1, bottom: 4, child: Container(width: 17, height: 17, decoration: BoxDecoration(color: RoomColors.coral, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.0), boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.30), blurRadius: 6, offset: const Offset(0, 2))]), child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 8.8))),
-    ]));
+    );
+
+    return SizedBox(
+      width: _RoomSeatLayoutState.avatarSize + 15,
+      height: _RoomSeatLayoutState.avatarSize + 15,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          if (selected)
+            Container(
+              width: _RoomSeatLayoutState.avatarSize + 6,
+              height: _RoomSeatLayoutState.avatarSize + 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 1.15),
+              ),
+            ),
+          SeatSpeakingWave(
+            size: _RoomSeatLayoutState.avatarSize,
+            active: speaking,
+            child: avatarFrame,
+          ),
+          if (user?.selfMuted ?? false)
+            const _SeatMuteBadge(color: RoomColors.selfMute),
+          if (user?.adminMuted ?? false)
+            _SeatMuteBadge(
+              color: RoomColors.coral,
+              glow: RoomColors.coral.withValues(alpha: 0.30),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SeatMuteBadge extends StatelessWidget {
+  const _SeatMuteBadge({required this.color, this.glow});
+
+  final Color color;
+  final Color? glow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      right: 1,
+      bottom: 4,
+      child: Container(
+        width: 17,
+        height: 17,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: RoomColors.deep, width: 1.0),
+          boxShadow: glow == null
+              ? null
+              : [BoxShadow(color: glow!, blurRadius: 6, offset: const Offset(0, 2))],
+        ),
+        child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 8.8),
+      ),
+    );
   }
 }
 
 class _SeatAvatarFallback extends StatelessWidget {
   const _SeatAvatarFallback({required this.user});
+
   final SeatUser user;
+
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors)),
-      child: Center(child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 18.5, fontWeight: FontWeight.w900))),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: user.avatarColors,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          avatarLetter(user.name),
+          style: const TextStyle(color: Colors.white, fontSize: 18.5, fontWeight: FontWeight.w900),
+        ),
+      ),
     );
   }
 }
 
 class _EmptySeatLabel extends StatelessWidget {
   const _EmptySeatLabel({required this.index});
+
   final int index;
+
   @override
-  Widget build(BuildContext context) => Center(child: Text('NO.${index + 1}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.56), fontSize: 9.4, fontWeight: FontWeight.w900, height: 1)));
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        'NO.${index + 1}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.56),
+          fontSize: 9.4,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
+      ),
+    );
+  }
 }
 
 class _UserSeatLabel extends StatelessWidget {
   const _UserSeatLabel({required this.user, required this.index});
+
   final SeatUser user;
   final int index;
+
   @override
   Widget build(BuildContext context) {
     final chipColor = user.gender == RoomUserGender.female ? RoomColors.coral : RoomColors.aqua;
-    return Row(mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 13, height: 13, alignment: Alignment.center, decoration: BoxDecoration(color: chipColor, shape: BoxShape.circle), child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 6.8, fontWeight: FontWeight.w900, height: 1))),
-      const SizedBox(width: 3),
-      Flexible(child: Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10.3, fontWeight: FontWeight.w900, height: 1))),
-    ]);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 13,
+          height: 13,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: chipColor, shape: BoxShape.circle),
+          child: Text(
+            '${index + 1}',
+            style: const TextStyle(color: Colors.white, fontSize: 6.8, fontWeight: FontWeight.w900, height: 1),
+          ),
+        ),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            user.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 10.3, fontWeight: FontWeight.w900, height: 1),
+          ),
+        ),
+      ],
+    );
   }
 }
 
 class _SeatMenu extends StatefulWidget {
-  const _SeatMenu({super.key, required this.locked, required this.applyOnlyModeEnabled, required this.canManageSeats, required this.onInvite, required this.onSwitch, required this.onLock, required this.onUnlock, required this.onApply});
+  const _SeatMenu({
+    super.key,
+    required this.locked,
+    required this.applyOnlyModeEnabled,
+    required this.canManageSeats,
+    required this.onInvite,
+    required this.onSwitch,
+    required this.onLock,
+    required this.onUnlock,
+    required this.onApply,
+  });
+
   final bool locked;
   final bool applyOnlyModeEnabled;
   final bool canManageSeats;
@@ -334,6 +503,7 @@ class _SeatMenu extends StatefulWidget {
   final VoidCallback onLock;
   final VoidCallback onUnlock;
   final VoidCallback onApply;
+
   @override
   State<_SeatMenu> createState() => _SeatMenuState();
 }
@@ -343,51 +513,160 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
   late final Animation<Offset> _slide;
+
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 190), reverseDuration: const Duration(milliseconds: 125));
-    final curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack, reverseCurve: Curves.easeInBack);
-    _opacity = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 190),
+      reverseDuration: const Duration(milliseconds: 125),
+    );
+    final curve = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutBack,
+      reverseCurve: Curves.easeInBack,
+    );
+    _opacity = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic),
+    );
     _scale = Tween<double>(begin: 0.88, end: 1).animate(curve);
-    _slide = Tween<Offset>(begin: const Offset(0, -0.14), end: Offset.zero).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInBack));
+    _slide = Tween<Offset>(begin: const Offset(0, -0.14), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInBack),
+    );
     _controller.forward();
   }
+
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final actions = widget.canManageSeats ? widget.locked ? [_MenuAction('Unlock', widget.onUnlock)] : [_MenuAction('Invite', widget.onInvite), _MenuAction('Switch', widget.onSwitch), _MenuAction('Lock', widget.onLock)] : <_MenuAction>[];
+    final actions = widget.canManageSeats
+        ? widget.locked
+            ? [_MenuAction('Unlock', widget.onUnlock)]
+            : [
+                _MenuAction('Invite', widget.onInvite),
+                _MenuAction('Switch', widget.onSwitch),
+                _MenuAction('Lock', widget.onLock),
+              ]
+        : <_MenuAction>[];
     if (actions.isEmpty) return const SizedBox.shrink();
-    return FadeTransition(opacity: _opacity, child: SlideTransition(position: _slide, child: ScaleTransition(scale: _scale, alignment: Alignment.topCenter, child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const _SeatMenuPointer(),
-      Material(color: Colors.transparent, borderRadius: BorderRadius.circular(13), elevation: 7, shadowColor: Colors.black.withValues(alpha: 0.13), child: Container(padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5), decoration: BoxDecoration(color: const Color(0xFF5F6470).withValues(alpha: 0.75), borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white.withValues(alpha: 0.13)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.13), blurRadius: 10, offset: const Offset(0, 5))]), child: Column(mainAxisSize: MainAxisSize.min, children: [for (var i = 0; i < actions.length; i++) ...[_MenuButton(action: actions[i]), if (i != actions.length - 1) Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 1.8, horizontal: 4), color: Colors.white.withValues(alpha: 0.10))]]))),
-    ]))));
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _slide,
+        child: ScaleTransition(
+          scale: _scale,
+          alignment: Alignment.topCenter,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _SeatMenuPointer(),
+              Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(13),
+                elevation: 7,
+                shadowColor: Colors.black.withValues(alpha: 0.13),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5F6470).withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.13)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.13),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 0; i < actions.length; i++) ...[
+                        _MenuButton(action: actions[i]),
+                        if (i != actions.length - 1)
+                          Container(
+                            height: 1,
+                            margin: const EdgeInsets.symmetric(vertical: 1.8, horizontal: 4),
+                            color: Colors.white.withValues(alpha: 0.10),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class _SeatMenuPointer extends StatelessWidget {
   const _SeatMenuPointer();
+
   @override
-  Widget build(BuildContext context) => CustomPaint(size: const Size(15, _RoomSeatLayoutState.menuArrowHeight), painter: _SeatMenuPointerPainter());
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(15, _RoomSeatLayoutState.menuArrowHeight),
+      painter: _SeatMenuPointerPainter(),
+    );
+  }
 }
 
 class _SeatMenuPointerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF5F6470).withValues(alpha: 0.75)..style = PaintingStyle.fill;
-    final path = Path()..moveTo(size.width / 2, 0)..lineTo(size.width, size.height)..lineTo(0, size.height)..close();
+    final paint = Paint()
+      ..color = const Color(0xFF5F6470).withValues(alpha: 0.75)
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
     canvas.drawPath(path, paint);
   }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _MenuAction { const _MenuAction(this.label, this.onTap); final String label; final VoidCallback onTap; }
+class _MenuAction {
+  const _MenuAction(this.label, this.onTap);
+
+  final String label;
+  final VoidCallback onTap;
+}
 
 class _MenuButton extends StatelessWidget {
   const _MenuButton({required this.action});
+
   final _MenuAction action;
+
   @override
-  Widget build(BuildContext context) => InkWell(borderRadius: BorderRadius.circular(9), onTap: action.onTap, child: SizedBox(height: _RoomSeatLayoutState.menuItemHeight, child: Center(child: Text(action.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10.9, fontWeight: FontWeight.w900, height: 1)))));
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(9),
+      onTap: action.onTap,
+      child: SizedBox(
+        height: _RoomSeatLayoutState.menuItemHeight,
+        child: Center(
+          child: Text(
+            action.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 10.9, fontWeight: FontWeight.w900, height: 1),
+          ),
+        ),
+      ),
+    );
+  }
 }
