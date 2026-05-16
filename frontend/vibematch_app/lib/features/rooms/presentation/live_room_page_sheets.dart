@@ -13,7 +13,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         guestMessagesEnabled: _guestMessagesEnabled,
         applyOnlyModeEnabled: _applyOnlyModeEnabled,
         joinRequestCount: _roomMessageController.joinRequestUsers.length,
-        onBackgroundTap: () => _openBackgroundStoreFromSettings(sheetContext),
+        onBackgroundTap: () => _openBackgroundPickerFromSettings(sheetContext),
         onCoverPhotoTap: () => _changeRoomCoverPhotoFromSettings(sheetContext),
         onCustomBackgroundTap: () => _submitCustomBackgroundFromSettings(sheetContext),
         onPrivacyTap: _openPrivacySheet,
@@ -99,26 +99,47 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     }
   }
 
-  Future<void> _openBackgroundStoreFromSettings(BuildContext sheetContext) async {
+  Future<void> _openBackgroundPickerFromSettings(BuildContext sheetContext) async {
     if (!_viewerCanManageRoom) {
       RoomToast.show(context, 'Only the host/admin can change room background');
       return;
     }
     Navigator.pop(sheetContext);
-    RoomToast.show(context, 'Loading room backgrounds...');
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => RoomBackgroundPickerSheet(
+        currentTheme: _selectedBackgroundTheme,
+        onThemeSelected: (theme) {
+          _roomStateController.setSelectedBackgroundTheme(theme);
+          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(theme.id);
+          RoomToast.show(context, '${theme.name} applied');
+          _insertSystemMessage('${theme.name} background applied by ${_currentUser.name}.');
+        },
+        onStoreTap: () {
+          Navigator.pop(context);
+          _openBackgroundStoreSheet();
+        },
+      ),
+    );
+  }
+
+  Future<void> _openBackgroundStoreSheet() async {
+    RoomToast.show(context, 'Loading store backgrounds...');
     try {
       final api = const RoomApiService();
       final themes = await api.listRoomThemes();
       if (!mounted) return;
-      if (themes.isEmpty) {
-        RoomToast.show(context, 'No backgrounds available yet');
+      final storeThemes = themes.where((theme) => !theme.isDefault).toList(growable: false);
+      if (storeThemes.isEmpty) {
+        RoomToast.show(context, 'No store backgrounds available yet');
         return;
       }
       LiveRoomSheetController.showTransparentSheet<void>(
         context: context,
         isScrollControlled: true,
         builder: (context) => _RoomThemeStoreSheet(
-          themes: themes,
+          themes: storeThemes,
           onThemePressed: (theme) async {
             try {
               var selectedTheme = theme;
@@ -154,7 +175,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       imageUrl: theme.imageUrl,
       assetPath: theme.assetPath,
       accent: RoomColors.aqua,
-      sourceType: RoomBackgroundSourceType.store,
+      sourceType: theme.isDefault ? RoomBackgroundSourceType.chatRoom : RoomBackgroundSourceType.store,
       unlockType: theme.isFree ? RoomBackgroundUnlockType.free : RoomBackgroundUnlockType.storePurchase,
       ownershipType: theme.isFree ? RoomBackgroundOwnershipType.free : RoomBackgroundOwnershipType.permanent,
       isDefault: theme.isDefault,
@@ -384,29 +405,34 @@ class _RoomThemeStoreSheet extends StatelessWidget {
         children: [
           const SheetHandle(width: 44),
           const SizedBox(height: 14),
-          const Text(
-            'Room Background Store',
-            style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900),
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Store Backgrounds', style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900)),
+                    SizedBox(height: 4),
+                    Text('Purchased and premium backgrounds', style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: RoomColors.plum)),
+            ],
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Buy, apply, or use approved custom backgrounds.',
-            style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Expanded(
             child: ListView.separated(
-              physics: const BouncingScrollPhysics(),
               itemCount: themes.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final theme = themes[index];
-                final action = theme.isOwned || theme.isFree ? 'Apply' : 'Buy ${theme.priceCoins} coins';
+                final priceLabel = theme.isFree ? 'Free' : theme.isOwned ? 'Owned' : '${theme.priceCoins} coins';
                 return Material(
                   color: RoomColors.pearl,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(18),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(18),
                     onTap: () => onThemePressed(theme),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -416,30 +442,24 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                             width: 58,
                             height: 58,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(18),
-                              gradient: const LinearGradient(colors: [RoomColors.deep, RoomColors.violet]),
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: const LinearGradient(colors: [RoomColors.deep, RoomColors.plum]),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: theme.imageUrl == null
-                                ? const Icon(Icons.wallpaper_rounded, color: Colors.white)
-                                : Image.network(theme.imageUrl!, fit: BoxFit.cover),
+                            child: _StoreThemePreview(theme: theme),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(theme.name, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
-                                const SizedBox(height: 3),
-                                Text(theme.isOwned ? 'Owned' : theme.isFree ? 'Free' : 'Store background', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w800)),
+                                Text(theme.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
+                                const SizedBox(height: 4),
+                                Text(priceLabel, style: const TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w800)),
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                            decoration: BoxDecoration(color: RoomColors.plum, borderRadius: BorderRadius.circular(999)),
-                            child: Text(action, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
-                          ),
+                          Icon(theme.isOwned || theme.isFree ? Icons.check_circle_rounded : Icons.shopping_bag_rounded, color: RoomColors.aqua),
                         ],
                       ),
                     ),
@@ -451,5 +471,24 @@ class _RoomThemeStoreSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _StoreThemePreview extends StatelessWidget {
+  const _StoreThemePreview({required this.theme});
+
+  final RoomThemeDto theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = theme.imageUrl?.trim();
+    final assetPath = theme.assetPath?.trim();
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+    }
+    if (assetPath != null && assetPath.isNotEmpty) {
+      return Image.asset(assetPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+    }
+    return const SizedBox.shrink();
   }
 }
