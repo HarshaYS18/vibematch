@@ -2,6 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.role_badge import RoleBadgeResponse
+from app.schemas.store import EquippedStoreItemsResponse
 from app.schemas.user import UserVipSummaryResponse
 
 
@@ -62,6 +63,7 @@ class RoomParticipantUserResponse(BaseModel):
     primary_role_badge: RoleBadgeResponse | None = None
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
     vip: UserVipSummaryResponse
+    equipped_items: EquippedStoreItemsResponse | None = None
     sending_level: int = 0
     receiving_level: int = 0
     sent_exp: int = 0
