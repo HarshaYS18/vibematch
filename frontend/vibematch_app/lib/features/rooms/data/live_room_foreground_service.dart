@@ -6,15 +6,17 @@ class LiveRoomForegroundService {
 
   static const MethodChannel _channel = MethodChannel('vibematch/live_room_service');
 
-  static Future<void> start({required String roomName, required String roomId}) async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+  static Future<bool> start({required String roomName, required String roomId}) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
     try {
-      await _channel.invokeMethod<bool>('startLiveRoomService', <String, Object?>{
+      final started = await _channel.invokeMethod<bool>('startLiveRoomService', <String, Object?>{
         'roomName': roomName,
         'roomId': roomId,
       });
+      return started == true;
     } catch (error) {
       debugPrint('[VibeMatchLiveRoomService] start failed: $error');
+      return false;
     }
   }
 
