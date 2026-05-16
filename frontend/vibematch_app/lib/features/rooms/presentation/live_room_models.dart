@@ -136,6 +136,7 @@ class SeatUser {
     this.isRoomAdmin = false,
     this.selfMuted = false,
     this.adminMuted = false,
+    this.isSpeaking = false,
   });
 
   final String id;
@@ -167,6 +168,7 @@ class SeatUser {
   final bool isRoomAdmin;
   final bool selfMuted;
   final bool adminMuted;
+  final bool isSpeaking;
 
   bool get muted => selfMuted || adminMuted;
   bool get showLocation =>
@@ -197,6 +199,7 @@ class SeatUser {
     bool? isRoomAdmin,
     bool? selfMuted,
     bool? adminMuted,
+    bool? isSpeaking,
     RoomUserGender? gender,
     int? svipLevel,
     int? age,
@@ -233,6 +236,7 @@ class SeatUser {
       isRoomAdmin: isRoomAdmin ?? this.isRoomAdmin,
       selfMuted: selfMuted ?? this.selfMuted,
       adminMuted: adminMuted ?? this.adminMuted,
+      isSpeaking: isSpeaking ?? this.isSpeaking,
     );
   }
 }
