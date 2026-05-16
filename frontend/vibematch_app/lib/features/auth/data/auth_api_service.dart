@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/vm_api_config.dart';
+import '../../../core/session/vm_session_cleanup_service.dart';
 import '../models/current_user.dart';
 
 class AuthApiService {
@@ -84,6 +85,7 @@ class AuthApiService {
     String? displayName,
     String? deviceId,
   }) async {
+    await VmSessionCleanupService.clearUserScopedState(reason: 'dev login account switch');
     _cachedAccessToken = null;
     _cachedUser = null;
 
@@ -131,6 +133,7 @@ class AuthApiService {
     required String idToken,
     String? deviceId,
   }) async {
+    await VmSessionCleanupService.clearUserScopedState(reason: 'google login account switch');
     _cachedAccessToken = null;
     _cachedUser = null;
 
@@ -234,12 +237,14 @@ class AuthApiService {
   }
 
   Future<void> logout() async {
+    await VmSessionCleanupService.clearUserScopedState(reason: 'logout');
     _cachedAccessToken = null;
     _cachedUser = null;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userJsonKey);
+    AuthUserRealtimeService.instance.publishSignedOut();
   }
 
   String? get cachedAccessToken => _cachedAccessToken;
@@ -267,12 +272,16 @@ class AuthUserRealtimeService {
 
   static final AuthUserRealtimeService instance = AuthUserRealtimeService._();
 
-  final StreamController<CurrentUser> _controller = StreamController<CurrentUser>.broadcast();
+  final StreamController<CurrentUser?> _controller = StreamController<CurrentUser?>.broadcast();
 
-  Stream<CurrentUser> get users => _controller.stream;
+  Stream<CurrentUser?> get users => _controller.stream;
 
   void publish(CurrentUser user) {
     _controller.add(user);
+  }
+
+  void publishSignedOut() {
+    _controller.add(null);
   }
 }
 
