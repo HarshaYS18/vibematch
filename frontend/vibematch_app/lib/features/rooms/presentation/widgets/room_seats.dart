@@ -247,11 +247,19 @@ class _SeatAvatar extends StatelessWidget {
     final user = seat.user;
     final avatarUrl = user?.avatarUrl?.trim();
     final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+    final equippedFrame = user == null
+        ? null
+        : equippedStoreAvatarFrame(
+            userId: user.id,
+            assetPath: user.equippedAvatarFrameAssetPath,
+            imageUrl: user.equippedAvatarFrameImageUrl,
+          );
     return SizedBox(width: _RoomSeatLayoutState.avatarSize + 14, height: _RoomSeatLayoutState.avatarSize + 14, child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
       if (selected) Container(width: _RoomSeatLayoutState.avatarSize + 8, height: _RoomSeatLayoutState.avatarSize + 8, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.92), width: 1.4))),
       RoomAvatarFrameHost(
-        frame: user == null ? null : defaultStaticAvatarFrame,
+        frame: user == null ? null : (equippedFrame ?? defaultStaticAvatarFrame),
         size: _RoomSeatLayoutState.avatarSize,
+        framePadding: equippedFrame == null ? 8 : 20,
         child: Container(
           width: _RoomSeatLayoutState.avatarSize,
           height: _RoomSeatLayoutState.avatarSize,
