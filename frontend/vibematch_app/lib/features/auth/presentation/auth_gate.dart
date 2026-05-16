@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/app_shell.dart';
 import '../data/auth_api_service.dart';
 import '../data/google_sign_in_config.dart';
 import '../models/current_user.dart';
+import 'profile_setup_page.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -14,6 +16,8 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  static const String _profileSetupDonePrefix = 'vm_profile_setup_done_';
+
   final AuthApiService _authApiService = AuthApiService();
   late final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: GoogleSignInConfig.clientId,
@@ -23,6 +27,7 @@ class _AuthGateState extends State<AuthGate> {
 
   bool _isCheckingAuth = true;
   bool _isLoading = false;
+  bool _needsProfileSetup = false;
   String? _error;
   CurrentUser? _currentUser;
 
@@ -41,9 +46,20 @@ class _AuthGateState extends State<AuthGate> {
     try {
       await _authApiService.restoreSavedSession();
       final user = await _authApiService.getCurrentUser();
-      if (mounted) setState(() => _currentUser = user);
+      final needsSetup = await _shouldShowProfileSetup(user);
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+          _needsProfileSetup = needsSetup;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _currentUser = null);
+      if (mounted) {
+        setState(() {
+          _currentUser = null;
+          _needsProfileSetup = false;
+        });
+      }
     } finally {
       if (mounted) setState(() => _isCheckingAuth = false);
     }
@@ -77,7 +93,13 @@ class _AuthGateState extends State<AuthGate> {
         accessToken: result.accessToken,
         forceRefresh: true,
       );
-      if (mounted) setState(() => _currentUser = user);
+      final needsSetup = await _shouldShowProfileSetup(user);
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+          _needsProfileSetup = needsSetup;
+        });
+      }
     } on GoogleSignInAccount catch (error) {
       if (mounted) setState(() => _error = 'Google login failed: $error');
     } catch (error) {
@@ -100,7 +122,34 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted) return;
     setState(() {
       _currentUser = null;
+      _needsProfileSetup = false;
       _error = null;
+    });
+  }
+
+  Future<bool> _shouldShowProfileSetup(CurrentUser user) async {
+    final prefs = await SharedPreferences.getInstance();
+    final setupKey = '$_profileSetupDonePrefix${user.publicUserId}';
+    final alreadyCompleted = prefs.getBool(setupKey) ?? false;
+    if (alreadyCompleted) return false;
+
+    final hasName = user.displayName?.trim().isNotEmpty == true;
+    final hasAvatar = user.avatarUrl?.trim().isNotEmpty == true;
+    return !hasName || !hasAvatar;
+  }
+
+  Future<void> _markProfileSetupCompleted(CurrentUser user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$_profileSetupDonePrefix${user.publicUserId}', true);
+  }
+
+  Future<void> _handleProfileSetupCompleted(CurrentUser user) async {
+    await _markProfileSetupCompleted(user);
+    await _authApiService.persistCurrentUser(user);
+    if (!mounted) return;
+    setState(() {
+      _currentUser = user;
+      _needsProfileSetup = false;
     });
   }
 
@@ -108,7 +157,8 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     if (_isCheckingAuth) return const _LoadingScreen();
 
-    if (_currentUser == null) {
+    final user = _currentUser;
+    if (user == null) {
       return _LoginScreen(
         isLoading: _isLoading,
         error: _error,
@@ -116,8 +166,16 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
+    if (_needsProfileSetup) {
+      return ProfileSetupPage(
+        user: user,
+        onCompleted: (updatedUser) => unawaited(_handleProfileSetupCompleted(updatedUser)),
+        onLogoutPressed: _logout,
+      );
+    }
+
     return AppShell(
-      currentUser: _currentUser!,
+      currentUser: user,
       onLogoutPressed: _logout,
       onRefreshPressed: _checkSavedLogin,
     );
