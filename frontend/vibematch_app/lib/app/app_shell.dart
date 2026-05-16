@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/icons/vm_icons.dart';
+import '../core/session/vm_session_cleanup_service.dart';
 import '../features/auth/data/auth_api_service.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/home/presentation/home_page_modular.dart';
@@ -36,7 +37,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   VmMainTab _selectedTab = VmMainTab.home;
   late CurrentUser _syncedUser;
-  StreamSubscription<CurrentUser>? _userSyncSubscription;
+  StreamSubscription<CurrentUser?>? _userSyncSubscription;
   final PresenceApiService _presenceApi = const PresenceApiService();
   Timer? _presenceHeartbeatTimer;
   int _homeRefreshNonce = 0;
@@ -51,7 +52,7 @@ class _AppShellState extends State<AppShell> {
     _syncedUser = widget.currentUser;
     _syncVibesPlaybackWithActiveTab();
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(_syncedUser);
-    _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onUserSynced);
+    _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onAuthUserEvent);
     _startPresenceHeartbeat();
     unawaited(WalletRealtimeSyncService.instance.start());
   }
@@ -96,6 +97,15 @@ class _AppShellState extends State<AppShell> {
     } catch (_) {
       // Heartbeat should never block app navigation. Auth/API errors are handled elsewhere.
     }
+  }
+
+  void _onAuthUserEvent(CurrentUser? user) {
+    if (user == null) {
+      _presenceHeartbeatTimer?.cancel();
+      VmSessionCleanupService.clearUserScopedStateUnawaited(reason: 'app shell signed out');
+      return;
+    }
+    _onUserSynced(user);
   }
 
   void _onUserSynced(CurrentUser user) {
