@@ -5,6 +5,7 @@ import '../../data/active_room_context.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_restrictions_service.dart';
 import '../../data/live_room_settings_event_bus.dart';
+import '../../data/room_seat_layout_sync_service.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
 import '../modules/cricket_mode_module.dart';
@@ -52,6 +53,7 @@ class LiveRoomStateController extends ChangeNotifier {
   Offset _bubbleOffset = const Offset(24, 120);
   final RoomSettingsRepository _settingsRepository = RoomSettingsRepository();
   RoomBackgroundTheme _selectedBackgroundTheme = defaultRoomBackgroundTheme;
+  String _seatLayoutId = '5x2';
   String _announcementText = '';
 
   String get roomName => _roomName;
@@ -69,6 +71,7 @@ class LiveRoomStateController extends ChangeNotifier {
   VibeSyncRoomState get vibeSyncState => _vibeSyncState;
   Offset get bubbleOffset => _bubbleOffset;
   RoomBackgroundTheme get selectedBackgroundTheme => _selectedBackgroundTheme;
+  String get seatLayoutId => _seatLayoutId;
   String get announcementText => _announcementText;
 
   @override
@@ -130,6 +133,11 @@ class LiveRoomStateController extends ChangeNotifier {
         activeRoomBackgroundTheme.value = nextTheme;
         changed = true;
       }
+    }
+
+    if (event.seatLayoutId.trim().isNotEmpty && event.seatLayoutId != _seatLayoutId) {
+      _seatLayoutId = event.seatLayoutId.trim();
+      changed = true;
     }
 
     if (event.announcementText != _announcementText && event.announcementText.trim().isNotEmpty) {
@@ -263,6 +271,36 @@ class LiveRoomStateController extends ChangeNotifier {
     setRoomBackgroundTheme(value);
   }
 
+  void setSeatLayoutId(String value) {
+    final nextLayoutId = value.trim();
+    if (nextLayoutId.isEmpty) return;
+    if (nextLayoutId == _seatLayoutId) {
+      RoomSeatLayoutSyncService.broadcastSeatLayout(roomId: _roomId, seatLayoutId: nextLayoutId);
+      return;
+    }
+    _seatLayoutId = nextLayoutId;
+    notifyListeners();
+
+    _settingsRepository
+        .updateSeatLayout(roomPublicId: _roomId, seatLayoutId: nextLayoutId)
+        .then((settings) {
+          if (settings.seatLayoutId != _seatLayoutId) {
+            _seatLayoutId = settings.seatLayoutId;
+            notifyListeners();
+          }
+          RoomSeatLayoutSyncService.broadcastSeatLayout(
+            roomId: _roomId,
+            seatLayoutId: settings.seatLayoutId,
+          );
+        })
+        .catchError((_) {
+          RoomSeatLayoutSyncService.broadcastSeatLayout(
+            roomId: _roomId,
+            seatLayoutId: nextLayoutId,
+          );
+        });
+  }
+
   void setVibeSyncState(VibeSyncRoomState value) {
     if (value == _vibeSyncState) return;
     _vibeSyncState = value;
@@ -285,6 +323,11 @@ class LiveRoomStateController extends ChangeNotifier {
       if (theme != _selectedBackgroundTheme) {
         _selectedBackgroundTheme = theme;
         activeRoomBackgroundTheme.value = theme;
+        changed = true;
+      }
+
+      if (settings.seatLayoutId.trim().isNotEmpty && settings.seatLayoutId != _seatLayoutId) {
+        _seatLayoutId = settings.seatLayoutId;
         changed = true;
       }
 
