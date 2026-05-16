@@ -41,6 +41,96 @@ async function createWebRtcTransport(router) {
   };
 }
 
+function findPeerByProducerId(room, producerId) {
+  for (const peer of room.peers.values()) {
+    if (peer.producers.has(producerId)) return peer;
+  }
+  return null;
+}
+
+async function ensureActiveSpeakerObserver(room, io) {
+  if (room.audioLevelObserver && !room.audioLevelObserver.closed) return room.audioLevelObserver;
+
+  const observer = await room.router.createAudioLevelObserver({
+    maxEntries: 8,
+    threshold: -65,
+    interval: 350,
+  });
+
+  room.audioLevelObserver = observer;
+
+  observer.on('volumes', (volumes) => {
+    const speakers = [];
+
+    for (const item of volumes) {
+      const producer = item.producer;
+      if (!producer || producer.closed) continue;
+      const peer = findPeerByProducerId(room, producer.id);
+      if (!peer || !peer.seatNo) continue;
+      const seat = room.seats.get(peer.seatNo);
+      if (!seat || seat.selfMuted || seat.adminMuted) continue;
+      speakers.push({
+        peerId: peer.id,
+        producerId: producer.id,
+        seatNo: peer.seatNo,
+        volume: item.volume,
+      });
+    }
+
+    io.to(room.id).emit('activeSpeakers', {
+      roomId: room.id,
+      speakers,
+      ts: Date.now(),
+    });
+  });
+
+  observer.on('silence', () => {
+    io.to(room.id).emit('activeSpeakers', {
+      roomId: room.id,
+      speakers: [],
+      ts: Date.now(),
+    });
+  });
+
+  observer.on('close', () => {
+    if (room.audioLevelObserver === observer) room.audioLevelObserver = null;
+  });
+
+  console.log(`[activeSpeakers] observer created room=${room.id}`);
+  return observer;
+}
+
+async function addProducerToActiveSpeakerObserver(room, io, producer) {
+  if (!producer || producer.closed || producer.kind !== 'audio') return;
+  try {
+    const observer = await ensureActiveSpeakerObserver(room, io);
+    await observer.addProducer({ producerId: producer.id });
+    producer.on('close', () => {
+      try {
+        observer.removeProducer({ producerId: producer.id });
+      } catch (_) {}
+      io.to(room.id).emit('activeSpeakers', {
+        roomId: room.id,
+        speakers: [],
+        ts: Date.now(),
+      });
+    });
+    producer.on('transportclose', () => {
+      try {
+        observer.removeProducer({ producerId: producer.id });
+      } catch (_) {}
+      io.to(room.id).emit('activeSpeakers', {
+        roomId: room.id,
+        speakers: [],
+        ts: Date.now(),
+      });
+    });
+    console.log(`[activeSpeakers] tracking producer=${producer.id} room=${room.id}`);
+  } catch (error) {
+    console.error('[activeSpeakers] observer add failed', error);
+  }
+}
+
 function getProducerSnapshot(room, requestingPeerId) {
   const peerProducers = Array.from(room.peers.values())
     .filter((peer) => peer.id !== requestingPeerId)
@@ -80,6 +170,14 @@ function closePeerProducers(room, peer, io) {
 
   for (const producerId of closedProducerIds) {
     io.to(room.id).emit('producerClosed', { producerId, peerId: peer.id });
+  }
+
+  if (closedProducerIds.length > 0) {
+    io.to(room.id).emit('activeSpeakers', {
+      roomId: room.id,
+      speakers: [],
+      ts: Date.now(),
+    });
   }
 
   return closedProducerIds;
@@ -136,6 +234,9 @@ function registerSocketHandlers(io) {
 
         const room = await getOrCreateRoom(joinedRoomId);
         ensureRoomMusicState(room);
+        ensureActiveSpeakerObserver(room, io).catch((error) => {
+          console.error('[joinRoom] active speaker observer failed', error);
+        });
         let peer = room.peers.get(joinedPeerId);
 
         if (!peer) peer = createPeer(room, joinedPeerId, socket.id);
@@ -351,6 +452,7 @@ function registerSocketHandlers(io) {
         const producer = await transport.produce({ kind, rtpParameters });
         peer.producers.set(producer.id, producer);
         setSeatProducer(room, peer.id, producer.id);
+        await addProducerToActiveSpeakerObserver(room, io, producer);
 
         producer.on('transportclose', () => {
           peer.producers.delete(producer.id);
@@ -486,6 +588,9 @@ function registerSocketHandlers(io) {
 
         const seat = setSelfMuted(room, String(peerId), Boolean(muted));
         const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        if (Boolean(muted)) {
+          io.to(roomId).emit('activeSpeakers', { roomId, speakers: [], ts: Date.now() });
+        }
         console.log(`[setSelfMuted] room=${roomId} peer=${peerId} muted=${Boolean(muted)}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
@@ -505,6 +610,9 @@ function registerSocketHandlers(io) {
 
         const seat = setAdminMuted(room, String(targetPeerId), Boolean(muted));
         const payload = emitSeatsUpdated(io, roomId, room, { seat });
+        if (Boolean(muted)) {
+          io.to(roomId).emit('activeSpeakers', { roomId, speakers: [], ts: Date.now() });
+        }
         console.log(`[setAdminMuted] room=${roomId} targetPeer=${targetPeerId} muted=${Boolean(muted)}`);
         safeCallback(callback, { ok: true, ...payload });
       } catch (error) {
@@ -534,6 +642,7 @@ function registerSocketHandlers(io) {
       socket.to(joinedRoomId).emit('peerLeft', { peerId: joinedPeerId });
 
       if (room) socket.to(joinedRoomId).emit('seatsUpdated', { seats: getSeatSnapshot(room) });
+      if (room) io.to(joinedRoomId).emit('activeSpeakers', { roomId: joinedRoomId, speakers: [], ts: Date.now() });
     });
   });
 }
