@@ -3,6 +3,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.role_badge import RoleBadgeResponse
+from app.schemas.store import EquippedStoreItemsResponse
 
 
 class UserVipSummaryResponse(BaseModel):
@@ -71,6 +72,7 @@ class UserMeResponse(BaseModel):
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
     vip: UserVipSummaryResponse | None = None
     wallet: UserWalletSummaryResponse | None = None
+    equipped_items: EquippedStoreItemsResponse | None = None
     is_active: bool
     is_banned: bool
     last_device_id: str | None = None
@@ -116,6 +118,7 @@ class PublicUserProfileResponse(BaseModel):
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
     vip: UserVipSummaryResponse
     wallet: UserWalletSummaryResponse | None = None
+    equipped_items: EquippedStoreItemsResponse | None = None
     is_online: bool
     last_seen_at: datetime | None = None
     created_at: datetime
@@ -132,6 +135,7 @@ class UserSearchResultResponse(BaseModel):
     primary_role_badge: RoleBadgeResponse | None = None
     role_badges: list[RoleBadgeResponse] = Field(default_factory=list)
     vip: UserVipSummaryResponse
+    equipped_items: EquippedStoreItemsResponse | None = None
     is_online: bool
     last_seen_at: datetime | None = None
     is_following: bool = False
