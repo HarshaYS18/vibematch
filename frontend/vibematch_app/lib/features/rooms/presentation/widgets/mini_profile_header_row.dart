@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../core/widgets/vm_gradient_name_text.dart';
+import '../../../../core/widgets/vm_gradient_name_text.dart';
 import '../live_room_models.dart';
 import 'mini_profile_decoration.dart';
 import 'mini_profile_header/mini_profile_more_menu_button.dart';
