@@ -49,6 +49,11 @@ flutter:
     - assets/images/vip_badges/
     - assets/images/vip_tags/
     - assets/images/svip_tags/
+    - assets/images/store/avatar_frames/
+    - assets/images/store/chat_bubbles/
+    - assets/images/store/entrance_effects/
+    - assets/images/store/profile_themes/
+    - assets/images/store/badges/
     - assets/images/gifts/
     - assets/gifts/normal/
     - assets/gifts/lucky/
