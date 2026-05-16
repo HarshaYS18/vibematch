@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../core/widgets/vm_gradient_name_text.dart';
 import '../live_room_models.dart';
 import 'mini_profile_decoration.dart';
 import 'mini_profile_header/mini_profile_more_menu_button.dart';
@@ -91,11 +92,12 @@ class MiniProfileHeaderRow extends StatelessWidget {
                     ],
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 176),
-                      child: Text(
-                        user.name,
+                      child: VmGradientNameText(
+                        text: user.name,
                         textAlign: TextAlign.center,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        gradientColors: user.nameGradientColors,
                         style: const TextStyle(
                           color: RoomColors.plum,
                           fontSize: 18,
