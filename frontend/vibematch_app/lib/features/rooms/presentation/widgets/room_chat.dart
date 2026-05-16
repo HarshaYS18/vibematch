@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../../core/widgets/vm_gradient_name_text.dart';
+import '../../../../core/widgets/vm_gradient_name_text.dart';
 import '../../../media/data/media_upload_service.dart';
 import '../controllers/live_room_message_controller.dart';
 import '../live_room_models.dart';
