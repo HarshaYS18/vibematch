@@ -6,6 +6,7 @@ class VmAvatarFrameStyle {
     required this.name,
     required this.accent,
     this.assetPath,
+    this.imageUrl,
     this.isDynamic = false,
   });
 
@@ -13,6 +14,7 @@ class VmAvatarFrameStyle {
   final String name;
   final Color accent;
   final String? assetPath;
+  final String? imageUrl;
   final bool isDynamic;
 }
 
@@ -73,6 +75,8 @@ class _VmAvatarFrameHostState extends State<VmAvatarFrameHost>
     if (frame == null) return widget.child;
 
     final frameSize = widget.size + widget.framePadding;
+    final imageUrl = frame.imageUrl?.trim();
+    final assetPath = frame.assetPath?.trim();
 
     return SizedBox(
       width: frameSize,
@@ -81,12 +85,27 @@ class _VmAvatarFrameHostState extends State<VmAvatarFrameHost>
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          if (frame.assetPath != null)
-            Image.asset(
-              frame.assetPath!,
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            Image.network(
+              imageUrl,
               width: frameSize,
               height: frameSize,
               fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (context, error, stackTrace) => _GeneratedVmAvatarFrame(
+                frame: frame,
+                size: frameSize,
+                controller: _controller,
+                staticStrokeWidth: widget.staticStrokeWidth,
+              ),
+            )
+          else if (assetPath != null && assetPath.isNotEmpty)
+            Image.asset(
+              assetPath,
+              width: frameSize,
+              height: frameSize,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
               errorBuilder: (context, error, stackTrace) => _GeneratedVmAvatarFrame(
                 frame: frame,
                 size: frameSize,
