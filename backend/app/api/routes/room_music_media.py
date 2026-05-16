@@ -1,4 +1,4 @@
-
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -67,9 +67,20 @@ class RoomMusicUploadResponse(BaseModel):
     filename: str
 
 
+def _public_media_base_url(request: Request) -> str:
+    configured = (
+        os.getenv("PUBLIC_MEDIA_BASE_URL")
+        or os.getenv("PUBLIC_BASE_URL")
+        or os.getenv("MEDIA_BASE_URL")
+        or ""
+    ).strip()
+    if configured:
+        return configured.rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
 def _absolute_url(request: Request, path: str) -> str:
-    base = str(request.base_url).rstrip("/")
-    return f"{base}{path}"
+    return f"{_public_media_base_url(request)}{path}"
 
 
 def _safe_upload_filename(filename: str, content_type: str) -> tuple[str, str]:
