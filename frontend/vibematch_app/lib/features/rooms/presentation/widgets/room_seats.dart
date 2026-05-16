@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../live_room_models.dart';
 import 'room_avatar_frames.dart';
 import 'room_theme.dart';
+import 'seat_speaking_wave.dart';
 
 final ValueNotifier<int> roomSeatActionDismissSignal = ValueNotifier<int>(0);
 
