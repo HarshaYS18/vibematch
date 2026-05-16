@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../live_room_models.dart';
 import 'compact_gift_card.dart';
+import 'gift_category_strip.dart';
 
 class GiftGalleryPager extends StatelessWidget {
   const GiftGalleryPager({
@@ -23,16 +24,17 @@ class GiftGalleryPager extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final categories = GiftCategoryStrip.visibleCategories;
     return PageView.builder(
       controller: controller,
       physics: const BouncingScrollPhysics(),
-      itemCount: GiftCategory.values.length,
+      itemCount: categories.length,
       onPageChanged: (index) {
-        final category = GiftCategory.values[index];
+        final category = categories[index];
         if (category != selectedCategory) onCategoryChanged(category);
       },
       itemBuilder: (context, index) {
-        final category = GiftCategory.values[index];
+        final category = categories[index];
         final filtered = _orderedGiftsForCategory(category);
 
         return GridView.builder(
