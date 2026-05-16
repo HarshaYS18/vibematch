@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../live_room_models.dart';
 import '../room_theme.dart';
 import 'gift_bottom_action_bar.dart';
+import 'gift_category_strip.dart';
 import 'gift_gallery_pager.dart';
 import 'gift_mock_extras.dart';
 import 'gift_panel_constants.dart';
@@ -53,11 +54,16 @@ class GiftPanelModular extends StatefulWidget {
 class _GiftPanelModularState extends State<GiftPanelModular> {
   late final PageController _categoryPageController;
 
+  int _pageIndexFor(GiftCategory category) {
+    final index = GiftCategoryStrip.visibleCategories.indexOf(category);
+    return index < 0 ? 0 : index;
+  }
+
   @override
   void initState() {
     super.initState();
     _categoryPageController = PageController(
-      initialPage: GiftCategory.values.indexOf(widget.selectedCategory),
+      initialPage: _pageIndexFor(widget.selectedCategory),
     );
   }
 
@@ -67,7 +73,7 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
     if (oldWidget.selectedCategory != widget.selectedCategory &&
         _categoryPageController.hasClients) {
       _categoryPageController.animateToPage(
-        GiftCategory.values.indexOf(widget.selectedCategory),
+        _pageIndexFor(widget.selectedCategory),
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
       );
@@ -116,7 +122,7 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
               onCategoryChanged: (category) {
                 widget.onCategoryChanged(category);
                 _categoryPageController.animateToPage(
-                  GiftCategory.values.indexOf(category),
+                  _pageIndexFor(category),
                   duration: const Duration(milliseconds: 180),
                   curve: Curves.easeOutCubic,
                 );
