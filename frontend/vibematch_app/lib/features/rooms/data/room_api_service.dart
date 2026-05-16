@@ -36,7 +36,7 @@ class RoomApiService {
       'mode': mode.trim(),
       'type': type.trim(),
       if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
-      ?'allow_screenshots': allowScreenshots,
+      if (allowScreenshots != null) 'allow_screenshots': allowScreenshots,
     };
 
     final response = await http.post(
