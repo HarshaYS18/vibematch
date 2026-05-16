@@ -82,8 +82,18 @@ async def _broadcast_conversation(conversation: InboxConversation) -> None:
         await inbox_ws_manager.send_to_user(participant.user_id, {"event": "inbox_conversation_updated", "conversation_id": conversation.public_id})
 
 
-async def _broadcast_message(conversation: InboxConversation, message_payload: dict) -> None:
-    await inbox_ws_manager.broadcast_to_users(inbox_service.participant_user_ids(conversation), {"event": "inbox_message_created", "conversation_id": conversation.public_id, "message": message_payload})
+async def _broadcast_message(conversation: InboxConversation, message, event: str = "inbox_message_created") -> None:
+    for participant in conversation.participants:
+        if participant.user is None:
+            continue
+        await inbox_ws_manager.send_to_user(
+            participant.user_id,
+            {
+                "event": event,
+                "conversation_id": conversation.public_id,
+                "message": inbox_service.message_to_dict(message, participant.user),
+            },
+        )
 
 
 async def _broadcast_report_task(report: InboxReport) -> None:
@@ -257,9 +267,8 @@ async def send_room_invite_by_public_id(public_user_id: int, request: InboxRoomI
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found")
     conversation, message = inbox_service.send_room_invite_message(db=db, sender=current_user, target_user=target_user, room_name=request.room_name, room_public_id=request.room_public_id, room_language=request.room_language, mode_title=request.mode_title)
-    target_payload = inbox_service.message_to_dict(message, target_user)
     sender_payload = inbox_service.message_to_dict(message, current_user)
-    await _broadcast_message(conversation, target_payload)
+    await _broadcast_message(conversation, message)
     await _broadcast_conversation(conversation)
     return InboxMessageResponse(**sender_payload)
 
@@ -283,7 +292,7 @@ async def send_message(conversation_id: str, request: InboxSendMessageRequest, d
         raise HTTPException(status_code=403, detail="Official team chat is read-only")
     message = inbox_service.send_message(db=db, conversation=conversation, sender=current_user, text=request.text, message_type=request.type, reply_to_text=request.reply_to_text, invite_room_name=request.invite_room_name, invite_room_id=request.invite_room_id, attachment_url=request.attachment_url)
     payload = inbox_service.message_to_dict(message, current_user)
-    await _broadcast_message(conversation, payload)
+    await _broadcast_message(conversation, message)
     await _broadcast_conversation(conversation)
     return InboxMessageResponse(**payload)
 
@@ -307,7 +316,7 @@ async def update_message(conversation_id: str, message_id: str, request: InboxMe
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
     payload = inbox_service.message_to_dict(message, current_user)
-    await inbox_ws_manager.broadcast_to_users(inbox_service.participant_user_ids(conversation), {"event": "inbox_message_updated", "conversation_id": conversation.public_id, "message": payload})
+    await _broadcast_message(conversation, message, event="inbox_message_updated")
     return InboxMessageResponse(**payload)
 
 

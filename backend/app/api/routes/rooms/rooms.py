@@ -169,7 +169,7 @@ def get_my_live_room(db: Session = Depends(get_db), current_user: User = Depends
 @router.post("/cleanup-stale")
 def cleanup_stale_rooms(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     removed_count = cleanup_stale_room_participants(db)
-    return {"removed_count": removed_count, "rule": "Active room participants with no heartbeat for 10 minutes are removed from the room."}
+    return {"removed_count": removed_count, "rule": "Active room participants with no heartbeat for 5 minutes are removed from the room."}
 
 
 @router.get("/trending", response_model=list[RoomTrendingResponse])

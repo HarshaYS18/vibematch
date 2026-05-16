@@ -198,19 +198,21 @@ def _get_or_create_identity_user(db: Session, provider: str, provider_user_id: s
     return user
 
 
-@router.post("/dev-login", response_model=AuthResponse)
-def dev_login(payload: DevLoginRequest, request: Request, db: Session = Depends(get_db)):
-    provider = "dev_email"
-    email = str(payload.email).lower().strip()
-    provider_user_id = email
-    client_ip = request.client.host if request.client else None
-    device_id = payload.device_id.strip() if payload.device_id else None
+if settings.ENABLE_DEV_LOGIN:
 
-    _fail_if_device_banned(db, email, provider, provider_user_id, device_id, client_ip)
-    user = _get_or_create_identity_user(db, provider, provider_user_id, email, payload.username, payload.display_name)
-    _fail_if_banned_or_inactive(db, user, email, provider, provider_user_id, device_id, client_ip)
-    _record_login_success(db, user, email, provider, provider_user_id, device_id, client_ip)
-    return _auth_response_for_user(db, user)
+    @router.post("/dev-login", response_model=AuthResponse)
+    def dev_login(payload: DevLoginRequest, request: Request, db: Session = Depends(get_db)):
+        provider = "dev_email"
+        email = str(payload.email).lower().strip()
+        provider_user_id = email
+        client_ip = request.client.host if request.client else None
+        device_id = payload.device_id.strip() if payload.device_id else None
+
+        _fail_if_device_banned(db, email, provider, provider_user_id, device_id, client_ip)
+        user = _get_or_create_identity_user(db, provider, provider_user_id, email, payload.username, payload.display_name)
+        _fail_if_banned_or_inactive(db, user, email, provider, provider_user_id, device_id, client_ip)
+        _record_login_success(db, user, email, provider, provider_user_id, device_id, client_ip)
+        return _auth_response_for_user(db, user)
 
 
 @router.post("/google-login", response_model=AuthResponse)

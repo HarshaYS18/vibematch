@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Google Sign-In OAuth client IDs. Comma-separated for web/android/ios clients.
     GOOGLE_AUTH_CLIENT_IDS: str = ""
+    ENABLE_DEV_LOGIN: bool = False
 
     # Google Drive backup OAuth
     GOOGLE_DRIVE_CLIENT_ID: str = ""

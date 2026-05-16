@@ -92,6 +92,11 @@ function roomSnapshot(room) {
       is_host: peer.isHost === true,
       is_room_admin: peer.isRoomAdmin === true || peer.isHost === true,
       role_label: peer.roleLabel || (peer.isHost === true ? 'Channel Host' : peer.isRoomAdmin === true ? 'Admin' : 'Member'),
+      avatar_url: peer.avatarUrl,
+      vip_level: peer.vipLevel,
+      svip_level: peer.svipLevel,
+      sending_level: peer.sendingLevel,
+      receiving_level: peer.receivingLevel,
       seat_index: peer.seatIndex,
       mic_enabled: peer.micEnabled,
       admin_muted: peer.adminMuted === true,
@@ -108,7 +113,12 @@ function createPeer(payload, ws) {
     isHost: payload.is_host === true || payload.isHost === true,
     isRoomAdmin: payload.is_room_admin === true || payload.isRoomAdmin === true || payload.is_host === true || payload.isHost === true,
     roleLabel: clean(payload.role_label, payload.is_host === true || payload.isHost === true ? 'Channel Host' : payload.is_room_admin === true || payload.isRoomAdmin === true ? 'Admin' : 'Member'),
-    seatIndex: payload.seat_index ?? null,
+    avatarUrl: clean(payload.avatar_url ?? payload.avatarUrl, ''),
+    vipLevel: Number(payload.vip_level ?? payload.vipLevel ?? 0) || 0,
+    svipLevel: Number(payload.svip_level ?? payload.svipLevel ?? 0) || 0,
+    sendingLevel: Number(payload.sending_level ?? payload.sendingLevel ?? 0) || 0,
+    receivingLevel: Number(payload.receiving_level ?? payload.receivingLevel ?? 0) || 0,
+    seatIndex: seatIndexFrom(payload.seat_index),
     micEnabled: false,
     adminMuted: false,
     joinedAt: new Date().toISOString(),
@@ -126,6 +136,7 @@ function findPeerByUserId(room, userId) {
 }
 
 function seatIndexFrom(value) {
+  if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }

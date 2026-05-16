@@ -18,8 +18,8 @@ from app.schemas.presence import (
 
 router = APIRouter(prefix="/presence", tags=["Presence"])
 
-_ONLINE_WINDOW_SECONDS = 120
-_ROOM_ACTIVE_WINDOW_SECONDS = 150
+_ONLINE_WINDOW_SECONDS = 300
+_ROOM_ACTIVE_WINDOW_SECONDS = 300
 
 
 def _now() -> datetime:

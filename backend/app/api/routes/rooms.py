@@ -19,7 +19,7 @@ from app.schemas.room_settings import (
 )
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
-_ROOM_ACTIVE_WINDOW_SECONDS = 150
+_ROOM_ACTIVE_WINDOW_SECONDS = 300
 # Keep a newly created/reopened room discoverable long enough for the mobile
 # client to finish entering the room and start heartbeats. Heartbeats keep
 # updated_at fresh, so active rooms continue to appear; dead rooms age out.

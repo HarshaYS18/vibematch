@@ -88,8 +88,8 @@ async def inbox_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
                     if conversation.messages:
                         participant.last_read_message_id = conversation.messages[-1].id
                     db.commit()
-                await inbox_ws_manager.broadcast_to_users(
-                    participant_ids,
+                await inbox_ws_manager.send_to_user(
+                    user.id,
                     {
                         "event": "inbox_messages_read",
                         "conversation_id": conversation.public_id,

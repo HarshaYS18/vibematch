@@ -339,6 +339,9 @@ def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
         "is_forwarded": message.is_forwarded,
         "invite_room_name": message.invite_room_name or metadata.get("invite_room_name") or metadata.get("room_name"),
         "invite_room_id": invite_room_id,
+        "love_bond_request_id": metadata.get("love_bond_request_id"),
+        "love_bond_card_name": metadata.get("love_bond_card_name") or metadata.get("card_name"),
+        "love_bond_status": metadata.get("love_bond_status") or metadata.get("status"),
         "created_at": message.created_at.isoformat() if message.created_at else None,
     }
 
@@ -349,13 +352,16 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
     last_message = messages[-1] if messages else None
     metadata = conversation.metadata_json or {}
     other_user = _other_participant_user(conversation, current_user)
+    uses_live_user_profile = not conversation.is_official and other_user is not None
+    title = _display_name(other_user) if uses_live_user_profile else conversation.title
+    avatar_url = other_user.avatar_url if uses_live_user_profile else metadata.get("avatar_url")
     return {
         "id": conversation.public_id,
-        "title": conversation.title,
+        "title": title,
         "subtitle": last_message.text if last_message else "No messages yet",
         "time": _time_label(conversation.updated_at),
-        "avatar_text": conversation.avatar_text,
-        "avatar_url": metadata.get("avatar_url") or (other_user.avatar_url if other_user else None),
+        "avatar_text": _avatar_text(title),
+        "avatar_url": avatar_url,
         "type": conversation.conversation_type,
         "unread_count": participant.unread_count if participant else 0,
         "is_online": False,

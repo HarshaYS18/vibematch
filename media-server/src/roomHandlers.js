@@ -40,6 +40,42 @@ function canControlRoom(peer) {
   return peer?.isHost === true || peer?.isRoomAdmin === true;
 }
 
+function cleanText(value, fallback = '') {
+  const text = String(value ?? '').trim();
+  return text || fallback;
+}
+
+function numberFrom(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function samePeer(room, peer) {
+  return room.peers.get(peer.id) === peer;
+}
+
+function findSeatOccupant(room, seatIndex) {
+  for (const peer of room.peers.values()) {
+    if (peer.seatIndex === seatIndex) return peer;
+  }
+  return null;
+}
+
+function replaceExistingPeer(room, peer) {
+  for (const existing of Array.from(room.peers.values())) {
+    if (existing.id !== peer.id && existing.userId !== peer.userId) continue;
+
+    if (existing.seatIndex != null && peer.seatIndex == null) peer.seatIndex = existing.seatIndex;
+    peer.micEnabled = existing.micEnabled === true;
+    peer.adminMuted = existing.adminMuted === true;
+
+    room.peers.delete(existing.id);
+    if (existing.ws !== peer.ws) {
+      try { existing.ws.close(); } catch (_error) {}
+    }
+  }
+}
+
 function joinRoom({ ws, payload, setSession }) {
   const room = getOrCreateRoom(payload.room_id);
   const userId = String(payload.user_id || 'guest');
@@ -57,6 +93,7 @@ function joinRoom({ ws, payload, setSession }) {
   }
 
   const peer = createPeer(payload, ws);
+  replaceExistingPeer(room, peer);
   room.peers.set(peer.id, peer);
   setSession(room, peer);
 
@@ -85,7 +122,50 @@ function joinRoom({ ws, payload, setSession }) {
   broadcastRoomSystemEvent(room, userEnteredEvent(peer), peer.id);
 }
 
+function updateProfile({ room, peer, payload }) {
+  if (!samePeer(room, peer)) return;
+
+  peer.displayName = cleanText(payload.display_name ?? payload.displayName, peer.displayName || 'Vibe User');
+  if (Object.prototype.hasOwnProperty.call(payload, 'avatar_url') || Object.prototype.hasOwnProperty.call(payload, 'avatarUrl')) {
+    peer.avatarUrl = cleanText(payload.avatar_url ?? payload.avatarUrl, '');
+  }
+  peer.vipLevel = numberFrom(payload.vip_level ?? payload.vipLevel, peer.vipLevel);
+  peer.svipLevel = numberFrom(payload.svip_level ?? payload.svipLevel, peer.svipLevel);
+  peer.sendingLevel = numberFrom(payload.sending_level ?? payload.sendingLevel, peer.sendingLevel);
+  peer.receivingLevel = numberFrom(payload.receiving_level ?? payload.receivingLevel, peer.receivingLevel);
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'is_host') || Object.prototype.hasOwnProperty.call(payload, 'isHost')) {
+    peer.isHost = payload.is_host === true || payload.isHost === true;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'is_room_admin') || Object.prototype.hasOwnProperty.call(payload, 'isRoomAdmin')) {
+    peer.isRoomAdmin = payload.is_room_admin === true || payload.isRoomAdmin === true || peer.isHost === true;
+  }
+  peer.roleLabel = cleanText(
+    payload.role_label ?? payload.roleLabel,
+    peer.isHost ? 'Channel Host' : peer.isRoomAdmin ? 'Admin' : peer.roleLabel || 'Member',
+  );
+
+  broadcastSnapshot(room, 'profile/updated', {
+    peer_id: peer.id,
+    user_id: peer.userId,
+    display_name: peer.displayName,
+    avatar_url: peer.avatarUrl,
+    vip_level: peer.vipLevel,
+    svip_level: peer.svipLevel,
+    sending_level: peer.sendingLevel,
+    receiving_level: peer.receivingLevel,
+    is_host: peer.isHost === true,
+    is_room_admin: peer.isRoomAdmin === true || peer.isHost === true,
+    role_label: peer.roleLabel,
+  });
+}
+
 function leaveRoom({ ws, room, peer, clearSession }) {
+  if (!samePeer(room, peer)) {
+    send(ws, 'room/left', { peer_id: peer.id });
+    clearSession();
+    return;
+  }
   room.peers.delete(peer.id);
   if (room.musicState?.controllerPeerId === peer.id || room.musicState?.producerPeerId === peer.id) {
     room.musicState = createDefaultMusicState();
@@ -210,9 +290,10 @@ function adminAssignSeat({ room, payload }) {
   }
 
   for (const peer of room.peers.values()) {
-    if (peer.seatIndex === seatIndex && peer.userId !== target.userId) {
+    if (peer.seatIndex === seatIndex && peer.id !== target.id && peer.userId !== target.userId) {
       throw new Error(`Seat ${seatIndex + 1} is already occupied`);
     }
+    if (peer.seatIndex === seatIndex && peer.userId === target.userId) clearPeerSeat(peer);
   }
 
   target.seatIndex = seatIndex;
@@ -236,6 +317,14 @@ function takeSeat({ ws, room, peer, payload }) {
   if (room.applyOnlyModeEnabled === true && peer.isRoomAdmin !== true && peer.isHost !== true) {
     send(ws, 'error', { detail: 'Apply Mode is enabled. Please apply for a seat.' });
     return;
+  }
+  const occupant = findSeatOccupant(room, seatIndex);
+  if (occupant && occupant.id !== peer.id) {
+    if (occupant.userId !== peer.userId) {
+      send(ws, 'error', { detail: `Seat ${seatIndex + 1} is already occupied.` });
+      return;
+    }
+    clearPeerSeat(occupant);
   }
   peer.seatIndex = seatIndex;
   peer.adminMuted = false;
@@ -581,6 +670,7 @@ function roomCricketEnd({ room, peer, payload = {} }) {
 }
 
 function peerClosed(room, peer) {
+  if (!samePeer(room, peer)) return;
   room.peers.delete(peer.id);
   if (room.musicState?.controllerPeerId === peer.id || room.musicState?.producerPeerId === peer.id) {
     room.musicState = createDefaultMusicState();
@@ -598,6 +688,7 @@ function peerClosed(room, peer) {
 module.exports = {
   send,
   joinRoom,
+  updateProfile,
   leaveRoom,
   setRoomApplyMode,
   setRoomImages,

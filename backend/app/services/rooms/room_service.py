@@ -2,11 +2,11 @@ import random
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
 from app.models.follow import UserFollow
+from app.models.presence import UserRoomPresence
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
@@ -16,8 +16,8 @@ from app.services.role_badge_service import get_primary_role_badge, get_role_bad
 from app.services.role_service import get_primary_role, get_user_roles
 
 # Backend truth: a user is considered inside a room only while room heartbeat is fresh.
-# After 10 minutes without room heartbeat, backend closes the active participant row.
-_ACTIVE_PARTICIPANT_WINDOW = timedelta(minutes=10)
+# After 5 minutes without room heartbeat, backend closes the active participant row.
+_ACTIVE_PARTICIPANT_WINDOW = timedelta(minutes=5)
 _UNLIMITED_ROOM_ROLES = {"founder_owner", "owner"}
 
 
@@ -259,26 +259,70 @@ def generate_room_public_id(db: Session) -> str:
     raise RuntimeError("Could not generate unique room ID")
 
 
+def _expire_stale_room_presence(db: Session, *, room_public_id: str | None = None, now: datetime | None = None) -> int:
+    now = now or datetime.utcnow()
+    cutoff = now - _ACTIVE_PARTICIPANT_WINDOW
+    query = db.query(UserRoomPresence).filter(
+        UserRoomPresence.is_active.is_(True),
+        UserRoomPresence.last_heartbeat_at < cutoff,
+    )
+    if room_public_id is not None:
+        query = query.filter(UserRoomPresence.room_public_id == room_public_id)
+    return int(
+        query.update(
+            {UserRoomPresence.is_active: False, UserRoomPresence.left_at: now},
+            synchronize_session=False,
+        )
+        or 0
+    )
+
+
+def _active_room_user_ids(db: Session, room: Room, cutoff: datetime) -> set[int]:
+    participant_ids = {
+        row[0]
+        for row in db.query(RoomParticipant.user_id)
+        .filter(
+            RoomParticipant.room_id == room.id,
+            RoomParticipant.is_active.is_(True),
+            RoomParticipant.last_seen_at >= cutoff,
+        )
+        .all()
+    }
+    presence_ids = {
+        row[0]
+        for row in db.query(UserRoomPresence.user_id)
+        .filter(
+            UserRoomPresence.room_public_id == room.room_public_id,
+            UserRoomPresence.is_active.is_(True),
+            UserRoomPresence.last_heartbeat_at >= cutoff,
+        )
+        .all()
+    }
+    return participant_ids | presence_ids
+
+
 def _refresh_room_online_count(db: Session, room: Room) -> int:
-    cutoff = datetime.utcnow() - _ACTIVE_PARTICIPANT_WINDOW
     now = datetime.utcnow()
+    cutoff = now - _ACTIVE_PARTICIPANT_WINDOW
     db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at < cutoff).update({RoomParticipant.is_active: False, RoomParticipant.left_at: now}, synchronize_session=False)
-    count = db.query(func.count(RoomParticipant.id)).filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at >= cutoff).scalar() or 0
+    _expire_stale_room_presence(db, room_public_id=room.room_public_id, now=now)
+    count = len(_active_room_user_ids(db, room, cutoff))
     room.online_count = count
-    room.trending_score = max(room.trending_score, count)
+    room.trending_score = max(int(room.trending_score or 0), count)
     db.flush()
     return count
 
 
 def cleanup_stale_room_participants(db: Session) -> int:
-    cutoff = datetime.utcnow() - _ACTIVE_PARTICIPANT_WINDOW
     now = datetime.utcnow()
+    cutoff = now - _ACTIVE_PARTICIPANT_WINDOW
     updated = db.query(RoomParticipant).filter(RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at < cutoff).update({RoomParticipant.is_active: False, RoomParticipant.left_at: now}, synchronize_session=False)
+    presence_updated = _expire_stale_room_presence(db, now=now)
     rooms = db.query(Room).filter(Room.is_active.is_(True)).all()
     for room in rooms:
         _refresh_room_online_count(db, room)
     db.commit()
-    return int(updated or 0)
+    return int(updated or 0) + int(presence_updated or 0)
 
 
 def room_to_trending_response(room: Room, followed_friends_inside: list[str] | None = None) -> RoomTrendingResponse:
@@ -476,7 +520,36 @@ def list_following_rooms(db: Session, current_user: User, language: str | None =
     followed_ids = [row[0] for row in db.query(UserFollow.followed_user_id).filter(UserFollow.follower_user_id == current_user.id).all()]
     if not followed_ids:
         return []
-    room_ids = [row[0] for row in db.query(RoomParticipant.room_id).filter(RoomParticipant.user_id.in_(followed_ids), RoomParticipant.is_active.is_(True)).distinct().all()]
+    cutoff = datetime.utcnow() - _ACTIVE_PARTICIPANT_WINDOW
+    room_ids = {
+        row[0]
+        for row in db.query(RoomParticipant.room_id)
+        .filter(
+            RoomParticipant.user_id.in_(followed_ids),
+            RoomParticipant.is_active.is_(True),
+            RoomParticipant.last_seen_at >= cutoff,
+        )
+        .distinct()
+        .all()
+    }
+    room_public_ids = [
+        row[0]
+        for row in db.query(UserRoomPresence.room_public_id)
+        .filter(
+            UserRoomPresence.user_id.in_(followed_ids),
+            UserRoomPresence.is_active.is_(True),
+            UserRoomPresence.last_heartbeat_at >= cutoff,
+        )
+        .distinct()
+        .all()
+    ]
+    if room_public_ids:
+        room_ids.update(
+            row[0]
+            for row in db.query(Room.id)
+            .filter(Room.room_public_id.in_(room_public_ids))
+            .all()
+        )
     if not room_ids:
         return []
     query = db.query(Room).filter(Room.id.in_(room_ids), Room.is_active.is_(True), Room.is_secret.is_(False), Room.online_count > 0)
@@ -488,7 +561,21 @@ def list_following_rooms(db: Session, current_user: User, language: str | None =
     result: list[RoomTrendingResponse] = []
     for room in rooms:
         names = [row[0] for row in db.query(User.display_name).join(RoomParticipant, RoomParticipant.user_id == User.id).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id.in_(followed_ids), RoomParticipant.is_active.is_(True)).limit(3).all()]
-        result.append(room_to_trending_response(room, [name for name in names if name]))
+        if len(names) < 3:
+            names.extend(
+                row[0]
+                for row in db.query(User.display_name)
+                .join(UserRoomPresence, UserRoomPresence.user_id == User.id)
+                .filter(
+                    UserRoomPresence.room_public_id == room.room_public_id,
+                    UserRoomPresence.user_id.in_(followed_ids),
+                    UserRoomPresence.is_active.is_(True),
+                    UserRoomPresence.last_heartbeat_at >= cutoff,
+                )
+                .limit(3 - len(names))
+                .all()
+            )
+        result.append(room_to_trending_response(room, list(dict.fromkeys(name for name in names if name))[:3]))
     return result
 
 

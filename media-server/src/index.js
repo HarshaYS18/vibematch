@@ -122,6 +122,7 @@ wss.on('connection', (ws) => {
       if (!requireRoom()) return;
 
       if (type === 'room/leave') return handlers.leaveRoom({ ws, room: currentRoom, peer: currentPeer, clearSession });
+      if (type === 'profile/update') return handlers.updateProfile({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'room_settings/apply_mode') return handlers.setRoomApplyMode({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'room_settings/images') return handlers.setRoomImages({ room: currentRoom, peer: currentPeer, payload });
       if (type === 'room_settings/guest_messages') return handlers.setGuestMessages({ room: currentRoom, peer: currentPeer, payload });

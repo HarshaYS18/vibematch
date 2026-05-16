@@ -16,6 +16,9 @@ class InboxMessageResponse(BaseModel):
     is_forwarded: bool = False
     invite_room_name: str | None = None
     invite_room_id: str | None = None
+    love_bond_request_id: str | None = None
+    love_bond_card_name: str | None = None
+    love_bond_status: str | None = None
     created_at: datetime | None = None
 
 
