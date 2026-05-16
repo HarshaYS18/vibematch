@@ -450,13 +450,21 @@ String avatarLetter(String input) {
 }
 
 String compactNumber(int value) {
-  if (value >= 1000000) {
-    return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+  if (value >= 10000000) {
+    return '${_trimOneDecimal(value / 10000000)}Cr';
+  }
+  if (value >= 100000) {
+    return '${_trimOneDecimal(value / 100000)}L';
   }
   if (value >= 1000) {
-    return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+    return '${_trimOneDecimal(value / 1000)}K';
   }
   return '$value';
+}
+
+String _trimOneDecimal(double value) {
+  final fixed = value.toStringAsFixed(value >= 100 ? 0 : 1);
+  return fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed;
 }
 
 RoomPrivacyMode privacyModeFromTitle(String title) {
