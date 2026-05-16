@@ -163,6 +163,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 familyLevel: _familyLevel(),
                 coverPhotos: coverPhotos,
                 avatarUrl: _avatarUrl(),
+                nameGradientColors: _backendProfile?.vip.nameGradientColors ?? widget.user.vip.nameGradientColors,
                 coverController: _coverController,
                 coverIndex: _coverIndex.clamp(0, coverPhotos.length - 1),
                 followStatus: _followStatus,
@@ -239,79 +240,56 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
                   child: PublicFamilyPanel(
-                    familyName: _familySummary!.safeName,
-                    familyLevel: _familySummary!.level,
+                    family: _familySummary!,
                     onTap: _openFamilyPage,
                   ),
                 ),
               )
             else if (_familyError != null)
               SliverToBoxAdapter(
-                child: _PublicProfileBackendError(
-                  message: _familyError!,
-                  onRetry: () => _loadPublicFamily(_targetPublicUserId()),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                  child: _PublicProfileBackendError(
+                    message: _familyError!,
+                    onRetry: _loadRealFamilyAndVibes,
+                  ),
                 ),
               ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'My Vibes (${_profileVibes.length})',
-                        style: const TextStyle(
-                          color: Color(0xFF251538),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    if (_loadingVibes)
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFF12C7B7),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            if (_vibesError != null)
-              SliverToBoxAdapter(
-                child: _PublicProfileBackendError(
-                  message: _vibesError!,
-                  onRetry: () => _loadPublicVibes(_targetPublicUserId()),
+            if (_loadingVibes)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(18, 16, 18, 0),
+                  child: LinearProgressIndicator(
+                    minHeight: 3,
+                    color: Color(0xFF12C7B7),
+                    backgroundColor: Color(0xFFECE2D8),
+                  ),
                 ),
               )
-            else if (_profileVibes.isEmpty && !_loadingVibes)
-              const SliverToBoxAdapter(child: _PublicVibesEmptyState())
+            else if (_profileVibes.isNotEmpty)
+              SliverToBoxAdapter(
+                child: PublicVibesGrid(
+                  vibes: _profileVibes
+                      .map(_publicVibeItemFromDto)
+                      .toList(growable: false),
+                  onVibeTap: (vibe) => _showAction(
+                    context,
+                    'Open Vibe details for ${vibe.title}.',
+                  ),
+                ),
+              )
+            else if (_vibesError != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                  child: _PublicProfileBackendError(
+                    message: _vibesError!,
+                    onRetry: _loadRealFamilyAndVibes,
+                  ),
+                ),
+              )
             else
-              SliverList.separated(
-                itemCount: _profileVibes.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  final vibe = _publicVibeItemFromDto(_profileVibes[index]);
-                  return Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      18,
-                      index == 0 ? 0 : 0,
-                      18,
-                      index == _profileVibes.length - 1 ? 28 : 0,
-                    ),
-                    child: PublicVibeCard(
-                      vibe: vibe,
-                      onTap: () => _showAction(context, 'Open this Vibe.'),
-                      onLikeTap: () => _showAction(context, 'Like synced.'),
-                      onCommentTap: () => _showAction(context, 'Comments will open.'),
-                      onShareTap: () => _showAction(context, 'Share sheet will open.'),
-                    ),
-                  );
-                },
-              ),
+              const SliverToBoxAdapter(child: _PublicVibesEmptyState()),
           ],
         ),
       ),
