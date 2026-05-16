@@ -6,7 +6,8 @@ import '../../data/live_room_media_signaling_service.dart';
 import '../controllers/live_room_navigation_controller.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../controllers/live_room_state_controller.dart';
-import '../live_room_page.dart';
+import '../live_room_presence_shell_page.dart';
+import '../live_room_restore_state.dart';
 import '../widgets/live_room_leave_sheet.dart';
 import '../widgets/live_room_minimized_overlay_service.dart';
 
@@ -22,6 +23,7 @@ class LiveRoomLeaveActionsModule {
     required String language,
     required String modeTitle,
     required int onlineCount,
+    required LiveRoomRestoreState restoreState,
     required VoidCallback dismissSeatActionPill,
     required VoidCallback clearFocus,
     required bool Function() mountedGetter,
@@ -52,6 +54,7 @@ class LiveRoomLeaveActionsModule {
             language: language,
             modeTitle: modeTitle,
             onlineCount: onlineCount,
+            restoreState: restoreState,
             mountedGetter: mountedGetter,
           );
         },
@@ -109,6 +112,7 @@ class LiveRoomLeaveActionsModule {
     required String language,
     required String modeTitle,
     required int onlineCount,
+    required LiveRoomRestoreState restoreState,
     required bool Function() mountedGetter,
   }) {
     final roomNavigator = Navigator.of(context);
@@ -119,12 +123,13 @@ class LiveRoomLeaveActionsModule {
       onRestore: () {
         rootNavigator.push(
           MaterialPageRoute(
-            builder: (_) => LiveRoomPage(
+            builder: (_) => LiveRoomPresenceShellPage(
               roomName: roomName,
               roomId: roomId,
               language: language,
               modeTitle: modeTitle,
-              onlineCount: onlineCount,
+              initialOnlineCount: onlineCount,
+              restoreState: restoreState,
             ),
           ),
         );

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../auth/data/auth_api_service.dart';
+import '../../auth/models/current_user.dart';
 import '../data/lucky_gifts_api_service.dart';
 
 class LuckyGiftRankingsSheet extends StatefulWidget {
@@ -43,11 +45,23 @@ class _LuckyGiftRankingsSheetState extends State<LuckyGiftRankingsSheet> {
   LuckyGiftRankingResponse? _ranking;
   bool _loading = false;
   String? _error;
+  CurrentUser? _syncedCurrentUser = const AuthApiService().cachedUser;
+  StreamSubscription<CurrentUser>? _userSubscription;
 
   @override
   void initState() {
     super.initState();
+    _userSubscription = AuthUserRealtimeService.instance.users.listen((user) {
+      if (!mounted) return;
+      setState(() => _syncedCurrentUser = user);
+    });
     unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -115,7 +129,9 @@ class _LuckyGiftRankingsSheetState extends State<LuckyGiftRankingsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final entries = _ranking?.entries ?? const <LuckyGiftRankingEntry>[];
+    final entries = (_ranking?.entries ?? const <LuckyGiftRankingEntry>[])
+        .map(_syncCurrentEntry)
+        .toList(growable: false);
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.84,
       child: Container(
@@ -172,31 +188,54 @@ class _LuckyGiftRankingsSheetState extends State<LuckyGiftRankingsSheet> {
                 Expanded(
                   child: _loading && entries.isEmpty
                       ? const Center(
-                          child: CircularProgressIndicator(color: Color(0xFFFFC857)),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFFC857),
+                          ),
                         )
                       : entries.isEmpty
-                          ? _EmptyState(error: _error, onRetry: () => unawaited(_load()))
-                          : RefreshIndicator(
-                              onRefresh: _load,
-                              color: const Color(0xFFFFC857),
-                              child: ListView.separated(
-                                physics: const AlwaysScrollableScrollPhysics(
-                                  parent: BouncingScrollPhysics(),
-                                ),
-                                padding: const EdgeInsets.only(bottom: 12),
-                                itemCount: entries.length,
-                                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  return _RankingTile(entry: entries[index], type: _type);
-                                },
-                              ),
+                      ? _EmptyState(
+                          error: _error,
+                          onRetry: () => unawaited(_load()),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          color: const Color(0xFFFFC857),
+                          child: ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
                             ),
+                            padding: const EdgeInsets.only(bottom: 12),
+                            itemCount: entries.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              return _RankingTile(
+                                entry: entries[index],
+                                type: _type,
+                              );
+                            },
+                          ),
+                        ),
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  LuckyGiftRankingEntry _syncCurrentEntry(LuckyGiftRankingEntry entry) {
+    final current = _syncedCurrentUser;
+    if (current == null || entry.publicUserId != current.publicUserId) {
+      return entry;
+    }
+    return LuckyGiftRankingEntry(
+      rank: entry.rank,
+      score: entry.score,
+      publicUserId: entry.publicUserId,
+      displayName: current.displayName ?? current.username ?? entry.displayName,
+      avatarUrl: current.avatarUrl,
     );
   }
 }
@@ -216,9 +255,15 @@ class _Header extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: const Color(0xFFFFC857).withValues(alpha: 0.18),
-            border: Border.all(color: const Color(0xFFFFC857).withValues(alpha: 0.42)),
+            border: Border.all(
+              color: const Color(0xFFFFC857).withValues(alpha: 0.42),
+            ),
           ),
-          child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFFFC857), size: 22),
+          child: const Icon(
+            Icons.auto_awesome_rounded,
+            color: Color(0xFFFFC857),
+            size: 22,
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -263,7 +308,11 @@ class _Header extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.10),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
-              child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
           ),
         ),
@@ -294,7 +343,11 @@ class _StatsCard extends StatelessWidget {
         children: [
           Text(
             'My lucky stats · ${period.label}',
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 10),
           Row(
@@ -336,14 +389,22 @@ class _StatPill extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFFFFC857), fontSize: 12, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Color(0xFFFFC857),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.50), fontSize: 9.5, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.50),
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),
@@ -378,7 +439,9 @@ class _TypeTabs extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
-                color: isSelected ? const Color(0xFFFFC857) : Colors.white.withValues(alpha: 0.08),
+                color: isSelected
+                    ? const Color(0xFFFFC857)
+                    : Colors.white.withValues(alpha: 0.08),
                 border: Border.all(
                   color: isSelected
                       ? Colors.white.withValues(alpha: 0.18)
@@ -388,7 +451,9 @@ class _TypeTabs extends StatelessWidget {
               child: Text(
                 type.label,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFF170B24) : Colors.white.withValues(alpha: 0.78),
+                  color: isSelected
+                      ? const Color(0xFF170B24)
+                      : Colors.white.withValues(alpha: 0.78),
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                 ),
@@ -410,37 +475,45 @@ class _PeriodTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: LuckyGiftPeriod.values.map((period) {
-        final isSelected = selected == period;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: GestureDetector(
-              onTap: () => onChanged(period),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: isSelected ? Colors.white.withValues(alpha: 0.16) : Colors.white.withValues(alpha: 0.06),
-                  border: Border.all(
-                    color: isSelected ? Colors.white.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-                child: Text(
-                  period.label,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.62),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w900,
+      children: LuckyGiftPeriod.values
+          .map((period) {
+            final isSelected = selected == period;
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: GestureDetector(
+                  onTap: () => onChanged(period),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.16)
+                          : Colors.white.withValues(alpha: 0.06),
+                      border: Border.all(
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.25)
+                            : Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Text(
+                      period.label,
+                      style: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.62),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-        );
-      }).toList(growable: false),
+            );
+          })
+          .toList(growable: false),
     );
   }
 }
@@ -464,8 +537,13 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final path = '/lucky-gifts/rankings/${type.backendValue}?period=${period.backendValue}';
-    final status = loading ? 'syncing live...' : error == null ? 'live backend data' : 'fallback: $error';
+    final path =
+        '/lucky-gifts/rankings/${type.backendValue}?period=${period.backendValue}';
+    final status = loading
+        ? 'syncing live...'
+        : error == null
+        ? 'live backend data'
+        : 'fallback: $error';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -476,7 +554,11 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.query_stats_rounded, color: Color(0xFFFFC857), size: 16),
+          const Icon(
+            Icons.query_stats_rounded,
+            color: Color(0xFFFFC857),
+            size: 16,
+          ),
           const SizedBox(width: 7),
           Expanded(
             child: Text(
@@ -501,7 +583,11 @@ class _StatusPill extends StatelessWidget {
           const SizedBox(width: 6),
           GestureDetector(
             onTap: onRefresh,
-            child: Icon(Icons.refresh_rounded, color: Colors.white.withValues(alpha: 0.75), size: 17),
+            child: Icon(
+              Icons.refresh_rounded,
+              color: Colors.white.withValues(alpha: 0.75),
+              size: 17,
+            ),
           ),
         ],
       ),
@@ -531,18 +617,27 @@ class _RankingTile extends StatelessWidget {
             child: Text(
               '#${entry.rank}',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFFFC857), fontSize: 13, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Color(0xFFFFC857),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           CircleAvatar(
             radius: 21,
             backgroundColor: const Color(0xFFFFC857).withValues(alpha: 0.22),
-            backgroundImage: entry.avatarUrl == null ? null : NetworkImage(entry.avatarUrl!),
+            backgroundImage: entry.avatarUrl == null
+                ? null
+                : NetworkImage(entry.avatarUrl!),
             child: entry.avatarUrl == null
                 ? Text(
                     _initial(entry.displayName),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
                   )
                 : null,
           ),
@@ -552,7 +647,11 @@ class _RankingTile extends StatelessWidget {
               entry.displayName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -561,7 +660,11 @@ class _RankingTile extends StatelessWidget {
             children: [
               Text(
                 _compact(entry.score),
-                style: const TextStyle(color: Color(0xFFFFC857), fontSize: 13, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                  color: Color(0xFFFFC857),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               Text(
                 type.label,
@@ -591,11 +694,21 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.auto_awesome_outlined, color: Colors.white.withValues(alpha: 0.56), size: 38),
+          Icon(
+            Icons.auto_awesome_outlined,
+            color: Colors.white.withValues(alpha: 0.56),
+            size: 38,
+          ),
           const SizedBox(height: 10),
           Text(
-            error == null ? 'No lucky ranking data yet' : 'Could not load lucky rankings',
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+            error == null
+                ? 'No lucky ranking data yet'
+                : 'Could not load lucky rankings',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('Retry')),

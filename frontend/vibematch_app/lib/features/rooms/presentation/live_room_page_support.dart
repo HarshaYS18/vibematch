@@ -29,3 +29,14 @@ class _PendingSeatInvite {
   final SeatUser invitedUser;
   final int seatIndex;
 }
+
+extension _LiveRoomRestoreStateBuilder on _LiveRoomPageState {
+  LiveRoomRestoreState _buildRestoreState() {
+    return LiveRoomRestoreState(
+      roomState: _roomStateController.snapshotForRestore(),
+      messageState: _roomMessageController.snapshotForRestore(),
+      seatState: _seatController.snapshotForRestore(),
+      messageDraft: _messageController.text,
+    );
+  }
+}

@@ -143,28 +143,39 @@ class LiveRoomUsersController {
     return SeatUser(
       id: peer.userId,
       name: displayName,
-      roleLabel: baseUser?.roleLabel ?? 'Member',
+      roleLabel: peer.isHost
+          ? 'Channel Host'
+          : peer.isRoomAdmin
+          ? 'Admin'
+          : (peer.roleLabel.trim().isNotEmpty
+                ? peer.roleLabel
+                : baseUser?.roleLabel ?? 'Member'),
       familyName: baseUser?.familyName ?? '',
       familyLevel: baseUser?.familyLevel ?? 'bronze',
       relationshipText: baseUser?.relationshipText ?? '',
-      vipLevel: baseUser?.vipLevel ?? peer.vipLevel,
-      svipLevel: baseUser?.svipLevel ?? peer.svipLevel,
-      sendingLevel: baseUser?.sendingLevel ?? peer.sendingLevel,
-      receivingLevel: baseUser?.receivingLevel ?? peer.receivingLevel,
+      vipLevel: peer.vipLevel > 0 ? peer.vipLevel : baseUser?.vipLevel ?? 0,
+      svipLevel: peer.svipLevel > 0 ? peer.svipLevel : baseUser?.svipLevel ?? 0,
+      sendingLevel: peer.sendingLevel > 0
+          ? peer.sendingLevel
+          : baseUser?.sendingLevel ?? 0,
+      receivingLevel: peer.receivingLevel > 0
+          ? peer.receivingLevel
+          : baseUser?.receivingLevel ?? 0,
       sentExp: baseUser?.sentExp ?? 0,
       receivedExp: baseUser?.receivedExp ?? 0,
       medals: baseUser?.medals ?? const [],
       avatarColors:
           baseUser?.avatarColors ??
           const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-      avatarUrl: baseUser?.avatarUrl ?? peer.avatarUrl,
+      avatarUrl: peer.avatarUrl ?? baseUser?.avatarUrl,
       age: baseUser?.age,
       locationLabel: baseUser?.locationLabel,
       locationVisible: baseUser?.locationVisible ?? true,
       gender: baseUser?.gender ?? RoomUserGender.undisclosed,
       isCurrentUser: baseUser?.isCurrentUser ?? false,
-      isHost: baseUser?.isHost ?? false,
-      isRoomAdmin: baseUser?.isRoomAdmin ?? false,
+      isHost: peer.isHost || (baseUser?.isHost ?? false),
+      isRoomAdmin:
+          peer.isRoomAdmin || peer.isHost || (baseUser?.isRoomAdmin ?? false),
       selfMuted: !peer.micEnabled,
       adminMuted: peer.adminMuted,
     );

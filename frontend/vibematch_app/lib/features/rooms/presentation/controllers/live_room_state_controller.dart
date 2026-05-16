@@ -18,12 +18,38 @@ class LiveRoomStateController extends ChangeNotifier {
     required String initialRoomName,
     required String initialRoomId,
     required String initialModeTitle,
+    RoomBackgroundTheme? initialBackgroundTheme,
+    LiveRoomStateSnapshot? initialStateSnapshot,
+    bool preserveInitialBackgroundOnFirstLoad = false,
     int initialInboxUnreadCount = 4,
   }) : _roomName = initialRoomName,
        _roomId = initialRoomId,
        _privacyMode = privacyModeFromTitle(initialModeTitle),
+       _selectedBackgroundTheme =
+           initialBackgroundTheme ?? defaultRoomBackgroundTheme,
+       _preserveInitialBackgroundOnFirstLoad =
+           preserveInitialBackgroundOnFirstLoad,
        _inboxUnreadCount = initialInboxUnreadCount {
+    final restoreState = initialStateSnapshot;
+    if (restoreState != null) {
+      _roomName = restoreState.roomName;
+      _roomId = restoreState.roomId;
+      _privacyMode = restoreState.privacyMode;
+      _roomImagesEnabled = restoreState.roomImagesEnabled;
+      _guestMessagesEnabled = restoreState.guestMessagesEnabled;
+      _applyOnlyModeEnabled = restoreState.applyOnlyModeEnabled;
+      _allowScreenshots = restoreState.allowScreenshots;
+      _inboxUnreadCount = restoreState.inboxUnreadCount;
+      _vibeSyncState = restoreState.vibeSyncState;
+      _bubbleOffset = restoreState.bubbleOffset;
+      _selectedBackgroundTheme = restoreState.selectedBackgroundTheme;
+      _seatLayoutId = restoreState.seatLayoutId;
+      _announcementText = restoreState.announcementText;
+      _preserveInitialSnapshotOnFirstLoad = true;
+      _preserveInitialBackgroundOnFirstLoad = true;
+    }
     ActiveRoomContext.setActiveRoom(roomPublicId: _roomId, roomName: _roomName);
+    activeRoomBackgroundTheme.value = _selectedBackgroundTheme;
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: _roomId,
       roomName: _roomName,
@@ -52,7 +78,9 @@ class LiveRoomStateController extends ChangeNotifier {
   VibeSyncRoomState _vibeSyncState = VibeSyncRoomState.inactive;
   Offset _bubbleOffset = const Offset(24, 120);
   final RoomSettingsRepository _settingsRepository = RoomSettingsRepository();
-  RoomBackgroundTheme _selectedBackgroundTheme = defaultRoomBackgroundTheme;
+  RoomBackgroundTheme _selectedBackgroundTheme;
+  bool _preserveInitialBackgroundOnFirstLoad;
+  bool _preserveInitialSnapshotOnFirstLoad = false;
   String _seatLayoutId = '5x2';
   String _announcementText = '';
 
@@ -74,6 +102,24 @@ class LiveRoomStateController extends ChangeNotifier {
   String get seatLayoutId => _seatLayoutId;
   String get announcementText => _announcementText;
 
+  LiveRoomStateSnapshot snapshotForRestore() {
+    return LiveRoomStateSnapshot(
+      roomName: _roomName,
+      roomId: _roomId,
+      privacyMode: _privacyMode,
+      roomImagesEnabled: _roomImagesEnabled,
+      guestMessagesEnabled: _guestMessagesEnabled,
+      applyOnlyModeEnabled: _applyOnlyModeEnabled,
+      allowScreenshots: _allowScreenshots,
+      inboxUnreadCount: _inboxUnreadCount,
+      vibeSyncState: _vibeSyncState,
+      bubbleOffset: _bubbleOffset,
+      selectedBackgroundTheme: _selectedBackgroundTheme,
+      seatLayoutId: _seatLayoutId,
+      announcementText: _announcementText,
+    );
+  }
+
   @override
   void dispose() {
     LiveRoomSettingsEventBus.latestEvent.removeListener(
@@ -92,20 +138,23 @@ class LiveRoomStateController extends ChangeNotifier {
     var restrictionsChanged = false;
 
     final nextApplyOnlyModeEnabled = event.applyOnlyModeEnabled;
-    if (nextApplyOnlyModeEnabled != null && nextApplyOnlyModeEnabled != _applyOnlyModeEnabled) {
+    if (nextApplyOnlyModeEnabled != null &&
+        nextApplyOnlyModeEnabled != _applyOnlyModeEnabled) {
       _applyOnlyModeEnabled = nextApplyOnlyModeEnabled;
       changed = true;
     }
 
     final nextRoomImagesEnabled = event.roomImagesEnabled;
-    if (nextRoomImagesEnabled != null && nextRoomImagesEnabled != _roomImagesEnabled) {
+    if (nextRoomImagesEnabled != null &&
+        nextRoomImagesEnabled != _roomImagesEnabled) {
       _roomImagesEnabled = nextRoomImagesEnabled;
       changed = true;
       restrictionsChanged = true;
     }
 
     final nextGuestMessagesEnabled = event.guestMessagesEnabled;
-    if (nextGuestMessagesEnabled != null && nextGuestMessagesEnabled != _guestMessagesEnabled) {
+    if (nextGuestMessagesEnabled != null &&
+        nextGuestMessagesEnabled != _guestMessagesEnabled) {
       _guestMessagesEnabled = nextGuestMessagesEnabled;
       changed = true;
       restrictionsChanged = true;
@@ -120,9 +169,12 @@ class LiveRoomStateController extends ChangeNotifier {
     }
 
     final nextAllowScreenshots = event.allowScreenshots;
-    if (nextAllowScreenshots != null && nextAllowScreenshots != _allowScreenshots) {
+    if (nextAllowScreenshots != null &&
+        nextAllowScreenshots != _allowScreenshots) {
       _allowScreenshots = nextAllowScreenshots;
-      ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: _allowScreenshots);
+      ScreenshotGuardService.applyRoomScreenshotPolicy(
+        allowScreenshots: _allowScreenshots,
+      );
       changed = true;
     }
 
@@ -135,12 +187,14 @@ class LiveRoomStateController extends ChangeNotifier {
       }
     }
 
-    if (event.seatLayoutId.trim().isNotEmpty && event.seatLayoutId != _seatLayoutId) {
+    if (event.seatLayoutId.trim().isNotEmpty &&
+        event.seatLayoutId != _seatLayoutId) {
       _seatLayoutId = event.seatLayoutId.trim();
       changed = true;
     }
 
-    if (event.announcementText != _announcementText && event.announcementText.trim().isNotEmpty) {
+    if (event.announcementText != _announcementText &&
+        event.announcementText.trim().isNotEmpty) {
       _announcementText = event.announcementText;
       changed = true;
     }
@@ -275,7 +329,10 @@ class LiveRoomStateController extends ChangeNotifier {
     final nextLayoutId = value.trim();
     if (nextLayoutId.isEmpty) return;
     if (nextLayoutId == _seatLayoutId) {
-      RoomSeatLayoutSyncService.broadcastSeatLayout(roomId: _roomId, seatLayoutId: nextLayoutId);
+      RoomSeatLayoutSyncService.broadcastSeatLayout(
+        roomId: _roomId,
+        seatLayoutId: nextLayoutId,
+      );
       return;
     }
     _seatLayoutId = nextLayoutId;
@@ -318,21 +375,42 @@ class LiveRoomStateController extends ChangeNotifier {
     try {
       final settings = await _settingsRepository.fetchRoomSettings(_roomId);
       var changed = false;
+      final preserveInitialSnapshot = _preserveInitialSnapshotOnFirstLoad;
 
-      final theme = _themeFromId(settings.backgroundThemeId);
-      if (theme != _selectedBackgroundTheme) {
+      final backgroundThemeId = settings.backgroundThemeId.trim();
+      final theme = _themeFromId(backgroundThemeId);
+      final shouldPreserveInitialBackground =
+          (_preserveInitialBackgroundOnFirstLoad || preserveInitialSnapshot) &&
+          _selectedBackgroundTheme.id != defaultRoomBackgroundTheme.id &&
+          (backgroundThemeId.isEmpty ||
+              backgroundThemeId == defaultRoomBackgroundTheme.id);
+      _preserveInitialBackgroundOnFirstLoad = false;
+      if (!shouldPreserveInitialBackground &&
+          theme != _selectedBackgroundTheme) {
         _selectedBackgroundTheme = theme;
         activeRoomBackgroundTheme.value = theme;
         changed = true;
       }
 
-      if (settings.seatLayoutId.trim().isNotEmpty && settings.seatLayoutId != _seatLayoutId) {
+      final shouldPreserveInitialSeatLayout =
+          preserveInitialSnapshot &&
+          _seatLayoutId != '5x2' &&
+          (settings.seatLayoutId.trim().isEmpty ||
+              settings.seatLayoutId == '5x2');
+      if (settings.seatLayoutId.trim().isNotEmpty &&
+          !shouldPreserveInitialSeatLayout &&
+          settings.seatLayoutId != _seatLayoutId) {
         _seatLayoutId = settings.seatLayoutId;
         changed = true;
       }
 
       final announcement = settings.announcementText ?? '';
-      if (announcement != _announcementText) {
+      final shouldPreserveInitialAnnouncement =
+          preserveInitialSnapshot &&
+          _announcementText.trim().isNotEmpty &&
+          announcement.trim().isEmpty;
+      if (!shouldPreserveInitialAnnouncement &&
+          announcement != _announcementText) {
         _announcementText = announcement;
         changed = true;
       }
@@ -340,23 +418,40 @@ class LiveRoomStateController extends ChangeNotifier {
       final mode = settings.mode;
       if (mode != null && mode.trim().isNotEmpty) {
         final nextPrivacy = privacyModeFromTitle(mode);
-        if (nextPrivacy != _privacyMode) {
+        final shouldPreserveInitialPrivacy =
+            preserveInitialSnapshot &&
+            _privacyMode != RoomPrivacyMode.open &&
+            nextPrivacy == RoomPrivacyMode.open;
+        if (!shouldPreserveInitialPrivacy && nextPrivacy != _privacyMode) {
           _privacyMode = nextPrivacy;
           changed = true;
         }
       }
 
-      if (settings.allowScreenshots != _allowScreenshots) {
+      final shouldPreserveInitialScreenshotPolicy =
+          preserveInitialSnapshot &&
+          !_allowScreenshots &&
+          settings.allowScreenshots;
+      if (!shouldPreserveInitialScreenshotPolicy &&
+          settings.allowScreenshots != _allowScreenshots) {
         _allowScreenshots = settings.allowScreenshots;
-        ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: _allowScreenshots);
+        ScreenshotGuardService.applyRoomScreenshotPolicy(
+          allowScreenshots: _allowScreenshots,
+        );
         changed = true;
       } else {
-        ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: _allowScreenshots);
+        ScreenshotGuardService.applyRoomScreenshotPolicy(
+          allowScreenshots: _allowScreenshots,
+        );
       }
 
+      _preserveInitialSnapshotOnFirstLoad = false;
       if (changed) notifyListeners();
     } catch (_) {
-      ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: _allowScreenshots);
+      _preserveInitialSnapshotOnFirstLoad = false;
+      ScreenshotGuardService.applyRoomScreenshotPolicy(
+        allowScreenshots: _allowScreenshots,
+      );
       // Room settings are non-critical for room entry.
     }
   }
@@ -430,4 +525,36 @@ class LiveRoomStateController extends ChangeNotifier {
     _minimized = false;
     notifyListeners();
   }
+}
+
+class LiveRoomStateSnapshot {
+  const LiveRoomStateSnapshot({
+    required this.roomName,
+    required this.roomId,
+    required this.privacyMode,
+    required this.roomImagesEnabled,
+    required this.guestMessagesEnabled,
+    required this.applyOnlyModeEnabled,
+    required this.allowScreenshots,
+    required this.inboxUnreadCount,
+    required this.vibeSyncState,
+    required this.bubbleOffset,
+    required this.selectedBackgroundTheme,
+    required this.seatLayoutId,
+    required this.announcementText,
+  });
+
+  final String roomName;
+  final String roomId;
+  final RoomPrivacyMode privacyMode;
+  final bool roomImagesEnabled;
+  final bool guestMessagesEnabled;
+  final bool applyOnlyModeEnabled;
+  final bool allowScreenshots;
+  final int inboxUnreadCount;
+  final VibeSyncRoomState vibeSyncState;
+  final Offset bubbleOffset;
+  final RoomBackgroundTheme selectedBackgroundTheme;
+  final String seatLayoutId;
+  final String announcementText;
 }

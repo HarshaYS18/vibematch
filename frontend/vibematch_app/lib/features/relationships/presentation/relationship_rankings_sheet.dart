@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../auth/data/auth_api_service.dart';
+import '../../auth/models/current_user.dart';
 import '../data/relationship_exp_api_service.dart';
 
 class RelationshipRankingsSheet extends StatefulWidget {
@@ -25,7 +27,8 @@ class RelationshipRankingsSheet extends StatefulWidget {
   }
 
   @override
-  State<RelationshipRankingsSheet> createState() => _RelationshipRankingsSheetState();
+  State<RelationshipRankingsSheet> createState() =>
+      _RelationshipRankingsSheetState();
 }
 
 class _RelationshipRankingsSheetState extends State<RelationshipRankingsSheet> {
@@ -35,11 +38,23 @@ class _RelationshipRankingsSheetState extends State<RelationshipRankingsSheet> {
   List<RelationshipRankingEntry> _entries = const <RelationshipRankingEntry>[];
   bool _loading = false;
   String? _error;
+  CurrentUser? _syncedCurrentUser = const AuthApiService().cachedUser;
+  StreamSubscription<CurrentUser>? _userSubscription;
 
   @override
   void initState() {
     super.initState();
+    _userSubscription = AuthUserRealtimeService.instance.users.listen((user) {
+      if (!mounted) return;
+      setState(() => _syncedCurrentUser = user);
+    });
     unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -78,6 +93,7 @@ class _RelationshipRankingsSheetState extends State<RelationshipRankingsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final entries = _entries.map(_syncCurrentEntry).toList(growable: false);
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.82,
       child: Container(
@@ -120,40 +136,83 @@ class _RelationshipRankingsSheetState extends State<RelationshipRankingsSheet> {
                 const SizedBox(height: 12),
                 _StatusPill(
                   period: _period,
-                  count: _entries.length,
+                  count: entries.length,
                   loading: _loading,
                   error: _error,
                   onRefresh: () => unawaited(_load()),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
-                  child: _loading && _entries.isEmpty
+                  child: _loading && entries.isEmpty
                       ? const Center(
-                          child: CircularProgressIndicator(color: Color(0xFFFF5AAA)),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFF5AAA),
+                          ),
                         )
-                      : _entries.isEmpty
-                          ? _EmptyState(error: _error, onRetry: () => unawaited(_load()))
-                          : RefreshIndicator(
-                              onRefresh: _load,
-                              color: const Color(0xFFFF5AAA),
-                              child: ListView.separated(
-                                physics: const AlwaysScrollableScrollPhysics(
-                                  parent: BouncingScrollPhysics(),
-                                ),
-                                padding: const EdgeInsets.only(bottom: 12),
-                                itemCount: _entries.length,
-                                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  return _RelationshipRankTile(entry: _entries[index]);
-                                },
-                              ),
+                      : entries.isEmpty
+                      ? _EmptyState(
+                          error: _error,
+                          onRetry: () => unawaited(_load()),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          color: const Color(0xFFFF5AAA),
+                          child: ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
                             ),
+                            padding: const EdgeInsets.only(bottom: 12),
+                            itemCount: entries.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              return _RelationshipRankTile(
+                                entry: entries[index],
+                              );
+                            },
+                          ),
+                        ),
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  RelationshipRankingEntry _syncCurrentEntry(RelationshipRankingEntry entry) {
+    final currentUser = _syncPairUser(entry.pair.currentUser);
+    final otherUser = _syncPairUser(entry.pair.otherUser);
+    if (identical(currentUser, entry.pair.currentUser) &&
+        identical(otherUser, entry.pair.otherUser)) {
+      return entry;
+    }
+    return RelationshipRankingEntry(
+      rank: entry.rank,
+      score: entry.score,
+      pair: RelationshipPairSummary(
+        pairId: entry.pair.pairId,
+        totalExp: entry.pair.totalExp,
+        level: entry.pair.level,
+        progress: entry.pair.progress,
+        currentUser: currentUser,
+        otherUser: otherUser,
+      ),
+    );
+  }
+
+  RelationshipPairUser? _syncPairUser(RelationshipPairUser? user) {
+    final current = _syncedCurrentUser;
+    if (current == null ||
+        user == null ||
+        user.publicUserId != current.publicUserId) {
+      return user;
+    }
+    return RelationshipPairUser(
+      publicUserId: user.publicUserId,
+      displayName: current.displayName ?? current.username ?? user.displayName,
+      avatarUrl: current.avatarUrl,
     );
   }
 }
@@ -173,9 +232,15 @@ class _Header extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: const Color(0xFFFF5AAA).withValues(alpha: 0.18),
-            border: Border.all(color: const Color(0xFFFF5AAA).withValues(alpha: 0.42)),
+            border: Border.all(
+              color: const Color(0xFFFF5AAA).withValues(alpha: 0.42),
+            ),
           ),
-          child: const Icon(Icons.favorite_rounded, color: Color(0xFFFF5AAA), size: 22),
+          child: const Icon(
+            Icons.favorite_rounded,
+            color: Color(0xFFFF5AAA),
+            size: 22,
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -220,7 +285,11 @@ class _Header extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.10),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
-              child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
           ),
         ),
@@ -238,39 +307,45 @@ class _PeriodTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: RelationshipRankingPeriod.values.map((period) {
-        final isSelected = selected == period;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: GestureDetector(
-              onTap: () => onChanged(period),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: isSelected ? const Color(0xFFFF5AAA) : Colors.white.withValues(alpha: 0.08),
-                  border: Border.all(
-                    color: isSelected
-                        ? Colors.white.withValues(alpha: 0.18)
-                        : Colors.white.withValues(alpha: 0.10),
-                  ),
-                ),
-                child: Text(
-                  period.label,
-                  style: TextStyle(
-                    color: isSelected ? const Color(0xFF230B1E) : Colors.white.withValues(alpha: 0.76),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w900,
+      children: RelationshipRankingPeriod.values
+          .map((period) {
+            final isSelected = selected == period;
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: GestureDetector(
+                  onTap: () => onChanged(period),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: isSelected
+                          ? const Color(0xFFFF5AAA)
+                          : Colors.white.withValues(alpha: 0.08),
+                      border: Border.all(
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.18)
+                            : Colors.white.withValues(alpha: 0.10),
+                      ),
+                    ),
+                    child: Text(
+                      period.label,
+                      style: TextStyle(
+                        color: isSelected
+                            ? const Color(0xFF230B1E)
+                            : Colors.white.withValues(alpha: 0.76),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-        );
-      }).toList(growable: false),
+            );
+          })
+          .toList(growable: false),
     );
   }
 }
@@ -293,7 +368,11 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = '/relationships/rankings?period=${period.backendValue}';
-    final status = loading ? 'syncing live...' : error == null ? 'live backend data' : 'fallback: $error';
+    final status = loading
+        ? 'syncing live...'
+        : error == null
+        ? 'live backend data'
+        : 'fallback: $error';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -304,7 +383,11 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.query_stats_rounded, color: Color(0xFFFF5AAA), size: 16),
+          const Icon(
+            Icons.query_stats_rounded,
+            color: Color(0xFFFF5AAA),
+            size: 16,
+          ),
           const SizedBox(width: 7),
           Expanded(
             child: Text(
@@ -329,7 +412,11 @@ class _StatusPill extends StatelessWidget {
           const SizedBox(width: 6),
           GestureDetector(
             onTap: onRefresh,
-            child: Icon(Icons.refresh_rounded, color: Colors.white.withValues(alpha: 0.75), size: 17),
+            child: Icon(
+              Icons.refresh_rounded,
+              color: Colors.white.withValues(alpha: 0.75),
+              size: 17,
+            ),
           ),
         ],
       ),
@@ -361,7 +448,11 @@ class _RelationshipRankTile extends StatelessWidget {
             child: Text(
               '#${entry.rank}',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFFF5AAA), fontSize: 13, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Color(0xFFFF5AAA),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -375,7 +466,11 @@ class _RelationshipRankTile extends StatelessWidget {
                   '${left?.displayName ?? 'Vibe User'} ❤ ${right?.displayName ?? 'Vibe User'}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -394,7 +489,11 @@ class _RelationshipRankTile extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             _compact(entry.score),
-            style: const TextStyle(color: Color(0xFFFF5AAA), fontSize: 13, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: Color(0xFFFF5AAA),
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ],
       ),
@@ -426,7 +525,11 @@ class _PairAvatars extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: Color(0xFFFF5AAA),
                 ),
-                child: const Icon(Icons.favorite_rounded, size: 12, color: Colors.white),
+                child: const Icon(
+                  Icons.favorite_rounded,
+                  size: 12,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -451,7 +554,10 @@ class _Avatar extends StatelessWidget {
       child: avatarUrl == null
           ? Text(
               _initial(user?.displayName ?? 'V'),
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
             )
           : null,
     );
@@ -470,11 +576,21 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.favorite_border_rounded, color: Colors.white.withValues(alpha: 0.56), size: 38),
+          Icon(
+            Icons.favorite_border_rounded,
+            color: Colors.white.withValues(alpha: 0.56),
+            size: 38,
+          ),
           const SizedBox(height: 10),
           Text(
-            error == null ? 'No relationship rankings yet' : 'Could not load relationship rankings',
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+            error == null
+                ? 'No relationship rankings yet'
+                : 'Could not load relationship rankings',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('Retry')),

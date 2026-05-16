@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_presence_repository.dart';
 import '../live_room_models.dart';
+import '../live_room_restore_state.dart';
 
 class LiveRoomSeatController {
   LiveRoomSeatController({
@@ -63,13 +64,29 @@ class LiveRoomSeatController {
     );
   }
 
-  void initialize(String initialLayoutId) {
+  void initialize(
+    String initialLayoutId, {
+    LiveRoomSeatRestoreState? restoreState,
+  }) {
     layoutId = initialLayoutId;
-    seats = buildSeatsForLayout(layoutId);
+    seats = restoreState?.seats.isNotEmpty == true
+        ? List<RoomSeat>.from(restoreState!.seats)
+        : buildSeatsForLayout(layoutId);
+    selectedSeatIndex = restoreState?.selectedSeatIndex;
+    micMuted = restoreState?.micMuted ?? micMuted;
     _refreshCurrentUserFromPresence();
     _applyLatestMediaSnapshot();
     LiveRoomMediaSignalingService.instance.joinRoom(currentUser: currentUser);
     Future<void>.microtask(_applyLatestMediaSnapshot);
+  }
+
+  LiveRoomSeatRestoreState snapshotForRestore() {
+    return LiveRoomSeatRestoreState(
+      layoutId: layoutId,
+      seats: List<RoomSeat>.from(seats),
+      selectedSeatIndex: selectedSeatIndex,
+      micMuted: micMuted,
+    );
   }
 
   List<RoomSeat> buildSeatsForLayout(String targetLayoutId) {
@@ -97,6 +114,7 @@ class LiveRoomSeatController {
     final changed =
         nextUser.isRoomAdmin != currentUser.isRoomAdmin ||
         nextUser.isHost != currentUser.isHost ||
+        nextUser.name != currentUser.name ||
         nextUser.roleLabel != currentUser.roleLabel ||
         nextUser.avatarUrl != currentUser.avatarUrl ||
         nextUser.vipLevel != currentUser.vipLevel ||
@@ -115,6 +133,7 @@ class LiveRoomSeatController {
     return currentUser.copyWith(
       isHost: liveUser.isHost,
       isRoomAdmin: liveUser.isRoomAdmin,
+      name: liveUser.name,
       roleLabel: liveUser.roleLabel,
       vipLevel: liveUser.vipLevel,
       svipLevel: liveUser.svipLevel,
@@ -203,17 +222,21 @@ class LiveRoomSeatController {
       familyName: baseUser?.familyName ?? '',
       familyLevel: baseUser?.familyLevel ?? 'bronze',
       relationshipText: baseUser?.relationshipText ?? '',
-      vipLevel: baseUser?.vipLevel ?? peer.vipLevel,
-      svipLevel: baseUser?.svipLevel ?? peer.svipLevel,
-      sendingLevel: baseUser?.sendingLevel ?? peer.sendingLevel,
-      receivingLevel: baseUser?.receivingLevel ?? peer.receivingLevel,
+      vipLevel: peer.vipLevel > 0 ? peer.vipLevel : baseUser?.vipLevel ?? 0,
+      svipLevel: peer.svipLevel > 0 ? peer.svipLevel : baseUser?.svipLevel ?? 0,
+      sendingLevel: peer.sendingLevel > 0
+          ? peer.sendingLevel
+          : baseUser?.sendingLevel ?? 0,
+      receivingLevel: peer.receivingLevel > 0
+          ? peer.receivingLevel
+          : baseUser?.receivingLevel ?? 0,
       sentExp: baseUser?.sentExp ?? 0,
       receivedExp: baseUser?.receivedExp ?? 0,
       medals: baseUser?.medals ?? const [],
       avatarColors:
           baseUser?.avatarColors ??
           const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-      avatarUrl: baseUser?.avatarUrl ?? peer.avatarUrl,
+      avatarUrl: peer.avatarUrl ?? baseUser?.avatarUrl,
       age: baseUser?.age,
       locationLabel: baseUser?.locationLabel,
       locationVisible: baseUser?.locationVisible ?? true,

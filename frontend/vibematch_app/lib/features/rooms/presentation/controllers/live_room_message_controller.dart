@@ -6,14 +6,17 @@ import '../../data/live_room_restrictions_service.dart';
 import '../../data/live_room_seat_application_event_bus.dart';
 import '../../data/live_room_system_event_bus.dart';
 import '../live_room_models.dart';
+import '../live_room_restore_state.dart';
 
 class LiveRoomMessageController {
   LiveRoomMessageController({
     required SeatUser currentUser,
     required this.onChanged,
+    LiveRoomMessageRestoreState? restoreState,
   }) : currentUser = LiveRoomMediaSignalingService.instance
            .effectiveCurrentUser(currentUser) {
-    messages = List<ChatEntry>.from(mockChatEntries);
+    messages = List<ChatEntry>.from(restoreState?.messages ?? mockChatEntries);
+    joinRequestUsers.addAll(restoreState?.joinRequestUsers ?? const []);
     _activeController?._detachSystemEventListener();
     _activeController = this;
     _attachSystemEventListener();
@@ -52,6 +55,13 @@ class LiveRoomMessageController {
   bool get _guestMessageAllowed {
     return LiveRoomRestrictionsService.guestMessagesEnabled ||
         _currentUserCanBypassGuestMessageBlock;
+  }
+
+  LiveRoomMessageRestoreState snapshotForRestore() {
+    return LiveRoomMessageRestoreState(
+      messages: List<ChatEntry>.from(messages),
+      joinRequestUsers: List<SeatUser>.from(joinRequestUsers),
+    );
   }
 
   void sendMessage(String text) {

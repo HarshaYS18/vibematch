@@ -23,6 +23,7 @@ import 'controllers/live_room_state_controller.dart';
 import 'controllers/live_room_users_controller.dart';
 import 'controllers/live_room_vibesync_controller.dart';
 import 'live_room_models.dart';
+import 'live_room_restore_state.dart';
 import 'modules/cricket_stumps_flow_module.dart';
 import 'modules/live_room_emoji_actions_module.dart';
 import 'modules/live_room_games_actions_module.dart';
@@ -39,6 +40,7 @@ import 'widgets/live_room_invite_sheet.dart';
 import 'widgets/live_room_join_requests_sheet.dart';
 import 'widgets/live_room_mini_profile_launcher.dart';
 import 'widgets/live_room_minimized_bubble.dart';
+import 'widgets/live_room_minimized_overlay_service.dart';
 import 'widgets/live_room_privacy_sheet.dart';
 import 'widgets/live_room_remote_audio_renderers.dart';
 import 'widgets/live_room_seat_invite_notification.dart';
@@ -64,6 +66,8 @@ class LiveRoomPage extends StatefulWidget {
     this.language = 'Telugu',
     this.modeTitle = 'Open',
     this.onlineCount = 1,
+    this.initialBackgroundTheme,
+    this.restoreState,
   });
 
   final String roomName;
@@ -71,6 +75,8 @@ class LiveRoomPage extends StatefulWidget {
   final String language;
   final String modeTitle;
   final int onlineCount;
+  final RoomBackgroundTheme? initialBackgroundTheme;
+  final LiveRoomRestoreState? restoreState;
 
   @override
   State<LiveRoomPage> createState() => _LiveRoomPageState();
@@ -173,14 +179,21 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     };
     LiveRoomMembershipService.snapshots.addListener(_roomMembershipListener!);
     final currentUser = _currentUser;
+    final restoreState = widget.restoreState;
 
-    _messageController = LiveRoomMentionTextController();
+    _messageController = LiveRoomMentionTextController(
+      text: restoreState?.messageDraft,
+    );
     _announcementController = TextEditingController();
     _messageFocusNode = FocusNode();
     _roomStateController = LiveRoomStateController(
       initialRoomName: widget.roomName,
       initialRoomId: widget.roomId,
       initialModeTitle: widget.modeTitle,
+      initialBackgroundTheme: widget.initialBackgroundTheme,
+      initialStateSnapshot: restoreState?.roomState,
+      preserveInitialBackgroundOnFirstLoad:
+          widget.initialBackgroundTheme != null || restoreState != null,
     )..addListener(_onRoomStateChanged);
     _presenceController = LiveRoomPresenceController();
 
@@ -190,21 +203,28 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     _roomMessageController = LiveRoomMessageController(
       currentUser: currentUser,
+      restoreState: restoreState?.messageState,
       onChanged: () {
         if (mounted) setState(() {});
       },
     );
 
-    _seatController = LiveRoomSeatController(
-      currentUser: currentUser,
-      onChanged: () {
-        if (mounted) setState(() {});
-      },
-      onToast: (message) {
-        if (!mounted) return;
-        RoomToast.show(context, message);
-      },
-    )..initialize('5x2');
+    _seatController =
+        LiveRoomSeatController(
+          currentUser: currentUser,
+          onChanged: () {
+            if (mounted) setState(() {});
+          },
+          onToast: (message) {
+            if (!mounted) return;
+            RoomToast.show(context, message);
+          },
+        )..initialize(
+          restoreState?.seatState.layoutId ??
+              restoreState?.roomState.seatLayoutId ??
+              '5x2',
+          restoreState: restoreState?.seatState,
+        );
 
     _giftController = LiveRoomGiftController(
       currentUser: currentUser,
@@ -233,10 +253,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   @override
   void dispose() {
+    final preservingMinimizedRoom =
+        LiveRoomMinimizedOverlayService.instance.isShowing &&
+        !_roomStateController.exitingRoom;
     _seatInviteAutoHideTimer?.cancel();
     _hostSeatOneTimer?.cancel();
     _hostSeatOneRetryTimer?.cancel();
-    unawaited(_presenceController.leave());
+    if (!preservingMinimizedRoom) {
+      unawaited(_presenceController.leave());
+    }
     _presenceController.dispose();
     _seatController.dispose();
     _roomStateController.removeListener(_onRoomStateChanged);
@@ -249,7 +274,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _messageFocusNode.dispose();
     _giftController.dispose();
     _moderationController.dispose();
-    unawaited(RoomMusicController.instance.stopBecauseControllerExitedRoom());
+    if (!preservingMinimizedRoom) {
+      unawaited(RoomMusicController.instance.stopBecauseControllerExitedRoom());
+    }
     _roomStateController.dispose();
     super.dispose();
   }
@@ -274,22 +301,24 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           backgroundColor: RoomColors.pearl,
           body: Stack(
             children: [
-              Positioned(
-                left: _bubbleOffset.dx,
-                top: _bubbleOffset.dy,
-                child: LiveRoomMinimizedBubble(
-                  offset: _bubbleOffset,
-                  onRestore: () => _roomStateController.setMinimized(false),
-                  onDrag: (details) {
-                    final size = MediaQuery.sizeOf(context);
-                    _roomStateController.setBubbleOffset(
-                      Offset(
-                        (_bubbleOffset.dx + details.delta.dx).clamp(8.0, size.width - 86),
-                        (_bubbleOffset.dy + details.delta.dy).clamp(40.0, size.height - 110),
+              LiveRoomMinimizedBubble(
+                offset: _bubbleOffset,
+                onRestore: () => _roomStateController.setMinimized(false),
+                onDrag: (details) {
+                  final size = MediaQuery.sizeOf(context);
+                  _roomStateController.setBubbleOffset(
+                    Offset(
+                      (_bubbleOffset.dx + details.delta.dx).clamp(
+                        8.0,
+                        size.width - 86,
                       ),
-                    );
-                  },
-                ),
+                      (_bubbleOffset.dy + details.delta.dy).clamp(
+                        40.0,
+                        size.height - 110,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -379,8 +408,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             if (slide != null) _giftController.tapGiftCombo(slide);
           },
           onVideoGiftFinished: _giftController.finishVideoGift,
-          onLuckyPacketGetTap: () => _giftController.claimLuckyPacket(_allRoomUsers),
-          onLuckyPacketResultsDismiss: _giftController.dismissLuckyPacketResults,
+          onLuckyPacketGetTap: () =>
+              _giftController.claimLuckyPacket(_allRoomUsers),
+          onLuckyPacketResultsDismiss:
+              _giftController.dismissLuckyPacketResults,
         ),
         if (pendingInvite != null)
           LiveRoomSeatInviteNotification(

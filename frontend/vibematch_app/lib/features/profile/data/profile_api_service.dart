@@ -60,7 +60,7 @@ class ProfileApiService {
     final user = CurrentUser.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
-    AuthUserRealtimeService.instance.publish(user);
+    await authApiService.persistCurrentUser(user);
     return user;
   }
 

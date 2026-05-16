@@ -33,6 +33,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   String? _roomId;
   String? _roomName;
   String? _peerId;
+  String? _roomScopedRoleRoomId;
 
   SeatUser? _currentUser;
   SeatUser? _activeLoggedInSeatUser;
@@ -90,29 +91,68 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final isOfficial = user.canSeeOwnerControls;
     final roleLabel =
         user.primaryRoleBadge?.badgeLabel ?? user.roleDisplayLabel;
+    final roomUserId = 'user_${user.publicUserId}';
+    final existingRoomUser =
+        _activeLoggedInSeatUser?.id == roomUserId &&
+            _roomScopedRoleRoomId == _roomId
+        ? _activeLoggedInSeatUser
+        : null;
+    final isRoomHost = isOfficial || (existingRoomUser?.isHost ?? false);
+    final isRoomAdmin =
+        isOfficial || isRoomHost || (existingRoomUser?.isRoomAdmin ?? false);
+    final roomRoleLabel = isRoomHost
+        ? 'Channel Host'
+        : isRoomAdmin
+        ? 'Admin'
+        : roleLabel;
 
     _activeLoggedInSeatUser = SeatUser(
-      id: 'user_${user.publicUserId}',
+      id: roomUserId,
       name: user.displayName ?? user.username ?? 'Vibe User',
-      roleLabel: isOfficial ? roleLabel : 'Member',
-      familyName: '',
-      familyLevel: 'bronze',
-      relationshipText: '',
+      roleLabel: roomRoleLabel,
+      familyName: existingRoomUser?.familyName ?? '',
+      familyLevel: existingRoomUser?.familyLevel ?? 'bronze',
+      relationshipText: existingRoomUser?.relationshipText ?? '',
       vipLevel: user.vip.vipLevel,
       svipLevel: user.vip.svipLevel,
-      sendingLevel: 0,
-      receivingLevel: 0,
-      sentExp: 0,
-      receivedExp: 0,
-      medals: const <String>[],
+      sendingLevel: existingRoomUser?.sendingLevel ?? 0,
+      receivingLevel: existingRoomUser?.receivingLevel ?? 0,
+      sentExp: existingRoomUser?.sentExp ?? 0,
+      receivedExp: existingRoomUser?.receivedExp ?? 0,
+      medals: existingRoomUser?.medals ?? const <String>[],
       avatarColors: isOfficial
           ? const <Color>[Color(0xFFFFC857), Color(0xFFE84C72)]
-          : const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+          : existingRoomUser?.avatarColors ??
+                const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
       avatarUrl: user.avatarUrl,
+      age: existingRoomUser?.age,
+      locationLabel: existingRoomUser?.locationLabel,
+      locationVisible: existingRoomUser?.locationVisible ?? true,
+      gender: existingRoomUser?.gender ?? RoomUserGender.undisclosed,
       isCurrentUser: true,
-      isHost: isOfficial,
-      isRoomAdmin: isOfficial,
+      isHost: isRoomHost,
+      isRoomAdmin: isRoomAdmin,
+      selfMuted: existingRoomUser?.selfMuted ?? true,
+      adminMuted: existingRoomUser?.adminMuted ?? false,
     );
+    if (_currentUser?.id == roomUserId) {
+      _currentUser = _activeLoggedInSeatUser;
+    }
+
+    final roomId = _roomId;
+    final shouldSyncActiveRoom =
+        roomId != null &&
+        (roomSnapshot.value?.roomId == roomId ||
+            LiveRoomPresenceRepository.currentRoomId == roomId ||
+            _joined);
+    if (shouldSyncActiveRoom) {
+      LiveRoomPresenceRepository.publishParticipant(_activeLoggedInSeatUser!);
+      _overlayCurrentUserProfileInSnapshot(_activeLoggedInSeatUser!);
+    }
+
+    if (_joined && _channel != null) {
+      _send('profile/update', _profileUpdatePayload(_activeLoggedInSeatUser!));
+    }
 
     _debug(
       'active logged-in room identity set: '
@@ -149,6 +189,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     );
 
     _currentUser = _activeLoggedInSeatUser;
+    _roomScopedRoleRoomId = _roomId;
 
     _debug(
       'active room identity seeded from presence: '
@@ -632,13 +673,32 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       'receiving_level': user.receivingLevel,
       'is_host': user.isHost,
       'is_room_admin': user.isRoomAdmin || user.isHost,
-      'role_label': user.isHost
-          ? 'Channel Host'
-          : user.isRoomAdmin
-          ? 'Admin'
-          : user.roleLabel,
+      'role_label': _roomRoleLabelFor(user),
       'seat_index': null,
     };
+  }
+
+  Map<String, Object?> _profileUpdatePayload(SeatUser user) {
+    return <String, Object?>{
+      'room_id': _roomId,
+      'peer_id': _peerId,
+      'user_id': user.id,
+      'display_name': user.name,
+      'avatar_url': user.avatarUrl,
+      'vip_level': user.vipLevel,
+      'svip_level': user.svipLevel,
+      'sending_level': user.sendingLevel,
+      'receiving_level': user.receivingLevel,
+      'is_host': user.isHost,
+      'is_room_admin': user.isRoomAdmin || user.isHost,
+      'role_label': _roomRoleLabelFor(user),
+    };
+  }
+
+  String _roomRoleLabelFor(SeatUser user) {
+    if (user.isHost) return 'Channel Host';
+    if (user.isRoomAdmin) return 'Admin';
+    return user.roleLabel;
   }
 
   void _send(String type, Map<String, Object?> payload) {
@@ -824,6 +884,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         return;
       }
 
+      if (type == 'profile/updated') {
+        _publishProfileUpdateFromPayload(payload);
+      }
+
       final roomData = payload['room'];
 
       if (roomData is Map<String, dynamic>) {
@@ -878,6 +942,101 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         );
       }).toList(),
     );
+  }
+
+  void _overlayCurrentUserProfileInSnapshot(SeatUser user) {
+    final snapshot = roomSnapshot.value;
+    if (snapshot == null) return;
+
+    final currentPeerId = _peerId;
+    final roleLabel = _roomRoleLabelFor(user);
+
+    roomSnapshot.value = LiveMediaRoomSnapshot(
+      roomId: snapshot.roomId,
+      peerCount: snapshot.peerCount,
+      lockedSeatIndexes: snapshot.lockedSeatIndexes,
+      peers: snapshot.peers.map((peer) {
+        final matchesUser = peer.userId == user.id;
+        final matchesPeer =
+            currentPeerId != null &&
+            currentPeerId.isNotEmpty &&
+            peer.peerId == currentPeerId;
+        if (!matchesUser && !matchesPeer) return peer;
+
+        return peer.copyWith(
+          displayName: user.name,
+          isHost: user.isHost,
+          isRoomAdmin: user.isRoomAdmin || user.isHost,
+          roleLabel: roleLabel,
+          avatarUrl: user.avatarUrl,
+          clearAvatarUrl: user.avatarUrl == null,
+          vipLevel: user.vipLevel,
+          svipLevel: user.svipLevel,
+          sendingLevel: user.sendingLevel,
+          receivingLevel: user.receivingLevel,
+        );
+      }).toList(),
+    );
+  }
+
+  void _publishProfileUpdateFromPayload(Map<String, dynamic> payload) {
+    final userId = payload['user_id']?.toString() ?? '';
+    if (userId.isEmpty) return;
+
+    final existing = LiveRoomPresenceRepository.userByRoomUserId(userId);
+    final isHost = payload['is_host'] == true || payload['isHost'] == true;
+    final isRoomAdmin =
+        payload['is_room_admin'] == true || payload['isRoomAdmin'] == true;
+    final displayName = _text(
+      payload['display_name'] ?? payload['displayName'],
+    );
+    final roleLabel = _text(payload['role_label'] ?? payload['roleLabel']);
+    final avatarUrl = _text(payload['avatar_url'] ?? payload['avatarUrl']);
+    final nextUser =
+        (existing ??
+                SeatUser(
+                  id: userId,
+                  name: displayName ?? 'Vibe User',
+                  roleLabel: isHost
+                      ? 'Channel Host'
+                      : isRoomAdmin
+                      ? 'Admin'
+                      : roleLabel ?? 'Member',
+                  familyName: '',
+                  relationshipText: '',
+                  vipLevel: 0,
+                  sendingLevel: 0,
+                  receivingLevel: 0,
+                  sentExp: 0,
+                  receivedExp: 0,
+                  medals: const <String>[],
+                  avatarColors: const <Color>[
+                    Color(0xFF12C7B7),
+                    Color(0xFF6D5DF6),
+                  ],
+                ))
+            .copyWith(
+              name: displayName,
+              roleLabel: isHost
+                  ? 'Channel Host'
+                  : isRoomAdmin
+                  ? 'Admin'
+                  : roleLabel,
+              avatarUrl: avatarUrl,
+              clearAvatarUrl: avatarUrl == null,
+              vipLevel: _int(payload['vip_level'] ?? payload['vipLevel']),
+              svipLevel: _int(payload['svip_level'] ?? payload['svipLevel']),
+              sendingLevel: _int(
+                payload['sending_level'] ?? payload['sendingLevel'],
+              ),
+              receivingLevel: _int(
+                payload['receiving_level'] ?? payload['receivingLevel'],
+              ),
+              isHost: isHost,
+              isRoomAdmin: isRoomAdmin || isHost,
+            );
+
+    LiveRoomPresenceRepository.publishParticipant(nextUser);
   }
 
   LiveMediaRoomSnapshot? _overlayAdminMute(

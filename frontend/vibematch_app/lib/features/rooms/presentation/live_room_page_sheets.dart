@@ -15,7 +15,8 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         joinRequestCount: _roomMessageController.joinRequestUsers.length,
         onBackgroundTap: () => _openBackgroundPickerFromSettings(sheetContext),
         onCoverPhotoTap: () => _changeRoomCoverPhotoFromSettings(sheetContext),
-        onCustomBackgroundTap: () => _submitCustomBackgroundFromSettings(sheetContext),
+        onCustomBackgroundTap: () =>
+            _submitCustomBackgroundFromSettings(sheetContext),
         onPrivacyTap: _openPrivacySheet,
         onSeatLayoutTap: _openSeatLayoutSheet,
         onAnnouncementTap: _openAnnouncementSheet,
@@ -55,19 +56,27 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     );
   }
 
-  Future<void> _changeRoomCoverPhotoFromSettings(BuildContext sheetContext) async {
+  Future<void> _changeRoomCoverPhotoFromSettings(
+    BuildContext sheetContext,
+  ) async {
     if (!_viewerCanManageRoom) {
       RoomToast.show(context, 'Only the host/admin can change the cover photo');
       return;
     }
     Navigator.pop(sheetContext);
     try {
-      final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 88);
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+      );
       if (file == null || !mounted) return;
       RoomToast.show(context, 'Uploading room cover photo...');
       final api = const RoomApiService();
       final upload = await api.uploadRoomCover(file);
-      await api.updateRoomCoverPhoto(roomId: _roomId, coverPhotoUrl: upload.url);
+      await api.updateRoomCoverPhoto(
+        roomId: _roomId,
+        coverPhotoUrl: upload.url,
+      );
       if (!mounted) return;
       RoomToast.show(context, 'Room cover photo updated');
       _insertSystemMessage('Room cover photo updated by ${_currentUser.name}.');
@@ -77,29 +86,44 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     }
   }
 
-  Future<void> _submitCustomBackgroundFromSettings(BuildContext sheetContext) async {
+  Future<void> _submitCustomBackgroundFromSettings(
+    BuildContext sheetContext,
+  ) async {
     if (!_viewerCanManageRoom) {
-      RoomToast.show(context, 'Only the host/admin can submit room backgrounds');
+      RoomToast.show(
+        context,
+        'Only the host/admin can submit room backgrounds',
+      );
       return;
     }
     Navigator.pop(sheetContext);
     try {
-      final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 90,
+      );
       if (file == null || !mounted) return;
       RoomToast.show(context, 'Uploading custom background...');
       final api = const RoomApiService();
       final upload = await api.uploadRoomBackground(file);
-      final review = await api.submitCustomBackground(roomId: _roomId, imageUrl: upload.url);
+      final review = await api.submitCustomBackground(
+        roomId: _roomId,
+        imageUrl: upload.url,
+      );
       if (!mounted) return;
       RoomToast.show(context, 'Submitted for review: ${review.reviewPublicId}');
-      _insertSystemMessage('Custom room background submitted for review. Current background stays unchanged until approval.');
+      _insertSystemMessage(
+        'Custom room background submitted for review. Current background stays unchanged until approval.',
+      );
     } catch (error) {
       if (!mounted) return;
       RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
     }
   }
 
-  Future<void> _openBackgroundPickerFromSettings(BuildContext sheetContext) async {
+  Future<void> _openBackgroundPickerFromSettings(
+    BuildContext sheetContext,
+  ) async {
     if (!_viewerCanManageRoom) {
       RoomToast.show(context, 'Only the host/admin can change room background');
       return;
@@ -112,9 +136,13 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         currentTheme: _selectedBackgroundTheme,
         onThemeSelected: (theme) {
           _roomStateController.setSelectedBackgroundTheme(theme);
-          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(theme.id);
+          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
+            theme.id,
+          );
           RoomToast.show(context, '${theme.name} applied');
-          _insertSystemMessage('${theme.name} background applied by ${_currentUser.name}.');
+          _insertSystemMessage(
+            '${theme.name} background applied by ${_currentUser.name}.',
+          );
         },
         onStoreTap: () {
           Navigator.pop(context);
@@ -130,7 +158,9 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       final api = const RoomApiService();
       final themes = await api.listRoomThemes();
       if (!mounted) return;
-      final storeThemes = themes.where((theme) => !theme.isDefault).toList(growable: false);
+      final storeThemes = themes
+          .where((theme) => !theme.isDefault)
+          .toList(growable: false);
       if (storeThemes.isEmpty) {
         RoomToast.show(context, 'No store backgrounds available yet');
         return;
@@ -145,19 +175,29 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
               var selectedTheme = theme;
               if (!selectedTheme.isOwned && !selectedTheme.isFree) {
                 RoomToast.show(context, 'Purchasing ${selectedTheme.name}...');
-                selectedTheme = await api.purchaseRoomTheme(selectedTheme.themeId);
+                selectedTheme = await api.purchaseRoomTheme(
+                  selectedTheme.themeId,
+                );
               }
-              await api.applyRoomTheme(roomId: _roomId, themeId: selectedTheme.themeId);
+              await api.applyRoomTheme(
+                roomId: _roomId,
+                themeId: selectedTheme.themeId,
+              );
               if (!mounted) return;
               Navigator.pop(context);
               _roomStateController.setSelectedBackgroundTheme(
                 _themeFromDto(selectedTheme),
               );
               RoomToast.show(context, '${selectedTheme.name} applied');
-              _insertSystemMessage('${selectedTheme.name} background applied by ${_currentUser.name}.');
+              _insertSystemMessage(
+                '${selectedTheme.name} background applied by ${_currentUser.name}.',
+              );
             } catch (error) {
               if (!mounted) return;
-              RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+              RoomToast.show(
+                context,
+                error.toString().replaceFirst('Exception: ', ''),
+              );
             }
           },
         ),
@@ -175,9 +215,15 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       imageUrl: theme.imageUrl,
       assetPath: theme.assetPath,
       accent: RoomColors.aqua,
-      sourceType: theme.isDefault ? RoomBackgroundSourceType.chatRoom : RoomBackgroundSourceType.store,
-      unlockType: theme.isFree ? RoomBackgroundUnlockType.free : RoomBackgroundUnlockType.storePurchase,
-      ownershipType: theme.isFree ? RoomBackgroundOwnershipType.free : RoomBackgroundOwnershipType.permanent,
+      sourceType: theme.isDefault
+          ? RoomBackgroundSourceType.chatRoom
+          : RoomBackgroundSourceType.store,
+      unlockType: theme.isFree
+          ? RoomBackgroundUnlockType.free
+          : RoomBackgroundUnlockType.storePurchase,
+      ownershipType: theme.isFree
+          ? RoomBackgroundOwnershipType.free
+          : RoomBackgroundOwnershipType.permanent,
       isDefault: theme.isDefault,
       overlayOpacity: 0.42,
       fallbackColors: const [RoomColors.deep, RoomColors.plum],
@@ -362,6 +408,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       language: widget.language,
       modeTitle: widget.modeTitle,
       onlineCount: _safeOnlineCount,
+      restoreState: _buildRestoreState(),
       dismissSeatActionPill: dismissRoomSeatActionPill,
       clearFocus: _clearRoomFocus,
       mountedGetter: () => mounted,
@@ -387,7 +434,10 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
 }
 
 class _RoomThemeStoreSheet extends StatelessWidget {
-  const _RoomThemeStoreSheet({required this.themes, required this.onThemePressed});
+  const _RoomThemeStoreSheet({
+    required this.themes,
+    required this.onThemePressed,
+  });
 
   final List<RoomThemeDto> themes;
   final ValueChanged<RoomThemeDto> onThemePressed;
@@ -396,7 +446,12 @@ class _RoomThemeStoreSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.sizeOf(context).height * 0.70,
-      padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 14),
+      padding: EdgeInsets.fromLTRB(
+        14,
+        10,
+        14,
+        MediaQuery.paddingOf(context).bottom + 14,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
@@ -412,13 +467,30 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Store Backgrounds', style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900)),
+                    Text(
+                      'Store Backgrounds',
+                      style: TextStyle(
+                        color: RoomColors.plum,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                     SizedBox(height: 4),
-                    Text('Purchased and premium backgrounds', style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    Text(
+                      'Purchased and premium backgrounds',
+                      style: TextStyle(
+                        color: Color(0xFF82758E),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: RoomColors.plum)),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded, color: RoomColors.plum),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -428,7 +500,11 @@ class _RoomThemeStoreSheet extends StatelessWidget {
               separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final theme = themes[index];
-                final priceLabel = theme.isFree ? 'Free' : theme.isOwned ? 'Owned' : '${theme.priceCoins} coins';
+                final priceLabel = theme.isFree
+                    ? 'Free'
+                    : theme.isOwned
+                    ? 'Owned'
+                    : '${theme.priceCoins} coins';
                 return Material(
                   color: RoomColors.pearl,
                   borderRadius: BorderRadius.circular(18),
@@ -444,7 +520,9 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                             height: 58,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
-                              gradient: const LinearGradient(colors: [RoomColors.deep, RoomColors.plum]),
+                              gradient: const LinearGradient(
+                                colors: [RoomColors.deep, RoomColors.plum],
+                              ),
                             ),
                             clipBehavior: Clip.antiAlias,
                             child: _StoreThemePreview(theme: theme),
@@ -454,13 +532,34 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(theme.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
+                                Text(
+                                  theme.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: RoomColors.plum,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
                                 const SizedBox(height: 4),
-                                Text(priceLabel, style: const TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w800)),
+                                Text(
+                                  priceLabel,
+                                  style: const TextStyle(
+                                    color: Color(0xFF82758E),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          Icon(theme.isOwned || theme.isFree ? Icons.check_circle_rounded : Icons.shopping_bag_rounded, color: RoomColors.aqua),
+                          Icon(
+                            theme.isOwned || theme.isFree
+                                ? Icons.check_circle_rounded
+                                : Icons.shopping_bag_rounded,
+                            color: RoomColors.aqua,
+                          ),
                         ],
                       ),
                     ),
@@ -485,10 +584,18 @@ class _StoreThemePreview extends StatelessWidget {
     final imageUrl = theme.imageUrl?.trim();
     final assetPath = theme.assetPath?.trim();
     if (imageUrl != null && imageUrl.isNotEmpty) {
-      return Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink());
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+      );
     }
     if (assetPath != null && assetPath.isNotEmpty) {
-      return Image.asset(assetPath, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink());
+      return Image.asset(
+        assetPath,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+      );
     }
     return const SizedBox.shrink();
   }

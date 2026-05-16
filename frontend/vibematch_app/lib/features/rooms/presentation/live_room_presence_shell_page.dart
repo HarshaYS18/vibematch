@@ -7,6 +7,9 @@ import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_presence_repository.dart';
 import 'live_room_models.dart';
 import 'live_room_page.dart';
+import 'live_room_restore_state.dart';
+import 'widgets/live_room_minimized_overlay_service.dart';
+import 'widgets/room_theme.dart';
 
 class LiveRoomPresenceShellPage extends StatefulWidget {
   const LiveRoomPresenceShellPage({
@@ -17,6 +20,8 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
     required this.modeTitle,
     required this.initialOnlineCount,
     this.currentUser,
+    this.initialBackgroundTheme,
+    this.restoreState,
   });
 
   final String roomName;
@@ -25,13 +30,17 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
   final String modeTitle;
   final int initialOnlineCount;
   final CurrentUser? currentUser;
+  final RoomBackgroundTheme? initialBackgroundTheme;
+  final LiveRoomRestoreState? restoreState;
 
   @override
-  State<LiveRoomPresenceShellPage> createState() => _LiveRoomPresenceShellPageState();
+  State<LiveRoomPresenceShellPage> createState() =>
+      _LiveRoomPresenceShellPageState();
 }
 
 class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
-  final LiveRoomPresenceRepository _presenceRepository = LiveRoomPresenceRepository();
+  final LiveRoomPresenceRepository _presenceRepository =
+      LiveRoomPresenceRepository();
   Timer? _heartbeatTimer;
   Timer? _enteredMessageTimer;
   LiveRoomPresenceSnapshot? _snapshot;
@@ -43,14 +52,19 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   String? _presenceError;
 
   int get _onlineCount => _snapshot?.onlineCount ?? widget.initialOnlineCount;
-  List<SeatUser> get _participants => _snapshot?.participants ?? const <SeatUser>[];
+  List<SeatUser> get _participants =>
+      _snapshot?.participants ?? const <SeatUser>[];
 
   @override
   void initState() {
     super.initState();
-    LiveRoomMediaSignalingService.instance.configureRoom(roomId: widget.roomId, roomName: widget.roomName);
+    LiveRoomMediaSignalingService.instance.configureRoom(
+      roomId: widget.roomId,
+      roomName: widget.roomName,
+    );
     final currentUser = widget.currentUser;
-    if (currentUser != null) LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(currentUser);
+    if (currentUser != null)
+      LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(currentUser);
     unawaited(_joinPresence());
   }
 
@@ -58,7 +72,11 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   void dispose() {
     _heartbeatTimer?.cancel();
     _enteredMessageTimer?.cancel();
-    unawaited(_presenceRepository.leaveRoom(widget.roomId).catchError((_) => 0));
+    if (!LiveRoomMinimizedOverlayService.instance.isShowing) {
+      unawaited(
+        _presenceRepository.leaveRoom(widget.roomId).catchError((_) => 0),
+      );
+    }
     _presenceRepository.close();
     super.dispose();
   }
@@ -94,7 +112,9 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     final currentPublicId = widget.currentUser?.publicUserId.toString();
     SeatUser? self;
     if (currentPublicId != null) {
-      self = snapshot.participants.where((user) => user.id == 'user_$currentPublicId').firstOrNull;
+      self = snapshot.participants
+          .where((user) => user.id == 'user_$currentPublicId')
+          .firstOrNull;
     }
     self ??= snapshot.joinedUser;
     if (self == null) return;
@@ -105,7 +125,8 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     final joinedUser = snapshot.joinedUser;
     if (!snapshot.shouldShowEnteredMessage || joinedUser == null) return;
     final currentPublicId = widget.currentUser?.publicUserId.toString();
-    if (currentPublicId != null && joinedUser.id == 'user_$currentPublicId') return;
+    if (currentPublicId != null && joinedUser.id == 'user_$currentPublicId')
+      return;
     _enteredMessageTimer?.cancel();
     setState(() => _enteredUser = joinedUser);
     _enteredMessageTimer = Timer(const Duration(seconds: 5), () {
@@ -119,26 +140,35 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     final currentUser = widget.currentUser;
     if (currentUser == null) return;
     final currentPublicId = currentUser.publicUserId.toString();
-    final self = snapshot.participants.where((user) => user.id == 'user_$currentPublicId').firstOrNull;
+    final self = snapshot.participants
+        .where((user) => user.id == 'user_$currentPublicId')
+        .firstOrNull;
     final isRoomHostOrAdmin = self?.isHost == true || self?.isRoomAdmin == true;
     final isOfficialOwner = currentUser.canSeeOwnerControls;
     if (!isRoomHostOrAdmin && !isOfficialOwner) return;
 
     _autoSeatAttempted = true;
     final media = LiveRoomMediaSignalingService.instance;
-    unawaited(Future<void>.delayed(const Duration(milliseconds: 700), () {
-      if (!mounted) return;
-      media.takeSeatIfVacant(0);
-    }));
-    unawaited(Future<void>.delayed(const Duration(milliseconds: 1700), () {
-      if (!mounted) return;
-      media.takeSeatIfVacant(0);
-    }));
+    unawaited(
+      Future<void>.delayed(const Duration(milliseconds: 700), () {
+        if (!mounted) return;
+        media.takeSeatIfVacant(0);
+      }),
+    );
+    unawaited(
+      Future<void>.delayed(const Duration(milliseconds: 1700), () {
+        if (!mounted) return;
+        media.takeSeatIfVacant(0);
+      }),
+    );
   }
 
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 12), (_) => unawaited(_heartbeat()));
+    _heartbeatTimer = Timer.periodic(
+      const Duration(seconds: 12),
+      (_) => unawaited(_heartbeat()),
+    );
   }
 
   Future<void> _heartbeat() async {
@@ -153,7 +183,9 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       _autoSeatIfAllowed(snapshot);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _presenceError = error.toString().replaceFirst('Exception: ', ''));
+      setState(
+        () => _presenceError = error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
@@ -161,7 +193,9 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     if (_participantsOpen) return;
     _participantsOpen = true;
     try {
-      final snapshot = await _presenceRepository.fetchParticipants(widget.roomId);
+      final snapshot = await _presenceRepository.fetchParticipants(
+        widget.roomId,
+      );
       if (mounted) setState(() => _snapshot = snapshot);
     } catch (_) {}
     if (!mounted) {
@@ -190,19 +224,25 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     if (!_identitySeeded && _joining) {
       return const Scaffold(
         backgroundColor: Color(0xFF120D1F),
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF12C7B7))),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF12C7B7)),
+        ),
       );
     }
 
     return Stack(
       children: [
         LiveRoomPage(
-          key: ValueKey('live-room-${widget.roomId}-${LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id ?? 'user'}'),
+          key: ValueKey(
+            'live-room-${widget.roomId}-${LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id ?? 'user'}',
+          ),
           roomName: widget.roomName,
           roomId: widget.roomId,
           language: widget.language,
           modeTitle: widget.modeTitle,
           onlineCount: _onlineCount,
+          initialBackgroundTheme: widget.initialBackgroundTheme,
+          restoreState: widget.restoreState,
         ),
         Positioned(
           top: MediaQuery.paddingOf(context).top + 8,
@@ -212,7 +252,9 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: _presenceError == null ? _openParticipantsSheet : _joinPresence,
+              onTap: _presenceError == null
+                  ? _openParticipantsSheet
+                  : _joinPresence,
               borderRadius: BorderRadius.circular(999),
               child: const SizedBox.expand(),
             ),
@@ -247,7 +289,13 @@ class _RoomEnteredSystemToast extends StatelessWidget {
             color: const Color(0xFF120D1F).withValues(alpha: 0.88),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.24), blurRadius: 18, offset: const Offset(0, 8))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.24),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -256,8 +304,18 @@ class _RoomEnteredSystemToast extends StatelessWidget {
                 width: 28,
                 height: 28,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
-                child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: user.avatarColors),
+                ),
+                child: Text(
+                  avatarLetter(user.name),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
               const SizedBox(width: 9),
               Expanded(
@@ -265,7 +323,11 @@ class _RoomEnteredSystemToast extends StatelessWidget {
                   '${user.name} entered the room',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
@@ -299,22 +361,75 @@ class _RealParticipantsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(12),
-      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.72),
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(color: const Color(0xFF120D1F), borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white.withValues(alpha: 0.10))),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+      ),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        16 + MediaQuery.paddingOf(context).bottom,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF120D1F),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 42, height: 5, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.24), borderRadius: BorderRadius.circular(999))),
+          Container(
+            width: 42,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.24),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(child: Text(roomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900))),
+              Expanded(
+                child: Text(
+                  roomName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
               if (joining)
-                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF12C7B7)))
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF12C7B7),
+                  ),
+                )
               else
-                Text('$onlineCount online', style: const TextStyle(color: Color(0xFF12C7B7), fontSize: 12, fontWeight: FontWeight.w900)),
-              IconButton(onPressed: () => error == null ? unawaited(onRefresh()) : unawaited(onRetryJoin()), icon: Icon(error == null ? Icons.refresh_rounded : Icons.sync_problem_rounded, color: Colors.white70)),
+                Text(
+                  '$onlineCount online',
+                  style: const TextStyle(
+                    color: Color(0xFF12C7B7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              IconButton(
+                onPressed: () => error == null
+                    ? unawaited(onRefresh())
+                    : unawaited(onRetryJoin()),
+                icon: Icon(
+                  error == null
+                      ? Icons.refresh_rounded
+                      : Icons.sync_problem_rounded,
+                  color: Colors.white70,
+                ),
+              ),
             ],
           ),
           if (error != null) ...[
@@ -322,23 +437,47 @@ class _RealParticipantsSheet extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFFE84C72).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE84C72).withValues(alpha: 0.28))),
-              child: Text(error!, style: const TextStyle(color: Color(0xFFFFB4C4), fontSize: 12, fontWeight: FontWeight.w800)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE84C72).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFFE84C72).withValues(alpha: 0.28),
+                ),
+              ),
+              child: Text(
+                error!,
+                style: const TextStyle(
+                  color: Color(0xFFFFB4C4),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
           ],
           const SizedBox(height: 8),
           if (participants.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 28),
-              child: Text('No active users yet. Refresh after another user joins.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+              child: Text(
+                'No active users yet. Refresh after another user joins.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             )
           else
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: participants.length,
-                separatorBuilder: (context, index) => Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
-                itemBuilder: (context, index) => _ParticipantTile(user: participants[index]),
+                separatorBuilder: (context, index) => Divider(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  height: 1,
+                ),
+                itemBuilder: (context, index) =>
+                    _ParticipantTile(user: participants[index]),
               ),
             ),
         ],
@@ -362,25 +501,60 @@ class _ParticipantTile extends StatelessWidget {
             width: 42,
             height: 42,
             alignment: Alignment.center,
-            decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
-            child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: user.avatarColors),
+            ),
+            child: Text(
+              avatarLetter(user.name),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
           const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                Text(
+                  user.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(height: 3),
-                Text(user.roleLabel, style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w700)),
+                Text(
+                  user.roleLabel,
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),
           if (user.vipLevel > 0)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(color: const Color(0xFFFFC857).withValues(alpha: 0.13), borderRadius: BorderRadius.circular(999)),
-              child: Text('VIP ${user.vipLevel}', style: const TextStyle(color: Color(0xFFFFC857), fontSize: 10, fontWeight: FontWeight.w900)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFC857).withValues(alpha: 0.13),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'VIP ${user.vipLevel}',
+                style: const TextStyle(
+                  color: Color(0xFFFFC857),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
         ],
       ),

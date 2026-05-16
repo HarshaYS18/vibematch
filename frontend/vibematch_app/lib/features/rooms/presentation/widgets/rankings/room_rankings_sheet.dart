@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../../auth/data/auth_api_service.dart';
+import '../../../../auth/models/current_user.dart';
 import '../../controllers/room_rankings_controller.dart';
 import '../../live_room_models.dart';
 import '../room_theme.dart';
@@ -39,12 +43,32 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
 
   late RoomRankingCategory _category = widget.initialCategory;
   late RoomRankingPeriod _period = widget.initialPeriod;
+  CurrentUser? _syncedCurrentUser = const AuthApiService().cachedUser;
+  StreamSubscription<CurrentUser>? _userSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _userSubscription = AuthUserRealtimeService.instance.users.listen((user) {
+      if (!mounted) return;
+      setState(() => _syncedCurrentUser = user);
+    });
+  }
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final accentColor = _category.accentColor;
+    final syncedUsers = widget.users
+        .map(_syncCurrentProfile)
+        .toList(growable: false);
     final allEntries = _controller.buildMockEntries(
-      users: widget.users,
+      users: syncedUsers,
       category: _category,
       period: _period,
     );
@@ -62,7 +86,12 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 12),
+            padding: EdgeInsets.fromLTRB(
+              14,
+              10,
+              14,
+              MediaQuery.paddingOf(context).bottom + 12,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -90,26 +119,38 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
                 Expanded(
                   child: ListView.separated(
                     physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.only(bottom: currentEntry == null ? 8 : 86),
+                    padding: EdgeInsets.only(
+                      bottom: currentEntry == null ? 8 : 86,
+                    ),
                     itemCount: topEntries.length + 2,
-                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       if (index == 0) {
-                        return RoomRankingsPodiumPreview(entries: allEntries, accentColor: accentColor);
+                        return RoomRankingsPodiumPreview(
+                          entries: allEntries,
+                          accentColor: accentColor,
+                        );
                       }
                       if (index == topEntries.length + 1) {
                         return Text(
                           'Backend later: GET $backendPath',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.42), fontSize: 9.5, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.42),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         );
                       }
                       final entry = topEntries[index - 1];
                       return RoomRankingEntryTile(
                         entry: entry,
                         accentColor: accentColor,
-                        onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(entry.user),
+                        onTap: widget.onUserTap == null
+                            ? null
+                            : () => widget.onUserTap!(entry.user),
                       );
                     },
                   ),
@@ -119,7 +160,9 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
                   RoomRankingEntryTile(
                     entry: currentEntry,
                     accentColor: accentColor,
-                    onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(currentEntry.user),
+                    onTap: widget.onUserTap == null
+                        ? null
+                        : () => widget.onUserTap!(currentEntry.user),
                   ),
                 ],
               ],
@@ -141,6 +184,20 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
       if (entry.user.isCurrentUser) return entry;
     }
     return entries.isEmpty ? null : entries.first;
+  }
+
+  SeatUser _syncCurrentProfile(SeatUser user) {
+    final current = _syncedCurrentUser;
+    if (current == null || user.id != 'user_${current.publicUserId}') {
+      return user;
+    }
+    return user.copyWith(
+      name: current.displayName ?? current.username ?? user.name,
+      avatarUrl: current.avatarUrl,
+      clearAvatarUrl: current.avatarUrl == null,
+      vipLevel: current.vip.vipLevel,
+      svipLevel: current.vip.svipLevel,
+    );
   }
 }
 
@@ -170,7 +227,13 @@ class _RankingsHeader extends StatelessWidget {
             shape: BoxShape.circle,
             color: accentColor.withValues(alpha: 0.18),
             border: Border.all(color: accentColor.withValues(alpha: 0.42)),
-            boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.20), blurRadius: 18, offset: const Offset(0, 8))],
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.20),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Icon(icon, color: accentColor, size: 20),
         ),
@@ -183,14 +246,23 @@ class _RankingsHeader extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -0.35),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.35,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 11.5, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.58),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
@@ -209,7 +281,11 @@ class _RankingsHeader extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.10),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
-              child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
           ),
         ),

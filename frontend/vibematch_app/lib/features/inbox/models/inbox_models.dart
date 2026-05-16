@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 enum InboxConversationType {
   official('Official'),
@@ -49,16 +49,10 @@ enum InboxMessageType {
   contact,
   roomInvite,
   relationshipRequest,
-  system;
+  system,
 }
 
-enum InboxMessageStatus {
-  sending,
-  sent,
-  delivered,
-  read,
-  failed;
-}
+enum InboxMessageStatus { sending, sent, delivered, read, failed }
 
 enum InboxReportStatus {
   pendingCsReview('Pending CS review'),
@@ -72,13 +66,21 @@ enum InboxReportStatus {
 }
 
 class InboxLockStatus {
-  const InboxLockStatus({required this.isEnabled, this.mobileNumber, this.recoveryRequested = false});
+  const InboxLockStatus({
+    required this.isEnabled,
+    this.mobileNumber,
+    this.recoveryRequested = false,
+  });
 
   final bool isEnabled;
   final String? mobileNumber;
   final bool recoveryRequested;
 
-  InboxLockStatus copyWith({bool? isEnabled, String? mobileNumber, bool? recoveryRequested}) {
+  InboxLockStatus copyWith({
+    bool? isEnabled,
+    String? mobileNumber,
+    bool? recoveryRequested,
+  }) {
     return InboxLockStatus(
       isEnabled: isEnabled ?? this.isEnabled,
       mobileNumber: mobileNumber ?? this.mobileNumber,
@@ -219,13 +221,21 @@ class InboxConversation {
   bool get isOfficial => type == InboxConversationType.official;
   bool get isStranger => type == InboxConversationType.stranger;
   bool get isRoomInvite => type == InboxConversationType.roomInvite;
-  bool get isMutualFollowChat => type == InboxConversationType.chat && !isStranger;
+  bool get isMutualFollowChat =>
+      type == InboxConversationType.chat && !isStranger;
   bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
 
   InboxConversation copyWith({
+    String? title,
     String? subtitle,
     String? time,
+    String? avatarText,
+    String? avatarUrl,
+    bool clearAvatarUrl = false,
     int? unreadCount,
+    bool? isOnline,
+    String? lastSeenText,
+    List<Color>? colors,
     List<InboxMessage>? messages,
     String? currentRoomName,
     String? currentRoomId,
@@ -237,16 +247,16 @@ class InboxConversation {
   }) {
     return InboxConversation(
       id: id,
-      title: title,
+      title: title ?? this.title,
       subtitle: subtitle ?? this.subtitle,
       time: time ?? this.time,
-      avatarText: avatarText,
-      avatarUrl: avatarUrl,
+      avatarText: avatarText ?? this.avatarText,
+      avatarUrl: clearAvatarUrl ? null : avatarUrl ?? this.avatarUrl,
       type: type,
       unreadCount: unreadCount ?? this.unreadCount,
-      isOnline: isOnline,
-      lastSeenText: lastSeenText,
-      colors: colors,
+      isOnline: isOnline ?? this.isOnline,
+      lastSeenText: lastSeenText ?? this.lastSeenText,
+      colors: colors ?? this.colors,
       messages: messages ?? this.messages,
       currentRoomName: currentRoomName ?? this.currentRoomName,
       currentRoomId: currentRoomId ?? this.currentRoomId,
@@ -296,8 +306,12 @@ class InboxMessage {
   final String? loveBondCardName;
   final String? loveBondStatus;
 
-  bool get isInvite => inviteRoomName != null || inviteRoomId != null || type == InboxMessageType.roomInvite;
-  bool get isLoveBondRequest => loveBondRequestId != null || type == InboxMessageType.relationshipRequest;
+  bool get isInvite =>
+      inviteRoomName != null ||
+      inviteRoomId != null ||
+      type == InboxMessageType.roomInvite;
+  bool get isLoveBondRequest =>
+      loveBondRequestId != null || type == InboxMessageType.relationshipRequest;
 
   InboxMessage copyWith({
     String? id,
@@ -341,7 +355,14 @@ class InboxMessage {
 }
 
 class InboxSearchResult {
-  const InboxSearchResult({required this.conversation, required this.matchType, required this.title, required this.preview, required this.matchedText, this.message});
+  const InboxSearchResult({
+    required this.conversation,
+    required this.matchType,
+    required this.title,
+    required this.preview,
+    required this.matchedText,
+    this.message,
+  });
   final InboxConversation conversation;
   final InboxSearchMatchType matchType;
   final String title;
@@ -351,7 +372,18 @@ class InboxSearchResult {
 }
 
 class InboxReportTask {
-  const InboxReportTask({required this.id, required this.reportedConversationId, required this.reportedUserName, required this.reporterName, required this.reason, required this.snapshot, required this.createdAtLabel, required this.status, this.csNote, this.monitorAction});
+  const InboxReportTask({
+    required this.id,
+    required this.reportedConversationId,
+    required this.reportedUserName,
+    required this.reporterName,
+    required this.reason,
+    required this.snapshot,
+    required this.createdAtLabel,
+    required this.status,
+    this.csNote,
+    this.monitorAction,
+  });
 
   final String id;
   final String reportedConversationId;
@@ -366,7 +398,11 @@ class InboxReportTask {
 
   bool get isPending => status == InboxReportStatus.pendingCsReview;
 
-  InboxReportTask copyWith({InboxReportStatus? status, String? csNote, String? monitorAction}) {
+  InboxReportTask copyWith({
+    InboxReportStatus? status,
+    String? csNote,
+    String? monitorAction,
+  }) {
     return InboxReportTask(
       id: id,
       reportedConversationId: reportedConversationId,
