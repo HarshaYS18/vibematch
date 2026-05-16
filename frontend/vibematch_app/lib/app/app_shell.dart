@@ -42,6 +42,8 @@ class _AppShellState extends State<AppShell> {
   final PresenceApiService _presenceApi = const PresenceApiService();
   Timer? _presenceHeartbeatTimer;
   int _homeRefreshNonce = 0;
+  int _backPressCount = 0;
+  Timer? _backPressResetTimer;
 
   CurrentUser get _activeUser => _syncedUser;
 
@@ -73,6 +75,7 @@ class _AppShellState extends State<AppShell> {
     _userSyncSubscription?.cancel();
     _signedOutSubscription?.cancel();
     _presenceHeartbeatTimer?.cancel();
+    _backPressResetTimer?.cancel();
     unawaited(WalletRealtimeSyncService.instance.stop());
     super.dispose();
   }
@@ -139,17 +142,48 @@ class _AppShellState extends State<AppShell> {
     _syncVibesPlaybackWithActiveTab();
   }
 
+  void _handleAppBack(bool didPop, Object? result) {
+    if (didPop) return;
+
+    if (_selectedTab != VmMainTab.home) {
+      _selectTab(VmMainTab.home);
+      return;
+    }
+
+    _backPressCount += 1;
+    _backPressResetTimer?.cancel();
+    _backPressResetTimer = Timer(const Duration(seconds: 2), () => _backPressCount = 0);
+
+    final remaining = (3 - _backPressCount).clamp(1, 3);
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Press back $remaining more time${remaining == 1 ? '' : 's'} to exit'),
+        duration: const Duration(milliseconds: 1200),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    // Intentionally do not close the app from swipe-back/gesture. This prevents
+    // accidental app exit during beta testing. Later we can add explicit Exit
+    // button if needed.
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F1),
-      body: Stack(
-        children: [
-          IndexedStack(index: _selectedTab.tabIndex, children: _pages),
-          const _LiveRoomMiniBubbleLayer(),
-        ],
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: _handleAppBack,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFAF7F1),
+        body: Stack(
+          children: [
+            IndexedStack(index: _selectedTab.tabIndex, children: _pages),
+            const _LiveRoomMiniBubbleLayer(),
+          ],
+        ),
+        bottomNavigationBar: _VibeBottomNav(selectedTab: _selectedTab, isTestingAsFounder: _isTestingAsFounder, onTabSelected: _selectTab),
       ),
-      bottomNavigationBar: _VibeBottomNav(selectedTab: _selectedTab, isTestingAsFounder: _isTestingAsFounder, onTabSelected: _selectTab),
     );
   }
 }
