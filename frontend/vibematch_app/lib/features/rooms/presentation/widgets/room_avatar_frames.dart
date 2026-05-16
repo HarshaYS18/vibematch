@@ -12,6 +12,7 @@ class RoomAvatarFrame {
     required this.type,
     required this.accent,
     this.assetPath,
+    this.imageUrl,
   });
 
   final String id;
@@ -19,6 +20,7 @@ class RoomAvatarFrame {
   final RoomAvatarFrameType type;
   final Color accent;
   final String? assetPath;
+  final String? imageUrl;
 
   bool get isDynamic => type == RoomAvatarFrameType.dynamicFrame;
 
@@ -28,9 +30,30 @@ class RoomAvatarFrame {
       name: name,
       accent: accent,
       assetPath: assetPath,
+      imageUrl: imageUrl,
       isDynamic: isDynamic,
     );
   }
+}
+
+RoomAvatarFrame? equippedStoreAvatarFrame({
+  required String userId,
+  String? assetPath,
+  String? imageUrl,
+}) {
+  final cleanAsset = assetPath?.trim();
+  final cleanImage = imageUrl?.trim();
+  if ((cleanAsset == null || cleanAsset.isEmpty) && (cleanImage == null || cleanImage.isEmpty)) {
+    return null;
+  }
+  return RoomAvatarFrame(
+    id: 'equipped_store_frame_$userId',
+    name: 'Equipped Frame',
+    type: RoomAvatarFrameType.staticFrame,
+    accent: RoomColors.gold,
+    assetPath: cleanAsset,
+    imageUrl: cleanImage,
+  );
 }
 
 const RoomAvatarFrame defaultStaticAvatarFrame = RoomAvatarFrame(
