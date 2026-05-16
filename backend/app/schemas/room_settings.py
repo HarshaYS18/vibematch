@@ -15,6 +15,7 @@ class RoomSettingsResponse(BaseModel):
     has_lock_password: bool = False
     cover_photo_url: str | None = None
     background_theme_id: str = "default"
+    seat_layout_id: str = "5x2"
     announcement_text: str | None = None
     announcement_updated_at: datetime | None = None
     announcement_updated_by_user_id: int | None = None
@@ -22,6 +23,10 @@ class RoomSettingsResponse(BaseModel):
 
 class RoomBackgroundUpdateRequest(BaseModel):
     background_theme_id: str = Field(min_length=1, max_length=80)
+
+
+class RoomSeatLayoutUpdateRequest(BaseModel):
+    seat_layout_id: str = Field(min_length=2, max_length=24)
 
 
 class RoomAnnouncementUpdateRequest(BaseModel):
