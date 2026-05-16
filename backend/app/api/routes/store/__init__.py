@@ -5,6 +5,7 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.store import (
+    EquippedStoreItemsResponse,
     InventoryItemResponse,
     InventoryResponse,
     StoreCatalogResponse,
@@ -40,6 +41,14 @@ def get_user_inventory(
     current_user: User = Depends(get_current_user),
 ):
     return store_service.inventory(db, current_user)
+
+
+@router.get("/equipped", response_model=EquippedStoreItemsResponse)
+def get_equipped_store_items(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return store_service.equipped_items(db, current_user)
 
 
 @router.post("/inventory/equip", response_model=InventoryItemResponse)
