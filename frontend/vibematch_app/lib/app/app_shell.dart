@@ -37,7 +37,8 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   VmMainTab _selectedTab = VmMainTab.home;
   late CurrentUser _syncedUser;
-  StreamSubscription<CurrentUser?>? _userSyncSubscription;
+  StreamSubscription<CurrentUser>? _userSyncSubscription;
+  StreamSubscription<void>? _signedOutSubscription;
   final PresenceApiService _presenceApi = const PresenceApiService();
   Timer? _presenceHeartbeatTimer;
   int _homeRefreshNonce = 0;
@@ -52,7 +53,8 @@ class _AppShellState extends State<AppShell> {
     _syncedUser = widget.currentUser;
     _syncVibesPlaybackWithActiveTab();
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(_syncedUser);
-    _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onAuthUserEvent);
+    _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onUserSynced);
+    _signedOutSubscription = AuthUserRealtimeService.instance.signedOut.listen((_) => _handleSignedOut());
     _startPresenceHeartbeat();
     unawaited(WalletRealtimeSyncService.instance.start());
   }
@@ -69,6 +71,7 @@ class _AppShellState extends State<AppShell> {
   void dispose() {
     VibeMediaPlaybackGate.feedPlaybackPaused.value = true;
     _userSyncSubscription?.cancel();
+    _signedOutSubscription?.cancel();
     _presenceHeartbeatTimer?.cancel();
     unawaited(WalletRealtimeSyncService.instance.stop());
     super.dispose();
@@ -99,13 +102,9 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  void _onAuthUserEvent(CurrentUser? user) {
-    if (user == null) {
-      _presenceHeartbeatTimer?.cancel();
-      VmSessionCleanupService.clearUserScopedStateUnawaited(reason: 'app shell signed out');
-      return;
-    }
-    _onUserSynced(user);
+  void _handleSignedOut() {
+    _presenceHeartbeatTimer?.cancel();
+    VmSessionCleanupService.clearUserScopedStateUnawaited(reason: 'app shell signed out');
   }
 
   void _onUserSynced(CurrentUser user) {
