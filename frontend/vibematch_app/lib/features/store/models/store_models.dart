@@ -246,6 +246,18 @@ String storeCategoryLabel(String category) {
   };
 }
 
+String storeCategoryShortLabel(String category) {
+  return switch (category) {
+    'room_background' => 'BG',
+    'avatar_frame' => 'Frame',
+    'chat_bubble' => 'Bubble',
+    'entrance_effect' => 'Entry',
+    'profile_theme' => 'Theme',
+    'badge' => 'Badge',
+    _ => category.replaceAll('_', ' ').trim(),
+  };
+}
+
 String compactCoins(int value) {
   if (value >= 1000000000) return '${(value / 1000000000).toStringAsFixed(value % 1000000000 == 0 ? 0 : 1)}B';
   if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1)}M';
