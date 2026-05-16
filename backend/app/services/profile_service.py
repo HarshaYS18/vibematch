@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.user import User
-from app.services import economy_level_service, role_badge_service, role_service
+from app.services import economy_level_service, role_badge_service, role_service, store_service
 
 SVIP_NAME_GRADIENTS: dict[int, dict[str, object]] = {
     1: {"key": "svip_1_aqua_violet", "colors": ["#20E3B2", "#7C4DFF", "#E040FB"]},
@@ -37,7 +37,7 @@ def vip_summary(db: Session, user: User) -> dict:
         "svip_expires_at": status.svip_expires_at,
         "name_gradient_key": str(gradient["key"]),
         "name_gradient_colors": list(gradient["colors"]),
-}
+    }
 
 
 def wallet_summary(db: Session, user: User, *, include_private_balances: bool = True) -> dict:
@@ -65,6 +65,10 @@ def wallet_summary(db: Session, user: User, *, include_private_balances: bool = 
         "vip": levels["vip"],
         "svip": levels["svip"],
     }
+
+
+def equipped_items_summary(db: Session, user: User) -> dict:
+    return store_service.equipped_items_dict(db, user)
 
 
 def public_profile_payload(db: Session, public_user_id: int) -> dict:
@@ -96,6 +100,7 @@ def public_profile_payload(db: Session, public_user_id: int) -> dict:
         "role_badges": role_badge_service.get_role_badges(user_roles),
         "vip": vip_summary(db, user),
         "wallet": wallet_summary(db, user, include_private_balances=False),
+        "equipped_items": equipped_items_summary(db, user),
         "is_online": is_online,
         "last_seen_at": user.last_seen_at,
         "created_at": user.created_at,
