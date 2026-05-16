@@ -42,11 +42,11 @@ extension _LiveRoomPagePresence on _LiveRoomPageState {
     _hostSeatOneRetryTimer?.cancel();
 
     _hostSeatOneTimer = Timer(
-      const Duration(milliseconds: 180),
+      const Duration(milliseconds: 260),
       _tryOccupySeatOneForHostOrAdmin,
     );
     _hostSeatOneRetryTimer = Timer(
-      const Duration(milliseconds: 1200),
+      const Duration(milliseconds: 1300),
       _tryOccupySeatOneForHostOrAdmin,
     );
   }
@@ -55,13 +55,26 @@ extension _LiveRoomPagePresence on _LiveRoomPageState {
     if (!mounted || !_viewerCanManageRoom) return;
     if (_seatController.seats.isEmpty) return;
 
+    // Do not keep forcing seat 1 if the host/admin is already seated anywhere.
+    // The media server accepts seat 1 correctly, but repeated auto-seat retries
+    // were causing repeated takeSeat/setSelfMuted/produce calls and made the UI
+    // look like seat 1 was failing.
+    if (_seatController.currentUserIsSeated) {
+      _hostSeatOneTimer?.cancel();
+      _hostSeatOneRetryTimer?.cancel();
+      return;
+    }
+
     final firstSeat = _seatController.seats.first;
-    if (firstSeat.locked || firstSeat.user != null) {
-      LiveRoomMediaSignalingService.instance.takeSeatIfVacant(0);
+    if (firstSeat.locked) return;
+
+    final firstSeatUser = firstSeat.user;
+    if (firstSeatUser != null) {
+      // If the first seat is already held by someone else, do not steal it or
+      // spam the media server. Admins can switch manually.
       return;
     }
 
     _seatController.occupySeat(0);
-    LiveRoomMediaSignalingService.instance.takeSeatIfVacant(0);
   }
 }
