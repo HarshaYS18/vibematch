@@ -25,6 +25,7 @@ class LiveRoomAudioService {
   dynamic _routerRtpCapabilities;
   Timer? _produceRetryTimer;
   Timer? _recoveryTimer;
+  Timer? _activeSpeakerSilenceTimer;
   DateTime? _sendTransportWarmupUntil;
   int? _desiredSeatIndex;
   int _produceRetryCount = 0;
@@ -56,6 +57,7 @@ class LiveRoomAudioService {
   final ValueNotifier<List<RTCVideoRenderer>> remoteAudioRenderers =
       ValueNotifier<List<RTCVideoRenderer>>(<RTCVideoRenderer>[]);
   final ValueNotifier<List<AudioSeatSnapshot>> seats = ValueNotifier<List<AudioSeatSnapshot>>(<AudioSeatSnapshot>[]);
+  final ValueNotifier<Set<String>> activeSpeakerPeerIds = ValueNotifier<Set<String>>(<String>{});
   final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
 
   bool get isJoined => _joined;
@@ -100,6 +102,7 @@ class LiveRoomAudioService {
 
   void leaveSeat() {
     _desiredSeatIndex = null;
+    _clearActiveSpeakers();
     if (!_canSendRoomEvent()) return;
     _seated = false;
     _selfMuted = true;
@@ -112,6 +115,7 @@ class LiveRoomAudioService {
   void setSelfMuted(bool muted) {
     _desiredSelfMuted = muted;
     _selfMuted = muted;
+    if (muted) _removeActiveSpeaker(_peerId);
     if (!muted) _produceRetryCount = 0;
     if (muted) _cancelProduceRetry();
     if (!_canSendRoomEvent()) {
@@ -185,6 +189,8 @@ class LiveRoomAudioService {
     _desiredSelfMuted = true;
     _recoveryTimer?.cancel();
     _recoveryTimer = null;
+    _activeSpeakerSilenceTimer?.cancel();
+    _activeSpeakerSilenceTimer = null;
     _cancelProduceRetry();
     await _stopPublishingAndCapture();
     await _closeAllRemoteConsumers();
@@ -193,6 +199,7 @@ class LiveRoomAudioService {
     _selfMuted = true;
     joined.value = false;
     seats.value = <AudioSeatSnapshot>[];
+    activeSpeakerPeerIds.value = <String>{};
     remoteAudioRenderers.value = <RTCVideoRenderer>[];
     _roomId = null;
     _peerId = null;
@@ -240,6 +247,7 @@ class LiveRoomAudioService {
       connected.value = false;
       _joined = false;
       joined.value = false;
+      _clearActiveSpeakers();
       _cancelProduceRetry();
       unawaited(_stopPublishingAndCapture());
       unawaited(_closeAllRemoteConsumers());
@@ -260,6 +268,7 @@ class LiveRoomAudioService {
         final nextSeats = AudioSeatSnapshot.listFromJson(payload['seats']);
         seats.value = nextSeats;
         _seated = nextSeats.any((seat) => seat.peerId == _peerId);
+        _dropInactiveSpeakersForSeats(nextSeats);
         if (!_seated && _desiredSeatIndex == null) {
           _selfMuted = true;
           _cancelProduceRetry();
@@ -269,8 +278,12 @@ class LiveRoomAudioService {
       }
     });
 
+    socket.on('activeSpeakers', _handleActiveSpeakers);
     socket.on('peerJoined', (dynamic payload) => _debug('audio peer joined $payload'));
-    socket.on('peerLeft', (dynamic payload) => _debug('audio peer left $payload'));
+    socket.on('peerLeft', (dynamic payload) {
+      _debug('audio peer left $payload');
+      if (payload is Map) _removeActiveSpeaker(payload['peerId']?.toString());
+    });
 
     socket.on('newProducer', (dynamic payload) {
       _debug('audio new producer $payload');
@@ -285,6 +298,8 @@ class LiveRoomAudioService {
       _debug('audio producer closed $payload');
       if (payload is Map) {
         final producerId = payload['producerId']?.toString();
+        final peerId = payload['peerId']?.toString();
+        _removeActiveSpeaker(peerId);
         if (producerId != null && producerId.isNotEmpty) unawaited(_closeRemoteConsumer(producerId));
       }
     });
@@ -753,6 +768,7 @@ class LiveRoomAudioService {
       producer.close();
     } catch (_) {}
     audioPublishing.value = false;
+    _removeActiveSpeaker(_peerId);
     _debug('audio producer closed locally');
   }
 
@@ -782,6 +798,7 @@ class LiveRoomAudioService {
     } catch (_) {}
     _audioProducer = null;
     audioPublishing.value = false;
+    _removeActiveSpeaker(_peerId);
   }
 
   void _closeRecvTransport() {
@@ -798,7 +815,8 @@ class LiveRoomAudioService {
     final consumer = _remoteConsumersByProducerId.remove(producerId);
     final renderer = _remoteAudioRenderersByProducerId.remove(producerId);
     _pendingProducerIds.remove(producerId);
-    _producerInfoById.remove(producerId);
+    final producerInfo = _producerInfoById.remove(producerId);
+    _removeActiveSpeaker(producerInfo?.peerId);
     try {
       consumer?.close();
     } catch (_) {}
@@ -820,6 +838,71 @@ class LiveRoomAudioService {
     }
     _pendingProducerIds.clear();
     _consumingProducerIds.clear();
+    _clearActiveSpeakers();
+  }
+
+  void _handleActiveSpeakers(dynamic payload) {
+    if (payload is! Map) return;
+    final roomId = payload['roomId']?.toString() ?? payload['room_id']?.toString();
+    if (roomId != null && _roomId != null && roomId != _roomId) return;
+
+    final rawSpeakers = payload['speakers'];
+    final next = <String>{};
+    if (rawSpeakers is List) {
+      for (final item in rawSpeakers) {
+        if (item is! Map) continue;
+        final peerId = item['peerId']?.toString() ?? item['peer_id']?.toString();
+        if (peerId == null || peerId.isEmpty) continue;
+        next.add(peerId);
+      }
+    }
+
+    if (_setEquals(activeSpeakerPeerIds.value, next)) {
+      _scheduleSpeakerSilenceFallback();
+      return;
+    }
+
+    activeSpeakerPeerIds.value = next;
+    _debug('active speakers=${next.join(',')}');
+    _scheduleSpeakerSilenceFallback();
+  }
+
+  void _scheduleSpeakerSilenceFallback() {
+    _activeSpeakerSilenceTimer?.cancel();
+    if (activeSpeakerPeerIds.value.isEmpty) return;
+    _activeSpeakerSilenceTimer = Timer(const Duration(milliseconds: 900), _clearActiveSpeakers);
+  }
+
+  void _clearActiveSpeakers() {
+    _activeSpeakerSilenceTimer?.cancel();
+    _activeSpeakerSilenceTimer = null;
+    if (activeSpeakerPeerIds.value.isEmpty) return;
+    activeSpeakerPeerIds.value = <String>{};
+  }
+
+  void _removeActiveSpeaker(String? peerId) {
+    if (peerId == null || peerId.isEmpty || activeSpeakerPeerIds.value.isEmpty) return;
+    final next = Set<String>.from(activeSpeakerPeerIds.value)..remove(peerId);
+    if (_setEquals(activeSpeakerPeerIds.value, next)) return;
+    activeSpeakerPeerIds.value = next;
+  }
+
+  void _dropInactiveSpeakersForSeats(List<AudioSeatSnapshot> nextSeats) {
+    if (activeSpeakerPeerIds.value.isEmpty) return;
+    final allowed = nextSeats
+        .where((seat) => seat.peerId != null && seat.peerId!.isNotEmpty && !seat.selfMuted && !seat.adminMuted)
+        .map((seat) => seat.peerId!)
+        .toSet();
+    final next = activeSpeakerPeerIds.value.intersection(allowed);
+    if (!_setEquals(activeSpeakerPeerIds.value, next)) activeSpeakerPeerIds.value = next;
+  }
+
+  bool _setEquals(Set<String> a, Set<String> b) {
+    if (a.length != b.length) return false;
+    for (final item in a) {
+      if (!b.contains(item)) return false;
+    }
+    return true;
   }
 
   Map<String, dynamic> _toPlainMap(dynamic value) {
