@@ -1,5 +1,10 @@
 part of 'public_profile_view_page.dart';
 
+const Duration _publicProfileIstOffset = Duration(hours: 5, minutes: 30);
+
+DateTime _publicProfileNowIst() => DateTime.now().toUtc().add(_publicProfileIstOffset);
+DateTime _publicProfileToIst(DateTime value) => value.toUtc().add(_publicProfileIstOffset);
+
 extension _PublicProfileViewController on _PublicProfileViewPageState {
   int _targetPublicUserId() => widget.publicUserId ?? widget.user.publicUserId;
 
@@ -361,11 +366,15 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     if (profile.isOnline) return 'Online';
     final lastSeen = profile.lastSeenAt;
     if (lastSeen == null) return 'Offline';
-    final diff = DateTime.now().difference(lastSeen.toLocal());
+    final diff = _publicProfileNowIst().difference(_publicProfileToIst(lastSeen));
     if (diff.inMinutes < 1) return 'last seen just now';
     if (diff.inMinutes < 60) return 'last seen ${diff.inMinutes} min ago';
-    if (diff.inHours < 24) return 'last seen ${diff.inHours} hour ago';
-    if (diff.inDays < 30) return 'last seen ${diff.inDays} day ago';
+    if (diff.inHours < 24) {
+      return 'last seen ${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+    }
+    if (diff.inDays < 30) {
+      return 'last seen ${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    }
     return 'last seen a month ago';
   }
 
