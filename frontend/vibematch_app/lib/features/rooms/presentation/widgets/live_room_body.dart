@@ -161,7 +161,7 @@ class LiveRoomBody extends StatelessWidget {
               Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                     child: RoomTopBar(
                       roomName: roomName,
                       roomId: roomId,
@@ -184,9 +184,9 @@ class LiveRoomBody extends StatelessWidget {
                       onRoomLevelTap: onRoomLevelTap,
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 14),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: RoomSeatLayout(
                       seats: seats,
                       layoutId: effectiveLayoutId,
@@ -202,13 +202,13 @@ class LiveRoomBody extends StatelessWidget {
                       onApply: onApplySeat,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 3),
                   Expanded(
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: onDismissOverlays,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
                         child: Column(
                           children: [
                             if (cricketModeActive)
@@ -217,7 +217,7 @@ class LiveRoomBody extends StatelessWidget {
                                 builder: (context, child) {
                                   return CricketRoomModeModule.fixedScoreboard(
                                     state: cricketController.match,
-                                    margin: const EdgeInsets.only(bottom: 8),
+                                    margin: const EdgeInsets.only(bottom: 6),
                                   );
                                 },
                               ),
@@ -258,46 +258,25 @@ class LiveRoomBody extends StatelessWidget {
                   builder: (context, child) {
                     return CricketRoomControlsModule(
                       controller: cricketController,
-                      canManage: scorerVisible,
-                      onEndMode: onDismissOverlays,
+                      visible: scorerVisible,
+                      onEvent: (event) {
+                        RoomToast.show(context, event.label);
+                      },
                     );
                   },
                 ),
-              if (cricketModeActive)
-                AnimatedBuilder(
-                  animation: cricketController,
-                  builder: (context, child) {
-                    return CricketRoomModeModule.scorerOverlay(
-                      controller: cricketController,
-                      visibleToCurrentUser: scorerVisible,
-                    );
-                  },
+              if (joinRequestPending)
+                Positioned(
+                  top: 76,
+                  left: 16,
+                  right: 16,
+                  child: LiveRoomSeatInviteNotification(
+                    title: 'Join request pending',
+                    message: 'Waiting for host approval before you can chat as a member.',
+                    onAccept: () {},
+                    onDecline: () {},
+                  ),
                 ),
-              ValueListenableBuilder<LiveMediaSeatInvite?>(
-                valueListenable: media.seatInvite,
-                builder: (context, invite, child) {
-                  if (invite == null || invite.seatIndex < 0) return const SizedBox.shrink();
-                  final currentUser = media.activeLoggedInSeatUser;
-                  if (currentUser == null) return const SizedBox.shrink();
-                  return Positioned.fill(
-                    child: IgnorePointer(
-                      ignoring: false,
-                      child: Center(
-                        child: LiveRoomSeatInviteNotification(
-                          inviterName: invite.inviterName,
-                          invitedUser: currentUser,
-                          seatIndex: invite.seatIndex,
-                          onReject: media.clearSeatInvite,
-                          onAccept: () {
-                            media.takeSeat(invite.seatIndex);
-                            media.clearSeatInvite();
-                          },
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
         );
