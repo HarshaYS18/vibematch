@@ -359,6 +359,10 @@ class RoomParticipantDto {
     required this.isOwner,
     required this.isMember,
     required this.isRoomAdmin,
+    this.equippedAvatarFrameAssetPath,
+    this.equippedAvatarFrameImageUrl,
+    this.equippedChatBubbleAssetPath,
+    this.equippedChatBubbleImageUrl,
   });
 
   final int publicUserId;
@@ -369,10 +373,20 @@ class RoomParticipantDto {
   final bool isOwner;
   final bool isMember;
   final bool isRoomAdmin;
+  final String? equippedAvatarFrameAssetPath;
+  final String? equippedAvatarFrameImageUrl;
+  final String? equippedChatBubbleAssetPath;
+  final String? equippedChatBubbleImageUrl;
 
   factory RoomParticipantDto.fromJson(Map<String, dynamic> json) {
     final publicId = int.tryParse(json['public_user_id']?.toString() ?? '') ?? 0;
     final username = _nullableString(json['username']) ?? 'user_$publicId';
+    final equipped = json['equipped_items'];
+    final equippedMap = equipped is Map<String, dynamic> ? equipped : const <String, dynamic>{};
+    final avatarFrame = equippedMap['avatar_frame'];
+    final avatarFrameMap = avatarFrame is Map<String, dynamic> ? avatarFrame : const <String, dynamic>{};
+    final chatBubble = equippedMap['chat_bubble'];
+    final chatBubbleMap = chatBubble is Map<String, dynamic> ? chatBubble : const <String, dynamic>{};
     return RoomParticipantDto(
       publicUserId: publicId,
       displayName: _nullableString(json['display_name']) ?? username,
@@ -382,6 +396,10 @@ class RoomParticipantDto {
       isOwner: json['is_owner'] == true,
       isMember: json['is_member'] == true,
       isRoomAdmin: json['is_room_admin'] == true,
+      equippedAvatarFrameAssetPath: _nullableString(avatarFrameMap['asset_path']),
+      equippedAvatarFrameImageUrl: _nullableString(avatarFrameMap['image_url']),
+      equippedChatBubbleAssetPath: _nullableString(chatBubbleMap['asset_path']),
+      equippedChatBubbleImageUrl: _nullableString(chatBubbleMap['image_url']),
     );
   }
 }
