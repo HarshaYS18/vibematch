@@ -14,11 +14,13 @@ from app.schemas.room_settings import (
     RoomAccessSettingsUpdateRequest,
     RoomAnnouncementUpdateRequest,
     RoomBackgroundUpdateRequest,
+    RoomSeatLayoutUpdateRequest,
     RoomSettingsResponse,
 )
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
 _ROOM_ACTIVE_WINDOW_SECONDS = 150
+_ALLOWED_SEAT_LAYOUT_IDS = {"4x2", "5x2", "4x3", "5x3", "host_4x2", "host_5x2", "host_4x3", "host_5x3"}
 
 
 def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
@@ -26,6 +28,13 @@ def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
     return room
+
+
+def _clean_seat_layout_id(value: str | None) -> str:
+    clean = (value or "5x2").strip()
+    if clean not in _ALLOWED_SEAT_LAYOUT_IDS:
+        raise HTTPException(status_code=400, detail="Unsupported room seat layout")
+    return clean
 
 
 def _active_room_count(db: Session, room_public_id: str) -> int:
@@ -74,6 +83,7 @@ def _get_or_create_room_for_settings(
         is_members_only=False,
         allow_screenshots=True,
         background_theme_id="default",
+        seat_layout_id="5x2",
     )
     db.add(room)
     db.commit()
@@ -93,6 +103,7 @@ def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse
         allow_screenshots=True,
         has_lock_password=False,
         background_theme_id="default",
+        seat_layout_id="5x2",
         announcement_text=None,
         announcement_updated_at=None,
         announcement_updated_by_user_id=None,
@@ -111,6 +122,7 @@ def _room_settings_response(room: Room) -> RoomSettingsResponse:
         allow_screenshots=room.allow_screenshots,
         has_lock_password=bool(room.lock_password_hash),
         background_theme_id=room.background_theme_id or "default",
+        seat_layout_id=room.seat_layout_id or "5x2",
         announcement_text=room.announcement_text,
         announcement_updated_at=room.announcement_updated_at,
         announcement_updated_by_user_id=room.announcement_updated_by_user_id,
@@ -140,6 +152,7 @@ def _room_discovery_payload(room: Room, *, online_count_override: int | None = N
         "is_members_only": room.is_members_only,
         "allow_screenshots": room.allow_screenshots,
         "has_lock_password": bool(room.lock_password_hash),
+        "seat_layout_id": room.seat_layout_id or "5x2",
     }
 
 
@@ -307,6 +320,8 @@ def create_room(
         if allow_screenshots is not None:
             existing_room.allow_screenshots = bool(allow_screenshots)
         _apply_mode_flags(existing_room, mode or existing_room.mode)
+        if not existing_room.seat_layout_id:
+            existing_room.seat_layout_id = "5x2"
         if existing_room.is_locked:
             lock_password = _clean_numeric_lock_password(payload.get("lock_password"), required=not bool(existing_room.lock_password_hash))
             if lock_password:
@@ -333,6 +348,7 @@ def create_room(
         trending_score=0,
         is_active=True,
         allow_screenshots=bool(allow_screenshots) if allow_screenshots is not None else True,
+        seat_layout_id="5x2",
     )
     _apply_mode_flags(room, room.mode)
     if room.is_locked:
@@ -434,6 +450,25 @@ def update_room_background(
 ) -> RoomSettingsResponse:
     room = _get_or_create_room_for_settings(db, room_public_id)
     room.background_theme_id = payload.background_theme_id.strip() or "default"
+    db.add(room)
+    db.commit()
+    db.refresh(room)
+    return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/seat-layout", response_model=RoomSettingsResponse)
+def update_room_seat_layout(
+    room_public_id: str,
+    payload: RoomSeatLayoutUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RoomSettingsResponse:
+    room = _get_or_create_room_for_settings(db, room_public_id, current_user)
+    if room.owner_user_id is not None and room.owner_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the room owner can change seat layout")
+    if room.owner_user_id is None:
+        room.owner_user_id = current_user.id
+    room.seat_layout_id = _clean_seat_layout_id(payload.seat_layout_id)
     db.add(room)
     db.commit()
     db.refresh(room)
