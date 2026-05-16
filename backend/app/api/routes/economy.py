@@ -1,6 +1,7 @@
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -52,6 +53,10 @@ def _pool_response(pool: CoinSupplyPool | GamePool | None) -> EconomyPoolRespons
         reserved_balance=pool.reserved_balance,
         status=pool.status,
     )
+
+
+def _metadata_json(payload: dict) -> str:
+    return json.dumps(jsonable_encoder(payload), separators=(",", ":"))
 
 
 def _public_wallet_summary(db: Session, user: User) -> dict:
@@ -271,7 +276,7 @@ async def send_lucky_gift_public(payload: GiftSendPublicRequest, current_user: U
             multiplier=multiplier,
             reward_coins=reward,
             net_win_coins=reward - total_coin_value,
-            metadata_json=json.dumps({"gift_transaction_id": result["gift_transaction_id"], "source": "send_lucky_public", "lucky_result": lucky_result, "risk": risk_result, "house": house_result}, separators=(",", ":")),
+            metadata_json=_metadata_json({"gift_transaction_id": result["gift_transaction_id"], "source": "send_lucky_public", "lucky_result": lucky_result, "risk": risk_result, "house": house_result}),
         )
         db.commit()
         db.refresh(sender_wallet)
