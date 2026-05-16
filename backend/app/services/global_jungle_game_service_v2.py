@@ -93,13 +93,7 @@ def _worst_exposure_after_bet(db: Session, round_id: int, target_id: int, amount
     return worst, selected_target_payout
 
 
-def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: int) -> dict[str, Any]:
-    round_obj = db.query(GameRound).filter(GameRound.id == round_id).first()
-    if not round_obj:
-        raise HTTPException(status_code=404, detail="Game round not found")
-    if round_obj.game_key != JUNGLE_HUNT_KEY:
-        return old.place_bet(db, round_id, user, target_id, amount)
-
+def _pool_risk_metadata(db: Session, round_id: int, target_id: int, amount: int) -> dict[str, Any]:
     worst_exposure, selected_target_payout = _worst_exposure_after_bet(db, round_id, target_id, amount)
     allowed, reason, metadata = game_pool_service.validate_exposure(
         db=db,
@@ -107,38 +101,23 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
         proposed_worst_payout=worst_exposure,
         proposed_single_payout=selected_target_payout,
     )
-    if not allowed:
-        wallet = old.economy_service.get_or_create_wallet(db, user.id)
-        old.base.audit(
-            db,
-            round_obj.game_key,
-            round_obj.id,
-            user.id,
-            "BET_REJECTED_POOL_RISK",
-            "HIGH",
-            0,
-            reason,
-            "Bet rejected by production Game House Pool exposure guard",
-            {"requested_amount": amount, "target_id": target_id, "pool_guard": _json_safe(metadata)},
-            user.id,
-        )
-        db.commit()
-        return {
-            "bet_id": None,
-            "round_id": round_obj.id,
-            "target_id": target_id,
-            "requested_amount": amount,
-            "accepted_amount": 0,
-            "spent_coins": 0,
-            "reward_coins": 0,
-            "net_win_coins": 0,
-            "wallet_coin_balance": wallet.coin_balance,
-            "winner_coin_balance": None,
-            "risk_level": "HIGH",
-            "risk_score": 0,
-            "risk_action": reason,
-            "message": "Bet not accepted because game house pool exposure is too high",
-        }
+    return {
+        "pool_guard_allowed": bool(allowed),
+        "pool_guard_reason": reason,
+        "pool_guard": _json_safe(metadata),
+        "worst_exposure_after_bet": worst_exposure,
+        "selected_target_payout_after_bet": selected_target_payout,
+    }
+
+
+def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: int) -> dict[str, Any]:
+    round_obj = db.query(GameRound).filter(GameRound.id == round_id).first()
+    if not round_obj:
+        raise HTTPException(status_code=404, detail="Game round not found")
+    if round_obj.game_key != JUNGLE_HUNT_KEY:
+        return old.place_bet(db, round_id, user, target_id, amount)
+
+    pool_meta = _pool_risk_metadata(db, round_id, target_id, amount)
 
     try:
         result = old.place_bet(db, round_id, user, target_id, amount, commit=False)
@@ -151,10 +130,31 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
                 amount=int(result["accepted_amount"]),
                 actor=user,
             )
+            if not pool_meta["pool_guard_allowed"]:
+                old.base.audit(
+                    db,
+                    round_obj.game_key,
+                    round_obj.id,
+                    user.id,
+                    "BET_ACCEPTED_POOL_RISK_PROBABILITY_REDUCED",
+                    "HIGH",
+                    int(result.get("risk_score") or 0),
+                    "ALLOW_POOL_RISK_PROBABILITY_REDUCED",
+                    "Bet accepted even though pool exposure guard was triggered; settlement probability is reduced instead of rejecting the bet.",
+                    {"requested_amount": amount, "target_id": target_id, **pool_meta},
+                    user.id,
+                )
             db.commit()
     except Exception:
         db.rollback()
         raise
+
+    if not pool_meta["pool_guard_allowed"] and int(result.get("accepted_amount") or 0) > 0:
+        result["risk_level"] = "HIGH"
+        result["risk_action"] = "ALLOW_POOL_RISK_PROBABILITY_REDUCED"
+        result["probability_mode"] = result.get("probability_mode") or "VERY_LOW_WHALE"
+        result["message"] = "Bet accepted; win probability reduced for pool exposure risk"
+        result["pool_guard"] = pool_meta
     return result
 
 
