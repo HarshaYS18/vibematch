@@ -240,7 +240,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
                   child: PublicFamilyPanel(
-                    family: _familySummary!,
+                    familyName: _familySummary!.name,
+                    familyLevel: _familySummary!.level,
                     onTap: _openFamilyPage,
                   ),
                 ),
@@ -268,13 +269,24 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
               )
             else if (_profileVibes.isNotEmpty)
               SliverToBoxAdapter(
-                child: PublicVibesGrid(
-                  vibes: _profileVibes
-                      .map(_publicVibeItemFromDto)
-                      .toList(growable: false),
-                  onVibeTap: (vibe) => _showAction(
-                    context,
-                    'Open Vibe details for ${vibe.title}.',
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                  child: Column(
+                    children: [
+                      for (final vibe in _profileVibes.map(_publicVibeItemFromDto)) ...[
+                        PublicVibeCard(
+                          vibe: vibe,
+                          onTap: () => _showAction(
+                            context,
+                            'Open Vibe details for ${vibe.title}.',
+                          ),
+                          onLikeTap: () => _showAction(context, 'Like action will sync.'),
+                          onCommentTap: () => _showAction(context, 'Comments will open.'),
+                          onShareTap: () => _showAction(context, 'Share sheet will open.'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ],
                   ),
                 ),
               )
