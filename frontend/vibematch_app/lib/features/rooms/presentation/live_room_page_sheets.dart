@@ -322,10 +322,11 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       builder: (context) => LiveRoomSeatLayoutPickerSheet(
         selectedLayout: _seatController.layoutId,
         onSelected: (layout) {
+          _roomStateController.setSeatLayoutId(layout);
           _seatController.changeLayout(layout);
           Navigator.pop(context);
-          unawaited(RoomMusicController.instance.attachRoom(widget.roomId));
-          unawaited(_roomStateController.loadPersistedRoomSettings());
+          RoomToast.show(context, 'Seat layout updated');
+          _insertSystemMessage('Seat layout updated by ${_currentUser.name}.');
           _autoOccupySeatOneForHostOrAdmin();
         },
       ),
