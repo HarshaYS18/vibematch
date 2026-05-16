@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 
 router = APIRouter(tags=["Room Realtime"])
 
@@ -71,9 +72,10 @@ def _update_peer(room_id: str, peer_key: str, updates: dict[str, Any]) -> None:
     if not peer_key:
         return
     state = _room(room_id)
+    clean_updates = {key: value for key, value in updates.items() if value is not None}
     for peer in _active_peers(state):
         if _peer_key(peer) == peer_key or peer.get("user_id") == peer_key:
-            peer.update(updates)
+            peer.update(clean_updates)
             break
 
 
@@ -139,14 +141,30 @@ def _seat_count_for_layout(layout_id: str) -> int:
         return 10
 
 
+def _websocket_connected(websocket: WebSocket) -> bool:
+    return websocket.client_state == WebSocketState.CONNECTED and websocket.application_state == WebSocketState.CONNECTED
+
+
+async def _safe_send_json(client: WebSocket, payload: dict[str, Any]) -> bool:
+    if not _websocket_connected(client):
+        return False
+    try:
+        await client.send_json(payload)
+        return True
+    except Exception:
+        return False
+
+
 async def _broadcast(room_id: str, payload: dict[str, Any]) -> None:
     clients = list(_room_clients.get(room_id, set()))
+    stale_clients: list[WebSocket] = []
     for client in clients:
-        try:
-            await client.send_json(payload)
-        except Exception:
-            _room_clients[room_id].discard(client)
-            _peer_room.pop(client, None)
+        sent = await _safe_send_json(client, payload)
+        if not sent:
+            stale_clients.append(client)
+    for client in stale_clients:
+        _room_clients[room_id].discard(client)
+        _peer_room.pop(client, None)
 
 
 async def _broadcast_room_state(room_id: str, event_type: str, extra: dict[str, Any] | None = None) -> None:
@@ -159,12 +177,24 @@ async def _broadcast_room_state(room_id: str, event_type: str, extra: dict[str, 
 
 @router.websocket("/ws/room-realtime")
 async def room_realtime_socket(websocket: WebSocket) -> None:
-    await websocket.accept()
     active_room_id: str | None = None
     active_peer_key: str = ""
+    accepted = False
     try:
-        while True:
-            raw = await websocket.receive_text()
+        await websocket.accept()
+        accepted = True
+        while _websocket_connected(websocket):
+            try:
+                raw = await websocket.receive_text()
+            except WebSocketDisconnect:
+                break
+            except RuntimeError:
+                # Some clients close the socket during fast room/gift UI refreshes.
+                # Starlette may raise RuntimeError instead of WebSocketDisconnect;
+                # treat it as a normal disconnect so one dead socket never logs an
+                # ASGI exception or destabilizes the room realtime service.
+                break
+
             try:
                 message = json.loads(raw)
             except json.JSONDecodeError:
@@ -234,13 +264,13 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                 continue
 
             if event_type == "mic/set_enabled":
-                _update_peer(room_id, active_peer_key, {"mic_enabled": payload.get("enabled") == True})
+                _update_peer(room_id, active_peer_key, {"mic_enabled": payload.get("enabled") is True})
                 await _broadcast_room_state(room_id, "seat/updated")
                 continue
 
             if event_type == "admin_mute/set":
                 target_user_id = str(payload.get("target_user_id") or "")
-                muted = payload.get("muted") == True
+                muted = payload.get("muted") is True
                 _update_peer(room_id, target_user_id, {"admin_muted": muted, "mic_enabled": False if muted else None})
                 await _broadcast_room_state(room_id, "admin_mute/updated", {"target_user_id": target_user_id, "admin_muted": muted})
                 continue
@@ -262,11 +292,15 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
             await _broadcast(room_id, {"type": event_type, "payload": payload})
     except WebSocketDisconnect:
         pass
+    except RuntimeError:
+        # Handles Starlette's "WebSocket is not connected" edge case.
+        pass
     finally:
         room_id = active_room_id or _peer_room.get(websocket)
         if room_id:
             _room_clients[room_id].discard(websocket)
             if active_peer_key:
                 _remove_peer(room_id, active_peer_key)
-            await _broadcast_room_state(room_id, "room/peer_left")
+            if accepted:
+                await _broadcast_room_state(room_id, "room/peer_left")
         _peer_room.pop(websocket, None)
