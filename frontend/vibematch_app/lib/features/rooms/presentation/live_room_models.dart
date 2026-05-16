@@ -450,21 +450,22 @@ String avatarLetter(String input) {
 }
 
 String compactNumber(int value) {
-  if (value >= 10000000) {
-    return '${_trimOneDecimal(value / 10000000)}Cr';
+  if (value >= 1000000000) {
+    return '${_trimCompactDecimal(value / 1000000000)}B';
   }
-  if (value >= 100000) {
-    return '${_trimOneDecimal(value / 100000)}L';
+  if (value >= 1000000) {
+    return '${_trimCompactDecimal(value / 1000000)}M';
   }
   if (value >= 1000) {
-    return '${_trimOneDecimal(value / 1000)}K';
+    return '${_trimCompactDecimal(value / 1000)}K';
   }
   return '$value';
 }
 
-String _trimOneDecimal(double value) {
-  final fixed = value.toStringAsFixed(value >= 100 ? 0 : 1);
-  return fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed;
+String _trimCompactDecimal(double value) {
+  final decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  final fixed = value.toStringAsFixed(decimals);
+  return fixed.replaceFirst(RegExp(r'\.0+$'), '').replaceFirst(RegExp(r'(\.\d*[1-9])0+$'), r'$1');
 }
 
 RoomPrivacyMode privacyModeFromTitle(String title) {
