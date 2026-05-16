@@ -1,6 +1,6 @@
-﻿from datetime import datetime
+from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -8,9 +8,6 @@ from app.database import Base
 
 class UserRoomPresence(Base):
     __tablename__ = "user_room_presence"
-    __table_args__ = (
-        UniqueConstraint("user_id", "is_active", name="uq_user_one_active_room_presence"),
-    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
