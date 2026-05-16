@@ -35,10 +35,12 @@ class StoreItem {
     required this.isEquipped,
     required this.isFeatured,
     this.description,
+    this.durationDays,
     this.assetPath,
     this.imageUrl,
     this.previewUrl,
     this.linkedThemeId,
+    this.expiresAt,
   });
 
   final String itemId;
@@ -46,6 +48,7 @@ class StoreItem {
   final String category;
   final String? description;
   final int priceCoins;
+  final int? durationDays;
   final String? assetPath;
   final String? imageUrl;
   final String? previewUrl;
@@ -53,8 +56,10 @@ class StoreItem {
   final bool isOwned;
   final bool isEquipped;
   final bool isFeatured;
+  final DateTime? expiresAt;
 
   bool get isFree => priceCoins <= 0;
+  bool get isTimed => durationDays != null && durationDays! > 0;
 
   factory StoreItem.fromJson(Map<String, dynamic> json) {
     return StoreItem(
@@ -63,6 +68,7 @@ class StoreItem {
       category: json['category']?.toString() ?? 'misc',
       description: _nullableString(json['description']),
       priceCoins: int.tryParse(json['price_coins']?.toString() ?? '') ?? 0,
+      durationDays: int.tryParse(json['duration_days']?.toString() ?? ''),
       assetPath: _nullableString(json['asset_path']),
       imageUrl: _nullableString(json['image_url']),
       previewUrl: _nullableString(json['preview_url']),
@@ -70,16 +76,18 @@ class StoreItem {
       isOwned: json['is_owned'] == true,
       isEquipped: json['is_equipped'] == true,
       isFeatured: json['is_featured'] == true,
+      expiresAt: DateTime.tryParse(json['expires_at']?.toString() ?? ''),
     );
   }
 
-  StoreItem copyWith({bool? isOwned, bool? isEquipped}) {
+  StoreItem copyWith({bool? isOwned, bool? isEquipped, DateTime? expiresAt}) {
     return StoreItem(
       itemId: itemId,
       name: name,
       category: category,
       description: description,
       priceCoins: priceCoins,
+      durationDays: durationDays,
       assetPath: assetPath,
       imageUrl: imageUrl,
       previewUrl: previewUrl,
@@ -87,6 +95,7 @@ class StoreItem {
       isOwned: isOwned ?? this.isOwned,
       isEquipped: isEquipped ?? this.isEquipped,
       isFeatured: isFeatured,
+      expiresAt: expiresAt ?? this.expiresAt,
     );
   }
 }
@@ -126,6 +135,7 @@ class InventoryItem {
     required this.source,
     required this.isEquipped,
     required this.createdAt,
+    this.durationDays,
     this.assetPath,
     this.imageUrl,
     this.previewUrl,
@@ -138,12 +148,15 @@ class InventoryItem {
   final String category;
   final String source;
   final bool isEquipped;
+  final int? durationDays;
   final String? assetPath;
   final String? imageUrl;
   final String? previewUrl;
   final String? linkedThemeId;
   final DateTime createdAt;
   final DateTime? expiresAt;
+
+  bool get isTimed => durationDays != null && durationDays! > 0;
 
   factory InventoryItem.fromJson(Map<String, dynamic> json) {
     return InventoryItem(
@@ -152,6 +165,7 @@ class InventoryItem {
       category: json['category']?.toString() ?? 'misc',
       source: json['source']?.toString() ?? 'purchase',
       isEquipped: json['is_equipped'] == true,
+      durationDays: int.tryParse(json['duration_days']?.toString() ?? ''),
       assetPath: _nullableString(json['asset_path']),
       imageUrl: _nullableString(json['image_url']),
       previewUrl: _nullableString(json['preview_url']),
@@ -159,6 +173,64 @@ class InventoryItem {
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
       expiresAt: DateTime.tryParse(json['expires_at']?.toString() ?? ''),
     );
+  }
+}
+
+class EquippedStoreItems {
+  const EquippedStoreItems({this.avatarFrame, this.chatBubble});
+
+  final EquippedStoreItem? avatarFrame;
+  final EquippedStoreItem? chatBubble;
+
+  factory EquippedStoreItems.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const EquippedStoreItems();
+    return EquippedStoreItems(
+      avatarFrame: EquippedStoreItem.fromJson(json['avatar_frame'] as Map<String, dynamic>?),
+      chatBubble: EquippedStoreItem.fromJson(json['chat_bubble'] as Map<String, dynamic>?),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'avatar_frame': avatarFrame?.toJson(),
+      'chat_bubble': chatBubble?.toJson(),
+    };
+  }
+}
+
+class EquippedStoreItem {
+  const EquippedStoreItem({required this.category, this.itemId, this.name, this.assetPath, this.imageUrl, this.expiresAt});
+
+  final String? itemId;
+  final String? name;
+  final String category;
+  final String? assetPath;
+  final String? imageUrl;
+  final DateTime? expiresAt;
+
+  factory EquippedStoreItem.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const EquippedStoreItem(category: '');
+    return EquippedStoreItem(
+      itemId: _nullableString(json['item_id']),
+      name: _nullableString(json['name']),
+      category: json['category']?.toString() ?? '',
+      assetPath: _nullableString(json['asset_path']),
+      imageUrl: _nullableString(json['image_url']),
+      expiresAt: DateTime.tryParse(json['expires_at']?.toString() ?? ''),
+    );
+  }
+
+  bool get isEmpty => (itemId == null || itemId!.isEmpty) && (assetPath == null || assetPath!.isEmpty) && (imageUrl == null || imageUrl!.isEmpty);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'item_id': itemId,
+      'name': name,
+      'category': category,
+      'asset_path': assetPath,
+      'image_url': imageUrl,
+      'expires_at': expiresAt?.toIso8601String(),
+    };
   }
 }
 
@@ -179,6 +251,15 @@ String compactCoins(int value) {
   if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1)}M';
   if (value >= 1000) return '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}K';
   return '$value';
+}
+
+String expiryLabel(DateTime? expiresAt) {
+  if (expiresAt == null) return 'Permanent';
+  final now = DateTime.now();
+  if (!expiresAt.isAfter(now)) return 'Expired';
+  final days = expiresAt.difference(now).inDays;
+  if (days <= 0) return 'Expires today';
+  return '$days days left';
 }
 
 String? _nullableString(Object? value) {
