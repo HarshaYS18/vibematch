@@ -215,11 +215,11 @@ def _apply_mode_flags(room: Room, mode: str) -> None:
         room.lock_updated_by_user_id = None
 
 
-def _find_latest_user_room(db: Session, user_id: int) -> Room | None:
+def _find_lifetime_user_room(db: Session, user_id: int) -> Room | None:
     rooms = (
         db.query(Room)
         .filter(Room.owner_user_id == user_id)
-        .order_by(Room.created_at.desc(), Room.id.desc())
+        .order_by(Room.created_at.asc(), Room.id.asc())
         .limit(20)
         .all()
     )
@@ -241,6 +241,15 @@ def _room_is_in_discovery_grace(room: Room) -> bool:
         except TypeError:
             continue
     return False
+
+
+def _activate_room_for_discovery(room: Room) -> None:
+    now = datetime.utcnow()
+    room.is_active = True
+    room.online_count = max(int(room.online_count or 0), 1)
+    room.trending_score = max(int(room.trending_score or 0), 1)
+    if hasattr(room, "updated_at"):
+        room.updated_at = now
 
 
 def _filter_discovery_rooms(
@@ -326,6 +335,33 @@ def create_room(
     cover_photo_url = _clean_text(payload.get("cover_photo_url") or avatar_url, field_name="Room cover photo", max_length=500, required=False)
     allow_screenshots = payload.get("allow_screenshots")
 
+    existing_room = _find_lifetime_user_room(db, current_user.id)
+    if existing_room is not None:
+        existing_room.name = name or existing_room.name
+        existing_room.language = language or existing_room.language
+        existing_room.room_type = room_type or existing_room.room_type
+        existing_room.subtitle = subtitle if subtitle is not None else existing_room.subtitle
+        if avatar_url is not None:
+            existing_room.avatar_url = avatar_url
+        if cover_photo_url is not None:
+            existing_room.cover_photo_url = cover_photo_url
+        if allow_screenshots is not None:
+            existing_room.allow_screenshots = bool(allow_screenshots)
+        _apply_mode_flags(existing_room, mode or existing_room.mode)
+        if not existing_room.seat_layout_id:
+            existing_room.seat_layout_id = "5x2"
+        if existing_room.is_locked:
+            lock_password = _clean_numeric_lock_password(payload.get("lock_password"), required=not bool(existing_room.lock_password_hash))
+            if lock_password:
+                existing_room.lock_password_hash = hash_password(lock_password)
+                existing_room.lock_updated_at = datetime.utcnow()
+                existing_room.lock_updated_by_user_id = current_user.id
+        _activate_room_for_discovery(existing_room)
+        db.add(existing_room)
+        db.commit()
+        db.refresh(existing_room)
+        return _room_discovery_payload(existing_room)
+
     room = Room(
         room_public_id=_new_room_public_id(db),
         owner_user_id=current_user.id,
@@ -349,6 +385,7 @@ def create_room(
             room.lock_password_hash = hash_password(lock_password)
             room.lock_updated_at = datetime.utcnow()
             room.lock_updated_by_user_id = current_user.id
+    _activate_room_for_discovery(room)
 
     db.add(room)
     db.commit()
@@ -361,7 +398,7 @@ def get_my_created_room(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict | None:
-    room = _find_latest_user_room(db, current_user.id)
+    room = _find_lifetime_user_room(db, current_user.id)
     if room is None:
         return None
     if not room.is_active:
