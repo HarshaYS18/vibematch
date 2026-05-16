@@ -1,9 +1,15 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
+
+const Duration _istOffset = Duration(hours: 5, minutes: 30);
+final RegExp _timestampHasOffsetPattern = RegExp(r'(Z|[+-]\d{2}:?\d{2})$');
+
+DateTime _toIst(DateTime value) => value.toUtc().add(_istOffset);
+DateTime _nowIst() => DateTime.now().toUtc().add(_istOffset);
 
 class PresenceApiService {
   const PresenceApiService({this.authApiService = const AuthApiService()});
@@ -20,14 +26,19 @@ class PresenceApiService {
       Uri.parse(VmApiConfig.endpoint('/presence/heartbeat')),
       headers: _authHeaders(),
       body: jsonEncode({
-        if (roomPublicId != null && roomPublicId.trim().isNotEmpty) 'room_public_id': roomPublicId.trim(),
-        if (roomName != null && roomName.trim().isNotEmpty) 'room_name': roomName.trim(),
-        if (roomMode != null && roomMode.trim().isNotEmpty) 'room_mode': roomMode.trim(),
+        if (roomPublicId != null && roomPublicId.trim().isNotEmpty)
+          'room_public_id': roomPublicId.trim(),
+        if (roomName != null && roomName.trim().isNotEmpty)
+          'room_name': roomName.trim(),
+        if (roomMode != null && roomMode.trim().isNotEmpty)
+          'room_mode': roomMode.trim(),
         'is_secret': isSecret,
       }),
     );
     _throwIfFailed(response, 'send presence heartbeat');
-    return PresenceDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return PresenceDto.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<PresenceDto> enterRoom({
@@ -42,12 +53,15 @@ class PresenceApiService {
       body: jsonEncode({
         'room_public_id': roomPublicId.trim(),
         'room_name': roomName.trim(),
-        if (roomMode != null && roomMode.trim().isNotEmpty) 'room_mode': roomMode.trim(),
+        if (roomMode != null && roomMode.trim().isNotEmpty)
+          'room_mode': roomMode.trim(),
         'is_secret': isSecret,
       }),
     );
     _throwIfFailed(response, 'enter room presence');
-    return PresenceDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return PresenceDto.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<PresenceDto> leaveRoom() async {
@@ -56,7 +70,9 @@ class PresenceApiService {
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'leave room presence');
-    return PresenceDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return PresenceDto.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<PresenceDto> getPublicPresence(int publicUserId) async {
@@ -65,11 +81,17 @@ class PresenceApiService {
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'load public presence');
-    return PresenceDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return PresenceDto.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<List<PresenceDto>> getBatchPresence(List<int> publicUserIds) async {
-    final uniqueIds = publicUserIds.where((id) => id > 0).toSet().take(100).toList(growable: false);
+    final uniqueIds = publicUserIds
+        .where((id) => id > 0)
+        .toSet()
+        .take(100)
+        .toList(growable: false);
     if (uniqueIds.isEmpty) return const <PresenceDto>[];
 
     final response = await http.post(
@@ -89,7 +111,8 @@ class PresenceApiService {
 
   Map<String, String> _authHeaders() {
     final access = authApiService.cachedAccessToken;
-    if (access == null || access.trim().isEmpty) throw Exception('Please login again.');
+    if (access == null || access.trim().isEmpty)
+      throw Exception('Please login again.');
     return {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
@@ -138,18 +161,23 @@ class PresenceDto {
   final String? roomMode;
   final DateTime? roomEnteredAt;
 
-  bool get hasVisibleRoom => inRoom && roomName != null && roomName!.trim().isNotEmpty;
+  bool get hasVisibleRoom =>
+      inRoom && roomName != null && roomName!.trim().isNotEmpty;
 
   String get onlineLabel {
     if (isOnline) return 'Online';
     final seen = lastSeenAt;
     if (seen == null) return 'Offline';
 
-    final diff = DateTime.now().difference(seen.toLocal());
+    final diff = _nowIst().difference(_toIst(seen));
     if (diff.inMinutes < 1) return 'last seen just now';
     if (diff.inMinutes < 60) return 'last seen ${diff.inMinutes} min ago';
-    if (diff.inHours < 24) return 'last seen ${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
-    if (diff.inDays < 30) return 'last seen ${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    if (diff.inHours < 24) {
+      return 'last seen ${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+    }
+    if (diff.inDays < 30) {
+      return 'last seen ${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    }
     return 'last seen a month ago';
   }
 
@@ -181,7 +209,23 @@ String? _nullableText(dynamic value) {
 }
 
 DateTime? _date(dynamic value) {
-  if (value is DateTime) return value;
-  if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value);
-  return null;
+  if (value is DateTime) return value.toUtc();
+  if (value is! String || value.trim().isEmpty) return null;
+
+  final text = value.trim();
+  final parsed = DateTime.tryParse(text);
+  if (parsed == null) return null;
+
+  if (_timestampHasOffsetPattern.hasMatch(text)) return parsed.toUtc();
+
+  return DateTime.utc(
+    parsed.year,
+    parsed.month,
+    parsed.day,
+    parsed.hour,
+    parsed.minute,
+    parsed.second,
+    parsed.millisecond,
+    parsed.microsecond,
+  );
 }
