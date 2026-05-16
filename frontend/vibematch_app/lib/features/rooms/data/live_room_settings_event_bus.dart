@@ -21,6 +21,7 @@ class LiveRoomSettingsEvent {
     this.actorUserId = '',
     this.actorName = '',
     this.backgroundThemeId = '',
+    this.seatLayoutId = '',
     this.announcementText = '',
     this.privacyModeTitle = '',
     this.allowScreenshots,
@@ -35,6 +36,7 @@ class LiveRoomSettingsEvent {
   final String actorUserId;
   final String actorName;
   final String backgroundThemeId;
+  final String seatLayoutId;
   final String announcementText;
   final String privacyModeTitle;
   final bool? allowScreenshots;
@@ -59,6 +61,12 @@ class LiveRoomSettingsEvent {
           json['backgroundThemeId']?.toString() ??
           roomMap['background_theme_id']?.toString() ??
           roomMap['backgroundThemeId']?.toString() ??
+          '',
+      seatLayoutId:
+          json['seat_layout_id']?.toString() ??
+          json['seatLayoutId']?.toString() ??
+          roomMap['seat_layout_id']?.toString() ??
+          roomMap['seatLayoutId']?.toString() ??
           '',
       announcementText:
           json['announcement_text']?.toString() ??
