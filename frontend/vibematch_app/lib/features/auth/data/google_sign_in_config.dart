@@ -1,27 +1,18 @@
 import 'package:flutter/foundation.dart';
 
-/// Google Sign-In client configuration for local web, Android debug, and future release builds.
+/// Google Sign-In client configuration for FunKey / VibeMatch beta.
 ///
 /// Google OAuth client IDs are public identifiers, not secrets. The fallback below is the
-/// same web client ID allowed by the backend GOOGLE_AUTH_CLIENT_IDS in local .env.
-/// It prevents Google login from silently breaking when --dart-define is forgotten.
+/// same web client ID that the backend GOOGLE_AUTH_CLIENT_IDS must allow.
 ///
-/// Web / laptop Chrome:
-/// flutter run -d chrome --web-port=5000
+/// Early beta VPS web origin:
+/// http://140.245.215.16:5000
 ///
-/// Optional override:
-/// flutter run -d chrome --web-port=5000 \
-///   --dart-define=VM_GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
-///
-/// Android phone/emulator:
-/// flutter run -d android \
-///   --dart-define=VM_GOOGLE_ANDROID_SERVER_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
-///
-/// Important:
+/// Android:
 /// - The Android OAuth client is matched by package name + SHA in Firebase/Google Cloud.
-/// - serverClientId should usually be the WEB client ID so Android returns an ID token
+/// - serverClientId should be the WEB client ID so Android returns an ID token
 ///   whose aud can be verified by the backend.
-/// - The backend .env GOOGLE_AUTH_CLIENT_IDS should include the same allowed client IDs.
+/// - The backend .env GOOGLE_AUTH_CLIENT_IDS should include the same web client ID.
 abstract final class GoogleSignInConfig {
   static const String _defaultWebClientId =
       '112046889240-db25nkdrkv5i0qtcveo878g3e9v8gctb.apps.googleusercontent.com';
@@ -50,8 +41,8 @@ abstract final class GoogleSignInConfig {
 
   static String get setupHint {
     if (kIsWeb) {
-      return 'For laptop Chrome, run with --web-port=5000. In Google Cloud, add http://localhost:5000 and http://127.0.0.1:5000 as authorized JavaScript origins for the web client ID.';
+      return 'For beta web, run with --web-port=5000 and add http://140.245.215.16:5000 as an authorized JavaScript origin in Google Cloud for the web client ID.';
     }
-    return 'For Android, add the app package name plus SHA-1/SHA-256 in Firebase/Google Cloud, download android/app/google-services.json, and keep VM_GOOGLE_ANDROID_SERVER_CLIENT_ID set to the web client ID if overriding.';
+    return 'For Android beta, add the app package name plus SHA-1/SHA-256 in Firebase/Google Cloud, download android/app/google-services.json, and keep the Android server client ID equal to the web client ID.';
   }
 }
