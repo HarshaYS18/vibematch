@@ -27,6 +27,11 @@ extension _LiveRoomPagePresence on _LiveRoomPageState {
 
   void _onRoomStateChanged() {
     _syncPresenceRoomDetails();
+    final syncedLayout = _roomStateController.seatLayoutId;
+    if (syncedLayout.trim().isNotEmpty && syncedLayout != _seatController.layoutId) {
+      _seatController.changeLayout(syncedLayout);
+      _autoOccupySeatOneForHostOrAdmin();
+    }
     if (mounted) _setRoomState(() {});
   }
 
