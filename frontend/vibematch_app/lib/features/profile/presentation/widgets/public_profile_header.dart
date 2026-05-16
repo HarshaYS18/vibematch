@@ -384,11 +384,52 @@ class PublicProfileHeader extends StatelessWidget {
 }
 
 String _compactCount(int value) {
-  if (value >= 1000000)
+  if (value >= 1000000) {
     return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-  if (value >= 1000)
+  }
+  if (value >= 1000) {
     return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+  }
   return value.toString();
+}
+
+class _PresenceLine extends StatelessWidget {
+  const _PresenceLine({
+    required this.presenceLabel,
+    required this.currentRoomName,
+    required this.onRoomTap,
+  });
+
+  final String presenceLabel;
+  final String? currentRoomName;
+  final VoidCallback onRoomTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasRoom = currentRoomName?.trim().isNotEmpty == true;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        PublicTinyStatusChip(
+          icon: Icons.circle,
+          label: presenceLabel.trim().isEmpty ? 'Offline' : presenceLabel.trim(),
+          color: presenceLabel.toLowerCase().contains('online')
+              ? const Color(0xFF12C7B7)
+              : const Color(0xFF8C7B8F),
+        ),
+        if (hasRoom)
+          GestureDetector(
+            onTap: onRoomTap,
+            child: PublicTinyStatusChip(
+              icon: Icons.graphic_eq_rounded,
+              label: 'In room: ${currentRoomName!.trim()}',
+              color: const Color(0xFF6D5DF6),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _PremiumMatchScorePill extends StatelessWidget {
