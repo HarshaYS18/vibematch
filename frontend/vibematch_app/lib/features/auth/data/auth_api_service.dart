@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -272,16 +272,18 @@ class AuthUserRealtimeService {
 
   static final AuthUserRealtimeService instance = AuthUserRealtimeService._();
 
-  final StreamController<CurrentUser?> _controller = StreamController<CurrentUser?>.broadcast();
+  final StreamController<CurrentUser> _controller = StreamController<CurrentUser>.broadcast();
+  final StreamController<void> _signedOutController = StreamController<void>.broadcast();
 
-  Stream<CurrentUser?> get users => _controller.stream;
+  Stream<CurrentUser> get users => _controller.stream;
+  Stream<void> get signedOut => _signedOutController.stream;
 
   void publish(CurrentUser user) {
     _controller.add(user);
   }
 
   void publishSignedOut() {
-    _controller.add(null);
+    _signedOutController.add(null);
   }
 }
 
