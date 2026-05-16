@@ -240,7 +240,9 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
                   child: PublicFamilyPanel(
-                    familyName: _familySummary!.name,
+                    familyName: _familySummary!.name?.trim().isNotEmpty == true
+                        ? _familySummary!.name!.trim()
+                        : 'Family',
                     familyLevel: _familySummary!.level,
                     onTap: _openFamilyPage,
                   ),
