@@ -27,14 +27,19 @@ def _gradient_for_svip(svip_level: int, is_active: bool) -> dict[str, object]:
 
 
 def vip_summary(db: Session, user: User) -> dict:
-    status = economy_level_service.sync_vip_status(db, user.id)
-    gradient = _gradient_for_svip(status.svip_level, status.svip_is_active)
+    wallet = economy_level_service.get_or_create_wallet(db, user.id)
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    status = economy_level_service.sync_vip_status(db, user.id, levels)
+    vip_level = int((levels.get("vip") or {}).get("level") or 0)
+    svip_level = int((levels.get("svip") or {}).get("level") or 0)
+    svip_active = svip_level > 0
+    gradient = _gradient_for_svip(svip_level, svip_active)
     return {
-        "vip_level": status.vip_level,
-        "svip_level": status.svip_level,
-        "vip_is_active": status.vip_is_active,
-        "svip_is_active": status.svip_is_active,
-        "svip_expires_at": status.svip_expires_at,
+        "vip_level": vip_level,
+        "svip_level": svip_level,
+        "vip_is_active": vip_level > 0,
+        "svip_is_active": svip_active,
+        "svip_expires_at": status.svip_expires_at if svip_active else None,
         "name_gradient_key": str(gradient["key"]),
         "name_gradient_colors": list(gradient["colors"]),
     }
