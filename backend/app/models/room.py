@@ -82,6 +82,12 @@ class Room(Base):
         default="default",
         server_default="default",
     )
+    seat_layout_id: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        default="5x2",
+        server_default="5x2",
+    )
     announcement_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     announcement_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     announcement_updated_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
