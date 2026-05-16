@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/mini_profile_economy_service.dart';
 import '../live_room_models.dart';
+import 'vip_badge.dart';
 
 class MiniProfileStatsRow extends StatelessWidget {
   const MiniProfileStatsRow({
@@ -22,11 +23,11 @@ class MiniProfileStatsRow extends StatelessWidget {
     return FutureBuilder<MiniProfileEconomySummary>(
       future: MiniProfileEconomyService.instance.summaryForSeatUser(user),
       builder: (context, snapshot) {
-        final data = snapshot.data ?? MiniProfileEconomySummary.fromSeatUser(user);
+        final data =
+            snapshot.data ?? MiniProfileEconomySummary.fromSeatUser(user);
         return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(child: MiniProfileVipStatCard(vipLevel: data.vipLevel, onTap: onVipTap)),
-            const SizedBox(width: 8),
             Expanded(
               child: MiniProfileMonthStatCard(
                 title: 'Sent',
@@ -58,18 +59,13 @@ class MiniProfileStatsRow extends StatelessWidget {
 }
 
 class MiniProfileVipStatCard extends StatelessWidget {
-  const MiniProfileVipStatCard({super.key, required this.vipLevel, required this.onTap});
+  const MiniProfileVipStatCard({
+    super.key,
+    required this.vipLevel,
+    required this.onTap,
+  });
   final int vipLevel;
   final VoidCallback onTap;
-  static const String _assetBase = 'assets/images/vip_badges';
-  String get _assetPath {
-    if (vipLevel >= 41) return '$_assetBase/vip_purple.png';
-    if (vipLevel >= 30) return '$_assetBase/vip_green.png';
-    if (vipLevel >= 21) return '$_assetBase/vip_blue.png';
-    if (vipLevel >= 11) return '$_assetBase/vip_red.png';
-    if (vipLevel >= 6) return '$_assetBase/vip_black_gold.png';
-    return '$_assetBase/vip_silver.png';
-  }
 
   Color get _accentColor {
     if (vipLevel >= 41) return const Color(0xFF9C3BCE);
@@ -101,7 +97,13 @@ class MiniProfileVipStatCard extends StatelessWidget {
           color: _tintColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _accentColor.withValues(alpha: 0.22)),
-          boxShadow: [BoxShadow(color: _accentColor.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: _accentColor.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
@@ -112,22 +114,25 @@ class MiniProfileVipStatCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text('VIP Level', textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xFF7B7282), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                  const Text(
+                    'VIP Level',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Color(0xFF7B7282),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                   const SizedBox(height: 3),
                   Center(
-                    child: Transform.translate(
-                      offset: const Offset(2, 0),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Image.asset(_assetPath, width: 34, height: 34, fit: BoxFit.contain, filterQuality: FilterQuality.high, errorBuilder: (context, error, stackTrace) => Icon(Icons.shield_rounded, color: _accentColor, size: 31)),
-                            const SizedBox(width: 1.5),
-                            Text('VIP $vipLevel', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _accentColor, fontSize: 13.8, fontWeight: FontWeight.w900, letterSpacing: -0.25)),
-                          ],
-                        ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: VipBadge(
+                        level: vipLevel,
+                        size: VipBadgeSize.small,
+                        showWhenZero: false,
                       ),
                     ),
                   ),
@@ -142,7 +147,16 @@ class MiniProfileVipStatCard extends StatelessWidget {
 }
 
 class MiniProfileMonthStatCard extends StatelessWidget {
-  const MiniProfileMonthStatCard({super.key, required this.title, required this.value, required this.onTap, required this.tint, required this.borderColor, required this.titleColor, required this.valueColor});
+  const MiniProfileMonthStatCard({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.onTap,
+    required this.tint,
+    required this.borderColor,
+    required this.titleColor,
+    required this.valueColor,
+  });
   final String title;
   final String value;
   final VoidCallback onTap;
@@ -156,14 +170,38 @@ class MiniProfileMonthStatCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
-        height: 72,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.center, children: [
-          Text(title, textAlign: TextAlign.center, style: TextStyle(color: titleColor, fontSize: 10.5, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(value, textAlign: TextAlign.center, style: TextStyle(color: valueColor, fontSize: 15, fontWeight: FontWeight.w900)),
-        ]),
+        height: 58,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: tint,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: titleColor,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: valueColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -180,7 +218,18 @@ class _MiniProfileStatCardShine extends StatelessWidget {
           child: Container(
             height: 18,
             margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.white.withValues(alpha: 0.28), Colors.white.withValues(alpha: 0.10), Colors.white.withValues(alpha: 0.00)])),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.28),
+                  Colors.white.withValues(alpha: 0.10),
+                  Colors.white.withValues(alpha: 0.00),
+                ],
+              ),
+            ),
           ),
         ),
       ),

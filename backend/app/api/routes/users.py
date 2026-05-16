@@ -186,7 +186,12 @@ def _search_result_payload(db: Session, user: User, current_user: User) -> UserS
 
 
 def _get_public_active_user(db: Session, public_user_id: int) -> User:
-    user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
+    user = (
+        db.query(User)
+        .filter(or_(User.public_user_id == public_user_id, User.display_custom_id == public_user_id))
+        .filter(User.is_active.is_(True), User.is_banned.is_(False))
+        .first()
+    )
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -266,6 +271,7 @@ def get_my_relationship(public_user_id: int, db: Session = Depends(get_db), curr
     return _relationship_payload(db, profile_user, current_user)
 
 
+@router.get("/public/{public_user_id}", response_model=PublicUserProfileResponse)
 @router.get("/profile/{public_user_id}", response_model=PublicUserProfileResponse)
 def get_public_profile(public_user_id: int, db: Session = Depends(get_db), current_user: User | None = Depends(get_current_user)):
     profile_user = _get_public_active_user(db, public_user_id)

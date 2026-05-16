@@ -6,7 +6,7 @@ import '../models/home_room.dart';
 
 class HomeController extends ChangeNotifier {
   HomeController({HomeRepository? repository})
-      : _repository = repository ?? HomeRepository();
+    : _repository = repository ?? HomeRepository();
 
   final HomeRepository _repository;
 
@@ -28,6 +28,10 @@ class HomeController extends ChangeNotifier {
   final List<String> categories = const [
     'Trending',
     'Following',
+    'Music',
+    'Gaming',
+    'Chat',
+    'PK',
   ];
 
   final List<String> languages = const [
@@ -61,22 +65,28 @@ class HomeController extends ChangeNotifier {
   bool get usingBackendRooms => _backendRooms.isNotEmpty && !hasNetworkError;
 
   bool _isOpenActiveRoom(HomeRoom room) {
-    final normalizedMode = room.mode.trim().toLowerCase();
-    final isOpen = normalizedMode == 'open';
     final hasActiveUsers = room.onlineCount > 0;
-    return isOpen && hasActiveUsers;
+    return room.isPublicOpen && hasActiveUsers;
   }
 
   List<HomeRoom> get filteredRooms {
     if (hasNetworkError) return const [];
 
     final filtered = rooms.where((room) {
-      final languageMatch = selectedLanguage == 'All' || room.language == selectedLanguage;
+      final languageMatch =
+          selectedLanguage == 'All' || room.language == selectedLanguage;
       if (!languageMatch) return false;
 
-      // Product rule: Trending/Home room list should show only public Open rooms
-      // that currently have at least one active/online participant in the chatroom.
-      if (selectedCategory == 'Trending') {
+      // Product rule: Trending/Home room list should show only public discovery
+      // rooms that currently have at least one active participant.
+      if (selectedCategory == 'Trending' ||
+          _isRoomTypeCategory(selectedCategory)) {
+        final selectedRoomType = selectedCategory.trim().toLowerCase();
+        final roomType = room.type.trim().toLowerCase();
+        if (_isRoomTypeCategory(selectedCategory) &&
+            roomType != selectedRoomType) {
+          return false;
+        }
         return _isOpenActiveRoom(room);
       }
       return true;
@@ -112,14 +122,21 @@ class HomeController extends ChangeNotifier {
       myCreatedRoom = results[0] as HomeRoom?;
       _eventBanners = (results[1] as List<HomeBanner>?) ?? const [];
       _policyBanners = (results[2] as List<HomeBanner>?) ?? const [];
-      selectedBannerIndex = _clampIndex(selectedBannerIndex, _eventBanners.length);
-      selectedPolicyBannerIndex = _clampIndex(selectedPolicyBannerIndex, _policyBanners.length);
+      selectedBannerIndex = _clampIndex(
+        selectedBannerIndex,
+        _eventBanners.length,
+      );
+      selectedPolicyBannerIndex = _clampIndex(
+        selectedPolicyBannerIndex,
+        _policyBanners.length,
+      );
       bannerErrorMessage = null;
     } catch (_) {
       myCreatedRoom = null;
       _eventBanners = const [];
       _policyBanners = const [];
-      bannerErrorMessage = 'Could not load home banners or created room. Pull to refresh.';
+      bannerErrorMessage =
+          'Could not load home banners or created room. Pull to refresh.';
     } finally {
       isLoadingHomeChrome = false;
       notifyListeners();
@@ -131,7 +148,8 @@ class HomeController extends ChangeNotifier {
     await loadRooms();
   }
 
-  Future<void> loadTrendingRooms({bool silent = false}) => loadRooms(silent: silent);
+  Future<void> loadTrendingRooms({bool silent = false}) =>
+      loadRooms(silent: silent);
 
   Future<void> loadRooms({bool silent = false}) async {
     if (isLoadingRooms) return;
@@ -141,17 +159,22 @@ class HomeController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final languageForBackend = selectedLanguage == 'All' ? null : selectedLanguage;
+      final languageForBackend = selectedLanguage == 'All'
+          ? null
+          : selectedLanguage;
+      final categoryForBackend = _isRoomTypeCategory(selectedCategory)
+          ? selectedCategory
+          : null;
 
       final fetchedRooms = selectedCategory == 'Following'
           ? await _repository.fetchFollowingRooms(
               language: languageForBackend,
-              category: null,
+              category: categoryForBackend,
               limit: 50,
             )
           : await _repository.fetchTrendingRooms(
               language: languageForBackend,
-              category: null,
+              category: categoryForBackend,
               limit: 50,
             );
 
@@ -175,10 +198,14 @@ class HomeController extends ChangeNotifier {
 
   void onScrollNearBottom(ScrollController scrollController) {
     if (!scrollController.hasClients || hasNetworkError) return;
-    final nearBottom = scrollController.position.pixels > scrollController.position.maxScrollExtent - 420;
+    final nearBottom =
+        scrollController.position.pixels >
+        scrollController.position.maxScrollExtent - 420;
     if (nearBottom && visibleRoomCount < filteredRooms.length) {
       final nextCount = visibleRoomCount + 4;
-      visibleRoomCount = nextCount > filteredRooms.length ? filteredRooms.length : nextCount;
+      visibleRoomCount = nextCount > filteredRooms.length
+          ? filteredRooms.length
+          : nextCount;
       notifyListeners();
     }
   }
@@ -226,6 +253,10 @@ class HomeController extends ChangeNotifier {
   int _clampCount(int value, int max) {
     if (max <= 0 || value <= 0) return 0;
     return value > max ? max : value;
+  }
+
+  bool _isRoomTypeCategory(String category) {
+    return category != 'Trending' && category != 'Following';
   }
 
   @override

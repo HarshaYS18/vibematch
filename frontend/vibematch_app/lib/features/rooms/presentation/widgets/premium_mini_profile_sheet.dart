@@ -103,19 +103,27 @@ class UserMiniProfileSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 7),
                   FutureBuilder<MiniProfileEconomySummary>(
-                    future: MiniProfileEconomyService.instance.summaryForSeatUser(user),
+                    future: MiniProfileEconomyService.instance
+                        .summaryForSeatUser(user),
                     builder: (context, snapshot) {
-                      final economy = snapshot.data ?? MiniProfileEconomySummary.fromSeatUser(user);
+                      final economy =
+                          snapshot.data ??
+                          MiniProfileEconomySummary.fromSeatUser(user);
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _IdentityRow(user: user, economy: economy, onVipTap: onVipTap),
+                          _IdentityRow(
+                            user: user,
+                            economy: economy,
+                            onVipTap: onVipTap,
+                          ),
                           const SizedBox(height: 7),
                           _MetaRow(user: user),
                           const SizedBox(height: 9),
                           _StatsLine(
                             sentTotalCoins: economy.monthlyGiftCoinsSent,
-                            receivedTotalCoins: economy.monthlyGiftCoinsReceived,
+                            receivedTotalCoins:
+                                economy.monthlyGiftCoinsReceived,
                             onSentTap: onSentRankingTap,
                             onReceivedTap: onReceivedRankingTap,
                           ),
@@ -256,7 +264,10 @@ class _Avatar extends StatelessWidget {
             width: 64,
             height: 64,
             padding: const EdgeInsets.all(3),
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
             child: _PremiumMiniProfileAvatarImage(user: user),
           ),
           Positioned(
@@ -267,10 +278,16 @@ class _Avatar extends StatelessWidget {
               height: 22,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(colors: [Color(0xFFFFC857), Color(0xFFFF5F7E)]),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFC857), Color(0xFFFF5F7E)],
+                ),
                 border: Border.all(color: Colors.white, width: 1.8),
               ),
-              child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 12),
+              child: const Icon(
+                Icons.favorite_rounded,
+                color: Colors.white,
+                size: 12,
+              ),
             ),
           ),
         ],
@@ -289,10 +306,17 @@ class _PremiumMiniProfileAvatarImage extends StatelessWidget {
     final avatarUrl = user.avatarUrl?.trim();
     final fallback = Container(
       alignment: Alignment.center,
-      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(colors: user.avatarColors),
+      ),
       child: Text(
         avatarLetter(user.name),
-        style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 23,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
     if (avatarUrl == null || avatarUrl.isEmpty) return fallback;
@@ -309,7 +333,11 @@ class _PremiumMiniProfileAvatarImage extends StatelessWidget {
 }
 
 class _IdentityRow extends StatelessWidget {
-  const _IdentityRow({required this.user, required this.economy, required this.onVipTap});
+  const _IdentityRow({
+    required this.user,
+    required this.economy,
+    required this.onVipTap,
+  });
 
   final SeatUser user;
   final MiniProfileEconomySummary economy;
@@ -323,9 +351,16 @@ class _IdentityRow extends StatelessWidget {
       spacing: 6,
       runSpacing: 5,
       children: [
-        VipBadge(level: economy.vipLevel, size: VipBadgeSize.small, onTap: onVipTap),
-        if (economy.svipLevel > 0) _SvipPill(level: economy.svipLevel, onTap: onVipTap),
-        _FamilyBadge(label: user.familyName.trim().isEmpty ? 'No Family' : user.familyName),
+        VipBadge(
+          level: economy.vipLevel,
+          size: VipBadgeSize.small,
+          onTap: onVipTap,
+        ),
+        if (economy.svipLevel > 0)
+          _SvipPill(level: economy.svipLevel, onTap: onVipTap),
+        _FamilyBadge(
+          label: user.familyName.trim().isEmpty ? 'No Family' : user.familyName,
+        ),
       ],
     );
   }
@@ -339,29 +374,7 @@ class _SvipPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(7),
-      onTap: onTap,
-      child: Container(
-        height: 27,
-        padding: const EdgeInsets.symmetric(horizontal: 9),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(7),
-          gradient: const LinearGradient(colors: [RoomColors.violet, RoomColors.aqua]),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.diamond_rounded, color: Colors.white, size: 12),
-            const SizedBox(width: 4),
-            Text(
-              'SVIP $level',
-              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
-            ),
-          ],
-        ),
-      ),
-    );
+    return SvipBadge(level: level, size: VipBadgeSize.tiny, onTap: onTap);
   }
 }
 
@@ -377,7 +390,9 @@ class _FamilyBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(7),
-        gradient: const LinearGradient(colors: [Color(0xFFB76E22), Color(0xFF12C7B7)]),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFB76E22), Color(0xFF12C7B7)],
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -390,7 +405,11 @@ class _FamilyBadge extends StatelessWidget {
               label.toUpperCase(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -413,9 +432,22 @@ class _MetaRow extends StatelessWidget {
       runSpacing: 5,
       children: [
         if (user.roleLabel.isNotEmpty)
-          _Meta(icon: Icons.account_box_rounded, label: user.roleLabel, color: RoomColors.violet),
-        _Meta(icon: user.gender.icon, label: user.age == null ? 'Age hidden' : '${user.age}', color: user.gender.color),
-        if (user.showLocation) _Meta(icon: Icons.location_on_rounded, label: user.locationLabel!, color: RoomColors.aqua),
+          _Meta(
+            icon: Icons.account_box_rounded,
+            label: user.roleLabel,
+            color: RoomColors.violet,
+          ),
+        _Meta(
+          icon: user.gender.icon,
+          label: user.age == null ? 'Age hidden' : '${user.age}',
+          color: user.gender.color,
+        ),
+        if (user.showLocation)
+          _Meta(
+            icon: Icons.location_on_rounded,
+            label: user.locationLabel!,
+            color: RoomColors.aqua,
+          ),
       ],
     );
   }
@@ -435,14 +467,26 @@ class _Meta extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 14),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: Color(0xFF756878), fontSize: 11.5, fontWeight: FontWeight.w800)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF756878),
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ],
     );
   }
 }
 
 class _StatsLine extends StatelessWidget {
-  const _StatsLine({required this.sentTotalCoins, required this.receivedTotalCoins, required this.onSentTap, required this.onReceivedTap});
+  const _StatsLine({
+    required this.sentTotalCoins,
+    required this.receivedTotalCoins,
+    required this.onSentTap,
+    required this.onReceivedTap,
+  });
 
   final int sentTotalCoins;
   final int receivedTotalCoins;
@@ -454,16 +498,33 @@ class _StatsLine extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _FollowStat(value: compactNumber(sentTotalCoins), label: 'Sent', onTap: onSentTap),
-        Container(width: 1, height: 16, margin: const EdgeInsets.symmetric(horizontal: 16), color: const Color(0xFFE2D8D0)),
-        _FollowStat(value: compactNumber(receivedTotalCoins), label: 'Received', onTap: onReceivedTap),
+        _FollowStat(
+          value: compactNumber(sentTotalCoins),
+          label: 'Sent',
+          onTap: onSentTap,
+        ),
+        Container(
+          width: 1,
+          height: 16,
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          color: const Color(0xFFE2D8D0),
+        ),
+        _FollowStat(
+          value: compactNumber(receivedTotalCoins),
+          label: 'Received',
+          onTap: onReceivedTap,
+        ),
       ],
     );
   }
 }
 
 class _FollowStat extends StatelessWidget {
-  const _FollowStat({required this.value, required this.label, required this.onTap});
+  const _FollowStat({
+    required this.value,
+    required this.label,
+    required this.onTap,
+  });
 
   final String value;
   final String label;
@@ -479,9 +540,20 @@ class _FollowStat extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('$value $label', style: const TextStyle(color: Color(0xFF756878), fontSize: 12, fontWeight: FontWeight.w800)),
+            Text(
+              '$value $label',
+              style: const TextStyle(
+                color: Color(0xFF756878),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             const SizedBox(width: 3),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF9A8E9F), size: 14),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF9A8E9F),
+              size: 14,
+            ),
           ],
         ),
       ),
@@ -521,7 +593,12 @@ class _MiniActionRow extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          _ActionPill(icon: Icons.workspace_premium_rounded, label: 'VIP', color: RoomColors.gold, onTap: onVipTap),
+          _ActionPill(
+            icon: Icons.workspace_premium_rounded,
+            label: 'VIP',
+            color: RoomColors.gold,
+            onTap: onVipTap,
+          ),
           _ActionPill(
             icon: Icons.north_east_rounded,
             label: 'Sent Lv $sendingLevel · ${compactNumber(lifetimeSendExp)}',
@@ -530,13 +607,29 @@ class _MiniActionRow extends StatelessWidget {
           ),
           _ActionPill(
             icon: Icons.favorite_rounded,
-            label: 'Receive Lv $receivingLevel · ${compactNumber(lifetimeReceiveExp)}',
+            label:
+                'Receive Lv $receivingLevel · ${compactNumber(lifetimeReceiveExp)}',
             color: RoomColors.coral,
             onTap: onReceivingLevelTap,
           ),
-          _ActionPill(icon: Icons.groups_rounded, label: 'Family', color: RoomColors.aqua, onTap: onFamilyTap),
-          _ActionPill(icon: Icons.favorite_border_rounded, label: 'Bonds', color: RoomColors.coral, onTap: onRelationshipTap),
-          _ActionPill(icon: Icons.workspace_premium_rounded, label: 'Badges', color: RoomColors.gold, onTap: onMedalsTap),
+          _ActionPill(
+            icon: Icons.groups_rounded,
+            label: 'Family',
+            color: RoomColors.aqua,
+            onTap: onFamilyTap,
+          ),
+          _ActionPill(
+            icon: Icons.favorite_border_rounded,
+            label: 'Bonds',
+            color: RoomColors.coral,
+            onTap: onRelationshipTap,
+          ),
+          _ActionPill(
+            icon: Icons.workspace_premium_rounded,
+            label: 'Badges',
+            color: RoomColors.gold,
+            onTap: onMedalsTap,
+          ),
         ],
       ),
     );
@@ -544,7 +637,12 @@ class _MiniActionRow extends StatelessWidget {
 }
 
 class _ActionPill extends StatelessWidget {
-  const _ActionPill({required this.icon, required this.label, required this.color, required this.onTap});
+  const _ActionPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -571,7 +669,14 @@ class _ActionPill extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 14),
               const SizedBox(width: 4),
-              Text(label, style: TextStyle(color: color, fontSize: 10.8, fontWeight: FontWeight.w900)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10.8,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ],
           ),
         ),
@@ -592,9 +697,15 @@ class _SendGiftButton extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        gradient: const LinearGradient(colors: [Color(0xFFFFC107), Color(0xFFFF4F39)]),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFC107), Color(0xFFFF4F39)],
+        ),
         boxShadow: [
-          BoxShadow(color: const Color(0xFFFF6A30).withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 6)),
+          BoxShadow(
+            color: const Color(0xFFFF6A30).withValues(alpha: 0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: Material(
@@ -607,11 +718,20 @@ class _SendGiftButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 18),
+                Icon(
+                  Icons.card_giftcard_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
                 SizedBox(width: 7),
                 Text(
                   'SEND GIFT',
-                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.2),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                  ),
                 ),
               ],
             ),
@@ -646,21 +766,48 @@ class _BottomActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
-      _BottomAction(icon: Icons.output_rounded, label: 'Leave', onTap: onLeaveAndLock),
-      _BottomAction(icon: Icons.person_rounded, label: 'Profile', onTap: onProfileTap),
+      _BottomAction(
+        icon: Icons.output_rounded,
+        label: 'Leave',
+        onTap: onLeaveAndLock,
+      ),
+      _BottomAction(
+        icon: Icons.person_rounded,
+        label: 'Profile',
+        onTap: onProfileTap,
+      ),
     ];
     if (isSelf) {
-      actions.add(_BottomAction(icon: selfMuted ? Icons.mic_rounded : Icons.mic_off_rounded, label: selfMuted ? 'Turn On' : 'Turn Off', onTap: onSelfMuteToggle));
+      actions.add(
+        _BottomAction(
+          icon: selfMuted ? Icons.mic_rounded : Icons.mic_off_rounded,
+          label: selfMuted ? 'Turn On' : 'Turn Off',
+          onTap: onSelfMuteToggle,
+        ),
+      );
     }
     if (canModerate && !isSelf) {
-      actions.add(_BottomAction(icon: adminMuted ? Icons.mic_rounded : Icons.mic_off_rounded, label: adminMuted ? 'Unmute' : 'Mute', onTap: onAdminMuteToggle));
+      actions.add(
+        _BottomAction(
+          icon: adminMuted ? Icons.mic_rounded : Icons.mic_off_rounded,
+          label: adminMuted ? 'Unmute' : 'Mute',
+          onTap: onAdminMuteToggle,
+        ),
+      );
     }
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: actions);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: actions,
+    );
   }
 }
 
 class _BottomAction extends StatelessWidget {
-  const _BottomAction({required this.icon, required this.label, required this.onTap});
+  const _BottomAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -678,7 +825,14 @@ class _BottomAction extends StatelessWidget {
           children: [
             Icon(icon, color: const Color(0xFF342B38), size: 20),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(color: Color(0xFF8B808E), fontSize: 10.5, fontWeight: FontWeight.w700)),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF8B808E),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),
@@ -687,7 +841,11 @@ class _BottomAction extends StatelessWidget {
 }
 
 class _RoundIcon extends StatelessWidget {
-  const _RoundIcon({required this.icon, required this.color, required this.onTap});
+  const _RoundIcon({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 
   final IconData icon;
   final Color color;
@@ -701,14 +859,23 @@ class _RoundIcon extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: SizedBox(width: 28, height: 28, child: Icon(icon, color: color, size: 16)),
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: Icon(icon, color: color, size: 16),
+        ),
       ),
     );
   }
 }
 
 class _MoreMenuButton extends StatelessWidget {
-  const _MoreMenuButton({required this.user, required this.onSetAdminTap, required this.onRemoveAdminTap, required this.onReportTap});
+  const _MoreMenuButton({
+    required this.user,
+    required this.onSetAdminTap,
+    required this.onRemoveAdminTap,
+    required this.onReportTap,
+  });
 
   final SeatUser user;
   final VoidCallback onSetAdminTap;
@@ -739,30 +906,53 @@ class _MoreMenuButton extends StatelessWidget {
         if (canRemoveAdmin)
           const PopupMenuItem<String>(
             value: 'remove_admin',
-            child: _MenuRow(icon: Icons.shield_moon_rounded, color: RoomColors.coral, label: 'Remove admin'),
+            child: _MenuRow(
+              icon: Icons.shield_moon_rounded,
+              color: RoomColors.coral,
+              label: 'Remove admin',
+            ),
           )
         else if (!user.isRoomAdmin && !user.isHost)
           const PopupMenuItem<String>(
             value: 'set_admin',
-            child: _MenuRow(icon: Icons.shield_rounded, color: RoomColors.aqua, label: 'Set as admin'),
+            child: _MenuRow(
+              icon: Icons.shield_rounded,
+              color: RoomColors.aqua,
+              label: 'Set as admin',
+            ),
           ),
         const PopupMenuItem<String>(
           value: 'report',
-          child: _MenuRow(icon: Icons.report_gmailerrorred_rounded, color: RoomColors.coral, label: 'Report'),
+          child: _MenuRow(
+            icon: Icons.report_gmailerrorred_rounded,
+            color: RoomColors.coral,
+            label: 'Report',
+          ),
         ),
       ],
       child: Container(
         width: 28,
         height: 28,
-        decoration: BoxDecoration(color: RoomColors.plum.withValues(alpha: 0.08), shape: BoxShape.circle),
-        child: const Icon(Icons.more_horiz_rounded, color: RoomColors.plum, size: 19),
+        decoration: BoxDecoration(
+          color: RoomColors.plum.withValues(alpha: 0.08),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.more_horiz_rounded,
+          color: RoomColors.plum,
+          size: 19,
+        ),
       ),
     );
   }
 }
 
 class _MenuRow extends StatelessWidget {
-  const _MenuRow({required this.icon, required this.color, required this.label});
+  const _MenuRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+  });
 
   final IconData icon;
   final Color color;
@@ -774,7 +964,13 @@ class _MenuRow extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: color),
         const SizedBox(width: 9),
-        Text(label, style: const TextStyle(color: RoomColors.plum, fontWeight: FontWeight.w800)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: RoomColors.plum,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ],
     );
   }

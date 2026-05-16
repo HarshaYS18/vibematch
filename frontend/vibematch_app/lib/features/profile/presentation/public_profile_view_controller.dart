@@ -2,8 +2,10 @@ part of 'public_profile_view_page.dart';
 
 const Duration _publicProfileIstOffset = Duration(hours: 5, minutes: 30);
 
-DateTime _publicProfileNowIst() => DateTime.now().toUtc().add(_publicProfileIstOffset);
-DateTime _publicProfileToIst(DateTime value) => value.toUtc().add(_publicProfileIstOffset);
+DateTime _publicProfileNowIst() =>
+    DateTime.now().toUtc().add(_publicProfileIstOffset);
+DateTime _publicProfileToIst(DateTime value) =>
+    value.toUtc().add(_publicProfileIstOffset);
 
 extension _PublicProfileViewController on _PublicProfileViewPageState {
   int _targetPublicUserId() => widget.publicUserId ?? widget.user.publicUserId;
@@ -29,21 +31,16 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     } catch (_) {}
   }
 
-  Future<void> _loadRealFamilyAndVibes() async {
+  Future<void> _loadRealFamily() async {
     final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
 
     _setProfileState(() {
       _loadingFamily = true;
-      _loadingVibes = true;
       _familyError = null;
-      _vibesError = null;
     });
 
-    await Future.wait<void>([
-      _loadPublicFamily(publicUserId),
-      _loadPublicVibes(publicUserId),
-    ]);
+    await _loadPublicFamily(publicUserId);
   }
 
   Future<void> _loadPublicFamily(int publicUserId) async {
@@ -61,24 +58,6 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
       );
     } finally {
       if (mounted) _setProfileState(() => _loadingFamily = false);
-    }
-  }
-
-  Future<void> _loadPublicVibes(int publicUserId) async {
-    try {
-      final vibes = await _profileApi.listPublicUserVibes(publicUserId);
-      if (!mounted) return;
-      _setProfileState(() {
-        _profileVibes = vibes;
-        _vibesError = null;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      _setProfileState(
-        () => _vibesError = error.toString().replaceFirst('Exception: ', ''),
-      );
-    } finally {
-      if (mounted) _setProfileState(() => _loadingVibes = false);
     }
   }
 
@@ -219,6 +198,41 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     title: '${_displayName()} QR',
   );
 
+  SeatUser _targetSeatUser() => SeatUser(
+    id: 'user_${_targetPublicUserId()}',
+    name: _displayName(),
+    roleLabel: _roleTag() ?? '',
+    familyName: _familyName(),
+    familyLevel: _familyLevel().toString(),
+    relationshipText: widget.relationshipLabel,
+    vipLevel: _vipLevel(),
+    svipLevel: _svipLevel(),
+    sendingLevel: _sentLevel(),
+    receivingLevel: _receiveLevel(),
+    sentExp: _monthlyGiftCoinsSent(),
+    receivedExp: _monthlyGiftCoinsReceived(),
+    medals: const <String>[],
+    avatarColors: const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+    avatarUrl: _avatarUrl(),
+    nameGradientColors:
+        _backendProfile?.vip.nameGradientColors ??
+        widget.user.vip.nameGradientColors,
+    isCurrentUser: _isSelfProfile,
+  );
+
+  void _openFollowersFollowed({required int initialTabIndex}) {
+    final targetUser = _targetSeatUser();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowersFollowedPage(
+          user: targetUser,
+          users: <SeatUser>[targetUser],
+          initialTabIndex: initialTabIndex,
+        ),
+      ),
+    );
+  }
+
   void _openViewerVipProgram({required int initialTabIndex}) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -327,7 +341,10 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
       _backendProfile?.visibleId ??
       widget.user.displayCustomId?.toString() ??
       widget.user.publicUserId.toString();
-  String? _avatarUrl() => _backendProfile?.avatarUrl ?? _economyCard?.avatarUrl ?? widget.user.avatarUrl;
+  String? _avatarUrl() =>
+      _backendProfile?.avatarUrl ??
+      _economyCard?.avatarUrl ??
+      widget.user.avatarUrl;
   bool _showOfficialTick() =>
       _backendProfile?.primaryRoleBadge?.showVerifiedTick == true ||
       widget.user.shouldShowOfficialYellowTick;
@@ -335,8 +352,14 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
       _backendProfile?.primaryRoleBadge?.badgeLabel ??
       widget.user.primaryRoleBadge?.badgeLabel ??
       MeProfileConstants.roleTagFor(widget.user.primaryRole);
-  int _vipLevel() => _economyCard?.vipLevel ?? _backendProfile?.vip.vipLevel ?? widget.vipLevel;
-  int _svipLevel() => _economyCard?.svipLevel ?? _backendProfile?.vip.svipLevel ?? widget.svipLevel;
+  int _vipLevel() =>
+      _economyCard?.vipLevel ??
+      _backendProfile?.vip.vipLevel ??
+      widget.vipLevel;
+  int _svipLevel() =>
+      _economyCard?.svipLevel ??
+      _backendProfile?.vip.svipLevel ??
+      widget.svipLevel;
   int _sentLevel() =>
       _economyCard?.sendLevel ??
       _backendProfile?.wallet.sendLevel ??
@@ -366,7 +389,9 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     if (profile.isOnline) return 'Online';
     final lastSeen = profile.lastSeenAt;
     if (lastSeen == null) return 'Offline';
-    final diff = _publicProfileNowIst().difference(_publicProfileToIst(lastSeen));
+    final diff = _publicProfileNowIst().difference(
+      _publicProfileToIst(lastSeen),
+    );
     if (diff.inMinutes < 1) return 'last seen just now';
     if (diff.inMinutes < 60) return 'last seen ${diff.inMinutes} min ago';
     if (diff.inHours < 24) {

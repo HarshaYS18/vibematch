@@ -10,52 +10,97 @@ class VmStoreCatalog {
   static const int gradientNameDurationDays = 30;
 
   static List<VmStoreItem> get gradientNameItems {
-    return GradientNameStyle.storeStyles.map((style) {
-      return VmStoreItem(
-        id: 'gradient_name_${style.id}_30d',
-        title: style.label,
-        subtitle: 'Gradient colored name effect across app for 30 days.',
-        section: VmStoreSection.specialItems,
-        type: VmStoreItemType.gradientName,
-        rarity: VmStoreItemRarity.svip,
-        priceCoins: gradientNamePriceCoins,
-        isDynamicRemoteItem: true,
-        isLimited: false,
-        previewAssetKey: 'remote://gradient-name/${style.id}',
-        durationDays: gradientNameDurationDays,
-        colors: style.colors,
-      );
-    }).toList(growable: false);
+    return GradientNameStyle.storeStyles
+        .map((style) {
+          return VmStoreItem(
+            id: 'gradient_name_${style.id}_30d',
+            title: style.label,
+            subtitle: 'Gradient colored name effect across app for 30 days.',
+            section: VmStoreSection.specialItems,
+            type: VmStoreItemType.gradientName,
+            rarity: VmStoreItemRarity.svip,
+            priceCoins: gradientNamePriceCoins,
+            isDynamicRemoteItem: true,
+            isLimited: false,
+            previewAssetKey: 'remote://gradient-name/${style.id}',
+            durationDays: gradientNameDurationDays,
+            colors: style.colors,
+          );
+        })
+        .toList(growable: false);
   }
 
   static final List<VmStoreItem> dynamicItems = [
     const VmStoreItem(
-      id: 'frame_neon_rose_30d',
-      title: 'Neon Rose Frame',
-      subtitle: 'Animated-style rose profile frame for 30 days.',
+      id: 'frame_royal_wing_crown',
+      title: 'Royal Wing Crown Frame',
+      subtitle: 'Gold wing crown avatar frame for 30 days.',
       section: VmStoreSection.frames,
       type: VmStoreItemType.frame,
       rarity: VmStoreItemRarity.premium,
-      priceCoins: 1200,
-      isDynamicRemoteItem: true,
+      priceCoins: 300000,
+      isDynamicRemoteItem: false,
       isLimited: false,
-      previewAssetKey: 'cdn://store/frames/neon_rose_v1.webp',
+      previewAssetKey: 'assets/images/store/avatar_frames/royal_wing_crown.png',
       durationDays: 30,
-      colors: [Color(0xFFE84C72), Color(0xFF6D5DF6)],
+      colors: [Color(0xFF7C54FF), Color(0xFFFFD36A)],
     ),
     const VmStoreItem(
-      id: 'frame_royal_gold_perm',
-      title: 'Royal Gold Frame',
-      subtitle: 'Permanent luxury official-style gold frame.',
+      id: 'frame_butterfly_crystal_heart',
+      title: 'Butterfly Crystal Heart Frame',
+      subtitle: 'Pink crystal butterfly avatar frame for 30 days.',
       section: VmStoreSection.frames,
       type: VmStoreItemType.frame,
-      rarity: VmStoreItemRarity.vip,
-      priceCoins: 8500,
-      isDynamicRemoteItem: true,
+      rarity: VmStoreItemRarity.premium,
+      priceCoins: 300000,
+      isDynamicRemoteItem: false,
       isLimited: false,
-      previewAssetKey: 'cdn://store/frames/royal_gold_v1.webp',
-      requiredVipLevel: 10,
-      colors: [Color(0xFFC99A3B), Color(0xFFFFD36A)],
+      previewAssetKey:
+          'assets/images/store/avatar_frames/butterfly_crystal_heart.png',
+      durationDays: 30,
+      colors: [Color(0xFFB754FF), Color(0xFFFF8AA8)],
+    ),
+    const VmStoreItem(
+      id: 'frame_neon_bike_racer',
+      title: 'Neon Bike Racer Frame',
+      subtitle: 'Round neon motorcycle avatar frame for 30 days.',
+      section: VmStoreSection.frames,
+      type: VmStoreItemType.frame,
+      rarity: VmStoreItemRarity.premium,
+      priceCoins: 300000,
+      isDynamicRemoteItem: false,
+      isLimited: false,
+      previewAssetKey: 'assets/images/store/avatar_frames/neon_bike_racer.png',
+      durationDays: 30,
+      colors: [Color(0xFF111827), Color(0xFFFF4DD8)],
+    ),
+    const VmStoreItem(
+      id: 'frame_cricket_champion',
+      title: 'Cricket Champion Frame',
+      subtitle: 'Cricket champion avatar frame for 30 days.',
+      section: VmStoreSection.frames,
+      type: VmStoreItemType.frame,
+      rarity: VmStoreItemRarity.premium,
+      priceCoins: 300000,
+      isDynamicRemoteItem: false,
+      isLimited: false,
+      previewAssetKey: 'assets/images/store/avatar_frames/cricket_champion.png',
+      durationDays: 30,
+      colors: [Color(0xFF0E2E7E), Color(0xFFFFD36A)],
+    ),
+    const VmStoreItem(
+      id: 'frame_speed_king_car',
+      title: 'Speed King Car Frame',
+      subtitle: 'Luxury racing car avatar frame for 30 days.',
+      section: VmStoreSection.frames,
+      type: VmStoreItemType.frame,
+      rarity: VmStoreItemRarity.premium,
+      priceCoins: 300000,
+      isDynamicRemoteItem: false,
+      isLimited: false,
+      previewAssetKey: 'assets/images/store/avatar_frames/speed_king_car.png',
+      durationDays: 30,
+      colors: [Color(0xFF2E1065), Color(0xFF38BDF8)],
     ),
     const VmStoreItem(
       id: 'entrance_love_comet_7d',
@@ -122,7 +167,8 @@ class VmStoreCatalog {
       priceCoins: 5200,
       isDynamicRemoteItem: true,
       isLimited: true,
-      previewAssetKey: 'cdn://store/room_backgrounds/ocean_drive_dynamic_v1.json',
+      previewAssetKey:
+          'cdn://store/room_backgrounds/ocean_drive_dynamic_v1.json',
       durationDays: 30,
       colors: [Color(0xFF12C7B7), Color(0xFF0C5B82)],
     ),
@@ -211,9 +257,12 @@ class VmStoreCatalog {
     ...gradientNameItems,
   ];
 
-  static List<VmStoreItem> visibleStoreItems({required bool hasLoveRelationship}) {
+  static List<VmStoreItem> visibleStoreItems({
+    required bool hasLoveRelationship,
+  }) {
     return dynamicItems.where((item) {
-      if (item.type == VmStoreItemType.loveCard && hasLoveRelationship) return false;
+      if (item.type == VmStoreItemType.loveCard && hasLoveRelationship)
+        return false;
       return true;
     }).toList();
   }

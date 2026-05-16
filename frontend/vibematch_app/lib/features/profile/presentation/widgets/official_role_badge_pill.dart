@@ -16,6 +16,8 @@ class OfficialRoleBadgePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = compact ? badge.badgeLabel : badge.pillLabel;
     if (label.trim().isEmpty) return const SizedBox.shrink();
+    final showLeadingIcon =
+        !(badge.showVerifiedTick && badge.icon == 'verified');
 
     return Container(
       height: compact ? 22 : 28,
@@ -23,7 +25,10 @@ class OfficialRoleBadgePill extends StatelessWidget {
       decoration: BoxDecoration(
         color: badge.backgroundColor,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: badge.borderColor.withValues(alpha: 0.82), width: 1),
+        border: Border.all(
+          color: badge.borderColor.withValues(alpha: 0.82),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: badge.borderColor.withValues(alpha: compact ? 0.12 : 0.20),
@@ -35,8 +40,14 @@ class OfficialRoleBadgePill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(badge.iconData, color: badge.textColor, size: compact ? 11 : 14),
-          SizedBox(width: compact ? 4 : 6),
+          if (showLeadingIcon) ...[
+            Icon(
+              badge.iconData,
+              color: badge.textColor,
+              size: compact ? 11 : 14,
+            ),
+            SizedBox(width: compact ? 4 : 6),
+          ],
           Flexible(
             child: Text(
               label,
@@ -53,7 +64,11 @@ class OfficialRoleBadgePill extends StatelessWidget {
           ),
           if (badge.showVerifiedTick) ...[
             SizedBox(width: compact ? 3 : 5),
-            Icon(Icons.verified_rounded, color: const Color(0xFFFFD36A), size: compact ? 11 : 14),
+            Icon(
+              Icons.verified_rounded,
+              color: const Color(0xFFFFD36A),
+              size: compact ? 11 : 14,
+            ),
           ],
         ],
       ),

@@ -41,6 +41,8 @@ class PublicProfileHeader extends StatelessWidget {
     required this.onFamilyTap,
     required this.onVipTap,
     required this.onSvipTap,
+    required this.onFollowersTap,
+    required this.onFollowingTap,
     this.nameGradientColors = const <String>[],
     this.avatarUrl,
     this.showSocialActions = true,
@@ -82,6 +84,8 @@ class PublicProfileHeader extends StatelessWidget {
   final VoidCallback onFamilyTap;
   final VoidCallback onVipTap;
   final VoidCallback onSvipTap;
+  final VoidCallback onFollowersTap;
+  final VoidCallback onFollowingTap;
   final List<String> nameGradientColors;
   final String? avatarUrl;
   final bool showSocialActions;
@@ -116,18 +120,6 @@ class PublicProfileHeader extends StatelessWidget {
           color: const Color(0xFF6D5DF6),
           onTap: onSvipTap,
         ),
-      if (sentLevel > 0)
-        PublicBadge(
-          icon: Icons.send_rounded,
-          label: 'Sent Lv $sentLevel',
-          color: const Color(0xFFFF8A00),
-        ),
-      if (receiveLevel > 0)
-        PublicBadge(
-          icon: Icons.volunteer_activism_rounded,
-          label: 'Receive Lv $receiveLevel',
-          color: const Color(0xFF12C7B7),
-        ),
       if (safeFamilyName.isNotEmpty && familyLevel > 0)
         PublicBadge(
           icon: Icons.family_restroom_rounded,
@@ -146,8 +138,6 @@ class PublicProfileHeader extends StatelessWidget {
         : coverPhotos;
     final followersText = _compactCount(followersCount ?? 0);
     final followingText = _compactCount(followingCount ?? 0);
-    final sentText = _compactCount(monthlyGiftCoinsSent);
-    final receivedText = _compactCount(monthlyGiftCoinsReceived);
     final score = matchScore;
 
     return Container(
@@ -266,7 +256,7 @@ class PublicProfileHeader extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (showOfficialTick) ...[
+                              if (showOfficialTick && roleBadge == null) ...[
                                 const SizedBox(width: 5),
                                 const Icon(
                                   Icons.verified_rounded,
@@ -355,22 +345,16 @@ class PublicProfileHeader extends StatelessWidget {
                       child: PublicStat(
                         value: followersText,
                         label: 'Followers',
+                        onTap: onFollowersTap,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: PublicStat(
                         value: followingText,
                         label: 'Following',
+                        onTap: onFollowingTap,
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: PublicStat(value: sentText, label: 'Sent'),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: PublicStat(value: receivedText, label: 'Received'),
                     ),
                   ],
                 ),
@@ -413,7 +397,9 @@ class _PresenceLine extends StatelessWidget {
       children: [
         PublicTinyStatusChip(
           icon: Icons.circle,
-          label: presenceLabel.trim().isEmpty ? 'Offline' : presenceLabel.trim(),
+          label: presenceLabel.trim().isEmpty
+              ? 'Offline'
+              : presenceLabel.trim(),
           color: presenceLabel.toLowerCase().contains('online')
               ? const Color(0xFF12C7B7)
               : const Color(0xFF8C7B8F),

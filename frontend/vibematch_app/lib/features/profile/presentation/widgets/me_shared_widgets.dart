@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../rooms/presentation/widgets/mini_profile_family_badge.dart';
-import '../../../rooms/presentation/widgets/mini_profile_level_row.dart';
 import '../../../rooms/presentation/widgets/vip_badge.dart';
 import '../models/me_page_models.dart';
 
@@ -46,7 +45,9 @@ class MePremiumAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOnline = presence == MePresenceStatus.online;
-    final letter = displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase();
+    final letter = displayName.trim().isEmpty
+        ? 'V'
+        : displayName.trim()[0].toUpperCase();
 
     return Container(
       height: size,
@@ -86,7 +87,9 @@ class MePremiumAvatar extends StatelessWidget {
               height: size * 0.25,
               width: size * 0.25,
               decoration: BoxDecoration(
-                color: isOnline ? const Color(0xFF12C7B7) : const Color(0xFF8C8198),
+                color: isOnline
+                    ? const Color(0xFF12C7B7)
+                    : const Color(0xFF8C8198),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2.3),
               ),
@@ -104,7 +107,11 @@ class MePremiumAvatar extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: vipColor, width: 1.5),
                 ),
-                child: const Icon(Icons.open_in_new_rounded, color: Color(0xFF251538), size: 13),
+                child: const Icon(
+                  Icons.open_in_new_rounded,
+                  color: Color(0xFF251538),
+                  size: 13,
+                ),
               ),
             ),
         ],
@@ -131,13 +138,17 @@ class MeNameWithOfficialTick extends StatelessWidget {
 
   bool get _showTick {
     final normalized = role.toLowerCase().trim();
-    return normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
+    return normalized == 'founder_owner' ||
+        normalized == 'super_owner' ||
+        normalized == 'owner';
   }
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: centered ? MainAxisAlignment.center : MainAxisAlignment.start,
+      mainAxisAlignment: centered
+          ? MainAxisAlignment.center
+          : MainAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Flexible(
@@ -156,7 +167,11 @@ class MeNameWithOfficialTick extends StatelessWidget {
         ),
         if (_showTick) ...[
           const SizedBox(width: 5),
-          const Icon(Icons.verified_rounded, color: Color(0xFFFFD36A), size: 21),
+          const Icon(
+            Icons.verified_rounded,
+            color: Color(0xFFFFD36A),
+            size: 21,
+          ),
         ],
       ],
     );
@@ -218,7 +233,11 @@ class MeProfileMiniBadge extends StatelessWidget {
         child: SizedBox(
           height: 30,
           child: Center(
-            child: VipBadge(level: vipLevel, size: VipBadgeSize.small, showWhenZero: true),
+            child: VipBadge(
+              level: vipLevel,
+              size: VipBadgeSize.small,
+              showWhenZero: true,
+            ),
           ),
         ),
       );
@@ -231,20 +250,10 @@ class MeProfileMiniBadge extends StatelessWidget {
         onTap: onTap,
         child: SizedBox(
           height: 30,
-          width: 90,
+          width: 44,
           child: Center(
             child: IgnorePointer(
-              child: MiniProfileCleanLevelPill(
-                label: 'SVIP $svipLevel',
-                icon: Icons.diamond_rounded,
-                width: 86,
-                background: const Color(0xFF30220B),
-                border: const Color(0xFFD7AA45),
-                textColor: const Color(0xFFFFE2A1),
-                shineColor: const Color(0xFFFFF1B8),
-                active: svipLevel > 0,
-                onTap: () {},
-              ),
+              child: SvipBadge(level: svipLevel, size: VipBadgeSize.tiny),
             ),
           ),
         ),
@@ -269,7 +278,11 @@ class MeProfileMiniBadge extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Color(0xFF251538),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ],
         ),
@@ -279,7 +292,11 @@ class MeProfileMiniBadge extends StatelessWidget {
 }
 
 class MeHeaderIconButton extends StatelessWidget {
-  const MeHeaderIconButton({super.key, required this.icon, required this.onTap});
+  const MeHeaderIconButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
@@ -330,9 +347,23 @@ class MeProfileStat extends StatelessWidget {
             children: [
               Icon(icon, color: const Color(0xFF6D5DF6), size: 20),
               const SizedBox(height: 5),
-              Text(value, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900, fontSize: 17)),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Color(0xFF251538),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 17,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(label, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11, fontWeight: FontWeight.w700)),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF8C8198),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),

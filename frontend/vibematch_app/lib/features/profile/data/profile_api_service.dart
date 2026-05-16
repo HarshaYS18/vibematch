@@ -83,7 +83,7 @@ class ProfileApiService {
 
   Future<PublicUserProfile> getPublicProfile(int publicUserId) async {
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/users/public/$publicUserId')),
+      Uri.parse(VmApiConfig.endpoint('/users/profile/$publicUserId')),
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'load public profile');
@@ -167,7 +167,7 @@ class ProfileApiService {
 
   Future<UserRelationship> getRelationship(int publicUserId) async {
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/relationship')),
+      Uri.parse(VmApiConfig.endpoint('/users/me/relationship/$publicUserId')),
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'load relationship');
@@ -178,7 +178,7 @@ class ProfileApiService {
 
   Future<UserRelationship> followUser(int publicUserId) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')),
+      Uri.parse(VmApiConfig.endpoint('/users/follow/$publicUserId')),
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'follow user');
@@ -189,7 +189,7 @@ class ProfileApiService {
 
   Future<UserRelationship> unfollowUser(int publicUserId) async {
     final response = await http.delete(
-      Uri.parse(VmApiConfig.endpoint('/users/$publicUserId/follow')),
+      Uri.parse(VmApiConfig.endpoint('/users/follow/$publicUserId')),
       headers: _authHeaders(),
     );
     _throwIfFailed(response, 'unfollow user');

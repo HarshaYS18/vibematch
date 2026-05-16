@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/mini_profile_economy_service.dart';
 import '../live_room_models.dart';
 import 'experience/experience_level_models.dart';
+import 'vip_badge.dart';
 
 class MiniProfileLevelRow extends StatelessWidget {
   const MiniProfileLevelRow({
@@ -25,32 +26,39 @@ class MiniProfileLevelRow extends StatelessWidget {
     return FutureBuilder<MiniProfileEconomySummary>(
       future: MiniProfileEconomyService.instance.summaryForSeatUser(user),
       builder: (context, snapshot) {
-        final data = snapshot.data ?? MiniProfileEconomySummary.fromSeatUser(user);
+        final data =
+            snapshot.data ?? MiniProfileEconomySummary.fromSeatUser(user);
         final sentStyle = data.sentLevel > 0
-            ? experiencePillStyleFor(type: ExperienceLevelType.sent, level: data.sentLevel)
+            ? experiencePillStyleFor(
+                type: ExperienceLevelType.sent,
+                level: data.sentLevel,
+              )
             : null;
         final receivedStyle = data.receiveLevel > 0
-            ? experiencePillStyleFor(type: ExperienceLevelType.received, level: data.receiveLevel)
+            ? experiencePillStyleFor(
+                type: ExperienceLevelType.received,
+                level: data.receiveLevel,
+              )
             : null;
 
         final items = <Widget>[
+          if (data.vipLevel > 0)
+            VipBadge(
+              level: data.vipLevel,
+              size: VipBadgeSize.small,
+              onTap: onVipTap,
+            ),
           if (data.svipLevel > 0)
-            MiniProfileCleanLevelPill(
-              label: 'SVIP ${data.svipLevel}',
-              icon: Icons.diamond_rounded,
-              width: 76,
-              background: const Color(0xFF30220B),
-              border: const Color(0xFFD7AA45),
-              textColor: const Color(0xFFFFE2A1),
-              shineColor: const Color(0xFFFFF1B8),
-              active: true,
+            SvipBadge(
+              level: data.svipLevel,
+              size: VipBadgeSize.tiny,
               onTap: onSvipTap,
             ),
           if (sentStyle != null)
             MiniProfileCleanLevelPill(
-              label: 'Lv ${data.sentLevel}',
+              label: 'LV ${data.sentLevel}',
               icon: sentStyle.crownIcon,
-              width: 68,
+              width: 56,
               background: sentStyle.gradient.first,
               gradientColors: sentStyle.gradient,
               border: sentStyle.glowColor,
@@ -61,9 +69,9 @@ class MiniProfileLevelRow extends StatelessWidget {
             ),
           if (receivedStyle != null)
             MiniProfileCleanLevelPill(
-              label: 'Lv ${data.receiveLevel}',
+              label: 'LV ${data.receiveLevel}',
               icon: receivedStyle.crownIcon,
-              width: 68,
+              width: 56,
               background: receivedStyle.gradient.first,
               gradientColors: receivedStyle.gradient,
               border: receivedStyle.glowColor,
@@ -134,11 +142,24 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
           color: effectiveGradient == null ? effectiveBackground : null,
           gradient: effectiveGradient == null
               ? null
-              : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: effectiveGradient),
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: effectiveGradient,
+                ),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: effectiveBorder.withValues(alpha: active ? 0.72 : 0.65), width: 0.8),
+          border: Border.all(
+            color: effectiveBorder.withValues(alpha: active ? 0.72 : 0.65),
+            width: 0.8,
+          ),
           boxShadow: active
-              ? [BoxShadow(color: effectiveBorder.withValues(alpha: 0.16), blurRadius: 9, offset: const Offset(0, 3))]
+              ? [
+                  BoxShadow(
+                    color: effectiveBorder.withValues(alpha: 0.16),
+                    blurRadius: 9,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
               : null,
         ),
         child: ClipRRect(
@@ -175,7 +196,12 @@ class MiniProfileCleanLevelPill extends StatelessWidget {
                         fontSize: 10.2,
                         fontWeight: FontWeight.w900,
                         shadows: active && effectiveGradient != null
-                            ? [Shadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 3)]
+                            ? [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.22),
+                                  blurRadius: 3,
+                                ),
+                              ]
                             : null,
                       ),
                     ),
@@ -199,13 +225,17 @@ class MiniProfilePillShine extends StatefulWidget {
   State<MiniProfilePillShine> createState() => _MiniProfilePillShineState();
 }
 
-class _MiniProfilePillShineState extends State<MiniProfilePillShine> with SingleTickerProviderStateMixin {
+class _MiniProfilePillShineState extends State<MiniProfilePillShine>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1850))..repeat();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1850),
+    )..repeat();
   }
 
   @override

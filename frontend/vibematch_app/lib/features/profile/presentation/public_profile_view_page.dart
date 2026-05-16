@@ -8,6 +8,8 @@ import '../../economy/data/economy_master_api_service.dart';
 import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
 import '../../presence/data/presence_api_service.dart';
+import '../../rooms/presentation/live_room_models.dart';
+import '../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../vip/presentation/vip_program_page.dart';
 import '../data/profile_api_service.dart';
 import '../data/love_bond_realtime_service.dart';
@@ -70,11 +72,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   UserRelationship? _relationship;
   PresenceDto? _presence;
   FamilySummaryDto? _familySummary;
-  List<ProfileVibeDto> _profileVibes = const <ProfileVibeDto>[];
   bool _loadingFamily = false;
-  bool _loadingVibes = false;
   String? _familyError;
-  String? _vibesError;
 
   bool get _isSelfProfile {
     final viewer = _viewer ?? _authApi.cachedUser;
@@ -97,7 +96,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
         .listen(_onRelationshipRealtimeEvent);
     unawaited(_loadBackendProfile());
     unawaited(_syncPublicLoveBonds());
-    unawaited(_loadRealFamilyAndVibes());
+    unawaited(_loadRealFamily());
     unawaited(_loadEconomyPublicCard());
   }
 
@@ -163,7 +162,9 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 familyLevel: _familyLevel(),
                 coverPhotos: coverPhotos,
                 avatarUrl: _avatarUrl(),
-                nameGradientColors: _backendProfile?.vip.nameGradientColors ?? widget.user.vip.nameGradientColors,
+                nameGradientColors:
+                    _backendProfile?.vip.nameGradientColors ??
+                    widget.user.vip.nameGradientColors,
                 coverController: _coverController,
                 coverIndex: _coverIndex.clamp(0, coverPhotos.length - 1),
                 followStatus: _followStatus,
@@ -194,6 +195,10 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 onFamilyTap: _openFamilyPage,
                 onVipTap: () => _openViewerVipProgram(initialTabIndex: 0),
                 onSvipTap: () => _openViewerVipProgram(initialTabIndex: 1),
+                onFollowersTap: () =>
+                    _openFollowersFollowed(initialTabIndex: 0),
+                onFollowingTap: () =>
+                    _openFollowersFollowed(initialTabIndex: 1),
               ),
             ),
             SliverToBoxAdapter(
@@ -254,56 +259,11 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
                   child: _PublicProfileBackendError(
                     message: _familyError!,
-                    onRetry: _loadRealFamilyAndVibes,
+                    onRetry: _loadRealFamily,
                   ),
                 ),
               ),
-            if (_loadingVibes)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(18, 16, 18, 0),
-                  child: LinearProgressIndicator(
-                    minHeight: 3,
-                    color: Color(0xFF12C7B7),
-                    backgroundColor: Color(0xFFECE2D8),
-                  ),
-                ),
-              )
-            else if (_profileVibes.isNotEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                  child: Column(
-                    children: [
-                      for (final vibe in _profileVibes.map(_publicVibeItemFromDto)) ...[
-                        PublicVibeCard(
-                          vibe: vibe,
-                          onTap: () => _showAction(
-                            context,
-                            'Open Vibe details for ${vibe.title}.',
-                          ),
-                          onLikeTap: () => _showAction(context, 'Like action will sync.'),
-                          onCommentTap: () => _showAction(context, 'Comments will open.'),
-                          onShareTap: () => _showAction(context, 'Share sheet will open.'),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                    ],
-                  ),
-                ),
-              )
-            else if (_vibesError != null)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                  child: _PublicProfileBackendError(
-                    message: _vibesError!,
-                    onRetry: _loadRealFamilyAndVibes,
-                  ),
-                ),
-              )
-            else
-              const SliverToBoxAdapter(child: _PublicVibesEmptyState()),
+            const SliverToBoxAdapter(child: SizedBox(height: 28)),
           ],
         ),
       ),

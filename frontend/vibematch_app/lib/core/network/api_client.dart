@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../constants/app_constants.dart';
 import 'api_exception.dart';
+import 'vm_api_config.dart';
 
 class ApiClient {
   ApiClient({String? baseUrl, http.Client? httpClient})
@@ -14,7 +15,7 @@ class ApiClient {
   final http.Client _httpClient;
 
   String get baseUrl {
-    return _baseUrlOverride ?? AppConstants.webApiBaseUrl;
+    return _baseUrlOverride ?? VmApiConfig.baseUrl;
   }
 
   Uri _buildUri(

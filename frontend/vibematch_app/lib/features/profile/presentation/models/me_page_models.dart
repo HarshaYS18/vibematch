@@ -51,7 +51,8 @@ class MeVibeItem {
 const List<MeVibeItem> mockMyVibes = [
   MeVibeItem(
     title: 'Founder room update',
-    body: 'Polishing Vibe Match live rooms, profiles and premium modules today.',
+    body:
+        'Polishing Vibe Match live rooms, profiles and premium modules today.',
     timeAgo: '2h ago',
     tag: 'Room',
     likes: '1.8K',
@@ -64,7 +65,8 @@ const List<MeVibeItem> mockMyVibes = [
   ),
   MeVibeItem(
     title: 'Family event prep',
-    body: 'Moon Fam is getting ready for events, rewards and contribution ranking.',
+    body:
+        'Moon Fam is getting ready for events, rewards and contribution ranking.',
     timeAgo: '9h ago',
     tag: 'Family',
     likes: '940',
@@ -77,7 +79,8 @@ const List<MeVibeItem> mockMyVibes = [
   ),
   MeVibeItem(
     title: 'Premium profile polish',
-    body: 'VIP, SVIP, official tags, presence and room status should feel clean.',
+    body:
+        'VIP, SVIP, official tags, presence and room status should feel clean.',
     timeAgo: '1d ago',
     tag: 'Profile',
     likes: '722',
@@ -182,7 +185,7 @@ List<MeActionItem> buildMeActionItems({
     ),
     MeActionItem(
       icon: VMIcons.helpCenter,
-      title: 'Help Centre',
+      title: 'Help Center',
       subtitle: 'Support, FAQs, safety, reports and contact options',
       color: Color(0xFF12C7B7),
       action: 'Help Centre will open.',
@@ -196,4 +199,3 @@ List<MeActionItem> buildMeActionItems({
     ),
   ];
 }
-

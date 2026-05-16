@@ -10,9 +10,8 @@ import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
 import '../../../games/presentation/game_test_page.dart';
 import '../../../presence/data/presence_api_service.dart';
-import '../../../rooms/presentation/live_room_models.dart';
 import '../../../rooms/presentation/live_room_page.dart';
-import '../../../rooms/presentation/widgets/followers_followed_page.dart';
+import '../../../store/presentation/store_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../../wallet/presentation/wallet_page_modular.dart';
@@ -23,19 +22,15 @@ import '../control_center/vip_svip_admin_page.dart';
 import '../cover_photos/edit_cover_photos_page.dart';
 import '../edit_profile_page.dart';
 import '../help_center/help_center_page.dart';
-import '../love_bonds/love_bond_detail_page.dart';
 import '../love_bonds/love_bonds_page.dart';
-import '../love_bonds/models/love_bond_models.dart';
 import '../models/me_page_models.dart';
 import '../profile_qr/profile_qr_pages.dart';
 import '../public_profile_view_page.dart';
 import '../settings/account_settings_page.dart';
-import '../store/store_page.dart';
 import 'me_account_widgets.dart';
 import 'me_profile_constants.dart';
 import 'me_profile_hero.dart';
 import 'me_session_sheet.dart';
-import 'me_stats_row.dart';
 
 class MePageContent extends StatefulWidget {
   const MePageContent({
@@ -92,29 +87,6 @@ class _MePageContentState extends State<MePageContent> {
         <String>{'coin_seller', 'merchant', 'reseller'}.contains(role);
   }
 
-  SeatUser get _viewerSeatUser => SeatUser(
-    id: 'user_${user.publicUserId}',
-    name: _displayName,
-    roleLabel: user.roleDisplayLabel,
-    familyName: _family?.shouldShow == true ? _family!.safeName : '',
-    familyLevel: (_family?.level ?? 0).toString(),
-    relationshipText: '',
-    vipLevel: _vipLevel,
-    svipLevel: _svipLevel,
-    sendingLevel: user.wallet.sendLevel,
-    receivingLevel: user.wallet.receiveLevel,
-    sentExp: user.wallet.monthlyGiftCoinsSent,
-    receivedExp: user.wallet.monthlyGiftCoinsReceived,
-    medals: const [],
-    avatarColors: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-    avatarUrl: user.avatarUrl,
-    isCurrentUser: true,
-    isHost: user.canSeeOwnerControls,
-    isRoomAdmin: user.canSeeOwnerControls,
-  );
-
-  List<SeatUser> get _socialPreviewUsers => <SeatUser>[_viewerSeatUser];
-
   String get _displayName {
     final displayName = user.displayName?.trim();
     if (displayName != null && displayName.isNotEmpty) return displayName;
@@ -130,12 +102,6 @@ class _MePageContentState extends State<MePageContent> {
   int get _lifetimeRechargeCoins =>
       _wallet?.lifetimeRechargeCoins ?? user.wallet.lifetimeCoinsSpent;
   int get _monthlyRechargeCoins => _wallet?.monthlyRechargeCoins ?? 0;
-  int get _sendLevel => _wallet?.sentLevel ?? user.wallet.sendLevel;
-  int get _receiveLevel => _wallet?.receiveLevel ?? user.wallet.receiveLevel;
-  int get _monthlyGiftCoinsSent =>
-      _wallet?.monthlyGiftCoinsSent ?? user.wallet.monthlyGiftCoinsSent;
-  int get _monthlyGiftCoinsReceived =>
-      _wallet?.monthlyGiftCoinsReceived ?? user.wallet.monthlyGiftCoinsReceived;
   String? get _currentRoomName =>
       _presence?.hasVisibleRoom == true ? _presence!.roomName : null;
   String? get _currentRoomId =>
@@ -295,7 +261,7 @@ class _MePageContentState extends State<MePageContent> {
   ).push(MaterialPageRoute(builder: (_) => const HelpCenterPage()));
   void _openStore(BuildContext context) => Navigator.of(
     context,
-  ).push(MaterialPageRoute(builder: (_) => const VmStorePage()));
+  ).push(MaterialPageRoute(builder: (_) => const StorePage()));
   void _openLoveBonds(BuildContext context) => Navigator.of(
     context,
   ).push(MaterialPageRoute(builder: (_) => const LoveBondsPage()));
@@ -425,22 +391,6 @@ class _MePageContentState extends State<MePageContent> {
           ),
         ),
       );
-  void _openBondDetail(BuildContext context, LoveBondCardData bond) =>
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => LoveBondDetailPage(bond: bond)));
-  void _openFollowersFollowed(
-    BuildContext context, {
-    required int initialTabIndex,
-  }) => Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => FollowersFollowedPage(
-        user: _viewerSeatUser,
-        users: _socialPreviewUsers,
-        initialTabIndex: initialTabIndex,
-      ),
-    ),
-  );
   void _openCurrentRoom(BuildContext context) {
     final roomName = _currentRoomName;
     final roomId = _currentRoomId;
@@ -475,11 +425,8 @@ class _MePageContentState extends State<MePageContent> {
       return <String>{
         'Edit Profile',
         'VIP / SVIP Center',
-        'Love & Bonds',
-        'Family',
         'Store & Inventory',
-        'Settings',
-        'Help Centre',
+        'Help Center',
         'Logout',
       }.contains(item.title);
     }
@@ -542,27 +489,6 @@ class _MePageContentState extends State<MePageContent> {
             onSvipTap: () => _openVipProgram(context, initialTabIndex: 1),
             onRoomTap: () => _openCurrentRoom(context),
           ),
-          const SizedBox(height: 14),
-          MeStatsRow(
-            userId: user.id,
-            publicUserId: user.publicUserId,
-            monthlyGiftCoinsSent: _monthlyGiftCoinsSent,
-            monthlyGiftCoinsReceived: _monthlyGiftCoinsReceived,
-            sendLevel: _sendLevel,
-            receiveLevel: _receiveLevel,
-            onFollowingTap: () =>
-                _openFollowersFollowed(context, initialTabIndex: 1),
-            onFollowersTap: () =>
-                _openFollowersFollowed(context, initialTabIndex: 0),
-            onRoomsTap: () {},
-            onVisitorsTap: () {},
-          ),
-          const SizedBox(height: 14),
-          MeRelationshipPanel(
-            publicUserId: user.publicUserId,
-            relationshipLabel: '',
-            onBondTap: (bond) => _openBondDetail(context, bond),
-          ),
           const SizedBox(height: 18),
           const Text(
             'Account',
@@ -613,7 +539,8 @@ class _MePageContentState extends State<MePageContent> {
                         _openMerchantSellerPanel(context);
                       } else if (item.title == 'Settings') {
                         _openAccountSettings(context);
-                      } else if (item.title == 'Help Centre') {
+                      } else if (item.title == 'Help Centre' ||
+                          item.title == 'Help Center') {
                         _openHelpCentre(context);
                       } else if (item.action == 'logout') {
                         await _endSession(context);

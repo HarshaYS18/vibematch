@@ -85,8 +85,11 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
   }
 
   bool get _showOfficialTick {
+    if (widget.roleBadge != null) return false;
     final normalized = widget.role.toLowerCase().trim();
-    return widget.roleBadge?.showVerifiedTick == true || normalized == 'founder_owner' || normalized == 'super_owner' || normalized == 'owner';
+    return normalized == 'founder_owner' ||
+        normalized == 'super_owner' ||
+        normalized == 'owner';
   }
 
   @override
@@ -125,13 +128,19 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
       else if (widget.roleTag != null)
         MeProfileMiniBadge(
           label: widget.roleTag!,
-          icon: widget.roleTag == 'Host' ? Icons.mic_external_on_rounded : Icons.verified_user_rounded,
+          icon: widget.roleTag == 'Host'
+              ? Icons.mic_external_on_rounded
+              : Icons.verified_user_rounded,
           color: const Color(0xFFC99A3B),
         ),
       if (widget.vipLevel > 0)
         MeProfileMiniBadge(
-          label: widget.vipFrozen ? 'VIP ${widget.vipLevel} Frozen' : 'VIP ${widget.vipLevel}',
-          icon: widget.vipFrozen ? Icons.lock_rounded : Icons.workspace_premium_rounded,
+          label: widget.vipFrozen
+              ? 'VIP ${widget.vipLevel} Frozen'
+              : 'VIP ${widget.vipLevel}',
+          icon: widget.vipFrozen
+              ? Icons.lock_rounded
+              : Icons.workspace_premium_rounded,
           color: widget.vipColor,
           onTap: widget.onVipTap,
         ),
@@ -170,7 +179,8 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                   controller: _coverController,
                   itemCount: covers.length,
                   onPageChanged: (index) => setState(() => _coverIndex = index),
-                  itemBuilder: (context, index) => PublicCoverPhotoView(cover: covers[index]),
+                  itemBuilder: (context, index) =>
+                      PublicCoverPhotoView(cover: covers[index]),
                 ),
               ),
               Positioned(
@@ -178,9 +188,15 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                 top: 14,
                 child: Row(
                   children: [
-                    PublicHeaderIconButton(icon: Icons.qr_code_rounded, onTap: widget.onQrTap),
+                    PublicHeaderIconButton(
+                      icon: Icons.qr_code_rounded,
+                      onTap: widget.onQrTap,
+                    ),
                     const SizedBox(width: 8),
-                    PublicHeaderIconButton(icon: Icons.edit_rounded, onTap: widget.onEditCoverPhotosTap),
+                    PublicHeaderIconButton(
+                      icon: Icons.edit_rounded,
+                      onTap: widget.onEditCoverPhotosTap,
+                    ),
                   ],
                 ),
               ),
@@ -199,7 +215,9 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                         width: index == _coverIndex ? 18 : 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: index == _coverIndex ? 0.95 : 0.45),
+                          color: Colors.white.withValues(
+                            alpha: index == _coverIndex ? 0.95 : 0.45,
+                          ),
                           borderRadius: BorderRadius.circular(99),
                         ),
                       ),
@@ -212,7 +230,10 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                 child: InkWell(
                   onTap: widget.onAvatarTap,
                   customBorder: const CircleBorder(),
-                  child: _MeCoverAvatar(displayName: widget.displayName, avatarUrl: widget.avatarUrl),
+                  child: _MeCoverAvatar(
+                    displayName: widget.displayName,
+                    avatarUrl: widget.avatarUrl,
+                  ),
                 ),
               ),
             ],
@@ -243,12 +264,23 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                     ),
                     if (_showOfficialTick) ...[
                       const SizedBox(width: 5),
-                      const Icon(Icons.verified_rounded, color: Color(0xFFFFC857), size: 24),
+                      const Icon(
+                        Icons.verified_rounded,
+                        color: Color(0xFFFFC857),
+                        size: 24,
+                      ),
                     ],
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text('ID ${widget.publicId}', style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 13, fontWeight: FontWeight.w800)),
+                Text(
+                  'ID ${widget.publicId}',
+                  style: const TextStyle(
+                    color: Color(0xFF8C7B8F),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 if (badges.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   SizedBox(
@@ -256,23 +288,67 @@ class _MePremiumProfileHeroState extends State<MePremiumProfileHero> {
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
-                      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                        for (var index = 0; index < badges.length; index++) ...[badges[index], if (index != badges.length - 1) const SizedBox(width: 8)],
-                      ]),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          for (
+                            var index = 0;
+                            index < badges.length;
+                            index++
+                          ) ...[
+                            badges[index],
+                            if (index != badges.length - 1)
+                              const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
                 const SizedBox(height: 12),
-                Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  _PresenceChip(presence: widget.presence, lastSeenText: widget.lastSeenText),
-                  if (widget.currentRoomName != null) InkWell(onTap: widget.onRoomTap, borderRadius: BorderRadius.circular(99), child: _RoomStatusChip(roomName: widget.currentRoomName!)),
-                ]),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _PresenceChip(
+                      presence: widget.presence,
+                      lastSeenText: widget.lastSeenText,
+                    ),
+                    if (widget.currentRoomName != null)
+                      InkWell(
+                        onTap: widget.onRoomTap,
+                        borderRadius: BorderRadius.circular(99),
+                        child: _RoomStatusChip(
+                          roomName: widget.currentRoomName!,
+                        ),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 16),
-                Row(children: [
-                  Expanded(child: _BalanceCapsule(label: 'Rubies', value: widget.diamonds, icon: Icons.diamond_rounded, color: const Color(0xFFE84C72), onTap: widget.onWalletTap)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _BalanceCapsule(label: 'Coins', value: widget.coins, icon: Icons.monetization_on_rounded, color: const Color(0xFFC99A3B), onTap: widget.onWalletTap)),
-                ]),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BalanceCapsule(
+                        label: 'Rubies',
+                        value: widget.diamonds,
+                        icon: Icons.diamond_rounded,
+                        color: const Color(0xFFE84C72),
+                        onTap: widget.onWalletTap,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _BalanceCapsule(
+                        label: 'Coins',
+                        value: widget.coins,
+                        icon: Icons.monetization_on_rounded,
+                        color: const Color(0xFFC99A3B),
+                        onTap: widget.onWalletTap,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -290,25 +366,62 @@ class _MeCoverAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final firstLetter = displayName.trim().isEmpty ? 'V' : displayName.trim()[0].toUpperCase();
+    final firstLetter = displayName.trim().isEmpty
+        ? 'V'
+        : displayName.trim()[0].toUpperCase();
     final url = avatarUrl?.trim();
 
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 9))]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF251538).withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
       child: ClipOval(
         child: Container(
           width: 96,
           height: 96,
-          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)])),
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF6D5DF6), Color(0xFFE84C72), Color(0xFFFFD36A)],
+            ),
+          ),
           child: url == null || url.isEmpty
-              ? Center(child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900)))
+              ? Center(
+                  child: Text(
+                    firstLetter,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                )
               : Image.network(
                   url,
                   fit: BoxFit.cover,
                   alignment: Alignment.center,
                   filterQuality: FilterQuality.high,
-                  errorBuilder: (context, error, stackTrace) => Center(child: Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900))),
+                  errorBuilder: (context, error, stackTrace) => Center(
+                    child: Text(
+                      firstLetter,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 40,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
                 ),
         ),
       ),
@@ -323,7 +436,37 @@ class _PresenceChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOnline = presence == MePresenceStatus.online;
-    return Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8), decoration: BoxDecoration(color: const Color(0xFF12C7B7).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(99)), child: Row(mainAxisSize: MainAxisSize.min, children: [Container(height: 9, width: 9, decoration: BoxDecoration(color: isOnline ? const Color(0xFF12C7B7) : const Color(0xFFB8B0C2), shape: BoxShape.circle)), const SizedBox(width: 7), Text(lastSeenText, style: const TextStyle(color: Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w900))]));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF12C7B7).withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 9,
+            width: 9,
+            decoration: BoxDecoration(
+              color: isOnline
+                  ? const Color(0xFF12C7B7)
+                  : const Color(0xFFB8B0C2),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            lastSeenText,
+            style: const TextStyle(
+              color: Color(0xFF251538),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -331,16 +474,96 @@ class _RoomStatusChip extends StatelessWidget {
   const _RoomStatusChip({required this.roomName});
   final String roomName;
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8), decoration: BoxDecoration(color: const Color(0xFF6D5DF6).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(99)), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.graphic_eq_rounded, color: Color(0xFF6D5DF6), size: 14), const SizedBox(width: 6), Text('In chatroom: $roomName', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900))]));
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+    decoration: BoxDecoration(
+      color: const Color(0xFF6D5DF6).withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(99),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.graphic_eq_rounded,
+          color: Color(0xFF6D5DF6),
+          size: 14,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'In chatroom: $roomName',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF251538),
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _BalanceCapsule extends StatelessWidget {
-  const _BalanceCapsule({required this.label, required this.value, required this.icon, required this.color, required this.onTap});
+  const _BalanceCapsule({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
   final String label;
   final String value;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12), decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFECE2D8))), child: Row(children: [Icon(icon, color: color, size: 22), const SizedBox(width: 9), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900)), Text(label, style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 11, fontWeight: FontWeight.w800))])), const Icon(Icons.chevron_right_rounded, color: Color(0xFFB8A8BD), size: 20)])));
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(18),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF7F1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFECE2D8)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF251538),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF8C7B8F),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: Color(0xFFB8A8BD),
+            size: 20,
+          ),
+        ],
+      ),
+    ),
+  );
 }
