@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Central API endpoint config for FunKey / VibeMatch frontend.
 ///
 /// Early beta default points to the VPS public IP:
