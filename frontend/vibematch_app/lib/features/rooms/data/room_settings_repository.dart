@@ -46,6 +46,18 @@ class RoomSettingsRepository {
     return RoomSettingsDto.fromJson(response);
   }
 
+  Future<RoomSettingsDto> updateSeatLayout({
+    required String roomPublicId,
+    required String seatLayoutId,
+  }) async {
+    final response = await _apiClient.patchMap(
+      '/rooms/$roomPublicId/seat-layout',
+      headers: await _authHeaders(),
+      body: {'seat_layout_id': seatLayoutId},
+    );
+    return RoomSettingsDto.fromJson(response);
+  }
+
   Future<RoomSettingsDto> updateAnnouncement({
     required String roomPublicId,
     required String announcementText,
@@ -71,6 +83,7 @@ class RoomSettingsDto {
   const RoomSettingsDto({
     required this.roomPublicId,
     required this.backgroundThemeId,
+    required this.seatLayoutId,
     this.name,
     this.language,
     this.mode,
@@ -86,6 +99,7 @@ class RoomSettingsDto {
 
   final String roomPublicId;
   final String backgroundThemeId;
+  final String seatLayoutId;
   final String? name;
   final String? language;
   final String? mode;
@@ -102,6 +116,7 @@ class RoomSettingsDto {
     return RoomSettingsDto(
       roomPublicId: json['room_public_id']?.toString() ?? '',
       backgroundThemeId: json['background_theme_id']?.toString() ?? 'default',
+      seatLayoutId: json['seat_layout_id']?.toString() ?? '5x2',
       name: _nullableString(json['name']),
       language: _nullableString(json['language']),
       mode: _nullableString(json['mode']),
