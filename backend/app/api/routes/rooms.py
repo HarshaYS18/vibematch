@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.core.security import hash_password
 from app.database import get_db
+from app.models.presence import UserRoomPresence
 from app.models.room import Room
 from app.models.user import User
 from app.schemas.room_settings import (
@@ -17,6 +18,7 @@ from app.schemas.room_settings import (
 )
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
+_ROOM_ACTIVE_WINDOW_SECONDS = 150
 
 
 def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
@@ -24,6 +26,20 @@ def _get_room_by_public_id(db: Session, room_public_id: str) -> Room:
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
     return room
+
+
+def _active_room_count(db: Session, room_public_id: str) -> int:
+    cutoff = datetime.utcnow() - timedelta(seconds=_ROOM_ACTIVE_WINDOW_SECONDS)
+    return (
+        db.query(UserRoomPresence.id)
+        .filter(
+            UserRoomPresence.room_public_id == room_public_id,
+            UserRoomPresence.is_active.is_(True),
+            UserRoomPresence.is_secret.is_(False),
+            UserRoomPresence.last_heartbeat_at >= cutoff,
+        )
+        .count()
+    )
 
 
 def _get_or_create_room_for_settings(
@@ -101,7 +117,8 @@ def _room_settings_response(room: Room) -> RoomSettingsResponse:
     )
 
 
-def _room_discovery_payload(room: Room) -> dict:
+def _room_discovery_payload(room: Room, *, online_count_override: int | None = None) -> dict:
+    online_count = room.online_count if online_count_override is None else online_count_override
     return {
         "id": room.room_public_id,
         "room_public_id": room.room_public_id,
@@ -111,7 +128,7 @@ def _room_discovery_payload(room: Room) -> dict:
         "mode": room.mode,
         "type": room.room_type,
         "room_type": room.room_type,
-        "online_count": room.online_count,
+        "online_count": online_count,
         "trending_score": room.trending_score,
         "followed_friends_inside": [],
         "cover_photo_url": room.cover_photo_url or room.avatar_url,
@@ -204,7 +221,8 @@ def _filter_discovery_rooms(
     category: str | None,
     limit: int,
     include_locked: bool = False,
-) -> list[Room]:
+) -> list[tuple[Room, int]]:
+    safe_limit = max(1, min(limit, 100))
     query = db.query(Room).filter(Room.is_active.is_(True), Room.is_secret.is_(False))
     if not include_locked:
         query = query.filter(Room.is_locked.is_(False), Room.is_members_only.is_(False))
@@ -212,7 +230,32 @@ def _filter_discovery_rooms(
         query = query.filter(Room.language == language.strip())
     if category and category.strip() and category.strip().lower() != "all":
         query = query.filter(Room.room_type == category.strip())
-    return query.order_by(Room.trending_score.desc(), Room.online_count.desc(), Room.updated_at.desc()).limit(max(1, min(limit, 100))).all()
+
+    candidates = (
+        query.order_by(Room.trending_score.desc(), Room.online_count.desc(), Room.updated_at.desc())
+        .limit(min(max(safe_limit * 4, safe_limit), 300))
+        .all()
+    )
+
+    visible_rooms: list[tuple[Room, int]] = []
+    stale_rooms: list[Room] = []
+    for room in candidates:
+        active_count = _active_room_count(db, room.room_public_id)
+        if room.online_count != active_count:
+            room.online_count = active_count
+            stale_rooms.append(room)
+        if active_count <= 0:
+            continue
+        visible_rooms.append((room, active_count))
+        if len(visible_rooms) >= safe_limit:
+            break
+
+    if stale_rooms:
+        for room in stale_rooms:
+            db.add(room)
+        db.commit()
+
+    return visible_rooms
 
 
 @router.get("/trending")
@@ -223,7 +266,7 @@ def get_trending_rooms(
     db: Session = Depends(get_db),
 ) -> list[dict]:
     rooms = _filter_discovery_rooms(db=db, language=language, category=category, limit=limit, include_locked=False)
-    return [_room_discovery_payload(room) for room in rooms]
+    return [_room_discovery_payload(room, online_count_override=active_count) for room, active_count in rooms]
 
 
 @router.get("/following")
@@ -234,7 +277,7 @@ def get_following_rooms(
     db: Session = Depends(get_db),
 ) -> list[dict]:
     rooms = _filter_discovery_rooms(db=db, language=language, category=category, limit=limit, include_locked=True)
-    return [_room_discovery_payload(room) for room in rooms]
+    return [_room_discovery_payload(room, online_count_override=active_count) for room, active_count in rooms]
 
 
 @router.post("")
@@ -286,7 +329,7 @@ def create_room(
         language=language or "English",
         mode=mode or "Open",
         room_type=room_type or "Chat",
-        online_count=1,
+        online_count=0,
         trending_score=0,
         is_active=True,
         allow_screenshots=bool(allow_screenshots) if allow_screenshots is not None else True,
