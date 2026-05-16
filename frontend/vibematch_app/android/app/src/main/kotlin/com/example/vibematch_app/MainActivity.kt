@@ -1,6 +1,8 @@
 package com.example.vibematch_app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -25,8 +27,8 @@ class MainActivity : FlutterActivity() {
                 "startLiveRoomService" -> {
                     val roomName = call.argument<String>("roomName") ?: "Live Room"
                     val roomId = call.argument<String>("roomId") ?: "Vibe Match"
-                    startLiveRoomService(roomName, roomId)
-                    result.success(true)
+                    val started = startLiveRoomServiceSafely(roomName, roomId)
+                    result.success(started)
                 }
                 "stopLiveRoomService" -> {
                     stopLiveRoomService()
@@ -56,15 +58,29 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun startLiveRoomService(roomName: String, roomId: String) {
+    private fun hasMicrophonePermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun startLiveRoomServiceSafely(roomName: String, roomId: String): Boolean {
+        if (!hasMicrophonePermission()) return false
+
         val intent = Intent(this, LiveRoomForegroundService::class.java).apply {
             putExtra(LiveRoomForegroundService.EXTRA_ROOM_NAME, roomName)
             putExtra(LiveRoomForegroundService.EXTRA_ROOM_ID, roomId)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ContextCompat.startForegroundService(this, intent)
-        } else {
-            startService(intent)
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.startForegroundService(this, intent)
+            } else {
+                startService(intent)
+            }
+            true
+        } catch (error: Throwable) {
+            false
         }
     }
 
