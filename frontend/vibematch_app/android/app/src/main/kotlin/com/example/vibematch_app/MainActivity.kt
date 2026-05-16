@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -59,14 +60,19 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun hasMicrophonePermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.RECORD_AUDIO,
-        ) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun askForMicrophonePermission() {
+        if (hasMicrophonePermission()) return
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 6922)
     }
 
     private fun startLiveRoomServiceSafely(roomName: String, roomId: String): Boolean {
-        if (!hasMicrophonePermission()) return false
+        if (!hasMicrophonePermission()) {
+            askForMicrophonePermission()
+            return false
+        }
 
         val intent = Intent(this, LiveRoomForegroundService::class.java).apply {
             putExtra(LiveRoomForegroundService.EXTRA_ROOM_NAME, roomName)
