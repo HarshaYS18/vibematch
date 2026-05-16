@@ -45,13 +45,13 @@ class RoomSeatLayout extends StatefulWidget {
 }
 
 class _RoomSeatLayoutState extends State<RoomSeatLayout> {
-  static const double seatWidth = 92;
-  static const double seatHeight = 106;
-  static const double rowHeight = 116;
-  static const double avatarSize = 62;
-  static const double menuWidth = 82;
-  static const double menuItemHeight = 34;
-  static const double menuArrowHeight = 9;
+  static const double seatWidth = 82;
+  static const double seatHeight = 92;
+  static const double rowHeight = 100;
+  static const double avatarSize = 52;
+  static const double menuWidth = 74;
+  static const double menuItemHeight = 29;
+  static const double menuArrowHeight = 7;
 
   int? _hiddenMenuSeat;
   OverlayEntry? _menuEntry;
@@ -116,7 +116,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     if (renderBox == null || !renderBox.hasSize) return;
     final seatTopLeft = _seatOffset(selectedSeat.index, spec, layoutSize.width);
     final localLeft = seatTopLeft.dx - (menuWidth / 2);
-    final localTop = seatTopLeft.dy + seatHeight + 3;
+    final localTop = seatTopLeft.dy + seatHeight + 2;
     final globalPosition = renderBox.localToGlobal(Offset(localLeft, localTop));
     final screenWidth = MediaQuery.sizeOf(context).width;
     final left = globalPosition.dx.clamp(6.0, screenWidth - menuWidth - 6);
@@ -232,8 +232,8 @@ class _SeatTile extends StatelessWidget {
     final user = seat.user;
     return GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: Column(mainAxisSize: MainAxisSize.min, children: [
       _SeatAvatar(seat: seat, selected: selected),
-      const SizedBox(height: 5),
-      SizedBox(height: 24, child: user == null ? _EmptySeatLabel(index: seat.index) : _UserSeatLabel(user: user, index: seat.index)),
+      const SizedBox(height: 4),
+      SizedBox(height: 20, child: user == null ? _EmptySeatLabel(index: seat.index) : _UserSeatLabel(user: user, index: seat.index)),
     ]));
   }
 }
@@ -254,12 +254,12 @@ class _SeatAvatar extends StatelessWidget {
             assetPath: user.equippedAvatarFrameAssetPath,
             imageUrl: user.equippedAvatarFrameImageUrl,
           );
-    return SizedBox(width: _RoomSeatLayoutState.avatarSize + 14, height: _RoomSeatLayoutState.avatarSize + 14, child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
-      if (selected) Container(width: _RoomSeatLayoutState.avatarSize + 8, height: _RoomSeatLayoutState.avatarSize + 8, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.92), width: 1.4))),
+    return SizedBox(width: _RoomSeatLayoutState.avatarSize + 12, height: _RoomSeatLayoutState.avatarSize + 12, child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
+      if (selected) Container(width: _RoomSeatLayoutState.avatarSize + 6, height: _RoomSeatLayoutState.avatarSize + 6, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 1.2))),
       RoomAvatarFrameHost(
         frame: user == null ? null : (equippedFrame ?? defaultStaticAvatarFrame),
         size: _RoomSeatLayoutState.avatarSize,
-        framePadding: equippedFrame == null ? 8 : 20,
+        framePadding: equippedFrame == null ? 7 : 17,
         child: Container(
           width: _RoomSeatLayoutState.avatarSize,
           height: _RoomSeatLayoutState.avatarSize,
@@ -267,11 +267,11 @@ class _SeatAvatar extends StatelessWidget {
             shape: BoxShape.circle,
             color: user == null ? Colors.white.withValues(alpha: seat.locked ? 0.08 : 0.12) : null,
             gradient: user == null || hasAvatar ? null : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors),
-            border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.86) : Colors.white.withValues(alpha: 0.18), width: selected ? 1.4 : 1.1),
+            border: Border.all(color: selected ? Colors.white.withValues(alpha: 0.84) : Colors.white.withValues(alpha: 0.16), width: selected ? 1.2 : 1.0),
           ),
           clipBehavior: Clip.antiAlias,
           child: user == null
-              ? Center(child: Icon(seat.locked ? Icons.lock_rounded : Icons.add_rounded, color: Colors.white70, size: seat.locked ? 22 : 28))
+              ? Center(child: Icon(seat.locked ? Icons.lock_rounded : Icons.add_rounded, color: Colors.white70, size: seat.locked ? 18 : 23))
               : hasAvatar
                   ? Image.network(
                       avatarUrl,
@@ -283,8 +283,8 @@ class _SeatAvatar extends StatelessWidget {
                   : _SeatAvatarFallback(user: user),
         ),
       ),
-      if (user?.selfMuted ?? false) Positioned(right: 0, bottom: 5, child: Container(width: 21, height: 21, decoration: BoxDecoration(color: RoomColors.selfMute, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.3)), child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 11))),
-      if (user?.adminMuted ?? false) Positioned(right: 0, bottom: 5, child: Container(width: 21, height: 21, decoration: BoxDecoration(color: RoomColors.coral, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.3), boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 2))]), child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 11))),
+      if (user?.selfMuted ?? false) Positioned(right: 1, bottom: 4, child: Container(width: 18, height: 18, decoration: BoxDecoration(color: RoomColors.selfMute, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.1)), child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 9))),
+      if (user?.adminMuted ?? false) Positioned(right: 1, bottom: 4, child: Container(width: 18, height: 18, decoration: BoxDecoration(color: RoomColors.coral, shape: BoxShape.circle, border: Border.all(color: RoomColors.deep, width: 1.1), boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.30), blurRadius: 6, offset: const Offset(0, 2))]), child: const Icon(Icons.mic_off_rounded, color: Colors.white, size: 9))),
     ]));
   }
 }
@@ -296,7 +296,7 @@ class _SeatAvatarFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: user.avatarColors)),
-      child: Center(child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900))),
+      child: Center(child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900))),
     );
   }
 }
@@ -305,7 +305,7 @@ class _EmptySeatLabel extends StatelessWidget {
   const _EmptySeatLabel({required this.index});
   final int index;
   @override
-  Widget build(BuildContext context) => Center(child: Text('NO.${index + 1}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 11.2, fontWeight: FontWeight.w900, height: 1)));
+  Widget build(BuildContext context) => Center(child: Text('NO.${index + 1}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.56), fontSize: 10, fontWeight: FontWeight.w900, height: 1)));
 }
 
 class _UserSeatLabel extends StatelessWidget {
@@ -316,9 +316,9 @@ class _UserSeatLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final chipColor = user.gender == RoomUserGender.female ? RoomColors.coral : RoomColors.aqua;
     return Row(mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 16, height: 16, alignment: Alignment.center, decoration: BoxDecoration(color: chipColor, shape: BoxShape.circle), child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 8.2, fontWeight: FontWeight.w900, height: 1))),
-      const SizedBox(width: 4),
-      Flexible(child: Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.2, fontWeight: FontWeight.w900, height: 1))),
+      Container(width: 14, height: 14, alignment: Alignment.center, decoration: BoxDecoration(color: chipColor, shape: BoxShape.circle), child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 7.3, fontWeight: FontWeight.w900, height: 1))),
+      const SizedBox(width: 3),
+      Flexible(child: Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, height: 1))),
     ]);
   }
 }
@@ -360,7 +360,7 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
     if (actions.isEmpty) return const SizedBox.shrink();
     return FadeTransition(opacity: _opacity, child: SlideTransition(position: _slide, child: ScaleTransition(scale: _scale, alignment: Alignment.topCenter, child: Column(mainAxisSize: MainAxisSize.min, children: [
       const _SeatMenuPointer(),
-      Material(color: Colors.transparent, borderRadius: BorderRadius.circular(16), elevation: 10, shadowColor: Colors.black.withValues(alpha: 0.16), child: Container(padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8), decoration: BoxDecoration(color: const Color(0xFF5F6470).withValues(alpha: 0.76), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: 0.16)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 14, offset: const Offset(0, 8))]), child: Column(mainAxisSize: MainAxisSize.min, children: [for (var i = 0; i < actions.length; i++) ...[_MenuButton(action: actions[i]), if (i != actions.length - 1) Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 4), color: Colors.white.withValues(alpha: 0.11))]]))),
+      Material(color: Colors.transparent, borderRadius: BorderRadius.circular(14), elevation: 8, shadowColor: Colors.black.withValues(alpha: 0.14), child: Container(padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6), decoration: BoxDecoration(color: const Color(0xFF5F6470).withValues(alpha: 0.76), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withValues(alpha: 0.14)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 11, offset: const Offset(0, 6))]), child: Column(mainAxisSize: MainAxisSize.min, children: [for (var i = 0; i < actions.length; i++) ...[_MenuButton(action: actions[i]), if (i != actions.length - 1) Container(height: 1, margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 4), color: Colors.white.withValues(alpha: 0.10))]]))),
     ]))));
   }
 }
@@ -368,7 +368,7 @@ class _SeatMenuState extends State<_SeatMenu> with SingleTickerProviderStateMixi
 class _SeatMenuPointer extends StatelessWidget {
   const _SeatMenuPointer();
   @override
-  Widget build(BuildContext context) => CustomPaint(size: const Size(18, _RoomSeatLayoutState.menuArrowHeight), painter: _SeatMenuPointerPainter());
+  Widget build(BuildContext context) => CustomPaint(size: const Size(16, _RoomSeatLayoutState.menuArrowHeight), painter: _SeatMenuPointerPainter());
 }
 
 class _SeatMenuPointerPainter extends CustomPainter {
@@ -388,5 +388,5 @@ class _MenuButton extends StatelessWidget {
   const _MenuButton({required this.action});
   final _MenuAction action;
   @override
-  Widget build(BuildContext context) => InkWell(borderRadius: BorderRadius.circular(12), onTap: action.onTap, child: SizedBox(height: _RoomSeatLayoutState.menuItemHeight, child: Center(child: Text(action.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.8, fontWeight: FontWeight.w900, height: 1)))));
+  Widget build(BuildContext context) => InkWell(borderRadius: BorderRadius.circular(10), onTap: action.onTap, child: SizedBox(height: _RoomSeatLayoutState.menuItemHeight, child: Center(child: Text(action.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900, height: 1)))));
 }
