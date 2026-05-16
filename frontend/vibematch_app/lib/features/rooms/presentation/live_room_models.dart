@@ -120,6 +120,7 @@ class SeatUser {
     required this.receivedExp,
     required this.medals,
     required this.avatarColors,
+    this.nameGradientColors = const <String>[],
     this.avatarUrl,
     this.equippedAvatarFrameAssetPath,
     this.equippedAvatarFrameImageUrl,
@@ -150,6 +151,7 @@ class SeatUser {
   final int receivedExp;
   final List<String> medals;
   final List<Color> avatarColors;
+  final List<String> nameGradientColors;
   final String? avatarUrl;
   final String? equippedAvatarFrameAssetPath;
   final String? equippedAvatarFrameImageUrl;
@@ -183,6 +185,7 @@ class SeatUser {
     int? receivedExp,
     List<String>? medals,
     List<Color>? avatarColors,
+    List<String>? nameGradientColors,
     String? avatarUrl,
     String? equippedAvatarFrameAssetPath,
     String? equippedAvatarFrameImageUrl,
@@ -214,6 +217,7 @@ class SeatUser {
       receivedExp: receivedExp ?? this.receivedExp,
       medals: medals ?? this.medals,
       avatarColors: avatarColors ?? this.avatarColors,
+      nameGradientColors: nameGradientColors ?? this.nameGradientColors,
       avatarUrl: clearAvatarUrl ? null : (avatarUrl ?? this.avatarUrl),
       equippedAvatarFrameAssetPath: equippedAvatarFrameAssetPath ?? this.equippedAvatarFrameAssetPath,
       equippedAvatarFrameImageUrl: equippedAvatarFrameImageUrl ?? this.equippedAvatarFrameImageUrl,
@@ -252,6 +256,7 @@ class ChatEntry {
     required this.message,
     this.senderId,
     this.senderAvatarUrl,
+    this.senderNameGradientColors = const <String>[],
     this.vipLevel = 0,
     this.sendingLevel = 0,
     this.receivingLevel = 0,
@@ -273,6 +278,7 @@ class ChatEntry {
   final String message;
   final String? senderId;
   final String? senderAvatarUrl;
+  final List<String> senderNameGradientColors;
   final int vipLevel;
   final int sendingLevel;
   final int receivingLevel;
@@ -304,6 +310,7 @@ class ChatEntry {
   ChatEntry copyWith({
     String? message,
     String? senderAvatarUrl,
+    List<String>? senderNameGradientColors,
     bool clearSenderAvatarUrl = false,
     bool? applicationApproved,
     bool? applicationRejected,
@@ -319,6 +326,7 @@ class ChatEntry {
     senderAvatarUrl: clearSenderAvatarUrl
         ? null
         : senderAvatarUrl ?? this.senderAvatarUrl,
+    senderNameGradientColors: senderNameGradientColors ?? this.senderNameGradientColors,
     vipLevel: vipLevel,
     sendingLevel: sendingLevel,
     receivingLevel: receivingLevel,
