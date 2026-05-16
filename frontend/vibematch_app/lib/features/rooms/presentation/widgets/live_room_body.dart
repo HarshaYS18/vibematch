@@ -6,6 +6,7 @@ import '../modules/cricket_room_controls_module.dart';
 import '../modules/cricket_room_mode_module.dart';
 import '../modules/cricket_room_mode_registry.dart';
 import '../modules/cricket_room_mode_signal.dart';
+import 'live_room_input_dock.dart';
 import 'live_room_seat_invite_notification.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
