@@ -7,6 +7,7 @@ from app.models.user_ban import UserBan, BanType, BanSource
 from app.models.device_ban import DeviceBan
 from app.models.room import Room, RoomMode, RoomType
 from app.models.room_participant import RoomParticipant
+from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, RoomSeatState
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
 from app.models.room_theme import RoomTheme, RoomThemeOwnershipType, RoomThemeReview, RoomThemeReviewStatus, UserRoomThemeInventory
 from app.models.store import StoreItem, StoreItemCategory, UserStoreInventory
