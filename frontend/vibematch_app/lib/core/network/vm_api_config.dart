@@ -1,17 +1,18 @@
 import 'package:flutter/foundation.dart';
 
-/// Central API endpoint config for VibeMatch frontend.
+/// Central API endpoint config for FunKey / VibeMatch frontend.
 ///
-/// Defaults:
-/// - Flutter Web / Windows / macOS / Linux local testing: http://127.0.0.1:8000
-/// - Android emulator can be selected with --dart-define=VM_API_ENV=androidEmulator
-/// - Physical phone/LAN can be selected with --dart-define=VM_API_BASE_URL=http://YOUR_LAN_IP:8000
+/// Early beta default points to the VPS public IP:
+/// http://140.245.215.16:8000
 ///
-/// Examples:
-/// flutter run -d edge --dart-define=VM_API_BASE_URL=http://127.0.0.1:8000
-/// flutter run -d android --dart-define=VM_API_ENV=androidEmulator
-/// flutter run -d android --dart-define=VM_API_BASE_URL=http://192.168.29.240:8000
+/// Optional overrides:
+/// - Local backend: --dart-define=VM_API_BASE_URL=http://127.0.0.1:8000
+/// - Android emulator: --dart-define=VM_API_ENV=androidEmulator
+/// - Any custom host: --dart-define=VM_API_BASE_URL=http://YOUR_HOST:8000
 abstract final class VmApiConfig {
+  static const String betaVpsHost = '140.245.215.16';
+  static const String betaVpsBaseUrl = 'http://$betaVpsHost:8000';
+
   static const String _overrideBaseUrl = String.fromEnvironment(
     'VM_API_BASE_URL',
     defaultValue: '',
@@ -19,7 +20,7 @@ abstract final class VmApiConfig {
 
   static const String _apiEnv = String.fromEnvironment(
     'VM_API_ENV',
-    defaultValue: '',
+    defaultValue: 'vpsBeta',
   );
 
   static String get baseUrl {
@@ -30,11 +31,11 @@ abstract final class VmApiConfig {
       return 'http://10.0.2.2:8000';
     }
 
-    if (kIsWeb) {
+    if (_apiEnv == 'local') {
       return 'http://127.0.0.1:8000';
     }
 
-    return 'http://127.0.0.1:8000';
+    return betaVpsBaseUrl;
   }
 
   static String endpoint(String path) {
