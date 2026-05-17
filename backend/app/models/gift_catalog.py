@@ -38,6 +38,7 @@ class GiftCatalogItem(Base):
     cdn_asset_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     cdn_video_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     animation_type: Mapped[str] = mapped_column(String(40), default="image", nullable=False)
+    display_mode: Mapped[str] = mapped_column(String(40), default="normal", nullable=False)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     show_gift_slide: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     show_premium_broadcast: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
