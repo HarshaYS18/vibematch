@@ -70,17 +70,20 @@ class GiftCatalogCategory {
 
 GiftItem _giftFromJson(Map<String, dynamic> json) {
   final giftId = (json['id'] ?? '').toString();
+  final giftName = (json['name'] ?? 'Gift').toString();
   final categoryKey = (json['category'] ?? 'classic').toString().trim().toLowerCase();
   final giftType = (json['gift_type'] ?? 'normal').toString().trim().toLowerCase();
   final minCombo = _int(json['min_combo']) <= 0 ? 1 : _int(json['min_combo']);
   final rawMaxCombo = _int(json['max_combo']);
   final maxCombo = rawMaxCombo == 0 ? 999 : (rawMaxCombo < minCombo ? minCombo : rawMaxCombo);
+  final displayMode = (json['display_mode'] ?? 'normal').toString();
   final premium = categoryKey == 'premium' || _bool(json['show_premium_broadcast'], fallback: false);
   final lucky = giftType == 'lucky' || categoryKey == 'lucky';
   GiftPanelConstants.registerGiftComboLimit(giftId: giftId, minCombo: minCombo, maxCombo: maxCombo);
+  GiftPanelConstants.registerGiftDisplayMode(giftId: giftId, giftName: giftName, displayMode: displayMode);
   return GiftItem(
     id: giftId,
-    name: (json['name'] ?? 'Gift').toString(),
+    name: giftName,
     category: _categoryFromKey(categoryKey),
     categoryKey: categoryKey,
     coins: _int(json['coin_value']),
