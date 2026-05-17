@@ -60,22 +60,14 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
   @override
   void initState() {
     super.initState();
-    _categoryPageController = PageController(
-      initialPage: _pageIndexFor(widget.selectedCategoryKey),
-    );
+    _categoryPageController = PageController(initialPage: _pageIndexFor(widget.selectedCategoryKey));
   }
 
   @override
   void didUpdateWidget(covariant GiftPanelModular oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((oldWidget.selectedCategoryKey != widget.selectedCategoryKey ||
-            oldWidget.categories.length != widget.categories.length) &&
-        _categoryPageController.hasClients) {
-      _categoryPageController.animateToPage(
-        _pageIndexFor(widget.selectedCategoryKey),
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-      );
+    if ((oldWidget.selectedCategoryKey != widget.selectedCategoryKey || oldWidget.categories.length != widget.categories.length) && _categoryPageController.hasClients) {
+      _categoryPageController.animateToPage(_pageIndexFor(widget.selectedCategoryKey), duration: const Duration(milliseconds: 180), curve: Curves.easeOutCubic);
     }
   }
 
@@ -87,29 +79,17 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
 
   @override
   Widget build(BuildContext context) {
-    final comboOptions = widget.selectedCategoryKey == 'lucky'
-        ? GiftPanelConstants.luckyCombos
-        : GiftPanelConstants.combos;
-    final isLuckyPacket = widget.selectedGift?.id == 'lucky_packet';
-    final comboValue = isLuckyPacket
-        ? 1
-        : (comboOptions.contains(widget.selectedCombo)
-              ? widget.selectedCombo
-              : comboOptions.first);
+    final gift = widget.selectedGift;
+    final isLuckyPacket = gift?.id == 'lucky_packet';
+    final isLucky = widget.selectedCategoryKey == 'lucky' || gift?.giftType == 'lucky';
+    final comboOptions = GiftPanelConstants.allowedCombos(isLucky: isLucky, minCombo: gift?.minCombo ?? 1, maxCombo: gift?.maxCombo ?? 999);
+    final comboValue = isLuckyPacket ? 1 : (comboOptions.contains(widget.selectedCombo) ? widget.selectedCombo : comboOptions.first);
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.414,
       child: Container(
-        padding: EdgeInsets.fromLTRB(
-          10,
-          7,
-          10,
-          MediaQuery.paddingOf(context).bottom + 8,
-        ),
-        decoration: const BoxDecoration(
-          color: Color(0xFF12101D),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
+        padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
+        decoration: const BoxDecoration(color: Color(0xFF12101D), borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -120,14 +100,9 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
               selectedCategoryKey: widget.selectedCategoryKey,
               onCategoryChanged: (categoryKey) {
                 widget.onCategoryChanged(categoryKey);
-                _categoryPageController.animateToPage(
-                  _pageIndexFor(categoryKey),
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                );
+                _categoryPageController.animateToPage(_pageIndexFor(categoryKey), duration: const Duration(milliseconds: 180), curve: Curves.easeOutCubic);
               },
-              onStoreTap: () =>
-                  RoomToast.show(context, 'Store / inventory opened'),
+              onStoreTap: () => RoomToast.show(context, 'Store / inventory opened'),
               onLuckyRankingsTap: widget.onLuckyRankingsTap,
             ),
             const SizedBox(height: 7),
@@ -154,9 +129,9 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
               comboValue: comboValue,
               comboOptions: isLuckyPacket ? const [1] : comboOptions,
               coinBalance: widget.coinBalance,
-              comboEnabled: !isLuckyPacket,
+              comboEnabled: !isLuckyPacket && comboOptions.length > 1,
               onSend: widget.onSend,
-              onComboChanged: widget.onComboChanged,
+              onComboChanged: (combo) => widget.onComboChanged(GiftPanelConstants.clampCombo(combo: combo, minCombo: gift?.minCombo ?? 1, maxCombo: gift?.maxCombo ?? 999)),
               onRecharge: widget.onRecharge,
             ),
           ],
