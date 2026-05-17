@@ -23,7 +23,7 @@ class LiveRoomUsersController {
 
     void rememberAlias(String rawId, String key) {
       final cleanRaw = rawId.trim();
-      if (cleanRaw.isEmpty) return;
+      if (cleanRaw.isEmpty || key.trim().isEmpty) return;
       rawIdToKey[cleanRaw] = key;
       rawIdToKey[_canonicalUserKey(cleanRaw)] = key;
     }
@@ -51,12 +51,9 @@ class LiveRoomUsersController {
       for (final peer in snapshot.peers) {
         final peerKey = _canonicalUserKey(peer.userId);
         rememberAlias(peer.userId, peerKey);
-        final publicUserId = peer.publicUserId;
-        if (publicUserId != null && publicUserId.trim().isNotEmpty) {
-          rememberAlias(publicUserId, peerKey);
-          rememberAlias('user_$publicUserId', peerKey);
-          rememberAlias('${snapshot.roomId}_user_$publicUserId', peerKey);
-        }
+        rememberAlias(peer.peerId, peerKey);
+        final userAlias = _userAliasFromPeerOrUserId(peer.peerId);
+        if (userAlias != null) rememberAlias(userAlias, peerKey);
       }
     }
 
@@ -299,6 +296,14 @@ class LiveRoomUsersController {
       return 'u:$value';
     }
     return value.toLowerCase();
+  }
+
+  String? _userAliasFromPeerOrUserId(String rawId) {
+    final value = rawId.trim();
+    if (value.isEmpty) return null;
+    final match = RegExp(r'(?:^|_)user_(\d+)$').firstMatch(value);
+    if (match == null) return null;
+    return 'user_${match.group(1)}';
   }
 
   String _fallbackDisplayNameForUserId(String userId) {
