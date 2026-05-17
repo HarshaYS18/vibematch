@@ -13,6 +13,8 @@ from app.services.role_service import get_primary_role
 
 router = APIRouter(prefix="/gifts", tags=["Gifts"])
 
+DISPLAY_MODES = {"normal", "large_80"}
+
 
 class LuckyGiftRollRequest(BaseModel):
     gift_id: str = Field(..., min_length=1, max_length=80)
@@ -50,6 +52,7 @@ class GiftItemAdminPayload(AdminReasonRequest):
     cdn_asset_path: str | None = None
     cdn_video_path: str | None = None
     animation_type: str = Field(default="image", min_length=1, max_length=40)
+    display_mode: str = Field(default="normal", min_length=1, max_length=40)
     is_enabled: bool = True
     show_gift_slide: bool = True
     show_premium_broadcast: bool = False
@@ -60,9 +63,13 @@ class GiftItemAdminPayload(AdminReasonRequest):
     metadata_json: dict | None = None
 
     @model_validator(mode="after")
-    def validate_combo_limits(self):
+    def validate_limits_and_display_mode(self):
         if self.max_combo < self.min_combo:
             raise ValueError("max_combo must be greater than or equal to min_combo")
+        clean_mode = self.display_mode.strip().lower()
+        if clean_mode not in DISPLAY_MODES:
+            raise ValueError("display_mode must be normal or large_80")
+        self.display_mode = clean_mode
         return self
 
 
@@ -206,6 +213,7 @@ def upsert_gift_item(gift_id: str, payload: GiftItemAdminPayload, db: Session = 
     item.cdn_asset_path = payload.cdn_asset_path
     item.cdn_video_path = payload.cdn_video_path
     item.animation_type = _clean_key(payload.animation_type)
+    item.display_mode = payload.display_mode.strip().lower()
     item.is_enabled = payload.is_enabled
     item.show_gift_slide = payload.show_gift_slide
     item.show_premium_broadcast = payload.show_premium_broadcast
@@ -214,7 +222,7 @@ def upsert_gift_item(gift_id: str, payload: GiftItemAdminPayload, db: Session = 
     item.sort_order = payload.sort_order
     item.max_multiplier = payload.max_multiplier
     item.metadata_json = payload.metadata_json
-    _audit(db, actor=current_user, action=action, resource_id=path_id, reason=payload.reason, metadata={"gift_id": path_id, "name": item.name, "category_key": item.category_key, "is_enabled": item.is_enabled, "min_combo": item.min_combo, "max_combo": item.max_combo})
+    _audit(db, actor=current_user, action=action, resource_id=path_id, reason=payload.reason, metadata={"gift_id": path_id, "name": item.name, "category_key": item.category_key, "is_enabled": item.is_enabled, "min_combo": item.min_combo, "max_combo": item.max_combo, "display_mode": item.display_mode})
     db.commit()
     db.refresh(item)
     return _item_response(item)
