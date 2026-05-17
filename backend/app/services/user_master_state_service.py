@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.economy import GiftTransaction, UserWallet
@@ -20,6 +20,13 @@ from app.services.role_service import get_primary_role, get_user_roles
 
 def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
+
+
+def _safe(section_name: str, default: Any, builder: Callable[[], Any]) -> Any:
+    try:
+        return builder()
+    except Exception as exc:
+        return {"status": "unavailable", "section": section_name, "error": str(exc), "data": default}
 
 
 def _identity(user: User) -> dict[str, Any]:
@@ -54,18 +61,22 @@ def _roles(user: User) -> dict[str, Any]:
     }
 
 
+def _vip_default() -> dict[str, Any]:
+    return {
+        "vip_level": 0,
+        "vip_is_active": False,
+        "vip_status": "none",
+        "svip_level": 0,
+        "svip_is_active": False,
+        "svip_expires_at": None,
+        "updated_at": None,
+    }
+
+
 def _vip(db: Session, user: User) -> dict[str, Any]:
     status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user.id).first()
     if status is None:
-        return {
-            "vip_level": 0,
-            "vip_is_active": False,
-            "vip_status": "none",
-            "svip_level": 0,
-            "svip_is_active": False,
-            "svip_expires_at": None,
-            "updated_at": None,
-        }
+        return _vip_default()
     vip_status = "active" if status.vip_is_active and status.vip_level > 0 else ("frozen" if status.vip_level > 0 else "none")
     return {
         "vip_level": status.vip_level,
@@ -78,20 +89,24 @@ def _vip(db: Session, user: User) -> dict[str, Any]:
     }
 
 
+def _wallet_default() -> dict[str, Any]:
+    return {
+        "coin_balance": 0,
+        "ruby_balance": 0,
+        "locked_ruby_balance": 0,
+        "pending_withdraw_rubies": 0,
+        "lifetime_coins_spent": 0,
+        "lifetime_coins_received_as_gifts": 0,
+        "lifetime_rubies_earned": 0,
+        "lifetime_rubies_withdrawn": 0,
+        "updated_at": None,
+    }
+
+
 def _wallet(db: Session, user: User) -> dict[str, Any]:
     wallet = db.query(UserWallet).filter(UserWallet.user_id == user.id).first()
     if wallet is None:
-        return {
-            "coin_balance": 0,
-            "ruby_balance": 0,
-            "locked_ruby_balance": 0,
-            "pending_withdraw_rubies": 0,
-            "lifetime_coins_spent": 0,
-            "lifetime_coins_received_as_gifts": 0,
-            "lifetime_rubies_earned": 0,
-            "lifetime_rubies_withdrawn": 0,
-            "updated_at": None,
-        }
+        return _wallet_default()
     return {
         "coin_balance": wallet.coin_balance,
         "ruby_balance": wallet.ruby_balance,
@@ -105,16 +120,20 @@ def _wallet(db: Session, user: User) -> dict[str, Any]:
     }
 
 
+def _experience_default() -> dict[str, Any]:
+    return {
+        "sent_level": 1,
+        "received_level": 1,
+        "sent_exp_lifetime": 0,
+        "received_exp_lifetime": 0,
+        "updated_at": None,
+    }
+
+
 def _experience(db: Session, user: User) -> dict[str, Any]:
     status = db.query(UserExperienceStatus).filter(UserExperienceStatus.user_id == user.id).first()
     if status is None:
-        return {
-            "sent_level": 1,
-            "received_level": 1,
-            "sent_exp_lifetime": 0,
-            "received_exp_lifetime": 0,
-            "updated_at": None,
-        }
+        return _experience_default()
     return {
         "sent_level": status.send_level,
         "received_level": status.receive_level,
@@ -124,15 +143,6 @@ def _experience(db: Session, user: User) -> dict[str, Any]:
         "last_source_id": status.last_source_id,
         "updated_at": _iso(status.updated_at),
     }
-
-
-def _gift_sum(db: Session, user_id: int, field, since: datetime | None = None) -> int:
-    query = db.query(func.coalesce(func.sum(field), 0))
-    query = query.filter(or_(GiftTransaction.sender_user_id == user_id, GiftTransaction.receiver_user_id == user_id))
-    if since is not None:
-        query = query.filter(GiftTransaction.created_at >= since)
-    value = query.scalar()
-    return int(value or 0)
 
 
 def _sent_sum(db: Session, user_id: int, since: datetime | None = None) -> int:
@@ -147,6 +157,11 @@ def _received_sum(db: Session, user_id: int, since: datetime | None = None) -> i
     if since is not None:
         query = query.filter(GiftTransaction.created_at >= since)
     return int(query.scalar() or 0)
+
+
+def _contribution_default() -> dict[str, Any]:
+    zero = {"daily": 0, "weekly": 0, "monthly": 0, "yearly": 0, "lifetime": 0}
+    return {"sent": dict(zero), "received": dict(zero)}
 
 
 def _contribution(db: Session, user: User) -> dict[str, Any]:
@@ -210,27 +225,41 @@ def _owned_room(db: Session, user: User) -> dict[str, Any] | None:
     }
 
 
+def _profile_summary_default() -> dict[str, Any]:
+    return {
+        "vip": _vip_default(),
+        "wallet": _wallet_default(),
+        "equipped_items": {},
+    }
+
+
+def _profile_summary(db: Session, user: User) -> dict[str, Any]:
+    return {
+        "vip": profile_service.vip_summary(db, user).model_dump(),
+        "wallet": profile_service.wallet_summary(db, user).model_dump(),
+        "equipped_items": profile_service.equipped_items_summary(db, user).model_dump(),
+    }
+
+
 def get_user_master_state(db: Session, user: User) -> dict[str, Any]:
     """Production read model for the full user state.
 
-    This is intentionally assembled from child/domain source tables. The users
-    table remains identity-only; wallet, VIP, room presence, EXP, and
-    contribution data keep their own table owners.
+    The users table remains identity-only. Wallet, VIP, room presence, EXP,
+    contribution and profile equipment data keep their own child table owners.
+    If a child section has no row yet, the endpoint still returns a complete
+    master-state object with safe defaults instead of falling back to older APIs.
     """
+    generated_at = datetime.utcnow()
     return {
-        "version": int(datetime.utcnow().timestamp()),
-        "generated_at": datetime.utcnow().isoformat(),
+        "version": int(generated_at.timestamp()),
+        "generated_at": generated_at.isoformat(),
         "identity": _identity(user),
         "roles": _roles(user),
-        "vip": _vip(db, user),
-        "wallet": _wallet(db, user),
-        "experience": _experience(db, user),
-        "contribution": _contribution(db, user),
-        "room_presence": _room_presence(db, user),
-        "owned_room": _owned_room(db, user),
-        "profile_summary": {
-            "vip": profile_service.vip_summary(db, user).model_dump(),
-            "wallet": profile_service.wallet_summary(db, user).model_dump(),
-            "equipped_items": profile_service.equipped_items_summary(db, user).model_dump(),
-        },
+        "vip": _safe("vip", _vip_default(), lambda: _vip(db, user)),
+        "wallet": _safe("wallet", _wallet_default(), lambda: _wallet(db, user)),
+        "experience": _safe("experience", _experience_default(), lambda: _experience(db, user)),
+        "contribution": _safe("contribution", _contribution_default(), lambda: _contribution(db, user)),
+        "room_presence": _safe("room_presence", None, lambda: _room_presence(db, user)),
+        "owned_room": _safe("owned_room", None, lambda: _owned_room(db, user)),
+        "profile_summary": _safe("profile_summary", _profile_summary_default(), lambda: _profile_summary(db, user)),
     }
