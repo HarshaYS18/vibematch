@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'control_center_page.dart';
 import 'game_pool_management_page.dart';
 import 'game_props_page.dart';
+import 'gift_catalog_editor_page.dart';
 import 'inbox_lock_owner_reset_page.dart';
 import '../../profile/presentation/control_center/vibes_reports_review_page.dart';
 
@@ -37,7 +38,7 @@ class ControlCenterHubPage extends StatelessWidget {
                   children: [
                     Icon(Icons.workspace_premium_rounded, color: Color(0xFFFFF0A8), size: 28),
                     SizedBox(width: 10),
-                    Expanded(child: Text('Super Owner Management', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900))),
+                    Expanded(child: Text('Owner Management', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900))),
                   ],
                 ),
                 SizedBox(height: 8),
@@ -52,9 +53,17 @@ class ControlCenterHubPage extends StatelessWidget {
           _HubOptionCard(
             icon: Icons.admin_panel_settings_rounded,
             title: 'Management',
-            subtitle: 'Existing users, roles, bans, coins, VIP/SVIP, logs and reviews.',
+            subtitle: 'Users, roles, coins, VIP/SVIP, logs and reviews.',
             gradient: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ControlCenterPage())),
+          ),
+          const SizedBox(height: 12),
+          _HubOptionCard(
+            icon: Icons.card_giftcard_rounded,
+            title: 'Gift Catalog Editor',
+            subtitle: 'Manage gift categories, gift items, prices, CDN paths and render flags.',
+            gradient: const [Color(0xFFFFC857), Color(0xFF8C5CF6), Color(0xFFE84C72)],
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCatalogEditorPage())),
           ),
           const SizedBox(height: 12),
           _HubOptionCard(
@@ -68,7 +77,7 @@ class ControlCenterHubPage extends StatelessWidget {
           _HubOptionCard(
             icon: Icons.shield_rounded,
             title: 'Moderation',
-            subtitle: 'Review reported Vibes, close reports, delete unsafe posts, and handle content safety.',
+            subtitle: 'Review reported Vibes and handle content safety.',
             gradient: const [Color(0xFFE84C72), Color(0xFFFFC857)],
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VibesReportsReviewPage())),
           ),
@@ -76,7 +85,7 @@ class ControlCenterHubPage extends StatelessWidget {
           _HubOptionCard(
             icon: Icons.tune_rounded,
             title: 'Game Props',
-            subtitle: 'Jungle Hunt testing mode, exposure controls, whale rules, probabilities and round flow.',
+            subtitle: 'Testing mode, exposure controls, probabilities and round flow.',
             gradient: const [Color(0xFF8C5CF6), Color(0xFF12C7B7), Color(0xFFFFC857)],
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GamePropsPage())),
           ),
@@ -84,7 +93,7 @@ class ControlCenterHubPage extends StatelessWidget {
           _HubOptionCard(
             icon: Icons.account_balance_rounded,
             title: 'Game Pool Management',
-            subtitle: 'Main game house pool, game-wise pool, RTP, caps, freeze/unfreeze and allocations.',
+            subtitle: 'Main game pool, game-wise pool, RTP, caps and allocations.',
             gradient: const [Color(0xFFFFC857), Color(0xFFE84C72), Color(0xFF8C5CF6)],
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GamePoolManagementPage())),
           ),
