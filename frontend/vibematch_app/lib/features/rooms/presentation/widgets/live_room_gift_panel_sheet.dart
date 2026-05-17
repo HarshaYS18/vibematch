@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../data/gift_catalog_api_service.dart';
 import '../live_room_models.dart';
 import 'gift_modules/gift_panel_modular.dart';
 
 class LiveRoomGiftPanelSheet extends StatefulWidget {
   const LiveRoomGiftPanelSheet({
     super.key,
+    required this.categories,
     required this.gifts,
     required this.users,
-    required this.selectedCategory,
+    required this.selectedCategoryKey,
     required this.selectedGift,
     required this.selectedReceiverIds,
     required this.selectedCombo,
@@ -22,15 +24,16 @@ class LiveRoomGiftPanelSheet extends StatefulWidget {
     this.onLuckyRankingsTap,
   });
 
+  final List<GiftCatalogCategory> categories;
   final List<GiftItem> gifts;
   final List<SeatUser> users;
-  final GiftCategory selectedCategory;
+  final String selectedCategoryKey;
   final GiftItem? selectedGift;
   final Set<String> selectedReceiverIds;
   final int selectedCombo;
   final int coinBalance;
 
-  final ValueChanged<GiftCategory> onCategoryChanged;
+  final ValueChanged<String> onCategoryChanged;
   final ValueChanged<GiftItem> onGiftSelected;
   final ValueChanged<String> onReceiverToggle;
   final ValueChanged<int> onComboChanged;
@@ -43,45 +46,48 @@ class LiveRoomGiftPanelSheet extends StatefulWidget {
 }
 
 class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
-  late GiftCategory _selectedCategory;
+  late String _selectedCategoryKey;
   late GiftItem? _selectedGift;
   late int _selectedCombo;
 
   @override
   void initState() {
     super.initState();
-    _selectedCategory = widget.selectedCategory;
+    _selectedCategoryKey = widget.selectedCategoryKey;
     _selectedGift = widget.selectedGift;
     _selectedCombo = widget.selectedCombo;
   }
 
-  GiftItem? _firstGiftForCategory(GiftCategory category) {
-    for (final gift in GiftPanelModular.withMockExtras(widget.gifts)) {
-      if (gift.category == category) return gift;
+  GiftItem? _firstGiftForCategory(String categoryKey) {
+    for (final gift in widget.gifts) {
+      if ((gift.categoryKey ?? gift.category.label.toLowerCase()) == categoryKey) {
+        return gift;
+      }
     }
     return null;
   }
 
-  int _defaultComboFor(GiftCategory category) {
-    return category == GiftCategory.lucky ? 9 : 1;
+  int _defaultComboFor(String categoryKey) {
+    return categoryKey == 'lucky' ? 9 : 1;
   }
 
   @override
   Widget build(BuildContext context) {
     return GiftPanelModular(
+      categories: widget.categories,
       gifts: widget.gifts,
       users: widget.users,
-      selectedCategory: _selectedCategory,
+      selectedCategoryKey: _selectedCategoryKey,
       selectedGift: _selectedGift,
       selectedReceiverIds: widget.selectedReceiverIds,
       selectedCombo: _selectedGift?.isVideoGift ?? false ? 1 : _selectedCombo,
       coinBalance: widget.coinBalance,
-      onCategoryChanged: (category) {
-        widget.onCategoryChanged(category);
+      onCategoryChanged: (categoryKey) {
+        widget.onCategoryChanged(categoryKey);
         setState(() {
-          _selectedCategory = category;
-          _selectedGift = _firstGiftForCategory(category) ?? _selectedGift;
-          _selectedCombo = _defaultComboFor(category);
+          _selectedCategoryKey = categoryKey;
+          _selectedGift = _firstGiftForCategory(categoryKey);
+          _selectedCombo = _defaultComboFor(categoryKey);
           if (_selectedGift != null) widget.onGiftSelected(_selectedGift!);
           widget.onComboChanged(_selectedCombo);
         });
@@ -90,8 +96,8 @@ class _LiveRoomGiftPanelSheetState extends State<LiveRoomGiftPanelSheet> {
         widget.onGiftSelected(gift);
         setState(() {
           _selectedGift = gift;
-          _selectedCategory = gift.category;
-          _selectedCombo = gift.isVideoGift ? 1 : _defaultComboFor(gift.category);
+          _selectedCategoryKey = gift.categoryKey ?? gift.category.label.toLowerCase();
+          _selectedCombo = gift.isVideoGift ? 1 : _defaultComboFor(_selectedCategoryKey);
         });
         widget.onComboChanged(_selectedCombo);
       },
