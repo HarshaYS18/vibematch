@@ -18,6 +18,15 @@ class RoomParticipant(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     is_member: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     is_room_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+
+    # Stealth presence is backend-owned. A stealth participant is internally
+    # tracked/audited, but excluded from public online counts, peers, user lists,
+    # public room presence, and public join/leave broadcasts.
+    is_stealth: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false", index=True)
+    visible_in_online_count: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true", index=True)
+    visible_in_user_list: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true", index=True)
+    visible_to_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true", index=True)
+
     joined_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     left_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
