@@ -78,7 +78,7 @@ class RoomTopBar extends StatelessWidget {
                     privacyMode: privacyMode,
                     onInfoTap: () => _openRoomInfo(context),
                     onJoinTap: onJoinTap,
-                    showJoinButton: !canManageRoom,
+                    showJoinButton: !canManageAdmins,
                     currentUserIsMember: currentUserIsMember,
                     joinRequestPending: joinRequestPending,
                   ),
@@ -173,7 +173,7 @@ class _RoomNamePill extends StatelessWidget {
         if (_showTrailingSlot) ...[
           Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
           if (_showMemberIcon)
-            const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.verified_user_rounded, color: RoomColors.aqua, size: 15)))
+            const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.card_membership_rounded, color: RoomColors.aqua, size: 15)))
           else if (_showPendingIcon)
             const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.hourglass_top_rounded, color: RoomColors.gold, size: 15)))
           else
@@ -187,10 +187,24 @@ class _RoomNamePill extends StatelessWidget {
 class _PrivacyIcon extends StatelessWidget {
   const _PrivacyIcon({required this.mode});
   final RoomPrivacyMode mode;
+
+  IconData get _icon {
+    switch (mode) {
+      case RoomPrivacyMode.open:
+        return Icons.public_rounded;
+      case RoomPrivacyMode.locked:
+        return Icons.lock_rounded;
+      case RoomPrivacyMode.membersOnly:
+        return Icons.groups_2_rounded;
+      case RoomPrivacyMode.privateVibe:
+        return Icons.visibility_off_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = mode == RoomPrivacyMode.open ? RoomColors.aqua : RoomColors.gold;
-    return Container(width: 16, height: 16, decoration: BoxDecoration(color: color.withValues(alpha: 0.15), shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.24), width: 0.7)), child: Icon(mode.icon, color: color, size: 9));
+    return Container(width: 16, height: 16, decoration: BoxDecoration(color: color.withValues(alpha: 0.15), shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.24), width: 0.7)), child: Icon(_icon, color: color, size: 9));
   }
 }
 
