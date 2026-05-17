@@ -237,37 +237,33 @@ class LiveRoomStateController extends ChangeNotifier {
   }
 
   void setPrivacyMode(RoomPrivacyMode value) {
-    if (value == _privacyMode) return;
-    _privacyMode = value;
-    notifyListeners();
+    final mode = _privacyModeToBackendMode(value);
+    _settingsRepository
+        .updateAccessSettings(roomPublicId: _roomId, mode: mode)
+        .then(_applySettingsFromRest)
+        .catchError((_) {});
   }
 
   void setAllowScreenshots(bool value) {
-    if (value == _allowScreenshots) return;
-    _allowScreenshots = value;
-    ScreenshotGuardService.applyRoomScreenshotPolicy(allowScreenshots: value);
-    notifyListeners();
+    _settingsRepository
+        .updateAccessSettings(
+          roomPublicId: _roomId,
+          allowScreenshots: value,
+        )
+        .then(_applySettingsFromRest)
+        .catchError((_) {});
   }
 
   void setRoomImagesEnabled(bool value) {
-    if (value == _roomImagesEnabled) return;
-    _roomImagesEnabled = value;
-    LiveRoomRestrictionsService.update(roomImagesEnabled: value);
-    notifyListeners();
+    LiveRoomMediaSignalingService.instance.setRoomImagesEnabled(value);
   }
 
   void setGuestMessagesEnabled(bool value) {
-    if (value == _guestMessagesEnabled) return;
-    _guestMessagesEnabled = value;
-    LiveRoomRestrictionsService.update(guestMessagesEnabled: value);
-    notifyListeners();
+    LiveRoomMediaSignalingService.instance.setGuestMessagesEnabled(value);
   }
 
   void setApplyOnlyModeEnabled(bool value) {
-    if (value == _applyOnlyModeEnabled) return;
-    _applyOnlyModeEnabled = value;
     LiveRoomMediaSignalingService.instance.setRoomApplyOnlyMode(value);
-    notifyListeners();
   }
 
   void setMinimized(bool value) {
@@ -374,79 +370,8 @@ class LiveRoomStateController extends ChangeNotifier {
   Future<void> loadPersistedRoomSettings() async {
     try {
       final settings = await _settingsRepository.fetchRoomSettings(_roomId);
-      var changed = false;
-      final preserveInitialSnapshot = _preserveInitialSnapshotOnFirstLoad;
-
-      final backgroundThemeId = settings.backgroundThemeId.trim();
-      final theme = _themeFromId(backgroundThemeId);
-      final shouldPreserveInitialBackground =
-          (_preserveInitialBackgroundOnFirstLoad || preserveInitialSnapshot) &&
-          _selectedBackgroundTheme.id != defaultRoomBackgroundTheme.id &&
-          (backgroundThemeId.isEmpty ||
-              backgroundThemeId == defaultRoomBackgroundTheme.id);
-      _preserveInitialBackgroundOnFirstLoad = false;
-      if (!shouldPreserveInitialBackground &&
-          theme != _selectedBackgroundTheme) {
-        _selectedBackgroundTheme = theme;
-        activeRoomBackgroundTheme.value = theme;
-        changed = true;
-      }
-
-      final shouldPreserveInitialSeatLayout =
-          preserveInitialSnapshot &&
-          _seatLayoutId != '5x2' &&
-          (settings.seatLayoutId.trim().isEmpty ||
-              settings.seatLayoutId == '5x2');
-      if (settings.seatLayoutId.trim().isNotEmpty &&
-          !shouldPreserveInitialSeatLayout &&
-          settings.seatLayoutId != _seatLayoutId) {
-        _seatLayoutId = settings.seatLayoutId;
-        changed = true;
-      }
-
-      final announcement = settings.announcementText ?? '';
-      final shouldPreserveInitialAnnouncement =
-          preserveInitialSnapshot &&
-          _announcementText.trim().isNotEmpty &&
-          announcement.trim().isEmpty;
-      if (!shouldPreserveInitialAnnouncement &&
-          announcement != _announcementText) {
-        _announcementText = announcement;
-        changed = true;
-      }
-
-      final mode = settings.mode;
-      if (mode != null && mode.trim().isNotEmpty) {
-        final nextPrivacy = privacyModeFromTitle(mode);
-        final shouldPreserveInitialPrivacy =
-            preserveInitialSnapshot &&
-            _privacyMode != RoomPrivacyMode.open &&
-            nextPrivacy == RoomPrivacyMode.open;
-        if (!shouldPreserveInitialPrivacy && nextPrivacy != _privacyMode) {
-          _privacyMode = nextPrivacy;
-          changed = true;
-        }
-      }
-
-      final shouldPreserveInitialScreenshotPolicy =
-          preserveInitialSnapshot &&
-          !_allowScreenshots &&
-          settings.allowScreenshots;
-      if (!shouldPreserveInitialScreenshotPolicy &&
-          settings.allowScreenshots != _allowScreenshots) {
-        _allowScreenshots = settings.allowScreenshots;
-        ScreenshotGuardService.applyRoomScreenshotPolicy(
-          allowScreenshots: _allowScreenshots,
-        );
-        changed = true;
-      } else {
-        ScreenshotGuardService.applyRoomScreenshotPolicy(
-          allowScreenshots: _allowScreenshots,
-        );
-      }
-
       _preserveInitialSnapshotOnFirstLoad = false;
-      if (changed) notifyListeners();
+      _applySettingsFromRest(settings, preserveInitialSnapshot: true);
     } catch (_) {
       _preserveInitialSnapshotOnFirstLoad = false;
       ScreenshotGuardService.applyRoomScreenshotPolicy(
@@ -454,6 +379,104 @@ class LiveRoomStateController extends ChangeNotifier {
       );
       // Room settings are non-critical for room entry.
     }
+  }
+
+  void _applySettingsFromRest(
+    RoomSettingsDto settings, {
+    bool preserveInitialSnapshot = false,
+  }) {
+    var changed = false;
+    var restrictionsChanged = false;
+    final preserveInitial = preserveInitialSnapshot || _preserveInitialSnapshotOnFirstLoad;
+
+    final backgroundThemeId = settings.backgroundThemeId.trim();
+    final theme = _themeFromId(backgroundThemeId);
+    final shouldPreserveInitialBackground =
+        (_preserveInitialBackgroundOnFirstLoad || preserveInitial) &&
+        _selectedBackgroundTheme.id != defaultRoomBackgroundTheme.id &&
+        (backgroundThemeId.isEmpty ||
+            backgroundThemeId == defaultRoomBackgroundTheme.id);
+    _preserveInitialBackgroundOnFirstLoad = false;
+    if (!shouldPreserveInitialBackground && theme != _selectedBackgroundTheme) {
+      _selectedBackgroundTheme = theme;
+      activeRoomBackgroundTheme.value = theme;
+      changed = true;
+    }
+
+    final shouldPreserveInitialSeatLayout =
+        preserveInitial &&
+        _seatLayoutId != '5x2' &&
+        (settings.seatLayoutId.trim().isEmpty || settings.seatLayoutId == '5x2');
+    if (settings.seatLayoutId.trim().isNotEmpty &&
+        !shouldPreserveInitialSeatLayout &&
+        settings.seatLayoutId != _seatLayoutId) {
+      _seatLayoutId = settings.seatLayoutId;
+      changed = true;
+    }
+
+    final announcement = settings.announcementText ?? '';
+    final shouldPreserveInitialAnnouncement =
+        preserveInitial &&
+        _announcementText.trim().isNotEmpty &&
+        announcement.trim().isEmpty;
+    if (!shouldPreserveInitialAnnouncement && announcement != _announcementText) {
+      _announcementText = announcement;
+      changed = true;
+    }
+
+    final mode = settings.mode;
+    if (mode != null && mode.trim().isNotEmpty) {
+      final nextPrivacy = privacyModeFromTitle(mode);
+      final shouldPreserveInitialPrivacy =
+          preserveInitial &&
+          _privacyMode != RoomPrivacyMode.open &&
+          nextPrivacy == RoomPrivacyMode.open;
+      if (!shouldPreserveInitialPrivacy && nextPrivacy != _privacyMode) {
+        _privacyMode = nextPrivacy;
+        changed = true;
+      }
+    }
+
+    final shouldPreserveInitialScreenshotPolicy =
+        preserveInitial && !_allowScreenshots && settings.allowScreenshots;
+    if (!shouldPreserveInitialScreenshotPolicy &&
+        settings.allowScreenshots != _allowScreenshots) {
+      _allowScreenshots = settings.allowScreenshots;
+      ScreenshotGuardService.applyRoomScreenshotPolicy(
+        allowScreenshots: _allowScreenshots,
+      );
+      changed = true;
+    } else {
+      ScreenshotGuardService.applyRoomScreenshotPolicy(
+        allowScreenshots: _allowScreenshots,
+      );
+    }
+
+    if (settings.roomImagesEnabled != _roomImagesEnabled) {
+      _roomImagesEnabled = settings.roomImagesEnabled;
+      changed = true;
+      restrictionsChanged = true;
+    }
+
+    if (settings.guestMessagesEnabled != _guestMessagesEnabled) {
+      _guestMessagesEnabled = settings.guestMessagesEnabled;
+      changed = true;
+      restrictionsChanged = true;
+    }
+
+    if (settings.applyOnlyModeEnabled != _applyOnlyModeEnabled) {
+      _applyOnlyModeEnabled = settings.applyOnlyModeEnabled;
+      changed = true;
+    }
+
+    _preserveInitialSnapshotOnFirstLoad = false;
+    if (restrictionsChanged) {
+      LiveRoomRestrictionsService.update(
+        roomImagesEnabled: _roomImagesEnabled,
+        guestMessagesEnabled: _guestMessagesEnabled,
+      );
+    }
+    if (changed) notifyListeners();
   }
 
   RoomBackgroundTheme _themeFromId(String themeId) {
@@ -516,6 +539,19 @@ class LiveRoomStateController extends ChangeNotifier {
         .catchError((_) {
           LiveRoomMediaSignalingService.instance.setRoomAnnouncement(nextValue);
         });
+  }
+
+  String _privacyModeToBackendMode(RoomPrivacyMode value) {
+    switch (value) {
+      case RoomPrivacyMode.open:
+        return 'Open';
+      case RoomPrivacyMode.locked:
+        return 'Locked';
+      case RoomPrivacyMode.membersOnly:
+        return 'Members Only';
+      case RoomPrivacyMode.privateVibe:
+        return 'Secret Vibe';
+    }
   }
 
   void resetForLeaveFlow() {
