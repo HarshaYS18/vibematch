@@ -13,34 +13,38 @@ class GiftCatalogEditorPage extends StatefulWidget {
 
 class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
   final GiftCatalogAdminApiService _api = const GiftCatalogAdminApiService();
+
   Map<String, dynamic>? _catalog;
   bool _loading = true;
   bool _saving = false;
   String? _error;
 
-  List<Map<String, dynamic>> get _categories =>
-      ((_catalog?['categories'] as List<dynamic>? ?? const <dynamic>[])
-              .whereType<Map<String, dynamic>>()
-              .toList())
-          ..sort((a, b) {
-            final left = _int(a['sort_order']);
-            final right = _int(b['sort_order']);
-            if (left != right) return left.compareTo(right);
-            return '${a['key']}'.compareTo('${b['key']}');
-          });
+  List<Map<String, dynamic>> get _categories {
+    final items = (_catalog?['categories'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    items.sort((a, b) {
+      final left = _int(a['sort_order']);
+      final right = _int(b['sort_order']);
+      if (left != right) return left.compareTo(right);
+      return '${a['key']}'.compareTo('${b['key']}');
+    });
+    return items;
+  }
 
-  List<Map<String, dynamic>> get _items =>
-      ((_catalog?['items'] as List<dynamic>? ??
-                  _catalog?['all'] as List<dynamic>? ??
-                  const <dynamic>[])
-              .whereType<Map<String, dynamic>>()
-              .toList())
-          ..sort((a, b) {
-            final left = _int(a['sort_order']);
-            final right = _int(b['sort_order']);
-            if (left != right) return left.compareTo(right);
-            return '${a['id']}'.compareTo('${b['id']}');
-          });
+  List<Map<String, dynamic>> get _items {
+    final raw = _catalog?['items'] as List<dynamic>? ??
+        _catalog?['all'] as List<dynamic>? ??
+        const <dynamic>[];
+    final items = raw.whereType<Map<String, dynamic>>().toList();
+    items.sort((a, b) {
+      final left = _int(a['sort_order']);
+      final right = _int(b['sort_order']);
+      if (left != right) return left.compareTo(right);
+      return '${a['id']}'.compareTo('${b['id']}');
+    });
+    return items;
+  }
 
   @override
   void initState() {
@@ -121,10 +125,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
       await _load();
     } catch (error) {
       if (!mounted) return;
-      _showSnack(
-        error.toString().replaceFirst('Exception: ', ''),
-        isError: true,
-      );
+      _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -174,6 +175,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
       text: category == null ? 'Create gift category' : 'Update gift category',
     );
     var enabled = _bool(category?['is_enabled'], fallback: true);
+
     final shouldSave = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -232,6 +234,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
         ),
       ),
     );
+
     if (shouldSave == true) {
       setState(() => _saving = true);
       try {
@@ -252,6 +255,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
         if (mounted) setState(() => _saving = false);
       }
     }
+
     keyController.dispose();
     labelController.dispose();
     sortController.dispose();
@@ -274,6 +278,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     if (!categoryKeys.contains(selectedCategoryKey)) {
       selectedCategoryKey = firstCategoryKey;
     }
+    var selectedDisplayMode = _cleanDisplayMode('${gift?['display_mode'] ?? 'normal'}');
 
     final giftIdController = TextEditingController(text: '${gift?['id'] ?? ''}');
     final nameController = TextEditingController(text: '${gift?['name'] ?? ''}');
@@ -323,9 +328,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
                     items: _categories.map((category) {
                       final key = _cleanKey('${category['key']}');
                       final label = '${category['label'] ?? key}';
-                      final enabledText = _bool(category['is_enabled'], fallback: true)
-                          ? ''
-                          : ' (disabled)';
+                      final enabledText = _bool(category['is_enabled'], fallback: true) ? '' : ' (disabled)';
                       return DropdownMenuItem<String>(
                         value: key,
                         child: Text('$label • $key$enabledText'),
@@ -334,6 +337,28 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
                     onChanged: (value) {
                       if (value == null || value.trim().isEmpty) return;
                       setLocal(() => selectedCategoryKey = value);
+                    },
+                  ),
+                  DropdownButtonFormField<String>(
+                    value: selectedDisplayMode,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Display mode',
+                      helperText: 'Normal = current size, Large 80% = big aspect-ratio-safe render',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'normal',
+                        child: Text('Normal / current display'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'large_80',
+                        child: Text('Large 80% screen display'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setLocal(() => selectedDisplayMode = _cleanDisplayMode(value));
                     },
                   ),
                   _field(giftTypeController, 'Gift type: normal / lucky'),
@@ -421,15 +446,14 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
             'cdn_asset_path': _nullable(cdnAssetPathController.text),
             'cdn_video_path': _nullable(cdnVideoPathController.text),
             'animation_type': _cleanKey(animationTypeController.text),
+            'display_mode': selectedDisplayMode,
             'is_enabled': enabled,
             'show_gift_slide': slide,
             'show_premium_broadcast': broadcast,
             'show_gift_flight': flight,
             'version': int.tryParse(versionController.text.trim()) ?? 1,
             'sort_order': int.tryParse(sortController.text.trim()) ?? 500,
-            'max_multiplier': maxMultiplierController.text.trim().isEmpty
-                ? null
-                : int.tryParse(maxMultiplierController.text.trim()),
+            'max_multiplier': maxMultiplierController.text.trim().isEmpty ? null : int.tryParse(maxMultiplierController.text.trim()),
             'metadata_json': null,
             'reason': reasonController.text.trim(),
           });
@@ -559,6 +583,11 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
 
   String _cleanKey(String value) => value.trim().toLowerCase().replaceAll(' ', '_');
 
+  String _cleanDisplayMode(String value) {
+    final clean = value.trim().toLowerCase();
+    return clean == 'large_80' ? 'large_80' : 'normal';
+  }
+
   String? _nullable(String value) {
     final text = value.trim();
     return text.isEmpty || text == 'null' ? null : text;
@@ -687,6 +716,7 @@ class _GiftCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = gift['is_enabled'] == true;
     final imageUrl = '${gift['asset_url'] ?? ''}'.trim();
+    final displayMode = '${gift['display_mode'] ?? 'normal'}';
     return _BaseCard(
       child: Row(
         children: [
@@ -725,7 +755,7 @@ class _GiftCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${gift['cdn_asset_path'] ?? 'no cdn icon'}',
+                  'display $displayMode • ${gift['cdn_asset_path'] ?? 'no cdn icon'}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 11, color: Color(0xFF8C8198)),
