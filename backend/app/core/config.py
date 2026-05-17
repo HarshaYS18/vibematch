@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     # Founder Owner
     FOUNDER_OWNER_PUBLIC_ID: int = 6922022
 
+    # Dynamic gift assets. In production set this to your CDN, e.g.
+    # https://cdn.funkey.app. When empty, API still returns local bundled
+    # fallback paths for closed-beta testing.
+    GIFT_CDN_BASE_URL: str = ""
+
     # Google Sign-In OAuth client IDs. Comma-separated for web/android/ios clients.
     GOOGLE_AUTH_CLIENT_IDS: str = ""
     ENABLE_DEV_LOGIN: bool = False
