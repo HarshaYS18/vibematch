@@ -16,12 +16,57 @@ class LuckyGiftRollRequest(BaseModel):
     house_risk_score: int = Field(default=0, ge=0, le=100)
 
 
+CATEGORY_LABELS = {
+    "classic": "Classic",
+    "lucky": "Lucky",
+    "relationship": "Relationship",
+    "event": "Event",
+    "premium": "Premium",
+    "svip": "SVIP",
+    "vip": "VIP",
+    "baggage": "Baggage",
+}
+
+CATEGORY_ORDER = {
+    "premium": 10,
+    "lucky": 20,
+    "classic": 30,
+    "relationship": 40,
+    "event": 50,
+    "svip": 60,
+    "vip": 70,
+    "baggage": 80,
+}
+
+
+def _category_payload(catalog: dict) -> list[dict]:
+    keys: set[str] = set()
+    for gift in catalog.get("all", []):
+        key = str(gift.get("category") or "classic").strip().lower()
+        if key:
+            keys.add(key)
+
+    return [
+        {
+            "key": key,
+            "label": CATEGORY_LABELS.get(key, key.replace("_", " ").title()),
+            "is_enabled": True,
+            "sort_order": CATEGORY_ORDER.get(key, 500),
+            "source": "backend_catalog",
+        }
+        for key in sorted(keys, key=lambda item: (CATEGORY_ORDER.get(item, 500), item))
+    ]
+
+
 @router.get("/catalog")
 def get_gift_catalog():
     # Public active catalog. This exposes only render metadata and backend-set
     # prices/categories for active gifts. Gift sending, lucky rolls, ownership,
     # balance checks, and economy mutations remain protected elsewhere.
-    return gift_catalog_service.list_gifts()
+    catalog = gift_catalog_service.list_gifts()
+    catalog["categories"] = _category_payload(catalog)
+    catalog["rule"] = "Backend catalog is the source of truth for active gift categories, gift prices, gift assets, and render flags. Flutter renders categories dynamically from this payload."
+    return catalog
 
 
 @router.get("/catalog/{gift_id}")
