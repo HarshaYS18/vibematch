@@ -88,7 +88,7 @@ def _has_pending_room_member_request(db: Session, room: Room, user_id: int) -> b
         db.query(RoomRealtimeEvent)
         .filter(
             RoomRealtimeEvent.room_id == room.id,
-            RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected"]),
+            RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected", "room.member.removed"]),
             RoomRealtimeEvent.target_user_id == user_id,
             RoomRealtimeEvent.id > pending.id,
         )
@@ -135,11 +135,7 @@ def leave_room(db: Session, room: Room, user: User, release_seat: bool = False) 
 
 def request_room_membership(db: Session, room: Room, user: User) -> dict[str, Any]:
     participant = _ensure_room_participant(db, room, user)
-    if user.id == room.owner_user_id or participant.is_room_admin:
-        participant.is_member = True
-        participant.member_added_at = participant.member_added_at or datetime.utcnow()
-        record_room_event(db, room, "room.member_request.approved", actor_user_id=user.id, target_user_id=user.id, payload={"auto": True, "reason": "host_or_admin"})
-        db.flush()
+    if user.id == room.owner_user_id:
         return room_snapshot(db, room)
     if participant.is_member:
         return room_snapshot(db, room)
@@ -156,7 +152,7 @@ def approve_room_membership(db: Session, room: Room, actor: User, target: User) 
     participant = _ensure_room_participant(db, room, target)
     participant.is_member = True
     participant.member_added_at = datetime.utcnow()
-    record_room_event(db, room, "room.member_request.approved", actor_user_id=actor.id, target_user_id=target.id, payload={"status": "approved"})
+    record_room_event(db, room, "room.member_request.approved", actor_user_id=actor.id, target_user_id=target.id, payload={"status": "room_member"})
     db.flush()
     return room_snapshot(db, room)
 
@@ -181,7 +177,7 @@ def remove_room_member(db: Session, room: Room, actor: User, target: User) -> di
     if participant:
         participant.is_member = False
         participant.member_added_at = None
-    record_room_event(db, room, "room.member.removed", actor_user_id=actor.id, target_user_id=target.id)
+    record_room_event(db, room, "room.member.removed", actor_user_id=actor.id, target_user_id=target.id, payload={"status": "removed"})
     db.flush()
     return room_snapshot(db, room)
 
