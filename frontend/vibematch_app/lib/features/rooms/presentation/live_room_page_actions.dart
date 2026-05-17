@@ -208,26 +208,26 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     _clearRoomFocus();
 
     if (_currentUserIsMember) {
-      RoomToast.show(context, 'You are already a member of $_roomName');
+      RoomToast.show(context, 'You are already a room member of $_roomName');
       return;
     }
 
     if (_joinRequestPending) {
-      RoomToast.show(context, 'Your member request is already pending.');
+      RoomToast.show(context, 'Your room member request is already pending.');
       return;
     }
 
     LiveRoomMembershipService.markPending(
       roomId: _roomId,
       userId: _currentUser.id,
+      roomName: _roomName,
+      language: widget.language,
+      modeTitle: widget.modeTitle,
+      onlineCount: _safeOnlineCount,
     );
+    LiveRoomMemberRequestService.instance.requestMembership();
 
-    _roomMessageController.requestJoin();
-
-    _openInfoSheet(
-      'Request sent',
-      'Your request to become a member of $_roomName has been sent to the channel host. The + button will stay hidden until the host accepts or rejects it.',
-    );
+    RoomToast.show(context, 'Room member request sent to channel host');
   }
 
   void _openRoomUsersSheet() {
@@ -437,22 +437,38 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
 
   void _setUserAsAdmin(String userId) {
     Navigator.pop(context);
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can add admins');
+      return;
+    }
     _seatController.setUserAsAdmin(userId);
     _clearRoomFocus();
   }
 
   void _removeUserAsAdmin(String userId) {
     Navigator.pop(context);
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can remove admins');
+      return;
+    }
     _seatController.removeUserAsAdmin(userId);
     _clearRoomFocus();
   }
 
   void _addRoomAdminFromInfo(SeatUser user) {
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can add admins');
+      return;
+    }
     _seatController.setUserAsAdmin(user.id);
     _clearRoomFocus();
   }
 
   void _removeRoomAdminFromInfo(SeatUser user) {
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can remove admins');
+      return;
+    }
     _seatController.removeUserAsAdmin(user.id);
     _clearRoomFocus();
   }
@@ -493,5 +509,14 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
   void _openEmojiTray() {
     _clearRoomFocus();
     LiveRoomEmojiActionsModule.openEmojiTray(context: context);
+  }
+}
+
+extension _FirstOrNullOnIterable<T> on Iterable<T> {
+  T? get firstOrNull {
+    for (final item in this) {
+      return item;
+    }
+    return null;
   }
 }
