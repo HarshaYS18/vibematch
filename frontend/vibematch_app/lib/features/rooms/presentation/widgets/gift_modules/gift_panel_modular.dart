@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../data/gift_catalog_api_service.dart';
 import '../../live_room_models.dart';
 import '../room_theme.dart';
 import 'gift_bottom_action_bar.dart';
-import 'gift_category_strip.dart';
 import 'gift_gallery_pager.dart';
-import 'gift_mock_extras.dart';
 import 'gift_panel_constants.dart';
 import 'gift_panel_header.dart';
 import 'gift_targets_row.dart';
@@ -13,9 +12,10 @@ import 'gift_targets_row.dart';
 class GiftPanelModular extends StatefulWidget {
   const GiftPanelModular({
     super.key,
+    required this.categories,
     required this.gifts,
     required this.users,
-    required this.selectedCategory,
+    required this.selectedCategoryKey,
     required this.selectedGift,
     required this.selectedReceiverIds,
     required this.selectedCombo,
@@ -29,23 +29,21 @@ class GiftPanelModular extends StatefulWidget {
     this.onLuckyRankingsTap,
   });
 
+  final List<GiftCatalogCategory> categories;
   final List<GiftItem> gifts;
   final List<SeatUser> users;
-  final GiftCategory selectedCategory;
+  final String selectedCategoryKey;
   final GiftItem? selectedGift;
   final Set<String> selectedReceiverIds;
   final int selectedCombo;
   final int coinBalance;
-  final ValueChanged<GiftCategory> onCategoryChanged;
+  final ValueChanged<String> onCategoryChanged;
   final ValueChanged<GiftItem> onGiftSelected;
   final ValueChanged<String> onReceiverToggle;
   final ValueChanged<int> onComboChanged;
   final VoidCallback onSend;
   final VoidCallback onRecharge;
   final VoidCallback? onLuckyRankingsTap;
-
-  static List<GiftItem> withMockExtras(List<GiftItem> gifts) =>
-      GiftMockExtras.mergeWith(gifts);
 
   @override
   State<GiftPanelModular> createState() => _GiftPanelModularState();
@@ -54,8 +52,8 @@ class GiftPanelModular extends StatefulWidget {
 class _GiftPanelModularState extends State<GiftPanelModular> {
   late final PageController _categoryPageController;
 
-  int _pageIndexFor(GiftCategory category) {
-    final index = GiftCategoryStrip.visibleCategories.indexOf(category);
+  int _pageIndexFor(String categoryKey) {
+    final index = widget.categories.indexWhere((category) => category.key == categoryKey);
     return index < 0 ? 0 : index;
   }
 
@@ -63,17 +61,18 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
   void initState() {
     super.initState();
     _categoryPageController = PageController(
-      initialPage: _pageIndexFor(widget.selectedCategory),
+      initialPage: _pageIndexFor(widget.selectedCategoryKey),
     );
   }
 
   @override
   void didUpdateWidget(covariant GiftPanelModular oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedCategory != widget.selectedCategory &&
+    if ((oldWidget.selectedCategoryKey != widget.selectedCategoryKey ||
+            oldWidget.categories.length != widget.categories.length) &&
         _categoryPageController.hasClients) {
       _categoryPageController.animateToPage(
-        _pageIndexFor(widget.selectedCategory),
+        _pageIndexFor(widget.selectedCategoryKey),
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
       );
@@ -88,8 +87,7 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
 
   @override
   Widget build(BuildContext context) {
-    final allGifts = GiftPanelModular.withMockExtras(widget.gifts);
-    final comboOptions = widget.selectedCategory == GiftCategory.lucky
+    final comboOptions = widget.selectedCategoryKey == 'lucky'
         ? GiftPanelConstants.luckyCombos
         : GiftPanelConstants.combos;
     final isLuckyPacket = widget.selectedGift?.id == 'lucky_packet';
@@ -118,11 +116,12 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
             const SheetHandle(width: 42),
             const SizedBox(height: 6),
             GiftPanelHeader(
-              selectedCategory: widget.selectedCategory,
-              onCategoryChanged: (category) {
-                widget.onCategoryChanged(category);
+              categories: widget.categories,
+              selectedCategoryKey: widget.selectedCategoryKey,
+              onCategoryChanged: (categoryKey) {
+                widget.onCategoryChanged(categoryKey);
                 _categoryPageController.animateToPage(
-                  _pageIndexFor(category),
+                  _pageIndexFor(categoryKey),
                   duration: const Duration(milliseconds: 180),
                   curve: Curves.easeOutCubic,
                 );
@@ -142,8 +141,9 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
             Expanded(
               child: GiftGalleryPager(
                 controller: _categoryPageController,
-                gifts: allGifts,
-                selectedCategory: widget.selectedCategory,
+                categories: widget.categories,
+                gifts: widget.gifts,
+                selectedCategoryKey: widget.selectedCategoryKey,
                 selectedGift: widget.selectedGift,
                 onCategoryChanged: widget.onCategoryChanged,
                 onGiftSelected: widget.onGiftSelected,
