@@ -61,9 +61,7 @@ def _resolve_user(db, payload: dict[str, Any]) -> User | None:
 async def room_realtime_socket(websocket: WebSocket) -> None:
     active_room_id: str | None = None
     active_user_id: int | None = None
-    accepted = False
     await websocket.accept()
-    accepted = True
 
     try:
         while _websocket_connected(websocket):
@@ -229,17 +227,8 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
     except RuntimeError:
         pass
     finally:
-        disconnected_rooms = room_realtime_connections.disconnect(websocket)
-        if accepted and active_user_id:
-            for room_id in disconnected_rooms or ([active_room_id] if active_room_id else []):
-                if not room_id:
-                    continue
-                with SessionLocal() as db:
-                    room = room_state_service.get_room_by_public_id(db, room_id)
-                    user = db.query(User).filter(User.id == active_user_id).first()
-                    if room and user:
-                        # WebSocket disconnect means offline from room presence, but does not clear seat.
-                        # This keeps minimize/restore and quick reconnect stable.
-                        snapshot = room_action_service.leave_room(db, room, user, release_seat=False)
-                        db.commit()
-                        await _broadcast_snapshot(room_id, "room/peer_left", snapshot)
+        # Important: never mutate saved room state on raw socket disconnect.
+        # Minimize/restore, mobile network changes, browser refreshes, and quick reconnects
+        # should not reset seats, mic state, locked seats, room settings, or chat data.
+        # Real leave behavior must come from the explicit `room/leave` event only.
+        room_realtime_connections.disconnect(websocket)
