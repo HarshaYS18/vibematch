@@ -63,13 +63,6 @@ def _next_sequence(db: Session, room: Room) -> int:
 
 
 def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = None) -> list[int]:
-    """Remove users who have not heartbeated/reconnected for 10 minutes.
-
-    WebSocket memory is delivery-only. Room presence and seats are backend-owned.
-    A raw socket disconnect keeps the user restorable temporarily, but if
-    `last_seen_at` stays older than the timeout, backend releases the user and
-    their seat.
-    """
     current_time = now or datetime.utcnow()
     cutoff = current_time - timedelta(seconds=ROOM_STALE_PRESENCE_TIMEOUT_SECONDS)
     stale_participants = (
@@ -93,11 +86,12 @@ def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = N
 
     seats = db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id.in_(stale_user_ids)).all()
     for seat in seats:
+        released_user_id = seat.occupant_user_id
         seat.occupant_user_id = None
         seat.mic_enabled = False
         seat.admin_muted = False
         seat.left_at = current_time
-        seat.updated_by_user_id = seat.occupant_user_id
+        seat.updated_by_user_id = released_user_id
 
     for user_id in stale_user_ids:
         event = RoomRealtimeEvent(
@@ -204,12 +198,24 @@ def recent_chat_messages(db: Session, room: Room, limit: int = 80) -> list[dict[
     return [chat_payload(message) for message in reversed(rows)]
 
 
+def room_participant_type(is_host: bool, is_room_admin: bool, is_room_member: bool) -> str:
+    if is_host:
+        return "owner"
+    if is_room_admin:
+        return "admin"
+    if is_room_member:
+        return "room_member"
+    return "visitor"
+
+
 def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeatState | None) -> dict[str, Any]:
     user = participant.user
     backend_user_id = participant.user_id
     public_user_id = user.public_user_id if user else backend_user_id
     is_host = backend_user_id == room.owner_user_id
     is_room_admin = participant.is_room_admin or is_host
+    is_room_member = bool(participant.is_member or is_room_admin or is_host)
+    participant_type = room_participant_type(is_host, is_room_admin, is_room_member)
     return {
         "backend_user_id": backend_user_id,
         "user_id": backend_user_id,
@@ -222,13 +228,16 @@ def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeat
         "official_handle": user.official_handle if user else None,
         "is_protected": bool(user.is_protected) if user else False,
         "is_host": is_host,
+        "is_room_owner": is_host,
         "is_room_admin": is_room_admin,
-        "role_label": "Host" if is_host else ("Admin" if is_room_admin else "Member"),
+        "is_room_member": is_room_member,
+        "participant_type": participant_type,
+        "role_label": "Host" if is_host else ("Admin" if is_room_admin else ("Room Member" if is_room_member else "Visitor")),
         "seat_index": seat.seat_index if seat else None,
         "mic_enabled": seat.mic_enabled if seat else False,
         "admin_muted": seat.admin_muted if seat else False,
         "is_active": participant.is_active,
-        "is_member": participant.is_member,
+        "is_member": is_room_member,
         "joined_at": participant.joined_at.isoformat() if participant.joined_at else None,
         "last_seen_at": participant.last_seen_at.isoformat() if participant.last_seen_at else None,
     }
@@ -262,7 +271,10 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
             "display_name": participant_data["display_name"],
             "avatar_url": participant_data["avatar_url"],
             "is_host": participant_data["is_host"],
+            "is_room_owner": participant_data["is_room_owner"],
             "is_room_admin": participant_data["is_room_admin"],
+            "is_room_member": participant_data["is_room_member"],
+            "participant_type": participant_data["participant_type"],
             "role_label": participant_data["role_label"],
             "seat_index": participant_data["seat_index"],
             "mic_enabled": participant_data["mic_enabled"],
