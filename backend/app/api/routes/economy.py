@@ -13,7 +13,7 @@ from app.models.room_participant import RoomParticipant
 from app.models.user import User
 from app.realtime.connection_manager import room_realtime_connections
 from app.schemas.economy import EconomyDashboardResponse, EconomyPoolResponse, EconomyWalletResponse, GiftEconomyPreviewRequest, GiftEconomyPreviewResponse, GiftSendPublicRequest, GiftSendRequest, GiftSendResponse, RubyConversionRequest, RubyWithdrawRequestCreate
-from app.services import economy_level_service, economy_service, lucky_gift_house_service, lucky_gift_props_service, lucky_gift_stats_service
+from app.services import economy_level_service, economy_service, gift_catalog_service, lucky_gift_house_service, lucky_gift_props_service, lucky_gift_stats_service
 from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.websocket.inbox_ws import inbox_ws_manager
 
@@ -111,20 +111,11 @@ def _room_from_public_id(db: Session, room_public_id: str | None) -> Room | None
     return room
 
 
-def _room_id_from_public_id(db: Session, room_public_id: str | None) -> int | None:
-    room = _room_from_public_id(db, room_public_id)
-    return room.id if room is not None else None
-
-
 def _receiver_from_public_id(db: Session, receiver_public_user_id: int) -> User:
     receiver = db.query(User).filter(User.public_user_id == receiver_public_user_id, User.is_active.is_(True), User.is_banned.is_(False)).first()
     if receiver is None:
         raise HTTPException(status_code=404, detail="Receiver not found")
     return receiver
-
-
-def _receiver_id_from_public_id(db: Session, receiver_public_user_id: int) -> int:
-    return _receiver_from_public_id(db, receiver_public_user_id).id
 
 
 async def _broadcast_user_level_updates(db: Session, sender_user_id: int, receiver_user_id: int) -> None:
@@ -170,7 +161,8 @@ async def _broadcast_room_gift_event(
 ) -> None:
     if room is None:
         return
-    gift_name = gift_id.replace("_", " ").title()
+    catalog_gift = gift_catalog_service.find_gift(gift_id) or {}
+    gift_name = str(catalog_gift.get("name") or gift_id.replace("_", " ").title())
     total_coin_value = int(result.get("total_coin_value") or (int(coin_value) * int(quantity)))
     multiplier = int(result.get("lucky_multiplier") or 0)
     reward = int(result.get("lucky_reward_coin_amount") or 0)
@@ -200,9 +192,23 @@ async def _broadcast_room_gift_event(
                 "message": message,
                 "gift_id": gift_id,
                 "gift_name": gift_name,
+                "gift_category": catalog_gift.get("category") or ("lucky" if is_lucky else "classic"),
+                "gift_type": catalog_gift.get("gift_type") or ("lucky" if is_lucky else "normal"),
                 "quantity": quantity,
                 "coin_value": coin_value,
                 "total_coin_value": total_coin_value,
+                "asset_url": catalog_gift.get("asset_url"),
+                "video_url": catalog_gift.get("video_url"),
+                "asset_path": catalog_gift.get("asset_path"),
+                "video_asset_path": catalog_gift.get("video_asset_path"),
+                "animation_type": catalog_gift.get("animation_type") or "image",
+                "gift_version": catalog_gift.get("version") or 1,
+                "catalog_version": catalog_gift.get("catalog_version") or gift_catalog_service.GIFT_CATALOG_VERSION,
+                "show_gift_slide": bool(catalog_gift.get("show_gift_slide", True)),
+                "show_premium_broadcast": bool(catalog_gift.get("show_premium_broadcast", False)),
+                "show_gift_flight": bool(catalog_gift.get("show_gift_flight", True)),
+                "ribbon_tier": "premium" if catalog_gift.get("show_premium_broadcast") else "normal",
+                "broadcast_scope": "room",
                 "is_lucky": is_lucky,
                 "lucky_multiplier": multiplier,
                 "lucky_reward_coin_amount": reward,
@@ -286,12 +292,14 @@ async def send_gift_public(payload: GiftSendPublicRequest, current_user: User = 
     receiver = _receiver_from_public_id(db, payload.receiver_public_user_id)
     room = _room_from_public_id(db, payload.room_public_id)
     room_id = room.id if room is not None else None
+    catalog_gift = gift_catalog_service.find_gift(payload.gift_id)
+    coin_value = int(catalog_gift.get("coin_value") if catalog_gift is not None else payload.coin_value)
     result = economy_service.send_gift(
         db=db,
         sender=current_user,
         receiver_user_id=receiver.id,
         gift_id=payload.gift_id,
-        coin_value=payload.coin_value,
+        coin_value=coin_value,
         quantity=payload.quantity,
         room_id=room_id,
         relationship_id=payload.relationship_id,
@@ -305,7 +313,7 @@ async def send_gift_public(payload: GiftSendPublicRequest, current_user: User = 
         sender=current_user,
         receiver=receiver,
         gift_id=payload.gift_id,
-        coin_value=payload.coin_value,
+        coin_value=coin_value,
         quantity=payload.quantity,
         result=result,
         is_lucky=False,
@@ -318,8 +326,10 @@ async def send_lucky_gift_public(payload: GiftSendPublicRequest, current_user: U
     receiver = _receiver_from_public_id(db, payload.receiver_public_user_id)
     room = _room_from_public_id(db, payload.room_public_id)
     room_id = room.id if room is not None else None
+    catalog_gift = gift_catalog_service.find_gift(payload.gift_id)
+    coin_value = int(catalog_gift.get("coin_value") if catalog_gift is not None else payload.coin_value)
     try:
-        total_coin_preview = int(payload.coin_value) * int(payload.quantity)
+        total_coin_preview = int(coin_value) * int(payload.quantity)
         risk_result = lucky_gift_props_service.evaluate_whale_risk(db, user_id=current_user.id, spend_amount=total_coin_preview)
         if risk_result.get("action") != "ALLOW":
             raise HTTPException(status_code=429, detail={"message": "Lucky gift blocked by whale detection", "risk": risk_result})
@@ -328,7 +338,7 @@ async def send_lucky_gift_public(payload: GiftSendPublicRequest, current_user: U
             sender=current_user,
             receiver_user_id=receiver.id,
             gift_id=payload.gift_id,
-            coin_value=payload.coin_value,
+            coin_value=coin_value,
             quantity=payload.quantity,
             room_id=room_id,
             relationship_id=payload.relationship_id,
@@ -337,7 +347,7 @@ async def send_lucky_gift_public(payload: GiftSendPublicRequest, current_user: U
         )
         total_coin_value = int(result["total_coin_value"])
         lucky_gift_house_service.record_spend_income(db, amount=total_coin_value, actor=current_user, source_id=f"lucky_gift:{result['gift_transaction_id']}", user_id=current_user.id, metadata={"gift_id": payload.gift_id, "receiver_user_id": receiver.id})
-        lucky_result = lucky_gift_props_service.roll_lucky_gift(db, gift_id=payload.gift_id, gift_name=payload.gift_id.replace("_", " ").title(), base_coin_value=payload.coin_value, quantity=payload.quantity, house_risk_score=int(risk_result.get("score") or 0))
+        lucky_result = lucky_gift_props_service.roll_lucky_gift(db, gift_id=payload.gift_id, gift_name=payload.gift_id.replace("_", " ").title(), base_coin_value=coin_value, quantity=payload.quantity, house_risk_score=int(risk_result.get("score") or 0))
         reward = int(lucky_result.get("reward_coin_amount") or 0)
         multiplier = int(lucky_result.get("multiplier") or 0)
         house_result = lucky_gift_house_service.validate_payout_exposure(db, payout_amount=reward)
@@ -350,7 +360,7 @@ async def send_lucky_gift_public(payload: GiftSendPublicRequest, current_user: U
             room_id=room_id,
             gift_id=payload.gift_id,
             gift_name=payload.gift_id.replace("_", " ").title(),
-            coin_value=payload.coin_value,
+            coin_value=coin_value,
             quantity=payload.quantity,
             spent_coins=total_coin_value,
             multiplier=multiplier,
@@ -387,7 +397,7 @@ async def send_lucky_gift_public(payload: GiftSendPublicRequest, current_user: U
         sender=current_user,
         receiver=receiver,
         gift_id=payload.gift_id,
-        coin_value=payload.coin_value,
+        coin_value=coin_value,
         quantity=payload.quantity,
         result=result,
         is_lucky=True,
