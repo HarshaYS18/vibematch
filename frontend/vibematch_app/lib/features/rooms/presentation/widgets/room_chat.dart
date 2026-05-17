@@ -59,8 +59,9 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
   @override
   void didUpdateWidget(covariant RoomChatFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.messages.length < _clearedMessageCount)
+    if (widget.messages.length < _clearedMessageCount) {
       _clearedMessageCount = widget.messages.length;
+    }
     if (widget.messages.length != _lastMessageCount) {
       _lastMessageCount = widget.messages.length;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -109,25 +110,28 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.only(top: 8, bottom: 10),
+      padding: const EdgeInsets.only(top: 10, bottom: 14),
       physics: const BouncingScrollPhysics(),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       itemCount: visibleMessages.length,
       itemBuilder: (context, index) {
         final message = visibleMessages[index];
-        return RoomTextBubbleHost(
-          bubble: null,
-          child: _CompactChatLine(
-            message: message,
-            canManageSeatApplications: widget.canManageSeatApplications,
-            onSenderTap: widget.onSenderTap == null
-                ? null
-                : () => widget.onSenderTap!(message),
-            onMentionTap: widget.onMentionTap,
-            onApproveSeatApplication: () =>
-                widget.onApproveSeatApplication(message),
-            onRejectSeatApplication: () =>
-                widget.onRejectSeatApplication(message),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 7),
+          child: RoomTextBubbleHost(
+            bubble: null,
+            child: _CompactChatLine(
+              message: message,
+              canManageSeatApplications: widget.canManageSeatApplications,
+              onSenderTap: widget.onSenderTap == null
+                  ? null
+                  : () => widget.onSenderTap!(message),
+              onMentionTap: widget.onMentionTap,
+              onApproveSeatApplication: () =>
+                  widget.onApproveSeatApplication(message),
+              onRejectSeatApplication: () =>
+                  widget.onRejectSeatApplication(message),
+            ),
           ),
         );
       },
@@ -154,107 +158,100 @@ class _CompactChatLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (message.isSystemMessage)
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: _SystemEventLine(message: message),
-      );
+    if (message.isSystemMessage) {
+      return _SystemEventLine(message: message);
+    }
 
     final showActions =
         message.isSeatApplication &&
         canManageSeatApplications &&
         !message.applicationResolved;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Flexible(
-            fit: FlexFit.loose,
-            child: _ChatGlassBox(
-              onTap: onSenderTap,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _ChatAvatar(
-                    senderName: message.senderName,
-                    avatarUrl: message.senderAvatarUrl,
-                    radius: 13.5,
-                    backgroundColor: message.isSeatApplication
-                        ? RoomColors.aqua
-                        : RoomColors.violet,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    fit: FlexFit.loose,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        RichText(
-                          maxLines: message.isImageMessage ? 1 : 2,
-                          overflow: TextOverflow.ellipsis,
-                          text: TextSpan(
-                            children: [
-                              WidgetSpan(
-                                alignment: PlaceholderAlignment.middle,
-                                child: ChatVipBadge(
-                                  level: message.vipLevel,
-                                  showWhenZero: true,
-                                ),
-                              ),
-                              const TextSpan(text: '  '),
-                              WidgetSpan(
-                                alignment: PlaceholderAlignment.middle,
-                                child: GestureDetector(
-                                  onTap: onSenderTap,
-                                  child: VmGradientNameText(
-                                    text: message.senderName,
-                                    gradientColors: message.senderNameGradientColors,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14.8,
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.15,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const TextSpan(text: '\n '),
-                              ..._messageSpans(message, onMentionTap),
-                            ],
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Flexible(
+          fit: FlexFit.loose,
+          child: _ChatGlassBox(
+            onTap: onSenderTap,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ChatAvatar(
+                  senderName: message.senderName,
+                  avatarUrl: message.senderAvatarUrl,
+                  radius: 13.5,
+                  backgroundColor: message.isSeatApplication
+                      ? RoomColors.aqua
+                      : RoomColors.violet,
+                ),
+                const SizedBox(width: 9),
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 5,
+                        runSpacing: 2,
+                        children: [
+                          ChatVipBadge(
+                            level: message.vipLevel,
+                            showWhenZero: true,
                           ),
-                        ),
-                        if (message.isImageMessage) ...[
-                          const SizedBox(height: 6),
-                          _ChatImagePreview(imageUrl: message.imageUrl!),
+                          GestureDetector(
+                            onTap: onSenderTap,
+                            child: VmGradientNameText(
+                              text: message.senderName,
+                              gradientColors: message.senderNameGradientColors,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14.8,
+                                fontWeight: FontWeight.w900,
+                                height: 1.15,
+                              ),
+                            ),
+                          ),
                         ],
+                      ),
+                      const SizedBox(height: 3),
+                      RichText(
+                        maxLines: message.isImageMessage ? 1 : 3,
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          children: _messageSpans(message, onMentionTap),
+                        ),
+                      ),
+                      if (message.isImageMessage) ...[
+                        const SizedBox(height: 6),
+                        _ChatImagePreview(imageUrl: message.imageUrl!),
                       ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          if (showActions) ...[
-            const SizedBox(width: 8),
-            _SeatApplicationActionButton(
-              label: 'Reject',
-              background: RoomColors.coral.withValues(alpha: 0.92),
-              foreground: Colors.white,
-              onTap: onRejectSeatApplication,
-            ),
-            const SizedBox(width: 6),
-            _SeatApplicationActionButton(
-              label: 'Agree',
-              background: RoomColors.aqua,
-              foreground: RoomColors.deep,
-              onTap: onApproveSeatApplication,
-            ),
-          ],
+        ),
+        if (showActions) ...[
+          const SizedBox(width: 8),
+          _SeatApplicationActionButton(
+            label: 'Reject',
+            background: RoomColors.coral.withValues(alpha: 0.92),
+            foreground: Colors.white,
+            onTap: onRejectSeatApplication,
+          ),
+          const SizedBox(width: 6),
+          _SeatApplicationActionButton(
+            label: 'Agree',
+            background: RoomColors.aqua,
+            foreground: RoomColors.deep,
+            onTap: onApproveSeatApplication,
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -267,9 +264,10 @@ class _CompactChatLine extends StatelessWidget {
           text: part,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.94),
-            fontSize: 13.2,
+            fontSize: 13.4,
             fontWeight: FontWeight.w700,
-            height: 1.24,
+            height: 1.28,
+            letterSpacing: 0.05,
           ),
         );
       }
@@ -279,9 +277,10 @@ class _CompactChatLine extends StatelessWidget {
           ..onTap = () => onMentionTap?.call(part.replaceFirst('@', '')),
         style: const TextStyle(
           color: RoomColors.aqua,
-          fontSize: 13.2,
+          fontSize: 13.4,
           fontWeight: FontWeight.w900,
-          height: 1.24,
+          height: 1.28,
+          letterSpacing: 0.05,
         ),
       );
     }).toList(growable: false);
@@ -297,6 +296,7 @@ class _SystemEventLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.22),
@@ -334,7 +334,7 @@ class _ChatGlassBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: child,
         ),
       ),
