@@ -36,7 +36,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
   final double bottomPadding;
   final ValueChanged<GiftSlide> onComboTap;
   final VoidCallback onComboButtonTap;
-  final ValueChanged<GiftSlide> onVideoGiftFinished;
+  final ValueChanged<GiftSlide> onVideoFinished;
   final VoidCallback? onLuckyPacketGetTap;
   final VoidCallback? onLuckyPacketResultsDismiss;
 
@@ -81,19 +81,28 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     if (!_handledBackendGiftIds.add(event.id)) return;
 
     final gift = _giftItemForEvent(event);
-    final videoPath = _videoPathForEvent(event, gift);
+    final videoUrl = _clean(event.giftVideoUrl) ?? _clean(gift.videoUrl);
+    final videoPath = _clean(event.giftVideoAssetPath) ??
+        _clean(gift.videoAssetPath) ??
+        _videoPathFromNormalizedId(_normalize(event.giftId)) ??
+        _videoPathFromNormalizedId(_normalize(event.giftName));
+    final assetUrl = _clean(event.giftAssetUrl) ?? _clean(gift.assetUrl);
+    final assetPath = _clean(event.giftAssetPath) ?? _clean(gift.assetPath);
+
     final slide = GiftSlide(
       id: event.id,
       senderName: event.actorName.trim().isEmpty ? 'Vibe User' : event.actorName.trim(),
       receiverName: event.targetName.trim().isEmpty ? 'user' : event.targetName.trim(),
       giftName: _giftDisplayName(event, gift),
       giftIcon: gift.icon,
-      giftAssetPath: gift.assetPath,
+      giftAssetPath: assetPath,
+      giftAssetUrl: assetUrl,
       videoAssetPath: videoPath,
+      videoUrl: videoUrl,
       colors: _colorsForBackendEvent(event, gift),
       combo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
       baseCombo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
-      remainingSeconds: videoPath == null ? 15 : 10,
+      remainingSeconds: (videoUrl == null && videoPath == null) ? 15 : 10,
     );
 
     if (event.showGiftSlide || slide.isVideoGift) {
@@ -137,17 +146,21 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       colors: looksPremium
           ? const <Color>[Color(0xFFFFD166), Color(0xFF8C5CF6)]
           : const <Color>[Color(0xFFFFC857), Color(0xFF12C7B7)],
-      videoAssetPath: _videoPathFromNormalizedId(cleanGiftId) ??
+      assetUrl: event.giftAssetUrl,
+      videoUrl: event.giftVideoUrl,
+      assetPath: event.giftAssetPath,
+      videoAssetPath: event.giftVideoAssetPath ??
+          _videoPathFromNormalizedId(cleanGiftId) ??
           _videoPathFromNormalizedId(cleanGiftName),
+      giftType: event.giftType,
+      animationType: event.animationType,
+      categoryKey: event.giftCategory,
+      version: event.giftVersion,
+      catalogVersion: event.catalogVersion,
+      showGiftSlide: event.showGiftSlide,
+      showPremiumBroadcast: event.showPremiumBroadcast,
+      showGiftFlight: event.showGiftFlight,
     );
-  }
-
-  String? _videoPathForEvent(LiveRoomSystemEvent event, GiftItem gift) {
-    final directPath = gift.videoAssetPath?.trim();
-    if (directPath != null && directPath.isNotEmpty) return directPath;
-    final idPath = _videoPathFromNormalizedId(_normalize(event.giftId));
-    if (idPath != null) return idPath;
-    return _videoPathFromNormalizedId(_normalize(event.giftName));
   }
 
   String? _videoPathFromNormalizedId(String normalized) {
@@ -175,6 +188,12 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         return 'assets/videos/gifts/premium_magic_3.mp4';
     }
     return null;
+  }
+
+  String? _clean(String? value) {
+    final clean = value?.trim();
+    if (clean == null || clean.isEmpty || clean == 'null') return null;
+    return clean;
   }
 
   String _normalize(String value) {
@@ -255,7 +274,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         targetName: slide.receiverName,
         giftName: gift.name,
         combo: slide.combo,
-        giftAssetPath: gift.assetPath,
+        giftAssetPath: slide.giftAssetPath,
+        giftAssetUrl: slide.giftAssetUrl,
       ),
     );
   }
@@ -291,9 +311,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     final normalSlides = _backendGiftSlides
         .where((slide) => !slide.isVideoGift)
         .toList(growable: false);
-    final hasActiveVideoGift = _backendGiftSlides.any(
-      (slide) => slide.videoAssetPath?.trim().isNotEmpty ?? false,
-    );
+    final hasActiveVideoGift = _backendGiftSlides.any((slide) => slide.isVideoGift);
     final hasLuckyPacketDialog = widget.activeLuckyPacket != null &&
         widget.activeLuckyPacket!.phase != LuckyPacketPhase.countdown;
 
