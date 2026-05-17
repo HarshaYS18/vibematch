@@ -39,13 +39,17 @@ def record_room_event(
     return event
 
 
-def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    now = datetime.utcnow()
-    participant = (
+def _room_participant(db: Session, room: Room, user: User) -> RoomParticipant | None:
+    return (
         db.query(RoomParticipant)
         .filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id)
         .first()
     )
+
+
+def _ensure_room_participant(db: Session, room: Room, user: User) -> RoomParticipant:
+    now = datetime.utcnow()
+    participant = _room_participant(db, room, user)
     if participant is None:
         participant = RoomParticipant(
             room_id=room.id,
@@ -63,17 +67,45 @@ def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | Non
         participant.left_at = None
         if user.id == room.owner_user_id:
             participant.is_room_admin = True
+    return participant
+
+
+def _has_pending_room_member_request(db: Session, room: Room, user_id: int) -> bool:
+    pending = (
+        db.query(RoomRealtimeEvent)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type == "room.member_request.pending",
+            RoomRealtimeEvent.actor_user_id == user_id,
+        )
+        .order_by(RoomRealtimeEvent.id.desc())
+        .first()
+    )
+    if pending is None:
+        return False
+
+    decision = (
+        db.query(RoomRealtimeEvent)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected"]),
+            RoomRealtimeEvent.target_user_id == user_id,
+            RoomRealtimeEvent.id > pending.id,
+        )
+        .first()
+    )
+    return decision is None
+
+
+def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    _ensure_room_participant(db, room, user)
     record_room_event(db, room, "room.joined", actor_user_id=user.id, payload=payload or {})
     db.flush()
     return room_snapshot(db, room)
 
 
 def heartbeat_room(db: Session, room: Room, user: User) -> dict[str, Any]:
-    participant = (
-        db.query(RoomParticipant)
-        .filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id)
-        .first()
-    )
+    participant = _room_participant(db, room, user)
     if participant:
         participant.is_active = True
         participant.last_seen_at = datetime.utcnow()
@@ -84,11 +116,7 @@ def heartbeat_room(db: Session, room: Room, user: User) -> dict[str, Any]:
 
 def leave_room(db: Session, room: Room, user: User, release_seat: bool = False) -> dict[str, Any]:
     now = datetime.utcnow()
-    participant = (
-        db.query(RoomParticipant)
-        .filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id)
-        .first()
-    )
+    participant = _room_participant(db, room, user)
     if participant:
         participant.is_active = False
         participant.left_at = now
@@ -101,6 +129,59 @@ def leave_room(db: Session, room: Room, user: User, release_seat: bool = False) 
             seat.left_at = now
             seat.updated_by_user_id = user.id
     record_room_event(db, room, "room.left", actor_user_id=user.id, payload={"release_seat": release_seat})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def request_room_membership(db: Session, room: Room, user: User) -> dict[str, Any]:
+    participant = _ensure_room_participant(db, room, user)
+    if user.id == room.owner_user_id or participant.is_room_admin:
+        participant.is_member = True
+        participant.member_added_at = participant.member_added_at or datetime.utcnow()
+        record_room_event(db, room, "room.member_request.approved", actor_user_id=user.id, target_user_id=user.id, payload={"auto": True, "reason": "host_or_admin"})
+        db.flush()
+        return room_snapshot(db, room)
+    if participant.is_member:
+        return room_snapshot(db, room)
+    if _has_pending_room_member_request(db, room, user.id):
+        return room_snapshot(db, room)
+    record_room_event(db, room, "room.member_request.pending", actor_user_id=user.id, target_user_id=room.owner_user_id, payload={"status": "pending"})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def approve_room_membership(db: Session, room: Room, actor: User, target: User) -> dict[str, Any]:
+    if actor.id != room.owner_user_id:
+        return room_snapshot(db, room)
+    participant = _ensure_room_participant(db, room, target)
+    participant.is_member = True
+    participant.member_added_at = datetime.utcnow()
+    record_room_event(db, room, "room.member_request.approved", actor_user_id=actor.id, target_user_id=target.id, payload={"status": "approved"})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def reject_room_membership(db: Session, room: Room, actor: User, target: User) -> dict[str, Any]:
+    if actor.id != room.owner_user_id:
+        return room_snapshot(db, room)
+    participant = _ensure_room_participant(db, room, target)
+    if not participant.is_member:
+        participant.member_added_at = None
+    record_room_event(db, room, "room.member_request.rejected", actor_user_id=actor.id, target_user_id=target.id, payload={"status": "rejected"})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def remove_room_member(db: Session, room: Room, actor: User, target: User) -> dict[str, Any]:
+    if actor.id != room.owner_user_id:
+        return room_snapshot(db, room)
+    if target.id == room.owner_user_id:
+        return room_snapshot(db, room)
+    participant = _room_participant(db, room, target)
+    if participant:
+        participant.is_member = False
+        participant.member_added_at = None
+    record_room_event(db, room, "room.member.removed", actor_user_id=actor.id, target_user_id=target.id)
     db.flush()
     return room_snapshot(db, room)
 
