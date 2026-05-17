@@ -31,6 +31,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.availableAdminUsers,
     required this.onAddAdmin,
     required this.onRemoveAdmin,
+    required this.onRemoveRoomMember,
     required this.messages,
     required this.canManageSeatApplications,
     required this.messageController,
@@ -83,6 +84,7 @@ class LiveRoomBody extends StatelessWidget {
   final List<SeatUser> availableAdminUsers;
   final ValueChanged<SeatUser> onAddAdmin;
   final ValueChanged<SeatUser> onRemoveAdmin;
+  final ValueChanged<SeatUser> onRemoveRoomMember;
   final List<ChatEntry> messages;
   final bool canManageSeatApplications;
   final TextEditingController messageController;
@@ -177,6 +179,7 @@ class LiveRoomBody extends StatelessWidget {
                       availableAdminUsers: availableAdminUsers,
                       onAddAdmin: onAddAdmin,
                       onRemoveAdmin: onRemoveAdmin,
+                      onRemoveRoomMember: onRemoveRoomMember,
                       onBack: onBack,
                       onJoinTap: onJoinTap,
                       onShare: onShare,
