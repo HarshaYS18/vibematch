@@ -1,15 +1,26 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
 from starlette.websockets import WebSocketState
 
-from app.database import SessionLocal
+from app.database import SessionLocal, get_db
 from app.models.user import User
 from app.realtime.connection_manager import room_realtime_connections
 from app.services.rooms import room_action_service, room_state_service
 
 router = APIRouter(tags=["Room Realtime"])
+
+
+@router.get("/rooms/{room_public_id}/realtime-snapshot")
+def get_room_realtime_snapshot(room_public_id: str, db: Session = Depends(get_db)):
+    room = room_state_service.get_room_by_public_id(db, room_public_id)
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+    snapshot = room_state_service.room_snapshot(db, room)
+    db.commit()
+    return {"room_id": room_public_id, "room": snapshot}
 
 
 def _websocket_connected(websocket: WebSocket) -> bool:
