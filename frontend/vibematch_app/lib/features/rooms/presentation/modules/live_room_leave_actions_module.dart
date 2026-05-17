@@ -90,14 +90,24 @@ class LiveRoomLeaveActionsModule {
     final roomNavigator = Navigator.of(context);
 
     roomStateController.setExitingRoom(true);
-    unawaited(LiveRoomMediaSignalingService.instance.leaveRoom());
+
+    // Production rule:
+    // Explicit Leave Room is different from minimize/network reconnect.
+    // A real leave must release the current seat first so re-entry comes back
+    // as audience unless the user explicitly takes a seat again.
+    LiveRoomMediaSignalingService.instance.leaveSeat();
+    unawaited(
+      Future<void>.delayed(const Duration(milliseconds: 120), () {
+        return LiveRoomMediaSignalingService.instance.leaveRoom();
+      }),
+    );
     Navigator.pop(sheetContext);
 
     if (!mountedGetter()) return;
 
     roomStateController.setAllowRoomPop(true);
 
-    Future<void>.delayed(const Duration(milliseconds: 120), () {
+    Future<void>.delayed(const Duration(milliseconds: 180), () {
       if (!mountedGetter()) return;
       roomNavigator.maybePop();
     });
