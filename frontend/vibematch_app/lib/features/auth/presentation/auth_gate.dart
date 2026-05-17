@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/app_shell.dart';
 import '../data/auth_api_service.dart';
 import '../data/google_sign_in_config.dart';
-import '../data/google_web_auth_fallback_service.dart';
 import '../models/current_user.dart';
 import 'profile_setup_page.dart';
 
@@ -22,7 +21,6 @@ class _AuthGateState extends State<AuthGate> {
   static const String _profileSetupDonePrefix = 'vm_profile_setup_done_';
 
   final AuthApiService _authApiService = AuthApiService();
-  final GoogleWebAuthFallbackService _googleWebAuthFallbackService = const GoogleWebAuthFallbackService();
   late final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: GoogleSignInConfig.clientId,
     serverClientId: GoogleSignInConfig.serverClientId,
@@ -69,6 +67,42 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
+  Future<void> _loginWithLocalTest() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await _authApiService.logout();
+      await _googleSignIn.signOut();
+      final result = await _authApiService.devLogin(
+        email: 'founder@vibematch.com',
+        username: 'founder',
+        displayName: 'Founder Owner',
+      );
+      final user = await _authApiService.getCurrentUser(
+        accessToken: result.accessToken,
+        forceRefresh: true,
+      );
+      final needsSetup = await _shouldShowProfileSetup(user);
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+          _needsProfileSetup = needsSetup;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = 'Local login failed: $error\nMake sure backend .env has ENABLE_DEV_LOGIN=true and restart backend.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _loginWithGoogle() async {
     setState(() {
       _isLoading = true;
@@ -85,11 +119,16 @@ class _AuthGateState extends State<AuthGate> {
       }
 
       final auth = await account.authentication;
-      final result = await _googleWebAuthFallbackService.loginWithGoogleCredential(
-        idToken: auth.idToken,
-        googleAccessToken: auth.accessToken,
+      final idToken = auth.idToken;
+      if (idToken == null || idToken.trim().isEmpty) {
+        throw Exception('Google did not return an ID token. ${GoogleSignInConfig.setupHint}');
+      }
+
+      final result = await _authApiService.googleLogin(idToken: idToken);
+      final user = await _authApiService.getCurrentUser(
+        accessToken: result.accessToken,
+        forceRefresh: true,
       );
-      final user = result.user;
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
@@ -103,10 +142,9 @@ class _AuthGateState extends State<AuthGate> {
       final message = error.toString();
       final lower = message.toLowerCase();
       final helpfulMessage =
-          lower.contains('api exception: 10') ||
-              lower.contains('sign_in_failed')
-          ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
-          : message;
+          lower.contains('api exception: 10') || lower.contains('sign_in_failed')
+              ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
+              : message;
       if (mounted) setState(() => _error = helpfulMessage);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -159,6 +197,7 @@ class _AuthGateState extends State<AuthGate> {
       return _LoginScreen(
         isLoading: _isLoading,
         error: _error,
+        onLocalLoginPressed: _loginWithLocalTest,
         onGoogleLoginPressed: _loginWithGoogle,
       );
     }
@@ -195,11 +234,13 @@ class _LoginScreen extends StatelessWidget {
   const _LoginScreen({
     required this.isLoading,
     required this.error,
+    required this.onLocalLoginPressed,
     required this.onGoogleLoginPressed,
   });
 
   final bool isLoading;
   final String? error;
+  final VoidCallback onLocalLoginPressed;
   final VoidCallback onGoogleLoginPressed;
 
   @override
@@ -209,9 +250,7 @@ class _LoginScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final maxWidth = constraints.maxWidth > 520
-                ? 430.0
-                : constraints.maxWidth;
+            final maxWidth = constraints.maxWidth > 520 ? 430.0 : constraints.maxWidth;
             return Center(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
@@ -225,7 +264,7 @@ class _LoginScreen extends StatelessWidget {
                       const _LoginPeopleOrbit(),
                       const SizedBox(height: 36),
                       const Text(
-                        'Early beta access\nstarts with Google',
+                        'Early beta access\nstarts with testing',
                         textAlign: TextAlign.left,
                         style: TextStyle(
                           color: Color(0xFF191423),
@@ -236,6 +275,11 @@ class _LoginScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 34),
+                      _LocalLoginButton(
+                        isLoading: isLoading,
+                        onTap: onLocalLoginPressed,
+                      ),
+                      const SizedBox(height: 12),
                       _GoogleLoginButton(
                         isLoading: isLoading,
                         onTap: onGoogleLoginPressed,
@@ -246,7 +290,7 @@ class _LoginScreen extends StatelessWidget {
                       ],
                       const SizedBox(height: 22),
                       Text(
-                        'By continuing, you agree to Vibe Match Terms, Privacy Policy, and Community Guidelines.',
+                        'Use Local Test Login for backend and room testing. Google can be fixed later for production sign-in.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: const Color(0xFF4B4055).withValues(alpha: 0.62),
@@ -368,8 +412,8 @@ class _FloatingBubble extends StatelessWidget {
   }
 }
 
-class _GoogleLoginButton extends StatelessWidget {
-  const _GoogleLoginButton({required this.isLoading, required this.onTap});
+class _LocalLoginButton extends StatelessWidget {
+  const _LocalLoginButton({required this.isLoading, required this.onTap});
 
   final bool isLoading;
   final VoidCallback onTap;
@@ -385,33 +429,80 @@ class _GoogleLoginButton extends StatelessWidget {
           height: 66,
           padding: const EdgeInsets.symmetric(horizontal: 22),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.72),
+            color: const Color(0xFF5B176A),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE9DEE8)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF5B176A).withValues(alpha: 0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 29, fontWeight: FontWeight.w900)),
-              const SizedBox(width: 38),
+              const Icon(Icons.bolt_rounded, color: Colors.white, size: 29),
+              const SizedBox(width: 28),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Login with Google',
+                      'Local Test Login',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Color(0xFF5B176A), fontSize: 17, fontWeight: FontWeight.w900),
+                      style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      isLoading ? 'Signing in...' : 'Real Google sign-in',
+                      isLoading ? 'Signing in...' : 'Founder Owner test account',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFF89798F), fontSize: 11, fontWeight: FontWeight.w800),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 11, fontWeight: FontWeight.w800),
                     ),
                   ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleLoginButton extends StatelessWidget {
+  const _GoogleLoginButton({required this.isLoading, required this.onTap});
+
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isLoading ? null : onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFE9DEE8)),
+          ),
+          child: Row(
+            children: [
+              const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 25, fontWeight: FontWeight.w900)),
+              const SizedBox(width: 28),
+              Expanded(
+                child: Text(
+                  isLoading ? 'Signing in...' : 'Google sign-in later',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF5B176A), fontSize: 14, fontWeight: FontWeight.w900),
                 ),
               ),
             ],
