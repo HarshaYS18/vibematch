@@ -137,8 +137,10 @@ def _ensure_runtime_schema() -> None:
         "ALTER TABLE user_room_presence DROP CONSTRAINT IF EXISTS uq_user_one_active_room_presence",
         "ALTER TABLE gift_catalog_items ADD COLUMN IF NOT EXISTS min_combo INTEGER DEFAULT 1 NOT NULL",
         "ALTER TABLE gift_catalog_items ADD COLUMN IF NOT EXISTS max_combo INTEGER DEFAULT 999 NOT NULL",
+        "ALTER TABLE gift_catalog_items ADD COLUMN IF NOT EXISTS display_mode VARCHAR(40) DEFAULT 'normal' NOT NULL",
         "UPDATE gift_catalog_items SET min_combo = 1 WHERE min_combo IS NULL OR min_combo < 1",
         "UPDATE gift_catalog_items SET max_combo = 999 WHERE max_combo IS NULL OR max_combo < min_combo",
+        "UPDATE gift_catalog_items SET display_mode = 'normal' WHERE display_mode IS NULL OR display_mode = ''",
     ]
     with engine.begin() as connection:
         for statement in statements:
