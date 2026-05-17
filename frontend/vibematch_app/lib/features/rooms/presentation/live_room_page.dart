@@ -241,9 +241,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       onChanged: () {
         if (mounted) setState(() {});
       },
-      onFinalGiftMessage: (entry) {
-        if (!mounted) return;
-        _roomMessageController.insertEntry(entry);
+      onFinalGiftMessage: (_) {
+        // Gift chat messages are backend-owned. The sender and all receivers
+        // render the same room_gift_sent websocket event only.
       },
       onToast: (message) {
         if (!mounted) return;
