@@ -157,10 +157,46 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   LiveRoomMembershipStatus get _currentMembershipStatus {
     if (_viewerCanManageRoom) return LiveRoomMembershipStatus.member;
+
+    final backendStatus = _currentBackendMembershipStatus;
+    if (backendStatus != null) return backendStatus;
+
     return LiveRoomMembershipService.statusFor(
       roomId: _roomId,
       userId: _currentUser.id,
     );
+  }
+
+  LiveRoomMembershipStatus? get _currentBackendMembershipStatus {
+    final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
+    if (snapshot == null) return null;
+    final currentId = _currentUser.id.trim();
+    if (currentId.isEmpty) return null;
+    final currentNumeric = currentId.replaceFirst(RegExp(r'^user_'), '');
+    for (final peer in snapshot.peers) {
+      final peerId = peer.peerId.trim();
+      final peerUserId = peer.userId.trim();
+      final matches = peerUserId == currentId ||
+          peerUserId == currentNumeric ||
+          peerId == currentId ||
+          peerId.endsWith('_$currentId') ||
+          peerId.endsWith('_$currentNumeric');
+      if (!matches) continue;
+      final role = peer.roleLabel.trim().toLowerCase().replaceAll('_', ' ');
+      if (peer.isHost || peer.isRoomAdmin || role == 'host' || role == 'admin' || role == 'channel host') {
+        return LiveRoomMembershipStatus.member;
+      }
+      if (role == 'room member') return LiveRoomMembershipStatus.member;
+      if (role == 'visitor' || role == 'member' || role.isEmpty) {
+        return LiveRoomMembershipService.statusFor(
+          roomId: _roomId,
+          userId: _currentUser.id,
+        ) == LiveRoomMembershipStatus.pending
+            ? LiveRoomMembershipStatus.pending
+            : LiveRoomMembershipStatus.guest;
+      }
+    }
+    return null;
   }
 
   bool get _currentUserIsMember =>
@@ -188,6 +224,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     };
     LiveRoomMemberRequestService.instance.pendingRequests.addListener(
       _roomMemberRequestListener!,
+    );
+    LiveRoomMediaSignalingService.instance.roomSnapshot.addListener(
+      _roomMembershipListener!,
     );
     final currentUser = _currentUser;
     final restoreState = widget.restoreState;
@@ -284,6 +323,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final membershipListener = _roomMembershipListener;
     if (membershipListener != null) {
       LiveRoomMembershipService.snapshots.removeListener(membershipListener);
+      LiveRoomMediaSignalingService.instance.roomSnapshot.removeListener(
+        membershipListener,
+      );
     }
     final requestListener = _roomMemberRequestListener;
     if (requestListener != null) {
