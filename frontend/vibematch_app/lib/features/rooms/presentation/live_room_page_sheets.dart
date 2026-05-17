@@ -534,7 +534,7 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                                 ? Image.network(
                                     theme.imageUrl!,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
+                                    errorBuilder: (context, error, stackTrace) =>
                                         const Icon(Icons.image_rounded),
                                   )
                                 : const Icon(
