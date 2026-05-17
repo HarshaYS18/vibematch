@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 /// Google OAuth client IDs are public identifiers, not secrets. The fallback below is the
 /// same web client ID that the backend GOOGLE_AUTH_CLIENT_IDS must allow.
 ///
+/// Local web testing origin:
+/// http://localhost:5000
+///
 /// Early beta VPS web origin:
 /// http://140.245.215.16:5000
 ///
@@ -41,7 +44,7 @@ abstract final class GoogleSignInConfig {
 
   static String get setupHint {
     if (kIsWeb) {
-      return 'For beta web, run with --web-port=5000 and add http://140.245.215.16:5000 as an authorized JavaScript origin in Google Cloud for the web client ID.';
+      return 'For local web testing, run with --web-port=5000 and add http://localhost:5000 as an authorized JavaScript origin in Google Cloud for the web client ID. For VPS beta, also add http://140.245.215.16:5000.';
     }
     return 'For Android beta, add the app package name plus SHA-1/SHA-256 in Firebase/Google Cloud, download android/app/google-services.json, and keep the Android server client ID equal to the web client ID.';
   }
