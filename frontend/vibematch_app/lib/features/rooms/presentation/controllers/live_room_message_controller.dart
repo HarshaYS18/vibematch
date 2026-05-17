@@ -66,17 +66,11 @@ class LiveRoomMessageController {
 
   void sendMessage(String text) {
     final trimmed = text.trim();
-    if (trimmed.isEmpty) {
-      return;
-    }
+    if (trimmed.isEmpty) return;
+    if (!_guestMessageAllowed) return;
 
-    if (!_guestMessageAllowed) {
-      return;
-    }
-
-    // Production rule: room chat is backend-owned. Do not insert the message
-    // locally before confirmation. The sender and every other room user render
-    // the same backend broadcast event after the DB write succeeds.
+    // Room chat is backend-owned. Sender and receivers render only the same
+    // backend broadcast after the DB write succeeds.
     LiveRoomMediaSignalingService.instance.sendRoomChat(trimmed);
   }
 
@@ -85,35 +79,12 @@ class LiveRoomMessageController {
     required String contentType,
   }) {
     final safeUrl = imageUrl.trim();
-    if (safeUrl.isEmpty) {
-      return;
-    }
+    if (safeUrl.isEmpty) return;
+    if (!LiveRoomRestrictionsService.roomImagesEnabled) return;
+    if (!_guestMessageAllowed) return;
 
-    if (!LiveRoomRestrictionsService.roomImagesEnabled) {
-      return;
-    }
-
-    if (!_guestMessageAllowed) {
-      return;
-    }
-
-    messages.insert(
-      0,
-      ChatEntry(
-        senderName: currentUser.name,
-        senderId: currentUser.id,
-        senderAvatarUrl: currentUser.avatarUrl,
-        message: 'sent an image',
-        vipLevel: currentUser.vipLevel,
-        sendingLevel: currentUser.sendingLevel,
-        receivingLevel: currentUser.receivingLevel,
-        imageUrl: safeUrl,
-        imageContentType: contentType.trim().isEmpty
-            ? 'image/jpeg'
-            : contentType.trim(),
-      ),
-    );
-    onChanged();
+    // TODO: move image upload/message to backend room event. Until then do not
+    // fake-send through local state under the single-source-of-truth rule.
   }
 
   void insertSystemMessage(String message) =>
@@ -121,9 +92,7 @@ class LiveRoomMessageController {
 
   void insertPersistentSystemMessage(String message) {
     final trimmed = message.trim();
-    if (trimmed.isEmpty) {
-      return;
-    }
+    if (trimmed.isEmpty) return;
     messages.insert(
       0,
       ChatEntry(senderName: 'System', senderId: 'system', message: trimmed),
@@ -153,6 +122,8 @@ class LiveRoomMessageController {
   }
 
   void insertEntry(ChatEntry entry) {
+    // Legacy local insert path. Keep for temporary local-only UI modules, but
+    // committed live-room events must go through backend websocket events.
     messages.insert(0, entry);
     if (entry.shouldAutoDismiss) {
       _scheduleAutoDismiss(entry);
@@ -211,9 +182,7 @@ class LiveRoomMessageController {
 
   void _detachSystemEventListener() {
     final listener = _systemEventListener;
-    if (listener == null) {
-      return;
-    }
+    if (listener == null) return;
     LiveRoomSystemEventBus.latestEvent.removeListener(listener);
     _systemEventListener = null;
     final seatApplicationListener = _seatApplicationListener;
@@ -227,12 +196,8 @@ class LiveRoomMessageController {
 
   void _handleLatestSeatApplicationEvent() {
     final event = LiveRoomSeatApplicationEventBus.latestEvent.value;
-    if (event == null || _handledSystemEventIds.contains(event.id)) {
-      return;
-    }
-    if (event.seatIndex < 0) {
-      return;
-    }
+    if (event == null || _handledSystemEventIds.contains(event.id)) return;
+    if (event.seatIndex < 0) return;
 
     _handledSystemEventIds.add(event.id);
 
@@ -244,9 +209,7 @@ class LiveRoomMessageController {
           message.seatIndex == event.seatIndex,
     );
 
-    if (existingPending) {
-      return;
-    }
+    if (existingPending) return;
 
     final applicant = event.applicantUserId == currentUser.id
         ? currentUser
@@ -274,9 +237,7 @@ class LiveRoomMessageController {
 
   void _handleLatestMediaSystemEvent() {
     final event = LiveRoomSystemEventBus.latestEvent.value;
-    if (event == null || _handledSystemEventIds.contains(event.id)) {
-      return;
-    }
+    if (event == null || _handledSystemEventIds.contains(event.id)) return;
     _handledSystemEventIds.add(event.id);
 
     if (event.isRoomChatMessage) {
@@ -292,6 +253,28 @@ class LiveRoomMessageController {
           vipLevel: event.actorVipLevel,
           sendingLevel: event.actorSendingLevel,
           receivingLevel: event.actorReceivingLevel,
+        ),
+      );
+      onChanged();
+      return;
+    }
+
+    if (event.isRoomGiftSent) {
+      messages.insert(
+        0,
+        ChatEntry(
+          senderName: event.actorName.trim().isEmpty
+              ? 'Vibe User'
+              : event.actorName.trim(),
+          senderId: event.actorUserId,
+          senderAvatarUrl: event.actorAvatarUrl,
+          message: event.message.trim().isEmpty
+              ? 'sent ${event.giftName} x${event.giftQuantity}'
+              : event.message.trim(),
+          vipLevel: event.actorVipLevel,
+          sendingLevel: event.actorSendingLevel,
+          receivingLevel: event.actorReceivingLevel,
+          isGift: true,
         ),
       );
       onChanged();
@@ -326,9 +309,7 @@ class LiveRoomMessageController {
     }
 
     if (event.isUserRemoved) {
-      if (event.targetUserId == currentUser.id) {
-        return;
-      }
+      if (event.targetUserId == currentUser.id) return;
       insertUserRemovedSystemEvent(
         actorName: event.actorName,
         targetName: event.targetName,
@@ -353,15 +334,11 @@ class LiveRoomMessageController {
 
   void _scheduleAutoDismiss(ChatEntry entry) {
     final dismissAt = entry.autoDismissAt;
-    if (dismissAt == null) {
-      return;
-    }
+    if (dismissAt == null) return;
     final delay = dismissAt.difference(DateTime.now());
     Timer(delay.isNegative ? Duration.zero : delay, () {
       final removed = messages.remove(entry);
-      if (removed) {
-        onChanged();
-      }
+      if (removed) onChanged();
     });
   }
 }
