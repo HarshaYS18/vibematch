@@ -63,12 +63,13 @@ class Room(Base):
     is_secret: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_members_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    allow_screenshots: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=True,
-        server_default="true",
-    )
+    allow_screenshots: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+
+    # Functional live room settings. These are backend-owned and broadcast as
+    # canonical room snapshots after each child update.
+    room_images_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    guest_messages_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    apply_only_mode_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     # Locked room access. Store only a hash, never the plain lock/password.
     lock_password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -76,30 +77,11 @@ class Room(Base):
     lock_updated_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Persistent room customization/state.
-    background_theme_id: Mapped[str] = mapped_column(
-        String(80),
-        nullable=False,
-        default="default",
-        server_default="default",
-    )
-    seat_layout_id: Mapped[str] = mapped_column(
-        String(24),
-        nullable=False,
-        default="5x2",
-        server_default="5x2",
-    )
+    background_theme_id: Mapped[str] = mapped_column(String(80), nullable=False, default="default", server_default="default")
+    seat_layout_id: Mapped[str] = mapped_column(String(24), nullable=False, default="5x2", server_default="5x2")
     announcement_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     announcement_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     announcement_updated_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
