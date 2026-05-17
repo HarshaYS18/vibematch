@@ -70,20 +70,10 @@ def _next_sequence(db: Session, room: Room) -> int:
 def calculate_room_trending_score(active_count: int, seated_count: int) -> int:
     if active_count <= 0:
         return 0
-    return (
-        TRENDING_ACTIVE_ROOM_BASE
-        + (active_count * TRENDING_ONLINE_WEIGHT)
-        + (seated_count * TRENDING_SEATED_WEIGHT)
-    )
+    return TRENDING_ACTIVE_ROOM_BASE + (active_count * TRENDING_ONLINE_WEIGHT) + (seated_count * TRENDING_SEATED_WEIGHT)
 
 
 def sync_room_live_counters(db: Session, room: Room) -> tuple[int, int, int]:
-    """Sync online_count and trending_score from backend-owned live state.
-
-    Trending must not be a stale counter. It is derived from active room
-    participants whose heartbeat is still valid plus currently occupied seats.
-    When stale heartbeat cleanup removes a user, this function drops the score.
-    """
     active_count = int(
         db.query(func.count(RoomParticipant.id))
         .filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True))
@@ -242,6 +232,61 @@ def recent_chat_messages(db: Session, room: Room, limit: int = 80) -> list[dict[
     return [chat_payload(message) for message in reversed(rows)]
 
 
+def _latest_decision_after(db: Session, room: Room, pending_event: RoomRealtimeEvent) -> RoomRealtimeEvent | None:
+    return (
+        db.query(RoomRealtimeEvent)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.target_user_id == pending_event.actor_user_id,
+            RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected"]),
+            RoomRealtimeEvent.id > pending_event.id,
+        )
+        .order_by(RoomRealtimeEvent.id.desc())
+        .first()
+    )
+
+
+def pending_room_member_requests(db: Session, room: Room) -> list[dict[str, Any]]:
+    pending_events = (
+        db.query(RoomRealtimeEvent)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type == "room.member_request.pending",
+        )
+        .order_by(RoomRealtimeEvent.id.asc())
+        .all()
+    )
+    requests: list[dict[str, Any]] = []
+    seen_user_ids: set[int] = set()
+    for event in pending_events:
+        actor_user_id = event.actor_user_id
+        if actor_user_id is None or actor_user_id in seen_user_ids:
+            continue
+        if _latest_decision_after(db, room, event) is not None:
+            continue
+        participant = (
+            db.query(RoomParticipant)
+            .filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == actor_user_id)
+            .first()
+        )
+        if participant and participant.is_member:
+            continue
+        user = db.query(User).filter(User.id == actor_user_id).first()
+        requests.append({
+            "request_id": event.id,
+            "user_id": actor_user_id,
+            "backend_user_id": actor_user_id,
+            "public_user_id": user.public_user_id if user else actor_user_id,
+            "display_name": (user.display_name or user.username or str(user.public_user_id)) if user else "Vibe User",
+            "username": user.username if user else None,
+            "avatar_url": user.avatar_url if user else None,
+            "requested_at": event.created_at.isoformat() if event.created_at else None,
+            "status": "pending",
+        })
+        seen_user_ids.add(actor_user_id)
+    return requests
+
+
 def room_participant_type(is_host: bool, is_room_admin: bool, is_room_member: bool) -> str:
     if is_host:
         return "owner"
@@ -252,14 +297,16 @@ def room_participant_type(is_host: bool, is_room_admin: bool, is_room_member: bo
     return "visitor"
 
 
-def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeatState | None) -> dict[str, Any]:
+def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeatState | None, pending_user_ids: set[int] | None = None) -> dict[str, Any]:
     user = participant.user
     backend_user_id = participant.user_id
     public_user_id = user.public_user_id if user else backend_user_id
     is_host = backend_user_id == room.owner_user_id
     is_room_admin = participant.is_room_admin or is_host
-    is_room_member = bool(participant.is_member or is_room_admin or is_host)
+    is_room_member = bool(participant.is_member)
+    has_pending_room_member_request = backend_user_id in (pending_user_ids or set())
     participant_type = room_participant_type(is_host, is_room_admin, is_room_member)
+    membership_request_status = "member" if is_room_member else ("pending" if has_pending_room_member_request else "none")
     return {
         "backend_user_id": backend_user_id,
         "user_id": backend_user_id,
@@ -275,6 +322,8 @@ def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeat
         "is_room_owner": is_host,
         "is_room_admin": is_room_admin,
         "is_room_member": is_room_member,
+        "has_pending_room_member_request": has_pending_room_member_request,
+        "membership_request_status": membership_request_status,
         "participant_type": participant_type,
         "role_label": "Host" if is_host else ("Admin" if is_room_admin else ("Room Member" if is_room_member else "Visitor")),
         "seat_index": seat.seat_index if seat else None,
@@ -291,6 +340,8 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
     seats = ensure_room_seats(db, room)
     participants = active_participants(db, room)
     seats = ensure_room_seats(db, room)
+    member_requests = pending_room_member_requests(db, room)
+    pending_user_ids = {int(request["backend_user_id"]) for request in member_requests if request.get("backend_user_id") is not None}
     active_count = len(participants)
     seated_count = len([seat for seat in seats if seat.occupant_user_id is not None])
     trending_score = calculate_room_trending_score(active_count, seated_count)
@@ -307,7 +358,7 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
             continue
         seen_backend_user_ids.add(participant.user_id)
         seat = next((item for item in seats if item.occupant_user_id == participant.user_id), None)
-        participant_data = participant_payload(room, participant, seat)
+        participant_data = participant_payload(room, participant, seat, pending_user_ids=pending_user_ids)
         canonical_participants.append(participant_data)
         peers.append({
             "peer_id": participant_data["peer_id"],
@@ -321,6 +372,8 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
             "is_room_owner": participant_data["is_room_owner"],
             "is_room_admin": participant_data["is_room_admin"],
             "is_room_member": participant_data["is_room_member"],
+            "has_pending_room_member_request": participant_data["has_pending_room_member_request"],
+            "membership_request_status": participant_data["membership_request_status"],
             "participant_type": participant_data["participant_type"],
             "role_label": participant_data["role_label"],
             "seat_index": participant_data["seat_index"],
@@ -359,6 +412,8 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
         "seats": [seat_payload(seat, room.room_public_id) for seat in seats],
         "locked_seat_indexes": [seat.seat_index for seat in seats if seat.is_locked],
         "participants": canonical_participants,
+        "pending_room_member_requests": member_requests,
+        "pending_room_member_request_count": len(member_requests),
         "peers": peers,
         "peer_count": len(canonical_participants),
     }
