@@ -23,6 +23,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.layoutId,
     required this.selectedSeatIndex,
     required this.canManageSeats,
+    this.canManageAdmins = false,
     required this.applyOnlyModeEnabled,
     this.currentUserIsMember = false,
     this.joinRequestPending = false,
@@ -74,6 +75,7 @@ class LiveRoomBody extends StatelessWidget {
   final String layoutId;
   final int? selectedSeatIndex;
   final bool canManageSeats;
+  final bool canManageAdmins;
   final bool applyOnlyModeEnabled;
   final bool currentUserIsMember;
   final bool joinRequestPending;
@@ -167,7 +169,8 @@ class LiveRoomBody extends StatelessWidget {
                       roomId: roomId,
                       privacyMode: privacyMode,
                       onlineCount: _effectiveOnlineCount,
-                      canManageAdmins: canManageSeats,
+                      canManageRoom: canManageSeats,
+                      canManageAdmins: canManageAdmins,
                       currentUserIsMember: currentUserIsMember,
                       joinRequestPending: joinRequestPending,
                       admins: admins,
