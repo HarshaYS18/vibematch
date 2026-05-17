@@ -3,8 +3,7 @@ import 'package:flutter/foundation.dart';
 class LiveRoomSettingsEventBus {
   LiveRoomSettingsEventBus._();
 
-  static final ValueNotifier<LiveRoomSettingsEvent?> latestEvent =
-      ValueNotifier<LiveRoomSettingsEvent?>(null);
+  static final ValueNotifier<LiveRoomSettingsEvent?> latestEvent = ValueNotifier<LiveRoomSettingsEvent?>(null);
 
   static void publish(LiveRoomSettingsEvent event) {
     latestEvent.value = event;
@@ -47,37 +46,17 @@ class LiveRoomSettingsEvent {
     final roomMap = room is Map<String, dynamic> ? room : <String, dynamic>{};
 
     return LiveRoomSettingsEvent(
-      id:
-          json['id']?.toString() ??
-          DateTime.now().microsecondsSinceEpoch.toString(),
+      id: json['id']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
       roomId: json['room_id']?.toString() ?? roomMap['room_id']?.toString() ?? roomMap['room_public_id']?.toString() ?? '',
       applyOnlyModeEnabled: _nullableBool(json['apply_only_mode_enabled'] ?? json['applyOnlyModeEnabled'] ?? roomMap['apply_only_mode_enabled'] ?? roomMap['applyOnlyModeEnabled']),
       roomImagesEnabled: _nullableBool(json['room_images_enabled'] ?? json['roomImagesEnabled'] ?? roomMap['room_images_enabled'] ?? roomMap['roomImagesEnabled']),
       guestMessagesEnabled: _nullableBool(json['guest_messages_enabled'] ?? json['guestMessagesEnabled'] ?? roomMap['guest_messages_enabled'] ?? roomMap['guestMessagesEnabled']),
       actorUserId: json['actor_user_id']?.toString() ?? '',
       actorName: json['actor_name']?.toString() ?? '',
-      backgroundThemeId:
-          json['background_theme_id']?.toString() ??
-          json['backgroundThemeId']?.toString() ??
-          roomMap['background_theme_id']?.toString() ??
-          roomMap['backgroundThemeId']?.toString() ??
-          '',
-      seatLayoutId:
-          json['seat_layout_id']?.toString() ??
-          json['seatLayoutId']?.toString() ??
-          '',
-      announcementText:
-          json['announcement_text']?.toString() ??
-          json['announcementText']?.toString() ??
-          roomMap['announcement_text']?.toString() ??
-          roomMap['announcementText']?.toString() ??
-          '',
-      privacyModeTitle:
-          json['privacy_mode_title']?.toString() ??
-          json['privacyModeTitle']?.toString() ??
-          json['mode']?.toString() ??
-          roomMap['mode']?.toString() ??
-          '',
+      backgroundThemeId: json['background_theme_id']?.toString() ?? json['backgroundThemeId']?.toString() ?? roomMap['background_theme_id']?.toString() ?? roomMap['backgroundThemeId']?.toString() ?? '',
+      seatLayoutId: json['seat_layout_id']?.toString() ?? json['seatLayoutId']?.toString() ?? roomMap['seat_layout_id']?.toString() ?? roomMap['seatLayoutId']?.toString() ?? '',
+      announcementText: json['announcement_text']?.toString() ?? json['announcementText']?.toString() ?? roomMap['announcement_text']?.toString() ?? roomMap['announcementText']?.toString() ?? '',
+      privacyModeTitle: json['privacy_mode_title']?.toString() ?? json['privacyModeTitle']?.toString() ?? json['mode']?.toString() ?? roomMap['mode']?.toString() ?? '',
       allowScreenshots: _nullableBool(json['allow_screenshots'] ?? json['allowScreenshots'] ?? roomMap['allow_screenshots'] ?? roomMap['allowScreenshots']),
       language: json['language']?.toString() ?? roomMap['language']?.toString() ?? '',
     );
