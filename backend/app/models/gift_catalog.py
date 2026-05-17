@@ -29,6 +29,8 @@ class GiftCatalogItem(Base):
     category_key: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     gift_type: Mapped[str] = mapped_column(String(40), default="normal", nullable=False, index=True)
     coin_value: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    min_combo: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    max_combo: Mapped[int] = mapped_column(Integer, default=999, nullable=False)
     icon_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
     chat_symbol: Mapped[str | None] = mapped_column(String(32), nullable=True)
     asset_path: Mapped[str | None] = mapped_column(Text, nullable=True)
