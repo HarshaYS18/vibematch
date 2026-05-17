@@ -28,7 +28,7 @@ def _websocket_connected(websocket: WebSocket) -> bool:
 
 
 def _payload_user_id(payload: dict[str, Any]) -> int | None:
-    raw = payload.get("user_id") or payload.get("peer_id")
+    raw = payload.get("user_id") or payload.get("backend_user_id") or payload.get("actor_user_id")
     try:
         return int(str(raw)) if raw is not None and str(raw).strip() else None
     except ValueError:
@@ -61,8 +61,8 @@ async def _broadcast_snapshot(room_id: str, event_type: str, room: dict[str, Any
     await room_realtime_connections.broadcast_room(room_id, _event_payload(event_type, room_id, room, extra))
 
 
-def _resolve_user(db, payload: dict[str, Any]) -> User | None:
-    user_id = _payload_user_id(payload)
+def _resolve_user(db, payload: dict[str, Any], fallback_user_id: int | None = None) -> User | None:
+    user_id = _payload_user_id(payload) or fallback_user_id
     if not user_id:
         return None
     return db.query(User).filter(User.id == user_id).first()
@@ -103,7 +103,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     )
                     continue
 
-                user = _resolve_user(db, payload)
+                user = _resolve_user(db, payload, active_user_id)
                 if active_room_id is None:
                     active_room_id = room_id
                     active_user_id = user.id if user else _payload_user_id(payload)
@@ -220,9 +220,9 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"background_theme_id": snapshot.get("background_theme_id")})
                     continue
 
-                if event_type == "room_chat/send" and user is not None:
+                if event_type in {"room_chat/send", "room/chat"}:
                     text = str(payload.get("text") or "").strip()
-                    if text:
+                    if text and user is not None:
                         snapshot = room_action_service.create_chat_message(db, room, user, text, message_type=str(payload.get("message_type") or "text"), metadata=payload)
                     else:
                         snapshot = room_state_service.room_snapshot(db, room)
