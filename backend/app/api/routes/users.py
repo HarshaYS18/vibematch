@@ -14,6 +14,7 @@ from app.schemas.user import PublicUserProfileResponse, UserMeResponse, UserProf
 from app.services import profile_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
+from app.services.user_master_state_service import get_user_master_state
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -240,6 +241,11 @@ def get_me(db: Session = Depends(get_db), current_user: User = Depends(get_curre
     return _user_me_response(db, current_user)
 
 
+@router.get("/me/master-state")
+def get_my_master_state(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return get_user_master_state(db, current_user)
+
+
 @router.patch("/me/profile", response_model=UserMeResponse)
 def update_my_profile(payload: UserProfileUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if payload.display_name is not None:
@@ -259,84 +265,65 @@ def update_my_profile(payload: UserProfileUpdateRequest, db: Session = Depends(g
     current_user.friend_gender_preference = _clean_enum(payload.friend_gender_preference, _ALLOWED_GENDER_PREFS, "friend gender preference")
     current_user.friend_marital_preference = _clean_enum(payload.friend_marital_preference, _ALLOWED_MARITAL_PREFS, "friend marital preference")
     current_user.interests = _clean_interests(payload.interests)
-    current_user.updated_at = datetime.utcnow()
+    db.add(current_user)
     db.commit()
     db.refresh(current_user)
     return _user_me_response(db, current_user)
 
 
-@router.get("/me/relationship/{public_user_id}", response_model=UserRelationshipResponse)
-def get_my_relationship(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    profile_user = _get_public_active_user(db, public_user_id)
-    return _relationship_payload(db, profile_user, current_user)
-
-
-@router.get("/public/{public_user_id}", response_model=PublicUserProfileResponse)
-@router.get("/profile/{public_user_id}", response_model=PublicUserProfileResponse)
-def get_public_profile(public_user_id: int, db: Session = Depends(get_db), current_user: User | None = Depends(get_current_user)):
-    profile_user = _get_public_active_user(db, public_user_id)
-    _record_profile_visit(db, profile_user, current_user)
-    payload = profile_service.public_profile_payload(db, public_user_id)
-    payload["relationship"] = _relationship_payload(db, profile_user, current_user)
-    return payload
-
-
 @router.get("/search", response_model=UserSearchResponse)
-def search_users(q: str = Query(..., min_length=1, max_length=80), limit: int = Query(default=20, ge=1, le=50), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def search_users(q: str = Query(..., min_length=1, max_length=80), limit: int = Query(20, ge=1, le=50), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     query = q.strip()
-    numeric_query = int(query) if query.isdigit() else None
-    users_query = db.query(User).filter(User.is_active.is_(True), User.is_banned.is_(False))
+    numeric = int(query) if query.isdigit() else None
     filters = [User.username.ilike(f"%{query}%"), User.display_name.ilike(f"%{query}%")]
-    if numeric_query is not None:
-        filters.extend([User.public_user_id == numeric_query, User.display_custom_id == numeric_query])
-    users = users_query.filter(or_(*filters)).order_by(User.updated_at.desc()).limit(limit).all()
-    return UserSearchResponse(query=query, users=[_search_result_payload(db, user, current_user) for user in users])
+    if numeric is not None:
+        filters.append(User.public_user_id == numeric)
+        filters.append(User.display_custom_id == numeric)
+    users = (
+        db.query(User)
+        .filter(or_(*filters))
+        .filter(User.is_active.is_(True), User.is_banned.is_(False))
+        .limit(limit)
+        .all()
+    )
+    return UserSearchResponse(results=[_search_result_payload(db, user, current_user) for user in users])
 
 
-@router.post("/follow/{public_user_id}", response_model=UserRelationshipResponse)
-def follow_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    target = _get_public_active_user(db, public_user_id)
-    if target.id == current_user.id:
-        raise HTTPException(status_code=400, detail="You cannot follow yourself")
-    if _is_blocked(db, target.id, current_user.id):
-        raise HTTPException(status_code=403, detail=f"{_display_name(target)} doesn't allow you to follow.")
-    existing = db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == target.id).first()
-    if existing is None:
-        db.add(UserFollow(follower_user_id=current_user.id, followed_user_id=target.id))
-        db.commit()
-    return _relationship_payload(db, target, current_user)
+@router.get("/{public_user_id}", response_model=PublicUserProfileResponse)
+def get_public_profile(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = _get_public_active_user(db, public_user_id)
+    _record_profile_visit(db, user, current_user)
+    user_roles = get_user_roles(user)
+    primary_role = get_primary_role(user)
+    return PublicUserProfileResponse(
+        public_user_id=user.public_user_id,
+        display_custom_id=user.display_custom_id,
+        username=user.username,
+        display_name=user.display_name,
+        avatar_url=user.avatar_url,
+        bio=user.bio,
+        cover_photo_urls=user.cover_photo_urls or [],
+        gender=user.gender,
+        profession=user.profession,
+        marital_status=user.marital_status,
+        interests=user.interests or [],
+        primary_role=primary_role.value,
+        primary_role_badge=get_primary_role_badge(primary_role),
+        role_badges=get_role_badges(user_roles),
+        vip=profile_service.vip_summary(db, user),
+        equipped_items=profile_service.equipped_items_summary(db, user),
+        relationship=_relationship_payload(db, user, current_user),
+        last_seen_at=user.last_seen_at,
+    )
 
 
-@router.delete("/follow/{public_user_id}", response_model=UserRelationshipResponse)
-def unfollow_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    target = _get_public_active_user(db, public_user_id)
-    db.query(UserFollow).filter(UserFollow.follower_user_id == current_user.id, UserFollow.followed_user_id == target.id).delete()
-    db.commit()
-    return _relationship_payload(db, target, current_user)
-
-
-@router.post("/block/{public_user_id}", response_model=UserRelationshipResponse)
-def block_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    target = _get_public_active_user(db, public_user_id)
-    if target.id == current_user.id:
-        raise HTTPException(status_code=400, detail="You cannot block yourself")
-    existing = db.query(UserBlock).filter(UserBlock.blocker_user_id == current_user.id, UserBlock.blocked_user_id == target.id).first()
-    if existing is None:
-        db.add(UserBlock(blocker_user_id=current_user.id, blocked_user_id=target.id))
-    db.query(UserFollow).filter(((UserFollow.follower_user_id == current_user.id) & (UserFollow.followed_user_id == target.id)) | ((UserFollow.follower_user_id == target.id) & (UserFollow.followed_user_id == current_user.id))).delete(synchronize_session=False)
-    db.commit()
-    return _relationship_payload(db, target, current_user)
-
-
-@router.delete("/block/{public_user_id}", response_model=UserRelationshipResponse)
-def unblock_user(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    target = _get_public_active_user(db, public_user_id)
-    db.query(UserBlock).filter(UserBlock.blocker_user_id == current_user.id, UserBlock.blocked_user_id == target.id).delete()
-    db.commit()
-    return _relationship_payload(db, target, current_user)
-
-
-@router.get("/me/visitors", response_model=ProfileVisitListResponse)
-def get_my_profile_visitors(limit: int = Query(default=20, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    visits = db.query(ProfileVisit).filter(ProfileVisit.profile_owner_user_id == current_user.id).order_by(ProfileVisit.last_visited_at.desc()).limit(limit).all()
+@router.get("/me/profile-visitors", response_model=ProfileVisitListResponse)
+def get_my_profile_visitors(limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    visits = (
+        db.query(ProfileVisit)
+        .filter(ProfileVisit.profile_owner_user_id == current_user.id)
+        .order_by(ProfileVisit.last_visited_at.desc())
+        .limit(limit)
+        .all()
+    )
     return ProfileVisitListResponse(visitors=[_profile_visit_payload(db, visit) for visit in visits])
