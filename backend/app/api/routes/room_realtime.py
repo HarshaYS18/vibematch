@@ -224,6 +224,33 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     await room_realtime_connections.send_json(websocket, _event_payload("room.snapshot", room_id, snapshot))
                     continue
 
+                if event_type == "room_member/request" and user is not None:
+                    snapshot = room_action_service.request_room_membership(db, room, user)
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_member/request_updated", snapshot, {"request_user_id": user.id})
+                    continue
+
+                if event_type == "room_member/approve" and user is not None:
+                    target = _target_user(db, payload)
+                    snapshot = room_action_service.approve_room_membership(db, room, user, target) if target else room_state_service.room_snapshot(db, room)
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_member/request_updated", snapshot, {"target_user_id": target.id if target else None, "decision": "approved"})
+                    continue
+
+                if event_type == "room_member/reject" and user is not None:
+                    target = _target_user(db, payload)
+                    snapshot = room_action_service.reject_room_membership(db, room, user, target) if target else room_state_service.room_snapshot(db, room)
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_member/request_updated", snapshot, {"target_user_id": target.id if target else None, "decision": "rejected"})
+                    continue
+
+                if event_type == "room_member/remove" and user is not None:
+                    target = _target_user(db, payload)
+                    snapshot = room_action_service.remove_room_member(db, room, user, target) if target else room_state_service.room_snapshot(db, room)
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_member/request_updated", snapshot, {"target_user_id": target.id if target else None, "decision": "removed"})
+                    continue
+
                 if event_type == "seat/take" and user is not None:
                     snapshot = room_action_service.take_seat(db, room, user, _int_payload(payload, "seat_index"))
                     db.commit()
