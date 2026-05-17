@@ -1,5 +1,6 @@
 from copy import deepcopy
 from random import random
+from urllib.parse import quote
 
 from app.core.config import settings
 
@@ -398,7 +399,10 @@ def _cdn_url(relative_path: str | None) -> str | None:
     base = settings.GIFT_CDN_BASE_URL.strip().rstrip("/")
     if not base:
         return None
-    return f"{base}/{relative_path.lstrip('/')}"
+    clean_path = relative_path.lstrip("/")
+    if "oraclecloud.com" in base and "/objectstorage." not in base:
+        return f"{base}/{quote(clean_path, safe='')}"
+    return f"{base}/{clean_path}"
 
 
 def _with_dynamic_urls(gift: dict) -> dict:
