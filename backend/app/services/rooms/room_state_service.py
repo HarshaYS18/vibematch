@@ -238,7 +238,7 @@ def _latest_decision_after(db: Session, room: Room, pending_event: RoomRealtimeE
         .filter(
             RoomRealtimeEvent.room_id == room.id,
             RoomRealtimeEvent.target_user_id == pending_event.actor_user_id,
-            RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected"]),
+            RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected", "room.member.removed"]),
             RoomRealtimeEvent.id > pending_event.id,
         )
         .order_by(RoomRealtimeEvent.id.desc())
@@ -306,7 +306,7 @@ def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeat
     is_room_member = bool(participant.is_member)
     has_pending_room_member_request = backend_user_id in (pending_user_ids or set())
     participant_type = room_participant_type(is_host, is_room_admin, is_room_member)
-    membership_request_status = "member" if is_room_member else ("pending" if has_pending_room_member_request else "none")
+    membership_request_status = "room_member" if is_room_member else ("pending" if has_pending_room_member_request else "none")
     return {
         "backend_user_id": backend_user_id,
         "user_id": backend_user_id,
