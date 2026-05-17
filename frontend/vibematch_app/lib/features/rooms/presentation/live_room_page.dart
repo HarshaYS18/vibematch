@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../social/widgets/friends_invite_sheet.dart';
 import '../data/live_room_media_signaling_service.dart';
+import '../data/live_room_member_request_service.dart';
 import '../data/live_room_membership_service.dart';
 import '../data/room_api_service.dart';
 import '../data/room_moderation_repository.dart';
@@ -107,6 +108,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   Timer? _hostSeatOneTimer;
   Timer? _hostSeatOneRetryTimer;
   VoidCallback? _roomMembershipListener;
+  VoidCallback? _roomMemberRequestListener;
 
   SeatUser get _currentUser {
     return LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser ??
@@ -147,8 +149,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       _usersController.buildRoomAdmins(_allRoomUsers);
   List<SeatUser> get _availableAdminUsers =>
       _usersController.buildAvailableAdminUsers(_allRoomUsers);
+  List<SeatUser> get _pendingRoomMemberRequests =>
+      LiveRoomMemberRequestService.instance.pendingRequests.value;
   bool get _viewerCanManageRoom =>
       _currentUser.isHost || _currentUser.isRoomAdmin;
+  bool get _viewerCanManageAdmins => _currentUser.isHost;
 
   LiveRoomMembershipStatus get _currentMembershipStatus {
     if (_viewerCanManageRoom) return LiveRoomMembershipStatus.member;
@@ -178,6 +183,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       if (mounted) setState(() {});
     };
     LiveRoomMembershipService.snapshots.addListener(_roomMembershipListener!);
+    _roomMemberRequestListener = () {
+      if (mounted) setState(() {});
+    };
+    LiveRoomMemberRequestService.instance.pendingRequests.addListener(
+      _roomMemberRequestListener!,
+    );
     final currentUser = _currentUser;
     final restoreState = widget.restoreState;
 
@@ -249,6 +260,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     unawaited(_roomStateController.loadPersistedRoomSettings());
     _autoOccupySeatOneForHostOrAdmin();
     _startRoomPresence();
+    LiveRoomMemberRequestService.instance.startRoom(
+      roomId: widget.roomId,
+      currentUser: currentUser,
+    );
   }
 
   @override
@@ -261,6 +276,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _hostSeatOneRetryTimer?.cancel();
     if (!preservingMinimizedRoom) {
       unawaited(_presenceController.leave());
+      LiveRoomMemberRequestService.instance.stop();
     }
     _presenceController.dispose();
     _seatController.dispose();
@@ -268,6 +284,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final membershipListener = _roomMembershipListener;
     if (membershipListener != null) {
       LiveRoomMembershipService.snapshots.removeListener(membershipListener);
+    }
+    final requestListener = _roomMemberRequestListener;
+    if (requestListener != null) {
+      LiveRoomMemberRequestService.instance.pendingRequests.removeListener(
+        requestListener,
+      );
     }
     _messageController.dispose();
     _announcementController.dispose();
@@ -351,6 +373,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   layoutId: _seatController.layoutId,
                   selectedSeatIndex: _seatController.selectedSeatIndex,
                   canManageSeats: _viewerCanManageRoom,
+                  canManageAdmins: _viewerCanManageAdmins,
                   applyOnlyModeEnabled: _applyOnlyModeEnabled,
                   currentUserIsMember: _currentUserIsMember,
                   joinRequestPending: _joinRequestPending,
