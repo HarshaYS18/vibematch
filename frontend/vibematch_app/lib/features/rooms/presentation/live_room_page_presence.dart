@@ -65,6 +65,11 @@ extension _LiveRoomPagePresence on _LiveRoomPageState {
     if (firstSeat.locked) return;
     if (firstSeat.user != null) return;
 
+    // Host/admin auto-seat should only run as the initial room-entry helper.
+    // Once it sends the first take-seat command, cancel retries so it cannot
+    // pull the host/admin back to seat 1 after they manually switch seats.
+    _hostSeatOneTimer?.cancel();
+    _hostSeatOneRetryTimer?.cancel();
     _seatController.occupySeat(0);
   }
 }
