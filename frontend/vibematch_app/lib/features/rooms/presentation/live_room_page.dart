@@ -380,6 +380,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   availableAdminUsers: _availableAdminUsers,
                   onAddAdmin: _addRoomAdminFromInfo,
                   onRemoveAdmin: _removeRoomAdminFromInfo,
+                  onRemoveRoomMember: _removeRoomMemberFromInfo,
                   messages: _roomMessageController.messages,
                   canManageSeatApplications: _viewerCanManageRoom,
                   messageController: _messageController,
