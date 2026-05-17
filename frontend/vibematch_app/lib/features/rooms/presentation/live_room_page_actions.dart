@@ -38,14 +38,6 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
       messages: _roomMessageController.messages,
       allRoomUsers: _allRoomUsers,
     );
-
-    final requesterId = entry.senderId;
-    if (requesterId != null && requesterId.trim().isNotEmpty) {
-      LiveRoomMembershipService.markMember(
-        roomId: _roomId,
-        userId: requesterId,
-      );
-    }
   }
 
   void _rejectSeatApplication(ChatEntry entry) {
@@ -53,11 +45,6 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
       entry: entry,
       messages: _roomMessageController.messages,
     );
-
-    final requesterId = entry.senderId;
-    if (requesterId != null && requesterId.trim().isNotEmpty) {
-      LiveRoomMembershipService.markGuest(roomId: _roomId, userId: requesterId);
-    }
   }
 
   void _applyForSeat(int index) => _seatController.applyForSeat(
@@ -217,16 +204,7 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
       return;
     }
 
-    LiveRoomMembershipService.markPending(
-      roomId: _roomId,
-      userId: _currentUser.id,
-      roomName: _roomName,
-      language: widget.language,
-      modeTitle: widget.modeTitle,
-      onlineCount: _safeOnlineCount,
-    );
     LiveRoomMemberRequestService.instance.requestMembership();
-
     RoomToast.show(context, 'Room member request sent to channel host');
   }
 
@@ -470,6 +448,16 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
       return;
     }
     _seatController.removeUserAsAdmin(user.id);
+    _clearRoomFocus();
+  }
+
+  void _removeRoomMemberFromInfo(SeatUser user) {
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can remove room members');
+      return;
+    }
+    LiveRoomMemberRequestService.instance.removeRoomMember(user);
+    RoomToast.show(context, 'Removing ${user.name} from room members');
     _clearRoomFocus();
   }
 
