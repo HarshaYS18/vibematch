@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../gifts/presentation/lucky_gift_rankings_sheet.dart';
+import '../../data/gift_catalog_api_service.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../live_room_models.dart';
@@ -11,26 +12,58 @@ import '../widgets/room_theme.dart';
 class LiveRoomGiftActionsModule {
   const LiveRoomGiftActionsModule._();
 
+  static const GiftCatalogApiService _catalogApi = GiftCatalogApiService();
+
   static Future<void> openGiftPanel({
     required BuildContext context,
     required LiveRoomGiftController giftController,
     required List<SeatUser> roomUsers,
-  }) {
+  }) async {
     FocusManager.instance.primaryFocus?.unfocus();
     giftController.ensureDefaultReceiver(roomUsers);
+
+    GiftCatalogSnapshot catalog;
+    try {
+      catalog = await _catalogApi.fetchActiveCatalog();
+    } catch (error) {
+      if (context.mounted) {
+        RoomToast.show(
+          context,
+          error.toString().replaceFirst('Exception: ', ''),
+        );
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+    if (catalog.isEmpty) {
+      RoomToast.show(context, 'No active gifts available from backend catalog');
+      return;
+    }
+
+    final selectedGift = _selectedGiftFromCatalog(
+      current: giftController.selectedGift,
+      catalog: catalog,
+    );
+    if (selectedGift != null && selectedGift.id != giftController.selectedGift?.id) {
+      giftController.selectGift(selectedGift);
+    }
+    final selectedCategoryKey =
+        selectedGift?.categoryKey ?? catalog.categories.first.key;
 
     return LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (_) => LiveRoomGiftPanelSheet(
-        gifts: mockGiftItems,
+        categories: catalog.categories,
+        gifts: catalog.gifts,
         users: roomUsers,
-        selectedCategory: giftController.selectedCategory,
-        selectedGift: giftController.selectedGift,
+        selectedCategoryKey: selectedCategoryKey,
+        selectedGift: selectedGift,
         selectedReceiverIds: giftController.selectedReceiverIds,
         selectedCombo: giftController.selectedCombo,
         coinBalance: giftController.coinBalance,
-        onCategoryChanged: giftController.selectCategory,
+        onCategoryChanged: (_) {},
         onGiftSelected: giftController.selectGift,
         onReceiverToggle: (id) => giftController.toggleReceiver(id, roomUsers),
         onComboChanged: giftController.setCombo,
@@ -59,6 +92,24 @@ class LiveRoomGiftActionsModule {
         },
       ),
     );
+  }
+
+  static GiftItem? _selectedGiftFromCatalog({
+    required GiftItem? current,
+    required GiftCatalogSnapshot catalog,
+  }) {
+    if (current != null) {
+      for (final gift in catalog.gifts) {
+        if (gift.id == current.id) return gift;
+      }
+    }
+    final firstCategoryKey = catalog.categories.first.key;
+    for (final gift in catalog.gifts) {
+      if ((gift.categoryKey ?? gift.category.label.toLowerCase()) == firstCategoryKey) {
+        return gift;
+      }
+    }
+    return catalog.gifts.isEmpty ? null : catalog.gifts.first;
   }
 
   static Future<void> _openLuckyPacketSetup({
