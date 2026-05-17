@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/app_shell.dart';
 import '../data/auth_api_service.dart';
 import '../data/google_sign_in_config.dart';
+import '../data/google_web_auth_fallback_service.dart';
 import '../models/current_user.dart';
 import 'profile_setup_page.dart';
 
@@ -21,6 +22,7 @@ class _AuthGateState extends State<AuthGate> {
   static const String _profileSetupDonePrefix = 'vm_profile_setup_done_';
 
   final AuthApiService _authApiService = AuthApiService();
+  final GoogleWebAuthFallbackService _googleWebAuthFallbackService = const GoogleWebAuthFallbackService();
   late final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: GoogleSignInConfig.clientId,
     serverClientId: GoogleSignInConfig.serverClientId,
@@ -83,18 +85,11 @@ class _AuthGateState extends State<AuthGate> {
       }
 
       final auth = await account.authentication;
-      final idToken = auth.idToken;
-      if (idToken == null || idToken.trim().isEmpty) {
-        throw Exception(
-          'Google did not return an ID token. ${GoogleSignInConfig.setupHint}',
-        );
-      }
-
-      final result = await _authApiService.googleLogin(idToken: idToken);
-      final user = await _authApiService.getCurrentUser(
-        accessToken: result.accessToken,
-        forceRefresh: true,
+      final result = await _googleWebAuthFallbackService.loginWithGoogleCredential(
+        idToken: auth.idToken,
+        googleAccessToken: auth.accessToken,
       );
+      final user = result.user;
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
@@ -254,9 +249,7 @@ class _LoginScreen extends StatelessWidget {
                         'By continuing, you agree to Vibe Match Terms, Privacy Policy, and Community Guidelines.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: const Color(
-                            0xFF4B4055,
-                          ).withValues(alpha: 0.62),
+                          color: const Color(0xFF4B4055).withValues(alpha: 0.62),
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                           height: 1.35,
@@ -278,55 +271,13 @@ class _LoginPeopleOrbit extends StatelessWidget {
   const _LoginPeopleOrbit();
 
   static const List<_OrbitAvatarData> _avatars = [
-    _OrbitAvatarData(
-      top: 8,
-      left: 28,
-      size: 78,
-      colors: [Color(0xFFFFD8E4), Color(0xFFE8B6C4)],
-      initial: 'R',
-    ),
-    _OrbitAvatarData(
-      top: 0,
-      left: 184,
-      size: 56,
-      colors: [Color(0xFF22324A), Color(0xFF7E5064)],
-      initial: 'H',
-    ),
-    _OrbitAvatarData(
-      top: 76,
-      left: 136,
-      size: 92,
-      colors: [Color(0xFFFFE0F2), Color(0xFFD7F0FF)],
-      initial: 'A',
-    ),
-    _OrbitAvatarData(
-      top: 90,
-      left: 308,
-      size: 62,
-      colors: [Color(0xFFFFD5C7), Color(0xFFEBC3D7)],
-      initial: 'M',
-    ),
-    _OrbitAvatarData(
-      top: 188,
-      left: 44,
-      size: 56,
-      colors: [Color(0xFF111827), Color(0xFFD45B75)],
-      initial: 'S',
-    ),
-    _OrbitAvatarData(
-      top: 212,
-      left: 214,
-      size: 42,
-      colors: [Color(0xFFFFE8CC), Color(0xFFCDB1A2)],
-      initial: 'K',
-    ),
-    _OrbitAvatarData(
-      top: 272,
-      left: 150,
-      size: 64,
-      colors: [Color(0xFFBFDCE8), Color(0xFF161A24)],
-      initial: 'V',
-    ),
+    _OrbitAvatarData(top: 8, left: 28, size: 78, colors: [Color(0xFFFFD8E4), Color(0xFFE8B6C4)], initial: 'R'),
+    _OrbitAvatarData(top: 0, left: 184, size: 56, colors: [Color(0xFF22324A), Color(0xFF7E5064)], initial: 'H'),
+    _OrbitAvatarData(top: 76, left: 136, size: 92, colors: [Color(0xFFFFE0F2), Color(0xFFD7F0FF)], initial: 'A'),
+    _OrbitAvatarData(top: 90, left: 308, size: 62, colors: [Color(0xFFFFD5C7), Color(0xFFEBC3D7)], initial: 'M'),
+    _OrbitAvatarData(top: 188, left: 44, size: 56, colors: [Color(0xFF111827), Color(0xFFD45B75)], initial: 'S'),
+    _OrbitAvatarData(top: 212, left: 214, size: 42, colors: [Color(0xFFFFE8CC), Color(0xFFCDB1A2)], initial: 'K'),
+    _OrbitAvatarData(top: 272, left: 150, size: 64, colors: [Color(0xFFBFDCE8), Color(0xFF161A24)], initial: 'V'),
   ];
 
   @override
@@ -338,21 +289,9 @@ class _LoginPeopleOrbit extends StatelessWidget {
         children: [
           Positioned.fill(child: CustomPaint(painter: _OrbitLinePainter())),
           for (final avatar in _avatars)
-            Positioned(
-              top: avatar.top,
-              left: avatar.left,
-              child: _OrbitAvatar(data: avatar),
-            ),
-          Positioned(
-            right: 18,
-            top: 20,
-            child: _FloatingBubble(icon: Icons.location_on_rounded, size: 44),
-          ),
-          Positioned(
-            left: 118,
-            bottom: 50,
-            child: _FloatingBubble(icon: Icons.more_horiz_rounded, size: 44),
-          ),
+            Positioned(top: avatar.top, left: avatar.left, child: _OrbitAvatar(data: avatar)),
+          Positioned(right: 18, top: 20, child: _FloatingBubble(icon: Icons.location_on_rounded, size: 44)),
+          Positioned(left: 118, bottom: 50, child: _FloatingBubble(icon: Icons.more_horiz_rounded, size: 44)),
         ],
       ),
     );
@@ -384,11 +323,7 @@ class _OrbitAvatar extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: data.colors,
-          ),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: data.colors),
         ),
         child: Center(
           child: Text(
@@ -397,12 +332,7 @@ class _OrbitAvatar extends StatelessWidget {
               color: Colors.white,
               fontSize: data.size * 0.36,
               fontWeight: FontWeight.w900,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.16),
-                  blurRadius: 8,
-                ),
-              ],
+              shadows: [Shadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 8)],
             ),
           ),
         ),
@@ -461,14 +391,7 @@ class _GoogleLoginButton extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Text(
-                'G',
-                style: TextStyle(
-                  color: Color(0xFF4285F4),
-                  fontSize: 29,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+              const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 29, fontWeight: FontWeight.w900)),
               const SizedBox(width: 38),
               Expanded(
                 child: Column(
@@ -479,22 +402,14 @@ class _GoogleLoginButton extends StatelessWidget {
                       'Login with Google',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Color(0xFF5B176A),
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: TextStyle(color: Color(0xFF5B176A), fontSize: 17, fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       isLoading ? 'Signing in...' : 'Real Google sign-in',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF89798F),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: const TextStyle(color: Color(0xFF89798F), fontSize: 11, fontWeight: FontWeight.w800),
                     ),
                   ],
                 ),
@@ -520,18 +435,9 @@ class _LoginErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFE84C72).withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFE84C72).withValues(alpha: 0.42),
-        ),
+        border: Border.all(color: const Color(0xFFE84C72).withValues(alpha: 0.42)),
       ),
-      child: Text(
-        error,
-        style: const TextStyle(
-          color: Color(0xFFE84C72),
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
+      child: Text(error, style: const TextStyle(color: Color(0xFFE84C72), fontSize: 12, fontWeight: FontWeight.w800)),
     );
   }
 }
@@ -545,30 +451,9 @@ class _OrbitLinePainter extends CustomPainter {
       ..strokeWidth = 1.4;
     final path = Path()
       ..moveTo(size.width * 0.19, size.height * 0.24)
-      ..cubicTo(
-        size.width * 0.34,
-        size.height * 0.02,
-        size.width * 0.62,
-        size.height * 0.10,
-        size.width * 0.72,
-        size.height * 0.34,
-      )
-      ..cubicTo(
-        size.width * 0.86,
-        size.height * 0.66,
-        size.width * 0.48,
-        size.height * 0.76,
-        size.width * 0.33,
-        size.height * 0.58,
-      )
-      ..cubicTo(
-        size.width * 0.18,
-        size.height * 0.40,
-        size.width * 0.30,
-        size.height * 0.30,
-        size.width * 0.52,
-        size.height * 0.42,
-      );
+      ..cubicTo(size.width * 0.34, size.height * 0.02, size.width * 0.62, size.height * 0.10, size.width * 0.72, size.height * 0.34)
+      ..cubicTo(size.width * 0.86, size.height * 0.66, size.width * 0.48, size.height * 0.76, size.width * 0.33, size.height * 0.58)
+      ..cubicTo(size.width * 0.18, size.height * 0.40, size.width * 0.30, size.height * 0.30, size.width * 0.52, size.height * 0.42);
     canvas.drawPath(path, paint);
   }
 
@@ -577,13 +462,7 @@ class _OrbitLinePainter extends CustomPainter {
 }
 
 class _OrbitAvatarData {
-  const _OrbitAvatarData({
-    required this.top,
-    required this.left,
-    required this.size,
-    required this.colors,
-    required this.initial,
-  });
+  const _OrbitAvatarData({required this.top, required this.left, required this.size, required this.colors, required this.initial});
 
   final double top;
   final double left;
