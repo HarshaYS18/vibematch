@@ -23,11 +23,7 @@ class GiftCatalogApiService {
 }
 
 class GiftCatalogSnapshot {
-  const GiftCatalogSnapshot({
-    required this.catalogVersion,
-    required this.categories,
-    required this.gifts,
-  });
+  const GiftCatalogSnapshot({required this.catalogVersion, required this.categories, required this.gifts});
 
   final int catalogVersion;
   final List<GiftCatalogCategory> categories;
@@ -47,30 +43,15 @@ class GiftCatalogSnapshot {
         .map(_giftFromJson)
         .toList(growable: false);
 
-    final categoryKeysWithGifts = rawGifts
-        .map((gift) => gift.categoryKey ?? gift.category.label.toLowerCase())
-        .where((key) => key.trim().isNotEmpty)
-        .toSet();
+    final categoryKeysWithGifts = rawGifts.map((gift) => gift.categoryKey ?? gift.category.label.toLowerCase()).where((key) => key.trim().isNotEmpty).toSet();
+    final categories = rawCategories.where((category) => categoryKeysWithGifts.contains(category.key)).toList(growable: false);
 
-    final categories = rawCategories
-        .where((category) => categoryKeysWithGifts.contains(category.key))
-        .toList(growable: false);
-
-    return GiftCatalogSnapshot(
-      catalogVersion: _int(json['catalog_version']),
-      categories: categories,
-      gifts: rawGifts,
-    );
+    return GiftCatalogSnapshot(catalogVersion: _int(json['catalog_version']), categories: categories, gifts: rawGifts);
   }
 }
 
 class GiftCatalogCategory {
-  const GiftCatalogCategory({
-    required this.key,
-    required this.label,
-    required this.isEnabled,
-    required this.sortOrder,
-  });
+  const GiftCatalogCategory({required this.key, required this.label, required this.isEnabled, required this.sortOrder});
 
   final String key;
   final String label;
@@ -93,12 +74,17 @@ GiftItem _giftFromJson(Map<String, dynamic> json) {
   final giftType = (json['gift_type'] ?? 'normal').toString().trim().toLowerCase();
   final isPremium = categoryKey == 'premium' || _bool(json['show_premium_broadcast'], fallback: false);
   final isLucky = giftType == 'lucky' || categoryKey == 'lucky';
+  final minCombo = _int(json['min_combo']) <= 0 ? 1 : _int(json['min_combo']);
+  final rawMaxCombo = _int(json['max_combo']);
+  final maxCombo = rawMaxCombo < minCombo ? minCombo : rawMaxCombo;
   return GiftItem(
     id: (json['id'] ?? '').toString(),
     name: (json['name'] ?? 'Gift').toString(),
     category: _categoryFromKey(categoryKey),
     categoryKey: categoryKey,
     coins: _int(json['coin_value']),
+    minCombo: minCombo,
+    maxCombo: maxCombo == 0 ? 999 : maxCombo,
     icon: _iconFor(json['icon_key']?.toString(), categoryKey),
     chatSymbol: (json['chat_symbol'] ?? (isLucky ? '🎁' : isPremium ? '👑' : '🎁')).toString(),
     assetPath: _text(json['asset_path']),
