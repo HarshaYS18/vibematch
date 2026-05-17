@@ -256,9 +256,14 @@ class _CompactChatLine extends StatelessWidget {
   }
 
   List<InlineSpan> _messageSpans(ChatEntry message, ValueChanged<String>? onMentionTap) {
-    final parts = message.message.split(RegExp(r'(\s+)'));
-    return parts.map((part) {
-      final isMention = part.startsWith('@') && part.length > 1;
+    // Do not use String.split(RegExp(r'(\s+)')) here: Dart discards delimiter
+    // matches, which removes spaces and renders "that was fire" as "thatwasfire".
+    final tokenMatches = RegExp(r'\s+|\S+').allMatches(message.message);
+    final tokens = tokenMatches.map((match) => match.group(0) ?? '').where((part) => part.isNotEmpty);
+
+    return tokens.map((part) {
+      final isWhitespace = part.trim().isEmpty;
+      final isMention = !isWhitespace && part.startsWith('@') && part.length > 1;
       if (!isMention) {
         return TextSpan(
           text: part,
@@ -267,7 +272,7 @@ class _CompactChatLine extends StatelessWidget {
             fontSize: 13.4,
             fontWeight: FontWeight.w700,
             height: 1.28,
-            letterSpacing: 0.05,
+            letterSpacing: isWhitespace ? 0 : 0.05,
           ),
         );
       }
