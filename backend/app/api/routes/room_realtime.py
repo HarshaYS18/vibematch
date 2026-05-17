@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -27,20 +28,76 @@ def _websocket_connected(websocket: WebSocket) -> bool:
     return websocket.client_state == WebSocketState.CONNECTED and websocket.application_state == WebSocketState.CONNECTED
 
 
+def _first_identity_value(payload: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        raw = payload.get(key)
+        if raw is None:
+            continue
+        value = str(raw).strip()
+        if value:
+            return value
+    return None
+
+
+def _numeric_identity_candidates(raw: str | None) -> list[int]:
+    if raw is None:
+        return []
+    value = str(raw).strip()
+    if not value:
+        return []
+
+    candidates: list[int] = []
+
+    if value.isdigit():
+        candidates.append(int(value))
+
+    for match in re.findall(r"(?:^|_)user_(\d+)$", value):
+        candidates.append(int(match))
+
+    # Preserve order and remove duplicates.
+    seen: set[int] = set()
+    unique: list[int] = []
+    for item in candidates:
+        if item in seen:
+            continue
+        seen.add(item)
+        unique.append(item)
+    return unique
+
+
+def _resolve_user_from_value(db: Session, raw: str | int | None) -> User | None:
+    candidates = _numeric_identity_candidates(str(raw) if raw is not None else None)
+    for candidate in candidates:
+        user = db.query(User).filter(User.id == candidate).first()
+        if user is not None:
+            return user
+        user = db.query(User).filter(User.public_user_id == candidate).first()
+        if user is not None:
+            return user
+        user = db.query(User).filter(User.display_custom_id == candidate).first()
+        if user is not None:
+            return user
+    return None
+
+
 def _payload_user_id(payload: dict[str, Any]) -> int | None:
-    raw = payload.get("user_id") or payload.get("backend_user_id") or payload.get("actor_user_id")
-    try:
-        return int(str(raw)) if raw is not None and str(raw).strip() else None
-    except ValueError:
-        return None
+    raw = _first_identity_value(payload, ("backend_user_id", "actor_user_id", "user_id", "public_user_id", "peer_id"))
+    candidates = _numeric_identity_candidates(raw)
+    return candidates[0] if candidates else None
 
 
 def _target_user_id(payload: dict[str, Any], fallback: int | None = None) -> int | None:
-    raw = payload.get("target_user_id") or payload.get("user_id") or fallback
-    try:
-        return int(str(raw)) if raw is not None and str(raw).strip() else None
-    except ValueError:
-        return fallback
+    raw = _first_identity_value(payload, ("target_backend_user_id", "target_user_id", "target_public_user_id"))
+    candidates = _numeric_identity_candidates(raw)
+    return candidates[0] if candidates else fallback
+
+
+def _target_user(db: Session, payload: dict[str, Any], fallback: int | None = None) -> User | None:
+    raw = _first_identity_value(payload, ("target_backend_user_id", "target_user_id", "target_public_user_id", "target_peer_id"))
+    user = _resolve_user_from_value(db, raw)
+    if user is not None:
+        return user
+    return db.query(User).filter(User.id == fallback).first() if fallback else None
 
 
 def _int_payload(payload: dict[str, Any], key: str, default: int = -1) -> int:
@@ -61,11 +118,12 @@ async def _broadcast_snapshot(room_id: str, event_type: str, room: dict[str, Any
     await room_realtime_connections.broadcast_room(room_id, _event_payload(event_type, room_id, room, extra))
 
 
-def _resolve_user(db, payload: dict[str, Any], fallback_user_id: int | None = None) -> User | None:
-    user_id = _payload_user_id(payload) or fallback_user_id
-    if not user_id:
-        return None
-    return db.query(User).filter(User.id == user_id).first()
+def _resolve_user(db: Session, payload: dict[str, Any], fallback_user_id: int | None = None) -> User | None:
+    raw = _first_identity_value(payload, ("backend_user_id", "actor_user_id", "user_id", "public_user_id", "peer_id"))
+    user = _resolve_user_from_value(db, raw)
+    if user is not None:
+        return user
+    return db.query(User).filter(User.id == fallback_user_id).first() if fallback_user_id else None
 
 
 @router.websocket("/ws/room-realtime")
@@ -109,6 +167,9 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     active_user_id = user.id if user else _payload_user_id(payload)
                     await room_realtime_connections.connect_room(room_id, websocket, active_user_id)
 
+                if user is not None:
+                    active_user_id = user.id
+
                 if event_type == "room/snapshot":
                     snapshot = room_state_service.room_snapshot(db, room)
                     db.commit()
@@ -119,7 +180,6 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     if user is None:
                         snapshot = room_state_service.room_snapshot(db, room)
                     else:
-                        active_user_id = user.id
                         snapshot = room_action_service.join_room(db, room, user, payload)
                     db.commit()
                     await _broadcast_snapshot(room_id, "room/joined", snapshot)
@@ -157,8 +217,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type == "admin/seat_assign":
-                    target_id = _target_user_id(payload)
-                    target = db.query(User).filter(User.id == target_id).first() if target_id else None
+                    target = _target_user(db, payload)
                     if target:
                         snapshot = room_action_service.take_seat(db, room, target, _int_payload(payload, "seat_index"), actor_user_id=active_user_id)
                     else:
@@ -168,8 +227,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type in {"admin/seat_leave", "admin/seat_leave_lock"}:
-                    target_id = _target_user_id(payload)
-                    target = db.query(User).filter(User.id == target_id).first() if target_id else None
+                    target = _target_user(db, payload)
                     if target:
                         snapshot = room_action_service.leave_seat(db, room, target, actor_user_id=active_user_id)
                     else:
@@ -199,13 +257,13 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type == "admin_mute/set":
-                    target_id = _target_user_id(payload)
-                    if target_id:
-                        snapshot = room_action_service.set_admin_mute(db, room, target_id, payload.get("muted") is True, actor_user_id=active_user_id)
+                    target = _target_user(db, payload)
+                    if target:
+                        snapshot = room_action_service.set_admin_mute(db, room, target.id, payload.get("muted") is True, actor_user_id=active_user_id)
                     else:
                         snapshot = room_state_service.room_snapshot(db, room)
                     db.commit()
-                    await _broadcast_snapshot(room_id, "admin_mute/updated", snapshot, {"target_user_id": target_id, "admin_muted": payload.get("muted") is True})
+                    await _broadcast_snapshot(room_id, "admin_mute/updated", snapshot, {"target_user_id": target.id if target else None, "admin_muted": payload.get("muted") is True})
                     continue
 
                 if event_type == "room_settings/seat_layout":
