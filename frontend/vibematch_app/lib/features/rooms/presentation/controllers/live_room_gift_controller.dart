@@ -132,7 +132,7 @@ class LiveRoomGiftController {
   StreamSubscription<CurrentUser>? _userRealtimeSub;
 
   GiftCategory selectedCategory = GiftCategory.premium;
-  GiftItem? selectedGift = mockGiftItems.isEmpty ? null : mockGiftItems.first;
+  GiftItem? selectedGift;
   final Set<String> selectedReceiverIds = <String>{};
   int selectedCombo = 1;
   int coinBalance = 0;
@@ -154,7 +154,9 @@ class LiveRoomGiftController {
   bool get selectedGiftIsLuckyPacket => selectedGift?.id == 'lucky_packet';
   bool get selectedGiftIsFromPremiumSection =>
       selectedCategory == GiftCategory.premium ||
-      selectedGift?.category == GiftCategory.premium;
+      selectedGift?.category == GiftCategory.premium ||
+      selectedGift?.categoryKey == 'premium' ||
+      selectedGift?.showPremiumBroadcast == true;
 
   Future<void> refreshCoinBalance() async {
     try {
@@ -190,17 +192,10 @@ class LiveRoomGiftController {
     if (selectedReceiverIds.isEmpty && roomUsers.isNotEmpty) {
       selectedReceiverIds.add(roomUsers.first.id);
     }
-    if (selectedGift == null && mockGiftItems.isNotEmpty) {
-      selectedGift = mockGiftItems.first;
-    }
   }
 
   void selectCategory(GiftCategory category) {
     selectedCategory = category;
-    final categoryGifts = mockGiftItems
-        .where((gift) => gift.category == category)
-        .toList();
-    selectedGift = categoryGifts.isNotEmpty ? categoryGifts.first : null;
     selectedCombo = category == GiftCategory.lucky ? 9 : 1;
     if (selectedGiftIsLuckyPacket) selectedCombo = 1;
     onChanged();
@@ -211,7 +206,7 @@ class LiveRoomGiftController {
     selectedCategory = gift.category;
     selectedCombo = gift.id == 'lucky_packet'
         ? 1
-        : (gift.category == GiftCategory.lucky ? 9 : 1);
+        : ((gift.categoryKey == 'lucky' || gift.category == GiftCategory.lucky) ? 9 : 1);
     onChanged();
   }
 
@@ -270,7 +265,7 @@ class LiveRoomGiftController {
       return;
     }
 
-    if (gift.category == GiftCategory.lucky) {
+    if (gift.categoryKey == 'lucky' || gift.category == GiftCategory.lucky) {
       unawaited(
         _sendLuckyGift(
           gift: gift,
@@ -380,7 +375,9 @@ class LiveRoomGiftController {
       giftName: gift.name,
       giftIcon: gift.icon,
       giftAssetPath: gift.assetPath,
+      giftAssetUrl: gift.assetUrl,
       videoAssetPath: gift.videoAssetPath,
+      videoUrl: gift.videoUrl,
       colors: gift.colors,
       combo: combo,
       baseCombo: combo,
@@ -881,7 +878,9 @@ class LiveRoomGiftController {
       giftName: '${gift.name} x$multiplier',
       giftIcon: gift.icon,
       giftAssetPath: gift.assetPath,
+      giftAssetUrl: gift.assetUrl,
       videoAssetPath: gift.videoAssetPath,
+      videoUrl: gift.videoUrl,
       colors: _slideColorsForMultiplier(gift.colors, multiplier),
       combo: combo,
       baseCombo: combo,
@@ -928,6 +927,7 @@ class LiveRoomGiftController {
         giftName: gift.name,
         combo: combo,
         giftAssetPath: gift.assetPath,
+        giftAssetUrl: gift.assetUrl,
       ),
     );
   }
