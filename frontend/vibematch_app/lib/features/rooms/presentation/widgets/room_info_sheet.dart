@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../data/live_room_membership_service.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
 
@@ -23,6 +24,7 @@ class RoomInfoSheet extends StatefulWidget {
     required this.availableAdminUsers,
     required this.onAddAdmin,
     required this.onRemoveAdmin,
+    required this.onRemoveRoomMember,
     this.broadcastAnnouncement =
         'Welcome to the room. Respect everyone and enjoy the vibe.',
   });
@@ -36,6 +38,7 @@ class RoomInfoSheet extends StatefulWidget {
   final List<SeatUser> availableAdminUsers;
   final ValueChanged<SeatUser> onAddAdmin;
   final ValueChanged<SeatUser> onRemoveAdmin;
+  final ValueChanged<SeatUser> onRemoveRoomMember;
   final String broadcastAnnouncement;
 
   @override
@@ -48,26 +51,29 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
   late List<SeatUser> _localAvailableAdminUsers;
   _RoomInfoTab _selectedTab = _RoomInfoTab.roomInfo;
 
+  List<SeatUser> get _allKnownUsers => _dedupeUsers(<SeatUser>[
+        ..._localAdmins,
+        ..._localAvailableAdminUsers,
+      ]);
+
   List<SeatUser> get _admins => _dedupeUsers(
-    _localAdmins.where((user) => user.isHost || user.isRoomAdmin),
-  );
+        _allKnownUsers.where((user) => user.isHost || user.isRoomAdmin),
+      );
+
   List<SeatUser> get _availableAdminUsers => _dedupeUsers(
-    _localAvailableAdminUsers.where(
-      (user) => !user.isHost && !user.isRoomAdmin,
-    ),
-  );
+        _allKnownUsers.where((user) => !user.isHost && !user.isRoomAdmin),
+      );
+
   List<SeatUser> get _members => _dedupeUsers(
-    _localAvailableAdminUsers.where(_isApprovedRoomMember),
-  );
+        _allKnownUsers.where(_isApprovedRoomMember),
+      );
 
   bool _isApprovedRoomMember(SeatUser user) {
-    if (user.isHost || user.isRoomAdmin) return false;
-    final normalizedRole = user.roleLabel
-        .trim()
-        .toLowerCase()
-        .replaceAll('_', ' ')
-        .replaceAll('-', ' ');
-    return normalizedRole == 'room member';
+    if (user.id.trim().isEmpty || user.isHost) return false;
+    return LiveRoomMembershipService.isRoomMember(
+      roomId: widget.roomId,
+      userId: user.id,
+    );
   }
 
   @override
@@ -75,6 +81,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
     super.initState();
     _pageController = PageController(initialPage: _selectedTab.index);
     _syncLocalUsersFromWidget();
+    LiveRoomMembershipService.snapshots.addListener(_onMembershipChanged);
   }
 
   @override
@@ -88,8 +95,13 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
 
   @override
   void dispose() {
+    LiveRoomMembershipService.snapshots.removeListener(_onMembershipChanged);
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _onMembershipChanged() {
+    if (mounted) setState(() {});
   }
 
   void _syncLocalUsersFromWidget() {
@@ -135,6 +147,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
   }
 
   void _addAdmin(SeatUser user) {
+    if (!widget.canManageAdmins) return;
     final promoted = user.copyWith(isRoomAdmin: true, roleLabel: 'Admin');
     setState(() {
       _localAvailableAdminUsers.removeWhere((item) => item.id == user.id);
@@ -146,7 +159,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
   }
 
   void _removeAdmin(SeatUser user) {
-    if (user.isHost) return;
+    if (user.isHost || !widget.canManageAdmins) return;
     final demoted = user.copyWith(isRoomAdmin: false, roleLabel: 'Visitor');
     setState(() {
       _localAdmins.removeWhere((item) => item.id == user.id);
@@ -158,14 +171,12 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
   }
 
   void _removeMember(SeatUser user) {
+    if (!widget.canManageAdmins) return;
     if (user.isHost) {
       RoomToast.show(context, 'Room owner cannot be removed');
       return;
     }
-    RoomToast.show(
-      context,
-      'Room member removal will use backend room membership permissions.',
-    );
+    widget.onRemoveRoomMember(user);
   }
 
   @override
@@ -561,10 +572,11 @@ class _MembersPage extends StatelessWidget {
   final ValueChanged<SeatUser> onRemoveMember;
   @override
   Widget build(BuildContext context) {
-    if (members.isEmpty)
+    if (members.isEmpty) {
       return const _EmptyRoomInfoState(
         message: 'No approved room members yet.',
       );
+    }
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
       itemCount: members.length,
