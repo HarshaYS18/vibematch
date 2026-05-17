@@ -15,9 +15,7 @@ class CleanVideoGiftOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeSlide = slides
-        .where((slide) => slide.videoAssetPath?.trim().isNotEmpty ?? false)
-        .firstOrNull;
+    final activeSlide = slides.where((slide) => slide.isVideoGift).firstOrNull;
     if (activeSlide == null) return const SizedBox.shrink();
 
     return Positioned.fill(
@@ -58,10 +56,16 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
   }
 
   Future<void> _load() async {
-    final path = widget.slide.videoAssetPath;
-    if (path == null || path.trim().isEmpty) return;
+    final networkUrl = widget.slide.videoUrl?.trim();
+    final localPath = widget.slide.videoAssetPath?.trim();
+    if ((networkUrl == null || networkUrl.isEmpty) &&
+        (localPath == null || localPath.isEmpty)) {
+      return;
+    }
     try {
-      final controller = VideoPlayerController.asset(path);
+      final controller = networkUrl != null && networkUrl.isNotEmpty
+          ? VideoPlayerController.networkUrl(Uri.parse(networkUrl))
+          : VideoPlayerController.asset(localPath!);
       _controller = controller;
       controller.addListener(_onTick);
       await controller.initialize();
@@ -104,7 +108,6 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
-    final path = widget.slide.videoAssetPath;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.96, end: 1.0),
       duration: const Duration(milliseconds: 260),
@@ -133,7 +136,8 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
                       ),
                     )
                   : _GiftFallback(
-                      assetPath: path,
+                      assetUrl: widget.slide.giftAssetUrl,
+                      assetPath: widget.slide.giftAssetPath,
                       colors: widget.slide.colors,
                       icon: widget.slide.giftIcon,
                     ),
@@ -147,6 +151,38 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
 
 class _GiftFallback extends StatelessWidget {
   const _GiftFallback({
+    required this.assetUrl,
+    required this.assetPath,
+    required this.colors,
+    required this.icon,
+  });
+
+  final String? assetUrl;
+  final String? assetPath;
+  final List<Color> colors;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final networkUrl = assetUrl?.trim();
+    if (networkUrl != null && networkUrl.isNotEmpty) {
+      return Image.network(
+        networkUrl,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) => _LocalOrIconFallback(
+          assetPath: assetPath,
+          colors: colors,
+          icon: icon,
+        ),
+      );
+    }
+    return _LocalOrIconFallback(assetPath: assetPath, colors: colors, icon: icon);
+  }
+}
+
+class _LocalOrIconFallback extends StatelessWidget {
+  const _LocalOrIconFallback({
     required this.assetPath,
     required this.colors,
     required this.icon,
@@ -159,7 +195,10 @@ class _GiftFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = assetPath?.toLowerCase().trim() ?? '';
-    if (path.endsWith('.webp') || path.endsWith('.gif') || path.endsWith('.png') || path.endsWith('.apng')) {
+    if (path.endsWith('.webp') ||
+        path.endsWith('.gif') ||
+        path.endsWith('.png') ||
+        path.endsWith('.apng')) {
       return Image.asset(assetPath!, fit: BoxFit.cover, gaplessPlayback: true);
     }
     return Center(
