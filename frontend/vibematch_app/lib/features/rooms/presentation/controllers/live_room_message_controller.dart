@@ -74,20 +74,10 @@ class LiveRoomMessageController {
       return;
     }
 
-    messages.insert(
-      0,
-      ChatEntry(
-        senderName: currentUser.name,
-        senderId: currentUser.id,
-        senderAvatarUrl: currentUser.avatarUrl,
-        message: trimmed,
-        vipLevel: currentUser.vipLevel,
-        sendingLevel: currentUser.sendingLevel,
-        receivingLevel: currentUser.receivingLevel,
-      ),
-    );
+    // Production rule: room chat is backend-owned. Do not insert the message
+    // locally before confirmation. The sender and every other room user render
+    // the same backend broadcast event after the DB write succeeds.
     LiveRoomMediaSignalingService.instance.sendRoomChat(trimmed);
-    onChanged();
   }
 
   void sendImageMessage({
@@ -289,6 +279,32 @@ class LiveRoomMessageController {
     }
     _handledSystemEventIds.add(event.id);
 
+    if (event.isRoomChatMessage) {
+      final alreadyRendered = messages.any(
+        (message) =>
+            message.senderId == event.actorUserId &&
+            message.message == event.message &&
+            message.senderName == event.actorName,
+      );
+      if (alreadyRendered) return;
+      messages.insert(
+        0,
+        ChatEntry(
+          senderName: event.actorName.trim().isEmpty
+              ? 'Vibe User'
+              : event.actorName.trim(),
+          senderId: event.actorUserId,
+          senderAvatarUrl: event.actorAvatarUrl,
+          message: event.message,
+          vipLevel: event.actorVipLevel,
+          sendingLevel: event.actorSendingLevel,
+          receivingLevel: event.actorReceivingLevel,
+        ),
+      );
+      onChanged();
+      return;
+    }
+
     if (event.isUserEntered) {
       if (event.targetUserId == currentUser.id ||
           event.actorUserId == currentUser.id) {
@@ -358,4 +374,3 @@ class LiveRoomMessageController {
 }
 
 typedef VoidCallbackLike = void Function();
-typedef ValueChangedLike<T> = void Function(T value);
