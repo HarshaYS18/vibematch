@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 enum LiveRoomMembershipStatus {
   guest,
   pending,
-  member,
+  roomMember,
 }
 
 class LiveRoomMembershipSnapshot {
@@ -52,28 +52,48 @@ class LiveRoomMembershipService {
   static final ValueNotifier<Map<String, LiveRoomMembershipSnapshot>> snapshots =
       ValueNotifier(<String, LiveRoomMembershipSnapshot>{});
 
-  static String keyFor({required String roomId, required String userId}) => '${roomId.trim()}::${userId.trim()}';
+  static String keyFor({required String roomId, required String userId}) =>
+      '${roomId.trim()}::${userId.trim()}';
 
-  static LiveRoomMembershipStatus statusFor({required String roomId, required String userId}) {
-    final status = snapshots.value[keyFor(roomId: roomId, userId: userId)]?.status;
-
-    // Production rule:
-    // Local cache may only represent a pending request. Approved room_member
-    // status must come from the backend room snapshot (`Room Member` /
-    // is_room_member), otherwise stale local cache can show the member shield
-    // for normal visitors.
-    if (status == LiveRoomMembershipStatus.pending) {
-      return LiveRoomMembershipStatus.pending;
-    }
-    return LiveRoomMembershipStatus.guest;
+  static LiveRoomMembershipStatus statusFor({
+    required String roomId,
+    required String userId,
+  }) {
+    return snapshots.value[keyFor(roomId: roomId, userId: userId)]?.status ??
+        LiveRoomMembershipStatus.guest;
   }
 
-  static List<LiveRoomMembershipSnapshot> memberRoomsForUserIds(Set<String> userIds) {
-    final normalizedIds = userIds.map((item) => item.trim()).where((item) => item.isNotEmpty).toSet();
+  static bool isRoomMember({required String roomId, required String userId}) {
+    return statusFor(roomId: roomId, userId: userId) ==
+        LiveRoomMembershipStatus.roomMember;
+  }
+
+  static bool isPending({required String roomId, required String userId}) {
+    return statusFor(roomId: roomId, userId: userId) ==
+        LiveRoomMembershipStatus.pending;
+  }
+
+  static List<LiveRoomMembershipSnapshot> roomMemberSnapshotsForRoom(
+    String roomId,
+  ) {
+    final cleanRoomId = roomId.trim();
+    return snapshots.value.values
+        .where((item) => item.roomId.trim() == cleanRoomId)
+        .where((item) => item.status == LiveRoomMembershipStatus.roomMember)
+        .toList(growable: false);
+  }
+
+  static List<LiveRoomMembershipSnapshot> memberRoomsForUserIds(
+    Set<String> userIds,
+  ) {
+    final normalizedIds = userIds
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
 
     return snapshots.value.values
         .where((item) => normalizedIds.contains(item.userId.trim()))
-        .where((item) => item.status == LiveRoomMembershipStatus.member)
+        .where((item) => item.status == LiveRoomMembershipStatus.roomMember)
         .toList(growable: false);
   }
 
@@ -96,7 +116,7 @@ class LiveRoomMembershipService {
     );
   }
 
-  static void markMember({
+  static void markRoomMember({
     required String roomId,
     required String userId,
     String? roomName,
@@ -107,7 +127,27 @@ class LiveRoomMembershipService {
     _setStatus(
       roomId: roomId,
       userId: userId,
-      status: LiveRoomMembershipStatus.member,
+      status: LiveRoomMembershipStatus.roomMember,
+      roomName: roomName,
+      language: language,
+      modeTitle: modeTitle,
+      onlineCount: onlineCount,
+    );
+  }
+
+  static void markMember({
+    required String roomId,
+    required String userId,
+    String? roomName,
+    String? language,
+    String? modeTitle,
+    int? onlineCount,
+  }) {
+    // Backward-compatible method name. The only approved member state in the
+    // room domain is roomMember; never use generic "member" as a contract.
+    markRoomMember(
+      roomId: roomId,
+      userId: userId,
       roomName: roomName,
       language: language,
       modeTitle: modeTitle,
@@ -116,7 +156,11 @@ class LiveRoomMembershipService {
   }
 
   static void markGuest({required String roomId, required String userId}) {
-    _setStatus(roomId: roomId, userId: userId, status: LiveRoomMembershipStatus.guest);
+    _setStatus(
+      roomId: roomId,
+      userId: userId,
+      status: LiveRoomMembershipStatus.guest,
+    );
   }
 
   static void _setStatus({
