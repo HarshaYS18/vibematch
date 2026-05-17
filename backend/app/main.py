@@ -126,7 +126,7 @@ def _ensure_runtime_schema() -> None:
     """Small dev/beta schema guard for existing local Postgres tables.
 
     create_all creates new tables but does not add columns to existing tables.
-    This keeps local closed-beta testing from crashing when room fields are
+    This keeps local closed-beta testing from crashing when fields are
     introduced before a formal Alembic migration pipeline is added.
     """
     statements = [
@@ -135,6 +135,10 @@ def _ensure_runtime_schema() -> None:
         "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS lock_updated_by_user_id INTEGER",
         "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS seat_layout_id VARCHAR(24) DEFAULT '5x2' NOT NULL",
         "ALTER TABLE user_room_presence DROP CONSTRAINT IF EXISTS uq_user_one_active_room_presence",
+        "ALTER TABLE gift_catalog_items ADD COLUMN IF NOT EXISTS min_combo INTEGER DEFAULT 1 NOT NULL",
+        "ALTER TABLE gift_catalog_items ADD COLUMN IF NOT EXISTS max_combo INTEGER DEFAULT 999 NOT NULL",
+        "UPDATE gift_catalog_items SET min_combo = 1 WHERE min_combo IS NULL OR min_combo < 1",
+        "UPDATE gift_catalog_items SET max_combo = 999 WHERE max_combo IS NULL OR max_combo < min_combo",
     ]
     with engine.begin() as connection:
         for statement in statements:
