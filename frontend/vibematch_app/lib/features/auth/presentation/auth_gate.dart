@@ -67,7 +67,30 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
-  Future<void> _loginWithLocalTest() async {
+  Future<void> _loginWithFounderTest() async {
+    await _loginWithDevAccount(
+      email: 'founder@vibematch.com',
+      username: 'founder',
+      displayName: 'Founder Owner',
+      label: 'Founder test login',
+    );
+  }
+
+  Future<void> _loginWithNormalTestUser() async {
+    await _loginWithDevAccount(
+      email: 'testuser@vibematch.com',
+      username: 'test_user',
+      displayName: 'Test User',
+      label: 'Test user login',
+    );
+  }
+
+  Future<void> _loginWithDevAccount({
+    required String email,
+    required String username,
+    required String displayName,
+    required String label,
+  }) async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -77,9 +100,9 @@ class _AuthGateState extends State<AuthGate> {
       await _authApiService.logout();
       await _googleSignIn.signOut();
       final result = await _authApiService.devLogin(
-        email: 'founder@vibematch.com',
-        username: 'founder',
-        displayName: 'Founder Owner',
+        email: email,
+        username: username,
+        displayName: displayName,
       );
       final user = await _authApiService.getCurrentUser(
         accessToken: result.accessToken,
@@ -95,7 +118,7 @@ class _AuthGateState extends State<AuthGate> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _error = 'Local login failed: $error\nMake sure backend .env has ENABLE_DEV_LOGIN=true and restart backend.';
+          _error = '$label failed: $error\nMake sure backend .env has ENABLE_DEV_LOGIN=true and restart backend.';
         });
       }
     } finally {
@@ -141,10 +164,9 @@ class _AuthGateState extends State<AuthGate> {
     } catch (error) {
       final message = error.toString();
       final lower = message.toLowerCase();
-      final helpfulMessage =
-          lower.contains('api exception: 10') || lower.contains('sign_in_failed')
-              ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
-              : message;
+      final helpfulMessage = lower.contains('api exception: 10') || lower.contains('sign_in_failed')
+          ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
+          : message;
       if (mounted) setState(() => _error = helpfulMessage);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -197,7 +219,8 @@ class _AuthGateState extends State<AuthGate> {
       return _LoginScreen(
         isLoading: _isLoading,
         error: _error,
-        onLocalLoginPressed: _loginWithLocalTest,
+        onFounderLoginPressed: _loginWithFounderTest,
+        onTestUserLoginPressed: _loginWithNormalTestUser,
         onGoogleLoginPressed: _loginWithGoogle,
       );
     }
@@ -234,13 +257,15 @@ class _LoginScreen extends StatelessWidget {
   const _LoginScreen({
     required this.isLoading,
     required this.error,
-    required this.onLocalLoginPressed,
+    required this.onFounderLoginPressed,
+    required this.onTestUserLoginPressed,
     required this.onGoogleLoginPressed,
   });
 
   final bool isLoading;
   final String? error;
-  final VoidCallback onLocalLoginPressed;
+  final VoidCallback onFounderLoginPressed;
+  final VoidCallback onTestUserLoginPressed;
   final VoidCallback onGoogleLoginPressed;
 
   @override
@@ -277,7 +302,20 @@ class _LoginScreen extends StatelessWidget {
                       const SizedBox(height: 34),
                       _LocalLoginButton(
                         isLoading: isLoading,
-                        onTap: onLocalLoginPressed,
+                        onTap: onFounderLoginPressed,
+                        title: 'Founder Test Login',
+                        subtitle: 'Owner/admin room control account',
+                        icon: Icons.workspace_premium_rounded,
+                        background: const Color(0xFF5B176A),
+                      ),
+                      const SizedBox(height: 12),
+                      _LocalLoginButton(
+                        isLoading: isLoading,
+                        onTap: onTestUserLoginPressed,
+                        title: 'Test User Login',
+                        subtitle: 'Normal user for two-window broadcast test',
+                        icon: Icons.person_rounded,
+                        background: const Color(0xFF0F7D78),
                       ),
                       const SizedBox(height: 12),
                       _GoogleLoginButton(
@@ -290,7 +328,7 @@ class _LoginScreen extends StatelessWidget {
                       ],
                       const SizedBox(height: 22),
                       Text(
-                        'Use Local Test Login for backend and room testing. Google can be fixed later for production sign-in.',
+                        'Use Founder + Test User in two browser windows to verify backend broadcast. Google can be fixed later for production sign-in.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: const Color(0xFF4B4055).withValues(alpha: 0.62),
@@ -413,10 +451,21 @@ class _FloatingBubble extends StatelessWidget {
 }
 
 class _LocalLoginButton extends StatelessWidget {
-  const _LocalLoginButton({required this.isLoading, required this.onTap});
+  const _LocalLoginButton({
+    required this.isLoading,
+    required this.onTap,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.background,
+  });
 
   final bool isLoading;
   final VoidCallback onTap;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color background;
 
   @override
   Widget build(BuildContext context) {
@@ -429,11 +478,11 @@ class _LocalLoginButton extends StatelessWidget {
           height: 66,
           padding: const EdgeInsets.symmetric(horizontal: 22),
           decoration: BoxDecoration(
-            color: const Color(0xFF5B176A),
+            color: background,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF5B176A).withValues(alpha: 0.18),
+                color: background.withValues(alpha: 0.18),
                 blurRadius: 18,
                 offset: const Offset(0, 10),
               ),
@@ -441,22 +490,22 @@ class _LocalLoginButton extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.bolt_rounded, color: Colors.white, size: 29),
+              Icon(icon, color: Colors.white, size: 29),
               const SizedBox(width: 28),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Local Test Login',
+                    Text(
+                      title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+                      style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      isLoading ? 'Signing in...' : 'Founder Owner test account',
+                      isLoading ? 'Signing in...' : subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 11, fontWeight: FontWeight.w800),
