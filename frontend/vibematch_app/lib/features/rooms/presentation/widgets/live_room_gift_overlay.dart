@@ -45,6 +45,8 @@ class LiveRoomGiftOverlay extends StatefulWidget {
 }
 
 class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
+  static const int _premiumGiftMinCoins = 1000;
+
   final List<RibbonMessage> _ribbonMessages = <RibbonMessage>[];
   final List<GiftSlide> _backendGiftSlides = <GiftSlide>[];
   final Map<String, Timer> _backendGiftTimers = <String, Timer>{};
@@ -114,8 +116,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     final looksPremium = event.showPremiumBroadcast ||
         event.ribbonTier == 'premium' ||
         event.broadcastScope == 'global' ||
-        event.giftTotalCoinValue >= LiveRoomGiftController.premiumGiftThreshold ||
-        event.giftCoinValue >= LiveRoomGiftController.premiumGiftThreshold ||
+        event.giftTotalCoinValue >= _premiumGiftMinCoins ||
+        event.giftCoinValue >= _premiumGiftMinCoins ||
         cleanGiftId.startsWith('premium_');
 
     return GiftItem(
@@ -138,7 +140,12 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   }
 
   String _normalize(String value) {
-    return value.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '');
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
   }
 
   String _giftDisplayName(LiveRoomSystemEvent event, GiftItem gift) {
