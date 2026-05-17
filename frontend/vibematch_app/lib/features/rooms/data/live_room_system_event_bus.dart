@@ -29,6 +29,15 @@ class LiveRoomSystemEvent {
     this.autoDismissSeconds,
     this.giftId = '',
     this.giftName = '',
+    this.giftAssetUrl,
+    this.giftVideoUrl,
+    this.giftAssetPath,
+    this.giftVideoAssetPath,
+    this.giftCategory = 'classic',
+    this.giftType = 'normal',
+    this.animationType = 'image',
+    this.giftVersion = 1,
+    this.catalogVersion = 1,
     this.giftQuantity = 0,
     this.giftCoinValue = 0,
     this.giftTotalCoinValue = 0,
@@ -58,6 +67,15 @@ class LiveRoomSystemEvent {
   final int? autoDismissSeconds;
   final String giftId;
   final String giftName;
+  final String? giftAssetUrl;
+  final String? giftVideoUrl;
+  final String? giftAssetPath;
+  final String? giftVideoAssetPath;
+  final String giftCategory;
+  final String giftType;
+  final String animationType;
+  final int giftVersion;
+  final int catalogVersion;
   final int giftQuantity;
   final int giftCoinValue;
   final int giftTotalCoinValue;
@@ -108,12 +126,21 @@ class LiveRoomSystemEvent {
           : int.tryParse(rawAutoDismiss.toString()),
       giftId: json['gift_id']?.toString() ?? '',
       giftName: json['gift_name']?.toString() ?? '',
+      giftAssetUrl: _text(json['asset_url'] ?? json['gift_asset_url'] ?? json['giftAssetUrl']),
+      giftVideoUrl: _text(json['video_url'] ?? json['gift_video_url'] ?? json['giftVideoUrl']),
+      giftAssetPath: _text(json['asset_path'] ?? json['gift_asset_path'] ?? json['giftAssetPath']),
+      giftVideoAssetPath: _text(json['video_asset_path'] ?? json['gift_video_asset_path'] ?? json['giftVideoAssetPath']),
+      giftCategory: (json['gift_category'] ?? json['category'] ?? 'classic').toString(),
+      giftType: (json['gift_type'] ?? 'normal').toString(),
+      animationType: (json['animation_type'] ?? 'image').toString(),
+      giftVersion: _int(json['gift_version'] ?? json['version']),
+      catalogVersion: _int(json['catalog_version']),
       giftQuantity: _int(json['quantity'] ?? json['gift_quantity']),
       giftCoinValue: _int(json['coin_value'] ?? json['gift_coin_value']),
       giftTotalCoinValue: _int(
         json['total_coin_value'] ?? json['gift_total_coin_value'],
       ),
-      isLuckyGift: json['is_lucky'] == true || json['is_lucky_gift'] == true,
+      isLuckyGift: json['is_lucky'] == true || json['is_lucky_gift'] == true || (json['gift_type']?.toString() == 'lucky'),
       luckyMultiplier: _int(json['lucky_multiplier']),
       luckyRewardCoinAmount: _int(json['lucky_reward_coin_amount']),
       ribbonTier: ribbonTier,
