@@ -13,18 +13,51 @@ class LiveRoomUsersController {
     required List<SeatUser> inviteUsers,
     required bool Function(String userId) isUserRemoved,
   }) {
-    final users = <SeatUser>[];
-    final ids = <String>{};
+    final usersByKey = <String, SeatUser>{};
+    final rawIdToKey = <String, String>{};
     final media = LiveRoomMediaSignalingService.instance;
     final snapshot = media.roomSnapshot.value;
     final presenceUsers = LiveRoomPresenceRepository.currentParticipantsForRoom(
       media.roomId,
     );
 
+    void rememberAlias(String rawId, String key) {
+      final cleanRaw = rawId.trim();
+      if (cleanRaw.isEmpty) return;
+      rawIdToKey[cleanRaw] = key;
+      rawIdToKey[_canonicalUserKey(cleanRaw)] = key;
+    }
+
+    String keyForUser(SeatUser user) {
+      final cleanId = user.id.trim();
+      if (cleanId.isEmpty) return '';
+      final existing = rawIdToKey[cleanId] ?? rawIdToKey[_canonicalUserKey(cleanId)];
+      if (existing != null) return existing;
+      return _canonicalUserKey(cleanId);
+    }
+
     void addUser(SeatUser user) {
-      if (user.id.trim().isEmpty) return;
-      if (isUserRemoved(user.id)) return;
-      if (ids.add(user.id)) users.add(user);
+      final cleanId = user.id.trim();
+      if (cleanId.isEmpty) return;
+      if (isUserRemoved(cleanId)) return;
+      final key = keyForUser(user);
+      if (key.isEmpty) return;
+      rememberAlias(cleanId, key);
+      final existing = usersByKey[key];
+      usersByKey[key] = existing == null ? user : _mergeDuplicateUser(existing, user);
+    }
+
+    if (snapshot != null) {
+      for (final peer in snapshot.peers) {
+        final peerKey = _canonicalUserKey(peer.userId);
+        rememberAlias(peer.userId, peerKey);
+        final publicUserId = peer.publicUserId;
+        if (publicUserId != null && publicUserId.trim().isNotEmpty) {
+          rememberAlias(publicUserId, peerKey);
+          rememberAlias('user_$publicUserId', peerKey);
+          rememberAlias('${snapshot.roomId}_user_$publicUserId', peerKey);
+        }
+      }
     }
 
     for (final user in presenceUsers) {
@@ -41,7 +74,7 @@ class LiveRoomUsersController {
     if (snapshot != null) {
       for (final peer in snapshot.peers) {
         final existingSeatUser = seatedUsers.firstWhereOrNull(
-          (user) => user.id == peer.userId,
+          (user) => keyForUser(user) == _canonicalUserKey(peer.userId),
         );
         final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(
           peer.userId,
@@ -66,7 +99,7 @@ class LiveRoomUsersController {
       addUser(user);
     }
 
-    return users;
+    return usersByKey.values.toList(growable: false);
   }
 
   List<SeatUser> buildRoomAdmins(List<SeatUser> users) {
@@ -82,11 +115,13 @@ class LiveRoomUsersController {
     required List<SeatUser> seatedUsers,
     String currentUserId = '',
   }) {
-    final seatedIds = seatedUsers.map((user) => user.id).toSet();
+    final seatedKeys = seatedUsers.map((user) => _canonicalUserKey(user.id)).toSet();
+    final currentKey = _canonicalUserKey(currentUserId);
     return allRoomUsers
-        .where(
-          (user) => user.id != currentUserId && !seatedIds.contains(user.id),
-        )
+        .where((user) {
+          final userKey = _canonicalUserKey(user.id);
+          return userKey != currentKey && !seatedKeys.contains(userKey);
+        })
         .toList();
   }
 
@@ -113,8 +148,9 @@ class LiveRoomUsersController {
       );
     }
 
+    final senderKey = _canonicalUserKey(senderId);
     return allRoomUsers.firstWhere(
-      (item) => item.id == senderId,
+      (item) => _canonicalUserKey(item.id) == senderKey,
       orElse: () => SeatUser(
         id: senderId,
         name: entry.senderName,
@@ -212,6 +248,57 @@ class LiveRoomUsersController {
       selfMuted: seatUser.selfMuted,
       adminMuted: seatUser.adminMuted,
     );
+  }
+
+  SeatUser _mergeDuplicateUser(SeatUser existing, SeatUser incoming) {
+    final preferIncomingName = incoming.name.trim().isNotEmpty &&
+        !incoming.name.trim().toLowerCase().startsWith('user ');
+    return SeatUser(
+      id: existing.id,
+      name: preferIncomingName ? incoming.name : existing.name,
+      roleLabel: incoming.isHost || incoming.isRoomAdmin ? incoming.roleLabel : existing.roleLabel,
+      familyName: incoming.familyName.trim().isNotEmpty ? incoming.familyName : existing.familyName,
+      familyLevel: incoming.familyLevel,
+      relationshipText: incoming.relationshipText.trim().isNotEmpty ? incoming.relationshipText : existing.relationshipText,
+      vipLevel: incoming.vipLevel > 0 ? incoming.vipLevel : existing.vipLevel,
+      svipLevel: incoming.svipLevel > 0 ? incoming.svipLevel : existing.svipLevel,
+      sendingLevel: incoming.sendingLevel > 0 ? incoming.sendingLevel : existing.sendingLevel,
+      receivingLevel: incoming.receivingLevel > 0 ? incoming.receivingLevel : existing.receivingLevel,
+      sentExp: incoming.sentExp > 0 ? incoming.sentExp : existing.sentExp,
+      receivedExp: incoming.receivedExp > 0 ? incoming.receivedExp : existing.receivedExp,
+      medals: incoming.medals.isNotEmpty ? incoming.medals : existing.medals,
+      avatarColors: incoming.avatarColors.isNotEmpty ? incoming.avatarColors : existing.avatarColors,
+      nameGradientColors: incoming.nameGradientColors.isNotEmpty ? incoming.nameGradientColors : existing.nameGradientColors,
+      avatarUrl: incoming.avatarUrl ?? existing.avatarUrl,
+      equippedAvatarFrameAssetPath: incoming.equippedAvatarFrameAssetPath ?? existing.equippedAvatarFrameAssetPath,
+      equippedAvatarFrameImageUrl: incoming.equippedAvatarFrameImageUrl ?? existing.equippedAvatarFrameImageUrl,
+      equippedChatBubbleAssetPath: incoming.equippedChatBubbleAssetPath ?? existing.equippedChatBubbleAssetPath,
+      equippedChatBubbleImageUrl: incoming.equippedChatBubbleImageUrl ?? existing.equippedChatBubbleImageUrl,
+      age: incoming.age ?? existing.age,
+      locationLabel: incoming.locationLabel ?? existing.locationLabel,
+      locationVisible: incoming.locationVisible || existing.locationVisible,
+      gender: incoming.gender != RoomUserGender.undisclosed ? incoming.gender : existing.gender,
+      isCurrentUser: existing.isCurrentUser || incoming.isCurrentUser,
+      isHost: existing.isHost || incoming.isHost,
+      isRoomAdmin: existing.isRoomAdmin || incoming.isRoomAdmin,
+      selfMuted: incoming.selfMuted,
+      adminMuted: existing.adminMuted || incoming.adminMuted,
+      isSpeaking: existing.isSpeaking || incoming.isSpeaking,
+    );
+  }
+
+  String _canonicalUserKey(String userId) {
+    var value = userId.trim();
+    if (value.isEmpty) return '';
+    value = value.replaceFirst(RegExp(r'^VM\d+_user_'), 'user_');
+    value = value.replaceFirst(RegExp(r'^room_\w+_user_'), 'user_');
+    if (value.startsWith('user_')) {
+      value = value.substring(5);
+    }
+    if (RegExp(r'^\d+$').hasMatch(value)) {
+      return 'u:$value';
+    }
+    return value.toLowerCase();
   }
 
   String _fallbackDisplayNameForUserId(String userId) {
