@@ -30,10 +30,6 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     this.onLuckyPacketResultsDismiss,
   });
 
-  // Legacy controller slides are intentionally no longer rendered as the source
-  // of truth for committed gifts. They are kept in the signature so the current
-  // gift panel/controller API remains stable while backend room_gift_sent owns
-  // the visible room gift event.
   final List<GiftSlide> slides;
   final GiftSlide? activeComboSlide;
   final LuckyPacketRoomEvent? activeLuckyPacket;
@@ -54,6 +50,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   final Map<String, Timer> _backendGiftTimers = <String, Timer>{};
   final Set<String> _handledBackendGiftIds = <String>{};
   VoidCallback? _backendGiftListener;
+
+  List<GiftItem> get _fullGiftCatalog => GiftPanel.withMockExtras(mockGiftItems);
 
   @override
   void initState() {
@@ -95,28 +93,52 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       remainingSeconds: gift.isVideoGift ? 10 : 15,
     );
 
-    _startBackendGiftSlide(slide);
+    if (event.showGiftSlide || gift.isVideoGift) {
+      _startBackendGiftSlide(slide);
+    }
     _publishBackendPremiumBroadcast(event, gift, slide);
     _publishBackendGiftFlight(event, gift, slide);
   }
 
   GiftItem _giftItemForEvent(LiveRoomSystemEvent event) {
-    final cleanGiftId = event.giftId.trim();
-    final cleanGiftName = event.giftName.trim().toLowerCase();
-    for (final gift in mockGiftItems) {
-      if (gift.id == cleanGiftId || gift.name.toLowerCase() == cleanGiftName) {
+    final cleanGiftId = _normalize(event.giftId);
+    final cleanGiftName = _normalize(event.giftName);
+    for (final gift in _fullGiftCatalog) {
+      final giftId = _normalize(gift.id);
+      final giftName = _normalize(gift.name);
+      if (giftId == cleanGiftId || giftName == cleanGiftName) {
         return gift;
       }
     }
+
+    final looksPremium = event.showPremiumBroadcast ||
+        event.ribbonTier == 'premium' ||
+        event.broadcastScope == 'global' ||
+        event.giftTotalCoinValue >= LiveRoomGiftController.premiumGiftThreshold ||
+        event.giftCoinValue >= LiveRoomGiftController.premiumGiftThreshold ||
+        cleanGiftId.startsWith('premium_');
+
     return GiftItem(
-      id: cleanGiftId.isEmpty ? 'backend_gift' : cleanGiftId,
+      id: event.giftId.trim().isEmpty ? 'backend_gift' : event.giftId.trim(),
       name: event.giftName.trim().isEmpty ? 'Gift' : event.giftName.trim(),
-      category: event.isLuckyGift ? GiftCategory.lucky : GiftCategory.classic,
+      category: event.isLuckyGift
+          ? GiftCategory.lucky
+          : looksPremium
+              ? GiftCategory.premium
+              : GiftCategory.classic,
       coins: event.giftCoinValue,
-      icon: Icons.card_giftcard_rounded,
-      chatSymbol: '🎁',
-      colors: const <Color>[Color(0xFFFFC857), Color(0xFF12C7B7)],
+      icon: looksPremium
+          ? Icons.workspace_premium_rounded
+          : Icons.card_giftcard_rounded,
+      chatSymbol: looksPremium ? '👑' : '🎁',
+      colors: looksPremium
+          ? const <Color>[Color(0xFFFFD166), Color(0xFF8C5CF6)]
+          : const <Color>[Color(0xFFFFC857), Color(0xFF12C7B7)],
     );
+  }
+
+  String _normalize(String value) {
+    return value.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '');
   }
 
   String _giftDisplayName(LiveRoomSystemEvent event, GiftItem gift) {
@@ -175,7 +197,11 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     GiftItem gift,
     GiftSlide slide,
   ) {
-    if (gift.category != GiftCategory.premium) return;
+    final shouldBroadcast = event.showPremiumBroadcast ||
+        gift.category == GiftCategory.premium ||
+        event.ribbonTier == 'premium' ||
+        event.broadcastScope == 'global';
+    if (!shouldBroadcast) return;
     PremiumGiftBroadcastBus.publish(
       PremiumGiftBroadcastEvent(
         id: 'premium-${event.id}',
@@ -194,6 +220,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     GiftItem gift,
     GiftSlide slide,
   ) {
+    if (!event.showGiftFlight) return;
     final totalCoins = event.giftTotalCoinValue > 0
         ? event.giftTotalCoinValue
         : gift.coins * slide.combo;
