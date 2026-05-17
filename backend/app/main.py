@@ -46,6 +46,7 @@ from app.api.routes import (
     room_levels,
     room_music_media,
     room_realtime,
+    room_realtime_commands,
     social,
     super_owner,
     users,
@@ -87,7 +88,10 @@ from app.models import (
     MvpFeatureState,
     ProfileVisit,
     Room,
+    RoomChatMessage,
     RoomExperienceStatus,
+    RoomRealtimeEvent,
+    RoomSeatState,
     RubyWithdrawRequest,
     SpecialPermission,
     StoreItem,
@@ -180,6 +184,7 @@ app.include_router(love_bonds.router)
 app.include_router(relationship_exp.router)
 app.include_router(inbox_ws.router)
 app.include_router(room_realtime.router)
+app.include_router(room_realtime_commands.router)
 app.include_router(experience.router)
 app.include_router(experience_room_public.router)
 app.include_router(social.router)
