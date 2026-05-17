@@ -73,10 +73,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     }
   }
 
-  Future<String?> _reasonDialog({
-    required String title,
-    required String hint,
-  }) async {
+  Future<String?> _reasonDialog({required String title, required String hint}) async {
     final controller = TextEditingController(text: hint);
     final result = await showDialog<String>(
       context: context,
@@ -143,11 +140,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     final key = '${category['key']}';
     final enabled = !_bool(category['is_enabled'], fallback: true);
     await _runMutation(
-      (reason) async => _api.setCategoryEnabled(
-        categoryKey: key,
-        enabled: enabled,
-        reason: reason,
-      ),
+      (reason) async => _api.setCategoryEnabled(categoryKey: key, enabled: enabled, reason: reason),
       '${enabled ? 'Enable' : 'Disable'} category',
       '${enabled ? 'Enable' : 'Disable'} gift category $key',
     );
@@ -157,11 +150,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     final id = '${gift['id']}';
     final enabled = !_bool(gift['is_enabled'], fallback: true);
     await _runMutation(
-      (reason) async => _api.setGiftEnabled(
-        giftId: id,
-        enabled: enabled,
-        reason: reason,
-      ),
+      (reason) async => _api.setGiftEnabled(giftId: id, enabled: enabled, reason: reason),
       '${enabled ? 'Enable' : 'Disable'} gift',
       '${enabled ? 'Enable' : 'Disable'} gift $id',
     );
@@ -222,14 +211,8 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Save'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
           ],
         ),
       ),
@@ -275,9 +258,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
         .toList(growable: false);
     final firstCategoryKey = categoryKeys.isEmpty ? 'classic' : categoryKeys.first;
     var selectedCategoryKey = _cleanKey('${gift?['category'] ?? firstCategoryKey}');
-    if (!categoryKeys.contains(selectedCategoryKey)) {
-      selectedCategoryKey = firstCategoryKey;
-    }
+    if (!categoryKeys.contains(selectedCategoryKey)) selectedCategoryKey = firstCategoryKey;
     var selectedDisplayMode = _cleanDisplayMode('${gift?['display_mode'] ?? 'normal'}');
 
     final giftIdController = TextEditingController(text: '${gift?['id'] ?? ''}');
@@ -319,7 +300,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
                   _field(giftIdController, 'Gift ID', enabled: gift == null),
                   _field(nameController, 'Name'),
                   DropdownButtonFormField<String>(
-                    value: selectedCategoryKey,
+                    initialValue: selectedCategoryKey,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Category',
@@ -329,10 +310,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
                       final key = _cleanKey('${category['key']}');
                       final label = '${category['label'] ?? key}';
                       final enabledText = _bool(category['is_enabled'], fallback: true) ? '' : ' (disabled)';
-                      return DropdownMenuItem<String>(
-                        value: key,
-                        child: Text('$label • $key$enabledText'),
-                      );
+                      return DropdownMenuItem<String>(value: key, child: Text('$label • $key$enabledText'));
                     }).toList(growable: false),
                     onChanged: (value) {
                       if (value == null || value.trim().isEmpty) return;
@@ -340,21 +318,15 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
                     },
                   ),
                   DropdownButtonFormField<String>(
-                    value: selectedDisplayMode,
+                    initialValue: selectedDisplayMode,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Display mode',
                       helperText: 'Normal = current size, Large 80% = big aspect-ratio-safe render',
                     ),
                     items: const [
-                      DropdownMenuItem(
-                        value: 'normal',
-                        child: Text('Normal / current display'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'large_80',
-                        child: Text('Large 80% screen display'),
-                      ),
+                      DropdownMenuItem(value: 'normal', child: Text('Normal / current display')),
+                      DropdownMenuItem(value: 'large_80', child: Text('Large 80% screen display')),
                     ],
                     onChanged: (value) {
                       if (value == null) return;
@@ -380,26 +352,10 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
                   _field(versionController, 'Version', number: true),
                   _field(sortController, 'Sort order', number: true),
                   _field(maxMultiplierController, 'Max multiplier for lucky gift', number: true),
-                  SwitchListTile(
-                    value: enabled,
-                    onChanged: (v) => setLocal(() => enabled = v),
-                    title: const Text('Enabled'),
-                  ),
-                  SwitchListTile(
-                    value: slide,
-                    onChanged: (v) => setLocal(() => slide = v),
-                    title: const Text('Show gift slide'),
-                  ),
-                  SwitchListTile(
-                    value: broadcast,
-                    onChanged: (v) => setLocal(() => broadcast = v),
-                    title: const Text('Premium broadcast'),
-                  ),
-                  SwitchListTile(
-                    value: flight,
-                    onChanged: (v) => setLocal(() => flight = v),
-                    title: const Text('Gift flight'),
-                  ),
+                  SwitchListTile(value: enabled, onChanged: (v) => setLocal(() => enabled = v), title: const Text('Enabled')),
+                  SwitchListTile(value: slide, onChanged: (v) => setLocal(() => slide = v), title: const Text('Show gift slide')),
+                  SwitchListTile(value: broadcast, onChanged: (v) => setLocal(() => broadcast = v), title: const Text('Premium broadcast')),
+                  SwitchListTile(value: flight, onChanged: (v) => setLocal(() => flight = v), title: const Text('Gift flight')),
                   TextField(
                     controller: reasonController,
                     maxLines: 2,
@@ -410,14 +366,8 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Save'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
           ],
         ),
       ),
@@ -492,18 +442,14 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     }
   }
 
-  TextField _field(
-    TextEditingController controller,
-    String label, {
-    bool enabled = true,
-    bool number = false,
-  }) =>
-      TextField(
-        controller: controller,
-        enabled: enabled,
-        keyboardType: number ? TextInputType.number : TextInputType.text,
-        decoration: InputDecoration(labelText: label),
-      );
+  TextField _field(TextEditingController controller, String label, {bool enabled = true, bool number = false}) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: number ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(labelText: label),
+    );
+  }
 
   void _showSnack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context)
@@ -526,9 +472,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
         foregroundColor: const Color(0xFF251538),
         elevation: 0,
         title: const Text('Gift Catalog Editor', style: TextStyle(fontWeight: FontWeight.w900)),
-        actions: [
-          IconButton(onPressed: _saving ? null : _load, icon: const Icon(Icons.refresh_rounded)),
-        ],
+        actions: [IconButton(onPressed: _saving ? null : _load, icon: const Icon(Icons.refresh_rounded))],
       ),
       floatingActionButton: _saving
           ? const FloatingActionButton(
@@ -559,23 +503,19 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
                     const SizedBox(height: 16),
                     const _SectionTitle('Categories'),
                     const SizedBox(height: 8),
-                    ..._categories.map(
-                      (category) => _CategoryCard(
-                        category: category,
-                        onEdit: () => _openCategoryEditor(category),
-                        onToggle: () => _toggleCategory(category),
-                      ),
-                    ),
+                    ..._categories.map((category) => _CategoryCard(
+                          category: category,
+                          onEdit: () => _openCategoryEditor(category),
+                          onToggle: () => _toggleCategory(category),
+                        )),
                     const SizedBox(height: 18),
                     const _SectionTitle('Gifts'),
                     const SizedBox(height: 8),
-                    ..._items.map(
-                      (gift) => _GiftCard(
-                        gift: gift,
-                        onEdit: () => _openGiftEditor(gift),
-                        onToggle: () => _toggleGift(gift),
-                      ),
-                    ),
+                    ..._items.map((gift) => _GiftCard(
+                          gift: gift,
+                          onEdit: () => _openGiftEditor(gift),
+                          onToggle: () => _toggleGift(gift),
+                        )),
                   ],
                 ),
     );
@@ -626,44 +566,23 @@ class _HeaderCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF120D1F), Color(0xFF4A2A63), Color(0xFFFFC857)],
-          ),
+          gradient: const LinearGradient(colors: [Color(0xFF120D1F), Color(0xFF4A2A63), Color(0xFFFFC857)]),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Backend-owned gift catalog',
-              style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900),
-            ),
+            const Text('Backend-owned gift catalog', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
             const SizedBox(height: 6),
-            Text(
-              'Source: $source • Categories: $categoryCount • Gifts: $itemCount',
-              style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
-            ),
+            Text('Source: $source • Categories: $categoryCount • Gifts: $itemCount', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            Text(
-              cdnBase.isEmpty ? 'CDN base not set' : cdnBase,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFFFFF0A8), fontSize: 11, fontWeight: FontWeight.w700),
-            ),
+            Text(cdnBase.isEmpty ? 'CDN base not set' : cdnBase, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFFFF0A8), fontSize: 11, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                FilledButton.icon(
-                  onPressed: onSeed,
-                  icon: const Icon(Icons.playlist_add_check_rounded),
-                  label: const Text('Seed defaults'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: onAddCategory,
-                  icon: const Icon(Icons.category_rounded),
-                  label: const Text('Add category'),
-                ),
+                FilledButton.icon(onPressed: onSeed, icon: const Icon(Icons.playlist_add_check_rounded), label: const Text('Seed defaults')),
+                OutlinedButton.icon(onPressed: onAddCategory, icon: const Icon(Icons.category_rounded), label: const Text('Add category')),
               ],
             ),
           ],
@@ -688,16 +607,13 @@ class _CategoryCard extends StatelessWidget {
           backgroundColor: enabled ? const Color(0xFF12C7B7) : const Color(0xFF8C8198),
           child: const Icon(Icons.category_rounded, color: Colors.white),
         ),
-        title: Text(
-          '${category['label']}',
-          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF251538)),
-        ),
+        title: Text('${category['label']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF251538))),
         subtitle: Text('${category['key']} • sort ${category['sort_order']}'),
         trailing: Wrap(
           spacing: 6,
           children: [
             IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_rounded)),
-            Switch(value: enabled, onChanged: (_) => onToggle()),
+            Switch(value: enabled, onChanged: (value) => onToggle()),
           ],
         ),
       ),
@@ -723,20 +639,14 @@ class _GiftCard extends StatelessWidget {
           Container(
             width: 54,
             height: 54,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: const Color(0xFF251538),
-            ),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), color: const Color(0xFF251538)),
             clipBehavior: Clip.antiAlias,
             child: imageUrl.isEmpty
                 ? const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFC857))
                 : Image.network(
                     imageUrl,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.card_giftcard_rounded,
-                      color: Color(0xFFFFC857),
-                    ),
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFC857)),
                   ),
           ),
           const SizedBox(width: 12),
@@ -744,27 +654,16 @@ class _GiftCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${gift['name']}',
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF251538)),
-                ),
+                Text('${gift['name']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF251538))),
                 const SizedBox(height: 3),
-                Text(
-                  '${gift['id']} • ${gift['category']} • ${gift['coin_value']} coins • combo ${gift['min_combo'] ?? 1}-${gift['max_combo'] ?? 999}',
-                  style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700),
-                ),
+                Text('${gift['id']} • ${gift['category']} • ${gift['coin_value']} coins • combo ${gift['min_combo'] ?? 1}-${gift['max_combo'] ?? 999}', style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)),
                 const SizedBox(height: 3),
-                Text(
-                  'display $displayMode • ${gift['cdn_asset_path'] ?? 'no cdn icon'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF8C8198)),
-                ),
+                Text('display $displayMode • ${gift['cdn_asset_path'] ?? 'no cdn icon'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF8C8198))),
               ],
             ),
           ),
           IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_rounded)),
-          Switch(value: enabled, onChanged: (_) => onToggle()),
+          Switch(value: enabled, onChanged: (value) => onToggle()),
         ],
       ),
     );
@@ -814,11 +713,7 @@ class _ErrorView extends StatelessWidget {
             children: [
               const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 42),
               const SizedBox(height: 10),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
+              Text(message, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
               const SizedBox(height: 12),
               FilledButton(onPressed: onRetry, child: const Text('Retry')),
             ],
