@@ -24,7 +24,7 @@ class GiftVisual extends StatelessWidget {
     final cleanPath = assetPath?.trim();
     final visualSize = size - padding;
 
-    final Widget? visual = cleanUrl != null && cleanUrl.isNotEmpty
+    final Widget visual = cleanUrl != null && cleanUrl.isNotEmpty
         ? Image.network(
             cleanUrl,
             width: visualSize,
@@ -82,26 +82,30 @@ class GiftVisual extends StatelessWidget {
                 ),
               ),
             ),
-            visual ?? Icon(icon, color: Colors.white, size: size * 0.46),
+            visual,
           ],
         ),
       ),
     );
   }
 
-  Widget? _localOrIcon(String? cleanPath, double visualSize) {
-    if (cleanPath == null || cleanPath.isEmpty) return null;
+  Widget _localOrIcon(String? cleanPath, double visualSize) {
+    if (cleanPath == null || cleanPath.isEmpty) return _iconFallback();
     return Image.asset(
       cleanPath,
       width: visualSize,
       height: visualSize,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) => Icon(
-        icon,
-        color: Colors.white,
-        size: size * 0.46,
-      ),
+      errorBuilder: (context, error, stackTrace) => _iconFallback(),
+    );
+  }
+
+  Widget _iconFallback() {
+    return Icon(
+      icon,
+      color: Colors.white,
+      size: size * 0.46,
     );
   }
 }
