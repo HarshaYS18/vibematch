@@ -54,7 +54,6 @@ def _numeric_identity_candidates(raw: str | None) -> list[int]:
     for match in re.findall(r"(?:^|_)user_(\d+)$", value):
         candidates.append(int(match))
 
-    # Preserve order and remove duplicates.
     seen: set[int] = set()
     unique: list[int] = []
     for item in candidates:
@@ -86,12 +85,6 @@ def _payload_user_id(payload: dict[str, Any]) -> int | None:
     return candidates[0] if candidates else None
 
 
-def _target_user_id(payload: dict[str, Any], fallback: int | None = None) -> int | None:
-    raw = _first_identity_value(payload, ("target_backend_user_id", "target_user_id", "target_public_user_id"))
-    candidates = _numeric_identity_candidates(raw)
-    return candidates[0] if candidates else fallback
-
-
 def _target_user(db: Session, payload: dict[str, Any], fallback: int | None = None) -> User | None:
     raw = _first_identity_value(payload, ("target_backend_user_id", "target_user_id", "target_public_user_id", "target_peer_id"))
     user = _resolve_user_from_value(db, raw)
@@ -112,6 +105,30 @@ def _event_payload(event_type: str, room_id: str, room: dict[str, Any], extra: d
     if extra:
         payload.update(extra)
     return {"type": event_type, "payload": payload}
+
+
+def _chat_event_payload(room_id: str, user: User, text: str) -> dict[str, Any]:
+    now_id = f"chat_{room_id}_{user.id}_{abs(hash(text))}"
+    return {
+        "type": "room/system_event",
+        "payload": {
+            "id": now_id,
+            "event_type": "room_chat_message",
+            "type": "room_chat_message",
+            "room_id": room_id,
+            "actor_user_id": str(user.id),
+            "actor_public_user_id": user.public_user_id,
+            "actor_name": user.display_name or user.username or f"User {user.public_user_id}",
+            "actor_avatar_url": user.avatar_url,
+            "actor_vip_level": 0,
+            "actor_sending_level": 0,
+            "actor_receiving_level": 0,
+            "target_user_id": "",
+            "target_name": "",
+            "message": text,
+            "created_at": None,
+        },
+    }
 
 
 async def _broadcast_snapshot(room_id: str, event_type: str, room: dict[str, Any], extra: dict[str, Any] | None = None) -> None:
@@ -282,9 +299,11 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     text = str(payload.get("text") or "").strip()
                     if text and user is not None:
                         snapshot = room_action_service.create_chat_message(db, room, user, text, message_type=str(payload.get("message_type") or "text"), metadata=payload)
+                        db.commit()
+                        await room_realtime_connections.broadcast_room(room_id, _chat_event_payload(room_id, user, text))
                     else:
                         snapshot = room_state_service.room_snapshot(db, room)
-                    db.commit()
+                        db.commit()
                     await _broadcast_snapshot(room_id, "room.chat.message_created", snapshot)
                     continue
 
