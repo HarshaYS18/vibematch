@@ -1,145 +1,276 @@
 import 'package:flutter/material.dart';
 
-// NOTE: This file intentionally keeps the existing live-room model surface
-// compact. Gift asset CDN fields are render-only metadata; backend remains the
-// source of truth for price, ownership, lucky results, category enablement, and
-// broadcast eligibility.
-
-enum RoomPrivacyMode {
-  open('Open', Icons.public_rounded),
-  locked('Locked', Icons.lock_rounded),
-  secret('Secret Vibe', Icons.visibility_off_rounded);
-
-  const RoomPrivacyMode(this.label, this.icon);
-  final String label;
-  final IconData icon;
-}
+enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
 
 enum GiftCategory {
-  classic('Classic'),
-  lucky('Lucky'),
-  event('Event'),
-  svip('SVIP'),
-  premium('Premium'),
-  baggage('Baggage');
-
-  const GiftCategory(this.label);
-  final String label;
+  classic,
+  lucky,
+  relationship,
+  event,
+  premium,
+  svip,
+  vip,
+  baggage,
 }
 
-enum RoomSystemEventType { userEntered, userRemoved }
+enum RoomUserGender { male, female, undisclosed }
+
+enum RoomSystemEventType { none, userEntered, userRemoved }
+
+extension RoomPrivacyModeX on RoomPrivacyMode {
+  String get label {
+    switch (this) {
+      case RoomPrivacyMode.open:
+        return 'Open';
+      case RoomPrivacyMode.locked:
+        return 'Locked';
+      case RoomPrivacyMode.membersOnly:
+        return 'Member only';
+      case RoomPrivacyMode.privateVibe:
+        return 'Private vibe';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case RoomPrivacyMode.open:
+        return Icons.public_rounded;
+      case RoomPrivacyMode.locked:
+        return Icons.lock_rounded;
+      case RoomPrivacyMode.membersOnly:
+        return Icons.verified_user_rounded;
+      case RoomPrivacyMode.privateVibe:
+        return Icons.visibility_off_rounded;
+    }
+  }
+
+  String get shortLabel {
+    switch (this) {
+      case RoomPrivacyMode.open:
+        return 'Open';
+      case RoomPrivacyMode.locked:
+        return 'Lock';
+      case RoomPrivacyMode.membersOnly:
+        return 'Member';
+      case RoomPrivacyMode.privateVibe:
+        return 'Secret';
+    }
+  }
+}
+
+extension GiftCategoryX on GiftCategory {
+  String get label {
+    switch (this) {
+      case GiftCategory.classic:
+        return 'Classic';
+      case GiftCategory.lucky:
+        return 'Lucky';
+      case GiftCategory.relationship:
+        return 'Relationship';
+      case GiftCategory.event:
+        return 'Event';
+      case GiftCategory.premium:
+        return 'Premium';
+      case GiftCategory.svip:
+        return 'SVIP';
+      case GiftCategory.vip:
+        return 'VIP';
+      case GiftCategory.baggage:
+        return 'Baggage';
+    }
+  }
+}
+
+extension RoomUserGenderX on RoomUserGender {
+  IconData get icon {
+    switch (this) {
+      case RoomUserGender.male:
+        return Icons.male_rounded;
+      case RoomUserGender.female:
+        return Icons.female_rounded;
+      case RoomUserGender.undisclosed:
+        return Icons.person_rounded;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case RoomUserGender.male:
+        return const Color(0xFF4A9BFF);
+      case RoomUserGender.female:
+        return const Color(0xFFE84C72);
+      case RoomUserGender.undisclosed:
+        return const Color(0xFF8C8198);
+    }
+  }
+}
 
 class SeatUser {
   const SeatUser({
     required this.id,
     required this.name,
+    required this.roleLabel,
+    required this.familyName,
+    this.familyLevel = 'bronze',
+    required this.relationshipText,
+    required this.vipLevel,
+    required this.sendingLevel,
+    required this.receivingLevel,
+    required this.sentExp,
+    required this.receivedExp,
+    required this.medals,
+    required this.avatarColors,
+    this.nameGradientColors = const <String>[],
     this.avatarUrl,
-    this.vipLevel = 0,
-    this.sendingLevel = 0,
-    this.receivingLevel = 0,
+    this.equippedAvatarFrameAssetPath,
+    this.equippedAvatarFrameImageUrl,
+    this.equippedChatBubbleAssetPath,
+    this.equippedChatBubbleImageUrl,
+    this.svipLevel = 0,
+    this.age,
+    this.locationLabel,
+    this.locationVisible = true,
+    this.gender = RoomUserGender.undisclosed,
+    this.isCurrentUser = false,
     this.isHost = false,
     this.isRoomAdmin = false,
-    this.roleLabel,
-    this.familyName,
-    this.publicUserId,
-    this.monthlySentCoins = 0,
-    this.monthlyReceivedCoins = 0,
-    this.isOnline = true,
-    this.isMicMuted = false,
-    this.isAdminMuted = false,
-    this.avatarColors = const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+    this.selfMuted = false,
+    this.adminMuted = false,
+    this.isSpeaking = false,
   });
 
   final String id;
   final String name;
-  final String? avatarUrl;
+  final String roleLabel;
+  final String familyName;
+  final String familyLevel;
+  final String relationshipText;
   final int vipLevel;
   final int sendingLevel;
   final int receivingLevel;
+  final int sentExp;
+  final int receivedExp;
+  final List<String> medals;
+  final List<Color> avatarColors;
+  final List<String> nameGradientColors;
+  final String? avatarUrl;
+  final String? equippedAvatarFrameAssetPath;
+  final String? equippedAvatarFrameImageUrl;
+  final String? equippedChatBubbleAssetPath;
+  final String? equippedChatBubbleImageUrl;
+  final int svipLevel;
+  final int? age;
+  final String? locationLabel;
+  final bool locationVisible;
+  final RoomUserGender gender;
+  final bool isCurrentUser;
   final bool isHost;
   final bool isRoomAdmin;
-  final String? roleLabel;
-  final String? familyName;
-  final int? publicUserId;
-  final int monthlySentCoins;
-  final int monthlyReceivedCoins;
-  final bool isOnline;
-  final bool isMicMuted;
-  final bool isAdminMuted;
-  final List<Color> avatarColors;
+  final bool selfMuted;
+  final bool adminMuted;
+  final bool isSpeaking;
+
+  bool get muted => selfMuted || adminMuted;
+  bool get isMicMuted => selfMuted || adminMuted;
+  bool get isAdminMuted => adminMuted;
+  bool get isOnline => true;
+  int? get publicUserId => int.tryParse(id);
+  int get monthlySentCoins => sentExp;
+  int get monthlyReceivedCoins => receivedExp;
+  bool get showLocation =>
+      locationVisible && (locationLabel?.trim().isNotEmpty ?? false);
 
   SeatUser copyWith({
-    String? id,
     String? name,
-    String? avatarUrl,
-    bool clearAvatarUrl = false,
+    String? roleLabel,
+    String? familyName,
+    String? familyLevel,
+    String? relationshipText,
     int? vipLevel,
     int? sendingLevel,
     int? receivingLevel,
+    int? sentExp,
+    int? receivedExp,
+    List<String>? medals,
+    List<Color>? avatarColors,
+    List<String>? nameGradientColors,
+    String? avatarUrl,
+    String? equippedAvatarFrameAssetPath,
+    String? equippedAvatarFrameImageUrl,
+    String? equippedChatBubbleAssetPath,
+    String? equippedChatBubbleImageUrl,
+    bool clearAvatarUrl = false,
+    bool? isCurrentUser,
     bool? isHost,
     bool? isRoomAdmin,
-    String? roleLabel,
-    bool clearRoleLabel = false,
-    String? familyName,
-    bool clearFamilyName = false,
-    int? publicUserId,
-    bool clearPublicUserId = false,
-    int? monthlySentCoins,
-    int? monthlyReceivedCoins,
-    bool? isOnline,
-    bool? isMicMuted,
-    bool? isAdminMuted,
-    List<Color>? avatarColors,
+    bool? selfMuted,
+    bool? adminMuted,
+    bool? isSpeaking,
+    RoomUserGender? gender,
+    int? svipLevel,
+    int? age,
+    String? locationLabel,
+    bool? locationVisible,
   }) {
     return SeatUser(
-      id: id ?? this.id,
+      id: id,
       name: name ?? this.name,
-      avatarUrl: clearAvatarUrl ? null : avatarUrl ?? this.avatarUrl,
+      roleLabel: roleLabel ?? this.roleLabel,
+      familyName: familyName ?? this.familyName,
+      familyLevel: familyLevel ?? this.familyLevel,
+      relationshipText: relationshipText ?? this.relationshipText,
       vipLevel: vipLevel ?? this.vipLevel,
       sendingLevel: sendingLevel ?? this.sendingLevel,
       receivingLevel: receivingLevel ?? this.receivingLevel,
+      sentExp: sentExp ?? this.sentExp,
+      receivedExp: receivedExp ?? this.receivedExp,
+      medals: medals ?? this.medals,
+      avatarColors: avatarColors ?? this.avatarColors,
+      nameGradientColors: nameGradientColors ?? this.nameGradientColors,
+      avatarUrl: clearAvatarUrl ? null : (avatarUrl ?? this.avatarUrl),
+      equippedAvatarFrameAssetPath:
+          equippedAvatarFrameAssetPath ?? this.equippedAvatarFrameAssetPath,
+      equippedAvatarFrameImageUrl:
+          equippedAvatarFrameImageUrl ?? this.equippedAvatarFrameImageUrl,
+      equippedChatBubbleAssetPath:
+          equippedChatBubbleAssetPath ?? this.equippedChatBubbleAssetPath,
+      equippedChatBubbleImageUrl:
+          equippedChatBubbleImageUrl ?? this.equippedChatBubbleImageUrl,
+      svipLevel: svipLevel ?? this.svipLevel,
+      age: age ?? this.age,
+      locationLabel: locationLabel ?? this.locationLabel,
+      locationVisible: locationVisible ?? this.locationVisible,
+      gender: gender ?? this.gender,
+      isCurrentUser: isCurrentUser ?? this.isCurrentUser,
       isHost: isHost ?? this.isHost,
       isRoomAdmin: isRoomAdmin ?? this.isRoomAdmin,
-      roleLabel: clearRoleLabel ? null : roleLabel ?? this.roleLabel,
-      familyName: clearFamilyName ? null : familyName ?? this.familyName,
-      publicUserId: clearPublicUserId ? null : publicUserId ?? this.publicUserId,
-      monthlySentCoins: monthlySentCoins ?? this.monthlySentCoins,
-      monthlyReceivedCoins: monthlyReceivedCoins ?? this.monthlyReceivedCoins,
-      isOnline: isOnline ?? this.isOnline,
-      isMicMuted: isMicMuted ?? this.isMicMuted,
-      isAdminMuted: isAdminMuted ?? this.isAdminMuted,
-      avatarColors: avatarColors ?? this.avatarColors,
+      selfMuted: selfMuted ?? this.selfMuted,
+      adminMuted: adminMuted ?? this.adminMuted,
+      isSpeaking: isSpeaking ?? this.isSpeaking,
     );
   }
 }
 
 class RoomSeat {
-  const RoomSeat({
-    required this.index,
-    this.user,
-    this.locked = false,
-  });
-
+  const RoomSeat({required this.index, this.user, this.locked = false});
   final int index;
   final SeatUser? user;
   final bool locked;
-
-  RoomSeat copyWith({SeatUser? user, bool clearUser = false, bool? locked}) {
-    return RoomSeat(
-      index: index,
-      user: clearUser ? null : user ?? this.user,
-      locked: locked ?? this.locked,
-    );
-  }
+  RoomSeat copyWith({SeatUser? user, bool clearUser = false, bool? locked}) =>
+      RoomSeat(
+        index: index,
+        user: clearUser ? null : (user ?? this.user),
+        locked: locked ?? this.locked,
+      );
 }
 
 class ChatEntry {
-  const ChatEntry({
+  ChatEntry({
     required this.senderName,
     required this.message,
     this.senderId,
     this.senderAvatarUrl,
-    this.senderNameGradientColors = const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+    this.senderNameGradientColors = const <String>[],
     this.vipLevel = 0,
     this.sendingLevel = 0,
     this.receivingLevel = 0,
@@ -151,18 +282,17 @@ class ChatEntry {
     this.applicationApproved = false,
     this.applicationRejected = false,
     this.applicationExpired = false,
-    this.systemEventType,
+    this.systemEventType = RoomSystemEventType.none,
     this.autoDismissAt,
     this.giftAssetPath,
     this.imageUrl,
     this.imageContentType,
   });
-
   final String senderName;
   final String message;
   final String? senderId;
   final String? senderAvatarUrl;
-  final List<Color> senderNameGradientColors;
+  final List<String> senderNameGradientColors;
   final int vipLevel;
   final int sendingLevel;
   final int receivingLevel;
@@ -174,68 +304,61 @@ class ChatEntry {
   final bool applicationApproved;
   final bool applicationRejected;
   final bool applicationExpired;
-  final RoomSystemEventType? systemEventType;
+  final RoomSystemEventType systemEventType;
   final DateTime? autoDismissAt;
   final String? giftAssetPath;
   final String? imageUrl;
   final String? imageContentType;
-
-  bool get applicationResolved =>
-      applicationApproved || applicationRejected || applicationExpired;
+  bool get isSystemMessage =>
+      senderId == 'system' || systemEventType != RoomSystemEventType.none;
   bool get shouldAutoDismiss => autoDismissAt != null;
-
+  bool get autoDismissed =>
+      autoDismissAt != null && DateTime.now().isAfter(autoDismissAt!);
+  bool get applicationTimedOut =>
+      applicationExpired ||
+      (applicationExpiresAt != null &&
+          DateTime.now().isAfter(applicationExpiresAt!));
+  bool get applicationResolved =>
+      applicationApproved || applicationRejected || applicationTimedOut;
+  bool get isImageMessage => imageUrl?.trim().isNotEmpty ?? false;
   ChatEntry copyWith({
-    String? senderName,
     String? message,
-    String? senderId,
-    bool clearSenderId = false,
     String? senderAvatarUrl,
+    List<String>? senderNameGradientColors,
     bool clearSenderAvatarUrl = false,
-    List<Color>? senderNameGradientColors,
-    int? vipLevel,
-    int? sendingLevel,
-    int? receivingLevel,
-    bool? isGift,
-    bool? isSeatApplication,
-    int? seatIndex,
-    DateTime? applicationCreatedAt,
-    DateTime? applicationExpiresAt,
     bool? applicationApproved,
     bool? applicationRejected,
     bool? applicationExpired,
     RoomSystemEventType? systemEventType,
     DateTime? autoDismissAt,
-    String? giftAssetPath,
     String? imageUrl,
     String? imageContentType,
-  }) {
-    return ChatEntry(
-      senderName: senderName ?? this.senderName,
-      message: message ?? this.message,
-      senderId: clearSenderId ? null : senderId ?? this.senderId,
-      senderAvatarUrl: clearSenderAvatarUrl
-          ? null
-          : senderAvatarUrl ?? this.senderAvatarUrl,
-      senderNameGradientColors:
-          senderNameGradientColors ?? this.senderNameGradientColors,
-      vipLevel: vipLevel ?? this.vipLevel,
-      sendingLevel: sendingLevel ?? this.sendingLevel,
-      receivingLevel: receivingLevel ?? this.receivingLevel,
-      isGift: isGift ?? this.isGift,
-      isSeatApplication: isSeatApplication ?? this.isSeatApplication,
-      seatIndex: seatIndex ?? this.seatIndex,
-      applicationCreatedAt: applicationCreatedAt ?? this.applicationCreatedAt,
-      applicationExpiresAt: applicationExpiresAt ?? this.applicationExpiresAt,
-      applicationApproved: applicationApproved ?? this.applicationApproved,
-      applicationRejected: applicationRejected ?? this.applicationRejected,
-      applicationExpired: applicationExpired ?? this.applicationExpired,
-      systemEventType: systemEventType ?? this.systemEventType,
-      autoDismissAt: autoDismissAt ?? this.autoDismissAt,
-      giftAssetPath: giftAssetPath ?? this.giftAssetPath,
-      imageUrl: imageUrl ?? this.imageUrl,
-      imageContentType: imageContentType ?? this.imageContentType,
-    );
-  }
+  }) => ChatEntry(
+    senderName: senderName,
+    message: message ?? this.message,
+    senderId: senderId,
+    senderAvatarUrl: clearSenderAvatarUrl
+        ? null
+        : senderAvatarUrl ?? this.senderAvatarUrl,
+    senderNameGradientColors:
+        senderNameGradientColors ?? this.senderNameGradientColors,
+    vipLevel: vipLevel,
+    sendingLevel: sendingLevel,
+    receivingLevel: receivingLevel,
+    isGift: isGift,
+    isSeatApplication: isSeatApplication,
+    seatIndex: seatIndex,
+    applicationCreatedAt: applicationCreatedAt,
+    applicationExpiresAt: applicationExpiresAt,
+    applicationApproved: applicationApproved ?? this.applicationApproved,
+    applicationRejected: applicationRejected ?? this.applicationRejected,
+    applicationExpired: applicationExpired ?? this.applicationExpired,
+    systemEventType: systemEventType ?? this.systemEventType,
+    autoDismissAt: autoDismissAt ?? this.autoDismissAt,
+    giftAssetPath: giftAssetPath,
+    imageUrl: imageUrl ?? this.imageUrl,
+    imageContentType: imageContentType ?? this.imageContentType,
+  );
 }
 
 class GiftItem {
@@ -260,7 +383,6 @@ class GiftItem {
     this.showPremiumBroadcast = false,
     this.showGiftFlight = true,
   });
-
   final String id;
   final String name;
   final GiftCategory category;
@@ -280,7 +402,6 @@ class GiftItem {
   final bool showGiftSlide;
   final bool showPremiumBroadcast;
   final bool showGiftFlight;
-
   bool get isVideoGift =>
       (videoUrl?.trim().isNotEmpty ?? false) ||
       (videoAssetPath?.trim().isNotEmpty ?? false);
@@ -302,7 +423,6 @@ class GiftSlide {
     this.baseCombo = 1,
     required this.remainingSeconds,
   });
-
   final String id;
   final String senderName;
   final String receiverName;
@@ -316,11 +436,9 @@ class GiftSlide {
   final int combo;
   final int baseCombo;
   final int remainingSeconds;
-
   bool get isVideoGift =>
       (videoUrl?.trim().isNotEmpty ?? false) ||
       (videoAssetPath?.trim().isNotEmpty ?? false);
-
   GiftSlide copyWith({int? combo, int? baseCombo, int? remainingSeconds}) =>
       GiftSlide(
         id: id,
@@ -346,17 +464,14 @@ class SeatLayoutSpec {
     required this.rows,
     required this.hasHostSeats,
   });
-
   final String id;
   final int columns;
   final int rows;
   final bool hasHostSeats;
-
   int get topSeatCount => hasHostSeats ? 2 : 0;
   int get totalSeats => topSeatCount + (columns * rows);
   String get label =>
       hasHostSeats ? 'Host + ${columns}x$rows' : '${columns}x$rows';
-
   static const List<String> withoutHostLayouts = ['4x2', '5x2', '4x3', '5x3'];
   static const List<String> withHostLayouts = [
     'host_4x2',
@@ -364,7 +479,6 @@ class SeatLayoutSpec {
     'host_4x3',
     'host_5x3',
   ];
-
   static SeatLayoutSpec parse(String id) {
     final hasHost = id.startsWith('host_');
     final raw = id.replaceFirst('host_', '');
@@ -387,9 +501,15 @@ String avatarLetter(String input) {
 }
 
 String compactNumber(int value) {
-  if (value >= 1000000000) return '${_trimCompactDecimal(value / 1000000000)}B';
-  if (value >= 1000000) return '${_trimCompactDecimal(value / 1000000)}M';
-  if (value >= 1000) return '${_trimCompactDecimal(value / 1000)}K';
+  if (value >= 1000000000) {
+    return '${_trimCompactDecimal(value / 1000000000)}B';
+  }
+  if (value >= 1000000) {
+    return '${_trimCompactDecimal(value / 1000000)}M';
+  }
+  if (value >= 1000) {
+    return '${_trimCompactDecimal(value / 1000)}K';
+  }
   return '$value';
 }
 
@@ -400,3 +520,140 @@ String _trimCompactDecimal(double value) {
       .replaceFirst(RegExp(r'\.0+$'), '')
       .replaceFirst(RegExp(r'(\.\d*[1-9])0+$'), r'$1');
 }
+
+RoomPrivacyMode privacyModeFromTitle(String title) {
+  final value = title.toLowerCase();
+  if (value.contains('lock')) return RoomPrivacyMode.locked;
+  if (value.contains('member')) return RoomPrivacyMode.membersOnly;
+  if (value.contains('private') || value.contains('secret')) {
+    return RoomPrivacyMode.privateVibe;
+  }
+  return RoomPrivacyMode.open;
+}
+
+final List<SeatUser> mockRoomUsers = <SeatUser>[];
+final List<SeatUser> mockInviteUsers = <SeatUser>[];
+final List<ChatEntry> mockChatEntries = <ChatEntry>[];
+
+const List<GiftItem> mockGiftItems = [
+  GiftItem(
+    id: 'rose_bloom',
+    name: 'Rose Bloom',
+    category: GiftCategory.classic,
+    coins: 9,
+    icon: Icons.favorite_rounded,
+    chatSymbol: '🌹',
+    assetPath: 'assets/gifts/normal/rose_bloom.webp',
+    colors: [Color(0xFFFF5F7E), Color(0xFFFFB3C1)],
+  ),
+  GiftItem(
+    id: 'gold_coin',
+    name: 'Gold Coin',
+    category: GiftCategory.classic,
+    coins: 29,
+    icon: Icons.paid_rounded,
+    chatSymbol: '🪙',
+    assetPath: 'assets/gifts/normal/gold_coin.webp',
+    colors: [Color(0xFFFFC857), Color(0xFFC99A3B)],
+  ),
+  GiftItem(
+    id: 'party_pop',
+    name: 'Party Pop',
+    category: GiftCategory.classic,
+    coins: 99,
+    icon: Icons.celebration_rounded,
+    chatSymbol: '🎉',
+    assetPath: 'assets/gifts/normal/party_pop.webp',
+    colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
+  ),
+  GiftItem(
+    id: 'love_rocket',
+    name: 'Love Rocket',
+    category: GiftCategory.premium,
+    coins: 999,
+    icon: Icons.rocket_launch_rounded,
+    chatSymbol: '🚀',
+    assetPath: 'assets/gifts/love_rocket/icon/love_rocket_icon.webp',
+    videoAssetPath: 'assets/videos/gifts/love_rocket.mp4',
+    colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)],
+    showPremiumBroadcast: true,
+    showGiftFlight: false,
+  ),
+  GiftItem(
+    id: 'arcane_crystal_wand',
+    name: 'Arcane Crystal Wand',
+    category: GiftCategory.lucky,
+    coins: 99,
+    icon: Icons.auto_fix_high_rounded,
+    chatSymbol: '🪄',
+    assetPath: 'assets/gifts/lucky/arcane_crystal_wand.png',
+    colors: [Color(0xFF8C5CF6), Color(0xFFC99A3B)],
+    giftType: 'lucky',
+  ),
+  GiftItem(
+    id: 'celestial_rose',
+    name: 'Celestial Rose',
+    category: GiftCategory.lucky,
+    coins: 199,
+    icon: Icons.favorite_border_rounded,
+    chatSymbol: '🌹',
+    assetPath: 'assets/gifts/lucky/celestial_rose.png',
+    colors: [Color(0xFFE84C72), Color(0xFFFFD166)],
+    giftType: 'lucky',
+  ),
+  GiftItem(
+    id: 'eternal_bond_rings',
+    name: 'Eternal Bond Rings',
+    category: GiftCategory.lucky,
+    coins: 299,
+    icon: Icons.diamond_rounded,
+    chatSymbol: '💍',
+    assetPath: 'assets/gifts/lucky/eternal_bond_rings.png',
+    colors: [Color(0xFFC99A3B), Color(0xFFEDE3D7)],
+    giftType: 'lucky',
+  ),
+  GiftItem(
+    id: 'bubble_elephant',
+    name: 'Bubble Elephant',
+    category: GiftCategory.lucky,
+    coins: 99,
+    icon: Icons.pets_rounded,
+    chatSymbol: '🐘',
+    assetPath: 'assets/gifts/lucky/bubble_elephant.png',
+    colors: [Color(0xFFFF9CCB), Color(0xFFEDE3D7)],
+    giftType: 'lucky',
+  ),
+  GiftItem(
+    id: 'sun_fortune_coin',
+    name: 'Sun Fortune Coin',
+    category: GiftCategory.lucky,
+    coins: 499,
+    icon: Icons.wb_sunny_rounded,
+    chatSymbol: '☀️',
+    assetPath: 'assets/gifts/lucky/sun_fortune_coin.png',
+    colors: [Color(0xFFFFC857), Color(0xFFC99A3B)],
+    giftType: 'lucky',
+  ),
+  GiftItem(
+    id: 'moonlit_koi',
+    name: 'Moonlit Koi',
+    category: GiftCategory.lucky,
+    coins: 299,
+    icon: Icons.waves_rounded,
+    chatSymbol: '🐟',
+    assetPath: 'assets/gifts/lucky/moonlit_koi.png',
+    colors: [Color(0xFFEDE3D7), Color(0xFF251538)],
+    giftType: 'lucky',
+  ),
+  GiftItem(
+    id: 'spellbound_tome',
+    name: 'Spellbound Tome',
+    category: GiftCategory.lucky,
+    coins: 999,
+    icon: Icons.auto_stories_rounded,
+    chatSymbol: '📖',
+    assetPath: 'assets/gifts/lucky/spellbound_tome.png',
+    colors: [Color(0xFF6D5DF6), Color(0xFF12C7B7)],
+    giftType: 'lucky',
+  ),
+];
