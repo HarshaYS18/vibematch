@@ -73,6 +73,8 @@ from app.models import (
     GameRiskAudit,
     GameRound,
     GameRoundPlayer,
+    GiftCatalogCategory,
+    GiftCatalogItem,
     GiftTransaction,
     InboxBackupJob,
     InboxBackupSetting,
