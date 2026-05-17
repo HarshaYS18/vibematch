@@ -13,6 +13,9 @@ from app.models.user import User
 
 _ALLOWED_SEAT_LAYOUT_IDS = {"4x2", "5x2", "4x3", "5x3", "host_4x2", "host_5x2", "host_4x3", "host_5x3"}
 ROOM_STALE_PRESENCE_TIMEOUT_SECONDS = 10 * 60
+TRENDING_ONLINE_WEIGHT = 100
+TRENDING_SEATED_WEIGHT = 35
+TRENDING_ACTIVE_ROOM_BASE = 25
 
 
 def normalize_layout(layout_id: str | None) -> str:
@@ -45,10 +48,12 @@ def ensure_room_seats(db: Session, room: Room) -> list[RoomSeatState]:
             existing[seat_index] = seat
     for seat_index, seat in existing.items():
         if seat_index >= max_seats and seat.occupant_user_id is not None:
+            released_user_id = seat.occupant_user_id
             seat.occupant_user_id = None
             seat.mic_enabled = False
             seat.admin_muted = False
             seat.left_at = datetime.utcnow()
+            seat.updated_by_user_id = released_user_id
     db.flush()
     return [existing[index] for index in sorted(existing) if index < max_seats]
 
@@ -60,6 +65,43 @@ def room_sequence(db: Session, room: Room) -> int:
 
 def _next_sequence(db: Session, room: Room) -> int:
     return room_sequence(db, room) + 1
+
+
+def calculate_room_trending_score(active_count: int, seated_count: int) -> int:
+    if active_count <= 0:
+        return 0
+    return (
+        TRENDING_ACTIVE_ROOM_BASE
+        + (active_count * TRENDING_ONLINE_WEIGHT)
+        + (seated_count * TRENDING_SEATED_WEIGHT)
+    )
+
+
+def sync_room_live_counters(db: Session, room: Room) -> tuple[int, int, int]:
+    """Sync online_count and trending_score from backend-owned live state.
+
+    Trending must not be a stale counter. It is derived from active room
+    participants whose heartbeat is still valid plus currently occupied seats.
+    When stale heartbeat cleanup removes a user, this function drops the score.
+    """
+    active_count = int(
+        db.query(func.count(RoomParticipant.id))
+        .filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True))
+        .scalar()
+        or 0
+    )
+    seated_count = int(
+        db.query(func.count(RoomSeatState.id))
+        .filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id.isnot(None))
+        .scalar()
+        or 0
+    )
+    trending_score = calculate_room_trending_score(active_count, seated_count)
+    room.online_count = active_count
+    room.trending_score = trending_score
+    room.updated_at = datetime.utcnow()
+    db.flush()
+    return active_count, seated_count, trending_score
 
 
 def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = None) -> list[int]:
@@ -76,6 +118,7 @@ def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = N
         .all()
     )
     if not stale_participants:
+        sync_room_live_counters(db, room)
         return []
 
     stale_user_ids = [participant.user_id for participant in stale_participants]
@@ -105,6 +148,7 @@ def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = N
         )
         db.add(event)
 
+    sync_room_live_counters(db, room)
     room.updated_at = current_time
     db.flush()
     return stale_user_ids
@@ -248,8 +292,11 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
     participants = active_participants(db, room)
     seats = ensure_room_seats(db, room)
     active_count = len(participants)
-    if room.online_count != active_count:
+    seated_count = len([seat for seat in seats if seat.occupant_user_id is not None])
+    trending_score = calculate_room_trending_score(active_count, seated_count)
+    if room.online_count != active_count or room.trending_score != trending_score:
         room.online_count = active_count
+        room.trending_score = trending_score
         db.flush()
 
     canonical_participants = []
@@ -294,6 +341,10 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
         "mode": room.mode,
         "room_type": room.room_type,
         "online_count": len(canonical_participants),
+        "active_presence_score": trending_score,
+        "trending_score": trending_score,
+        "active_participant_count": active_count,
+        "active_seated_count": seated_count,
         "is_active": room.is_active,
         "is_secret": room.is_secret,
         "is_locked": room.is_locked,
