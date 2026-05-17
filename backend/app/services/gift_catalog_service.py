@@ -400,7 +400,7 @@ def _cdn_url(relative_path: str | None) -> str | None:
     if not base:
         return None
     clean_path = relative_path.lstrip("/")
-    if "oraclecloud.com" in base and "/objectstorage." not in base:
+    if "oraclecloud.com" in base:
         return f"{base}/{quote(clean_path, safe='')}"
     return f"{base}/{clean_path}"
 
