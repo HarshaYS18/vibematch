@@ -27,6 +27,14 @@ class LiveRoomSystemEvent {
     this.actorSendingLevel = 0,
     this.actorReceivingLevel = 0,
     this.autoDismissSeconds,
+    this.giftId = '',
+    this.giftName = '',
+    this.giftQuantity = 0,
+    this.giftCoinValue = 0,
+    this.giftTotalCoinValue = 0,
+    this.isLuckyGift = false,
+    this.luckyMultiplier = 0,
+    this.luckyRewardCoinAmount = 0,
   });
 
   final String id;
@@ -43,11 +51,20 @@ class LiveRoomSystemEvent {
   final int actorReceivingLevel;
   final DateTime createdAt;
   final int? autoDismissSeconds;
+  final String giftId;
+  final String giftName;
+  final int giftQuantity;
+  final int giftCoinValue;
+  final int giftTotalCoinValue;
+  final bool isLuckyGift;
+  final int luckyMultiplier;
+  final int luckyRewardCoinAmount;
 
   bool get isUserEntered => type == 'user_entered';
   bool get isUserRemoved => type == 'user_removed';
   bool get isRoomSystemMessage => type == 'room_system_message';
   bool get isRoomChatMessage => type == 'room_chat_message';
+  bool get isRoomGiftSent => type == 'room_gift_sent';
   bool get isChatCleared => type == 'chat_cleared';
 
   factory LiveRoomSystemEvent.fromJson(Map<String, dynamic> json) {
@@ -77,6 +94,16 @@ class LiveRoomSystemEvent {
       autoDismissSeconds: rawAutoDismiss == null
           ? null
           : int.tryParse(rawAutoDismiss.toString()),
+      giftId: json['gift_id']?.toString() ?? '',
+      giftName: json['gift_name']?.toString() ?? '',
+      giftQuantity: _int(json['quantity'] ?? json['gift_quantity']),
+      giftCoinValue: _int(json['coin_value'] ?? json['gift_coin_value']),
+      giftTotalCoinValue: _int(
+        json['total_coin_value'] ?? json['gift_total_coin_value'],
+      ),
+      isLuckyGift: json['is_lucky'] == true || json['is_lucky_gift'] == true,
+      luckyMultiplier: _int(json['lucky_multiplier']),
+      luckyRewardCoinAmount: _int(json['lucky_reward_coin_amount']),
     );
   }
 }
