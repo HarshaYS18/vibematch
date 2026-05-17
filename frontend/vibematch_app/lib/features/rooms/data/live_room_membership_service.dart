@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 
 enum LiveRoomMembershipStatus {
   guest,
@@ -55,7 +55,17 @@ class LiveRoomMembershipService {
   static String keyFor({required String roomId, required String userId}) => '${roomId.trim()}::${userId.trim()}';
 
   static LiveRoomMembershipStatus statusFor({required String roomId, required String userId}) {
-    return snapshots.value[keyFor(roomId: roomId, userId: userId)]?.status ?? LiveRoomMembershipStatus.guest;
+    final status = snapshots.value[keyFor(roomId: roomId, userId: userId)]?.status;
+
+    // Production rule:
+    // Local cache may only represent a pending request. Approved room_member
+    // status must come from the backend room snapshot (`Room Member` /
+    // is_room_member), otherwise stale local cache can show the member shield
+    // for normal visitors.
+    if (status == LiveRoomMembershipStatus.pending) {
+      return LiveRoomMembershipStatus.pending;
+    }
+    return LiveRoomMembershipStatus.guest;
   }
 
   static List<LiveRoomMembershipSnapshot> memberRoomsForUserIds(Set<String> userIds) {
