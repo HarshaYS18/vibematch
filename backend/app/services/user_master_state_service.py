@@ -50,14 +50,44 @@ def _identity(user: User) -> dict[str, Any]:
     }
 
 
+def _user_role_badge() -> dict[str, Any]:
+    return {
+        "role": "user",
+        "display_title": "Member",
+        "badge_label": "Member",
+        "pill_label": "Member",
+        "group": "user",
+        "priority": 0,
+        "icon": "person",
+        "background_color": "#F3EEF7",
+        "text_color": "#5B176A",
+        "border_color": "#E6D8EA",
+        "show_verified_tick": False,
+    }
+
+
+def _roles_default() -> dict[str, Any]:
+    badge = _user_role_badge()
+    return {
+        "roles": ["user"],
+        "primary_role": "user",
+        "primary_role_badge": badge,
+        "role_badges": [badge],
+    }
+
+
 def _roles(user: User) -> dict[str, Any]:
     user_roles = get_user_roles(user)
     primary_role = get_primary_role(user)
+    primary_badge = get_primary_role_badge(primary_role)
+    role_badges = get_role_badges(user_roles)
+    if primary_badge is None:
+        return _roles_default()
     return {
-        "roles": [role.value for role in user_roles],
+        "roles": [role.value for role in user_roles] or ["user"],
         "primary_role": primary_role.value,
-        "primary_role_badge": get_primary_role_badge(primary_role).model_dump(),
-        "role_badges": [badge.model_dump() for badge in get_role_badges(user_roles)],
+        "primary_role_badge": primary_badge.model_dump(),
+        "role_badges": [badge.model_dump() for badge in role_badges] or [primary_badge.model_dump()],
     }
 
 
@@ -254,7 +284,7 @@ def get_user_master_state(db: Session, user: User) -> dict[str, Any]:
         "version": int(generated_at.timestamp()),
         "generated_at": generated_at.isoformat(),
         "identity": _identity(user),
-        "roles": _roles(user),
+        "roles": _safe("roles", _roles_default(), lambda: _roles(user)),
         "vip": _safe("vip", _vip_default(), lambda: _vip(db, user)),
         "wallet": _safe("wallet", _wallet_default(), lambda: _wallet(db, user)),
         "experience": _safe("experience", _experience_default(), lambda: _experience(db, user)),
