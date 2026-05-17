@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func
@@ -12,6 +12,7 @@ from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, R
 from app.models.user import User
 
 _ALLOWED_SEAT_LAYOUT_IDS = {"4x2", "5x2", "4x3", "5x3", "host_4x2", "host_5x2", "host_4x3", "host_5x3"}
+ROOM_STALE_PRESENCE_TIMEOUT_SECONDS = 10 * 60
 
 
 def normalize_layout(layout_id: str | None) -> str:
@@ -57,7 +58,66 @@ def room_sequence(db: Session, room: Room) -> int:
     return int(value or 0)
 
 
+def _next_sequence(db: Session, room: Room) -> int:
+    return room_sequence(db, room) + 1
+
+
+def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = None) -> list[int]:
+    """Remove users who have not heartbeated/reconnected for 10 minutes.
+
+    WebSocket memory is delivery-only. Room presence and seats are backend-owned.
+    A raw socket disconnect keeps the user restorable temporarily, but if
+    `last_seen_at` stays older than the timeout, backend releases the user and
+    their seat.
+    """
+    current_time = now or datetime.utcnow()
+    cutoff = current_time - timedelta(seconds=ROOM_STALE_PRESENCE_TIMEOUT_SECONDS)
+    stale_participants = (
+        db.query(RoomParticipant)
+        .filter(
+            RoomParticipant.room_id == room.id,
+            RoomParticipant.is_active.is_(True),
+            RoomParticipant.last_seen_at.isnot(None),
+            RoomParticipant.last_seen_at < cutoff,
+        )
+        .all()
+    )
+    if not stale_participants:
+        return []
+
+    stale_user_ids = [participant.user_id for participant in stale_participants]
+    for participant in stale_participants:
+        participant.is_active = False
+        participant.left_at = current_time
+        participant.last_seen_at = current_time
+
+    seats = db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id.in_(stale_user_ids)).all()
+    for seat in seats:
+        seat.occupant_user_id = None
+        seat.mic_enabled = False
+        seat.admin_muted = False
+        seat.left_at = current_time
+        seat.updated_by_user_id = seat.occupant_user_id
+
+    for user_id in stale_user_ids:
+        event = RoomRealtimeEvent(
+            room_id=room.id,
+            room_public_id=room.room_public_id,
+            event_type="room.participant_stale_removed",
+            actor_user_id=user_id,
+            target_user_id=user_id,
+            payload={"reason": "presence_timeout", "timeout_seconds": ROOM_STALE_PRESENCE_TIMEOUT_SECONDS},
+            sequence=_next_sequence(db, room),
+        )
+        db.add(event)
+
+    room.updated_at = current_time
+    db.flush()
+    return stale_user_ids
+
+
 def active_participants(db: Session, room: Room) -> list[RoomParticipant]:
+    cleanup_stale_participants(db, room)
     return (
         db.query(RoomParticipant)
         .filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True))
@@ -177,6 +237,7 @@ def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeat
 def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[str, Any]:
     seats = ensure_room_seats(db, room)
     participants = active_participants(db, room)
+    seats = ensure_room_seats(db, room)
     active_count = len(participants)
     if room.online_count != active_count:
         room.online_count = active_count
