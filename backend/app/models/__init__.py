@@ -70,6 +70,7 @@ from app.models.economy_stats import (
     UserLuckyGiftStats,
 )
 from app.models.game import GameBet, GameDefinition, GameRiskAudit
+from app.models.gift_catalog import GiftCatalogCategory, GiftCatalogItem
 from app.models.vip_status import UserVipStatus
 from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeSave, VibeShare
 
