@@ -1,4 +1,9 @@
+from copy import deepcopy
 from random import random
+
+from app.core.config import settings
+
+GIFT_CATALOG_VERSION = 1
 
 NORMAL_GIFTS = [
     {
@@ -11,7 +16,14 @@ NORMAL_GIFTS = [
         "chat_symbol": "🌹",
         "asset_path": "assets/gifts/normal/rose_bloom.webp",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/rose_bloom/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 10,
     },
     {
@@ -24,7 +36,14 @@ NORMAL_GIFTS = [
         "chat_symbol": "🪙",
         "asset_path": "assets/gifts/normal/gold_coin.webp",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/gold_coin/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 20,
     },
     {
@@ -37,7 +56,14 @@ NORMAL_GIFTS = [
         "chat_symbol": "🎉",
         "asset_path": "assets/gifts/normal/party_pop.webp",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/party_pop/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 30,
     },
     {
@@ -50,8 +76,155 @@ NORMAL_GIFTS = [
         "chat_symbol": "🚀",
         "asset_path": "assets/gifts/love_rocket/icon/love_rocket_icon.webp",
         "video_asset_path": "assets/videos/gifts/love_rocket.mp4",
+        "cdn_asset_path": "gifts/love_rocket/v1/icon.webp",
+        "cdn_video_path": "gifts/love_rocket/v1/animation.mp4",
+        "animation_type": "video",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": True,
+        "show_gift_flight": False,
+        "version": 1,
         "sort_order": 100,
+    },
+    {
+        "id": "proposal",
+        "name": "Proposal",
+        "category": "premium",
+        "gift_type": "normal",
+        "coin_value": 1299,
+        "icon_key": "local_favorite",
+        "chat_symbol": "💍",
+        "asset_path": "assets/images/gifts/proposal.png",
+        "video_asset_path": "assets/videos/gifts/boy_proposing_girl_d_romantic.mp4",
+        "cdn_asset_path": "gifts/proposal/v1/icon.webp",
+        "cdn_video_path": "gifts/proposal/v1/animation.mp4",
+        "animation_type": "video",
+        "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": True,
+        "show_gift_flight": False,
+        "version": 1,
+        "sort_order": 110,
+    },
+    {
+        "id": "butterfly",
+        "name": "Butterfly",
+        "category": "premium",
+        "gift_type": "normal",
+        "coin_value": 1299,
+        "icon_key": "local_flutter_dash",
+        "chat_symbol": "🦋",
+        "asset_path": "assets/images/gifts/butterfly.png",
+        "video_asset_path": "assets/videos/gifts/pretty_girl_butterfly_animation.mp4",
+        "cdn_asset_path": "gifts/butterfly/v1/icon.webp",
+        "cdn_video_path": "gifts/butterfly/v1/animation.mp4",
+        "animation_type": "video",
+        "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": True,
+        "show_gift_flight": False,
+        "version": 1,
+        "sort_order": 120,
+    },
+    {
+        "id": "premium_magic_1",
+        "name": "Magic 1",
+        "category": "premium",
+        "gift_type": "normal",
+        "coin_value": 1499,
+        "icon_key": "local_auto_fix_high",
+        "chat_symbol": "🪄",
+        "asset_path": "assets/images/gifts/premium_magic_1.png",
+        "video_asset_path": "assets/videos/gifts/premium_magic_1.mp4",
+        "cdn_asset_path": "gifts/premium_magic_1/v1/icon.webp",
+        "cdn_video_path": "gifts/premium_magic_1/v1/animation.mp4",
+        "animation_type": "video",
+        "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": True,
+        "show_gift_flight": False,
+        "version": 1,
+        "sort_order": 130,
+    },
+    {
+        "id": "premium_magic_2",
+        "name": "Magic 2",
+        "category": "premium",
+        "gift_type": "normal",
+        "coin_value": 1599,
+        "icon_key": "local_auto_awesome",
+        "chat_symbol": "✨",
+        "asset_path": "assets/images/gifts/premium_magic_2.png",
+        "video_asset_path": "assets/videos/gifts/premium_magic_2.mp4",
+        "cdn_asset_path": "gifts/premium_magic_2/v1/icon.webp",
+        "cdn_video_path": "gifts/premium_magic_2/v1/animation.mp4",
+        "animation_type": "video",
+        "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": True,
+        "show_gift_flight": False,
+        "version": 1,
+        "sort_order": 140,
+    },
+    {
+        "id": "premium_magic_3",
+        "name": "Magic 3",
+        "category": "premium",
+        "gift_type": "normal",
+        "coin_value": 1699,
+        "icon_key": "local_workspace_premium",
+        "chat_symbol": "👑",
+        "asset_path": "assets/images/gifts/premium_magic_3.png",
+        "video_asset_path": "assets/videos/gifts/premium_magic_3.mp4",
+        "cdn_asset_path": "gifts/premium_magic_3/v1/icon.webp",
+        "cdn_video_path": "gifts/premium_magic_3/v1/animation.mp4",
+        "animation_type": "video",
+        "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": True,
+        "show_gift_flight": False,
+        "version": 1,
+        "sort_order": 150,
+    },
+    {
+        "id": "premium_yacht",
+        "name": "Yacht",
+        "category": "premium",
+        "gift_type": "normal",
+        "coin_value": 1299,
+        "icon_key": "local_sailing",
+        "chat_symbol": "🛥️",
+        "asset_path": "assets/images/gifts/premium_yacht.png",
+        "video_asset_path": None,
+        "cdn_asset_path": "gifts/premium_yacht/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
+        "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": True,
+        "show_gift_flight": False,
+        "version": 1,
+        "sort_order": 160,
+    },
+    {
+        "id": "premium_castle",
+        "name": "Castle",
+        "category": "premium",
+        "gift_type": "normal",
+        "coin_value": 1999,
+        "icon_key": "local_castle",
+        "chat_symbol": "🏰",
+        "asset_path": "assets/images/gifts/premium_castle.png",
+        "video_asset_path": None,
+        "cdn_asset_path": "gifts/premium_castle/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
+        "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": True,
+        "show_gift_flight": False,
+        "version": 1,
+        "sort_order": 170,
     },
 ]
 
@@ -66,7 +239,14 @@ LUCKY_GIFTS = [
         "chat_symbol": "🪄",
         "asset_path": "assets/gifts/lucky/arcane_crystal_wand.png",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/arcane_crystal_wand/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 210,
         "max_multiplier": 100,
     },
@@ -80,7 +260,14 @@ LUCKY_GIFTS = [
         "chat_symbol": "🌹",
         "asset_path": "assets/gifts/lucky/celestial_rose.png",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/celestial_rose/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 220,
         "max_multiplier": 100,
     },
@@ -94,7 +281,14 @@ LUCKY_GIFTS = [
         "chat_symbol": "💍",
         "asset_path": "assets/gifts/lucky/eternal_bond_rings.png",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/eternal_bond_rings/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 230,
         "max_multiplier": 500,
     },
@@ -108,7 +302,14 @@ LUCKY_GIFTS = [
         "chat_symbol": "🐘",
         "asset_path": "assets/gifts/lucky/bubble_elephant.png",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/bubble_elephant/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 240,
         "max_multiplier": 100,
     },
@@ -122,7 +323,14 @@ LUCKY_GIFTS = [
         "chat_symbol": "☀️",
         "asset_path": "assets/gifts/lucky/sun_fortune_coin.png",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/sun_fortune_coin/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 250,
         "max_multiplier": 500,
     },
@@ -136,7 +344,14 @@ LUCKY_GIFTS = [
         "chat_symbol": "🐟",
         "asset_path": "assets/gifts/lucky/moonlit_koi.png",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/moonlit_koi/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 260,
         "max_multiplier": 500,
     },
@@ -150,7 +365,14 @@ LUCKY_GIFTS = [
         "chat_symbol": "📖",
         "asset_path": "assets/gifts/lucky/spellbound_tome.png",
         "video_asset_path": None,
+        "cdn_asset_path": "gifts/spellbound_tome/v1/icon.webp",
+        "cdn_video_path": None,
+        "animation_type": "image",
         "is_enabled": True,
+        "show_gift_slide": True,
+        "show_premium_broadcast": False,
+        "show_gift_flight": True,
+        "version": 1,
         "sort_order": 270,
         "max_multiplier": 1000,
     },
@@ -168,12 +390,46 @@ MULTIPLIER_TABLE = [
 ]
 
 
+def _cdn_url(relative_path: str | None) -> str | None:
+    if not relative_path:
+        return None
+    if relative_path.startswith("http://") or relative_path.startswith("https://"):
+        return relative_path
+    base = settings.GIFT_CDN_BASE_URL.strip().rstrip("/")
+    if not base:
+        return None
+    return f"{base}/{relative_path.lstrip('/')}"
+
+
+def _with_dynamic_urls(gift: dict) -> dict:
+    item = deepcopy(gift)
+    item["asset_url"] = _cdn_url(item.get("cdn_asset_path"))
+    item["video_url"] = _cdn_url(item.get("cdn_video_path"))
+    item["cdn_enabled"] = bool(settings.GIFT_CDN_BASE_URL.strip())
+    item["catalog_version"] = GIFT_CATALOG_VERSION
+    return item
+
+
+def _all_gifts() -> list[dict]:
+    return sorted([*NORMAL_GIFTS, *LUCKY_GIFTS], key=lambda item: item["sort_order"])
+
+
 def list_gifts() -> dict:
-    return {"normal": NORMAL_GIFTS, "lucky": LUCKY_GIFTS, "all": sorted([*NORMAL_GIFTS, *LUCKY_GIFTS], key=lambda item: item["sort_order"])}
+    all_gifts = [_with_dynamic_urls(gift) for gift in _all_gifts() if gift.get("is_enabled")]
+    normal = [gift for gift in all_gifts if gift.get("gift_type") == "normal"]
+    lucky = [gift for gift in all_gifts if gift.get("gift_type") == "lucky"]
+    return {
+        "catalog_version": GIFT_CATALOG_VERSION,
+        "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+        "normal": normal,
+        "lucky": lucky,
+        "all": all_gifts,
+    }
 
 
 def find_gift(gift_id: str) -> dict | None:
-    return next((gift for gift in [*NORMAL_GIFTS, *LUCKY_GIFTS] if gift["id"] == gift_id), None)
+    gift = next((gift for gift in _all_gifts() if gift["id"] == gift_id), None)
+    return _with_dynamic_urls(gift) if gift is not None else None
 
 
 def roll_lucky_multiplier(gift_id: str, total_coin_value: int, house_risk_score: int = 0) -> dict:
