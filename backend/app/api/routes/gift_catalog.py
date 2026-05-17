@@ -84,6 +84,11 @@ def _clean_key(value: str) -> str:
     return value.strip().lower().replace(" ", "_")
 
 
+def _clean_display_mode(value: str | None) -> str:
+    clean = (value or "normal").strip().lower()
+    return clean if clean in DISPLAY_MODES else "normal"
+
+
 def _require_gift_catalog_admin(current_user: User) -> None:
     if get_primary_role(current_user) not in GIFT_CATALOG_ADMIN_ROLES:
         raise HTTPException(status_code=403, detail="Founder Owner or Owner access required")
@@ -97,8 +102,26 @@ def _category_response(category: GiftCatalogCategory) -> dict:
     return {"key": category.category_key, "label": category.label, "is_enabled": category.is_enabled, "sort_order": category.sort_order, "source": category.source, "created_at": category.created_at, "updated_at": category.updated_at}
 
 
+def _display_mode_map(db: Session) -> dict[str, str]:
+    items = db.query(GiftCatalogItem.gift_id, GiftCatalogItem.display_mode).all()
+    return {str(gift_id): _clean_display_mode(display_mode) for gift_id, display_mode in items}
+
+
+def _apply_display_modes_to_catalog(catalog: dict, db: Session) -> dict:
+    modes = _display_mode_map(db)
+    for key in ("items", "normal", "lucky", "all"):
+        values = catalog.get(key)
+        if not isinstance(values, list):
+            continue
+        for gift in values:
+            if isinstance(gift, dict):
+                gift["display_mode"] = modes.get(str(gift.get("id") or ""), _clean_display_mode(gift.get("display_mode")))
+    return catalog
+
+
 def _item_response(item: GiftCatalogItem) -> dict:
     gift = gift_catalog_service._with_dynamic_urls(gift_catalog_service._item_to_gift_dict(item))
+    gift["display_mode"] = _clean_display_mode(item.display_mode)
     gift["created_at"] = item.created_at
     gift["updated_at"] = item.updated_at
     return gift
@@ -106,7 +129,7 @@ def _item_response(item: GiftCatalogItem) -> dict:
 
 @router.get("/catalog")
 def get_gift_catalog(db: Session = Depends(get_db)):
-    return gift_catalog_service.list_gifts(db)
+    return _apply_display_modes_to_catalog(gift_catalog_service.list_gifts(db), db)
 
 
 @router.get("/catalog/{gift_id}")
@@ -114,6 +137,8 @@ def get_gift_detail(gift_id: str, db: Session = Depends(get_db)):
     gift = gift_catalog_service.find_gift(gift_id, db=db)
     if gift is None:
         raise HTTPException(status_code=404, detail="Gift not found")
+    item = db.query(GiftCatalogItem).filter(GiftCatalogItem.gift_id == gift_id).first()
+    gift["display_mode"] = _clean_display_mode(item.display_mode if item else gift.get("display_mode"))
     return gift
 
 
@@ -137,13 +162,13 @@ def seed_default_gift_catalog(payload: AdminReasonRequest, db: Session = Depends
     result = gift_catalog_service.seed_default_catalog(db)
     _audit(db, actor=current_user, action="GIFT_CATALOG_SEED_DEFAULTS", resource_id="catalog", reason=payload.reason, metadata=result)
     db.commit()
-    return {"status": "ok", **result, "catalog": gift_catalog_service.admin_catalog_snapshot(db)}
+    return {"status": "ok", **result, "catalog": _apply_display_modes_to_catalog(gift_catalog_service.admin_catalog_snapshot(db), db)}
 
 
 @router.get("/admin/catalog")
 def get_admin_gift_catalog(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_gift_catalog_admin(current_user)
-    return gift_catalog_service.admin_catalog_snapshot(db)
+    return _apply_display_modes_to_catalog(gift_catalog_service.admin_catalog_snapshot(db), db)
 
 
 @router.put("/admin/categories/{category_key}")
@@ -213,7 +238,7 @@ def upsert_gift_item(gift_id: str, payload: GiftItemAdminPayload, db: Session = 
     item.cdn_asset_path = payload.cdn_asset_path
     item.cdn_video_path = payload.cdn_video_path
     item.animation_type = _clean_key(payload.animation_type)
-    item.display_mode = payload.display_mode.strip().lower()
+    item.display_mode = _clean_display_mode(payload.display_mode)
     item.is_enabled = payload.is_enabled
     item.show_gift_slide = payload.show_gift_slide
     item.show_premium_broadcast = payload.show_premium_broadcast
