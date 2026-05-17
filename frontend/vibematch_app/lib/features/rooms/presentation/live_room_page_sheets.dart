@@ -12,7 +12,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         roomImagesEnabled: _roomImagesEnabled,
         guestMessagesEnabled: _guestMessagesEnabled,
         applyOnlyModeEnabled: _applyOnlyModeEnabled,
-        joinRequestCount: _roomMessageController.joinRequestUsers.length,
+        joinRequestCount: _pendingRoomMemberRequests.length,
         onBackgroundTap: () => _openBackgroundPickerFromSettings(sheetContext),
         onCoverPhotoTap: () => _changeRoomCoverPhotoFromSettings(sheetContext),
         onCustomBackgroundTap: () =>
@@ -313,7 +313,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) => LiveRoomJoinRequestsSheet(
-          users: _roomMessageController.joinRequestUsers,
+          users: _pendingRoomMemberRequests,
           onApprove: (user) {
             _resolveJoinRequest(user, approved: true);
             setSheetState(() {});
@@ -328,14 +328,20 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
   }
 
   void _resolveJoinRequest(SeatUser user, {required bool approved}) {
-    _roomMessageController.resolveJoinRequest(
-      user: user,
-      approved: approved,
-      roomName: _roomName,
-    );
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can approve room member requests');
+      return;
+    }
+    if (approved) {
+      LiveRoomMemberRequestService.instance.approveMembership(user);
+      LiveRoomMembershipService.markMember(roomId: _roomId, userId: user.id);
+    } else {
+      LiveRoomMemberRequestService.instance.rejectMembership(user);
+      LiveRoomMembershipService.markGuest(roomId: _roomId, userId: user.id);
+    }
     RoomToast.show(
       context,
-      approved ? '${user.name} approved' : '${user.name} rejected',
+      approved ? '${user.name} approved as room member' : '${user.name} rejected',
     );
   }
 
@@ -519,13 +525,22 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                             width: 58,
                             height: 58,
                             decoration: BoxDecoration(
+                              color: RoomColors.deep,
                               borderRadius: BorderRadius.circular(16),
-                              gradient: const LinearGradient(
-                                colors: [RoomColors.deep, RoomColors.plum],
-                              ),
+                              border: Border.all(color: RoomColors.softLine),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: _StoreThemePreview(theme: theme),
+                            child: theme.imageUrl != null
+                                ? Image.network(
+                                    theme.imageUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        const Icon(Icons.image_rounded),
+                                  )
+                                : const Icon(
+                                    Icons.wallpaper_rounded,
+                                    color: Colors.white,
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -534,8 +549,6 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                               children: [
                                 Text(
                                   theme.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: RoomColors.plum,
                                     fontSize: 14,
@@ -545,8 +558,10 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                                 const SizedBox(height: 4),
                                 Text(
                                   priceLabel,
-                                  style: const TextStyle(
-                                    color: Color(0xFF82758E),
+                                  style: TextStyle(
+                                    color: theme.isOwned || theme.isFree
+                                        ? RoomColors.aqua
+                                        : RoomColors.coral,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -554,11 +569,9 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                               ],
                             ),
                           ),
-                          Icon(
-                            theme.isOwned || theme.isFree
-                                ? Icons.check_circle_rounded
-                                : Icons.shopping_bag_rounded,
-                            color: RoomColors.aqua,
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            color: RoomColors.plum,
                           ),
                         ],
                       ),
@@ -571,32 +584,5 @@ class _RoomThemeStoreSheet extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _StoreThemePreview extends StatelessWidget {
-  const _StoreThemePreview({required this.theme});
-
-  final RoomThemeDto theme;
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrl = theme.imageUrl?.trim();
-    final assetPath = theme.assetPath?.trim();
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-      );
-    }
-    if (assetPath != null && assetPath.isNotEmpty) {
-      return Image.asset(
-        assetPath,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-      );
-    }
-    return const SizedBox.shrink();
   }
 }
