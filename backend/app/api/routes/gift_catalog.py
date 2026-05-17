@@ -116,9 +116,6 @@ def _item_response(item: GiftCatalogItem) -> dict:
 
 @router.get("/catalog")
 def get_gift_catalog(db: Session = Depends(get_db)):
-    # Public active catalog. This exposes only render metadata and backend-set
-    # prices/categories for active gifts. Gift sending, lucky rolls, ownership,
-    # balance checks, and economy mutations remain protected elsewhere.
     return gift_catalog_service.list_gifts(db)
 
 
@@ -214,14 +211,14 @@ def upsert_gift_category(
         action=action,
         resource_id=path_key,
         reason=payload.reason,
-        metadata={"category": _category_response(category)},
+        metadata={"category_key": path_key, "label": category.label, "is_enabled": category.is_enabled},
     )
     db.commit()
     db.refresh(category)
     return _category_response(category)
 
 
-@patch_router := router.patch("/admin/categories/{category_key}/enabled")
+@router.patch("/admin/categories/{category_key}/enabled")
 def set_gift_category_enabled(
     category_key: str,
     payload: GiftCategoryEnabledPayload,
@@ -298,7 +295,7 @@ def upsert_gift_item(
         action=action,
         resource_id=path_id,
         reason=payload.reason,
-        metadata={"gift": gift_catalog_service._item_to_gift_dict(item)},
+        metadata={"gift_id": path_id, "name": item.name, "category_key": item.category_key, "is_enabled": item.is_enabled},
     )
     db.commit()
     db.refresh(item)
