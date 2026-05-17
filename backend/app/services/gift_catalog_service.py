@@ -2,9 +2,34 @@ from copy import deepcopy
 from random import random
 from urllib.parse import quote
 
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
+from app.models.gift_catalog import GiftCatalogCategory, GiftCatalogItem
 
 GIFT_CATALOG_VERSION = 1
+
+CATEGORY_LABELS = {
+    "classic": "Classic",
+    "lucky": "Lucky",
+    "relationship": "Relationship",
+    "event": "Event",
+    "premium": "Premium",
+    "svip": "SVIP",
+    "vip": "VIP",
+    "baggage": "Baggage",
+}
+
+CATEGORY_ORDER = {
+    "premium": 10,
+    "lucky": 20,
+    "classic": 30,
+    "relationship": 40,
+    "event": 50,
+    "svip": 60,
+    "vip": 70,
+    "baggage": 80,
+}
 
 NORMAL_GIFTS = [
     {
@@ -414,30 +439,203 @@ def _with_dynamic_urls(gift: dict) -> dict:
     return item
 
 
-def _all_gifts() -> list[dict]:
+def _all_static_gifts() -> list[dict]:
     return sorted([*NORMAL_GIFTS, *LUCKY_GIFTS], key=lambda item: item["sort_order"])
 
 
-def list_gifts() -> dict:
-    all_gifts = [_with_dynamic_urls(gift) for gift in _all_gifts() if gift.get("is_enabled")]
-    normal = [gift for gift in all_gifts if gift.get("gift_type") == "normal"]
-    lucky = [gift for gift in all_gifts if gift.get("gift_type") == "lucky"]
+def _static_categories_from_gifts(gifts: list[dict]) -> list[dict]:
+    keys = sorted(
+        {str(gift.get("category") or "classic").strip().lower() for gift in gifts},
+        key=lambda item: (CATEGORY_ORDER.get(item, 500), item),
+    )
+    return [
+        {
+            "key": key,
+            "label": CATEGORY_LABELS.get(key, key.replace("_", " ").title()),
+            "is_enabled": True,
+            "sort_order": CATEGORY_ORDER.get(key, 500),
+            "source": "static_bootstrap",
+        }
+        for key in keys
+        if key
+    ]
+
+
+def _category_to_payload(category: GiftCatalogCategory) -> dict:
     return {
-        "catalog_version": GIFT_CATALOG_VERSION,
-        "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
-        "normal": normal,
-        "lucky": lucky,
-        "all": all_gifts,
+        "key": category.category_key,
+        "label": category.label,
+        "is_enabled": category.is_enabled,
+        "sort_order": category.sort_order,
+        "source": category.source,
     }
 
 
-def find_gift(gift_id: str) -> dict | None:
-    gift = next((gift for gift in _all_gifts() if gift["id"] == gift_id), None)
-    return _with_dynamic_urls(gift) if gift is not None else None
+def _item_to_gift_dict(item: GiftCatalogItem) -> dict:
+    gift = {
+        "id": item.gift_id,
+        "name": item.name,
+        "category": item.category_key,
+        "gift_type": item.gift_type,
+        "coin_value": item.coin_value,
+        "icon_key": item.icon_key,
+        "chat_symbol": item.chat_symbol,
+        "asset_path": item.asset_path,
+        "video_asset_path": item.video_asset_path,
+        "cdn_asset_path": item.cdn_asset_path,
+        "cdn_video_path": item.cdn_video_path,
+        "animation_type": item.animation_type,
+        "is_enabled": item.is_enabled,
+        "show_gift_slide": item.show_gift_slide,
+        "show_premium_broadcast": item.show_premium_broadcast,
+        "show_gift_flight": item.show_gift_flight,
+        "version": item.version,
+        "sort_order": item.sort_order,
+    }
+    if item.max_multiplier is not None:
+        gift["max_multiplier"] = item.max_multiplier
+    if item.metadata_json:
+        gift["metadata"] = item.metadata_json
+    return gift
 
 
-def roll_lucky_multiplier(gift_id: str, total_coin_value: int, house_risk_score: int = 0) -> dict:
-    gift = find_gift(gift_id)
+def _db_seeded(db: Session | None) -> bool:
+    if db is None:
+        return False
+    return db.query(GiftCatalogItem).count() > 0
+
+
+def seed_default_catalog(db: Session) -> dict:
+    seeded_categories = 0
+    seeded_items = 0
+    for payload in _static_categories_from_gifts(_all_static_gifts()):
+        category = db.query(GiftCatalogCategory).filter(
+            GiftCatalogCategory.category_key == payload["key"]
+        ).first()
+        if category is None:
+            db.add(GiftCatalogCategory(
+                category_key=payload["key"],
+                label=payload["label"],
+                is_enabled=True,
+                sort_order=payload["sort_order"],
+                source="admin_db",
+            ))
+            seeded_categories += 1
+
+    for gift in _all_static_gifts():
+        item = db.query(GiftCatalogItem).filter(
+            GiftCatalogItem.gift_id == gift["id"]
+        ).first()
+        if item is None:
+            db.add(GiftCatalogItem(
+                gift_id=gift["id"],
+                name=gift["name"],
+                category_key=gift["category"],
+                gift_type=gift["gift_type"],
+                coin_value=int(gift["coin_value"]),
+                icon_key=gift.get("icon_key"),
+                chat_symbol=gift.get("chat_symbol"),
+                asset_path=gift.get("asset_path"),
+                video_asset_path=gift.get("video_asset_path"),
+                cdn_asset_path=gift.get("cdn_asset_path"),
+                cdn_video_path=gift.get("cdn_video_path"),
+                animation_type=gift.get("animation_type") or "image",
+                is_enabled=bool(gift.get("is_enabled", True)),
+                show_gift_slide=bool(gift.get("show_gift_slide", True)),
+                show_premium_broadcast=bool(gift.get("show_premium_broadcast", False)),
+                show_gift_flight=bool(gift.get("show_gift_flight", True)),
+                version=int(gift.get("version") or 1),
+                sort_order=int(gift.get("sort_order") or 500),
+                max_multiplier=gift.get("max_multiplier"),
+            ))
+            seeded_items += 1
+    db.commit()
+    return {
+        "seeded_categories": seeded_categories,
+        "seeded_items": seeded_items,
+        "catalog_version": GIFT_CATALOG_VERSION,
+    }
+
+
+def admin_catalog_snapshot(db: Session) -> dict:
+    if not _db_seeded(db):
+        seed_default_catalog(db)
+    categories = db.query(GiftCatalogCategory).order_by(
+        GiftCatalogCategory.sort_order.asc(), GiftCatalogCategory.category_key.asc()
+    ).all()
+    items = db.query(GiftCatalogItem).order_by(
+        GiftCatalogItem.sort_order.asc(), GiftCatalogItem.gift_id.asc()
+    ).all()
+    gifts = [_with_dynamic_urls(_item_to_gift_dict(item)) for item in items]
+    return {
+        "catalog_version": GIFT_CATALOG_VERSION,
+        "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+        "categories": [_category_to_payload(category) for category in categories],
+        "items": gifts,
+        "normal": [gift for gift in gifts if gift.get("gift_type") == "normal"],
+        "lucky": [gift for gift in gifts if gift.get("gift_type") == "lucky"],
+        "all": gifts,
+        "source": "admin_db",
+    }
+
+
+def list_gifts(db: Session | None = None) -> dict:
+    if _db_seeded(db):
+        categories = db.query(GiftCatalogCategory).filter(
+            GiftCatalogCategory.is_enabled == True
+        ).order_by(GiftCatalogCategory.sort_order.asc(), GiftCatalogCategory.category_key.asc()).all()
+        enabled_category_keys = {category.category_key for category in categories}
+        items = db.query(GiftCatalogItem).filter(
+            GiftCatalogItem.is_enabled == True,
+            GiftCatalogItem.category_key.in_(enabled_category_keys),
+        ).order_by(GiftCatalogItem.sort_order.asc(), GiftCatalogItem.gift_id.asc()).all()
+        all_gifts = [_with_dynamic_urls(_item_to_gift_dict(item)) for item in items]
+        return {
+            "catalog_version": GIFT_CATALOG_VERSION,
+            "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+            "categories": [_category_to_payload(category) for category in categories],
+            "normal": [gift for gift in all_gifts if gift.get("gift_type") == "normal"],
+            "lucky": [gift for gift in all_gifts if gift.get("gift_type") == "lucky"],
+            "all": all_gifts,
+            "source": "admin_db",
+            "rule": "Gift catalog DB is source of truth. Flutter renders categories and gifts from this payload.",
+        }
+
+    all_gifts = [_with_dynamic_urls(gift) for gift in _all_static_gifts() if gift.get("is_enabled")]
+    return {
+        "catalog_version": GIFT_CATALOG_VERSION,
+        "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+        "categories": _static_categories_from_gifts(all_gifts),
+        "normal": [gift for gift in all_gifts if gift.get("gift_type") == "normal"],
+        "lucky": [gift for gift in all_gifts if gift.get("gift_type") == "lucky"],
+        "all": all_gifts,
+        "source": "static_bootstrap_until_seeded",
+        "rule": "Seed the admin DB catalog to make DB the source of truth.",
+    }
+
+
+def find_gift(gift_id: str, db: Session | None = None) -> dict | None:
+    if _db_seeded(db):
+        item = db.query(GiftCatalogItem).filter(
+            GiftCatalogItem.gift_id == gift_id,
+            GiftCatalogItem.is_enabled == True,
+        ).first()
+        if item is None:
+            return None
+        category = db.query(GiftCatalogCategory).filter(
+            GiftCatalogCategory.category_key == item.category_key,
+            GiftCatalogCategory.is_enabled == True,
+        ).first()
+        if category is None:
+            return None
+        return _with_dynamic_urls(_item_to_gift_dict(item))
+
+    gift = next((gift for gift in _all_static_gifts() if gift["id"] == gift_id), None)
+    return _with_dynamic_urls(gift) if gift is not None and gift.get("is_enabled") else None
+
+
+def roll_lucky_multiplier(gift_id: str, total_coin_value: int, house_risk_score: int = 0, db: Session | None = None) -> dict:
+    gift = find_gift(gift_id, db=db)
     if gift is None or gift.get("gift_type") != "lucky":
         raise ValueError("Lucky gift not found")
 
