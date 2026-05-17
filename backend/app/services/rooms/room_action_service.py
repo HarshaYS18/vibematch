@@ -5,10 +5,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models.room import Room
+from app.models.room import Room, RoomMode
 from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, RoomSeatState
 from app.models.user import User
+from app.services.permissions import room_permission_service
 from app.services.rooms.room_state_service import ensure_room_seats, normalize_layout, room_sequence, room_snapshot, seat_count_for_layout
 
 
@@ -40,16 +41,19 @@ def record_room_event(
 
 
 def _room_participant(db: Session, room: Room, user: User) -> RoomParticipant | None:
-    return (
-        db.query(RoomParticipant)
-        .filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id)
-        .first()
-    )
+    return db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id).first()
 
 
-def _ensure_room_participant(db: Session, room: Room, user: User) -> RoomParticipant:
+def _requested_hidden(payload: dict[str, Any] | None) -> bool:
+    if not payload:
+        return False
+    return payload.get("stealth") is True or payload.get("is_stealth") is True or payload.get("hidden_presence") is True
+
+
+def _ensure_room_participant(db: Session, room: Room, user: User, payload: dict[str, Any] | None = None) -> RoomParticipant:
     now = datetime.utcnow()
     participant = _room_participant(db, room, user)
+    visibility = room_permission_service.hidden_presence_flags(db, user, _requested_hidden(payload))
     if participant is None:
         participant = RoomParticipant(
             room_id=room.id,
@@ -59,47 +63,71 @@ def _ensure_room_participant(db: Session, room: Room, user: User) -> RoomPartici
             is_room_admin=user.id == room.owner_user_id,
             joined_at=now,
             last_seen_at=now,
+            **visibility,
         )
         db.add(participant)
     else:
         participant.is_active = True
         participant.last_seen_at = now
         participant.left_at = None
+        participant.is_stealth = visibility["is_stealth"]
+        participant.visible_in_online_count = visibility["visible_in_online_count"]
+        participant.visible_in_user_list = visibility["visible_in_user_list"]
+        participant.visible_to_public = visibility["visible_to_public"]
         if user.id == room.owner_user_id:
             participant.is_room_admin = True
     return participant
 
 
+def _host_or_admin_should_auto_seat(room: Room, participant: RoomParticipant, user: User) -> bool:
+    return user.id == room.owner_user_id or participant.is_room_admin
+
+
+def _seat_occupied_by_user(db: Session, room: Room, user_id: int) -> bool:
+    return db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == user_id).first() is not None
+
+
+def _auto_place_host_admin_if_needed(db: Session, room: Room, user: User, participant: RoomParticipant) -> None:
+    if participant.is_stealth:
+        return
+    if not _host_or_admin_should_auto_seat(room, participant, user):
+        return
+    if _seat_occupied_by_user(db, room, user.id):
+        return
+    seats = ensure_room_seats(db, room)
+    seat_one = next((seat for seat in seats if seat.seat_index == 0), None)
+    if seat_one is None or seat_one.is_locked or seat_one.occupant_user_id is not None:
+        return
+    now = datetime.utcnow()
+    seat_one.occupant_user_id = user.id
+    seat_one.mic_enabled = False
+    seat_one.admin_muted = False
+    seat_one.occupied_at = now
+    seat_one.left_at = None
+    seat_one.updated_by_user_id = user.id
+
+
 def _has_pending_room_member_request(db: Session, room: Room, user_id: int) -> bool:
-    pending = (
-        db.query(RoomRealtimeEvent)
-        .filter(
-            RoomRealtimeEvent.room_id == room.id,
-            RoomRealtimeEvent.event_type == "room.member_request.pending",
-            RoomRealtimeEvent.actor_user_id == user_id,
-        )
-        .order_by(RoomRealtimeEvent.id.desc())
-        .first()
-    )
+    pending = db.query(RoomRealtimeEvent).filter(
+        RoomRealtimeEvent.room_id == room.id,
+        RoomRealtimeEvent.event_type == "room.member_request.pending",
+        RoomRealtimeEvent.actor_user_id == user_id,
+    ).order_by(RoomRealtimeEvent.id.desc()).first()
     if pending is None:
         return False
-
-    decision = (
-        db.query(RoomRealtimeEvent)
-        .filter(
-            RoomRealtimeEvent.room_id == room.id,
-            RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected", "room.member.removed"]),
-            RoomRealtimeEvent.target_user_id == user_id,
-            RoomRealtimeEvent.id > pending.id,
-        )
-        .first()
-    )
+    decision = db.query(RoomRealtimeEvent).filter(
+        RoomRealtimeEvent.room_id == room.id,
+        RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected", "room.member.removed"]),
+        RoomRealtimeEvent.target_user_id == user_id,
+        RoomRealtimeEvent.id > pending.id,
+    ).first()
     return decision is None
 
 
 def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    _ensure_room_participant(db, room, user)
-    record_room_event(db, room, "room.joined", actor_user_id=user.id, payload=payload or {})
+    participant = _ensure_room_participant(db, room, user, payload)
+    _auto_place_host_admin_if_needed(db, room, user, participant)
+    record_room_event(db, room, "room.joined", actor_user_id=user.id, payload={**(payload or {}), "is_stealth": participant.is_stealth})
     db.flush()
     return room_snapshot(db, room)
 
@@ -147,7 +175,7 @@ def request_room_membership(db: Session, room: Room, user: User) -> dict[str, An
 
 
 def approve_room_membership(db: Session, room: Room, actor: User, target: User) -> dict[str, Any]:
-    if actor.id != room.owner_user_id:
+    if actor.id != room.owner_user_id and not room_permission_service.can_manage_room_admins(db, actor, room.owner_user_id):
         return room_snapshot(db, room)
     participant = _ensure_room_participant(db, room, target)
     participant.is_member = True
@@ -158,7 +186,7 @@ def approve_room_membership(db: Session, room: Room, actor: User, target: User) 
 
 
 def reject_room_membership(db: Session, room: Room, actor: User, target: User) -> dict[str, Any]:
-    if actor.id != room.owner_user_id:
+    if actor.id != room.owner_user_id and not room_permission_service.can_manage_room_admins(db, actor, room.owner_user_id):
         return room_snapshot(db, room)
     participant = _ensure_room_participant(db, room, target)
     if not participant.is_member:
@@ -169,7 +197,7 @@ def reject_room_membership(db: Session, room: Room, actor: User, target: User) -
 
 
 def remove_room_member(db: Session, room: Room, actor: User, target: User) -> dict[str, Any]:
-    if actor.id != room.owner_user_id:
+    if actor.id != room.owner_user_id and not room_permission_service.can_manage_room_admins(db, actor, room.owner_user_id):
         return room_snapshot(db, room)
     if target.id == room.owner_user_id:
         return room_snapshot(db, room)
@@ -183,6 +211,9 @@ def remove_room_member(db: Session, room: Room, actor: User, target: User) -> di
 
 
 def take_seat(db: Session, room: Room, user: User, seat_index: int, actor_user_id: int | None = None) -> dict[str, Any]:
+    participant = _room_participant(db, room, user)
+    if participant and participant.is_stealth:
+        return room_snapshot(db, room)
     seats = ensure_room_seats(db, room)
     max_seats = seat_count_for_layout(room.seat_layout_id)
     if seat_index < 0 or seat_index >= max_seats:
@@ -252,6 +283,10 @@ def set_mic_enabled(db: Session, room: Room, user: User, enabled: bool) -> dict[
 
 
 def set_admin_mute(db: Session, room: Room, target_user_id: int, muted: bool, actor_user_id: int | None = None) -> dict[str, Any]:
+    actor = db.query(User).filter(User.id == actor_user_id).first() if actor_user_id else None
+    target = db.query(User).filter(User.id == target_user_id).first()
+    if actor is not None and target is not None and not room_permission_service.can_mute_room_user(db, actor, target):
+        return room_snapshot(db, room)
     now = datetime.utcnow()
     for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == target_user_id).all():
         seat.admin_muted = muted
@@ -276,6 +311,32 @@ def set_seat_layout(db: Session, room: Room, layout_id: str, actor_user_id: int 
 def set_background_theme(db: Session, room: Room, theme_id: str, actor_user_id: int | None = None) -> dict[str, Any]:
     room.background_theme_id = theme_id or "default"
     record_room_event(db, room, "room.theme.updated", actor_user_id=actor_user_id, payload={"background_theme_id": room.background_theme_id})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def set_room_privacy(db: Session, room: Room, actor: User, mode: str, lock_password_hash: str | None = None) -> dict[str, Any]:
+    if not room_permission_service.can_change_room_privacy(db, actor, room.owner_user_id):
+        return room_snapshot(db, room)
+    clean_mode = mode if mode in {item.value for item in RoomMode} else RoomMode.OPEN.value
+    room.mode = clean_mode
+    room.is_secret = clean_mode == RoomMode.SECRET_VIBE.value
+    room.is_locked = clean_mode == RoomMode.LOCKED.value
+    room.is_members_only = clean_mode == RoomMode.MEMBERS_ONLY.value
+    if lock_password_hash is not None:
+        room.lock_password_hash = lock_password_hash
+        room.lock_updated_at = datetime.utcnow()
+        room.lock_updated_by_user_id = actor.id
+    record_room_event(db, room, "room.privacy.updated", actor_user_id=actor.id, payload={"mode": clean_mode})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def set_room_screenshots(db: Session, room: Room, actor: User, allow_screenshots: bool) -> dict[str, Any]:
+    if not room_permission_service.can_change_room_privacy(db, actor, room.owner_user_id):
+        return room_snapshot(db, room)
+    room.allow_screenshots = allow_screenshots
+    record_room_event(db, room, "room.screenshots.updated", actor_user_id=actor.id, payload={"allow_screenshots": allow_screenshots})
     db.flush()
     return room_snapshot(db, room)
 
