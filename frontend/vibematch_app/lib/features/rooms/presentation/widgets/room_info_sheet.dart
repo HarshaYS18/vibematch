@@ -56,8 +56,19 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
       (user) => !user.isHost && !user.isRoomAdmin,
     ),
   );
-  List<SeatUser> get _members =>
-      _dedupeUsers(<SeatUser>[..._localAdmins, ..._localAvailableAdminUsers]);
+  List<SeatUser> get _members => _dedupeUsers(
+    _localAvailableAdminUsers.where(_isApprovedRoomMember),
+  );
+
+  bool _isApprovedRoomMember(SeatUser user) {
+    if (user.isHost || user.isRoomAdmin) return false;
+    final normalizedRole = user.roleLabel
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ');
+    return normalizedRole == 'room member';
+  }
 
   @override
   void initState() {
@@ -136,7 +147,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
 
   void _removeAdmin(SeatUser user) {
     if (user.isHost) return;
-    final demoted = user.copyWith(isRoomAdmin: false, roleLabel: 'Member');
+    final demoted = user.copyWith(isRoomAdmin: false, roleLabel: 'Visitor');
     setState(() {
       _localAdmins.removeWhere((item) => item.id == user.id);
       _localAvailableAdminUsers.removeWhere((item) => item.id == user.id);
@@ -153,7 +164,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
     }
     RoomToast.show(
       context,
-      'Member removal will use backend moderation permissions.',
+      'Room member removal will use backend room membership permissions.',
     );
   }
 
@@ -272,7 +283,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Choose a real room participant to promote as Admin.',
+              'Choose a real room user to promote as Admin.',
               style: TextStyle(
                 color: Color(0xFF82758E),
                 fontSize: 12,
@@ -354,7 +365,7 @@ class _RoomInfoTabs extends StatelessWidget {
             onChanged: onChanged,
           ),
           _TabPill(
-            label: 'Members',
+            label: 'Room Members',
             tab: _RoomInfoTab.members,
             selected: selected,
             onChanged: onChanged,
@@ -552,7 +563,7 @@ class _MembersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (members.isEmpty)
       return const _EmptyRoomInfoState(
-        message: 'No real room participants found.',
+        message: 'No approved room members yet.',
       );
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
@@ -562,7 +573,7 @@ class _MembersPage extends StatelessWidget {
         final member = members[index];
         return _MemberTile(
           user: member,
-          canManage: canManageMembers && !member.isHost,
+          canManage: canManageMembers,
           onRemove: () => onRemoveMember(member),
         );
       },
@@ -780,15 +791,11 @@ class _MemberTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _UserTile(
     user: user,
-    subtitle: user.isHost
-        ? 'Channel Host'
-        : user.isRoomAdmin
-        ? 'Admin'
-        : 'Member',
+    subtitle: 'Room Member',
     trailing: canManage
         ? IconButton(
             visualDensity: VisualDensity.compact,
-            tooltip: 'Remove member',
+            tooltip: 'Remove room member',
             onPressed: onRemove,
             icon: const Icon(
               Icons.remove_circle_rounded,
@@ -889,7 +896,7 @@ class _AddAdminTile extends StatelessWidget {
     onTap: onTap,
     child: _UserTile(
       user: user,
-      subtitle: 'Eligible member',
+      subtitle: 'Eligible room user',
       trailing: const Icon(
         Icons.add_moderator_rounded,
         color: RoomColors.aqua,
