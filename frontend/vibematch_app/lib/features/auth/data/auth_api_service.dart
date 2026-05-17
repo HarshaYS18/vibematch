@@ -186,25 +186,16 @@ class AuthApiService {
       return _cachedUser!;
     }
 
-    final headers = {'Authorization': 'Bearer $token'};
-    http.Response response = await http.get(
+    final response = await http.get(
       Uri.parse(VmApiConfig.endpoint('/users/me/master-state')),
-      headers: headers,
+      headers: {'Authorization': 'Bearer $token'},
     );
 
-    CurrentUser user;
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      user = currentUserFromMasterStateJson(jsonDecode(response.body) as Map<String, dynamic>);
-    } else {
-      response = await http.get(
-        Uri.parse(VmApiConfig.endpoint('/users/me')),
-        headers: headers,
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Failed to load current user (${response.statusCode}): ${response.body}');
-      }
-      user = CurrentUser.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to load backend master user state (${response.statusCode}): ${response.body}');
     }
+
+    final user = currentUserFromMasterStateJson(jsonDecode(response.body) as Map<String, dynamic>);
 
     final deviceId = _cachedDeviceId ?? await getCurrentDeviceId();
     await _persistSession(accessToken: token, user: user, deviceId: deviceId);
