@@ -57,9 +57,7 @@ class LiveRoomMemberRequestService {
   }
 
   void requestMembership() {
-    final user = _currentUser;
-    if (user == null || _roomId.isEmpty) return;
-    LiveRoomMembershipService.markPending(roomId: _roomId, userId: user.id);
+    if (_currentUser == null || _roomId.isEmpty) return;
     _send('room_member/request', <String, Object?>{});
   }
 
@@ -155,14 +153,18 @@ class LiveRoomMemberRequestService {
         if (publicUserId.isNotEmpty) publicUserId,
         if (publicUserId.isNotEmpty) 'user_$publicUserId',
       };
-      final status = rawPeer['membership_request_status']?.toString() ?? '';
-      final roleLabel = rawPeer['role_label']?.toString().toLowerCase() ?? '';
-      final isRoomMember = rawPeer['is_room_member'] == true || status == 'member' || roleLabel == 'room member';
-      final isPending = rawPeer['has_pending_room_member_request'] == true || status == 'pending';
+      final status = rawPeer['membership_request_status']?.toString() ?? 'none';
+      final participantType = rawPeer['participant_type']?.toString() ?? 'visitor';
+      final isRoomMember =
+          rawPeer['is_room_member'] == true ||
+          status == 'room_member' ||
+          participantType == 'room_member';
+      final isPending =
+          rawPeer['has_pending_room_member_request'] == true || status == 'pending';
 
       for (final alias in aliases) {
         if (isRoomMember) {
-          LiveRoomMembershipService.markMember(roomId: roomId, userId: alias);
+          LiveRoomMembershipService.markRoomMember(roomId: roomId, userId: alias);
         } else if (isPending) {
           LiveRoomMembershipService.markPending(roomId: roomId, userId: alias);
         } else {
@@ -172,7 +174,7 @@ class LiveRoomMemberRequestService {
 
       if (currentUser != null && aliases.contains(currentUser.id)) {
         if (isRoomMember) {
-          LiveRoomMembershipService.markMember(roomId: roomId, userId: currentUser.id);
+          LiveRoomMembershipService.markRoomMember(roomId: roomId, userId: currentUser.id);
         } else if (isPending) {
           LiveRoomMembershipService.markPending(roomId: roomId, userId: currentUser.id);
         } else {
