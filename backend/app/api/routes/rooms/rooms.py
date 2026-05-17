@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -6,7 +8,7 @@ from app.database import get_db
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
-from app.schemas.room_settings import RoomAccessSettingsUpdateRequest, RoomSettingsResponse
+from app.schemas.room_settings import RoomAccessSettingsUpdateRequest, RoomAnnouncementUpdateRequest, RoomBackgroundUpdateRequest, RoomSeatLayoutUpdateRequest, RoomSettingsResponse
 from app.schemas.room_theme import (
     CustomRoomBackgroundSubmitRequest,
     RoomCoverPhotoUpdateRequest,
@@ -21,6 +23,7 @@ from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
 from app.services.rooms.room_background_service import list_room_backgrounds
 from app.services.rooms.room_contribution_service import room_contribution_rankings
+from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_service import (
     apply_room_mode,
@@ -38,6 +41,7 @@ from app.services.rooms.room_service import (
     set_room_admin,
     set_room_member,
 )
+from app.services.rooms.room_state_service import normalize_layout
 from app.services.rooms.room_theme_service import (
     apply_room_theme,
     decide_custom_background_review,
@@ -76,6 +80,7 @@ def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse
         has_lock_password=False,
         cover_photo_url=None,
         background_theme_id="default",
+        seat_layout_id="5x2",
         announcement_text=None,
         announcement_updated_at=None,
         announcement_updated_by_user_id=None,
@@ -95,6 +100,7 @@ def _room_settings_response(room: Room) -> RoomSettingsResponse:
         has_lock_password=bool(room.lock_password_hash),
         cover_photo_url=room.cover_photo_url,
         background_theme_id=room.background_theme_id or "default",
+        seat_layout_id=normalize_layout(room.seat_layout_id),
         announcement_text=room.announcement_text,
         announcement_updated_at=room.announcement_updated_at,
         announcement_updated_by_user_id=room.announcement_updated_by_user_id,
@@ -102,47 +108,21 @@ def _room_settings_response(room: Room) -> RoomSettingsResponse:
 
 
 def _latest_user_room(db: Session, user_id: int) -> Room | None:
-    return (
-        db.query(Room)
-        .filter(Room.owner_user_id == user_id)
-        .order_by(Room.updated_at.desc(), Room.created_at.desc(), Room.id.desc())
-        .first()
-    )
+    return db.query(Room).filter(Room.owner_user_id == user_id).order_by(Room.updated_at.desc(), Room.created_at.desc(), Room.id.desc()).first()
 
 
 def _get_or_create_room_for_settings(db: Session, room_public_id: str, current_user: User | None = None) -> Room:
     clean_room_public_id = room_public_id.strip()
     if not clean_room_public_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Room ID is required")
-
     room = db.query(Room).filter(Room.room_public_id == clean_room_public_id).first()
     if room is not None:
         return room
-
     if current_user is not None:
         existing_user_room = _latest_user_room(db, current_user.id)
         if existing_user_room is not None:
             return existing_user_room
-
-    room = Room(
-        room_public_id=clean_room_public_id,
-        owner_user_id=current_user.id if current_user is not None else None,
-        name="Live Room",
-        subtitle=None,
-        avatar_url=None,
-        cover_photo_url=None,
-        language="English",
-        mode="Open",
-        room_type="Chat",
-        online_count=0,
-        trending_score=0,
-        is_active=True,
-        is_secret=False,
-        is_locked=False,
-        is_members_only=False,
-        allow_screenshots=True,
-        background_theme_id="default",
-    )
+    room = Room(room_public_id=clean_room_public_id, owner_user_id=current_user.id if current_user is not None else None, name="Live Room", subtitle=None, avatar_url=None, cover_photo_url=None, language="English", mode="Open", room_type="Chat", online_count=0, trending_score=0, is_active=True, is_secret=False, is_locked=False, is_members_only=False, allow_screenshots=True, background_theme_id="default", seat_layout_id="5x2")
     db.add(room)
     db.commit()
     db.refresh(room)
@@ -169,7 +149,7 @@ def get_my_live_room(db: Session = Depends(get_db), current_user: User = Depends
 @router.post("/cleanup-stale")
 def cleanup_stale_rooms(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     removed_count = cleanup_stale_room_participants(db)
-    return {"removed_count": removed_count, "rule": "Active room participants with no heartbeat for 5 minutes are removed from the room."}
+    return {"removed_count": removed_count, "rule": "Active room participants with no heartbeat for 10 minutes are removed from the room."}
 
 
 @router.get("/trending", response_model=list[RoomTrendingResponse])
@@ -224,14 +204,8 @@ def get_room_settings(room_public_id: str, db: Session = Depends(get_db)) -> Roo
 
 
 @router.patch("/{room_public_id}/settings", response_model=RoomSettingsResponse)
-def update_room_settings(
-    room_public_id: str,
-    payload: RoomAccessSettingsUpdateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> RoomSettingsResponse:
+def update_room_settings(room_public_id: str, payload: RoomAccessSettingsUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RoomSettingsResponse:
     room = _get_room_for_update(db, room_public_id, current_user)
-
     if payload.language is not None:
         room.language = payload.language.strip()
     if payload.allow_screenshots is not None:
@@ -239,8 +213,41 @@ def update_room_settings(
     if payload.mode is not None:
         apply_room_mode(room, mode=payload.mode, actor_user_id=current_user.id, lock_password=payload.lock_password)
     room.is_active = True
-
     db.add(room)
+    db.commit()
+    db.refresh(room)
+    return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/background", response_model=RoomSettingsResponse)
+def update_room_background(room_public_id: str, payload: RoomBackgroundUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room = _get_room_for_update(db, room_public_id, current_user)
+    room.background_theme_id = payload.background_theme_id.strip()
+    room.is_active = True
+    room.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(room)
+    return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/seat-layout", response_model=RoomSettingsResponse)
+def update_room_seat_layout(room_public_id: str, payload: RoomSeatLayoutUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room = _get_room_for_update(db, room_public_id, current_user)
+    room.seat_layout_id = normalize_layout(payload.seat_layout_id)
+    room.is_active = True
+    room.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(room)
+    return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/announcement", response_model=RoomSettingsResponse)
+def update_room_announcement(room_public_id: str, payload: RoomAnnouncementUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room = _get_room_for_update(db, room_public_id, current_user)
+    room.announcement_text = payload.announcement_text.strip()
+    room.announcement_updated_at = datetime.utcnow()
+    room.announcement_updated_by_user_id = current_user.id
+    room.is_active = True
     db.commit()
     db.refresh(room)
     return _room_settings_response(room)
@@ -264,13 +271,7 @@ def apply_room_background_theme(room_public_id: str, payload: RoomThemeApplyRequ
 
 
 @router.get("/{room_public_id}/contributions")
-def get_room_contribution_rankings(
-    room_public_id: str,
-    period: str = Query(default="daily"),
-    category: str = Query(default="sent"),
-    limit: int = Query(default=100, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
+def get_room_contribution_rankings(room_public_id: str, period: str = Query(default="daily"), category: str = Query(default="sent"), limit: int = Query(default=100, ge=1, le=100), db: Session = Depends(get_db)):
     payload = room_contribution_rankings(db=db, room_public_id=room_public_id, category=category, period=period, limit=limit)
     if payload is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
