@@ -66,11 +66,26 @@ def active_participants(db: Session, room: Room) -> list[RoomParticipant]:
     )
 
 
+def room_user_key(room_public_id: str, user_id: int | None) -> str | None:
+    if user_id is None:
+        return None
+    return f"room:{room_public_id}:user:{user_id}"
+
+
+def peer_id_for(room_public_id: str, user: User | None, user_id: int | None = None) -> str | None:
+    resolved_user_id = user.id if user else user_id
+    if resolved_user_id is None:
+        return None
+    public_user_id = user.public_user_id if user else resolved_user_id
+    return f"{room_public_id}_user_{public_user_id}"
+
+
 def user_card(user: User | None) -> dict[str, Any] | None:
     if user is None:
         return None
     return {
         "user_id": user.id,
+        "backend_user_id": user.id,
         "public_user_id": user.public_user_id,
         "display_name": user.display_name or user.username or str(user.public_user_id),
         "username": user.username,
@@ -80,31 +95,41 @@ def user_card(user: User | None) -> dict[str, Any] | None:
     }
 
 
-def seat_payload(seat: RoomSeatState) -> dict[str, Any]:
+def seat_payload(seat: RoomSeatState, room_public_id: str | None = None) -> dict[str, Any]:
+    occupant = seat.occupant
     return {
         "seat_index": seat.seat_index,
         "occupant_user_id": seat.occupant_user_id,
+        "occupant_backend_user_id": seat.occupant_user_id,
+        "occupant_public_user_id": occupant.public_user_id if occupant else None,
+        "occupant_room_user_key": room_user_key(room_public_id or "", seat.occupant_user_id) if room_public_id else None,
+        "occupant_peer_id": peer_id_for(room_public_id, occupant, seat.occupant_user_id) if room_public_id else None,
         "is_locked": seat.is_locked,
         "mic_enabled": seat.mic_enabled,
         "admin_muted": seat.admin_muted,
         "locked_by_user_id": seat.locked_by_user_id,
         "admin_muted_by_user_id": seat.admin_muted_by_user_id,
         "updated_by_user_id": seat.updated_by_user_id,
-        "occupant": user_card(seat.occupant),
+        "occupant": user_card(occupant),
     }
 
 
 def chat_payload(message: RoomChatMessage) -> dict[str, Any]:
+    sender = message.sender
     return {
         "id": message.id,
         "room_public_id": message.room_public_id,
         "sender_user_id": message.sender_user_id,
+        "sender_backend_user_id": message.sender_user_id,
+        "sender_public_user_id": sender.public_user_id if sender else None,
+        "sender_room_user_key": room_user_key(message.room_public_id, message.sender_user_id),
+        "sender_peer_id": peer_id_for(message.room_public_id, sender, message.sender_user_id),
         "message_type": message.message_type,
         "text": message.text,
         "media_url": message.media_url,
         "metadata": message.metadata_json or {},
         "created_at": message.created_at.isoformat() if message.created_at else None,
-        "sender": user_card(message.sender),
+        "sender": user_card(sender),
     }
 
 
@@ -119,6 +144,36 @@ def recent_chat_messages(db: Session, room: Room, limit: int = 80) -> list[dict[
     return [chat_payload(message) for message in reversed(rows)]
 
 
+def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeatState | None) -> dict[str, Any]:
+    user = participant.user
+    backend_user_id = participant.user_id
+    public_user_id = user.public_user_id if user else backend_user_id
+    is_host = backend_user_id == room.owner_user_id
+    is_room_admin = participant.is_room_admin or is_host
+    return {
+        "backend_user_id": backend_user_id,
+        "user_id": backend_user_id,
+        "public_user_id": public_user_id,
+        "room_user_key": room_user_key(room.room_public_id, backend_user_id),
+        "peer_id": peer_id_for(room.room_public_id, user, backend_user_id),
+        "display_name": (user.display_name or user.username or str(public_user_id)) if user else "Vibe User",
+        "username": user.username if user else None,
+        "avatar_url": user.avatar_url if user else None,
+        "official_handle": user.official_handle if user else None,
+        "is_protected": bool(user.is_protected) if user else False,
+        "is_host": is_host,
+        "is_room_admin": is_room_admin,
+        "role_label": "Host" if is_host else ("Admin" if is_room_admin else "Member"),
+        "seat_index": seat.seat_index if seat else None,
+        "mic_enabled": seat.mic_enabled if seat else False,
+        "admin_muted": seat.admin_muted if seat else False,
+        "is_active": participant.is_active,
+        "is_member": participant.is_member,
+        "joined_at": participant.joined_at.isoformat() if participant.joined_at else None,
+        "last_seen_at": participant.last_seen_at.isoformat() if participant.last_seen_at else None,
+    }
+
+
 def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[str, Any]:
     seats = ensure_room_seats(db, room)
     participants = active_participants(db, room)
@@ -127,21 +182,30 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
         room.online_count = active_count
         db.flush()
 
+    canonical_participants = []
     peers = []
+    seen_backend_user_ids: set[int] = set()
     for participant in participants:
+        if participant.user_id in seen_backend_user_ids:
+            continue
+        seen_backend_user_ids.add(participant.user_id)
         seat = next((item for item in seats if item.occupant_user_id == participant.user_id), None)
-        user = participant.user
+        participant_data = participant_payload(room, participant, seat)
+        canonical_participants.append(participant_data)
         peers.append({
-            "peer_id": str(participant.user_id),
-            "user_id": str(participant.user_id),
-            "display_name": (user.display_name or user.username or str(user.public_user_id)) if user else "Vibe User",
-            "avatar_url": user.avatar_url if user else None,
-            "is_host": participant.user_id == room.owner_user_id,
-            "is_room_admin": participant.is_room_admin or participant.user_id == room.owner_user_id,
-            "role_label": "Host" if participant.user_id == room.owner_user_id else ("Admin" if participant.is_room_admin else "Member"),
-            "seat_index": seat.seat_index if seat else None,
-            "mic_enabled": seat.mic_enabled if seat else False,
-            "admin_muted": seat.admin_muted if seat else False,
+            "peer_id": participant_data["peer_id"],
+            "user_id": str(participant_data["backend_user_id"]),
+            "backend_user_id": participant_data["backend_user_id"],
+            "public_user_id": participant_data["public_user_id"],
+            "room_user_key": participant_data["room_user_key"],
+            "display_name": participant_data["display_name"],
+            "avatar_url": participant_data["avatar_url"],
+            "is_host": participant_data["is_host"],
+            "is_room_admin": participant_data["is_room_admin"],
+            "role_label": participant_data["role_label"],
+            "seat_index": participant_data["seat_index"],
+            "mic_enabled": participant_data["mic_enabled"],
+            "admin_muted": participant_data["admin_muted"],
         })
 
     payload: dict[str, Any] = {
@@ -156,7 +220,7 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
         "language": room.language,
         "mode": room.mode,
         "room_type": room.room_type,
-        "online_count": active_count,
+        "online_count": len(canonical_participants),
         "is_active": room.is_active,
         "is_secret": room.is_secret,
         "is_locked": room.is_locked,
@@ -168,10 +232,11 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
         "announcement_text": room.announcement_text,
         "state_version": room_sequence(db, room),
         "updated_at": room.updated_at.isoformat() if room.updated_at else None,
-        "seats": [seat_payload(seat) for seat in seats],
+        "seats": [seat_payload(seat, room.room_public_id) for seat in seats],
         "locked_seat_indexes": [seat.seat_index for seat in seats if seat.is_locked],
+        "participants": canonical_participants,
         "peers": peers,
-        "peer_count": active_count,
+        "peer_count": len(canonical_participants),
     }
     if include_chat:
         payload["recent_messages"] = recent_chat_messages(db, room)
