@@ -35,6 +35,11 @@ class LiveRoomSystemEvent {
     this.isLuckyGift = false,
     this.luckyMultiplier = 0,
     this.luckyRewardCoinAmount = 0,
+    this.ribbonTier = 'normal',
+    this.broadcastScope = 'room',
+    this.showGiftSlide = true,
+    this.showPremiumBroadcast = false,
+    this.showGiftFlight = true,
   });
 
   final String id;
@@ -59,6 +64,11 @@ class LiveRoomSystemEvent {
   final bool isLuckyGift;
   final int luckyMultiplier;
   final int luckyRewardCoinAmount;
+  final String ribbonTier;
+  final String broadcastScope;
+  final bool showGiftSlide;
+  final bool showPremiumBroadcast;
+  final bool showGiftFlight;
 
   bool get isUserEntered => type == 'user_entered';
   bool get isUserRemoved => type == 'user_removed';
@@ -69,6 +79,8 @@ class LiveRoomSystemEvent {
 
   factory LiveRoomSystemEvent.fromJson(Map<String, dynamic> json) {
     final rawAutoDismiss = json['auto_dismiss_seconds'];
+    final ribbonTier = (json['ribbon_tier'] ?? json['ribbonTier'] ?? 'normal').toString();
+    final broadcastScope = (json['broadcast_scope'] ?? json['broadcastScope'] ?? 'room').toString();
     return LiveRoomSystemEvent(
       id:
           json['id']?.toString() ??
@@ -104,6 +116,14 @@ class LiveRoomSystemEvent {
       isLuckyGift: json['is_lucky'] == true || json['is_lucky_gift'] == true,
       luckyMultiplier: _int(json['lucky_multiplier']),
       luckyRewardCoinAmount: _int(json['lucky_reward_coin_amount']),
+      ribbonTier: ribbonTier,
+      broadcastScope: broadcastScope,
+      showGiftSlide: _bool(json['show_gift_slide'] ?? json['showGiftSlide'], fallback: true),
+      showPremiumBroadcast: _bool(
+        json['show_premium_broadcast'] ?? json['showPremiumBroadcast'],
+        fallback: ribbonTier == 'premium' || broadcastScope == 'global',
+      ),
+      showGiftFlight: _bool(json['show_gift_flight'] ?? json['showGiftFlight'], fallback: true),
     );
   }
 }
@@ -118,4 +138,15 @@ int _int(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+bool _bool(dynamic value, {required bool fallback}) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final clean = value.trim().toLowerCase();
+    if (clean == 'true' || clean == '1' || clean == 'yes') return true;
+    if (clean == 'false' || clean == '0' || clean == 'no') return false;
+  }
+  return fallback;
 }
