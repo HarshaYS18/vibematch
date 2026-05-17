@@ -280,13 +280,6 @@ class LiveRoomMessageController {
     _handledSystemEventIds.add(event.id);
 
     if (event.isRoomChatMessage) {
-      final alreadyRendered = messages.any(
-        (message) =>
-            message.senderId == event.actorUserId &&
-            message.message == event.message &&
-            message.senderName == event.actorName,
-      );
-      if (alreadyRendered) return;
       messages.insert(
         0,
         ChatEntry(
