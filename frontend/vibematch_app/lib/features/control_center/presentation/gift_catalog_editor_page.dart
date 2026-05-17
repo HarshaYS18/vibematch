@@ -76,16 +76,10 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
         content: TextField(
           controller: controller,
           maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Reason required',
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(labelText: 'Reason required', border: OutlineInputBorder()),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
               final reason = controller.text.trim();
@@ -119,22 +113,14 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
   }
 
   Future<void> _seedDefaults() async {
-    await _runMutation(
-      (reason) async => _api.seedDefaults(reason: reason),
-      'Seed default gift catalog',
-      'Initial admin DB gift catalog seed',
-    );
+    await _runMutation((reason) async => _api.seedDefaults(reason: reason), 'Seed default gift catalog', 'Initial admin DB gift catalog seed');
   }
 
   Future<void> _toggleCategory(Map<String, dynamic> category) async {
     final key = '${category['key']}';
     final enabled = !_bool(category['is_enabled'], fallback: true);
     await _runMutation(
-      (reason) async => _api.setCategoryEnabled(
-        categoryKey: key,
-        enabled: enabled,
-        reason: reason,
-      ),
+      (reason) async => _api.setCategoryEnabled(categoryKey: key, enabled: enabled, reason: reason),
       '${enabled ? 'Enable' : 'Disable'} category',
       '${enabled ? 'Enable' : 'Disable'} gift category $key',
     );
@@ -144,11 +130,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     final id = '${gift['id']}';
     final enabled = !_bool(gift['is_enabled'], fallback: true);
     await _runMutation(
-      (reason) async => _api.setGiftEnabled(
-        giftId: id,
-        enabled: enabled,
-        reason: reason,
-      ),
+      (reason) async => _api.setGiftEnabled(giftId: id, enabled: enabled, reason: reason),
       '${enabled ? 'Enable' : 'Disable'} gift',
       '${enabled ? 'Enable' : 'Disable'} gift $id',
     );
@@ -160,7 +142,6 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     final sortController = TextEditingController(text: '${category?['sort_order'] ?? 500}');
     final reasonController = TextEditingController(text: category == null ? 'Create gift category' : 'Update gift category');
     var enabled = _bool(category?['is_enabled'], fallback: true);
-
     final shouldSave = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -169,20 +150,13 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
           content: SizedBox(
             width: 440,
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: keyController, enabled: category == null, decoration: const InputDecoration(labelText: 'Category key', helperText: 'Example: cricket, premium, lucky')),
-                  TextField(controller: labelController, decoration: const InputDecoration(labelText: 'Display label')),
-                  TextField(controller: sortController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Sort order')),
-                  SwitchListTile(
-                    value: enabled,
-                    onChanged: (value) => setLocal(() => enabled = value),
-                    title: const Text('Enabled'),
-                  ),
-                  TextField(controller: reasonController, maxLines: 2, decoration: const InputDecoration(labelText: 'Reason required')),
-                ],
-              ),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(controller: keyController, enabled: category == null, decoration: const InputDecoration(labelText: 'Category key', helperText: 'Example: cricket, premium, lucky')),
+                TextField(controller: labelController, decoration: const InputDecoration(labelText: 'Display label')),
+                TextField(controller: sortController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Sort order')),
+                SwitchListTile(value: enabled, onChanged: (value) => setLocal(() => enabled = value), title: const Text('Enabled')),
+                TextField(controller: reasonController, maxLines: 2, decoration: const InputDecoration(labelText: 'Reason required')),
+              ]),
             ),
           ),
           actions: [
@@ -192,17 +166,10 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
         ),
       ),
     );
-
     if (shouldSave == true) {
       setState(() => _saving = true);
       try {
-        await _api.upsertCategory(
-          key: _cleanKey(keyController.text),
-          label: labelController.text.trim(),
-          enabled: enabled,
-          sortOrder: int.tryParse(sortController.text.trim()) ?? 500,
-          reason: reasonController.text.trim(),
-        );
+        await _api.upsertCategory(key: _cleanKey(keyController.text), label: labelController.text.trim(), enabled: enabled, sortOrder: int.tryParse(sortController.text.trim()) ?? 500, reason: reasonController.text.trim());
         if (!mounted) return;
         _showSnack('Category saved');
         await _load();
@@ -213,7 +180,6 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
         if (mounted) setState(() => _saving = false);
       }
     }
-
     keyController.dispose();
     labelController.dispose();
     sortController.dispose();
@@ -226,6 +192,8 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     final categoryController = TextEditingController(text: '${gift?['category'] ?? _categories.firstOrNull?['key'] ?? 'classic'}');
     final giftTypeController = TextEditingController(text: '${gift?['gift_type'] ?? 'normal'}');
     final coinController = TextEditingController(text: '${gift?['coin_value'] ?? 0}');
+    final minComboController = TextEditingController(text: '${gift?['min_combo'] ?? 1}');
+    final maxComboController = TextEditingController(text: '${gift?['max_combo'] ?? 999}');
     final iconKeyController = TextEditingController(text: '${gift?['icon_key'] ?? ''}');
     final chatSymbolController = TextEditingController(text: '${gift?['chat_symbol'] ?? '🎁'}');
     final assetPathController = TextEditingController(text: '${gift?['asset_path'] ?? ''}');
@@ -250,31 +218,33 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
           content: SizedBox(
             width: 560,
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _field(giftIdController, 'Gift ID', enabled: gift == null),
-                  _field(nameController, 'Name'),
-                  _field(categoryController, 'Category key'),
-                  _field(giftTypeController, 'Gift type: normal / lucky'),
-                  _field(coinController, 'Coin value', number: true),
-                  _field(iconKeyController, 'Icon key'),
-                  _field(chatSymbolController, 'Chat symbol'),
-                  _field(assetPathController, 'Local asset path fallback'),
-                  _field(videoAssetPathController, 'Local video path fallback'),
-                  _field(cdnAssetPathController, 'CDN icon path e.g. gifts/love_rocket/v1/icon.webp'),
-                  _field(cdnVideoPathController, 'CDN video path e.g. gifts/love_rocket/v1/animation.mp4'),
-                  _field(animationTypeController, 'Animation type: image / video'),
-                  _field(versionController, 'Version', number: true),
-                  _field(sortController, 'Sort order', number: true),
-                  _field(maxMultiplierController, 'Max multiplier for lucky gift', number: true),
-                  SwitchListTile(value: enabled, onChanged: (v) => setLocal(() => enabled = v), title: const Text('Enabled')),
-                  SwitchListTile(value: slide, onChanged: (v) => setLocal(() => slide = v), title: const Text('Show gift slide')),
-                  SwitchListTile(value: broadcast, onChanged: (v) => setLocal(() => broadcast = v), title: const Text('Premium broadcast')),
-                  SwitchListTile(value: flight, onChanged: (v) => setLocal(() => flight = v), title: const Text('Gift flight')),
-                  TextField(controller: reasonController, maxLines: 2, decoration: const InputDecoration(labelText: 'Reason required')),
-                ],
-              ),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                _field(giftIdController, 'Gift ID', enabled: gift == null),
+                _field(nameController, 'Name'),
+                _field(categoryController, 'Category key'),
+                _field(giftTypeController, 'Gift type: normal / lucky'),
+                _field(coinController, 'Coin value', number: true),
+                Row(children: [
+                  Expanded(child: _field(minComboController, 'Minimum combo allowed', number: true)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _field(maxComboController, 'Maximum combo allowed', number: true)),
+                ]),
+                _field(iconKeyController, 'Icon key'),
+                _field(chatSymbolController, 'Chat symbol'),
+                _field(assetPathController, 'Local asset path fallback'),
+                _field(videoAssetPathController, 'Local video path fallback'),
+                _field(cdnAssetPathController, 'CDN icon path or full URL'),
+                _field(cdnVideoPathController, 'CDN video path or full URL'),
+                _field(animationTypeController, 'Animation type: image / video'),
+                _field(versionController, 'Version', number: true),
+                _field(sortController, 'Sort order', number: true),
+                _field(maxMultiplierController, 'Max multiplier for lucky gift', number: true),
+                SwitchListTile(value: enabled, onChanged: (v) => setLocal(() => enabled = v), title: const Text('Enabled')),
+                SwitchListTile(value: slide, onChanged: (v) => setLocal(() => slide = v), title: const Text('Show gift slide')),
+                SwitchListTile(value: broadcast, onChanged: (v) => setLocal(() => broadcast = v), title: const Text('Premium broadcast')),
+                SwitchListTile(value: flight, onChanged: (v) => setLocal(() => flight = v), title: const Text('Gift flight')),
+                TextField(controller: reasonController, maxLines: 2, decoration: const InputDecoration(labelText: 'Reason required')),
+              ]),
             ),
           ),
           actions: [
@@ -286,131 +256,84 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     );
 
     if (shouldSave == true) {
-      setState(() => _saving = true);
-      try {
-        await _api.upsertGift({
-          'gift_id': giftIdController.text.trim(),
-          'name': nameController.text.trim(),
-          'category_key': _cleanKey(categoryController.text),
-          'gift_type': _cleanKey(giftTypeController.text),
-          'coin_value': int.tryParse(coinController.text.trim()) ?? 0,
-          'icon_key': _nullable(iconKeyController.text),
-          'chat_symbol': _nullable(chatSymbolController.text),
-          'asset_path': _nullable(assetPathController.text),
-          'video_asset_path': _nullable(videoAssetPathController.text),
-          'cdn_asset_path': _nullable(cdnAssetPathController.text),
-          'cdn_video_path': _nullable(cdnVideoPathController.text),
-          'animation_type': _cleanKey(animationTypeController.text),
-          'is_enabled': enabled,
-          'show_gift_slide': slide,
-          'show_premium_broadcast': broadcast,
-          'show_gift_flight': flight,
-          'version': int.tryParse(versionController.text.trim()) ?? 1,
-          'sort_order': int.tryParse(sortController.text.trim()) ?? 500,
-          'max_multiplier': maxMultiplierController.text.trim().isEmpty ? null : int.tryParse(maxMultiplierController.text.trim()),
-          'metadata_json': null,
-          'reason': reasonController.text.trim(),
-        });
-        if (!mounted) return;
-        _showSnack('Gift saved');
-        await _load();
-      } catch (error) {
-        if (!mounted) return;
-        _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
-      } finally {
-        if (mounted) setState(() => _saving = false);
+      final minCombo = int.tryParse(minComboController.text.trim()) ?? 1;
+      final maxCombo = int.tryParse(maxComboController.text.trim()) ?? 999;
+      if (minCombo < 1 || maxCombo < minCombo) {
+        _showSnack('Max combo must be greater than or equal to min combo', isError: true);
+      } else {
+        setState(() => _saving = true);
+        try {
+          await _api.upsertGift({
+            'gift_id': giftIdController.text.trim(),
+            'name': nameController.text.trim(),
+            'category_key': _cleanKey(categoryController.text),
+            'gift_type': _cleanKey(giftTypeController.text),
+            'coin_value': int.tryParse(coinController.text.trim()) ?? 0,
+            'min_combo': minCombo,
+            'max_combo': maxCombo,
+            'icon_key': _nullable(iconKeyController.text),
+            'chat_symbol': _nullable(chatSymbolController.text),
+            'asset_path': _nullable(assetPathController.text),
+            'video_asset_path': _nullable(videoAssetPathController.text),
+            'cdn_asset_path': _nullable(cdnAssetPathController.text),
+            'cdn_video_path': _nullable(cdnVideoPathController.text),
+            'animation_type': _cleanKey(animationTypeController.text),
+            'is_enabled': enabled,
+            'show_gift_slide': slide,
+            'show_premium_broadcast': broadcast,
+            'show_gift_flight': flight,
+            'version': int.tryParse(versionController.text.trim()) ?? 1,
+            'sort_order': int.tryParse(sortController.text.trim()) ?? 500,
+            'max_multiplier': maxMultiplierController.text.trim().isEmpty ? null : int.tryParse(maxMultiplierController.text.trim()),
+            'metadata_json': null,
+            'reason': reasonController.text.trim(),
+          });
+          if (!mounted) return;
+          _showSnack('Gift saved');
+          await _load();
+        } catch (error) {
+          if (!mounted) return;
+          _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
+        } finally {
+          if (mounted) setState(() => _saving = false);
+        }
       }
     }
 
-    for (final controller in [
-      giftIdController,
-      nameController,
-      categoryController,
-      giftTypeController,
-      coinController,
-      iconKeyController,
-      chatSymbolController,
-      assetPathController,
-      videoAssetPathController,
-      cdnAssetPathController,
-      cdnVideoPathController,
-      animationTypeController,
-      versionController,
-      sortController,
-      maxMultiplierController,
-      reasonController,
-    ]) {
+    for (final controller in [giftIdController, nameController, categoryController, giftTypeController, coinController, minComboController, maxComboController, iconKeyController, chatSymbolController, assetPathController, videoAssetPathController, cdnAssetPathController, cdnVideoPathController, animationTypeController, versionController, sortController, maxMultiplierController, reasonController]) {
       controller.dispose();
     }
   }
 
-  TextField _field(TextEditingController controller, String label, {bool enabled = true, bool number = false}) {
-    return TextField(
-      controller: controller,
-      enabled: enabled,
-      keyboardType: number ? TextInputType.number : TextInputType.text,
-      decoration: InputDecoration(labelText: label),
-    );
-  }
+  TextField _field(TextEditingController controller, String label, {bool enabled = true, bool number = false}) => TextField(controller: controller, enabled: enabled, keyboardType: number ? TextInputType.number : TextInputType.text, decoration: InputDecoration(labelText: label));
 
   void _showSnack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
-          backgroundColor: isError ? const Color(0xFFE84C72) : const Color(0xFF251538),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), backgroundColor: isError ? const Color(0xFFE84C72) : const Color(0xFF251538), behavior: SnackBarBehavior.floating));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFAF7F1),
-        foregroundColor: const Color(0xFF251538),
-        elevation: 0,
-        title: const Text('Gift Catalog Editor', style: TextStyle(fontWeight: FontWeight.w900)),
-        actions: [
-          IconButton(onPressed: _saving ? null : _load, icon: const Icon(Icons.refresh_rounded)),
-        ],
-      ),
-      floatingActionButton: _saving
-          ? const FloatingActionButton(onPressed: null, child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
-          : FloatingActionButton.extended(
-              onPressed: () => _openGiftEditor(),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Add Gift'),
-            ),
+      appBar: AppBar(backgroundColor: const Color(0xFFFAF7F1), foregroundColor: const Color(0xFF251538), elevation: 0, title: const Text('Gift Catalog Editor', style: TextStyle(fontWeight: FontWeight.w900)), actions: [IconButton(onPressed: _saving ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
+      floatingActionButton: _saving ? const FloatingActionButton(onPressed: null, child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))) : FloatingActionButton.extended(onPressed: () => _openGiftEditor(), icon: const Icon(Icons.add_rounded), label: const Text('Add Gift')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _ErrorView(message: _error!, onRetry: _load)
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                  children: [
-                    _HeaderCard(
-                      source: '${_catalog?['source'] ?? 'unknown'}',
-                      cdnBase: '${_catalog?['cdn_base_url'] ?? ''}',
-                      itemCount: _items.length,
-                      categoryCount: _categories.length,
-                      onSeed: _saving ? null : _seedDefaults,
-                      onAddCategory: _saving ? null : () => _openCategoryEditor(),
-                    ),
-                    const SizedBox(height: 16),
-                    const _SectionTitle('Categories'),
-                    const SizedBox(height: 8),
-                    ..._categories.map((category) => _CategoryCard(category: category, onEdit: () => _openCategoryEditor(category), onToggle: () => _toggleCategory(category))),
-                    const SizedBox(height: 18),
-                    const _SectionTitle('Gifts'),
-                    const SizedBox(height: 8),
-                    ..._items.map((gift) => _GiftCard(gift: gift, onEdit: () => _openGiftEditor(gift), onToggle: () => _toggleGift(gift))),
-                  ],
-                ),
+              : ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 120), physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()), children: [
+                  _HeaderCard(source: '${_catalog?['source'] ?? 'unknown'}', cdnBase: '${_catalog?['cdn_base_url'] ?? ''}', itemCount: _items.length, categoryCount: _categories.length, onSeed: _saving ? null : _seedDefaults, onAddCategory: _saving ? null : () => _openCategoryEditor()),
+                  const SizedBox(height: 16),
+                  const _SectionTitle('Categories'),
+                  const SizedBox(height: 8),
+                  ..._categories.map((category) => _CategoryCard(category: category, onEdit: () => _openCategoryEditor(category), onToggle: () => _toggleCategory(category))),
+                  const SizedBox(height: 18),
+                  const _SectionTitle('Gifts'),
+                  const SizedBox(height: 8),
+                  ..._items.map((gift) => _GiftCard(gift: gift, onEdit: () => _openGiftEditor(gift), onToggle: () => _toggleGift(gift))),
+                ]),
     );
   }
 
@@ -439,27 +362,19 @@ class _HeaderCard extends StatelessWidget {
   final VoidCallback? onAddCategory;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(colors: [Color(0xFF120D1F), Color(0xFF4A2A63), Color(0xFFFFC857)]),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Backend-owned gift catalog', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 6),
-        Text('Source: $source • Categories: $categoryCount • Gifts: $itemCount', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
-        Text(cdnBase.isEmpty ? 'CDN base not set' : cdnBase, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFFFF0A8), fontSize: 11, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 12),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          FilledButton.icon(onPressed: onSeed, icon: const Icon(Icons.playlist_add_check_rounded), label: const Text('Seed defaults')),
-          OutlinedButton.icon(onPressed: onAddCategory, icon: const Icon(Icons.category_rounded), label: const Text('Add category')),
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), gradient: const LinearGradient(colors: [Color(0xFF120D1F), Color(0xFF4A2A63), Color(0xFFFFC857)])),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Backend-owned gift catalog', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 6),
+          Text('Source: $source • Categories: $categoryCount • Gifts: $itemCount', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          Text(cdnBase.isEmpty ? 'CDN base not set' : cdnBase, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFFFF0A8), fontSize: 11, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [FilledButton.icon(onPressed: onSeed, icon: const Icon(Icons.playlist_add_check_rounded), label: const Text('Seed defaults')), OutlinedButton.icon(onPressed: onAddCategory, icon: const Icon(Icons.category_rounded), label: const Text('Add category'))]),
         ]),
-      ]),
-    );
-  }
+      );
 }
 
 class _CategoryCard extends StatelessWidget {
@@ -471,18 +386,7 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = category['is_enabled'] == true;
-    return _BaseCard(
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: CircleAvatar(backgroundColor: enabled ? const Color(0xFF12C7B7) : const Color(0xFF8C8198), child: const Icon(Icons.category_rounded, color: Colors.white)),
-        title: Text('${category['label']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF251538))),
-        subtitle: Text('${category['key']} • sort ${category['sort_order']}'),
-        trailing: Wrap(spacing: 6, children: [
-          IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_rounded)),
-          Switch(value: enabled, onChanged: (_) => onToggle()),
-        ]),
-      ),
-    );
+    return _BaseCard(child: ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(backgroundColor: enabled ? const Color(0xFF12C7B7) : const Color(0xFF8C8198), child: const Icon(Icons.category_rounded, color: Colors.white)), title: Text('${category['label']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF251538))), subtitle: Text('${category['key']} • sort ${category['sort_order']}'), trailing: Wrap(spacing: 6, children: [IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_rounded)), Switch(value: enabled, onChanged: (_) => onToggle())])));
   }
 }
 
@@ -496,31 +400,13 @@ class _GiftCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = gift['is_enabled'] == true;
     final imageUrl = '${gift['asset_url'] ?? ''}'.trim();
-    return _BaseCard(
-      child: Row(children: [
-        Container(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), color: const Color(0xFF251538)),
-          clipBehavior: Clip.antiAlias,
-          child: imageUrl.isEmpty
-              ? const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFC857))
-              : Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFC857))),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${gift['name']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF251538))),
-            const SizedBox(height: 3),
-            Text('${gift['id']} • ${gift['category']} • ${gift['coin_value']} coins', style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)),
-            const SizedBox(height: 3),
-            Text('${gift['cdn_asset_path'] ?? 'no cdn icon'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF8C8198))),
-          ]),
-        ),
-        IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_rounded)),
-        Switch(value: enabled, onChanged: (_) => onToggle()),
-      ]),
-    );
+    return _BaseCard(child: Row(children: [
+      Container(width: 54, height: 54, decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), color: const Color(0xFF251538)), clipBehavior: Clip.antiAlias, child: imageUrl.isEmpty ? const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFC857)) : Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFC857)))),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${gift['name']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF251538))), const SizedBox(height: 3), Text('${gift['id']} • ${gift['category']} • ${gift['coin_value']} coins • combo ${gift['min_combo'] ?? 1}-${gift['max_combo'] ?? 999}', style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)), const SizedBox(height: 3), Text('${gift['cdn_asset_path'] ?? 'no cdn icon'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF8C8198)))])),
+      IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_rounded)),
+      Switch(value: enabled, onChanged: (_) => onToggle()),
+    ]));
   }
 }
 
@@ -528,14 +414,7 @@ class _BaseCard extends StatelessWidget {
   const _BaseCard({required this.child});
   final Widget child;
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFEDE3D7))),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFEDE3D7))), child: child);
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -550,18 +429,5 @@ class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 42),
-          const SizedBox(height: 10),
-          Text(message, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: onRetry, child: const Text('Retry')),
-        ]),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(22), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)), const SizedBox(height: 12), FilledButton(onPressed: onRetry, child: const Text('Retry'))])));
 }
