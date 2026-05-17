@@ -27,6 +27,7 @@ class RoomTopBar extends StatelessWidget {
     this.onRoomLevelTap,
     this.roomLevel = 1,
     this.language = 'Telugu',
+    this.canManageRoom = true,
     this.canManageAdmins = true,
     this.currentUserIsMember = false,
     this.joinRequestPending = false,
@@ -50,6 +51,7 @@ class RoomTopBar extends StatelessWidget {
   final VoidCallback? onRoomLevelTap;
   final int roomLevel;
   final String language;
+  final bool canManageRoom;
   final bool canManageAdmins;
   final bool currentUserIsMember;
   final bool joinRequestPending;
@@ -76,7 +78,7 @@ class RoomTopBar extends StatelessWidget {
                     privacyMode: privacyMode,
                     onInfoTap: () => _openRoomInfo(context),
                     onJoinTap: onJoinTap,
-                    showJoinButton: !canManageAdmins,
+                    showJoinButton: !canManageRoom,
                     currentUserIsMember: currentUserIsMember,
                     joinRequestPending: joinRequestPending,
                   ),
@@ -87,7 +89,7 @@ class RoomTopBar extends StatelessWidget {
             RoundRoomButton(icon: Icons.send_rounded, onTap: onShare, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
             const SizedBox(width: 5),
             RoundRoomButton(icon: Icons.campaign_rounded, onTap: onAnnouncement, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
-            if (canManageAdmins) ...[
+            if (canManageRoom) ...[
               const SizedBox(width: 5),
               RoundRoomButton(icon: Icons.settings_rounded, onTap: onSettings, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
             ],
@@ -144,8 +146,9 @@ class _RoomNamePill extends StatelessWidget {
   String get _cleanRoomName => roomName.trim().isEmpty ? 'Room' : roomName.trim();
 
   bool get _showMemberIcon => showJoinButton && currentUserIsMember;
+  bool get _showPendingIcon => showJoinButton && !currentUserIsMember && joinRequestPending;
   bool get _showPlusButton => showJoinButton && !currentUserIsMember && !joinRequestPending;
-  bool get _showTrailingSlot => _showMemberIcon || _showPlusButton;
+  bool get _showTrailingSlot => _showMemberIcon || _showPendingIcon || _showPlusButton;
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +174,8 @@ class _RoomNamePill extends StatelessWidget {
           Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
           if (_showMemberIcon)
             const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.verified_user_rounded, color: RoomColors.aqua, size: 15)))
+          else if (_showPendingIcon)
+            const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.hourglass_top_rounded, color: RoomColors.gold, size: 15)))
           else
             Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onJoinTap, child: const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.add_rounded, color: RoomColors.aqua, size: 17))))),
         ],
