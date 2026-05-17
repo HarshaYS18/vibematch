@@ -11,7 +11,8 @@ class DevLoginRequest(BaseModel):
 
 
 class GoogleLoginRequest(BaseModel):
-    id_token: str = Field(..., min_length=20)
+    id_token: str | None = None
+    access_token: str | None = None
     device_id: str | None = None
 
 
