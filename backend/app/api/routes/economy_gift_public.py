@@ -119,12 +119,22 @@ def _resolve_receiver_and_room(db: Session, payload: PublicGiftSendRequest) -> t
     return receiver, room_id
 
 
+def _validate_catalog_gift_price(db: Session, gift_id: str, coin_value: int) -> dict:
+    gift = gift_catalog_service.find_gift(gift_id, db=db)
+    if gift is None:
+        raise HTTPException(status_code=404, detail="Gift not found")
+    if int(gift.get("coin_value") or 0) != int(coin_value):
+        raise HTTPException(status_code=400, detail="Gift coin value does not match catalog")
+    return gift
+
+
 @router.post("/send-public")
 async def send_gift_by_public_ids(
     payload: PublicGiftSendRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _validate_catalog_gift_price(db, payload.gift_id, payload.coin_value)
     receiver, room_id = _resolve_receiver_and_room(db, payload)
 
     result = economy_service.send_gift(
@@ -155,13 +165,9 @@ async def send_lucky_gift_by_public_ids(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    gift = gift_catalog_service.find_gift(payload.gift_id)
-    if gift is None:
-        raise HTTPException(status_code=404, detail="Gift not found")
+    gift = _validate_catalog_gift_price(db, payload.gift_id, payload.coin_value)
     if gift.get("gift_type") != "lucky":
         raise HTTPException(status_code=400, detail="Gift is not a lucky gift")
-    if int(gift.get("coin_value") or 0) != payload.coin_value:
-        raise HTTPException(status_code=400, detail="Gift coin value does not match catalog")
 
     receiver, room_id = _resolve_receiver_and_room(db, payload)
 
