@@ -1,6 +1,8 @@
 import json
 import re
+from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
@@ -107,12 +109,13 @@ def _event_payload(event_type: str, room_id: str, room: dict[str, Any], extra: d
     return {"type": event_type, "payload": payload}
 
 
-def _chat_event_payload(room_id: str, user: User, text: str) -> dict[str, Any]:
-    now_id = f"chat_{room_id}_{user.id}_{abs(hash(text))}"
+def _chat_event_payload(room_id: str, user: User, text: str, message_id: int | None = None) -> dict[str, Any]:
+    created_at = datetime.utcnow().isoformat()
+    event_id = f"chat_{message_id}" if message_id else f"chat_{room_id}_{user.id}_{uuid4().hex}"
     return {
         "type": "room/system_event",
         "payload": {
-            "id": now_id,
+            "id": event_id,
             "event_type": "room_chat_message",
             "type": "room_chat_message",
             "room_id": room_id,
@@ -126,7 +129,7 @@ def _chat_event_payload(room_id: str, user: User, text: str) -> dict[str, Any]:
             "target_user_id": "",
             "target_name": "",
             "message": text,
-            "created_at": None,
+            "created_at": created_at,
         },
     }
 
@@ -299,8 +302,15 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     text = str(payload.get("text") or "").strip()
                     if text and user is not None:
                         snapshot = room_action_service.create_chat_message(db, room, user, text, message_type=str(payload.get("message_type") or "text"), metadata=payload)
+                        message_id = None
+                        try:
+                            recent_messages = snapshot.get("recent_messages") or []
+                            if recent_messages:
+                                message_id = int(recent_messages[-1].get("id"))
+                        except Exception:
+                            message_id = None
                         db.commit()
-                        await room_realtime_connections.broadcast_room(room_id, _chat_event_payload(room_id, user, text))
+                        await room_realtime_connections.broadcast_room(room_id, _chat_event_payload(room_id, user, text, message_id=message_id))
                     else:
                         snapshot = room_state_service.room_snapshot(db, room)
                         db.commit()
@@ -315,8 +325,4 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
     except RuntimeError:
         pass
     finally:
-        # Important: never mutate saved room state on raw socket disconnect.
-        # Minimize/restore, mobile network changes, browser refreshes, and quick reconnects
-        # should not reset seats, mic state, locked seats, room settings, or chat data.
-        # Real leave behavior must come from the explicit `room/leave` event only.
         room_realtime_connections.disconnect(websocket)
