@@ -156,8 +156,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool get _viewerCanManageAdmins => _currentUser.isHost;
 
   LiveRoomMembershipStatus get _currentMembershipStatus {
-    if (_viewerCanManageRoom) return LiveRoomMembershipStatus.member;
-
     final backendStatus = _currentBackendMembershipStatus;
     if (backendStatus != null) return backendStatus;
 
@@ -183,11 +181,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           peerId.endsWith('_$currentNumeric');
       if (!matches) continue;
       final role = peer.roleLabel.trim().toLowerCase().replaceAll('_', ' ');
-      if (peer.isHost || peer.isRoomAdmin || role == 'host' || role == 'admin' || role == 'channel host') {
-        return LiveRoomMembershipStatus.member;
-      }
+
+      // Important: top-bar membership icon is ONLY for approved room_members.
+      // Host/Admin are permissions, not room_member status for this icon.
       if (role == 'room member') return LiveRoomMembershipStatus.member;
-      if (role == 'visitor' || role == 'member' || role.isEmpty) {
+      if (role == 'visitor' ||
+          role == 'member' ||
+          role == 'host' ||
+          role == 'admin' ||
+          role == 'channel host' ||
+          peer.isHost ||
+          peer.isRoomAdmin ||
+          role.isEmpty) {
         return LiveRoomMembershipService.statusFor(
           roomId: _roomId,
           userId: _currentUser.id,
