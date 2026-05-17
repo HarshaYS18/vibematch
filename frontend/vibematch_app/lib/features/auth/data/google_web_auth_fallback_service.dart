@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../../core/network/vm_api_config.dart';
-import '../models/current_user.dart';
 import 'auth_api_service.dart';
 
 class GoogleWebAuthFallbackService {
