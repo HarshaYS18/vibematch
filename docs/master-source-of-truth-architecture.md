@@ -35,6 +35,54 @@ User action in Flutter
 8. Every sensitive change is audit/event logged.
 9. Every money/coin/gift/game action is ledger-based.
 10. Every domain must define its canonical table/service/event owner.
+11. Every real room event must be broadcast through backend realtime to all eligible room users.
+12. No room event should be local-only unless it is purely private UI state such as an input draft, scroll position, or animation progress.
+
+## Bigo-style broadcast rule
+
+Every meaningful in-room action must flow through backend and broadcast to all eligible users, Bigo-style. The client may animate instantly, but the authoritative event must still come from the backend or be confirmed by a backend snapshot.
+
+Room events that must never be local-only include:
+
+- user joined room
+- user left room
+- seat taken
+- seat left
+- seat switched
+- seat locked/unlocked
+- mic self mute/unmute
+- admin mute/unmute
+- room admin add/remove
+- room settings changed
+- room mode changed
+- background/theme changed
+- chat text/image message sent
+- floating/ribbon message sent
+- gift sent
+- combo gift updated
+- lucky gift result
+- lucky packet sent/claimed
+- global/regional broadcast created
+- room announcement changed
+- join request submitted/approved/rejected
+- room member/admin/kick/mute moderation action
+- cricket mode start/update/end
+- watch party start/update/end
+- games round start/bet/result/end
+- wallet/level/contribution updates caused by room actions
+
+The only local-only state allowed in room UI is temporary private interface state:
+
+- text currently typed but not sent
+- selected gift before pressing send
+- open/closed bottom sheet
+- scroll position
+- local animation progress
+- selected tab/filter
+- drag position of minimized bubble
+- temporary loading indicators
+
+If another user in the same eligible room should see or be affected by the action, it is not local state. It must be backend-saved or backend-validated, then broadcast.
 
 ## Source-of-truth registry
 
@@ -182,3 +230,4 @@ Still needed:
 - frontend repository wiring to always load snapshots first
 - event replay/offline delivery
 - same source-of-truth registry applied to wallet, gifts, inbox, Vibes, profile, store, games, cricket, watch party
+- convert remaining local-only room UI actions into backend command + broadcast + snapshot-confirmed actions
