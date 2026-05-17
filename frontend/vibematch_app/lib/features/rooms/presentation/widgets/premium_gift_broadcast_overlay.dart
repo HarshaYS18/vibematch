@@ -10,6 +10,7 @@ class PremiumGiftBroadcastEvent {
     required this.combo,
     this.senderAvatarUrl,
     this.giftAssetPath,
+    this.giftAssetUrl,
   });
 
   final String id;
@@ -19,6 +20,7 @@ class PremiumGiftBroadcastEvent {
   final int combo;
   final String? senderAvatarUrl;
   final String? giftAssetPath;
+  final String? giftAssetUrl;
 }
 
 class PremiumGiftBroadcastBus {
@@ -222,18 +224,12 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                               ],
                             ),
                           ),
-                          if (widget.event.giftAssetPath?.trim().isNotEmpty ?? false) ...[
+                          if ((widget.event.giftAssetUrl?.trim().isNotEmpty ?? false) ||
+                              (widget.event.giftAssetPath?.trim().isNotEmpty ?? false)) ...[
                             const SizedBox(width: 7),
-                            Image.asset(
-                              widget.event.giftAssetPath!,
-                              width: 34,
-                              height: 34,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) => const Icon(
-                                Icons.card_giftcard_rounded,
-                                color: Color(0xFFFFD166),
-                                size: 26,
-                              ),
+                            _BroadcastGiftImage(
+                              assetUrl: widget.event.giftAssetUrl,
+                              assetPath: widget.event.giftAssetPath,
                             ),
                           ],
                         ],
@@ -245,6 +241,58 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _BroadcastGiftImage extends StatelessWidget {
+  const _BroadcastGiftImage({this.assetUrl, this.assetPath});
+
+  final String? assetUrl;
+  final String? assetPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final cleanUrl = assetUrl?.trim();
+    if (cleanUrl != null && cleanUrl.isNotEmpty) {
+      return Image.network(
+        cleanUrl,
+        width: 34,
+        height: 34,
+        fit: BoxFit.contain,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) => _LocalGiftImage(assetPath: assetPath),
+      );
+    }
+    return _LocalGiftImage(assetPath: assetPath);
+  }
+}
+
+class _LocalGiftImage extends StatelessWidget {
+  const _LocalGiftImage({this.assetPath});
+
+  final String? assetPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final cleanPath = assetPath?.trim();
+    if (cleanPath == null || cleanPath.isEmpty) {
+      return const Icon(
+        Icons.card_giftcard_rounded,
+        color: Color(0xFFFFD166),
+        size: 26,
+      );
+    }
+    return Image.asset(
+      cleanPath,
+      width: 34,
+      height: 34,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) => const Icon(
+        Icons.card_giftcard_rounded,
+        color: Color(0xFFFFD166),
+        size: 26,
       ),
     );
   }
