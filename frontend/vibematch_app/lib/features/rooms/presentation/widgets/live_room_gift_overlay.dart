@@ -81,6 +81,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     if (!_handledBackendGiftIds.add(event.id)) return;
 
     final gift = _giftItemForEvent(event);
+    final videoPath = _videoPathForEvent(event, gift);
     final slide = GiftSlide(
       id: event.id,
       senderName: event.actorName.trim().isEmpty ? 'Vibe User' : event.actorName.trim(),
@@ -88,14 +89,14 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       giftName: _giftDisplayName(event, gift),
       giftIcon: gift.icon,
       giftAssetPath: gift.assetPath,
-      videoAssetPath: gift.videoAssetPath,
+      videoAssetPath: videoPath,
       colors: _colorsForBackendEvent(event, gift),
       combo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
       baseCombo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
-      remainingSeconds: gift.isVideoGift ? 10 : 15,
+      remainingSeconds: videoPath == null ? 15 : 10,
     );
 
-    if (event.showGiftSlide || gift.isVideoGift) {
+    if (event.showGiftSlide || slide.isVideoGift) {
       _startBackendGiftSlide(slide);
     }
     _publishBackendPremiumBroadcast(event, gift, slide);
@@ -136,7 +137,44 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       colors: looksPremium
           ? const <Color>[Color(0xFFFFD166), Color(0xFF8C5CF6)]
           : const <Color>[Color(0xFFFFC857), Color(0xFF12C7B7)],
+      videoAssetPath: _videoPathFromNormalizedId(cleanGiftId) ??
+          _videoPathFromNormalizedId(cleanGiftName),
     );
+  }
+
+  String? _videoPathForEvent(LiveRoomSystemEvent event, GiftItem gift) {
+    final directPath = gift.videoAssetPath?.trim();
+    if (directPath != null && directPath.isNotEmpty) return directPath;
+    final idPath = _videoPathFromNormalizedId(_normalize(event.giftId));
+    if (idPath != null) return idPath;
+    return _videoPathFromNormalizedId(_normalize(event.giftName));
+  }
+
+  String? _videoPathFromNormalizedId(String normalized) {
+    switch (normalized) {
+      case 'love_rocket':
+        return 'assets/videos/gifts/love_rocket.mp4';
+      case 'proposal':
+      case 'propose':
+      case 'boy_proposing_girl':
+      case 'boy_proposing_girl_d_romantic':
+      case 'romantic_proposal':
+        return 'assets/videos/gifts/boy_proposing_girl_d_romantic.mp4';
+      case 'butterfly':
+      case 'pretty_girl_butterfly':
+      case 'pretty_girl_butterfly_animation':
+        return 'assets/videos/gifts/pretty_girl_butterfly_animation.mp4';
+      case 'magic_1':
+      case 'premium_magic_1':
+        return 'assets/videos/gifts/premium_magic_1.mp4';
+      case 'magic_2':
+      case 'premium_magic_2':
+        return 'assets/videos/gifts/premium_magic_2.mp4';
+      case 'magic_3':
+      case 'premium_magic_3':
+        return 'assets/videos/gifts/premium_magic_3.mp4';
+    }
+    return null;
   }
 
   String _normalize(String value) {
