@@ -38,6 +38,8 @@ NORMAL_GIFTS = [
         "category": "classic",
         "gift_type": "normal",
         "coin_value": 9,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_favorite",
         "chat_symbol": "🌹",
         "asset_path": "assets/gifts/normal/rose_bloom.webp",
@@ -58,6 +60,8 @@ NORMAL_GIFTS = [
         "category": "classic",
         "gift_type": "normal",
         "coin_value": 29,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_paid",
         "chat_symbol": "🪙",
         "asset_path": "assets/gifts/normal/gold_coin.webp",
@@ -78,6 +82,8 @@ NORMAL_GIFTS = [
         "category": "classic",
         "gift_type": "normal",
         "coin_value": 99,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_celebration",
         "chat_symbol": "🎉",
         "asset_path": "assets/gifts/normal/party_pop.webp",
@@ -98,6 +104,8 @@ NORMAL_GIFTS = [
         "category": "premium",
         "gift_type": "normal",
         "coin_value": 999,
+        "min_combo": 1,
+        "max_combo": 1,
         "icon_key": "local_rocket",
         "chat_symbol": "🚀",
         "asset_path": "assets/gifts/love_rocket/icon/love_rocket_icon.webp",
@@ -118,6 +126,8 @@ NORMAL_GIFTS = [
         "category": "premium",
         "gift_type": "normal",
         "coin_value": 1299,
+        "min_combo": 1,
+        "max_combo": 1,
         "icon_key": "local_favorite",
         "chat_symbol": "💍",
         "asset_path": "assets/images/gifts/proposal.png",
@@ -138,6 +148,8 @@ NORMAL_GIFTS = [
         "category": "premium",
         "gift_type": "normal",
         "coin_value": 1299,
+        "min_combo": 1,
+        "max_combo": 1,
         "icon_key": "local_flutter_dash",
         "chat_symbol": "🦋",
         "asset_path": "assets/images/gifts/butterfly.png",
@@ -158,6 +170,8 @@ NORMAL_GIFTS = [
         "category": "premium",
         "gift_type": "normal",
         "coin_value": 1499,
+        "min_combo": 1,
+        "max_combo": 1,
         "icon_key": "local_auto_fix_high",
         "chat_symbol": "🪄",
         "asset_path": "assets/images/gifts/premium_magic_1.png",
@@ -178,6 +192,8 @@ NORMAL_GIFTS = [
         "category": "premium",
         "gift_type": "normal",
         "coin_value": 1599,
+        "min_combo": 1,
+        "max_combo": 1,
         "icon_key": "local_auto_awesome",
         "chat_symbol": "✨",
         "asset_path": "assets/images/gifts/premium_magic_2.png",
@@ -198,6 +214,8 @@ NORMAL_GIFTS = [
         "category": "premium",
         "gift_type": "normal",
         "coin_value": 1699,
+        "min_combo": 1,
+        "max_combo": 1,
         "icon_key": "local_workspace_premium",
         "chat_symbol": "👑",
         "asset_path": "assets/images/gifts/premium_magic_3.png",
@@ -218,6 +236,8 @@ NORMAL_GIFTS = [
         "category": "premium",
         "gift_type": "normal",
         "coin_value": 1299,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_sailing",
         "chat_symbol": "🛥️",
         "asset_path": "assets/images/gifts/premium_yacht.png",
@@ -238,6 +258,8 @@ NORMAL_GIFTS = [
         "category": "premium",
         "gift_type": "normal",
         "coin_value": 1999,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_castle",
         "chat_symbol": "🏰",
         "asset_path": "assets/images/gifts/premium_castle.png",
@@ -261,6 +283,8 @@ LUCKY_GIFTS = [
         "category": "lucky",
         "gift_type": "lucky",
         "coin_value": 99,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_auto_fix_high",
         "chat_symbol": "🪄",
         "asset_path": "assets/gifts/lucky/arcane_crystal_wand.png",
@@ -282,6 +306,8 @@ LUCKY_GIFTS = [
         "category": "lucky",
         "gift_type": "lucky",
         "coin_value": 199,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_favorite_border",
         "chat_symbol": "🌹",
         "asset_path": "assets/gifts/lucky/celestial_rose.png",
@@ -303,6 +329,8 @@ LUCKY_GIFTS = [
         "category": "lucky",
         "gift_type": "lucky",
         "coin_value": 299,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_diamond",
         "chat_symbol": "💍",
         "asset_path": "assets/gifts/lucky/eternal_bond_rings.png",
@@ -324,6 +352,8 @@ LUCKY_GIFTS = [
         "category": "lucky",
         "gift_type": "lucky",
         "coin_value": 99,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_pets",
         "chat_symbol": "🐘",
         "asset_path": "assets/gifts/lucky/bubble_elephant.png",
@@ -345,6 +375,8 @@ LUCKY_GIFTS = [
         "category": "lucky",
         "gift_type": "lucky",
         "coin_value": 499,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_wb_sunny",
         "chat_symbol": "☀️",
         "asset_path": "assets/gifts/lucky/sun_fortune_coin.png",
@@ -366,6 +398,8 @@ LUCKY_GIFTS = [
         "category": "lucky",
         "gift_type": "lucky",
         "coin_value": 299,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_waves",
         "chat_symbol": "🐟",
         "asset_path": "assets/gifts/lucky/moonlit_koi.png",
@@ -387,6 +421,8 @@ LUCKY_GIFTS = [
         "category": "lucky",
         "gift_type": "lucky",
         "coin_value": 999,
+        "min_combo": 1,
+        "max_combo": 999,
         "icon_key": "local_auto_stories",
         "chat_symbol": "📖",
         "asset_path": "assets/gifts/lucky/spellbound_tome.png",
@@ -436,6 +472,8 @@ def _with_dynamic_urls(gift: dict) -> dict:
     item["video_url"] = _cdn_url(item.get("cdn_video_path"))
     item["cdn_enabled"] = bool(settings.GIFT_CDN_BASE_URL.strip())
     item["catalog_version"] = GIFT_CATALOG_VERSION
+    item["min_combo"] = max(1, int(item.get("min_combo") or 1))
+    item["max_combo"] = max(item["min_combo"], int(item.get("max_combo") or 999))
     return item
 
 
@@ -478,6 +516,8 @@ def _item_to_gift_dict(item: GiftCatalogItem) -> dict:
         "category": item.category_key,
         "gift_type": item.gift_type,
         "coin_value": item.coin_value,
+        "min_combo": item.min_combo,
+        "max_combo": item.max_combo,
         "icon_key": item.icon_key,
         "chat_symbol": item.chat_symbol,
         "asset_path": item.asset_path,
@@ -533,6 +573,8 @@ def seed_default_catalog(db: Session) -> dict:
                 category_key=gift["category"],
                 gift_type=gift["gift_type"],
                 coin_value=int(gift["coin_value"]),
+                min_combo=int(gift.get("min_combo") or 1),
+                max_combo=int(gift.get("max_combo") or 999),
                 icon_key=gift.get("icon_key"),
                 chat_symbol=gift.get("chat_symbol"),
                 asset_path=gift.get("asset_path"),
@@ -632,6 +674,13 @@ def find_gift(gift_id: str, db: Session | None = None) -> dict | None:
 
     gift = next((gift for gift in _all_static_gifts() if gift["id"] == gift_id), None)
     return _with_dynamic_urls(gift) if gift is not None and gift.get("is_enabled") else None
+
+
+def validate_gift_combo(gift: dict, quantity: int) -> None:
+    min_combo = max(1, int(gift.get("min_combo") or 1))
+    max_combo = max(min_combo, int(gift.get("max_combo") or 999))
+    if quantity < min_combo or quantity > max_combo:
+        raise ValueError(f"Gift combo must be between {min_combo} and {max_combo}")
 
 
 def roll_lucky_multiplier(gift_id: str, total_coin_value: int, house_risk_score: int = 0, db: Session | None = None) -> dict:
