@@ -47,15 +47,11 @@ def _numeric_identity_candidates(raw: str | None) -> list[int]:
     value = str(raw).strip()
     if not value:
         return []
-
     candidates: list[int] = []
-
     if value.isdigit():
         candidates.append(int(value))
-
     for match in re.findall(r"(?:^|_)user_(\d+)$", value):
         candidates.append(int(match))
-
     seen: set[int] = set()
     unique: list[int] = []
     for item in candidates:
@@ -100,6 +96,15 @@ def _int_payload(payload: dict[str, Any], key: str, default: int = -1) -> int:
         return int(payload.get(key) if payload.get(key) is not None else default)
     except (TypeError, ValueError):
         return default
+
+
+def _bool_payload(payload: dict[str, Any], key: str, default: bool = False) -> bool:
+    raw = payload.get(key)
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        return raw
+    return str(raw).strip().lower() in {"true", "1", "yes", "on"}
 
 
 def _event_payload(event_type: str, room_id: str, room: dict[str, Any], extra: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -151,7 +156,6 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
     active_room_id: str | None = None
     active_user_id: int | None = None
     await websocket.accept()
-
     try:
         while _websocket_connected(websocket):
             try:
@@ -160,33 +164,25 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                 break
             except RuntimeError:
                 break
-
             try:
                 message = json.loads(raw)
             except json.JSONDecodeError:
                 continue
-
             event_type = str(message.get("type") or "unknown")
             payload = message.get("payload") if isinstance(message.get("payload"), dict) else {}
             room_id = str(payload.get("room_id") or active_room_id or "").strip()
             if not room_id:
                 continue
-
             with SessionLocal() as db:
                 room = room_state_service.get_room_by_public_id(db, room_id)
                 if room is None:
-                    await room_realtime_connections.send_json(
-                        websocket,
-                        {"type": "error", "payload": {"room_id": room_id, "message": "Room not found"}},
-                    )
+                    await room_realtime_connections.send_json(websocket, {"type": "error", "payload": {"room_id": room_id, "message": "Room not found"}})
                     continue
-
                 user = _resolve_user(db, payload, active_user_id)
                 if active_room_id is None:
                     active_room_id = room_id
                     active_user_id = user.id if user else _payload_user_id(payload)
                     await room_realtime_connections.connect_room(room_id, websocket, active_user_id)
-
                 if user is not None:
                     active_user_id = user.id
 
@@ -197,29 +193,21 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type == "room/join":
-                    if user is None:
-                        snapshot = room_state_service.room_snapshot(db, room)
-                    else:
-                        snapshot = room_action_service.join_room(db, room, user, payload)
+                    snapshot = room_action_service.join_room(db, room, user, payload) if user is not None else room_state_service.room_snapshot(db, room)
                     db.commit()
-                    await _broadcast_snapshot(room_id, "room/joined", snapshot)
+                    if not (user is not None and snapshot.get("internal_participants") and any(int(item.get("backend_user_id") or 0) == user.id and item.get("is_stealth") is True for item in snapshot.get("internal_participants", []))):
+                        await _broadcast_snapshot(room_id, "room/joined", snapshot)
                     await room_realtime_connections.send_json(websocket, _event_payload("room.snapshot", room_id, snapshot))
                     continue
 
                 if event_type == "room/leave":
-                    if user is not None:
-                        snapshot = room_action_service.leave_room(db, room, user, release_seat=payload.get("release_seat") is True)
-                    else:
-                        snapshot = room_state_service.room_snapshot(db, room)
+                    snapshot = room_action_service.leave_room(db, room, user, release_seat=payload.get("release_seat") is True) if user is not None else room_state_service.room_snapshot(db, room)
                     db.commit()
                     await _broadcast_snapshot(room_id, "room/peer_left", snapshot)
                     continue
 
                 if event_type == "room/heartbeat":
-                    if user is not None:
-                        snapshot = room_action_service.heartbeat_room(db, room, user)
-                    else:
-                        snapshot = room_state_service.room_snapshot(db, room, include_chat=False)
+                    snapshot = room_action_service.heartbeat_room(db, room, user) if user is not None else room_state_service.room_snapshot(db, room, include_chat=False)
                     db.commit()
                     await room_realtime_connections.send_json(websocket, _event_payload("room.snapshot", room_id, snapshot))
                     continue
@@ -265,20 +253,14 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
 
                 if event_type == "admin/seat_assign":
                     target = _target_user(db, payload)
-                    if target:
-                        snapshot = room_action_service.take_seat(db, room, target, _int_payload(payload, "seat_index"), actor_user_id=active_user_id)
-                    else:
-                        snapshot = room_state_service.room_snapshot(db, room)
+                    snapshot = room_action_service.take_seat(db, room, target, _int_payload(payload, "seat_index"), actor_user_id=active_user_id) if target else room_state_service.room_snapshot(db, room)
                     db.commit()
                     await _broadcast_snapshot(room_id, "seat/updated", snapshot)
                     continue
 
                 if event_type in {"admin/seat_leave", "admin/seat_leave_lock"}:
                     target = _target_user(db, payload)
-                    if target:
-                        snapshot = room_action_service.leave_seat(db, room, target, actor_user_id=active_user_id)
-                    else:
-                        snapshot = room_state_service.room_snapshot(db, room)
+                    snapshot = room_action_service.leave_seat(db, room, target, actor_user_id=active_user_id) if target else room_state_service.room_snapshot(db, room)
                     if event_type == "admin/seat_leave_lock":
                         snapshot = room_action_service.lock_seat(db, room, _int_payload(payload, "seat_index"), True, actor_user_id=active_user_id)
                     db.commit()
@@ -305,10 +287,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
 
                 if event_type == "admin_mute/set":
                     target = _target_user(db, payload)
-                    if target:
-                        snapshot = room_action_service.set_admin_mute(db, room, target.id, payload.get("muted") is True, actor_user_id=active_user_id)
-                    else:
-                        snapshot = room_state_service.room_snapshot(db, room)
+                    snapshot = room_action_service.set_admin_mute(db, room, target.id, payload.get("muted") is True, actor_user_id=active_user_id) if target else room_state_service.room_snapshot(db, room)
                     db.commit()
                     await _broadcast_snapshot(room_id, "admin_mute/updated", snapshot, {"target_user_id": target.id if target else None, "admin_muted": payload.get("muted") is True})
                     continue
@@ -323,6 +302,18 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     snapshot = room_action_service.set_background_theme(db, room, str(payload.get("background_theme_id") or "default"), actor_user_id=active_user_id)
                     db.commit()
                     await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"background_theme_id": snapshot.get("background_theme_id")})
+                    continue
+
+                if event_type == "room_settings/privacy" and user is not None:
+                    snapshot = room_action_service.set_room_privacy(db, room, user, str(payload.get("mode") or payload.get("privacy_mode") or "Open"))
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"mode": snapshot.get("mode")})
+                    continue
+
+                if event_type == "room_settings/screenshots" and user is not None:
+                    snapshot = room_action_service.set_room_screenshots(db, room, user, _bool_payload(payload, "allow_screenshots", True))
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"allow_screenshots": snapshot.get("allow_screenshots")})
                     continue
 
                 if event_type in {"room_chat/send", "room/chat"}:
