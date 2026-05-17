@@ -27,7 +27,8 @@ class RoomSettingsRepository {
       body: {
         'language': ?language,
         'mode': ?mode,
-        if (lockPassword != null && lockPassword.trim().isNotEmpty) 'lock_password': lockPassword.trim(),
+        if (lockPassword != null && lockPassword.trim().isNotEmpty)
+          'lock_password': lockPassword.trim(),
         'allow_screenshots': ?allowScreenshots,
       },
     );
@@ -91,6 +92,9 @@ class RoomSettingsDto {
     this.isLocked = false,
     this.isMembersOnly = false,
     this.allowScreenshots = true,
+    this.roomImagesEnabled = true,
+    this.guestMessagesEnabled = true,
+    this.applyOnlyModeEnabled = false,
     this.hasLockPassword = false,
     this.announcementText,
     this.announcementUpdatedAt,
@@ -107,6 +111,9 @@ class RoomSettingsDto {
   final bool isLocked;
   final bool isMembersOnly;
   final bool allowScreenshots;
+  final bool roomImagesEnabled;
+  final bool guestMessagesEnabled;
+  final bool applyOnlyModeEnabled;
   final bool hasLockPassword;
   final String? announcementText;
   final DateTime? announcementUpdatedAt;
@@ -124,10 +131,17 @@ class RoomSettingsDto {
       isLocked: json['is_locked'] == true,
       isMembersOnly: json['is_members_only'] == true,
       allowScreenshots: json['allow_screenshots'] != false,
+      roomImagesEnabled: json['room_images_enabled'] != false,
+      guestMessagesEnabled: json['guest_messages_enabled'] != false,
+      applyOnlyModeEnabled: json['apply_only_mode_enabled'] == true,
       hasLockPassword: json['has_lock_password'] == true,
       announcementText: json['announcement_text']?.toString(),
-      announcementUpdatedAt: DateTime.tryParse(json['announcement_updated_at']?.toString() ?? ''),
-      announcementUpdatedByUserId: int.tryParse(json['announcement_updated_by_user_id']?.toString() ?? ''),
+      announcementUpdatedAt: DateTime.tryParse(
+        json['announcement_updated_at']?.toString() ?? '',
+      ),
+      announcementUpdatedByUserId: int.tryParse(
+        json['announcement_updated_by_user_id']?.toString() ?? '',
+      ),
     );
   }
 }
