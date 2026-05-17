@@ -7,7 +7,6 @@ import '../modules/cricket_room_mode_module.dart';
 import '../modules/cricket_room_mode_registry.dart';
 import '../modules/cricket_room_mode_signal.dart';
 import 'live_room_input_dock.dart';
-import 'live_room_seat_invite_notification.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
 import 'room_top_bar.dart';
@@ -268,19 +267,6 @@ class LiveRoomBody extends StatelessWidget {
                       onEndMode: () => CricketRoomModeSignal.deactivate(roomId),
                     );
                   },
-                ),
-              if (joinRequestPending && currentUser != null)
-                Positioned(
-                  top: 76,
-                  left: 16,
-                  right: 16,
-                  child: LiveRoomSeatInviteNotification(
-                    inviterName: 'Room host',
-                    invitedUser: currentUser,
-                    seatIndex: selectedSeatIndex ?? 0,
-                    onReject: () {},
-                    onAccept: () {},
-                  ),
                 ),
             ],
           ),
