@@ -36,7 +36,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
   final double bottomPadding;
   final ValueChanged<GiftSlide> onComboTap;
   final VoidCallback onComboButtonTap;
-  final ValueChanged<GiftSlide> onVideoFinished;
+  final ValueChanged<GiftSlide> onVideoGiftFinished;
   final VoidCallback? onLuckyPacketGetTap;
   final VoidCallback? onLuckyPacketResultsDismiss;
 
