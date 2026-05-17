@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../data/live_room_system_event_bus.dart';
 import '../../modules/gift_slide/presentation/gift_slide_overlay.dart';
 import '../../modules/ribbon_chat/models/ribbon_message.dart';
 import '../../modules/ribbon_chat/presentation/ribbon_message_overlay.dart';
@@ -27,6 +30,10 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     this.onLuckyPacketResultsDismiss,
   });
 
+  // Legacy controller slides are intentionally no longer rendered as the source
+  // of truth for committed gifts. They are kept in the signature so the current
+  // gift panel/controller API remains stable while backend room_gift_sent owns
+  // the visible room gift event.
   final List<GiftSlide> slides;
   final GiftSlide? activeComboSlide;
   final LuckyPacketRoomEvent? activeLuckyPacket;
@@ -43,12 +50,180 @@ class LiveRoomGiftOverlay extends StatefulWidget {
 
 class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   final List<RibbonMessage> _ribbonMessages = <RibbonMessage>[];
+  final List<GiftSlide> _backendGiftSlides = <GiftSlide>[];
+  final Map<String, Timer> _backendGiftTimers = <String, Timer>{};
+  final Set<String> _handledBackendGiftIds = <String>{};
+  VoidCallback? _backendGiftListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _backendGiftListener = _handleBackendRoomEvent;
+    LiveRoomSystemEventBus.latestEvent.addListener(_backendGiftListener!);
+  }
+
+  @override
+  void dispose() {
+    final listener = _backendGiftListener;
+    if (listener != null) {
+      LiveRoomSystemEventBus.latestEvent.removeListener(listener);
+    }
+    for (final timer in _backendGiftTimers.values) {
+      timer.cancel();
+    }
+    _backendGiftTimers.clear();
+    super.dispose();
+  }
+
+  void _handleBackendRoomEvent() {
+    final event = LiveRoomSystemEventBus.latestEvent.value;
+    if (event == null || !event.isRoomGiftSent) return;
+    if (!_handledBackendGiftIds.add(event.id)) return;
+
+    final gift = _giftItemForEvent(event);
+    final slide = GiftSlide(
+      id: event.id,
+      senderName: event.actorName.trim().isEmpty ? 'Vibe User' : event.actorName.trim(),
+      receiverName: event.targetName.trim().isEmpty ? 'user' : event.targetName.trim(),
+      giftName: _giftDisplayName(event, gift),
+      giftIcon: gift.icon,
+      giftAssetPath: gift.assetPath,
+      videoAssetPath: gift.videoAssetPath,
+      colors: _colorsForBackendEvent(event, gift),
+      combo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
+      baseCombo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
+      remainingSeconds: gift.isVideoGift ? 10 : 15,
+    );
+
+    _startBackendGiftSlide(slide);
+    _publishBackendPremiumBroadcast(event, gift, slide);
+    _publishBackendGiftFlight(event, gift, slide);
+  }
+
+  GiftItem _giftItemForEvent(LiveRoomSystemEvent event) {
+    final cleanGiftId = event.giftId.trim();
+    final cleanGiftName = event.giftName.trim().toLowerCase();
+    for (final gift in mockGiftItems) {
+      if (gift.id == cleanGiftId || gift.name.toLowerCase() == cleanGiftName) {
+        return gift;
+      }
+    }
+    return GiftItem(
+      id: cleanGiftId.isEmpty ? 'backend_gift' : cleanGiftId,
+      name: event.giftName.trim().isEmpty ? 'Gift' : event.giftName.trim(),
+      category: event.isLuckyGift ? GiftCategory.lucky : GiftCategory.classic,
+      coins: event.giftCoinValue,
+      icon: Icons.card_giftcard_rounded,
+      chatSymbol: '🎁',
+      colors: const <Color>[Color(0xFFFFC857), Color(0xFF12C7B7)],
+    );
+  }
+
+  String _giftDisplayName(LiveRoomSystemEvent event, GiftItem gift) {
+    final base = event.giftName.trim().isEmpty ? gift.name : event.giftName.trim();
+    if (!event.isLuckyGift || event.luckyMultiplier <= 0) return base;
+    return '$base x${event.luckyMultiplier}';
+  }
+
+  List<Color> _colorsForBackendEvent(LiveRoomSystemEvent event, GiftItem gift) {
+    if (!event.isLuckyGift) return gift.colors;
+    if (event.luckyMultiplier >= 1000) {
+      return const <Color>[Color(0xFF8B5CF6), Color(0xFF22D3EE)];
+    }
+    if (event.luckyMultiplier >= 500) {
+      return const <Color>[Color(0xFFFF2D95), Color(0xFF00E5FF)];
+    }
+    if (event.luckyMultiplier >= 100) {
+      return const <Color>[Color(0xFFFFC857), Color(0xFFFF5F7E)];
+    }
+    return gift.colors;
+  }
+
+  void _startBackendGiftSlide(GiftSlide slide) {
+    if (!mounted) return;
+    setState(() {
+      _backendGiftSlides.removeWhere((item) => item.id == slide.id);
+      _backendGiftSlides.insert(0, slide);
+    });
+    _backendGiftTimers[slide.id]?.cancel();
+    _backendGiftTimers[slide.id] = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final index = _backendGiftSlides.indexWhere((item) => item.id == slide.id);
+      if (index < 0) {
+        timer.cancel();
+        _backendGiftTimers.remove(slide.id);
+        return;
+      }
+      final active = _backendGiftSlides[index];
+      if (active.remainingSeconds <= 0) {
+        timer.cancel();
+        _backendGiftTimers.remove(slide.id);
+        if (!mounted) return;
+        setState(() => _backendGiftSlides.removeAt(index));
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _backendGiftSlides[index] = active.copyWith(
+          remainingSeconds: active.remainingSeconds - 1,
+        );
+      });
+    });
+  }
+
+  void _publishBackendPremiumBroadcast(
+    LiveRoomSystemEvent event,
+    GiftItem gift,
+    GiftSlide slide,
+  ) {
+    if (gift.category != GiftCategory.premium) return;
+    PremiumGiftBroadcastBus.publish(
+      PremiumGiftBroadcastEvent(
+        id: 'premium-${event.id}',
+        senderName: slide.senderName,
+        senderAvatarUrl: event.actorAvatarUrl,
+        targetName: slide.receiverName,
+        giftName: gift.name,
+        combo: slide.combo,
+        giftAssetPath: gift.assetPath,
+      ),
+    );
+  }
+
+  void _publishBackendGiftFlight(
+    LiveRoomSystemEvent event,
+    GiftItem gift,
+    GiftSlide slide,
+  ) {
+    final totalCoins = event.giftTotalCoinValue > 0
+        ? event.giftTotalCoinValue
+        : gift.coins * slide.combo;
+    if (totalCoins >= LiveRoomGiftController.smallGiftFlightThreshold) return;
+    GiftFlightBus.publish(
+      GiftFlightEvent(
+        id: 'flight-${event.id}',
+        gift: gift,
+        senderName: slide.senderName,
+        receiverName: slide.receiverName,
+        combo: slide.combo,
+        multiplier: event.luckyMultiplier <= 0 ? null : event.luckyMultiplier,
+        rewardCoinAmount: event.luckyRewardCoinAmount <= 0
+            ? null
+            : event.luckyRewardCoinAmount,
+        endAlignment: Alignment.center,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final normalSlides = widget.slides.where((slide) => !slide.isVideoGift).toList(growable: false);
-    final hasActiveVideoGift = widget.slides.any((slide) => slide.videoAssetPath?.trim().isNotEmpty ?? false);
-    final hasLuckyPacketDialog = widget.activeLuckyPacket != null && widget.activeLuckyPacket!.phase != LuckyPacketPhase.countdown;
+    final normalSlides = _backendGiftSlides
+        .where((slide) => !slide.isVideoGift)
+        .toList(growable: false);
+    final hasActiveVideoGift = _backendGiftSlides.any(
+      (slide) => slide.videoAssetPath?.trim().isNotEmpty ?? false,
+    );
+    final hasLuckyPacketDialog = widget.activeLuckyPacket != null &&
+        widget.activeLuckyPacket!.phase != LuckyPacketPhase.countdown;
 
     return SizedBox.expand(
       child: Stack(
@@ -61,8 +236,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             onComboTap: widget.onComboTap,
           ),
           CleanVideoGiftOverlay(
-            slides: widget.slides,
-            onVideoFinished: widget.onVideoGiftFinished,
+            slides: _backendGiftSlides,
+            onVideoFinished: _finishBackendVideoGift,
           ),
           ValueListenableBuilder<GiftFlightEvent?>(
             valueListenable: GiftFlightBus.latest,
@@ -84,7 +259,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             right: 18,
             bottom: 178 + widget.bottomPadding,
             child: ComboBuzzer(
-              slide: widget.activeComboSlide,
+              slide: null,
               onTap: widget.onComboButtonTap,
             ),
           ),
@@ -96,5 +271,11 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         ],
       ),
     );
+  }
+
+  void _finishBackendVideoGift(GiftSlide slide) {
+    _backendGiftTimers.remove(slide.id)?.cancel();
+    if (!mounted) return;
+    setState(() => _backendGiftSlides.removeWhere((item) => item.id == slide.id));
   }
 }
