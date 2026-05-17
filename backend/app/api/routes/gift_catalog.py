@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.services import gift_catalog_service, lucky_gift_props_service
-from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/gifts", tags=["Gifts"])
 
@@ -17,12 +17,15 @@ class LuckyGiftRollRequest(BaseModel):
 
 
 @router.get("/catalog")
-def get_gift_catalog(current_user: User = Depends(get_current_user)):
+def get_gift_catalog():
+    # Public active catalog. This exposes only render metadata and backend-set
+    # prices/categories for active gifts. Gift sending, lucky rolls, ownership,
+    # balance checks, and economy mutations remain protected elsewhere.
     return gift_catalog_service.list_gifts()
 
 
 @router.get("/catalog/{gift_id}")
-def get_gift_detail(gift_id: str, current_user: User = Depends(get_current_user)):
+def get_gift_detail(gift_id: str):
     gift = gift_catalog_service.find_gift(gift_id)
     if gift is None:
         raise HTTPException(status_code=404, detail="Gift not found")
@@ -30,7 +33,11 @@ def get_gift_detail(gift_id: str, current_user: User = Depends(get_current_user)
 
 
 @router.post("/lucky/roll")
-def roll_lucky_gift(payload: LuckyGiftRollRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def roll_lucky_gift(
+    payload: LuckyGiftRollRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     gift = gift_catalog_service.find_gift(payload.gift_id)
     if gift is None:
         raise HTTPException(status_code=404, detail="Gift not found")
