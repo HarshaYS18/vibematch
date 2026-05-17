@@ -40,9 +40,19 @@ class LiveRoomUsersController {
       final cleanId = user.id.trim();
       if (cleanId.isEmpty) return;
       if (isUserRemoved(cleanId)) return;
-      final key = keyForUser(user);
+      var key = keyForUser(user);
       if (key.isEmpty) return;
+
+      for (final entry in usersByKey.entries) {
+        if (_sameVisiblePerson(entry.value, user)) {
+          key = entry.key;
+          break;
+        }
+      }
+
       rememberAlias(cleanId, key);
+      final alias = _userAliasFromPeerOrUserId(cleanId);
+      if (alias != null) rememberAlias(alias, key);
       final existing = usersByKey[key];
       usersByKey[key] = existing == null ? user : _mergeDuplicateUser(existing, user);
     }
@@ -284,6 +294,29 @@ class LiveRoomUsersController {
     );
   }
 
+  bool _sameVisiblePerson(SeatUser existing, SeatUser incoming) {
+    final existingKey = _canonicalUserKey(existing.id);
+    final incomingKey = _canonicalUserKey(incoming.id);
+    if (existingKey.isNotEmpty && existingKey == incomingKey) return true;
+
+    final existingName = _stableName(existing.name);
+    final incomingName = _stableName(incoming.name);
+    if (existingName == null || incomingName == null || existingName != incomingName) {
+      return false;
+    }
+
+    final sameAvatar =
+        existing.avatarUrl != null &&
+        incoming.avatarUrl != null &&
+        existing.avatarUrl == incoming.avatarUrl;
+    final sameAuthority =
+        (existing.isHost && incoming.isHost) ||
+        (existing.isRoomAdmin && incoming.isRoomAdmin);
+    final sameRoleLabel = existing.roleLabel.trim().toLowerCase() == incoming.roleLabel.trim().toLowerCase();
+
+    return sameAvatar || sameAuthority || sameRoleLabel;
+  }
+
   String _canonicalUserKey(String userId) {
     var value = userId.trim();
     if (value.isEmpty) return '';
@@ -304,6 +337,15 @@ class LiveRoomUsersController {
     final match = RegExp(r'(?:^|_)user_(\d+)$').firstMatch(value);
     if (match == null) return null;
     return 'user_${match.group(1)}';
+  }
+
+  String? _stableName(String name) {
+    final value = name.trim().toLowerCase();
+    if (value.isEmpty) return null;
+    if (value.startsWith('user ')) return null;
+    if (value == 'vibe user') return null;
+    if (value == 'member') return null;
+    return value;
   }
 
   String _fallbackDisplayNameForUserId(String userId) {
