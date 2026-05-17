@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../presentation/live_room_models.dart';
+import '../../../presentation/widgets/gift_modules/gift_panel_constants.dart';
 
 class CleanVideoGiftOverlay extends StatelessWidget {
   const CleanVideoGiftOverlay({
@@ -108,6 +109,13 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
+    final displayMode = GiftPanelConstants.displayModeForGiftName(widget.slide.giftName);
+    final isLarge80 = displayMode == 'large_80';
+    final boxWidth = isLarge80 ? screen.width * 0.96 : screen.width;
+    final boxHeight = isLarge80 ? screen.height * 0.80 : screen.height * 0.62;
+    final offsetY = isLarge80 ? 0.0 : screen.height * 0.12;
+    final fit = isLarge80 ? BoxFit.contain : BoxFit.cover;
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.96, end: 1.0),
       duration: const Duration(milliseconds: 260),
@@ -119,15 +127,15 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
         );
       },
       child: Transform.translate(
-        offset: Offset(0, screen.height * 0.12),
+        offset: Offset(0, offsetY),
         child: Center(
           child: SizedBox(
-            width: screen.width,
-            height: screen.height * 0.62,
+            width: boxWidth,
+            height: boxHeight,
             child: ClipRect(
               child: _ready && _controller != null
                   ? FittedBox(
-                      fit: BoxFit.cover,
+                      fit: fit,
                       clipBehavior: Clip.hardEdge,
                       child: SizedBox(
                         width: _controller!.value.size.width,
@@ -140,6 +148,7 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
                       assetPath: widget.slide.giftAssetPath,
                       colors: widget.slide.colors,
                       icon: widget.slide.giftIcon,
+                      fit: fit,
                     ),
             ),
           ),
@@ -155,12 +164,14 @@ class _GiftFallback extends StatelessWidget {
     required this.assetPath,
     required this.colors,
     required this.icon,
+    required this.fit,
   });
 
   final String? assetUrl;
   final String? assetPath;
   final List<Color> colors;
   final IconData icon;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -168,16 +179,22 @@ class _GiftFallback extends StatelessWidget {
     if (networkUrl != null && networkUrl.isNotEmpty) {
       return Image.network(
         networkUrl,
-        fit: BoxFit.cover,
+        fit: fit,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) => _LocalOrIconFallback(
           assetPath: assetPath,
           colors: colors,
           icon: icon,
+          fit: fit,
         ),
       );
     }
-    return _LocalOrIconFallback(assetPath: assetPath, colors: colors, icon: icon);
+    return _LocalOrIconFallback(
+      assetPath: assetPath,
+      colors: colors,
+      icon: icon,
+      fit: fit,
+    );
   }
 }
 
@@ -186,11 +203,13 @@ class _LocalOrIconFallback extends StatelessWidget {
     required this.assetPath,
     required this.colors,
     required this.icon,
+    required this.fit,
   });
 
   final String? assetPath;
   final List<Color> colors;
   final IconData icon;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -199,7 +218,7 @@ class _LocalOrIconFallback extends StatelessWidget {
         path.endsWith('.gif') ||
         path.endsWith('.png') ||
         path.endsWith('.apng')) {
-      return Image.asset(assetPath!, fit: BoxFit.cover, gaplessPlayback: true);
+      return Image.asset(assetPath!, fit: fit, gaplessPlayback: true);
     }
     return Center(
       child: Container(
