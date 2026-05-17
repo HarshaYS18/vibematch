@@ -24,7 +24,6 @@ from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickout
 from app.services.rooms.room_background_service import list_room_backgrounds
 from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
-from app.services.rooms.room_kickout_service import create_room_kickout, list_active_room_kickouts, remove_room_kickout
 from app.services.rooms.room_service import (
     apply_room_mode,
     cleanup_stale_room_participants,
@@ -77,6 +76,9 @@ def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse
         is_locked=False,
         is_members_only=False,
         allow_screenshots=True,
+        room_images_enabled=True,
+        guest_messages_enabled=True,
+        apply_only_mode_enabled=False,
         has_lock_password=False,
         cover_photo_url=None,
         background_theme_id="default",
@@ -97,6 +99,9 @@ def _room_settings_response(room: Room) -> RoomSettingsResponse:
         is_locked=room.is_locked,
         is_members_only=room.is_members_only,
         allow_screenshots=room.allow_screenshots,
+        room_images_enabled=room.room_images_enabled,
+        guest_messages_enabled=room.guest_messages_enabled,
+        apply_only_mode_enabled=room.apply_only_mode_enabled,
         has_lock_password=bool(room.lock_password_hash),
         cover_photo_url=room.cover_photo_url,
         background_theme_id=room.background_theme_id or "default",
@@ -122,7 +127,7 @@ def _get_or_create_room_for_settings(db: Session, room_public_id: str, current_u
         existing_user_room = _latest_user_room(db, current_user.id)
         if existing_user_room is not None:
             return existing_user_room
-    room = Room(room_public_id=clean_room_public_id, owner_user_id=current_user.id if current_user is not None else None, name="Live Room", subtitle=None, avatar_url=None, cover_photo_url=None, language="English", mode="Open", room_type="Chat", online_count=0, trending_score=0, is_active=True, is_secret=False, is_locked=False, is_members_only=False, allow_screenshots=True, background_theme_id="default", seat_layout_id="5x2")
+    room = Room(room_public_id=clean_room_public_id, owner_user_id=current_user.id if current_user is not None else None, name="Live Room", subtitle=None, avatar_url=None, cover_photo_url=None, language="English", mode="Open", room_type="Chat", online_count=0, trending_score=0, is_active=True, is_secret=False, is_locked=False, is_members_only=False, allow_screenshots=True, room_images_enabled=True, guest_messages_enabled=True, apply_only_mode_enabled=False, background_theme_id="default", seat_layout_id="5x2")
     db.add(room)
     db.commit()
     db.refresh(room)
