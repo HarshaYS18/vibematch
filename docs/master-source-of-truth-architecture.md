@@ -8,6 +8,160 @@ Vibe Match must have one master source of truth for the whole app, and only one 
 
 The backend is the master source of truth. Flutter must never be treated as source of truth for permanent app state. Flutter can only hold temporary UI state, optimistic state, animation state, local draft state, or cached snapshots that are replaced by backend truth.
 
+## Master DB rule
+
+Vibe Match should use one master PostgreSQL database as the backend authority for production data. That does not mean one giant table. It means one canonical backend database owns the truth, and every domain table inside that database has one clear responsibility.
+
+Correct production structure:
+
+```txt
+Master PostgreSQL DB
+  -> canonical identity tables
+  -> child/domain source tables
+  -> ledger/event/audit tables
+  -> materialized read/snapshot tables or views
+  -> backend snapshot APIs and websocket events
+```
+
+The `users` table is the root identity table, not the place to dump every changing counter. High-write and history-sensitive data must stay in child tables and ledgers, then be assembled into master snapshots.
+
+## Master user state rule
+
+Every user must have one canonical user identity, and app screens should fetch a clean master user state snapshot assembled from child/domain tables.
+
+Root identity fields belong in `users`:
+
+- backend user ID
+- public user ID
+- custom display ID
+- username
+- display name
+- avatar URL
+- official handle
+- basic profile fields
+- active/banned/protected flags
+- created/updated timestamps
+
+High-change user state belongs in child/domain tables:
+
+- VIP/SVIP status in `user_vip_status`
+- wallet balance in `user_wallets`
+- wallet/gift/recharge source-of-truth in ledger tables
+- sent/received gift totals in contribution/experience tables
+- daily/weekly/monthly/yearly aggregates in user stat aggregate tables
+- sent level and received level in `user_experience_status`
+- current room presence in `room_participants` / room presence tables
+- room ownership and room level in room tables / room experience tables
+- store inventory in `user_store_inventory`
+- relationship/family/CP status in relationship tables
+- ranking data in ranking aggregate tables
+- moderation/bans in ban tables
+- inbox/notification counts in inbox/notification tables
+
+The backend should expose a master snapshot such as:
+
+```txt
+GET /users/{user_id}/master-state
+GET /users/me/master-state
+```
+
+That snapshot can include:
+
+```json
+{
+  "identity": {
+    "backend_user_id": 1,
+    "public_user_id": 6922022,
+    "display_custom_id": null,
+    "username": "founder",
+    "display_name": "Maddy 🔥",
+    "avatar_url": "..."
+  },
+  "vip": {
+    "vip_level": 25,
+    "vip_status": "active",
+    "svip_level": 3,
+    "svip_expires_at": "..."
+  },
+  "wallet": {
+    "coin_balance": 10000,
+    "diamond_balance": 0
+  },
+  "experience": {
+    "sent_level": 16,
+    "received_level": 9,
+    "sent_exp_lifetime": 123456,
+    "received_exp_lifetime": 654321
+  },
+  "contribution": {
+    "sent": {
+      "daily": 100,
+      "weekly": 500,
+      "monthly": 2000,
+      "yearly": 12000,
+      "lifetime": 50000
+    },
+    "received": {
+      "daily": 80,
+      "weekly": 450,
+      "monthly": 1800,
+      "yearly": 9000,
+      "lifetime": 40000
+    }
+  },
+  "room_presence": {
+    "current_room_id": "VM251544",
+    "room_user_key": "room:VM251544:user:1",
+    "is_host": true,
+    "is_room_admin": true,
+    "seat_index": 0
+  },
+  "room_stats": {
+    "owned_room_id": "VM251544",
+    "room_level": 4,
+    "room_exp": 900
+  }
+}
+```
+
+This master snapshot is a read model. It can be assembled live from child tables first, then later optimized with a cached/materialized table like `user_master_state_snapshots` or `user_profile_summary`.
+
+## Why not one giant user table
+
+Do not store every changing value directly on `users`. That creates clutter, race conditions, and bad auditability.
+
+Bad pattern:
+
+```txt
+users.vip_level
+users.coin_balance
+users.daily_sent
+users.monthly_received
+users.current_room_id
+users.room_level
+users.sent_level
+users.received_level
+users.gift_total
+users.game_total
+```
+
+Production pattern:
+
+```txt
+users                         -> identity only
+user_wallets                  -> current wallet balance
+wallet_ledger                 -> every wallet movement
+gift_transactions             -> every gift send/receive event
+user_contribution_aggregates  -> daily/weekly/monthly/yearly sent/received totals
+user_experience_status        -> sent/received levels and EXP
+user_vip_status               -> VIP/SVIP state
+room_participants             -> current room presence
+room_experience_status        -> room level/EXP
+user_master_state_snapshots   -> optional cached read model assembled from child tables
+```
+
+The app should fetch the final clean snapshot. The backend should fetch/compute it from the child tables.
+
 ## App-wide source-of-truth flow
 
 ```txt
@@ -18,6 +172,7 @@ User action in Flutter
   -> backend checks permission and hierarchy
   -> backend writes canonical state in DB transaction
   -> backend writes event/audit/ledger row when needed
+  -> backend updates aggregate/read model when needed
   -> backend commits
   -> backend publishes realtime event
   -> all clients update from event or refetch snapshot
@@ -37,6 +192,8 @@ User action in Flutter
 10. Every domain must define its canonical table/service/event owner.
 11. Every real room event must be broadcast through backend realtime to all eligible room users.
 12. No room event should be local-only unless it is purely private UI state such as an input draft, scroll position, or animation progress.
+13. User identity belongs in `users`; changing stats/counters belong in child tables, ledgers, and aggregate/read models.
+14. Flutter should fetch user master state snapshots, not stitch important profile/economy/rank data from local state.
 
 ## Bigo-style broadcast rule
 
@@ -89,6 +246,7 @@ If another user in the same eligible room should see or be affected by the actio
 | Element | Master source of truth | Write service | Read/snapshot service | Realtime event source | Client allowed state |
 |---|---|---|---|---|---|
 | User identity | `users`, `auth_identities` | `identity_service`, `auth` routes | `users/me`, profile services | `user.updated` later | cached current user only |
+| User master state | child tables + `user_master_state_snapshots` or service read model | domain services | `user_master_state_service` | `user.master_state.updated` | displayed snapshot cache only |
 | Roles/permissions | `user_roles`, `special_permissions` | `role_service`, `special_permission_service` | admin/user role endpoints | `role.updated` later | display-only role labels |
 | User bans/device bans | `user_bans`, `device_bans` | `ban_service` | moderation/admin endpoints | `moderation.updated` later | none |
 | Login history | `login_history` | `login_history_service` | admin login history endpoints | none initially | none |
@@ -104,6 +262,7 @@ If another user in the same eligible room should see or be affected by the actio
 | Gifts | `gift_transactions`, `gift_catalog` | gift service | gift/history/catalog endpoints | `gift.sent`, `gift.combo.updated` | animation queue only |
 | Wallet/coins | `user_wallets`, `wallet_ledger` | wallet/transaction service | wallet endpoints | `wallet.balance.updated` | displayed balance cache only |
 | Sender/receiver levels | `user_experience_status` | experience service | level endpoints | `level.sender.updated`, `level.receiver.updated` | displayed badge cache only |
+| Contribution totals | `user_contribution_aggregates`, gift/recharge ledgers | contribution service | user master state/ranking endpoints | `contribution.updated` | displayed aggregate cache only |
 | Room level | `room_experience_status` | room experience service | room level endpoint/snapshot | `room.level.updated` | displayed badge cache only |
 | Inbox conversations | `inbox_conversations`, `inbox_participants` | inbox service | inbox endpoints | `inbox.updated` | conversation list cache only |
 | Inbox messages | `inbox_messages` | inbox service | inbox endpoints | `inbox.message_created` | input draft only |
@@ -186,6 +345,7 @@ Later each domain should expose similar versions:
 - `inbox.last_message_id`
 - `profile.updated_at`
 - `vibes.cursor/version`
+- `user_master_state.version`
 
 ## Conflict rule
 
@@ -215,6 +375,7 @@ Implemented foundation:
 - persistent room seats: `room_seat_states`
 - persistent room events: `room_realtime_events`
 - persistent room chat messages: `room_chat_messages`
+- canonical room participant identity snapshot fields in backend room snapshots
 - room state snapshot service
 - room action service
 - room permission service foundation
@@ -229,5 +390,7 @@ Still needed:
 - full audit logging for every room action
 - frontend repository wiring to always load snapshots first
 - event replay/offline delivery
+- implement `user_master_state_service` and master-state endpoints
+- create aggregate/read models for contribution totals, VIP/SVIP, levels, room state, wallet summary
 - same source-of-truth registry applied to wallet, gifts, inbox, Vibes, profile, store, games, cricket, watch party
 - convert remaining local-only room UI actions into backend command + broadcast + snapshot-confirmed actions
