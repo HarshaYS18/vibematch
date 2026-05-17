@@ -12,6 +12,9 @@ class RoomSettingsResponse(BaseModel):
     is_locked: bool = False
     is_members_only: bool = False
     allow_screenshots: bool = True
+    room_images_enabled: bool = True
+    guest_messages_enabled: bool = True
+    apply_only_mode_enabled: bool = False
     has_lock_password: bool = False
     cover_photo_url: str | None = None
     background_theme_id: str = "default"
