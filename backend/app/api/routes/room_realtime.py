@@ -117,26 +117,7 @@ def _event_payload(event_type: str, room_id: str, room: dict[str, Any], extra: d
 def _chat_event_payload(room_id: str, user: User, text: str, message_id: int | None = None) -> dict[str, Any]:
     created_at = datetime.utcnow().isoformat()
     event_id = f"chat_{message_id}" if message_id else f"chat_{room_id}_{user.id}_{uuid4().hex}"
-    return {
-        "type": "room/system_event",
-        "payload": {
-            "id": event_id,
-            "event_type": "room_chat_message",
-            "type": "room_chat_message",
-            "room_id": room_id,
-            "actor_user_id": str(user.id),
-            "actor_public_user_id": user.public_user_id,
-            "actor_name": user.display_name or user.username or f"User {user.public_user_id}",
-            "actor_avatar_url": user.avatar_url,
-            "actor_vip_level": 0,
-            "actor_sending_level": 0,
-            "actor_receiving_level": 0,
-            "target_user_id": "",
-            "target_name": "",
-            "message": text,
-            "created_at": created_at,
-        },
-    }
+    return {"type": "room/system_event", "payload": {"id": event_id, "event_type": "room_chat_message", "type": "room_chat_message", "room_id": room_id, "actor_user_id": str(user.id), "actor_public_user_id": user.public_user_id, "actor_name": user.display_name or user.username or f"User {user.public_user_id}", "actor_avatar_url": user.avatar_url, "actor_vip_level": 0, "actor_sending_level": 0, "actor_receiving_level": 0, "target_user_id": "", "target_name": "", "message": text, "created_at": created_at}}
 
 
 async def _broadcast_snapshot(room_id: str, event_type: str, room: dict[str, Any], extra: dict[str, Any] | None = None) -> None:
@@ -314,6 +295,30 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     snapshot = room_action_service.set_room_screenshots(db, room, user, _bool_payload(payload, "allow_screenshots", True))
                     db.commit()
                     await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"allow_screenshots": snapshot.get("allow_screenshots")})
+                    continue
+
+                if event_type == "room_settings/images" and user is not None:
+                    snapshot = room_action_service.set_room_images_enabled(db, room, user, _bool_payload(payload, "room_images_enabled", _bool_payload(payload, "enabled", True)))
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"room_images_enabled": snapshot.get("room_images_enabled")})
+                    continue
+
+                if event_type == "room_settings/guest_messages" and user is not None:
+                    snapshot = room_action_service.set_guest_messages_enabled(db, room, user, _bool_payload(payload, "guest_messages_enabled", _bool_payload(payload, "enabled", True)))
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"guest_messages_enabled": snapshot.get("guest_messages_enabled")})
+                    continue
+
+                if event_type == "room_settings/apply_mode" and user is not None:
+                    snapshot = room_action_service.set_apply_only_mode_enabled(db, room, user, _bool_payload(payload, "apply_only_mode_enabled", _bool_payload(payload, "enabled", False)))
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"apply_only_mode_enabled": snapshot.get("apply_only_mode_enabled")})
+                    continue
+
+                if event_type == "room_settings/announcement" and user is not None:
+                    snapshot = room_action_service.set_announcement(db, room, user, str(payload.get("announcement_text") or ""))
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"announcement_text": snapshot.get("announcement_text")})
                     continue
 
                 if event_type in {"room_chat/send", "room/chat"}:
