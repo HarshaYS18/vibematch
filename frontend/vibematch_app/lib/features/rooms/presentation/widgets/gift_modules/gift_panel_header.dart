@@ -1,32 +1,34 @@
 import 'package:flutter/material.dart';
 
-import '../../live_room_models.dart';
+import '../../../data/gift_catalog_api_service.dart';
 import 'gift_category_strip.dart';
 
 class GiftPanelHeader extends StatelessWidget {
   const GiftPanelHeader({
     super.key,
-    required this.selectedCategory,
+    required this.categories,
+    required this.selectedCategoryKey,
     required this.onCategoryChanged,
     required this.onStoreTap,
     this.onLuckyRankingsTap,
   });
 
-  final GiftCategory selectedCategory;
-  final ValueChanged<GiftCategory> onCategoryChanged;
+  final List<GiftCatalogCategory> categories;
+  final String selectedCategoryKey;
+  final ValueChanged<String> onCategoryChanged;
   final VoidCallback onStoreTap;
   final VoidCallback? onLuckyRankingsTap;
 
   @override
   Widget build(BuildContext context) {
-    final showLuckyRankings =
-        selectedCategory == GiftCategory.lucky && onLuckyRankingsTap != null;
+    final showLuckyRankings = selectedCategoryKey == 'lucky' && onLuckyRankingsTap != null;
 
     return Row(
       children: [
         Expanded(
           child: GiftCategoryStrip(
-            selectedCategory: selectedCategory,
+            categories: categories,
+            selectedCategoryKey: selectedCategoryKey,
             onChanged: onCategoryChanged,
           ),
         ),
