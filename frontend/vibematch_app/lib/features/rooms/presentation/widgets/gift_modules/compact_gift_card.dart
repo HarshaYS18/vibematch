@@ -6,7 +6,12 @@ import '../room_theme.dart';
 import 'gift_visual.dart';
 
 class CompactGiftCard extends StatelessWidget {
-  const CompactGiftCard({super.key, required this.gift, required this.selected, required this.onTap});
+  const CompactGiftCard({
+    super.key,
+    required this.gift,
+    required this.selected,
+    required this.onTap,
+  });
 
   final GiftItem gift;
   final bool selected;
@@ -25,20 +30,54 @@ class CompactGiftCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: selected ? 0.15 : 0.07),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? gift.colors.first : Colors.white12, width: selected ? 1.6 : 1),
-          boxShadow: selected ? [BoxShadow(color: gift.colors.first.withValues(alpha: 0.20), blurRadius: 10, offset: const Offset(0, 4))] : null,
+          border: Border.all(
+            color: selected ? gift.colors.first : Colors.white12,
+            width: selected ? 1.6 : 1,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: gift.colors.first.withValues(alpha: 0.20),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           children: [
-            GiftVisual(icon: gift.icon, colors: gift.colors, assetPath: gift.assetPath, size: 28, padding: 2),
+            GiftVisual(
+              icon: gift.icon,
+              colors: gift.colors,
+              assetPath: gift.assetPath,
+              assetUrl: gift.assetUrl,
+              size: 28,
+              padding: 2,
+            ),
             const SizedBox(height: 2),
-            Text(gift.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 9.2, fontWeight: FontWeight.w900)),
+            Text(
+              gift.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9.2,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (!isLuckyPacket)
-                  isOwned ? const Icon(Icons.inventory_2_rounded, color: RoomColors.aqua, size: 10) : const GoldCoinIcon(size: 10),
+                  isOwned
+                      ? const Icon(
+                          Icons.inventory_2_rounded,
+                          color: RoomColors.aqua,
+                          size: 10,
+                        )
+                      : const GoldCoinIcon(size: 10),
                 if (!isLuckyPacket) const SizedBox(width: 2),
                 Text(
                   isLuckyPacket ? 'Custom' : (isOwned ? 'Owned' : '${gift.coins}'),
