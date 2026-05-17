@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
 
-import '../../live_room_models.dart';
+import '../../../data/gift_catalog_api_service.dart';
 import '../room_theme.dart';
 
 class GiftCategoryStrip extends StatelessWidget {
   const GiftCategoryStrip({
     super.key,
-    required this.selectedCategory,
+    required this.categories,
+    required this.selectedCategoryKey,
     required this.onChanged,
   });
 
-  static const List<GiftCategory> visibleCategories = <GiftCategory>[
-    GiftCategory.premium,
-    GiftCategory.lucky,
-  ];
-
-  final GiftCategory selectedCategory;
-  final ValueChanged<GiftCategory> onChanged;
+  final List<GiftCatalogCategory> categories;
+  final String selectedCategoryKey;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -24,13 +21,13 @@ class GiftCategoryStrip extends StatelessWidget {
       height: 28,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: visibleCategories.length,
+        itemCount: categories.length,
         separatorBuilder: (context, index) => const SizedBox(width: 5),
         itemBuilder: (context, index) {
-          final category = visibleCategories[index];
-          final selected = category == selectedCategory;
+          final category = categories[index];
+          final selected = category.key == selectedCategoryKey;
           return GestureDetector(
-            onTap: () => onChanged(category),
+            onTap: () => onChanged(category.key),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 140),
               padding: const EdgeInsets.symmetric(horizontal: 14),
