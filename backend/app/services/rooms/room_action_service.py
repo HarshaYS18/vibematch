@@ -341,6 +341,44 @@ def set_room_screenshots(db: Session, room: Room, actor: User, allow_screenshots
     return room_snapshot(db, room)
 
 
+def set_room_images_enabled(db: Session, room: Room, actor: User, enabled: bool) -> dict[str, Any]:
+    if not room_permission_service.can_change_room_privacy(db, actor, room.owner_user_id):
+        return room_snapshot(db, room)
+    room.room_images_enabled = enabled
+    record_room_event(db, room, "room.images.updated", actor_user_id=actor.id, payload={"room_images_enabled": enabled})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def set_guest_messages_enabled(db: Session, room: Room, actor: User, enabled: bool) -> dict[str, Any]:
+    if not room_permission_service.can_change_room_privacy(db, actor, room.owner_user_id):
+        return room_snapshot(db, room)
+    room.guest_messages_enabled = enabled
+    record_room_event(db, room, "room.guest_messages.updated", actor_user_id=actor.id, payload={"guest_messages_enabled": enabled})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def set_apply_only_mode_enabled(db: Session, room: Room, actor: User, enabled: bool) -> dict[str, Any]:
+    if not room_permission_service.can_change_room_privacy(db, actor, room.owner_user_id):
+        return room_snapshot(db, room)
+    room.apply_only_mode_enabled = enabled
+    record_room_event(db, room, "room.apply_only.updated", actor_user_id=actor.id, payload={"apply_only_mode_enabled": enabled})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def set_announcement(db: Session, room: Room, actor: User, announcement_text: str) -> dict[str, Any]:
+    if not room_permission_service.can_change_room_privacy(db, actor, room.owner_user_id):
+        return room_snapshot(db, room)
+    room.announcement_text = announcement_text.strip()
+    room.announcement_updated_at = datetime.utcnow()
+    room.announcement_updated_by_user_id = actor.id
+    record_room_event(db, room, "room.announcement.updated", actor_user_id=actor.id, payload={"announcement_text": room.announcement_text})
+    db.flush()
+    return room_snapshot(db, room)
+
+
 def create_chat_message(db: Session, room: Room, user: User | None, text: str | None, message_type: str = "text", metadata: dict[str, Any] | None = None) -> dict[str, Any]:
     message = RoomChatMessage(
         room_id=room.id,
