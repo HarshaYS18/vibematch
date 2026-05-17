@@ -30,20 +30,41 @@ extension _LiveRoomPagePresence on _LiveRoomPageState {
     final syncedLayout = _roomStateController.seatLayoutId;
     if (syncedLayout.trim().isNotEmpty && syncedLayout != _seatController.layoutId) {
       _seatController.changeLayout(syncedLayout);
+      _autoOccupySeatOneForHostOrAdmin();
     }
     if (mounted) _setRoomState(() {});
   }
 
   void _autoOccupySeatOneForHostOrAdmin() {
-    // Production rule:
-    // Entering or re-entering a room must not auto-occupy a seat.
-    // The backend snapshot is the only source of truth for whether the user is
-    // seated. A user becomes seated only through an explicit seat/take command.
     _hostSeatOneTimer?.cancel();
     _hostSeatOneRetryTimer?.cancel();
+
+    if (!_viewerCanManageRoom) return;
+
+    _hostSeatOneTimer = Timer(
+      const Duration(milliseconds: 260),
+      _tryOccupySeatOneForHostOrAdmin,
+    );
+    _hostSeatOneRetryTimer = Timer(
+      const Duration(milliseconds: 1300),
+      _tryOccupySeatOneForHostOrAdmin,
+    );
   }
 
   void _tryOccupySeatOneForHostOrAdmin() {
-    // Intentionally disabled. See _autoOccupySeatOneForHostOrAdmin.
+    if (!mounted || !_viewerCanManageRoom) return;
+    if (_seatController.seats.isEmpty) return;
+
+    if (_seatController.currentUserIsSeated) {
+      _hostSeatOneTimer?.cancel();
+      _hostSeatOneRetryTimer?.cancel();
+      return;
+    }
+
+    final firstSeat = _seatController.seats.first;
+    if (firstSeat.locked) return;
+    if (firstSeat.user != null) return;
+
+    _seatController.occupySeat(0);
   }
 }
