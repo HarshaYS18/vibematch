@@ -313,8 +313,15 @@ class LiveRoomUsersController {
         (existing.isHost && incoming.isHost) ||
         (existing.isRoomAdmin && incoming.isRoomAdmin);
     final sameRoleLabel = existing.roleLabel.trim().toLowerCase() == incoming.roleLabel.trim().toLowerCase();
+    final sameNormalProfile =
+        !existing.isHost &&
+        !incoming.isHost &&
+        !existing.isRoomAdmin &&
+        !incoming.isRoomAdmin &&
+        existing.vipLevel == incoming.vipLevel &&
+        existing.svipLevel == incoming.svipLevel;
 
-    return sameAvatar || sameAuthority || sameRoleLabel;
+    return sameAvatar || sameAuthority || sameRoleLabel || sameNormalProfile;
   }
 
   String _canonicalUserKey(String userId) {
