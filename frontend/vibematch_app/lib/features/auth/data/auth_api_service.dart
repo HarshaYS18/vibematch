@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/vm_api_config.dart';
 import '../../../core/session/vm_session_cleanup_service.dart';
 import '../models/current_user.dart';
+import '../models/current_user_master_state_mapper.dart';
 
 class AuthApiService {
   const AuthApiService();
@@ -185,15 +186,25 @@ class AuthApiService {
       return _cachedUser!;
     }
 
-    final uri = Uri.parse(VmApiConfig.endpoint('/users/me'));
-    final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+    final headers = {'Authorization': 'Bearer $token'};
+    http.Response response = await http.get(
+      Uri.parse(VmApiConfig.endpoint('/users/me/master-state')),
+      headers: headers,
+    );
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Failed to load current user (${response.statusCode}): ${response.body}');
+    CurrentUser user;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      user = currentUserFromMasterStateJson(jsonDecode(response.body) as Map<String, dynamic>);
+    } else {
+      response = await http.get(
+        Uri.parse(VmApiConfig.endpoint('/users/me')),
+        headers: headers,
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Failed to load current user (${response.statusCode}): ${response.body}');
+      }
+      user = CurrentUser.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
     }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final user = CurrentUser.fromJson(decoded);
 
     final deviceId = _cachedDeviceId ?? await getCurrentDeviceId();
     await _persistSession(accessToken: token, user: user, deviceId: deviceId);
@@ -231,7 +242,7 @@ class AuthApiService {
       throw Exception(_errorMessage(response, fallback: 'Failed to update profile'));
     }
 
-    final user = CurrentUser.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    final user = await getCurrentUser(accessToken: token, forceRefresh: true);
     await persistCurrentUser(user);
     return user;
   }
