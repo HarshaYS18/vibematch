@@ -162,10 +162,11 @@ class _CompactChatLine extends StatelessWidget {
       return _SystemEventLine(message: message);
     }
 
-    final showActions =
+    final showAgreeAction =
         message.isSeatApplication &&
         canManageSeatApplications &&
         !message.applicationResolved;
+    final showAgreedState = message.isSeatApplication && message.applicationApproved;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -235,20 +236,21 @@ class _CompactChatLine extends StatelessWidget {
             ),
           ),
         ),
-        if (showActions) ...[
+        if (showAgreeAction) ...[
           const SizedBox(width: 8),
-          _SeatApplicationActionButton(
-            label: 'Reject',
-            background: RoomColors.coral.withValues(alpha: 0.92),
-            foreground: Colors.white,
-            onTap: onRejectSeatApplication,
-          ),
-          const SizedBox(width: 6),
           _SeatApplicationActionButton(
             label: 'Agree',
             background: RoomColors.aqua,
             foreground: RoomColors.deep,
             onTap: onApproveSeatApplication,
+          ),
+        ] else if (showAgreedState) ...[
+          const SizedBox(width: 8),
+          _SeatApplicationActionButton(
+            label: 'Agreed',
+            background: RoomColors.aqua.withValues(alpha: 0.72),
+            foreground: RoomColors.deep,
+            onTap: () {},
           ),
         ],
       ],
