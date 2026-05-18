@@ -255,14 +255,34 @@ class LiveRoomStateController extends ChangeNotifier {
   }
 
   void setRoomImagesEnabled(bool value) {
+    if (_roomImagesEnabled != value) {
+      _roomImagesEnabled = value;
+      LiveRoomRestrictionsService.update(
+        roomImagesEnabled: _roomImagesEnabled,
+        guestMessagesEnabled: _guestMessagesEnabled,
+      );
+      notifyListeners();
+    }
     LiveRoomMediaSignalingService.instance.setRoomImagesEnabled(value);
   }
 
   void setGuestMessagesEnabled(bool value) {
+    if (_guestMessagesEnabled != value) {
+      _guestMessagesEnabled = value;
+      LiveRoomRestrictionsService.update(
+        roomImagesEnabled: _roomImagesEnabled,
+        guestMessagesEnabled: _guestMessagesEnabled,
+      );
+      notifyListeners();
+    }
     LiveRoomMediaSignalingService.instance.setGuestMessagesEnabled(value);
   }
 
   void setApplyOnlyModeEnabled(bool value) {
+    if (_applyOnlyModeEnabled != value) {
+      _applyOnlyModeEnabled = value;
+      notifyListeners();
+    }
     LiveRoomMediaSignalingService.instance.setRoomApplyOnlyMode(value);
   }
 
