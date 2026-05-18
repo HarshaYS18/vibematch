@@ -308,7 +308,7 @@ class LiveRoomMessageController {
       final name = event.targetName.trim().isNotEmpty
           ? event.targetName
           : event.actorName;
-      _insertUserEnteredByName(name);
+      _insertUserEnteredByName(name, avatarUrl: event.actorAvatarUrl);
       return;
     }
 
@@ -355,10 +355,9 @@ class LiveRoomMessageController {
     final name = rawName.trim().isEmpty ? 'User' : rawName.trim();
     final entry = ChatEntry(
       senderName: name,
-      senderId: 'system',
+      senderId: 'entered_${DateTime.now().microsecondsSinceEpoch}',
       senderAvatarUrl: avatarUrl,
-      message: '$name Entered the Room',
-      systemEventType: RoomSystemEventType.userEntered,
+      message: 'entered the room',
       autoDismissAt: DateTime.now().add(const Duration(seconds: 10)),
     );
     messages.insert(0, entry);
@@ -371,6 +370,7 @@ class LiveRoomMessageController {
     required bool approved,
   }) {
     var changed = false;
+    final entriesToDismiss = <ChatEntry>[];
     for (var i = 0; i < messages.length; i++) {
       final entry = messages[i];
       if (!entry.isSeatApplication ||
@@ -385,16 +385,24 @@ class LiveRoomMessageController {
       final seatLabel = entry.seatIndex == null
           ? ''
           : ' ${entry.seatIndex! + 1}';
-      messages[i] = entry.copyWith(
+      final updatedEntry = entry.copyWith(
         message: approved
             ? '${entry.senderName} seat$seatLabel request agreed'
             : '${entry.senderName} seat$seatLabel request rejected',
         applicationApproved: approved,
         applicationRejected: !approved,
+        autoDismissAt: DateTime.now().add(const Duration(seconds: 10)),
       );
+      messages[i] = updatedEntry;
+      entriesToDismiss.add(updatedEntry);
       changed = true;
     }
-    if (changed) onChanged();
+    if (changed) {
+      onChanged();
+      for (final entry in entriesToDismiss) {
+        _scheduleAutoDismiss(entry);
+      }
+    }
   }
 
   bool _sameRoomUserId(String? a, String? b) {
