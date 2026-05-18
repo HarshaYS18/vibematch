@@ -389,23 +389,77 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     );
   }
 
-  void _openAnnouncementSheet() {
+  void _openEditRoomNameSheet() {
     _clearRoomFocus();
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can edit room name');
+      return;
+    }
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => LiveRoomAnnouncementSheet(
-        controller: _announcementController,
-        onSubmit: (message) {
-          Navigator.pop(context);
-          if (message.isNotEmpty) {
-            _insertSystemMessage(message);
-            _announcementController.clear();
-          }
-          RoomToast.show(context, 'Announcement saved');
+      builder: (sheetContext) => _RoomNameEditSheet(
+        initialName: _roomName,
+        onSubmit: (name) {
+          Navigator.pop(sheetContext);
+          unawaited(_saveRoomName(name));
         },
       ),
     );
+  }
+
+  Future<void> _saveRoomName(String name) async {
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) {
+      RoomToast.show(context, 'Room name cannot be empty');
+      return;
+    }
+    try {
+      await _roomStateController.setRoomName(cleanName);
+      if (!mounted) return;
+      RoomToast.show(context, 'Room name updated');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  void _openAnnouncementSheet() {
+    _clearRoomFocus();
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can update broad announcement');
+      return;
+    }
+    _announcementController.text = _roomStateController.announcementText;
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => LiveRoomAnnouncementSheet(
+        controller: _announcementController,
+        onSubmit: (message) {
+          Navigator.pop(sheetContext);
+          unawaited(_saveAnnouncement(message));
+        },
+      ),
+    );
+  }
+
+  Future<void> _saveAnnouncement(String message) async {
+    final cleanMessage = message.trim();
+    try {
+      await _roomStateController.setRoomAnnouncement(cleanMessage);
+      if (!mounted) return;
+      _announcementController.clear();
+      if (cleanMessage.isNotEmpty) {
+        LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
+          cleanMessage,
+        );
+      }
+      RoomToast.show(context, 'Announcement saved');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   void _openLeaveSheet() {
@@ -439,6 +493,97 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       builder: (context) => LiveRoomInfoSheet(title: title, body: body),
+    );
+  }
+}
+
+class _RoomNameEditSheet extends StatefulWidget {
+  const _RoomNameEditSheet({required this.initialName, required this.onSubmit});
+
+  final String initialName;
+  final ValueChanged<String> onSubmit;
+
+  @override
+  State<_RoomNameEditSheet> createState() => _RoomNameEditSheetState();
+}
+
+class _RoomNameEditSheetState extends State<_RoomNameEditSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(
+          18,
+          12,
+          18,
+          MediaQuery.paddingOf(context).bottom + 16,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(),
+            const SizedBox(height: 16),
+            const Text(
+              'Edit Room Name',
+              style: TextStyle(
+                color: RoomColors.plum,
+                fontSize: 23,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              maxLength: 120,
+              decoration: InputDecoration(
+                hintText: 'Room name',
+                filled: true,
+                fillColor: RoomColors.pearl,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => widget.onSubmit(_controller.text.trim()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: RoomColors.plum,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
