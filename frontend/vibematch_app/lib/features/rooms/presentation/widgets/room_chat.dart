@@ -158,6 +158,9 @@ class _CompactChatLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.systemEventType == RoomSystemEventType.userEntered) {
+      return _EnteredRoomLine(message: message);
+    }
     if (message.isSystemMessage) {
       return _SystemEventLine(message: message);
     }
@@ -291,6 +294,67 @@ class _CompactChatLine extends StatelessWidget {
         ),
       );
     }).toList(growable: false);
+  }
+}
+
+class _EnteredRoomLine extends StatelessWidget {
+  const _EnteredRoomLine({required this.message});
+
+  final ChatEntry message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.24),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ChatAvatar(
+              senderName: message.senderName,
+              avatarUrl: message.senderAvatarUrl,
+              radius: 9.5,
+              backgroundColor: RoomColors.aqua,
+            ),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.56,
+              ),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: message.senderName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' ${message.message}',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11.2, height: 1),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
