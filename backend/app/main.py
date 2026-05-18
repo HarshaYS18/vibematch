@@ -175,6 +175,8 @@ def _ensure_runtime_schema() -> None:
         "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS vip_required_level INTEGER DEFAULT 0 NOT NULL",
         "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS svip_required_level INTEGER DEFAULT 0 NOT NULL",
         "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS official_only BOOLEAN DEFAULT false NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS availability_starts_at TIMESTAMP",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS availability_ends_at TIMESTAMP",
         "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS asset_version INTEGER DEFAULT 1 NOT NULL",
         "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS cache_key VARCHAR(120)",
         "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS catalog_version INTEGER DEFAULT 1 NOT NULL",
