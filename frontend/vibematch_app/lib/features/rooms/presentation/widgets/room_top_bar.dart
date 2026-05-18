@@ -151,6 +151,8 @@ class RoomTopBar extends StatelessWidget {
               fallbackLevel: roomLevel,
               onTap: onRoomLevelTap,
             ),
+            const SizedBox(width: 5),
+            _OnlineButton(count: onlineCount, onTap: onUsersTap),
           ],
         ),
       ],
@@ -467,6 +469,47 @@ class _TrophyButton extends StatelessWidget {
           ],
         ),
         child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 14),
+      ),
+    ),
+  );
+}
+
+class _OnlineButton extends StatelessWidget {
+  const _OnlineButton({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(999),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.30),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.groups_rounded, color: RoomColors.aqua, size: 12),
+            const SizedBox(width: 3),
+            Text(
+              '$count',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
