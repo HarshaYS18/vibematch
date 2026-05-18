@@ -219,35 +219,52 @@ class LiveRoomMessageController {
     if (event.seatIndex < 0) return;
 
     _handledSystemEventIds.add(event.id);
+    _insertSeatApplicationRequest(
+      applicantUserId: event.applicantUserId,
+      applicantName: event.applicantName,
+      applicantAvatarUrl: null,
+      seatIndex: event.seatIndex,
+      createdAt: event.createdAt,
+      expiresAt: event.expiresAt,
+    );
+  }
 
+  void _insertSeatApplicationRequest({
+    required String applicantUserId,
+    required String applicantName,
+    required String? applicantAvatarUrl,
+    required int seatIndex,
+    required DateTime createdAt,
+    required DateTime expiresAt,
+  }) {
     final existingPending = messages.any(
       (message) =>
           message.isSeatApplication &&
           !message.applicationResolved &&
-          message.senderId == event.applicantUserId &&
-          message.seatIndex == event.seatIndex,
+          _sameRoomUserId(message.senderId, applicantUserId) &&
+          message.seatIndex == seatIndex,
     );
 
     if (existingPending) return;
 
-    final applicant = event.applicantUserId == currentUser.id
+    final applicant = _sameRoomUserId(applicantUserId, currentUser.id)
         ? currentUser
-        : LiveRoomPresenceRepository.userByRoomUserId(event.applicantUserId);
+        : LiveRoomPresenceRepository.userByRoomUserId(applicantUserId);
 
     messages.insert(
       0,
       ChatEntry(
-        senderName: applicant?.name ?? event.applicantName,
-        senderId: event.applicantUserId,
-        senderAvatarUrl: applicant?.avatarUrl,
-        message: 'has applied for seat ${event.seatIndex + 1}',
+        senderName: applicant?.name ?? applicantName,
+        senderId: applicantUserId,
+        senderAvatarUrl: applicant?.avatarUrl ?? applicantAvatarUrl,
+        message: 'has applied for seat ${seatIndex + 1}',
         vipLevel: applicant?.vipLevel ?? 0,
         sendingLevel: applicant?.sendingLevel ?? 0,
         receivingLevel: applicant?.receivingLevel ?? 0,
         isSeatApplication: true,
-        seatIndex: event.seatIndex,
-        applicationCreatedAt: event.createdAt,
-        applicationExpiresAt: event.expiresAt,
+        seatIndex: seatIndex,
+        applicationCreatedAt: createdAt,
+        applicationExpiresAt: expiresAt,
       ),
     );
 
@@ -312,6 +329,26 @@ class LiveRoomMessageController {
       return;
     }
 
+    if (event.type == 'seat_application_requested') {
+      final seatIndex = event.seatIndex;
+      final applicantId = event.actorUserId.trim().isNotEmpty
+          ? event.actorUserId
+          : event.targetUserId;
+      if (seatIndex != null && applicantId.trim().isNotEmpty) {
+        _insertSeatApplicationRequest(
+          applicantUserId: applicantId,
+          applicantName: event.actorName.trim().isEmpty
+              ? event.targetName
+              : event.actorName,
+          applicantAvatarUrl: event.actorAvatarUrl,
+          seatIndex: seatIndex,
+          createdAt: event.createdAt,
+          expiresAt: event.createdAt.add(const Duration(seconds: 20)),
+        );
+      }
+      return;
+    }
+
     if (event.isChatCleared) {
       messages.clear();
       insertTransientSystemMessage(
@@ -355,9 +392,10 @@ class LiveRoomMessageController {
     final name = rawName.trim().isEmpty ? 'User' : rawName.trim();
     final entry = ChatEntry(
       senderName: name,
-      senderId: 'entered_${DateTime.now().microsecondsSinceEpoch}',
+      senderId: 'system',
       senderAvatarUrl: avatarUrl,
       message: 'entered the room',
+      systemEventType: RoomSystemEventType.userEntered,
       autoDismissAt: DateTime.now().add(const Duration(seconds: 10)),
     );
     messages.insert(0, entry);
