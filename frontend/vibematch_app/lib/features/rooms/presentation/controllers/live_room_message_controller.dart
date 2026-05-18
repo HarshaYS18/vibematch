@@ -100,6 +100,23 @@ class LiveRoomMessageController {
     onChanged();
   }
 
+  void insertTransientSystemMessage(
+    String message, {
+    Duration duration = const Duration(seconds: 10),
+  }) {
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) return;
+    final entry = ChatEntry(
+      senderName: 'System',
+      senderId: 'system',
+      message: trimmed,
+      autoDismissAt: DateTime.now().add(duration),
+    );
+    messages.insert(0, entry);
+    onChanged();
+    _scheduleAutoDismiss(entry);
+  }
+
   void insertUserEnteredSystemEvent(SeatUser user) =>
       _insertUserEnteredByName(user.name, avatarUrl: user.avatarUrl);
 
@@ -116,9 +133,11 @@ class LiveRoomMessageController {
         senderId: 'system',
         message: '$actor has removed $member from the group',
         systemEventType: RoomSystemEventType.userRemoved,
+        autoDismissAt: DateTime.now().add(const Duration(seconds: 10)),
       ),
     );
     onChanged();
+    _scheduleAutoDismiss(messages.first);
   }
 
   void insertEntry(ChatEntry entry) {
@@ -295,7 +314,7 @@ class LiveRoomMessageController {
 
     if (event.isChatCleared) {
       messages.clear();
-      insertPersistentSystemMessage(
+      insertTransientSystemMessage(
         event.message.trim().isEmpty
             ? 'Chat cleared for everyone'
             : event.message.trim(),
@@ -303,17 +322,32 @@ class LiveRoomMessageController {
       return;
     }
 
+    if (event.isSeatApplicationAgreed || event.isSeatApplicationRejected) {
+      _resolveSeatApplicationFromSystemEvent(
+        event,
+        approved: event.isSeatApplicationAgreed,
+      );
+      insertTransientSystemMessage(event.message);
+      return;
+    }
+
     if (event.isRoomSystemMessage) {
-      insertPersistentSystemMessage(event.message);
+      insertTransientSystemMessage(event.message);
       return;
     }
 
     if (event.isUserRemoved) {
       if (event.targetUserId == currentUser.id) return;
-      insertUserRemovedSystemEvent(
-        actorName: event.actorName,
-        targetName: event.targetName,
+      insertTransientSystemMessage(
+        event.message.trim().isEmpty
+            ? '${event.targetName.trim().isEmpty ? 'User' : event.targetName} was removed from the room'
+            : event.message.trim(),
       );
+      return;
+    }
+
+    if (event.message.trim().isNotEmpty) {
+      insertTransientSystemMessage(event.message);
     }
   }
 
@@ -325,11 +359,63 @@ class LiveRoomMessageController {
       senderAvatarUrl: avatarUrl,
       message: '$name Entered the Room',
       systemEventType: RoomSystemEventType.userEntered,
-      autoDismissAt: DateTime.now().add(const Duration(seconds: 5)),
+      autoDismissAt: DateTime.now().add(const Duration(seconds: 10)),
     );
     messages.insert(0, entry);
     onChanged();
     _scheduleAutoDismiss(entry);
+  }
+
+  void _resolveSeatApplicationFromSystemEvent(
+    LiveRoomSystemEvent event, {
+    required bool approved,
+  }) {
+    var changed = false;
+    for (var i = 0; i < messages.length; i++) {
+      final entry = messages[i];
+      if (!entry.isSeatApplication ||
+          entry.applicationApproved ||
+          entry.applicationRejected) {
+        continue;
+      }
+      if (!_sameRoomUserId(entry.senderId, event.targetUserId)) continue;
+      final eventSeatIndex = event.seatIndex;
+      if (eventSeatIndex != null && entry.seatIndex != eventSeatIndex) continue;
+
+      final seatLabel = entry.seatIndex == null
+          ? ''
+          : ' ${entry.seatIndex! + 1}';
+      messages[i] = entry.copyWith(
+        message: approved
+            ? '${entry.senderName} seat$seatLabel request agreed'
+            : '${entry.senderName} seat$seatLabel request rejected',
+        applicationApproved: approved,
+        applicationRejected: !approved,
+      );
+      changed = true;
+    }
+    if (changed) onChanged();
+  }
+
+  bool _sameRoomUserId(String? a, String? b) {
+    final left = _identityAliases(a);
+    final right = _identityAliases(b);
+    if (left.isEmpty || right.isEmpty) return false;
+    return left.intersection(right).isNotEmpty;
+  }
+
+  Set<String> _identityAliases(String? rawId) {
+    final value = rawId?.trim();
+    if (value == null || value.isEmpty) return <String>{};
+    final aliases = <String>{value, value.toLowerCase()};
+    final match = RegExp(r'(?:^|_)user_(\d+)$').firstMatch(value);
+    if (match != null) {
+      aliases.add(match.group(1)!);
+      aliases.add('user_${match.group(1)!}');
+    }
+    final direct = int.tryParse(value);
+    if (direct != null) aliases.add('user_$direct');
+    return aliases;
   }
 
   void _scheduleAutoDismiss(ChatEntry entry) {

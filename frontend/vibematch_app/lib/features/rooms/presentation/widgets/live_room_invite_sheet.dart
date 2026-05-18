@@ -95,10 +95,6 @@ class _LiveRoomInviteSheetState extends State<LiveRoomInviteSheet> {
     if (currentUserId != null && user.id == currentUserId) return;
     if (!_isOnline(user)) return;
     setState(() => _invitedIds.add(user.id));
-    signaling.sendSeatInvite(
-      seatIndex: widget.seatIndex,
-      targetUserId: user.id,
-    );
     widget.onInvite(user);
   }
 

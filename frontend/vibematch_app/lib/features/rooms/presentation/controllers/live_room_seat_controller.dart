@@ -416,7 +416,6 @@ class LiveRoomSeatController {
     }
     if (seatIndex < 0 ||
         seatIndex >= seats.length ||
-        seats[seatIndex].locked ||
         seats[seatIndex].user != null) {
       return false;
     }

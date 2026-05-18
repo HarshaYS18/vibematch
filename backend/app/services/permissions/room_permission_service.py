@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.role import RoleName
@@ -10,7 +12,44 @@ from app.models.user import User
 from app.services.role_service import can_act_on, get_primary_role, is_founder_owner, is_owner_or_above
 
 
+_SPECIAL_PERMISSION_ENUM_SUPPORT: dict[str, bool] = {}
+
+
+def _db_supports_special_permission(db: Session, permission: SpecialPermissionName) -> bool:
+    bind = db.get_bind()
+    if bind.dialect.name != "postgresql":
+        return True
+
+    cache_key = permission.value
+    cached = _SPECIAL_PERMISSION_ENUM_SUPPORT.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        supported = bool(
+            db.execute(
+                text(
+                    "select exists("
+                    "select 1 from pg_type t "
+                    "join pg_enum e on e.enumtypid = t.oid "
+                    "where t.typname = 'specialpermissionname' "
+                    "and e.enumlabel = :permission"
+                    ")"
+                ),
+                {"permission": permission.value},
+            ).scalar()
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        supported = False
+
+    _SPECIAL_PERMISSION_ENUM_SUPPORT[cache_key] = supported
+    return supported
+
+
 def has_active_special_permission(db: Session, user: User, permission: SpecialPermissionName) -> bool:
+    if not _db_supports_special_permission(db, permission):
+        return False
     now = datetime.utcnow()
     return db.query(SpecialPermission).filter(
         SpecialPermission.user_id == user.id,

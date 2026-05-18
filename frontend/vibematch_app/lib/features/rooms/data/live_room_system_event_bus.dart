@@ -27,6 +27,7 @@ class LiveRoomSystemEvent {
     this.actorSendingLevel = 0,
     this.actorReceivingLevel = 0,
     this.autoDismissSeconds,
+    this.seatIndex,
     this.giftId = '',
     this.giftName = '',
     this.giftAssetUrl,
@@ -65,6 +66,7 @@ class LiveRoomSystemEvent {
   final int actorReceivingLevel;
   final DateTime createdAt;
   final int? autoDismissSeconds;
+  final int? seatIndex;
   final String giftId;
   final String giftName;
   final String? giftAssetUrl;
@@ -94,11 +96,16 @@ class LiveRoomSystemEvent {
   bool get isRoomChatMessage => type == 'room_chat_message';
   bool get isRoomGiftSent => type == 'room_gift_sent';
   bool get isChatCleared => type == 'chat_cleared';
+  bool get isSeatApplicationAgreed => type == 'seat_application_agreed';
+  bool get isSeatApplicationRejected => type == 'seat_application_rejected';
 
   factory LiveRoomSystemEvent.fromJson(Map<String, dynamic> json) {
     final rawAutoDismiss = json['auto_dismiss_seconds'];
-    final ribbonTier = (json['ribbon_tier'] ?? json['ribbonTier'] ?? 'normal').toString();
-    final broadcastScope = (json['broadcast_scope'] ?? json['broadcastScope'] ?? 'room').toString();
+    final ribbonTier = (json['ribbon_tier'] ?? json['ribbonTier'] ?? 'normal')
+        .toString();
+    final broadcastScope =
+        (json['broadcast_scope'] ?? json['broadcastScope'] ?? 'room')
+            .toString();
     return LiveRoomSystemEvent(
       id:
           json['id']?.toString() ??
@@ -124,13 +131,25 @@ class LiveRoomSystemEvent {
       autoDismissSeconds: rawAutoDismiss == null
           ? null
           : int.tryParse(rawAutoDismiss.toString()),
+      seatIndex: int.tryParse(json['seat_index']?.toString() ?? ''),
       giftId: json['gift_id']?.toString() ?? '',
       giftName: json['gift_name']?.toString() ?? '',
-      giftAssetUrl: _text(json['asset_url'] ?? json['gift_asset_url'] ?? json['giftAssetUrl']),
-      giftVideoUrl: _text(json['video_url'] ?? json['gift_video_url'] ?? json['giftVideoUrl']),
-      giftAssetPath: _text(json['asset_path'] ?? json['gift_asset_path'] ?? json['giftAssetPath']),
-      giftVideoAssetPath: _text(json['video_asset_path'] ?? json['gift_video_asset_path'] ?? json['giftVideoAssetPath']),
-      giftCategory: (json['gift_category'] ?? json['category'] ?? 'classic').toString(),
+      giftAssetUrl: _text(
+        json['asset_url'] ?? json['gift_asset_url'] ?? json['giftAssetUrl'],
+      ),
+      giftVideoUrl: _text(
+        json['video_url'] ?? json['gift_video_url'] ?? json['giftVideoUrl'],
+      ),
+      giftAssetPath: _text(
+        json['asset_path'] ?? json['gift_asset_path'] ?? json['giftAssetPath'],
+      ),
+      giftVideoAssetPath: _text(
+        json['video_asset_path'] ??
+            json['gift_video_asset_path'] ??
+            json['giftVideoAssetPath'],
+      ),
+      giftCategory: (json['gift_category'] ?? json['category'] ?? 'classic')
+          .toString(),
       giftType: (json['gift_type'] ?? 'normal').toString(),
       animationType: (json['animation_type'] ?? 'image').toString(),
       giftVersion: _int(json['gift_version'] ?? json['version']),
@@ -140,17 +159,26 @@ class LiveRoomSystemEvent {
       giftTotalCoinValue: _int(
         json['total_coin_value'] ?? json['gift_total_coin_value'],
       ),
-      isLuckyGift: json['is_lucky'] == true || json['is_lucky_gift'] == true || (json['gift_type']?.toString() == 'lucky'),
+      isLuckyGift:
+          json['is_lucky'] == true ||
+          json['is_lucky_gift'] == true ||
+          (json['gift_type']?.toString() == 'lucky'),
       luckyMultiplier: _int(json['lucky_multiplier']),
       luckyRewardCoinAmount: _int(json['lucky_reward_coin_amount']),
       ribbonTier: ribbonTier,
       broadcastScope: broadcastScope,
-      showGiftSlide: _bool(json['show_gift_slide'] ?? json['showGiftSlide'], fallback: true),
+      showGiftSlide: _bool(
+        json['show_gift_slide'] ?? json['showGiftSlide'],
+        fallback: true,
+      ),
       showPremiumBroadcast: _bool(
         json['show_premium_broadcast'] ?? json['showPremiumBroadcast'],
         fallback: ribbonTier == 'premium' || broadcastScope == 'global',
       ),
-      showGiftFlight: _bool(json['show_gift_flight'] ?? json['showGiftFlight'], fallback: true),
+      showGiftFlight: _bool(
+        json['show_gift_flight'] ?? json['showGiftFlight'],
+        fallback: true,
+      ),
     );
   }
 }

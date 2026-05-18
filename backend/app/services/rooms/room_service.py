@@ -219,10 +219,18 @@ def _active_kickout_detail(db: Session, room: Room, user: User) -> str | None:
     if kickout is None:
         return None
     if kickout.is_permanent:
-        return "You are blocked from this room until the host/admin removes the block."
+        return "You are currently kicked from this room permanently. You can message the host/admin if you believe this was a mistake."
     if kickout.blocked_until is not None:
-        return f"You are blocked from this room until {kickout.blocked_until.isoformat()} UTC."
-    return "You are blocked from this room."
+        remaining = kickout.blocked_until - datetime.utcnow()
+        total_seconds = max(0, int(remaining.total_seconds()))
+        if total_seconds >= 86400:
+            duration = f"{(total_seconds + 86399) // 86400} day(s)"
+        elif total_seconds >= 3600:
+            duration = f"{(total_seconds + 3599) // 3600} hour(s)"
+        else:
+            duration = f"{max(1, (total_seconds + 59) // 60)} minute(s)"
+        return f"You are currently kicked from this room for about {duration}. Re-entry opens at {kickout.blocked_until.isoformat()} UTC. Take a breather and come back fresh, or message the host/admin if this feels off."
+    return "You are currently kicked from this room. Message the host/admin if you believe this was a mistake."
 
 
 def _can_enter_room(db: Session, room: Room, user: User, lock_password: str | None = None) -> bool:

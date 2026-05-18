@@ -109,14 +109,6 @@ class HomeNavigationController {
     required HomeRoom room,
     required CurrentUser? currentUser,
   }) {
-    if (room.mode.toLowerCase().contains('lock')) {
-      openLockedRoomSheet(
-        context: context,
-        room: room,
-        currentUser: currentUser,
-      );
-      return;
-    }
     unawaited(
       _joinAndEnter(context: context, room: room, currentUser: currentUser),
     );
@@ -194,6 +186,12 @@ class HomeNavigationController {
 
   static String _entryBlockedMessage(String backendMessage) {
     final normalized = backendMessage.toLowerCase();
+    if (normalized.contains('kicked') || normalized.contains('blocked')) {
+      return backendMessage
+          .replaceFirst('You are currently', "You're currently")
+          .replaceFirst('Take a breather', 'Take a breather')
+          .trim();
+    }
     if (normalized.contains('members-only') ||
         normalized.contains('members only')) {
       return 'Members Only room. Membership approval required.';

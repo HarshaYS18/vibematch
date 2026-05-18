@@ -15,6 +15,7 @@ from app.services.rooms.room_service import assert_room_entry_allowed
 from app.services.rooms.room_state_service import ensure_room_seats, normalize_layout, room_sequence, room_snapshot, seat_count_for_layout
 
 SEAT_APPLICATION_EXPIRY_SECONDS = 20
+SEAT_APPLICATION_COOLDOWN_SECONDS = 30
 
 
 def _next_sequence(db: Session, room: Room) -> int:
@@ -126,6 +127,61 @@ def _seat_can_receive_application(db: Session, room: Room, seat_index: int) -> b
         return False
     seat = next((item for item in ensure_room_seats(db, room) if item.seat_index == seat_index), None)
     return bool(seat is not None and not seat.is_locked and seat.occupant_user_id is None)
+
+
+def _seat_can_receive_invite(db: Session, room: Room, seat_index: int) -> bool:
+    if seat_index < 0 or seat_index >= seat_count_for_layout(room.seat_layout_id):
+        return False
+    seat = next((item for item in ensure_room_seats(db, room) if item.seat_index == seat_index), None)
+    return bool(seat is not None and seat.occupant_user_id is None)
+
+
+def latest_seat_application_request_id(db: Session, room: Room, user: User) -> int | None:
+    latest = (
+        db.query(RoomRealtimeEvent.id)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type == "seat.application.requested",
+            RoomRealtimeEvent.actor_user_id == user.id,
+        )
+        .order_by(RoomRealtimeEvent.id.desc())
+        .first()
+    )
+    return int(latest[0]) if latest else None
+
+
+def latest_seat_invite_id(db: Session, room: Room, actor: User, target: User, seat_index: int) -> int | None:
+    latest = (
+        db.query(RoomRealtimeEvent.id)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type == "seat.invite.sent",
+            RoomRealtimeEvent.actor_user_id == actor.id,
+            RoomRealtimeEvent.target_user_id == target.id,
+        )
+        .order_by(RoomRealtimeEvent.id.desc())
+        .first()
+    )
+    if latest is None:
+        return None
+    return int(latest[0])
+
+
+def _seat_application_cooldown_remaining(db: Session, room: Room, user: User) -> int:
+    latest = (
+        db.query(RoomRealtimeEvent)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type == "seat.application.requested",
+            RoomRealtimeEvent.actor_user_id == user.id,
+        )
+        .order_by(RoomRealtimeEvent.id.desc())
+        .first()
+    )
+    if latest is None:
+        return 0
+    elapsed = int((datetime.utcnow() - latest.created_at).total_seconds())
+    return max(0, SEAT_APPLICATION_COOLDOWN_SECONDS - elapsed)
 
 
 def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -291,7 +347,7 @@ def lock_seat(db: Session, room: Room, seat_index: int, locked: bool, actor_user
 def send_seat_invite(db: Session, room: Room, actor: User, target: User, seat_index: int) -> dict[str, Any]:
     if not _is_room_manager(db, room, actor):
         return room_snapshot(db, room)
-    if not _seat_can_receive_application(db, room, seat_index):
+    if not _seat_can_receive_invite(db, room, seat_index):
         return room_snapshot(db, room)
     invite_id = f"seat_invite_{room.room_public_id}_{actor.id}_{target.id}_{seat_index}_{int(datetime.utcnow().timestamp() * 1000)}"
     record_room_event(db, room, "seat.invite.sent", actor_user_id=actor.id, target_user_id=target.id, payload={"invite_id": invite_id, "seat_index": seat_index}, privacy_scope="target")
@@ -303,6 +359,8 @@ def request_seat_application(db: Session, room: Room, user: User, seat_index: in
     if not room.apply_only_mode_enabled:
         return take_seat(db, room, user, seat_index)
     if not _seat_can_receive_application(db, room, seat_index):
+        return room_snapshot(db, room)
+    if _seat_application_cooldown_remaining(db, room, user) > 0:
         return room_snapshot(db, room)
     now = datetime.utcnow()
     expires_at = now + timedelta(seconds=SEAT_APPLICATION_EXPIRY_SECONDS)
@@ -393,8 +451,15 @@ def _has_pending_seat_invite(db: Session, room: Room, user: User, seat_index: in
 def accept_seat_invite(db: Session, room: Room, user: User, seat_index: int) -> dict[str, Any]:
     if not _has_pending_seat_invite(db, room, user, seat_index):
         return room_snapshot(db, room)
-    if not _seat_can_receive_application(db, room, seat_index):
+    if not _seat_can_receive_invite(db, room, seat_index):
         return room_snapshot(db, room)
+    for seat in ensure_room_seats(db, room):
+        if seat.seat_index == seat_index and seat.is_locked:
+            seat.is_locked = False
+            seat.locked_by_user_id = None
+            seat.locked_at = None
+            seat.updated_by_user_id = user.id
+            break
     record_room_event(db, room, "seat.invite.accepted", actor_user_id=user.id, target_user_id=user.id, payload={"seat_index": seat_index}, privacy_scope="target")
     return take_seat(db, room, user, seat_index)
 
