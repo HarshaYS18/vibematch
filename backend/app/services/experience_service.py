@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.experience import RoomExperienceStatus, UserExperienceStatus
 from app.models.room import Room
 from app.models.user import User
+from app.services import economy_rules_service
 from app.services import level_progression_service as progression
 
 MAX_EXP_LEVEL = progression.MAX_LEVEL
@@ -58,12 +59,12 @@ def apply_gift_exp(
     receiver_status = get_or_create_user_exp(db, receiver_user_id)
 
     sender_status.send_total_exp += max(send_exp, 0)
-    sender_status.send_level = progression.level_for_exp(sender_status.send_total_exp, progression.ProgressionTrack.SEND)
+    sender_status.send_level = economy_rules_service.level_for_exp(db, sender_status.send_total_exp, "send")
     sender_status.last_source_type = "GIFT_SEND"
     sender_status.last_source_id = source_id
 
     receiver_status.receive_total_exp += max(receive_exp, 0)
-    receiver_status.receive_level = progression.level_for_exp(receiver_status.receive_total_exp, progression.ProgressionTrack.RECEIVE)
+    receiver_status.receive_level = economy_rules_service.level_for_exp(db, receiver_status.receive_total_exp, "receive")
     receiver_status.last_source_type = "GIFT_RECEIVE"
     receiver_status.last_source_id = source_id
 
@@ -71,7 +72,7 @@ def apply_gift_exp(
     if room_id is not None and room_exp > 0:
         room_status = get_or_create_room_exp(db, room_id)
         room_status.total_exp += max(room_exp, 0)
-        room_status.level = progression.level_for_exp(room_status.total_exp, progression.ProgressionTrack.ROOM)
+        room_status.level = economy_rules_service.level_for_exp(db, room_status.total_exp, "room")
         room_status.last_source_type = "GIFT_RECEIVE"
         room_status.last_source_id = source_id
 

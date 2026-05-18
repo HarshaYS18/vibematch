@@ -2,105 +2,412 @@ import '../../../core/network/api_client.dart';
 import '../../auth/data/auth_api_service.dart';
 
 class ControlCenterApiService {
-  ControlCenterApiService({ApiClient? apiClient, AuthApiService? authApiService})
-      : _apiClient = apiClient ?? ApiClient(),
-        _authApiService = authApiService ?? const AuthApiService();
+  ControlCenterApiService({
+    ApiClient? apiClient,
+    AuthApiService? authApiService,
+  }) : _apiClient = apiClient ?? ApiClient(),
+       _authApiService = authApiService ?? const AuthApiService();
 
   final ApiClient _apiClient;
   final AuthApiService _authApiService;
 
   Future<AdminControlSummary> loadSummary() async {
-    final json = await _apiClient.getMap('/admin/control-summary', headers: _headers());
+    final json = await _apiClient.getMap(
+      '/admin/control-summary',
+      headers: _headers(),
+    );
     return AdminControlSummary.fromJson(json);
   }
 
   Future<List<AdminUser>> loadUsers() async {
     final json = await _apiClient.getList('/admin/users', headers: _headers());
-    return json.whereType<Map<String, dynamic>>().map(AdminUser.fromJson).toList(growable: false);
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(AdminUser.fromJson)
+        .toList(growable: false);
   }
 
   Future<List<RoleOption>> loadRoleOptions() async {
-    final json = await _apiClient.getList('/admin/role-options', headers: _headers());
-    return json.whereType<Map<String, dynamic>>().map(RoleOption.fromJson).toList(growable: false);
+    final json = await _apiClient.getList(
+      '/admin/role-options',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(RoleOption.fromJson)
+        .toList(growable: false);
   }
 
-  Future<void> assignRole({required int targetUserId, required String role, required String reason}) async {
-    await _apiClient.postMap('/admin/roles/assign', headers: _headers(), body: {'target_user_id': targetUserId, 'role': role, 'reason': reason});
+  Future<void> assignRole({
+    required int targetUserId,
+    required String role,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/admin/roles/assign',
+      headers: _headers(),
+      body: {'target_user_id': targetUserId, 'role': role, 'reason': reason},
+    );
   }
 
-  Future<void> banUser({required int targetUserId, required String reason, String? deviceId}) async {
-    await _apiClient.postMap('/moderation/users/ban', headers: _headers(), body: {'target_user_id': targetUserId, 'reason': reason, if (deviceId != null && deviceId.trim().isNotEmpty) 'device_id': deviceId.trim()});
+  Future<void> banUser({
+    required int targetUserId,
+    required String reason,
+    String? deviceId,
+  }) async {
+    await _apiClient.postMap(
+      '/moderation/users/ban',
+      headers: _headers(),
+      body: {
+        'target_user_id': targetUserId,
+        'reason': reason,
+        if (deviceId != null && deviceId.trim().isNotEmpty)
+          'device_id': deviceId.trim(),
+      },
+    );
   }
 
-  Future<void> unbanUser({required int targetUserId, required String reason}) async {
-    await _apiClient.postMap('/moderation/users/unban', headers: _headers(), body: {'target_user_id': targetUserId, 'reason': reason});
+  Future<void> unbanUser({
+    required int targetUserId,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/moderation/users/unban',
+      headers: _headers(),
+      body: {'target_user_id': targetUserId, 'reason': reason},
+    );
   }
 
   Future<List<UserBanItem>> loadUserBans() async {
-    final json = await _apiClient.getList('/moderation/users/bans', headers: _headers());
-    return json.whereType<Map<String, dynamic>>().map(UserBanItem.fromJson).toList(growable: false);
+    final json = await _apiClient.getList(
+      '/moderation/users/bans',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(UserBanItem.fromJson)
+        .toList(growable: false);
   }
 
   Future<List<DeviceBanItem>> loadDeviceBans() async {
-    final json = await _apiClient.getList('/moderation/devices/bans', headers: _headers());
-    return json.whereType<Map<String, dynamic>>().map(DeviceBanItem.fromJson).toList(growable: false);
+    final json = await _apiClient.getList(
+      '/moderation/devices/bans',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(DeviceBanItem.fromJson)
+        .toList(growable: false);
   }
 
-  Future<void> unbanDevice({required String deviceId, required String reason}) async {
-    await _apiClient.postMap('/moderation/devices/unban', headers: _headers(), body: {'device_id': deviceId, 'reason': reason});
+  Future<void> unbanDevice({
+    required String deviceId,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/moderation/devices/unban',
+      headers: _headers(),
+      body: {'device_id': deviceId, 'reason': reason},
+    );
   }
 
   Future<List<SuperOwnerPoolItem>> loadCoinPools() async {
-    final json = await _apiClient.getList('/super-owner/coin-pools', headers: _headers());
-    return json.whereType<Map<String, dynamic>>().map(SuperOwnerPoolItem.fromJson).toList(growable: false);
+    final json = await _apiClient.getList(
+      '/super-owner/coin-pools',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(SuperOwnerPoolItem.fromJson)
+        .toList(growable: false);
   }
 
-  Future<void> mintCoins({required String poolType, required int amount, required String reason, int? targetUserId}) async {
-    await _apiClient.postMap('/super-owner/coins/mint', headers: _headers(), body: {'target_pool_type': poolType, 'amount': amount, 'reason': reason, 'target_user_id': ?targetUserId});
+  Future<void> mintCoins({
+    required String poolType,
+    required int amount,
+    required String reason,
+    int? targetUserId,
+  }) async {
+    await _apiClient.postMap(
+      '/super-owner/coins/mint',
+      headers: _headers(),
+      body: {
+        'target_pool_type': poolType,
+        'amount': amount,
+        'reason': reason,
+        'target_user_id': ?targetUserId,
+      },
+    );
   }
 
-  Future<void> sendCoinsToAll({required int coinAmount, required bool activeOnly, required String reason}) async {
-    await _apiClient.postMap('/super-owner/coins/send-all', headers: _headers(), body: {'coin_amount': coinAmount, 'active_only': activeOnly, 'reason': reason});
+  Future<void> sendCoinsToAll({
+    required int coinAmount,
+    required bool activeOnly,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/super-owner/coins/send-all',
+      headers: _headers(),
+      body: {
+        'coin_amount': coinAmount,
+        'active_only': activeOnly,
+        'reason': reason,
+      },
+    );
   }
 
-  Future<void> assignCustomId({required int targetUserId, required int? customId, required String reason}) async {
-    await _apiClient.postMap('/super-owner/custom-id', headers: _headers(), body: {'target_user_id': targetUserId, 'display_custom_id': customId, 'reason': reason});
+  Future<void> assignCustomId({
+    required int targetUserId,
+    required int? customId,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/super-owner/custom-id',
+      headers: _headers(),
+      body: {
+        'target_user_id': targetUserId,
+        'display_custom_id': customId,
+        'reason': reason,
+      },
+    );
   }
 
-  Future<void> setStealth({required int targetUserId, required bool enabled, required String reason}) async {
-    await _apiClient.postMap('/super-owner/stealth', headers: _headers(), body: {'target_user_id': targetUserId, 'enabled': enabled, 'reason': reason});
+  Future<void> setStealth({
+    required int targetUserId,
+    required bool enabled,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/super-owner/stealth',
+      headers: _headers(),
+      body: {
+        'target_user_id': targetUserId,
+        'enabled': enabled,
+        'reason': reason,
+      },
+    );
   }
 
   Future<List<SpecialPermissionOption>> loadSpecialPermissionOptions() async {
-    final json = await _apiClient.getList('/super-owner/special-permissions/options', headers: _headers());
-    return json.whereType<Map<String, dynamic>>().map(SpecialPermissionOption.fromJson).toList(growable: false);
+    final json = await _apiClient.getList(
+      '/super-owner/special-permissions/options',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(SpecialPermissionOption.fromJson)
+        .toList(growable: false);
   }
 
-  Future<void> grantSpecialPermission({required int targetUserId, required String permission, required String reason}) async {
-    await _apiClient.postMap('/super-owner/special-permissions/grant', headers: _headers(), body: {'target_user_id': targetUserId, 'permission': permission, 'reason': reason});
+  Future<void> grantSpecialPermission({
+    required int targetUserId,
+    required String permission,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/super-owner/special-permissions/grant',
+      headers: _headers(),
+      body: {
+        'target_user_id': targetUserId,
+        'permission': permission,
+        'reason': reason,
+      },
+    );
   }
 
-  Future<void> adjustVip({required int targetUserId, required int vipLevel, required int svipLevel, required bool vipActive, required bool svipActive, required String reason}) async {
-    await _apiClient.postMap('/super-owner/vip-adjust', headers: _headers(), body: {'target_user_id': targetUserId, 'vip_level': vipLevel, 'svip_level': svipLevel, 'vip_is_active': vipActive, 'svip_is_active': svipActive, 'reason': reason});
+  Future<void> adjustVip({
+    required int targetUserId,
+    required int vipLevel,
+    required int svipLevel,
+    required bool vipActive,
+    required bool svipActive,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/super-owner/vip-adjust',
+      headers: _headers(),
+      body: {
+        'target_user_id': targetUserId,
+        'vip_level': vipLevel,
+        'svip_level': svipLevel,
+        'vip_is_active': vipActive,
+        'svip_is_active': svipActive,
+        'reason': reason,
+      },
+    );
   }
 
-  Future<void> adjustLevels({required int targetUserId, int? sendExpTotal, int? receiveExpTotal, int? rubyTotal, required String reason}) async {
-    await _apiClient.postMap('/super-owner/levels-adjust', headers: _headers(), body: {'target_user_id': targetUserId, 'send_exp_total': ?sendExpTotal, 'receive_exp_total': ?receiveExpTotal, 'ruby_total': ?rubyTotal, 'reason': reason});
+  Future<void> adjustLevels({
+    required int targetUserId,
+    int? sendExpTotal,
+    int? receiveExpTotal,
+    int? rubyTotal,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/super-owner/levels-adjust',
+      headers: _headers(),
+      body: {
+        'target_user_id': targetUserId,
+        'send_exp_total': ?sendExpTotal,
+        'receive_exp_total': ?receiveExpTotal,
+        'ruby_total': ?rubyTotal,
+        'reason': reason,
+      },
+    );
   }
 
   Future<List<SuperOwnerLogItem>> loadSuperOwnerLogs() async {
-    final json = await _apiClient.getList('/super-owner/logs', headers: _headers());
-    return json.whereType<Map<String, dynamic>>().map(SuperOwnerLogItem.fromJson).toList(growable: false);
+    final json = await _apiClient.getList(
+      '/super-owner/logs',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(SuperOwnerLogItem.fromJson)
+        .toList(growable: false);
   }
 
   Future<List<SuperOwnerReviewItem>> loadReviewItems() async {
-    final json = await _apiClient.getList('/super-owner/reviews', headers: _headers());
-    return json.whereType<Map<String, dynamic>>().map(SuperOwnerReviewItem.fromJson).toList(growable: false);
+    final json = await _apiClient.getList(
+      '/super-owner/reviews',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(SuperOwnerReviewItem.fromJson)
+        .toList(growable: false);
   }
 
   Future<SuperOwnerReviewItem> loadReviewDetail(int reviewId) async {
-    final json = await _apiClient.getMap('/super-owner/reviews/$reviewId', headers: _headers());
+    final json = await _apiClient.getMap(
+      '/super-owner/reviews/$reviewId',
+      headers: _headers(),
+    );
     return SuperOwnerReviewItem.fromJson(json);
+  }
+
+  Future<List<ControlCenterEconomyRuleSet>> loadEconomyRuleSets() async {
+    final json = await _apiClient.getList(
+      '/control-center/economy/rules',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(ControlCenterEconomyRuleSet.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<void> updateEconomyRuleSet({
+    required String trackKey,
+    required String title,
+    required List<Map<String, dynamic>> levels,
+    required String reason,
+  }) async {
+    await _apiClient.postMap(
+      '/control-center/economy/rules/$trackKey',
+      headers: _headers(),
+      body: {'title': title, 'levels': levels, 'reason': reason},
+    );
+  }
+
+  Future<List<ControlCenterStoreCategory>> loadStoreCategories() async {
+    final json = await _apiClient.getList(
+      '/control-center/store/categories',
+      headers: _headers(),
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(ControlCenterStoreCategory.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<ControlCenterStoreItem>> loadStoreItems({
+    String? category,
+  }) async {
+    final json = await _apiClient.getList(
+      '/control-center/store/items',
+      headers: _headers(),
+      queryParameters: {'category': category},
+    );
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(ControlCenterStoreItem.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<void> upsertStoreCategory(Map<String, dynamic> payload) async {
+    await _apiClient.postMap(
+      '/control-center/store/categories',
+      headers: _headers(),
+      body: payload,
+    );
+  }
+
+  Future<void> upsertStoreItem(Map<String, dynamic> payload) async {
+    await _apiClient.postMap(
+      '/control-center/store/items',
+      headers: _headers(),
+      body: payload,
+    );
+  }
+
+  Future<Map<String, dynamic>> previewStoreManifest(
+    Map<String, dynamic> manifest,
+  ) {
+    return _apiClient.postMap(
+      '/control-center/store/manifest/preview',
+      headers: _headers(),
+      body: {'manifest': manifest},
+    );
+  }
+
+  Future<Map<String, dynamic>> importStoreManifest({
+    required Map<String, dynamic> manifest,
+    required String reason,
+  }) {
+    return _apiClient.postMap(
+      '/control-center/store/manifest/import',
+      headers: _headers(),
+      body: {'manifest': manifest, 'reason': reason},
+    );
+  }
+
+  Future<StealthState> loadMyStealthState() async {
+    final json = await _apiClient.getMap(
+      '/control-center/stealth/me',
+      headers: _headers(),
+    );
+    return StealthState.fromJson(json);
+  }
+
+  Future<StealthState> toggleMyStealth({
+    required bool enabled,
+    required String reason,
+  }) async {
+    final json = await _apiClient.postMap(
+      '/control-center/stealth/me',
+      headers: _headers(),
+      body: {'enabled': enabled, 'reason': reason},
+    );
+    return StealthState.fromJson(json);
+  }
+
+  Future<StealthState> grantStealth({
+    required int targetUserId,
+    required bool enabled,
+    required String reason,
+  }) async {
+    final json = await _apiClient.postMap(
+      '/control-center/stealth/grants',
+      headers: _headers(),
+      body: {
+        'target_user_id': targetUserId,
+        'enabled': enabled,
+        'reason': reason,
+      },
+    );
+    return StealthState.fromJson(json);
   }
 
   Map<String, String> _headers() {
@@ -115,7 +422,18 @@ class ControlCenterApiService {
 }
 
 class AdminControlSummary {
-  const AdminControlSummary({required this.currentUserId, required this.currentPrimaryRole, required this.canAssignRoles, required this.canViewAuditLogs, required this.canViewLoginHistory, required this.usersCount, required this.activeUsersCount, required this.bannedUsersCount, required this.officialUsersCount, required this.recentAuditCount});
+  const AdminControlSummary({
+    required this.currentUserId,
+    required this.currentPrimaryRole,
+    required this.canAssignRoles,
+    required this.canViewAuditLogs,
+    required this.canViewLoginHistory,
+    required this.usersCount,
+    required this.activeUsersCount,
+    required this.bannedUsersCount,
+    required this.officialUsersCount,
+    required this.recentAuditCount,
+  });
   final int currentUserId;
   final String currentPrimaryRole;
   final bool canAssignRoles;
@@ -129,11 +447,33 @@ class AdminControlSummary {
   bool get isSuperOwnerPanel => currentPrimaryRole == 'founder_owner';
   bool get isOwnerPanel => currentPrimaryRole == 'owner';
   bool get isSuperAdminPanel => currentPrimaryRole == 'superadmin';
-  factory AdminControlSummary.fromJson(Map<String, dynamic> json) => AdminControlSummary(currentUserId: _int(json['current_user_id']), currentPrimaryRole: json['current_primary_role']?.toString() ?? 'user', canAssignRoles: json['can_assign_roles'] == true, canViewAuditLogs: json['can_view_audit_logs'] == true, canViewLoginHistory: json['can_view_login_history'] == true, usersCount: _int(json['users_count']), activeUsersCount: _int(json['active_users_count']), bannedUsersCount: _int(json['banned_users_count']), officialUsersCount: _int(json['official_users_count']), recentAuditCount: _int(json['recent_audit_count']));
+  factory AdminControlSummary.fromJson(Map<String, dynamic> json) =>
+      AdminControlSummary(
+        currentUserId: _int(json['current_user_id']),
+        currentPrimaryRole: json['current_primary_role']?.toString() ?? 'user',
+        canAssignRoles: json['can_assign_roles'] == true,
+        canViewAuditLogs: json['can_view_audit_logs'] == true,
+        canViewLoginHistory: json['can_view_login_history'] == true,
+        usersCount: _int(json['users_count']),
+        activeUsersCount: _int(json['active_users_count']),
+        bannedUsersCount: _int(json['banned_users_count']),
+        officialUsersCount: _int(json['official_users_count']),
+        recentAuditCount: _int(json['recent_audit_count']),
+      );
 }
 
 class AdminUser {
-  const AdminUser({required this.id, required this.publicUserId, required this.displayName, required this.username, required this.isActive, required this.isBanned, required this.roles, required this.primaryRole, this.displayCustomId});
+  const AdminUser({
+    required this.id,
+    required this.publicUserId,
+    required this.displayName,
+    required this.username,
+    required this.isActive,
+    required this.isBanned,
+    required this.roles,
+    required this.primaryRole,
+    this.displayCustomId,
+  });
   final int id;
   final int publicUserId;
   final int? displayCustomId;
@@ -147,61 +487,137 @@ class AdminUser {
   String get roleLabel => primaryRole.replaceAll('_', ' ').toUpperCase();
   bool get isNormalUser => primaryRole == 'user';
   factory AdminUser.fromJson(Map<String, dynamic> json) {
-    final username = json['username']?.toString() ?? 'user_${json['public_user_id']}';
+    final username =
+        json['username']?.toString() ?? 'user_${json['public_user_id']}';
     final displayName = json['display_name']?.toString() ?? username;
     final rolesRaw = json['roles'];
-    return AdminUser(id: _int(json['id']), publicUserId: _int(json['public_user_id']), displayCustomId: json['display_custom_id'] == null ? null : _int(json['display_custom_id']), displayName: displayName, username: username, isActive: json['is_active'] != false, isBanned: json['is_banned'] == true, roles: rolesRaw is List ? rolesRaw.map((item) => item.toString()).toList(growable: false) : const <String>[], primaryRole: json['primary_role']?.toString() ?? 'user');
+    return AdminUser(
+      id: _int(json['id']),
+      publicUserId: _int(json['public_user_id']),
+      displayCustomId: json['display_custom_id'] == null
+          ? null
+          : _int(json['display_custom_id']),
+      displayName: displayName,
+      username: username,
+      isActive: json['is_active'] != false,
+      isBanned: json['is_banned'] == true,
+      roles: rolesRaw is List
+          ? rolesRaw.map((item) => item.toString()).toList(growable: false)
+          : const <String>[],
+      primaryRole: json['primary_role']?.toString() ?? 'user',
+    );
   }
 }
 
 class RoleOption {
-  const RoleOption({required this.value, required this.label, required this.power, required this.assignable});
+  const RoleOption({
+    required this.value,
+    required this.label,
+    required this.power,
+    required this.assignable,
+  });
   final String value;
   final String label;
   final int power;
   final bool assignable;
-  factory RoleOption.fromJson(Map<String, dynamic> json) => RoleOption(value: json['value']?.toString() ?? 'user', label: json['label']?.toString() ?? 'User', power: _int(json['power']), assignable: json['assignable'] == true);
+  factory RoleOption.fromJson(Map<String, dynamic> json) => RoleOption(
+    value: json['value']?.toString() ?? 'user',
+    label: json['label']?.toString() ?? 'User',
+    power: _int(json['power']),
+    assignable: json['assignable'] == true,
+  );
 }
 
 class UserBanItem {
-  const UserBanItem({required this.id, required this.userId, required this.reason, required this.isActive, this.deviceId});
+  const UserBanItem({
+    required this.id,
+    required this.userId,
+    required this.reason,
+    required this.isActive,
+    this.deviceId,
+  });
   final int id;
   final int userId;
   final String reason;
   final bool isActive;
   final String? deviceId;
-  factory UserBanItem.fromJson(Map<String, dynamic> json) => UserBanItem(id: _int(json['id']), userId: _int(json['user_id']), reason: json['reason']?.toString() ?? 'No reason', isActive: json['is_active'] != false, deviceId: json['device_id_snapshot']?.toString());
+  factory UserBanItem.fromJson(Map<String, dynamic> json) => UserBanItem(
+    id: _int(json['id']),
+    userId: _int(json['user_id']),
+    reason: json['reason']?.toString() ?? 'No reason',
+    isActive: json['is_active'] != false,
+    deviceId: json['device_id_snapshot']?.toString(),
+  );
 }
 
 class DeviceBanItem {
-  const DeviceBanItem({required this.id, required this.deviceId, required this.reason, required this.isActive});
+  const DeviceBanItem({
+    required this.id,
+    required this.deviceId,
+    required this.reason,
+    required this.isActive,
+  });
   final int id;
   final String deviceId;
   final String reason;
   final bool isActive;
-  factory DeviceBanItem.fromJson(Map<String, dynamic> json) => DeviceBanItem(id: _int(json['id']), deviceId: json['device_id']?.toString() ?? '', reason: json['reason']?.toString() ?? 'No reason', isActive: json['is_active'] != false);
+  factory DeviceBanItem.fromJson(Map<String, dynamic> json) => DeviceBanItem(
+    id: _int(json['id']),
+    deviceId: json['device_id']?.toString() ?? '',
+    reason: json['reason']?.toString() ?? 'No reason',
+    isActive: json['is_active'] != false,
+  );
 }
 
 class SuperOwnerPoolItem {
-  const SuperOwnerPoolItem({required this.id, required this.ownerUserId, required this.poolType, required this.balance, required this.reservedBalance, required this.status});
+  const SuperOwnerPoolItem({
+    required this.id,
+    required this.ownerUserId,
+    required this.poolType,
+    required this.balance,
+    required this.reservedBalance,
+    required this.status,
+  });
   final int id;
   final int? ownerUserId;
   final String poolType;
   final int balance;
   final int reservedBalance;
   final String status;
-  factory SuperOwnerPoolItem.fromJson(Map<String, dynamic> json) => SuperOwnerPoolItem(id: _int(json['id']), ownerUserId: json['owner_user_id'] == null ? null : _int(json['owner_user_id']), poolType: json['pool_type']?.toString() ?? '', balance: _int(json['balance']), reservedBalance: _int(json['reserved_balance']), status: json['status']?.toString() ?? 'ACTIVE');
+  factory SuperOwnerPoolItem.fromJson(Map<String, dynamic> json) =>
+      SuperOwnerPoolItem(
+        id: _int(json['id']),
+        ownerUserId: json['owner_user_id'] == null
+            ? null
+            : _int(json['owner_user_id']),
+        poolType: json['pool_type']?.toString() ?? '',
+        balance: _int(json['balance']),
+        reservedBalance: _int(json['reserved_balance']),
+        status: json['status']?.toString() ?? 'ACTIVE',
+      );
 }
 
 class SpecialPermissionOption {
   const SpecialPermissionOption({required this.value, required this.label});
   final String value;
   final String label;
-  factory SpecialPermissionOption.fromJson(Map<String, dynamic> json) => SpecialPermissionOption(value: json['value']?.toString() ?? '', label: json['label']?.toString() ?? 'Permission');
+  factory SpecialPermissionOption.fromJson(Map<String, dynamic> json) =>
+      SpecialPermissionOption(
+        value: json['value']?.toString() ?? '',
+        label: json['label']?.toString() ?? 'Permission',
+      );
 }
 
 class SuperOwnerLogItem {
-  const SuperOwnerLogItem({required this.id, required this.action, required this.reason, required this.createdAt, this.actorUserId, this.targetUserId, this.resourceType});
+  const SuperOwnerLogItem({
+    required this.id,
+    required this.action,
+    required this.reason,
+    required this.createdAt,
+    this.actorUserId,
+    this.targetUserId,
+    this.resourceType,
+  });
   final int id;
   final int? actorUserId;
   final int? targetUserId;
@@ -209,18 +625,136 @@ class SuperOwnerLogItem {
   final String? resourceType;
   final String reason;
   final String createdAt;
-  factory SuperOwnerLogItem.fromJson(Map<String, dynamic> json) => SuperOwnerLogItem(id: _int(json['id']), actorUserId: json['actor_user_id'] == null ? null : _int(json['actor_user_id']), targetUserId: json['target_user_id'] == null ? null : _int(json['target_user_id']), action: json['action']?.toString() ?? 'LOG', resourceType: json['resource_type']?.toString(), reason: json['reason']?.toString() ?? '', createdAt: json['created_at']?.toString() ?? '');
+  factory SuperOwnerLogItem.fromJson(Map<String, dynamic> json) =>
+      SuperOwnerLogItem(
+        id: _int(json['id']),
+        actorUserId: json['actor_user_id'] == null
+            ? null
+            : _int(json['actor_user_id']),
+        targetUserId: json['target_user_id'] == null
+            ? null
+            : _int(json['target_user_id']),
+        action: json['action']?.toString() ?? 'LOG',
+        resourceType: json['resource_type']?.toString(),
+        reason: json['reason']?.toString() ?? '',
+        createdAt: json['created_at']?.toString() ?? '',
+      );
 }
 
 class SuperOwnerReviewItem {
-  const SuperOwnerReviewItem({required this.id, required this.kind, required this.title, required this.status, required this.reason, required this.createdAt});
+  const SuperOwnerReviewItem({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.status,
+    required this.reason,
+    required this.createdAt,
+  });
   final int id;
   final String kind;
   final String title;
   final String status;
   final String reason;
   final String createdAt;
-  factory SuperOwnerReviewItem.fromJson(Map<String, dynamic> json) => SuperOwnerReviewItem(id: _int(json['id']), kind: json['kind']?.toString() ?? 'audit', title: json['title']?.toString() ?? 'Review', status: json['status']?.toString() ?? 'open', reason: json['reason']?.toString() ?? '', createdAt: json['created_at']?.toString() ?? '');
+  factory SuperOwnerReviewItem.fromJson(Map<String, dynamic> json) =>
+      SuperOwnerReviewItem(
+        id: _int(json['id']),
+        kind: json['kind']?.toString() ?? 'audit',
+        title: json['title']?.toString() ?? 'Review',
+        status: json['status']?.toString() ?? 'open',
+        reason: json['reason']?.toString() ?? '',
+        createdAt: json['created_at']?.toString() ?? '',
+      );
+}
+
+class ControlCenterEconomyRuleSet {
+  const ControlCenterEconomyRuleSet({
+    required this.id,
+    required this.trackKey,
+    required this.version,
+    required this.title,
+    required this.maxLevel,
+    required this.levelCount,
+  });
+  final int id;
+  final String trackKey;
+  final int version;
+  final String title;
+  final int maxLevel;
+  final int levelCount;
+  factory ControlCenterEconomyRuleSet.fromJson(Map<String, dynamic> json) {
+    final levels = json['levels'];
+    return ControlCenterEconomyRuleSet(
+      id: _int(json['id']),
+      trackKey: json['track_key']?.toString() ?? '',
+      version: _int(json['version']),
+      title: json['title']?.toString() ?? '',
+      maxLevel: _int(json['max_level']),
+      levelCount: levels is List ? levels.length : 0,
+    );
+  }
+}
+
+class ControlCenterStoreCategory {
+  const ControlCenterStoreCategory({
+    required this.key,
+    required this.label,
+    required this.active,
+    required this.sortOrder,
+  });
+  final String key;
+  final String label;
+  final bool active;
+  final int sortOrder;
+  factory ControlCenterStoreCategory.fromJson(Map<String, dynamic> json) =>
+      ControlCenterStoreCategory(
+        key: json['category_key']?.toString() ?? '',
+        label: json['label']?.toString() ?? '',
+        active: json['is_active'] != false,
+        sortOrder: _int(json['sort_order']),
+      );
+}
+
+class ControlCenterStoreItem {
+  const ControlCenterStoreItem({
+    required this.itemId,
+    required this.name,
+    required this.category,
+    required this.itemType,
+    required this.priceCoins,
+    required this.active,
+  });
+  final String itemId;
+  final String name;
+  final String category;
+  final String itemType;
+  final int priceCoins;
+  final bool active;
+  factory ControlCenterStoreItem.fromJson(Map<String, dynamic> json) =>
+      ControlCenterStoreItem(
+        itemId: json['item_id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        category: json['category']?.toString() ?? '',
+        itemType: json['item_type']?.toString() ?? '',
+        priceCoins: _int(json['price_coins']),
+        active: json['is_active'] != false,
+      );
+}
+
+class StealthState {
+  const StealthState({
+    required this.userId,
+    required this.enabled,
+    required this.canUseStealth,
+  });
+  final int userId;
+  final bool enabled;
+  final bool canUseStealth;
+  factory StealthState.fromJson(Map<String, dynamic> json) => StealthState(
+    userId: _int(json['user_id']),
+    enabled: json['is_enabled'] == true,
+    canUseStealth: json['can_use_stealth'] == true,
+  );
 }
 
 int _int(Object? value) {

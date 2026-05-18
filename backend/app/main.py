@@ -9,6 +9,7 @@ from app.api.routes import (
     admin,
     auth,
     coin_sales,
+    control_center,
     economy,
     economy_admin,
     economy_gift_public,
@@ -40,6 +41,7 @@ from app.api.routes import (
     mvp_social,
     notifications,
     presence,
+    profile_display,
     rankings,
     relationship_exp,
     role_badges,
@@ -63,6 +65,8 @@ from app.models import (
     CoinPoolLedger,
     CoinSaleOrder,
     CoinSupplyPool,
+    EconomyRuleLevel,
+    EconomyRuleSet,
     CricketMatch,
     CricketTournament,
     DeviceBan,
@@ -89,6 +93,7 @@ from app.models import (
     LoveBondRequest,
     MvpFeatureState,
     ProfileVisit,
+    ProfileDisplayAudit,
     Room,
     RoomChatMessage,
     RoomExperienceStatus,
@@ -97,6 +102,8 @@ from app.models import (
     RubyWithdrawRequest,
     SpecialPermission,
     StoreItem,
+    StoreAssetManifest,
+    StoreCategory,
     User,
     UserBan,
     UserBlock,
@@ -106,6 +113,7 @@ from app.models import (
     UserRoomPresence,
     UserRole,
     UserStoreInventory,
+    UserStealthState,
     UserVipStatus,
     VibeComment,
     VibePost,
@@ -155,8 +163,48 @@ def _ensure_runtime_schema() -> None:
         "UPDATE gift_catalog_items SET min_combo = 1 WHERE min_combo IS NULL OR min_combo < 1",
         "UPDATE gift_catalog_items SET max_combo = 999 WHERE max_combo IS NULL OR max_combo < min_combo",
         "UPDATE gift_catalog_items SET display_mode = 'normal' WHERE display_mode IS NULL OR display_mode = ''",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS item_type VARCHAR(60) DEFAULT 'store_item' NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS currency_type VARCHAR(30) DEFAULT 'coin' NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS ownership_type VARCHAR(40) DEFAULT 'permanent' NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS duration_days INTEGER",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS cdn_asset_url VARCHAR(700)",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS thumbnail_url VARCHAR(700)",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS animation_url VARCHAR(700)",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS video_url VARCHAR(700)",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS visibility VARCHAR(40) DEFAULT 'public' NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS vip_required_level INTEGER DEFAULT 0 NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS svip_required_level INTEGER DEFAULT 0 NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS official_only BOOLEAN DEFAULT false NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS asset_version INTEGER DEFAULT 1 NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS cache_key VARCHAR(120)",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS catalog_version INTEGER DEFAULT 1 NOT NULL",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS metadata_json JSON",
+        "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS admin_notes TEXT",
+        "ALTER TABLE user_store_inventory ADD COLUMN IF NOT EXISTS ownership_type VARCHAR(40) DEFAULT 'purchase' NOT NULL",
+        "ALTER TABLE user_store_inventory ADD COLUMN IF NOT EXISTS granted_by_user_id INTEGER",
     ]
     with engine.begin() as connection:
+        if connection.dialect.name == "postgresql":
+            for permission in [
+                "ROOM_FORCE_JOIN",
+                "ROOM_LOCK_OVERRIDE",
+                "SECRET_VIBE_OVERRIDE",
+                "MANAGE_STORE_CATALOG",
+                "MANAGE_ASSETS",
+                "MANAGE_ECONOMY_RULES",
+                "MANAGE_VIP_RULES",
+                "MANAGE_SVIP_RULES",
+                "MANAGE_LEVEL_RULES",
+                "MANAGE_ROLES",
+                "MANAGE_PERMISSIONS",
+                "GRANT_STEALTH",
+                "USE_STEALTH",
+                "MANAGE_ROOM_PRIVACY",
+                "MANAGE_ROOM_ASSETS",
+                "MANAGE_GIFTS",
+                "MANAGE_GIFT_CATEGORIES",
+            ]:
+                connection.execute(text(f"ALTER TYPE specialpermissionname ADD VALUE IF NOT EXISTS '{permission}'"))
         for statement in statements:
             connection.execute(text(statement))
 
@@ -192,6 +240,7 @@ app.include_router(role_badges.router)
 app.include_router(admin.router)
 app.include_router(moderation.router)
 app.include_router(super_owner.router)
+app.include_router(control_center.router)
 app.include_router(game_pool_admin.router)
 app.include_router(game_props_admin.router)
 app.include_router(rooms.router)
@@ -213,6 +262,7 @@ app.include_router(social.router)
 app.include_router(vibes.router)
 app.include_router(notifications.router)
 app.include_router(presence.router)
+app.include_router(profile_display.router)
 app.include_router(media.router)
 app.include_router(room_music_media.router)
 app.include_router(mvp_core.router)

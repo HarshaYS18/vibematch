@@ -22,21 +22,34 @@ def _ensure_founder_owner(actor: User) -> None:
 def _ensure_target_is_normal_user(target_user: User) -> None:
     target_role = get_primary_role(target_user)
 
-    if target_role != RoleName.USER:
+    if target_role in {RoleName.FOUNDER_OWNER, RoleName.OWNER}:
         raise HTTPException(
             status_code=403,
-            detail="Special permissions can only be granted to normal users.",
+            detail="Special permissions cannot be granted to protected owner-level accounts.",
         )
 
 
 def grant_special_permission(
     db: Session,
-    target_user: User,
-    permission: SpecialPermissionName,
-    granted_by: User,
-    reason: str,
+    target_user: User | None = None,
+    permission: SpecialPermissionName | None = None,
+    granted_by: User | None = None,
+    reason: str = "",
     expires_at: datetime | None = None,
+    user_id: int | None = None,
+    granted_by_user_id: int | None = None,
 ) -> SpecialPermission:
+    if target_user is None and user_id is not None:
+        target_user = db.query(User).filter(User.id == user_id).first()
+    if granted_by is None and granted_by_user_id is not None:
+        granted_by = db.query(User).filter(User.id == granted_by_user_id).first()
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    if granted_by is None:
+        raise HTTPException(status_code=404, detail="Granting user not found")
+    if permission is None:
+        raise HTTPException(status_code=400, detail="Special permission is required")
+
     _ensure_founder_owner(granted_by)
     _ensure_target_is_normal_user(target_user)
 
@@ -77,9 +90,14 @@ def grant_special_permission(
 def revoke_special_permission(
     db: Session,
     special_permission: SpecialPermission,
-    revoked_by: User,
-    reason: str,
+    revoked_by: User | None = None,
+    reason: str = "",
+    revoked_by_user_id: int | None = None,
 ) -> SpecialPermission:
+    if revoked_by is None and revoked_by_user_id is not None:
+        revoked_by = db.query(User).filter(User.id == revoked_by_user_id).first()
+    if revoked_by is None:
+        raise HTTPException(status_code=404, detail="Revoking user not found")
     _ensure_founder_owner(revoked_by)
 
     special_permission.is_active = False

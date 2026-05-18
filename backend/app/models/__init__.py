@@ -10,7 +10,7 @@ from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, RoomSeatState
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
 from app.models.room_theme import RoomTheme, RoomThemeOwnershipType, RoomThemeReview, RoomThemeReviewStatus, UserRoomThemeInventory
-from app.models.store import StoreItem, StoreItemCategory, UserStoreInventory
+from app.models.store import StoreAssetManifest, StoreCategory, StoreItem, StoreItemCategory, UserStoreInventory
 from app.models.home_banner import HomeBanner, HomeBannerPlacement, HomeBannerTarget
 from app.models.cricket import (
     CricketMatch,
@@ -69,8 +69,10 @@ from app.models.economy_stats import (
     UserGameStats,
     UserLuckyGiftStats,
 )
+from app.models.economy_control import EconomyRuleLevel, EconomyRuleSet
 from app.models.game import GameBet, GameDefinition, GameRiskAudit
 from app.models.gift_catalog import GiftCatalogCategory, GiftCatalogItem
+from app.models.profile_display import ProfileDisplayAudit, UserStealthState
 from app.models.vip_status import UserVipStatus
 from app.models.vibe import VibeComment, VibePost, VibeReaction, VibeReport, VibeSave, VibeShare
 

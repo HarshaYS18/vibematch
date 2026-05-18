@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
 from app.models.room_theme import UserRoomThemeInventory
-from app.models.store import StoreItem, StoreItemCategory, UserStoreInventory
+from app.models.store import StoreCategory, StoreItem, StoreItemCategory, UserStoreInventory
 from app.models.user import User
 from app.schemas.store import (
     EquippedStoreItemResponse,
@@ -199,6 +199,17 @@ _TIMED_CATEGORIES = {StoreItemCategory.AVATAR_FRAME.value, StoreItemCategory.CHA
 
 def seed_default_store_items(db: Session) -> None:
     room_theme_service.seed_default_room_themes(db)
+    for order, category in enumerate(CATEGORY_ORDER, start=1):
+        existing_category = db.query(StoreCategory).filter(StoreCategory.category_key == category).first()
+        if existing_category is None:
+            db.add(
+                StoreCategory(
+                    category_key=category,
+                    label=category.replace("_", " ").title(),
+                    sort_order=order * 10,
+                    is_system=True,
+                )
+            )
     for item_data in DEFAULT_STORE_ITEMS:
         data = dict(item_data)
         duration_days = data.pop("duration_days", None)
@@ -213,6 +224,8 @@ def seed_default_store_items(db: Session) -> None:
 
 
 def _duration_days_for_item(item: StoreItem) -> int | None:
+    if item.duration_days is not None:
+        return int(item.duration_days)
     for data in DEFAULT_STORE_ITEMS:
         if data["item_id"] == item.item_id:
             duration = data.get("duration_days")
@@ -266,10 +279,20 @@ def _item_payload(db: Session, item: StoreItem, user_id: int) -> StoreItemRespon
         description=item.description,
         price_coins=int(item.price_coins or 0),
         duration_days=_duration_days_for_item(item),
+        item_type=getattr(item, "item_type", None),
+        currency_type=getattr(item, "currency_type", "coin"),
+        ownership_type=getattr(item, "ownership_type", "permanent"),
         asset_path=item.asset_path,
+        cdn_asset_url=getattr(item, "cdn_asset_url", None),
         image_url=item.image_url,
+        thumbnail_url=getattr(item, "thumbnail_url", None),
         preview_url=item.preview_url,
+        animation_url=getattr(item, "animation_url", None),
+        video_url=getattr(item, "video_url", None),
         linked_theme_id=item.linked_theme_id,
+        visibility=getattr(item, "visibility", "public"),
+        asset_version=int(getattr(item, "asset_version", 1) or 1),
+        catalog_version=int(getattr(item, "catalog_version", 1) or 1),
         is_active=item.is_active,
         is_featured=item.is_featured,
         is_owned=is_owned,
@@ -281,11 +304,22 @@ def _item_payload(db: Session, item: StoreItem, user_id: int) -> StoreItemRespon
 def catalog(db: Session, user: User) -> StoreCatalogResponse:
     seed_default_store_items(db)
     db.commit()
+    categories = [
+        row.category_key
+        for row in db.query(StoreCategory)
+        .filter(StoreCategory.is_active.is_(True))
+        .order_by(StoreCategory.sort_order.asc(), StoreCategory.id.asc())
+        .all()
+    ]
     items = db.query(StoreItem).filter(StoreItem.is_active.is_(True)).order_by(StoreItem.sort_order.asc(), StoreItem.id.asc()).all()
-    sections: dict[str, list[StoreItemResponse]] = {category: [] for category in CATEGORY_ORDER}
+    sections: dict[str, list[StoreItemResponse]] = {category: [] for category in categories}
     for item in items:
         sections.setdefault(item.category, []).append(_item_payload(db, item, user.id))
-    return StoreCatalogResponse(categories=[category for category in CATEGORY_ORDER if sections.get(category)], sections=sections)
+    ordered_categories = [category for category in categories if sections.get(category)]
+    for category in sections:
+        if category not in ordered_categories and sections.get(category):
+            ordered_categories.append(category)
+    return StoreCatalogResponse(categories=ordered_categories, sections=sections)
 
 
 def purchase(db: Session, user: User, item_id: str) -> StoreItemResponse:
@@ -354,8 +388,12 @@ def inventory(db: Session, user: User) -> InventoryResponse:
                 is_equipped=owned.is_equipped,
                 duration_days=_duration_days_for_item(item),
                 asset_path=item.asset_path,
+                cdn_asset_url=getattr(item, "cdn_asset_url", None),
                 image_url=item.image_url,
+                thumbnail_url=getattr(item, "thumbnail_url", None),
                 preview_url=item.preview_url,
+                animation_url=getattr(item, "animation_url", None),
+                video_url=getattr(item, "video_url", None),
                 linked_theme_id=item.linked_theme_id,
                 expires_at=owned.expires_at,
                 created_at=owned.created_at,
@@ -386,8 +424,12 @@ def equip(db: Session, user: User, item_id: str, equipped: bool) -> InventoryIte
         is_equipped=owned.is_equipped,
         duration_days=_duration_days_for_item(item),
         asset_path=item.asset_path,
+        cdn_asset_url=getattr(item, "cdn_asset_url", None),
         image_url=item.image_url,
+        thumbnail_url=getattr(item, "thumbnail_url", None),
         preview_url=item.preview_url,
+        animation_url=getattr(item, "animation_url", None),
+        video_url=getattr(item, "video_url", None),
         linked_theme_id=item.linked_theme_id,
         expires_at=owned.expires_at,
         created_at=owned.created_at,
@@ -414,7 +456,9 @@ def _equipped_item(db: Session, user_id: int, category: str) -> EquippedStoreIte
         name=item.name,
         category=item.category,
         asset_path=item.asset_path,
+        cdn_asset_url=getattr(item, "cdn_asset_url", None),
         image_url=item.image_url,
+        thumbnail_url=getattr(item, "thumbnail_url", None),
         expires_at=owned.expires_at,
     )
 
@@ -423,6 +467,10 @@ def equipped_items(db: Session, user: User) -> EquippedStoreItemsResponse:
     return EquippedStoreItemsResponse(
         avatar_frame=_equipped_item(db, user.id, StoreItemCategory.AVATAR_FRAME.value),
         chat_bubble=_equipped_item(db, user.id, StoreItemCategory.CHAT_BUBBLE.value),
+        text_bubble=_equipped_item(db, user.id, StoreItemCategory.TEXT_BUBBLE.value),
+        entrance_effect=_equipped_item(db, user.id, StoreItemCategory.ENTRANCE_EFFECT.value),
+        profile_decoration=_equipped_item(db, user.id, StoreItemCategory.PROFILE_DECORATION.value),
+        name_gradient=_equipped_item(db, user.id, StoreItemCategory.NAME_GRADIENT.value),
     )
 
 

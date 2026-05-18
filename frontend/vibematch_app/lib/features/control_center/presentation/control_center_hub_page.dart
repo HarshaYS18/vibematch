@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'control_center_page.dart';
+import 'economy_store_control_center_page.dart';
 import 'game_pool_management_page.dart';
 import 'game_props_page.dart';
 import 'gift_catalog_editor_page.dart';
@@ -18,33 +19,68 @@ class ControlCenterHubPage extends StatelessWidget {
         backgroundColor: const Color(0xFFFAF7F1),
         foregroundColor: const Color(0xFF251538),
         elevation: 0,
-        title: const Text('Control Center', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'Control Center',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
       ),
       body: ListView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 110),
         children: [
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
-              gradient: const LinearGradient(colors: [Color(0xFF120D1F), Color(0xFF4A2A63), Color(0xFFFFC857)]),
-              boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.14), blurRadius: 22, offset: const Offset(0, 12))],
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF120D1F),
+                  Color(0xFF4A2A63),
+                  Color(0xFFFFC857),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF251538).withValues(alpha: 0.14),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
+              ],
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.workspace_premium_rounded, color: Color(0xFFFFF0A8), size: 28),
+                    Icon(
+                      Icons.workspace_premium_rounded,
+                      color: Color(0xFFFFF0A8),
+                      size: 28,
+                    ),
                     SizedBox(width: 10),
-                    Expanded(child: Text('Owner Management', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900))),
+                    Expanded(
+                      child: Text(
+                        'Owner Management',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 SizedBox(height: 8),
                 Text(
                   'Choose the management area. Sensitive tools are backend role-checked and only work for allowed roles.',
-                  style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.35),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -55,23 +91,54 @@ class ControlCenterHubPage extends StatelessWidget {
             title: 'Management',
             subtitle: 'Users, roles, coins, VIP/SVIP, logs and reviews.',
             gradient: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ControlCenterPage())),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ControlCenterPage()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _HubOptionCard(
+            icon: Icons.hub_rounded,
+            title: 'Economy & Store Source',
+            subtitle:
+                'Canonical level rules, store catalog items, manifests and stealth state.',
+            gradient: const [
+              Color(0xFF251538),
+              Color(0xFF12C7B7),
+              Color(0xFFFFC857),
+            ],
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const EconomyStoreControlCenterPage(),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           _HubOptionCard(
             icon: Icons.card_giftcard_rounded,
             title: 'Gift Catalog Editor',
-            subtitle: 'Manage gift categories, gift items, prices, CDN paths and render flags.',
-            gradient: const [Color(0xFFFFC857), Color(0xFF8C5CF6), Color(0xFFE84C72)],
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCatalogEditorPage())),
+            subtitle:
+                'Manage gift categories, gift items, prices, CDN paths and render flags.',
+            gradient: const [
+              Color(0xFFFFC857),
+              Color(0xFF8C5CF6),
+              Color(0xFFE84C72),
+            ],
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const GiftCatalogEditorPage()),
+            ),
           ),
           const SizedBox(height: 12),
           _HubOptionCard(
             icon: Icons.lock_reset_rounded,
             title: 'Reset Inbox Lock',
-            subtitle: 'Search by public/custom ID and reset verified user Inbox Lock to 1234.',
+            subtitle:
+                'Search by public/custom ID and reset verified user Inbox Lock to 1234.',
             gradient: const [Color(0xFF251538), Color(0xFF8C5CF6)],
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const InboxLockOwnerResetPage())),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const InboxLockOwnerResetPage(),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           _HubOptionCard(
@@ -79,23 +146,39 @@ class ControlCenterHubPage extends StatelessWidget {
             title: 'Moderation',
             subtitle: 'Review reported Vibes and handle content safety.',
             gradient: const [Color(0xFFE84C72), Color(0xFFFFC857)],
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VibesReportsReviewPage())),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const VibesReportsReviewPage()),
+            ),
           ),
           const SizedBox(height: 12),
           _HubOptionCard(
             icon: Icons.tune_rounded,
             title: 'Game Props',
-            subtitle: 'Testing mode, exposure controls, probabilities and round flow.',
-            gradient: const [Color(0xFF8C5CF6), Color(0xFF12C7B7), Color(0xFFFFC857)],
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GamePropsPage())),
+            subtitle:
+                'Testing mode, exposure controls, probabilities and round flow.',
+            gradient: const [
+              Color(0xFF8C5CF6),
+              Color(0xFF12C7B7),
+              Color(0xFFFFC857),
+            ],
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const GamePropsPage())),
           ),
           const SizedBox(height: 12),
           _HubOptionCard(
             icon: Icons.account_balance_rounded,
             title: 'Game Pool Management',
-            subtitle: 'Main game pool, game-wise pool, RTP, caps and allocations.',
-            gradient: const [Color(0xFFFFC857), Color(0xFFE84C72), Color(0xFF8C5CF6)],
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GamePoolManagementPage())),
+            subtitle:
+                'Main game pool, game-wise pool, RTP, caps and allocations.',
+            gradient: const [
+              Color(0xFFFFC857),
+              Color(0xFFE84C72),
+              Color(0xFF8C5CF6),
+            ],
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const GamePoolManagementPage()),
+            ),
           ),
         ],
       ),
@@ -104,7 +187,13 @@ class ControlCenterHubPage extends StatelessWidget {
 }
 
 class _HubOptionCard extends StatelessWidget {
-  const _HubOptionCard({required this.icon, required this.title, required this.subtitle, required this.gradient, required this.onTap});
+  const _HubOptionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String title;
@@ -125,7 +214,13 @@ class _HubOptionCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(26),
             border: Border.all(color: const Color(0xFFEDE3D7)),
-            boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.045), blurRadius: 16, offset: const Offset(0, 8))],
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF251538).withValues(alpha: 0.045),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Row(
             children: [
@@ -134,7 +229,11 @@ class _HubOptionCard extends StatelessWidget {
                 height: 52,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(19),
-                  gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  gradient: LinearGradient(
+                    colors: gradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
                 child: Icon(icon, color: Colors.white, size: 27),
               ),
@@ -143,13 +242,32 @@ class _HubOptionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Color(0xFF251538),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.25)),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFF7B6A86),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF8C8198)),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: Color(0xFF8C8198),
+              ),
             ],
           ),
         ),

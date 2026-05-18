@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../auth/data/auth_api_service.dart';
+import '../../profile_display/models/canonical_user_display_model.dart';
 import '../presentation/live_room_models.dart';
 
 class LiveRoomPresenceRepository {
@@ -294,17 +295,29 @@ class LiveRoomPresenceSnapshot {
   }
 
   static SeatUser participantToSeatUser(Map<String, dynamic> json) {
+    final canonicalRaw = json['canonical_user_display'];
+    final canonical = canonicalRaw is Map
+        ? CanonicalUserDisplayModel.fromJson(
+            canonicalRaw.cast<String, dynamic>(),
+          )
+        : null;
     final publicUserId = json['public_user_id']?.toString() ?? '';
     final displayName =
+        canonical?.displayName ??
         _text(json['display_name']) ??
         _text(json['username']) ??
         (publicUserId.isEmpty ? 'Vibe User' : 'User $publicUserId');
     final vip = json['vip'] is Map<String, dynamic>
         ? json['vip'] as Map<String, dynamic>
         : <String, dynamic>{};
-    final svipLevel = _int(vip['svip_level']);
-    final vipLevel = _int(vip['vip_level']);
-    final avatarUrl = _text(json['avatar_url']) ?? _text(json['avatarUrl']);
+    final svipLevel =
+        canonical?.svipLevel ?? _int(json['svip_level'] ?? vip['svip_level']);
+    final vipLevel =
+        canonical?.vipLevel ?? _int(json['vip_level'] ?? vip['vip_level']);
+    final avatarUrl =
+        canonical?.avatarUrl ??
+        _text(json['avatar_url']) ??
+        _text(json['avatarUrl']);
     final isOwner = json['is_owner'] == true;
     final isRoomAdmin = json['is_room_admin'] == true;
     final isMember = json['is_member'] == true;
@@ -318,19 +331,37 @@ class LiveRoomPresenceSnapshot {
           ? 'Admin'
           : isMember
           ? 'Member'
-          : _roleLabel(role),
+          : (canonical?.roomRoleLabel.trim().isNotEmpty == true
+                ? canonical!.roomRoleLabel
+                : _roleLabel(role)),
       familyName: '',
       familyLevel: 'bronze',
       relationshipText: '',
       vipLevel: vipLevel,
       svipLevel: svipLevel,
-      sendingLevel: _int(json['sending_level'] ?? json['sendingLevel']),
-      receivingLevel: _int(json['receiving_level'] ?? json['receivingLevel']),
-      sentExp: _int(json['sent_exp'] ?? json['sentExp']),
-      receivedExp: _int(json['received_exp'] ?? json['receivedExp']),
+      sendingLevel:
+          canonical?.sentLevel ??
+          _int(json['sending_level'] ?? json['sendingLevel']),
+      receivingLevel:
+          canonical?.receivedLevel ??
+          _int(json['receiving_level'] ?? json['receivingLevel']),
+      sentExp:
+          canonical?.monthlySentCoins ??
+          _int(json['sent_exp'] ?? json['sentExp']),
+      receivedExp:
+          canonical?.monthlyReceivedCoins ??
+          _int(json['received_exp'] ?? json['receivedExp']),
       medals: const [],
       avatarColors: _avatarColors(publicUserId),
+      nameGradientColors: canonical?.nameGradientColors ?? const <String>[],
       avatarUrl: avatarUrl,
+      equippedAvatarFrameAssetPath: canonical?.avatarFrame?.assetPath,
+      equippedAvatarFrameImageUrl:
+          canonical?.avatarFrame?.imageUrl ??
+          canonical?.avatarFrame?.cdnAssetUrl,
+      equippedChatBubbleAssetPath: canonical?.textBubble?.assetPath,
+      equippedChatBubbleImageUrl:
+          canonical?.textBubble?.imageUrl ?? canonical?.textBubble?.cdnAssetUrl,
       isHost: isOwner,
       isRoomAdmin: isRoomAdmin || isOwner,
     );

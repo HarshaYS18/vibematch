@@ -62,7 +62,7 @@ def has_active_special_permission(db: Session, user: User, permission: SpecialPe
 def can_use_hidden_presence(db: Session, user: User) -> bool:
     if is_founder_owner(user):
         return True
-    return has_active_special_permission(db, user, SpecialPermissionName.STEALTH_MODE)
+    return has_active_special_permission(db, user, SpecialPermissionName.STEALTH_MODE) or has_active_special_permission(db, user, SpecialPermissionName.USE_STEALTH)
 
 
 def can_force_join_room(db: Session, user: User) -> bool:

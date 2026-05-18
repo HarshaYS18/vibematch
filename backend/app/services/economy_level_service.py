@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.economy import EconomyCurrency, EconomyDirection, GiftTransaction, UserWallet, WalletLedger
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
-from app.services import experience_service
+from app.services import economy_rules_service, experience_service
 from app.services import level_progression_service as progression
 
 OFFICIAL_RECHARGE_SOURCE_TYPES = {
@@ -113,10 +113,10 @@ def wallet_level_payload(db: Session, wallet: UserWallet) -> dict:
         "monthly_gift_coins_received": monthly_gifts["received"],
         "lifetime_send_exp": user_exp.send_total_exp,
         "lifetime_receive_exp": user_exp.receive_total_exp,
-        "vip": progression.vip_payload(recharge["lifetime"]),
-        "svip": progression.svip_payload(recharge["monthly"]),
-        "sent": progression.send_payload(user_exp.send_total_exp),
-        "received": progression.receive_payload(user_exp.receive_total_exp),
+        "vip": economy_rules_service.progress_payload(db, recharge["lifetime"], "vip"),
+        "svip": economy_rules_service.progress_payload(db, recharge["monthly"], "svip"),
+        "sent": economy_rules_service.progress_payload(db, user_exp.send_total_exp, "send"),
+        "received": economy_rules_service.progress_payload(db, user_exp.receive_total_exp, "receive"),
     }
 
 

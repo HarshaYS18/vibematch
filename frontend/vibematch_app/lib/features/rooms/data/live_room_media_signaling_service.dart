@@ -1390,6 +1390,11 @@ class LiveMediaPeerSnapshot {
     this.svipLevel = 0,
     this.sendingLevel = 0,
     this.receivingLevel = 0,
+    this.nameGradientColors = const <String>[],
+    this.equippedAvatarFrameAssetPath,
+    this.equippedAvatarFrameImageUrl,
+    this.equippedChatBubbleAssetPath,
+    this.equippedChatBubbleImageUrl,
     this.seatIndex,
     this.micEnabled = false,
     this.adminMuted = false,
@@ -1406,11 +1411,23 @@ class LiveMediaPeerSnapshot {
   final int svipLevel;
   final int sendingLevel;
   final int receivingLevel;
+  final List<String> nameGradientColors;
+  final String? equippedAvatarFrameAssetPath;
+  final String? equippedAvatarFrameImageUrl;
+  final String? equippedChatBubbleAssetPath;
+  final String? equippedChatBubbleImageUrl;
   final int? seatIndex;
   final bool micEnabled;
   final bool adminMuted;
 
   factory LiveMediaPeerSnapshot.fromJson(Map<String, dynamic> json) {
+    final canonical = _map(json['canonical_user_display']);
+    final gradient = _map(json['name_gradient'] ?? canonical['name_gradient']);
+    final equipped = _map(
+      json['equipped_items'] ?? canonical['equipped_items'],
+    );
+    final avatarFrame = _map(equipped['avatar_frame']);
+    final textBubble = _map(equipped['text_bubble'] ?? equipped['chat_bubble']);
     return LiveMediaPeerSnapshot(
       peerId: json['peer_id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
@@ -1419,10 +1436,31 @@ class LiveMediaPeerSnapshot {
       isRoomAdmin: json['is_room_admin'] == true || json['isRoomAdmin'] == true,
       roleLabel: json['role_label']?.toString() ?? '',
       avatarUrl: _text(json['avatar_url'] ?? json['avatarUrl']),
-      vipLevel: _int(json['vip_level'] ?? json['vipLevel']),
-      svipLevel: _int(json['svip_level'] ?? json['svipLevel']),
-      sendingLevel: _int(json['sending_level'] ?? json['sendingLevel']),
-      receivingLevel: _int(json['receiving_level'] ?? json['receivingLevel']),
+      vipLevel: _int(
+        json['vip_level'] ?? json['vipLevel'] ?? canonical['vip_level'],
+      ),
+      svipLevel: _int(
+        json['svip_level'] ?? json['svipLevel'] ?? canonical['svip_level'],
+      ),
+      sendingLevel: _int(
+        json['sending_level'] ??
+            json['sendingLevel'] ??
+            canonical['sent_level'],
+      ),
+      receivingLevel: _int(
+        json['receiving_level'] ??
+            json['receivingLevel'] ??
+            canonical['received_level'],
+      ),
+      nameGradientColors: _stringList(gradient['colors']),
+      equippedAvatarFrameAssetPath: _text(avatarFrame['asset_path']),
+      equippedAvatarFrameImageUrl: _text(
+        avatarFrame['image_url'] ?? avatarFrame['cdn_asset_url'],
+      ),
+      equippedChatBubbleAssetPath: _text(textBubble['asset_path']),
+      equippedChatBubbleImageUrl: _text(
+        textBubble['image_url'] ?? textBubble['cdn_asset_url'],
+      ),
       seatIndex: int.tryParse(json['seat_index']?.toString() ?? ''),
       micEnabled: json['mic_enabled'] == true || json['micEnabled'] == true,
       adminMuted: json['admin_muted'] == true || json['adminMuted'] == true,
@@ -1442,6 +1480,11 @@ class LiveMediaPeerSnapshot {
     int? svipLevel,
     int? sendingLevel,
     int? receivingLevel,
+    List<String>? nameGradientColors,
+    String? equippedAvatarFrameAssetPath,
+    String? equippedAvatarFrameImageUrl,
+    String? equippedChatBubbleAssetPath,
+    String? equippedChatBubbleImageUrl,
     int? seatIndex,
     bool clearSeatIndex = false,
     bool? micEnabled,
@@ -1459,6 +1502,15 @@ class LiveMediaPeerSnapshot {
       svipLevel: svipLevel ?? this.svipLevel,
       sendingLevel: sendingLevel ?? this.sendingLevel,
       receivingLevel: receivingLevel ?? this.receivingLevel,
+      nameGradientColors: nameGradientColors ?? this.nameGradientColors,
+      equippedAvatarFrameAssetPath:
+          equippedAvatarFrameAssetPath ?? this.equippedAvatarFrameAssetPath,
+      equippedAvatarFrameImageUrl:
+          equippedAvatarFrameImageUrl ?? this.equippedAvatarFrameImageUrl,
+      equippedChatBubbleAssetPath:
+          equippedChatBubbleAssetPath ?? this.equippedChatBubbleAssetPath,
+      equippedChatBubbleImageUrl:
+          equippedChatBubbleImageUrl ?? this.equippedChatBubbleImageUrl,
       seatIndex: clearSeatIndex ? null : seatIndex ?? this.seatIndex,
       micEnabled: micEnabled ?? this.micEnabled,
       adminMuted: adminMuted ?? this.adminMuted,
@@ -1469,6 +1521,20 @@ class LiveMediaPeerSnapshot {
 String? _text(dynamic value) {
   final text = value?.toString().trim();
   return text == null || text.isEmpty || text == 'null' ? null : text;
+}
+
+Map<String, dynamic> _map(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return value.cast<String, dynamic>();
+  return const <String, dynamic>{};
+}
+
+List<String> _stringList(dynamic value) {
+  if (value is! List) return const <String>[];
+  return value
+      .map((item) => item.toString())
+      .where((item) => item.trim().isNotEmpty)
+      .toList(growable: false);
 }
 
 int _int(dynamic value) {
