@@ -32,6 +32,10 @@ class RoomSeatLayoutUpdateRequest(BaseModel):
     seat_layout_id: str = Field(min_length=2, max_length=24)
 
 
+class RoomNameUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
 class RoomAnnouncementUpdateRequest(BaseModel):
     announcement_text: str = Field(default="", max_length=500)
 
