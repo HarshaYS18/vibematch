@@ -23,6 +23,8 @@ class LiveRoomBody extends StatelessWidget {
     required this.selectedSeatIndex,
     required this.canManageSeats,
     this.canManageAdmins = false,
+    this.canEditRoomName = false,
+    this.canManageAnnouncement = false,
     required this.applyOnlyModeEnabled,
     this.currentUserIsMember = false,
     this.joinRequestPending = false,
@@ -43,6 +45,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.onJoinTap,
     required this.onShare,
     required this.onAnnouncement,
+    required this.onEditRoomName,
     required this.onSettings,
     required this.onUsersTap,
     required this.onRoomRankingsTap,
@@ -76,6 +79,8 @@ class LiveRoomBody extends StatelessWidget {
   final int? selectedSeatIndex;
   final bool canManageSeats;
   final bool canManageAdmins;
+  final bool canEditRoomName;
+  final bool canManageAnnouncement;
   final bool applyOnlyModeEnabled;
   final bool currentUserIsMember;
   final bool joinRequestPending;
@@ -96,6 +101,7 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onJoinTap;
   final VoidCallback onShare;
   final VoidCallback onAnnouncement;
+  final VoidCallback onEditRoomName;
   final VoidCallback onSettings;
   final VoidCallback onUsersTap;
   final VoidCallback onRoomRankingsTap;
@@ -172,6 +178,8 @@ class LiveRoomBody extends StatelessWidget {
                       onlineCount: _effectiveOnlineCount,
                       canManageRoom: canManageSeats,
                       canManageAdmins: canManageAdmins,
+                      canEditRoomName: canEditRoomName,
+                      canManageAnnouncement: canManageAnnouncement,
                       currentUserIsMember: currentUserIsMember,
                       joinRequestPending: joinRequestPending,
                       admins: admins,
@@ -183,6 +191,7 @@ class LiveRoomBody extends StatelessWidget {
                       onJoinTap: onJoinTap,
                       onShare: onShare,
                       onAnnouncement: onAnnouncement,
+                      onEditRoomName: onEditRoomName,
                       onSettings: onSettings,
                       onUsersTap: onUsersTap,
                       onRoomRankingsTap: onRoomRankingsTap,
