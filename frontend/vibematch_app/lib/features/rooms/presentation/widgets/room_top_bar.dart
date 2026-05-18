@@ -17,6 +17,7 @@ class RoomTopBar extends StatelessWidget {
     required this.onJoinTap,
     required this.onShare,
     required this.onAnnouncement,
+    required this.onEditRoomName,
     required this.onSettings,
     required this.onUsersTap,
     required this.admins,
@@ -30,6 +31,8 @@ class RoomTopBar extends StatelessWidget {
     this.language = 'Telugu',
     this.canManageRoom = true,
     this.canManageAdmins = true,
+    this.canEditRoomName = false,
+    this.canManageAnnouncement = false,
     this.currentUserIsMember = false,
     this.joinRequestPending = false,
   });
@@ -42,6 +45,7 @@ class RoomTopBar extends StatelessWidget {
   final VoidCallback onJoinTap;
   final VoidCallback onShare;
   final VoidCallback onAnnouncement;
+  final VoidCallback onEditRoomName;
   final VoidCallback onSettings;
   final VoidCallback onUsersTap;
   final List<SeatUser> admins;
@@ -55,6 +59,8 @@ class RoomTopBar extends StatelessWidget {
   final String language;
   final bool canManageRoom;
   final bool canManageAdmins;
+  final bool canEditRoomName;
+  final bool canManageAnnouncement;
   final bool currentUserIsMember;
   final bool joinRequestPending;
 
@@ -70,15 +76,22 @@ class RoomTopBar extends StatelessWidget {
           children: [
             RoundRoomButton(icon: Icons.arrow_back_rounded, onTap: onBack, size: 28, iconSize: 16, background: Colors.black.withValues(alpha: 0.24)),
             const SizedBox(width: 5),
-            Expanded(
+            Flexible(
+              fit: FlexFit.loose,
               child: Align(
                 alignment: Alignment.centerLeft,
+                widthFactor: 1,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 112, maxWidth: 198),
+                  constraints: BoxConstraints(
+                    minWidth: 112,
+                    maxWidth: MediaQuery.sizeOf(context).width * 0.56,
+                  ),
                   child: _RoomNamePill(
                     roomName: roomName,
                     privacyMode: privacyMode,
                     onInfoTap: () => _openRoomInfo(context),
+                    onEditRoomName: onEditRoomName,
+                    canEditRoomName: canEditRoomName,
                     onJoinTap: onJoinTap,
                     showJoinButton: !canManageAdmins,
                     currentUserIsMember: currentUserIsMember,
@@ -89,8 +102,10 @@ class RoomTopBar extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             RoundRoomButton(icon: Icons.send_rounded, onTap: onShare, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
-            const SizedBox(width: 5),
-            RoundRoomButton(icon: Icons.campaign_rounded, onTap: onAnnouncement, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
+            if (canManageAnnouncement) ...[
+              const SizedBox(width: 5),
+              RoundRoomButton(icon: Icons.campaign_rounded, onTap: onAnnouncement, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
+            ],
             if (canManageRoom) ...[
               const SizedBox(width: 5),
               RoundRoomButton(icon: Icons.settings_rounded, onTap: onSettings, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
@@ -131,6 +146,8 @@ class _RoomNamePill extends StatelessWidget {
     required this.roomName,
     required this.privacyMode,
     required this.onInfoTap,
+    required this.onEditRoomName,
+    required this.canEditRoomName,
     required this.onJoinTap,
     required this.showJoinButton,
     required this.currentUserIsMember,
@@ -140,6 +157,8 @@ class _RoomNamePill extends StatelessWidget {
   final String roomName;
   final RoomPrivacyMode privacyMode;
   final VoidCallback onInfoTap;
+  final VoidCallback onEditRoomName;
+  final bool canEditRoomName;
   final VoidCallback onJoinTap;
   final bool showJoinButton;
   final bool currentUserIsMember;
@@ -157,21 +176,26 @@ class _RoomNamePill extends StatelessWidget {
     return Container(
       height: 28,
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), color: Colors.black.withValues(alpha: 0.34), border: Border.all(color: Colors.white.withValues(alpha: 0.11)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 11, offset: const Offset(0, 5))]),
-      child: Row(children: [
-        Expanded(
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Flexible(
+          fit: FlexFit.loose,
           child: Material(
             color: Colors.transparent,
             borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
             child: InkWell(
-              borderRadius: BorderRadius.horizontal(left: const Radius.circular(999), right: Radius.circular(_showTrailingSlot ? 0 : 999)),
+              borderRadius: BorderRadius.horizontal(left: const Radius.circular(999), right: Radius.circular(canEditRoomName || _showTrailingSlot ? 0 : 999)),
               onTap: onInfoTap,
               child: Padding(
-                padding: const EdgeInsets.only(left: 8, right: 3),
-                child: Row(children: [_PrivacyIcon(mode: privacyMode), const SizedBox(width: 5), Flexible(child: Text(_cleanRoomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.01, height: 1))), const SizedBox(width: 3), Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.72), size: 13)]),
+                padding: const EdgeInsets.only(left: 8, right: 4),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [_PrivacyIcon(mode: privacyMode), const SizedBox(width: 5), Flexible(child: Text(_cleanRoomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.01, height: 1))), const SizedBox(width: 3), Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.72), size: 13)]),
               ),
             ),
           ),
         ),
+        if (canEditRoomName) ...[
+          Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
+          Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onEditRoomName, child: const SizedBox(width: 26, height: 28, child: Center(child: Icon(Icons.edit_rounded, color: RoomColors.aqua, size: 13))))),
+        ],
         if (_showTrailingSlot) ...[
           Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
           if (_showMemberIcon)
