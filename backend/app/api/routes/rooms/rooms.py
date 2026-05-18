@@ -9,7 +9,7 @@ from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
 from app.realtime.connection_manager import room_realtime_connections
-from app.schemas.room_settings import RoomAccessSettingsUpdateRequest, RoomAnnouncementUpdateRequest, RoomBackgroundUpdateRequest, RoomSeatLayoutUpdateRequest, RoomSettingsResponse
+from app.schemas.room_settings import RoomAccessSettingsUpdateRequest, RoomAnnouncementUpdateRequest, RoomBackgroundUpdateRequest, RoomNameUpdateRequest, RoomSeatLayoutUpdateRequest, RoomSettingsResponse
 from app.schemas.room_theme import (
     CustomRoomBackgroundSubmitRequest,
     RoomCoverPhotoUpdateRequest,
@@ -61,11 +61,19 @@ def _role_values(user: User) -> set[str]:
     return {role.value if hasattr(role, "value") else str(role) for role in get_user_roles(user)}
 
 
+def _display_name(user: User) -> str:
+    return user.display_name or user.username or str(user.public_user_id)
+
+
 def _can_manage_room(db: Session, room: Room, user: User) -> bool:
     if room.owner_user_id == user.id or bool(_role_values(user) & {"founder_owner", "owner"}):
         return True
     participant = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user.id).first()
     return bool(participant and participant.is_room_admin)
+
+
+def _can_update_host_owned_room(room: Room, user: User) -> bool:
+    return room.owner_user_id == user.id or bool(_role_values(user) & {"founder_owner", "owner"})
 
 
 def _default_room_settings_response(room_public_id: str) -> RoomSettingsResponse:
@@ -141,6 +149,25 @@ def _get_room_for_update(db: Session, room_public_id: str, current_user: User) -
     if not _can_manage_room(db, room, current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host/admin or Owner can update room settings")
     return room
+
+
+def _get_room_for_host_update(db: Session, room_public_id: str, current_user: User) -> Room:
+    room = _get_or_create_room_for_settings(db, room_public_id, current_user)
+    if not _can_update_host_owned_room(room, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the channel host can update this room field")
+    return room
+
+
+async def _broadcast_room_settings(room: Room, db: Session, extra: dict | None = None) -> None:
+    snapshot = room_state_service.room_snapshot(db, room)
+    db.commit()
+    payload = {"room_id": room.room_public_id, "room": snapshot}
+    if extra:
+        payload.update(extra)
+    await room_realtime_connections.broadcast_room(
+        room.room_public_id,
+        {"type": "room_settings/updated", "payload": payload},
+    )
 
 
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -223,12 +250,19 @@ async def update_room_settings(room_public_id: str, payload: RoomAccessSettingsU
     db.add(room)
     db.commit()
     db.refresh(room)
-    snapshot = room_state_service.room_snapshot(db, room)
+    await _broadcast_room_settings(room, db)
+    return _room_settings_response(room)
+
+
+@router.patch("/{room_public_id}/name", response_model=RoomSettingsResponse)
+async def update_room_name(room_public_id: str, payload: RoomNameUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RoomSettingsResponse:
+    room = _get_room_for_host_update(db, room_public_id, current_user)
+    room.name = payload.name.strip()
+    room.is_active = True
+    room.updated_at = datetime.utcnow()
     db.commit()
-    await room_realtime_connections.broadcast_room(
-        room.room_public_id,
-        {"type": "room_settings/updated", "payload": {"room_id": room.room_public_id, "room": snapshot}},
-    )
+    db.refresh(room)
+    await _broadcast_room_settings(room, db, {"name": room.name, "actor_user_id": str(current_user.id), "actor_name": _display_name(current_user)})
     return _room_settings_response(room)
 
 
@@ -255,14 +289,15 @@ def update_room_seat_layout(room_public_id: str, payload: RoomSeatLayoutUpdateRe
 
 
 @router.patch("/{room_public_id}/announcement", response_model=RoomSettingsResponse)
-def update_room_announcement(room_public_id: str, payload: RoomAnnouncementUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    room = _get_room_for_update(db, room_public_id, current_user)
+async def update_room_announcement(room_public_id: str, payload: RoomAnnouncementUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room = _get_room_for_host_update(db, room_public_id, current_user)
     room.announcement_text = payload.announcement_text.strip()
     room.announcement_updated_at = datetime.utcnow()
     room.announcement_updated_by_user_id = current_user.id
     room.is_active = True
     db.commit()
     db.refresh(room)
+    await _broadcast_room_settings(room, db, {"announcement_text": room.announcement_text, "actor_user_id": str(current_user.id), "actor_name": _display_name(current_user)})
     return _room_settings_response(room)
 
 
