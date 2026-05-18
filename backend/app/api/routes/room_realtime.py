@@ -119,6 +119,12 @@ def _room_user_key(user: User | None) -> str:
     return f"user_{user.public_user_id}"
 
 
+def _display_name(user: User | None, fallback: str = "Vibe User") -> str:
+    if user is None:
+        return fallback
+    return user.display_name or user.username or str(user.public_user_id)
+
+
 def _user_identity_payload(room_id: str, prefix: str, user: User | None) -> dict[str, Any]:
     if user is None:
         return {}
@@ -127,7 +133,7 @@ def _user_identity_payload(room_id: str, prefix: str, user: User | None) -> dict
         f"{prefix}_backend_user_id": user.id,
         f"{prefix}_public_user_id": user.public_user_id,
         f"{prefix}_peer_id": _room_peer_id(room_id, user),
-        f"{prefix}_name": user.display_name or user.username or str(user.public_user_id),
+        f"{prefix}_name": _display_name(user),
         f"{prefix}_avatar_url": user.avatar_url,
     }
 
@@ -142,7 +148,7 @@ def _event_payload(event_type: str, room_id: str, room: dict[str, Any], extra: d
 def _chat_event_payload(room_id: str, user: User, text: str, message_id: int | None = None) -> dict[str, Any]:
     created_at = datetime.utcnow().isoformat()
     event_id = f"chat_{message_id}" if message_id else f"chat_{room_id}_{user.id}_{uuid4().hex}"
-    return {"type": "room/system_event", "payload": {"id": event_id, "event_type": "room_chat_message", "type": "room_chat_message", "room_id": room_id, "actor_user_id": str(user.id), "actor_public_user_id": user.public_user_id, "actor_name": user.display_name or user.username or f"User {user.public_user_id}", "actor_avatar_url": user.avatar_url, "actor_vip_level": 0, "actor_sending_level": 0, "actor_receiving_level": 0, "target_user_id": "", "target_name": "", "message": text, "created_at": created_at}}
+    return {"type": "room/system_event", "payload": {"id": event_id, "event_type": "room_chat_message", "type": "room_chat_message", "room_id": room_id, "actor_user_id": str(user.id), "actor_public_user_id": user.public_user_id, "actor_name": _display_name(user, f"User {user.public_user_id}"), "actor_avatar_url": user.avatar_url, "actor_vip_level": 0, "actor_sending_level": 0, "actor_receiving_level": 0, "target_user_id": "", "target_name": "", "message": text, "created_at": created_at}}
 
 
 def _system_event_payload(
@@ -162,12 +168,12 @@ def _system_event_payload(
         "actor_user_id": _room_user_key(actor) if actor else "",
         "actor_backend_user_id": actor.id if actor else None,
         "actor_public_user_id": actor.public_user_id if actor else None,
-        "actor_name": actor.display_name or actor.username or str(actor.public_user_id) if actor else "System",
+        "actor_name": _display_name(actor, "System"),
         "actor_avatar_url": actor.avatar_url if actor else None,
         "target_user_id": _room_user_key(target) if target else "",
         "target_backend_user_id": target.id if target else None,
         "target_public_user_id": target.public_user_id if target else None,
-        "target_name": target.display_name or target.username or str(target.public_user_id) if target else "",
+        "target_name": _display_name(target, "") if target else "",
         "message": message,
         "created_at": datetime.utcnow().isoformat(),
         "auto_dismiss_seconds": 10,
@@ -175,6 +181,10 @@ def _system_event_payload(
     if seat_index is not None:
         payload["seat_index"] = seat_index
     return {"type": "room/system_event", "payload": payload}
+
+
+def _setting_message(actor: User, setting_name: str, enabled: bool) -> str:
+    return f"{_display_name(actor, 'Room admin')} turned {setting_name} {'on' if enabled else 'off'}"
 
 
 def _latest_chat_message_matches(snapshot: dict[str, Any], user: User, text: str) -> tuple[bool, int | None]:
@@ -213,6 +223,20 @@ def _snapshot_has_user_on_seat(snapshot: dict[str, Any], user: User, seat_index:
         if aliases.intersection(values):
             return True
     return False
+
+
+def _snapshot_user_is_stealth(snapshot: dict[str, Any], user: User | None) -> bool:
+    if user is None:
+        return False
+    participants = snapshot.get("internal_participants") or []
+    if not isinstance(participants, list):
+        return False
+    return any(
+        isinstance(item, dict)
+        and int(item.get("backend_user_id") or 0) == user.id
+        and item.get("is_stealth") is True
+        for item in participants
+    )
 
 
 async def _broadcast_snapshot(room_id: str, event_type: str, room: dict[str, Any], extra: dict[str, Any] | None = None) -> None:
@@ -286,8 +310,10 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                             },
                         )
                         continue
-                    if not (user is not None and snapshot.get("internal_participants") and any(int(item.get("backend_user_id") or 0) == user.id and item.get("is_stealth") is True for item in snapshot.get("internal_participants", []))):
+                    if not _snapshot_user_is_stealth(snapshot, user):
                         await _broadcast_snapshot(room_id, "room/joined", snapshot)
+                        if user is not None:
+                            await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "user_entered", f"{_display_name(user)} entered the room", actor=user, target=user))
                     await room_realtime_connections.send_json(websocket, _event_payload("room.snapshot", room_id, snapshot))
                     continue
 
@@ -379,7 +405,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                             **_user_identity_payload(room_id, "target", target),
                         }
                         await room_realtime_connections.send_room_user(room_id, target.id, {"type": "seat_invite/received", "payload": invite_payload})
-                        invite_message = f"{user.display_name or user.username or 'Room admin'} invited {target.display_name or target.username or 'you'} to seat {seat_index + 1}"
+                        invite_message = f"{_display_name(user, 'Room admin')} invited {_display_name(target, 'you')} to seat {seat_index + 1}"
                         await room_realtime_connections.send_room_user(room_id, user.id, _system_event_payload(room_id, "seat_invite_sent", invite_message, actor=user, target=target, seat_index=seat_index))
                         await room_realtime_connections.send_room_user(room_id, target.id, _system_event_payload(room_id, "seat_invite_sent", invite_message, actor=user, target=target, seat_index=seat_index))
                     await _broadcast_snapshot(room_id, "seat_invite/sent", snapshot, {"target_user_id": target.id if target else None, "seat_index": seat_index})
@@ -429,7 +455,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         **_user_identity_payload(room_id, "applicant", user),
                     }
                     await room_realtime_connections.broadcast_room(room_id, {"type": "seat_application/received", "payload": application_payload})
-                    await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "seat_application_requested", f"{user.display_name or user.username or 'A user'} applied for seat {seat_index + 1}", actor=user, target=user, seat_index=seat_index))
+                    await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "seat_application_requested", f"{_display_name(user, 'A user')} applied for seat {seat_index + 1}", actor=user, target=user, seat_index=seat_index))
                     await _broadcast_snapshot(room_id, "seat_application/requested", snapshot, {"applicant_user_id": user.id, "seat_index": seat_index})
                     continue
 
@@ -439,7 +465,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     snapshot = room_action_service.reject_seat_application(db, room, user, target, seat_index) if target else room_state_service.room_snapshot(db, room)
                     db.commit()
                     if target is not None:
-                        await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "seat_application_rejected", f"{target.display_name or target.username or 'User'}'s request for seat {seat_index + 1} was rejected", actor=user, target=target, seat_index=seat_index))
+                        await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "seat_application_rejected", f"{_display_name(target)}'s request for seat {seat_index + 1} was rejected", actor=user, target=target, seat_index=seat_index))
                     await _broadcast_snapshot(room_id, "seat_application/rejected", snapshot, {"target_user_id": target.id if target else None, "seat_index": seat_index})
                     continue
 
@@ -449,7 +475,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     snapshot = room_action_service.assign_seat(db, room, user, target, seat_index) if target else room_state_service.room_snapshot(db, room)
                     db.commit()
                     if target is not None and _snapshot_has_user_on_seat(snapshot, target, seat_index):
-                        await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "seat_application_agreed", f"{target.display_name or target.username or 'User'}'s request for seat {seat_index + 1} was agreed", actor=user, target=target, seat_index=seat_index))
+                        await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "seat_application_agreed", f"{_display_name(target)}'s request for seat {seat_index + 1} was agreed", actor=user, target=target, seat_index=seat_index))
                     await _broadcast_snapshot(room_id, "seat/updated", snapshot)
                     continue
 
@@ -482,7 +508,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     db.commit()
                     if target is not None:
                         await room_realtime_connections.send_room_user(room_id, target.id, {"type": "room/kicked", "payload": {"room_id": room_id, "room": snapshot, "reason": reason, "duration": duration, **_user_identity_payload(room_id, "target", target)}})
-                        await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "user_removed", f"{target.display_name or target.username or 'User'} was removed from the room", actor=user, target=target))
+                        await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "user_removed", f"{_display_name(target)} was removed from the room", actor=user, target=target))
                     await _broadcast_snapshot(room_id, "room/peer_left", snapshot, {"target_user_id": target.id if target else None})
                     continue
 
@@ -530,21 +556,27 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type == "room_settings/images" and user is not None:
-                    snapshot = room_action_service.set_room_images_enabled(db, room, user, _bool_payload(payload, "room_images_enabled", _bool_payload(payload, "enabled", True)))
+                    enabled = _bool_payload(payload, "room_images_enabled", _bool_payload(payload, "enabled", True))
+                    snapshot = room_action_service.set_room_images_enabled(db, room, user, enabled)
                     db.commit()
                     await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"room_images_enabled": snapshot.get("room_images_enabled")})
+                    await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "room_system_message", _setting_message(user, "image messages", enabled), actor=user))
                     continue
 
                 if event_type == "room_settings/guest_messages" and user is not None:
-                    snapshot = room_action_service.set_guest_messages_enabled(db, room, user, _bool_payload(payload, "guest_messages_enabled", _bool_payload(payload, "enabled", True)))
+                    enabled = _bool_payload(payload, "guest_messages_enabled", _bool_payload(payload, "enabled", True))
+                    snapshot = room_action_service.set_guest_messages_enabled(db, room, user, enabled)
                     db.commit()
                     await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"guest_messages_enabled": snapshot.get("guest_messages_enabled")})
+                    await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "room_system_message", _setting_message(user, "guest messages", enabled), actor=user))
                     continue
 
                 if event_type == "room_settings/apply_mode" and user is not None:
-                    snapshot = room_action_service.set_apply_only_mode_enabled(db, room, user, _bool_payload(payload, "apply_only_mode_enabled", _bool_payload(payload, "enabled", False)))
+                    enabled = _bool_payload(payload, "apply_only_mode_enabled", _bool_payload(payload, "enabled", False))
+                    snapshot = room_action_service.set_apply_only_mode_enabled(db, room, user, enabled)
                     db.commit()
                     await _broadcast_snapshot(room_id, "room_settings/updated", snapshot, {"apply_only_mode_enabled": snapshot.get("apply_only_mode_enabled")})
+                    await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "room_system_message", _setting_message(user, "apply-only seat mode", enabled), actor=user))
                     continue
 
                 if event_type == "room_settings/announcement" and user is not None:
