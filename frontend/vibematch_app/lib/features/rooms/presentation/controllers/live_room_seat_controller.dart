@@ -255,22 +255,7 @@ class LiveRoomSeatController {
       avatarColors:
           baseUser?.avatarColors ??
           const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-      nameGradientColors: peer.nameGradientColors.isNotEmpty
-          ? peer.nameGradientColors
-          : baseUser?.nameGradientColors ?? const <String>[],
       avatarUrl: peer.avatarUrl ?? baseUser?.avatarUrl,
-      equippedAvatarFrameAssetPath:
-          peer.equippedAvatarFrameAssetPath ??
-          baseUser?.equippedAvatarFrameAssetPath,
-      equippedAvatarFrameImageUrl:
-          peer.equippedAvatarFrameImageUrl ??
-          baseUser?.equippedAvatarFrameImageUrl,
-      equippedChatBubbleAssetPath:
-          peer.equippedChatBubbleAssetPath ??
-          baseUser?.equippedChatBubbleAssetPath,
-      equippedChatBubbleImageUrl:
-          peer.equippedChatBubbleImageUrl ??
-          baseUser?.equippedChatBubbleImageUrl,
       age: baseUser?.age,
       locationLabel: baseUser?.locationLabel,
       locationVisible: baseUser?.locationVisible ?? true,

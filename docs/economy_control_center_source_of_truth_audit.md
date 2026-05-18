@@ -2,7 +2,7 @@
 
 Branch: `economy-control-center-source-of-truth-v1`
 
-This pass is intentionally a foundation and safe-wiring pass. Stable live-room entry, privacy, settings, seats, gifts, and profile navigation are preserved. Risky rewrites are deferred.
+This pass is intentionally a foundation pass. Stable live-room entry, privacy, settings, seats, gifts, chat, and profile navigation are preserved. Risky live-room realtime/profile rewiring is deferred.
 
 ## Current Backend Sources
 
@@ -41,7 +41,7 @@ This pass is intentionally a foundation and safe-wiring pass. Stable live-room e
 - Ranking source: gift/ledger/stat tables and existing ranking endpoints; materialized `ranking_snapshots` remains available for later scheduled snapshots.
 - Store catalog: `store_categories`, `store_items`, and `store_asset_manifests`.
 - Inventory/equipment: `user_store_inventory`.
-- Shared display payload: `/profile-display/me`, `/profile-display/users/{public_user_id}`, and embedded `canonical_user_display` inside room realtime snapshots.
+- Shared display payload: `/profile-display/me` and `/profile-display/users/{public_user_id}`. Embedding this payload into room realtime snapshots was deferred because the stable live-room sync path must remain untouched until a dedicated verification pass.
 - Roles/permissions: `user_roles`, `special_permissions`, and centralized role/room permission services.
 - Stealth eligibility/state: `special_permissions.USE_STEALTH` and `user_stealth_states`; per-room public visibility still comes from room participant visibility flags.
 
@@ -51,7 +51,7 @@ This pass is intentionally a foundation and safe-wiring pass. Stable live-room e
 2. Let `/control-center/economy/rules` seed rule sets from the previous hardcoded thresholds.
 3. Verify `/economy/me`, `/economy/users/{id}/public-card`, and gift sends still return the same levels.
 4. Add/edit store categories/items through Control Center and confirm `/store/catalog` reflects DB category order.
-5. Verify `/profile-display/users/{public_user_id}` matches live-room mini profile values.
+5. Verify `/profile-display/users/{public_user_id}` matches existing backend profile/economy values without wiring it into live-room realtime yet.
 6. Migrate remaining store/gift assets from local fallback lists to DB catalog entries in small batches.
 7. Replace remaining mock-only screens after each screen has a canonical endpoint and analyze passes.
 
@@ -59,6 +59,7 @@ This pass is intentionally a foundation and safe-wiring pass. Stable live-room e
 
 - Full migration of gift panel fallback items is deferred because gift sending is stable and has a separate catalog editor.
 - Public Profile and Me page deep rewiring is deferred beyond the shared payload endpoint; their current payload already uses backend profile/economy services.
+- Live-room seats, chat, mini profile, and realtime peer snapshots are intentionally left on the stable pre-foundation data path. Canonical display wiring there needs a dedicated two-window realtime verification pass before it is reintroduced.
 - Scheduled ranking materialization for hourly/daily/weekly/monthly periods is deferred; current ranking endpoints calculate from ledger/gift tables.
 - Asset manifest rollback UI is deferred. The backend stores manifest imports and validation results, but rollback needs a product decision around version pinning.
 - Fine-grained permission-grant UI for every new special permission is deferred; backend enum/service support is in place and existing Control Center role/permission tools remain active.

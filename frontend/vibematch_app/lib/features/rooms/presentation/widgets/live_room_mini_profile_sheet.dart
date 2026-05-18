@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../profile_display/data/profile_display_repository.dart';
-import '../../../profile_display/models/canonical_user_display_model.dart';
+import '../../../economy/data/economy_master_api_service.dart';
 import '../../../profile/data/profile_api_service.dart';
 import '../../../social/data/social_api_service.dart';
 import '../live_room_models.dart';
@@ -70,30 +69,24 @@ class LiveRoomMiniProfileSheet extends StatefulWidget {
   final VoidCallback? onKickOutTap;
 
   @override
-  State<LiveRoomMiniProfileSheet> createState() =>
-      _LiveRoomMiniProfileSheetState();
+  State<LiveRoomMiniProfileSheet> createState() => _LiveRoomMiniProfileSheetState();
 }
 
 class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
   late MiniProfileSocialRelation _relation = widget.initialRelation;
   bool _relationBusy = false;
-  CanonicalUserDisplayModel? _profileDisplay;
-  StreamSubscription<ProfileRelationshipRealtimeEvent>?
-  _relationshipRealtimeSub;
+  EconomyPublicCardSnapshot? _economyCard;
+  StreamSubscription<ProfileRelationshipRealtimeEvent>? _relationshipRealtimeSub;
 
   int? get _targetPublicUserId => publicUserIdFromRoomUserId(widget.user.id);
-  int? get _viewerPublicUserId =>
-      publicUserIdFromRoomUserId(widget.currentUser.id);
+  int? get _viewerPublicUserId => publicUserIdFromRoomUserId(widget.currentUser.id);
 
   @override
   void initState() {
     super.initState();
-    _relationshipRealtimeSub = ProfileRelationshipRealtimeService
-        .instance
-        .events
-        .listen(_onRelationshipRealtimeEvent);
+    _relationshipRealtimeSub = ProfileRelationshipRealtimeService.instance.events.listen(_onRelationshipRealtimeEvent);
     unawaited(_refreshRelationFromBackend(showBusy: true));
-    unawaited(_loadProfileDisplay());
+    unawaited(_loadEconomyPublicCard());
   }
 
   @override
@@ -102,41 +95,30 @@ class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
     super.dispose();
   }
 
-  Future<void> _loadProfileDisplay() async {
+  Future<void> _loadEconomyPublicCard() async {
     final publicUserId = _targetPublicUserId;
     if (publicUserId == null || publicUserId <= 0) return;
     try {
-      final profile = await ProfileDisplayRepository().getPublicUser(
-        publicUserId,
-      );
+      final card = await const EconomyMasterApiService().getPublicCard(publicUserId);
       if (!mounted) return;
-      setState(() => _profileDisplay = profile);
+      setState(() => _economyCard = card);
     } catch (_) {
-      // Keep existing room snapshot values if canonical profile display is unavailable.
+      // Keep existing room snapshot values if the economy card is unavailable.
     }
   }
 
   SeatUser _effectiveUser() {
-    final profile = _profileDisplay;
-    if (profile == null) return widget.user;
+    final card = _economyCard;
+    if (card == null) return widget.user;
     return widget.user.copyWith(
-      name: profile.displayName.trim().isEmpty
-          ? widget.user.name
-          : profile.displayName,
-      avatarUrl: profile.avatarUrl,
-      vipLevel: profile.vipLevel,
-      svipLevel: profile.svipLevel,
-      sendingLevel: profile.sentLevel,
-      receivingLevel: profile.receivedLevel,
-      sentExp: profile.monthlySentCoins,
-      receivedExp: profile.monthlyReceivedCoins,
-      nameGradientColors: profile.nameGradientColors,
-      equippedAvatarFrameAssetPath: profile.avatarFrame?.assetPath,
-      equippedAvatarFrameImageUrl:
-          profile.avatarFrame?.imageUrl ?? profile.avatarFrame?.cdnAssetUrl,
-      equippedChatBubbleAssetPath: profile.textBubble?.assetPath,
-      equippedChatBubbleImageUrl:
-          profile.textBubble?.imageUrl ?? profile.textBubble?.cdnAssetUrl,
+      name: card.displayName.trim().isEmpty ? widget.user.name : card.displayName,
+      avatarUrl: card.avatarUrl,
+      vipLevel: card.vipLevel,
+      svipLevel: card.svipLevel,
+      sendingLevel: card.sendLevel,
+      receivingLevel: card.receiveLevel,
+      sentExp: card.monthlySentCoins,
+      receivedExp: card.monthlyReceivedCoins,
     );
   }
 
@@ -144,9 +126,7 @@ class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
     final targetPublicUserId = _targetPublicUserId;
     final viewerPublicUserId = _viewerPublicUserId;
     if (targetPublicUserId == null || viewerPublicUserId == null) return;
-    if (!event.touchesProfile(targetPublicUserId) &&
-        !event.touchesProfile(viewerPublicUserId))
-      return;
+    if (!event.touchesProfile(targetPublicUserId) && !event.touchesProfile(viewerPublicUserId)) return;
     unawaited(_refreshRelationFromBackend());
   }
 
@@ -155,8 +135,7 @@ class _LiveRoomMiniProfileSheetState extends State<LiveRoomMiniProfileSheet> {
     if (publicUserId == null || publicUserId <= 0) return;
     if (showBusy && mounted) setState(() => _relationBusy = true);
     try {
-      final status = await const SocialApiService()
-          .getFollowStatusByPublicUserId(publicUserId);
+      final status = await const SocialApiService().getFollowStatusByPublicUserId(publicUserId);
       if (!mounted) return;
       setState(() => _relation = _relationFromFollowStatus(status));
     } catch (_) {
