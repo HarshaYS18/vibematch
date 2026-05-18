@@ -35,6 +35,18 @@ class RoomSettingsRepository {
     return RoomSettingsDto.fromJson(response);
   }
 
+  Future<RoomSettingsDto> updateRoomName({
+    required String roomPublicId,
+    required String name,
+  }) async {
+    final response = await _apiClient.patchMap(
+      '/rooms/$roomPublicId/name',
+      headers: await _authHeaders(),
+      body: {'name': name.trim()},
+    );
+    return RoomSettingsDto.fromJson(response);
+  }
+
   Future<RoomSettingsDto> updateBackground({
     required String roomPublicId,
     required String backgroundThemeId,
