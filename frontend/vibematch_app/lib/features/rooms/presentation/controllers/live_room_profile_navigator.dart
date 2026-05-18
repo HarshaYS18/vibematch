@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../auth/models/current_user.dart';
 import '../../../auth/models/role_badge.dart';
 import '../../../profile/presentation/public_profile_view_page.dart';
-import '../../../profile/presentation/widgets/me_profile_constants.dart';
 import '../../../social/data/social_api_service.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../live_room_models.dart';
@@ -115,18 +114,19 @@ class LiveRoomProfileNavigator {
     required BuildContext context,
     required SeatUser user,
   }) {
-    _openViewerVipProgram(context: context, initialTabIndex: 0);
+    _openVipProgram(context: context, user: user, initialTabIndex: 0);
   }
 
   static void openSvipCentrePage({
     required BuildContext context,
     required SeatUser user,
   }) {
-    _openViewerVipProgram(context: context, initialTabIndex: 1);
+    _openVipProgram(context: context, user: user, initialTabIndex: 1);
   }
 
-  static void _openViewerVipProgram({
+  static void _openVipProgram({
     required BuildContext context,
+    required SeatUser user,
     required int initialTabIndex,
   }) {
     Navigator.pop(context);
@@ -137,10 +137,8 @@ class LiveRoomProfileNavigator {
         MaterialPageRoute(
           builder: (_) => VipProgramPage(
             initialTabIndex: initialTabIndex,
-            vipLevel: MeProfileConstants.vipLevel,
-            svipLevel: MeProfileConstants.svipLevel,
-            lifetimeRechargeCoins: MeProfileConstants.diamonds,
-            monthlyRechargeCoins: 42000,
+            vipLevel: user.vipLevel,
+            svipLevel: user.svipLevel,
           ),
         ),
       );

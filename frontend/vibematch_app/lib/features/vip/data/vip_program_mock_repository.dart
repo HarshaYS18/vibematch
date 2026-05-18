@@ -18,14 +18,22 @@ class VipProgramMockRepository {
     int monthlyRechargeCoins = 42000,
     Map<String, dynamic>? programConfig,
   }) {
-    final vipLevels = _parseVipLevels(programConfig?['vip_levels']) ?? _defaultVipLevels;
-    final svipLevels = _parseSvipLevels(programConfig?['svip_levels']) ?? _defaultSvipLevels;
+    final vipLevels =
+        _parseVipLevels(programConfig?['vip_levels']) ?? _defaultVipLevels;
+    final svipLevels =
+        _parseSvipLevels(programConfig?['svip_levels']) ?? _defaultSvipLevels;
+    final safeVipLevel = vipLevel.clamp(0, 50).toInt();
+    final safeSvipLevel = svipLevel.clamp(0, 10).toInt();
 
     return VipProgramSnapshot(
-      vipLevel: vipLevel.clamp(0, 50).toInt(),
-      svipLevel: svipLevel.clamp(0, 10).toInt(),
-      lifetimeRechargeCoins: lifetimeRechargeCoins,
-      monthlyRechargeCoins: monthlyRechargeCoins,
+      vipLevel: safeVipLevel,
+      svipLevel: safeSvipLevel,
+      lifetimeRechargeCoins: lifetimeRechargeCoins > 0
+          ? lifetimeRechargeCoins
+          : _requiredVipCoinsForLevel(vipLevels, safeVipLevel),
+      monthlyRechargeCoins: monthlyRechargeCoins > 0
+          ? monthlyRechargeCoins
+          : _requiredSvipCoinsForLevel(svipLevels, safeSvipLevel),
       vipLevels: vipLevels,
       svipLevels: svipLevels,
       vipRewards: _vipRewards,
@@ -57,8 +65,10 @@ class VipProgramMockRepository {
   //   ]
   // }
 
-  static final List<VipLevelConfig> _defaultVipLevels = _buildDefaultVipLevels();
-  static final List<SvipLevelConfig> _defaultSvipLevels = _buildDefaultSvipLevels();
+  static final List<VipLevelConfig> _defaultVipLevels =
+      _buildDefaultVipLevels();
+  static final List<SvipLevelConfig> _defaultSvipLevels =
+      _buildDefaultSvipLevels();
 
   static List<VipLevelConfig>? _parseVipLevels(Object? rawLevels) {
     if (rawLevels is! List) return null;
@@ -75,7 +85,10 @@ class VipProgramMockRepository {
         VipLevelConfig(
           level: level,
           requiredRechargeCoins: requiredCoins,
-          difficulty: _readDifficulty(rawLevel['difficulty'], fallbackLevel: level),
+          difficulty: _readDifficulty(
+            rawLevel['difficulty'],
+            fallbackLevel: level,
+          ),
           rewardIds: _readStringList(rawLevel['reward_ids']),
         ),
       );
@@ -150,11 +163,20 @@ class VipProgramMockRepository {
 
   static List<String> _readStringList(Object? value) {
     if (value is! List) return const [];
-    return value.map((item) => item.toString()).where((item) => item.trim().isNotEmpty).toList();
+    return value
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
   }
 
-  static VipProgressDifficulty _readDifficulty(Object? value, {required int fallbackLevel}) {
-    final normalized = value?.toString().trim().toLowerCase().replaceAll('_', '');
+  static VipProgressDifficulty _readDifficulty(
+    Object? value, {
+    required int fallbackLevel,
+  }) {
+    final normalized = value?.toString().trim().toLowerCase().replaceAll(
+      '_',
+      '',
+    );
     if (normalized == 'easy') return VipProgressDifficulty.easy;
     if (normalized == 'medium') return VipProgressDifficulty.medium;
     if (normalized == 'hard') return VipProgressDifficulty.hard;
@@ -174,7 +196,8 @@ class VipProgramMockRepository {
     VipRewardConfig(
       id: 'vip_mute_protection',
       title: 'Priority Voice Protection',
-      description: 'Eligible VIP 35 users receive enhanced protection from room mute actions, subject to official safety rules.',
+      description:
+          'Eligible VIP 35 users receive enhanced protection from room mute actions, subject to official safety rules.',
       icon: Icons.mic_external_on_rounded,
       unlockVipLevel: 35,
       isProtection: true,
@@ -182,14 +205,16 @@ class VipProgramMockRepository {
     VipRewardConfig(
       id: 'vip_background_40',
       title: 'Royal VIP Background',
-      description: 'Unlock the high-tier VIP 40 background collection for rooms and profile display zones.',
+      description:
+          'Unlock the high-tier VIP 40 background collection for rooms and profile display zones.',
       icon: Icons.diamond_rounded,
       unlockVipLevel: 40,
     ),
     VipRewardConfig(
       id: 'vip_kick_protection',
       title: 'Priority Room Stay Protection',
-      description: 'Eligible VIP 40 users receive enhanced protection from room kickout actions, subject to official safety rules.',
+      description:
+          'Eligible VIP 40 users receive enhanced protection from room kickout actions, subject to official safety rules.',
       icon: Icons.security_rounded,
       unlockVipLevel: 40,
       isProtection: true,
@@ -200,28 +225,32 @@ class VipProgramMockRepository {
     VipRewardConfig(
       id: 'svip_1',
       title: 'Room Message Recall',
-      description: 'Recall eligible messages you sent in chatrooms within the allowed time window.',
+      description:
+          'Recall eligible messages you sent in chatrooms within the allowed time window.',
       icon: Icons.undo_rounded,
       unlockSvipLevel: 1,
     ),
     VipRewardConfig(
       id: 'svip_2',
       title: 'Private Ranking Identity',
-      description: 'Hide your public identity in eligible room contribution rankings while preserving backend audit visibility.',
+      description:
+          'Hide your public identity in eligible room contribution rankings while preserving backend audit visibility.',
       icon: Icons.visibility_off_rounded,
       unlockSvipLevel: 2,
     ),
     VipRewardConfig(
       id: 'svip_3',
       title: 'Monthly Entrance Effect',
-      description: 'Equip a premium SVIP entrance visual and sound effect when entering rooms.',
+      description:
+          'Equip a premium SVIP entrance visual and sound effect when entering rooms.',
       icon: Icons.auto_awesome_rounded,
       unlockSvipLevel: 3,
     ),
     VipRewardConfig(
       id: 'svip_4',
       title: 'Kickout Protection',
-      description: 'Receive enhanced protection from room kickout actions, subject to official moderation and safety rules.',
+      description:
+          'Receive enhanced protection from room kickout actions, subject to official moderation and safety rules.',
       icon: Icons.shield_rounded,
       unlockSvipLevel: 4,
       isProtection: true,
@@ -229,42 +258,48 @@ class VipProgramMockRepository {
     VipRewardConfig(
       id: 'svip_5',
       title: 'Exclusive Avatar Frame',
-      description: 'Unlock a premium SVIP avatar frame while your monthly status remains active.',
+      description:
+          'Unlock a premium SVIP avatar frame while your monthly status remains active.',
       icon: Icons.account_circle_rounded,
       unlockSvipLevel: 5,
     ),
     VipRewardConfig(
       id: 'svip_6',
       title: 'Personalized Gift Style',
-      description: 'Access a custom gift styling slot for approved premium gift visuals.',
+      description:
+          'Access a custom gift styling slot for approved premium gift visuals.',
       icon: Icons.card_giftcard_rounded,
       unlockSvipLevel: 6,
     ),
     VipRewardConfig(
       id: 'svip_7',
       title: 'Discreet Room List Display',
-      description: 'Show a discreet hidden-name state in eligible chatroom lists without granting official hidden-presence powers.',
+      description:
+          'Show a discreet hidden-name state in eligible chatroom lists without granting official hidden-presence powers.',
       icon: Icons.person_off_rounded,
       unlockSvipLevel: 7,
     ),
     VipRewardConfig(
       id: 'svip_8',
       title: 'Premium Numeric ID',
-      description: 'Unlock access to a premium custom numeric ID option when available.',
+      description:
+          'Unlock access to a premium custom numeric ID option when available.',
       icon: Icons.pin_rounded,
       unlockSvipLevel: 8,
     ),
     VipRewardConfig(
       id: 'svip_9',
       title: 'Priority Support Lane',
-      description: 'Receive priority customer support routing for account and payment issues.',
+      description:
+          'Receive priority customer support routing for account and payment issues.',
       icon: Icons.support_agent_rounded,
       unlockSvipLevel: 9,
     ),
     VipRewardConfig(
       id: 'svip_10',
       title: 'Custom Text ID',
-      description: 'Unlock the highest-tier text custom ID privilege, subject to reserved-name and official-handle rules.',
+      description:
+          'Unlock the highest-tier text custom ID privilege, subject to reserved-name and official-handle rules.',
       icon: Icons.badge_rounded,
       unlockSvipLevel: 10,
     ),
@@ -287,6 +322,23 @@ class VipProgramMockRepository {
       maxLevel: 50,
       maxRequiredCoins: _vipMaxRequiredCoins,
     );
+  }
+
+  static int _requiredVipCoinsForLevel(List<VipLevelConfig> levels, int level) {
+    if (level <= 0 || levels.isEmpty) return 0;
+    return levels
+        .lastWhere((item) => item.level <= level, orElse: () => levels.first)
+        .requiredRechargeCoins;
+  }
+
+  static int _requiredSvipCoinsForLevel(
+    List<SvipLevelConfig> levels,
+    int level,
+  ) {
+    if (level <= 0 || levels.isEmpty) return 0;
+    return levels
+        .lastWhere((item) => item.level <= level, orElse: () => levels.first)
+        .monthlyRechargeCoins;
   }
 
   static int _defaultSvipRequiredCoins(int level) {

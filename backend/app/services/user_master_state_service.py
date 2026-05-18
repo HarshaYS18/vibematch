@@ -104,18 +104,21 @@ def _vip_default() -> dict[str, Any]:
 
 
 def _vip(db: Session, user: User) -> dict[str, Any]:
+    summary = profile_service.vip_summary(db, user)
     status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user.id).first()
-    if status is None:
-        return _vip_default()
-    vip_status = "active" if status.vip_is_active and status.vip_level > 0 else ("frozen" if status.vip_level > 0 else "none")
+    vip_level = int(summary.get("vip_level") or 0)
+    svip_level = int(summary.get("svip_level") or 0)
+    vip_active = bool(summary.get("vip_is_active"))
+    svip_active = bool(summary.get("svip_is_active"))
+    vip_status = "active" if vip_active and vip_level > 0 else ("frozen" if vip_level > 0 else "none")
     return {
-        "vip_level": status.vip_level,
-        "vip_is_active": status.vip_is_active,
+        "vip_level": vip_level,
+        "vip_is_active": vip_active,
         "vip_status": vip_status,
-        "svip_level": status.svip_level,
-        "svip_is_active": status.svip_is_active,
-        "svip_expires_at": _iso(status.svip_expires_at),
-        "updated_at": _iso(status.updated_at),
+        "svip_level": svip_level,
+        "svip_is_active": svip_active,
+        "svip_expires_at": _iso(summary.get("svip_expires_at")),
+        "updated_at": _iso(status.updated_at) if status else None,
     }
 
 
@@ -265,9 +268,9 @@ def _profile_summary_default() -> dict[str, Any]:
 
 def _profile_summary(db: Session, user: User) -> dict[str, Any]:
     return {
-        "vip": profile_service.vip_summary(db, user).model_dump(),
-        "wallet": profile_service.wallet_summary(db, user).model_dump(),
-        "equipped_items": profile_service.equipped_items_summary(db, user).model_dump(),
+        "vip": profile_service.vip_summary(db, user),
+        "wallet": profile_service.wallet_summary(db, user),
+        "equipped_items": profile_service.equipped_items_summary(db, user),
     }
 
 

@@ -8,10 +8,10 @@ class VipProgramPage extends StatefulWidget {
   const VipProgramPage({
     super.key,
     this.initialTabIndex = 0,
-    this.vipLevel = 25,
-    this.svipLevel = 3,
-    this.lifetimeRechargeCoins = 128500,
-    this.monthlyRechargeCoins = 42000,
+    this.vipLevel = 0,
+    this.svipLevel = 0,
+    this.lifetimeRechargeCoins = 0,
+    this.monthlyRechargeCoins = 0,
   });
 
   final int initialTabIndex;
@@ -56,7 +56,10 @@ class _VipProgramPageState extends State<VipProgramPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: plum,
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
       );
   }
@@ -71,7 +74,8 @@ class _VipProgramPageState extends State<VipProgramPage> {
             _VipHeader(
               selectedTabIndex: _selectedTabIndex,
               onBack: () => Navigator.of(context).maybePop(),
-              onTabChanged: (index) => setState(() => _selectedTabIndex = index),
+              onTabChanged: (index) =>
+                  setState(() => _selectedTabIndex = index),
             ),
             Expanded(
               child: IndexedStack(
@@ -79,11 +83,13 @@ class _VipProgramPageState extends State<VipProgramPage> {
                 children: [
                   _VipTab(
                     snapshot: _snapshot,
-                    onRewardTap: (reward) => _showAction('${reward.title} details will open.'),
+                    onRewardTap: (reward) =>
+                        _showAction('${reward.title} details will open.'),
                   ),
                   _SvipTab(
                     snapshot: _snapshot,
-                    onRewardTap: (reward) => _showAction('${reward.title} details will open.'),
+                    onRewardTap: (reward) =>
+                        _showAction('${reward.title} details will open.'),
                   ),
                 ],
               ),
@@ -112,7 +118,9 @@ class _VipHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.96),
-        border: const Border(bottom: BorderSide(color: _VipProgramPageState.softBorder)),
+        border: const Border(
+          bottom: BorderSide(color: _VipProgramPageState.softBorder),
+        ),
         boxShadow: [
           BoxShadow(
             color: _VipProgramPageState.plum.withValues(alpha: 0.055),
@@ -123,7 +131,10 @@ class _VipHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _RoundIconButton(icon: Icons.arrow_back_ios_new_rounded, onTap: onBack),
+          _RoundIconButton(
+            icon: Icons.arrow_back_ios_new_rounded,
+            onTap: onBack,
+          ),
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
@@ -203,7 +214,8 @@ class _SvipTab extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         const _CompactPolicyCard(
-          text: 'SVIP is monthly. If the required monthly recharge is not maintained, it drops by 2 levels next month and can reach 0.',
+          text:
+              'SVIP is monthly. If the required monthly recharge is not maintained, it drops by 2 levels next month and can reach 0.',
         ),
         const SizedBox(height: 14),
         const _SectionTitle(
@@ -377,7 +389,9 @@ class _VipHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = _vipPalette(level);
-    final progress = requiredCoins <= 0 ? 1.0 : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
+    final progress = requiredCoins <= 0
+        ? 1.0
+        : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
 
     return Padding(
       padding: const EdgeInsets.only(top: 26),
@@ -404,11 +418,20 @@ class _VipHeroCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('VIP $level', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.1)),
+                Text(
+                  'VIP $level',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.1,
+                  ),
+                ),
                 const Spacer(),
                 _ProgressBlock(
                   progress: progress,
-                  label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} coins',
+                  label:
+                      '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} coins',
                   color: palette.accent,
                 ),
               ],
@@ -434,7 +457,9 @@ class _SvipHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = _svipPalette(level);
-    final progress = requiredCoins <= 0 ? 1.0 : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
+    final progress = requiredCoins <= 0
+        ? 1.0
+        : (currentCoins / requiredCoins).clamp(0.0, 1.0).toDouble();
 
     return Padding(
       padding: const EdgeInsets.only(top: 26),
@@ -453,21 +478,39 @@ class _SvipHeroCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.14),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.34)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.34),
+                  ),
                   boxShadow: [
-                    BoxShadow(color: palette.accent.withValues(alpha: 0.45), blurRadius: 28, spreadRadius: 3),
-                    BoxShadow(color: Colors.white.withValues(alpha: 0.20), blurRadius: 12, offset: const Offset(-3, -4)),
+                    BoxShadow(
+                      color: palette.accent.withValues(alpha: 0.45),
+                      blurRadius: 28,
+                      spreadRadius: 3,
+                    ),
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.20),
+                      blurRadius: 12,
+                      offset: const Offset(-3, -4),
+                    ),
                   ],
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   clipBehavior: Clip.none,
                   children: [
-                    Icon(Icons.diamond_rounded, color: palette.accent, size: 36),
+                    Icon(
+                      Icons.diamond_rounded,
+                      color: palette.accent,
+                      size: 36,
+                    ),
                     Positioned(
                       right: 3,
                       top: 2,
-                      child: Icon(Icons.auto_awesome_rounded, color: Colors.white.withValues(alpha: 0.82), size: 15),
+                      child: Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Colors.white.withValues(alpha: 0.82),
+                        size: 15,
+                      ),
                     ),
                   ],
                 ),
@@ -476,11 +519,20 @@ class _SvipHeroCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('SVIP $level', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.1)),
+                Text(
+                  'SVIP $level',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.1,
+                  ),
+                ),
                 const Spacer(),
                 _ProgressBlock(
                   progress: progress,
-                  label: '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} monthly coins',
+                  label:
+                      '${_formatCoins(currentCoins)} / ${_formatCoins(requiredCoins)} monthly coins',
                   color: palette.accent,
                 ),
               ],
@@ -493,7 +545,11 @@ class _SvipHeroCard extends StatelessWidget {
 }
 
 class _HeroPageHint extends StatelessWidget {
-  const _HeroPageHint({required this.current, required this.total, required this.label});
+  const _HeroPageHint({
+    required this.current,
+    required this.total,
+    required this.label,
+  });
 
   final int current;
   final int total;
@@ -508,7 +564,11 @@ class _HeroPageHint extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           '$label · $current/$total',
-          style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11.5, fontWeight: FontWeight.w900),
+          style: const TextStyle(
+            color: Color(0xFF8C8198),
+            fontSize: 11.5,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ],
     );
@@ -540,7 +600,11 @@ class _RewardCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: unlocked ? _VipProgramPageState.champagne.withValues(alpha: 0.42) : _VipProgramPageState.softBorder),
+            border: Border.all(
+              color: unlocked
+                  ? _VipProgramPageState.champagne.withValues(alpha: 0.42)
+                  : _VipProgramPageState.softBorder,
+            ),
           ),
           child: Row(
             children: [
@@ -550,8 +614,15 @@ class _RewardCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   gradient: unlocked
-                      ? const LinearGradient(colors: [_VipProgramPageState.champagne, _VipProgramPageState.coral])
-                      : const LinearGradient(colors: [Color(0xFFE8E0D8), Color(0xFFB7ACBF)]),
+                      ? const LinearGradient(
+                          colors: [
+                            _VipProgramPageState.champagne,
+                            _VipProgramPageState.coral,
+                          ],
+                        )
+                      : const LinearGradient(
+                          colors: [Color(0xFFE8E0D8), Color(0xFFB7ACBF)],
+                        ),
                 ),
                 child: Icon(reward.icon, color: Colors.white, size: 20),
               ),
@@ -561,11 +632,18 @@ class _RewardCard extends StatelessWidget {
                   reward.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _VipProgramPageState.plum, fontSize: 13.5, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    color: _VipProgramPageState.plum,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              _MiniStatusPill(label: unlocked ? 'Unlocked' : unlockLabel, active: unlocked),
+              _MiniStatusPill(
+                label: unlocked ? 'Unlocked' : unlockLabel,
+                active: unlocked,
+              ),
             ],
           ),
         ),
@@ -591,12 +669,21 @@ class _CompactPolicyCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_rounded, color: _VipProgramPageState.violet, size: 20),
+          const Icon(
+            Icons.info_rounded,
+            color: _VipProgramPageState.violet,
+            size: 20,
+          ),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                color: Color(0xFF7A6B86),
+                fontSize: 12.5,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -616,16 +703,35 @@ class _SectionTitle extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(color: _VipProgramPageState.plum, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -0.3)),
+        Text(
+          title,
+          style: const TextStyle(
+            color: _VipProgramPageState.plum,
+            fontSize: 19,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(subtitle, style: const TextStyle(color: Color(0xFF7A6B86), fontSize: 12, fontWeight: FontWeight.w700)),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: Color(0xFF7A6B86),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ],
     );
   }
 }
 
 class _ProgressBlock extends StatelessWidget {
-  const _ProgressBlock({required this.progress, required this.label, required this.color});
+  const _ProgressBlock({
+    required this.progress,
+    required this.label,
+    required this.color,
+  });
 
   final double progress;
   final String label;
@@ -650,7 +756,11 @@ class _ProgressBlock extends StatelessWidget {
           alignment: Alignment.centerRight,
           child: Text(
             label,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 12, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.88),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],
@@ -669,17 +779,34 @@ class _MiniStatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: active ? _VipProgramPageState.aqua.withValues(alpha: 0.12) : const Color(0xFFF4EEE8),
+        color: active
+            ? _VipProgramPageState.aqua.withValues(alpha: 0.12)
+            : const Color(0xFFF4EEE8),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: active ? _VipProgramPageState.aqua.withValues(alpha: 0.32) : _VipProgramPageState.softBorder),
+        border: Border.all(
+          color: active
+              ? _VipProgramPageState.aqua.withValues(alpha: 0.32)
+              : _VipProgramPageState.softBorder,
+        ),
       ),
-      child: Text(label, style: TextStyle(color: active ? _VipProgramPageState.plum : const Color(0xFF8C8198), fontSize: 10, fontWeight: FontWeight.w900)),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: active ? _VipProgramPageState.plum : const Color(0xFF8C8198),
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
 
 class _SegmentedPill extends StatelessWidget {
-  const _SegmentedPill({required this.selectedIndex, required this.labels, required this.onChanged});
+  const _SegmentedPill({
+    required this.selectedIndex,
+    required this.labels,
+    required this.onChanged,
+  });
 
   final int selectedIndex;
   final List<String> labels;
@@ -703,15 +830,22 @@ class _SegmentedPill extends StatelessWidget {
               onTap: () => onChanged(index),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: selectedIndex == index ? _VipProgramPageState.plum : Colors.transparent,
+                  color: selectedIndex == index
+                      ? _VipProgramPageState.plum
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   labels[index],
                   style: TextStyle(
-                    color: selectedIndex == index ? Colors.white : _VipProgramPageState.deepViolet,
+                    color: selectedIndex == index
+                        ? Colors.white
+                        : _VipProgramPageState.deepViolet,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w900,
                   ),
@@ -750,7 +884,11 @@ class _RoundIconButton extends StatelessWidget {
 }
 
 class _HeroPalette {
-  const _HeroPalette({required this.colors, required this.accent, required this.shadow});
+  const _HeroPalette({
+    required this.colors,
+    required this.accent,
+    required this.shadow,
+  });
 
   final List<Color> colors;
   final Color accent;
