@@ -12,7 +12,6 @@ import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/public_profile_page.dart';
 import '../features/rankings/presentation/rankings_page.dart';
 import '../features/room_level/presentation/room_level_page.dart';
-import '../features/rooms/presentation/live_room_page.dart';
 import '../features/rooms/presentation/routes/live_room_route_args.dart';
 import '../features/rooms/presentation/routes/live_room_routes.dart';
 import '../features/search/presentation/search_page.dart';
@@ -43,10 +42,11 @@ class AppRouteFactory {
               modeTitle: args.modeTitle,
               onlineCount: args.onlineCount,
               currentUser: args.currentUser,
+              lockPassword: args.lockPassword,
             ),
           );
         }
-        return _buildRoute(settings, const LiveRoomPage());
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Room Access Required', subtitle: 'Open rooms from Home so backend join checks can run before the live room starts.', icon: Icons.lock_rounded));
 
       case VmRoutes.roomLevel:
         return _buildRoute(settings, const RoomLevelPage());

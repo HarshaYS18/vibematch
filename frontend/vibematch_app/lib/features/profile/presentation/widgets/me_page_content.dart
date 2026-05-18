@@ -10,11 +10,11 @@ import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
 import '../../../games/presentation/game_test_page.dart';
 import '../../../presence/data/presence_api_service.dart';
-import '../../../rooms/presentation/live_room_page.dart';
 import '../../../store/presentation/store_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../../wallet/presentation/wallet_page_modular.dart';
+import '../../../../core/navigation/vm_navigator.dart';
 import '../../data/love_bond_realtime_service.dart';
 import '../../data/profile_api_service.dart';
 import '../control_center/coin_supply_grant_page.dart';
@@ -401,16 +401,13 @@ class _MePageContentState extends State<MePageContent> {
       _showAction(context, 'No active room right now.');
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LiveRoomPage(
-          roomName: roomName,
-          roomId: roomId,
-          language: 'English',
-          modeTitle: _presence?.roomMode ?? 'Open',
-          onlineCount: 1,
-        ),
-      ),
+    VmNavigator.openLiveRoom(
+      context,
+      roomName: roomName,
+      roomId: roomId,
+      language: 'English',
+      modeTitle: _presence?.roomMode ?? 'Open',
+      onlineCount: 1,
     );
   }
 

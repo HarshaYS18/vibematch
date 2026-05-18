@@ -58,5 +58,11 @@ class RealtimeConnectionManager:
         for client in clients:
             await self.send_json(client, payload)
 
+    async def send_room_user(self, room_public_id: str, user_id: int, payload: dict[str, Any]) -> None:
+        clients = list(self._room_clients.get(room_public_id, set()))
+        for client in clients:
+            if self._client_users.get(client) == user_id:
+                await self.send_json(client, payload)
+
 
 room_realtime_connections = RealtimeConnectionManager()

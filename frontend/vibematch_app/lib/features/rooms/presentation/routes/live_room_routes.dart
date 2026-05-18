@@ -21,6 +21,7 @@ class LiveRoomRoutes {
         modeTitle: args.modeTitle,
         initialOnlineCount: args.onlineCount,
         currentUser: currentUser,
+        lockPassword: args.lockPassword,
       ),
     );
   }

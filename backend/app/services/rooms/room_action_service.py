@@ -10,6 +10,8 @@ from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, RoomSeatState
 from app.models.user import User
 from app.services.permissions import room_permission_service
+from app.services.rooms.room_kickout_service import create_room_kickout_for_user, deactivate_room_user_for_kickout
+from app.services.rooms.room_service import assert_room_entry_allowed
 from app.services.rooms.room_state_service import ensure_room_seats, normalize_layout, room_sequence, room_snapshot, seat_count_for_layout
 
 SEAT_APPLICATION_EXPIRY_SECONDS = 20
@@ -26,6 +28,7 @@ def record_room_event(
     actor_user_id: int | None = None,
     target_user_id: int | None = None,
     payload: dict[str, Any] | None = None,
+    privacy_scope: str = "room",
 ) -> RoomRealtimeEvent:
     event = RoomRealtimeEvent(
         room_id=room.id,
@@ -34,6 +37,7 @@ def record_room_event(
         actor_user_id=actor_user_id,
         target_user_id=target_user_id,
         payload=payload or {},
+        privacy_scope=privacy_scope,
         sequence=_next_sequence(db, room),
     )
     db.add(event)
@@ -111,6 +115,8 @@ def _has_pending_room_member_request(db: Session, room: Room, user_id: int) -> b
 def _is_room_manager(db: Session, room: Room, user: User) -> bool:
     if user.id == room.owner_user_id:
         return True
+    if room_permission_service.can_force_join_room(db, user):
+        return True
     participant = _room_participant(db, room, user)
     return bool(participant and participant.is_room_admin)
 
@@ -123,6 +129,7 @@ def _seat_can_receive_application(db: Session, room: Room, seat_index: int) -> b
 
 
 def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    assert_room_entry_allowed(db, room, user, lock_password=str((payload or {}).get("lock_password") or "") or None)
     participant = _ensure_room_participant(db, room, user, payload)
     _auto_place_host_admin_if_needed(db, room, user, participant)
     record_room_event(db, room, "room.joined", actor_user_id=user.id, payload={**(payload or {}), "is_stealth": participant.is_stealth})
@@ -131,6 +138,7 @@ def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | Non
 
 
 def heartbeat_room(db: Session, room: Room, user: User) -> dict[str, Any]:
+    assert_room_entry_allowed(db, room, user)
     participant = _room_participant(db, room, user)
     if participant:
         participant.is_active = True
@@ -219,6 +227,10 @@ def take_seat(db: Session, room: Room, user: User, seat_index: int, actor_user_i
     target = next((seat for seat in seats if seat.seat_index == seat_index), None)
     if target is None or target.is_locked:
         return room_snapshot(db, room)
+    if target.occupant_user_id is not None and target.occupant_user_id != user.id:
+        actor = db.query(User).filter(User.id == actor_user_id).first() if actor_user_id else None
+        if actor is None or not _is_room_manager(db, room, actor):
+            return room_snapshot(db, room)
     now = datetime.utcnow()
     for seat in seats:
         if seat.occupant_user_id == user.id:
@@ -235,6 +247,12 @@ def take_seat(db: Session, room: Room, user: User, seat_index: int, actor_user_i
     record_room_event(db, room, "seat.taken", actor_user_id=actor_user_id or user.id, target_user_id=user.id, payload={"seat_index": seat_index})
     db.flush()
     return room_snapshot(db, room)
+
+
+def assign_seat(db: Session, room: Room, actor: User, target: User, seat_index: int) -> dict[str, Any]:
+    if not _is_room_manager(db, room, actor):
+        return room_snapshot(db, room)
+    return take_seat(db, room, target, seat_index, actor_user_id=actor.id)
 
 
 def leave_seat(db: Session, room: Room, user: User, actor_user_id: int | None = None) -> dict[str, Any]:
@@ -276,7 +294,7 @@ def send_seat_invite(db: Session, room: Room, actor: User, target: User, seat_in
     if not _seat_can_receive_application(db, room, seat_index):
         return room_snapshot(db, room)
     invite_id = f"seat_invite_{room.room_public_id}_{actor.id}_{target.id}_{seat_index}_{int(datetime.utcnow().timestamp() * 1000)}"
-    record_room_event(db, room, "seat.invite.sent", actor_user_id=actor.id, target_user_id=target.id, payload={"invite_id": invite_id, "seat_index": seat_index})
+    record_room_event(db, room, "seat.invite.sent", actor_user_id=actor.id, target_user_id=target.id, payload={"invite_id": invite_id, "seat_index": seat_index}, privacy_scope="target")
     db.flush()
     return room_snapshot(db, room)
 
@@ -303,23 +321,86 @@ def reject_seat_application(db: Session, room: Room, actor: User, target: User, 
 
 
 def kick_user(db: Session, room: Room, actor: User, target: User, reason: str = "Removed by room admin", duration: str = "1h") -> dict[str, Any]:
-    if not room_permission_service.can_kick_room_user(db, actor, target):
+    if target.id == actor.id:
         return room_snapshot(db, room)
-    if target.id == room.owner_user_id and actor.id != target.id:
+    actor_can_manage_room = _is_room_manager(db, room, actor)
+    role_can_kick = room_permission_service.can_kick_room_user(db, actor, target)
+    if not actor_can_manage_room and not role_can_kick:
         return room_snapshot(db, room)
-    now = datetime.utcnow()
-    participant = _room_participant(db, room, target)
-    if participant:
-        participant.is_active = False
-        participant.left_at = now
-        participant.last_seen_at = now
-    for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == target.id).all():
-        seat.occupant_user_id = None
-        seat.mic_enabled = False
-        seat.admin_muted = False
-        seat.left_at = now
-        seat.updated_by_user_id = actor.id
+    if actor_can_manage_room and not role_can_kick:
+        target_is_normal = not bool(target.is_protected)
+        if not target_is_normal:
+            return room_snapshot(db, room)
+    create_room_kickout_for_user(
+        db,
+        room_public_id=room.room_public_id,
+        target=target,
+        actor=actor,
+        duration=duration,
+        reason=reason,
+        actor_can_manage_room=actor_can_manage_room,
+    )
+    deactivate_room_user_for_kickout(
+        db,
+        room_public_id=room.room_public_id,
+        target=target,
+        actor_user_id=actor.id,
+    )
     record_room_event(db, room, "room.user.kicked", actor_user_id=actor.id, target_user_id=target.id, payload={"reason": reason, "duration": duration})
+    db.flush()
+    return room_snapshot(db, room)
+
+
+def take_or_request_seat(db: Session, room: Room, user: User, seat_index: int) -> dict[str, Any]:
+    if room.apply_only_mode_enabled and not _is_room_manager(db, room, user):
+        return request_seat_application(db, room, user, seat_index)
+    return take_seat(db, room, user, seat_index)
+
+
+def _has_pending_seat_invite(db: Session, room: Room, user: User, seat_index: int) -> bool:
+    invite = (
+        db.query(RoomRealtimeEvent)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type == "seat.invite.sent",
+            RoomRealtimeEvent.target_user_id == user.id,
+        )
+        .order_by(RoomRealtimeEvent.id.desc())
+        .first()
+    )
+    if invite is None:
+        return False
+    payload = invite.payload or {}
+    try:
+        invited_seat_index = int(payload.get("seat_index"))
+    except Exception:
+        return False
+    if invited_seat_index != seat_index:
+        return False
+    decision = (
+        db.query(RoomRealtimeEvent)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type.in_(["seat.invite.accepted", "seat.invite.rejected", "seat.taken"]),
+            RoomRealtimeEvent.target_user_id == user.id,
+            RoomRealtimeEvent.id > invite.id,
+        )
+        .first()
+    )
+    return decision is None
+
+
+def accept_seat_invite(db: Session, room: Room, user: User, seat_index: int) -> dict[str, Any]:
+    if not _has_pending_seat_invite(db, room, user, seat_index):
+        return room_snapshot(db, room)
+    if not _seat_can_receive_application(db, room, seat_index):
+        return room_snapshot(db, room)
+    record_room_event(db, room, "seat.invite.accepted", actor_user_id=user.id, target_user_id=user.id, payload={"seat_index": seat_index}, privacy_scope="target")
+    return take_seat(db, room, user, seat_index)
+
+
+def reject_seat_invite(db: Session, room: Room, user: User, seat_index: int) -> dict[str, Any]:
+    record_room_event(db, room, "seat.invite.rejected", actor_user_id=user.id, target_user_id=user.id, payload={"seat_index": seat_index}, privacy_scope="target")
     db.flush()
     return room_snapshot(db, room)
 
@@ -432,8 +513,14 @@ def set_announcement(db: Session, room: Room, actor: User, announcement_text: st
 
 
 def create_chat_message(db: Session, room: Room, user: User | None, text: str | None, message_type: str = "text", metadata: dict[str, Any] | None = None) -> dict[str, Any]:
-    if user is not None and not room.guest_messages_enabled and not _is_room_manager(db, room, user):
+    participant = _room_participant(db, room, user) if user is not None else None
+    can_bypass_guest_block = bool(user is not None and (_is_room_manager(db, room, user) or (participant is not None and participant.is_member)))
+    if user is not None and not room.guest_messages_enabled and not can_bypass_guest_block:
         record_room_event(db, room, "room.chat.blocked", actor_user_id=user.id, payload={"reason": "guest_messages_disabled"})
+        db.flush()
+        return room_snapshot(db, room)
+    if user is not None and message_type == "image" and not room.room_images_enabled and not _is_room_manager(db, room, user):
+        record_room_event(db, room, "room.chat.blocked", actor_user_id=user.id, payload={"reason": "room_images_disabled"})
         db.flush()
         return room_snapshot(db, room)
     message = RoomChatMessage(room_id=room.id, room_public_id=room.room_public_id, sender_user_id=user.id if user else None, message_type=message_type, text=text, metadata_json=metadata or {})

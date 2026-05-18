@@ -4,10 +4,14 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.role import ROLE_POWER, RoleName
+from app.models.presence import UserRoomPresence
 from app.models.room import Room
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
+from app.models.room_participant import RoomParticipant
+from app.models.room_realtime_state import RoomSeatState
 from app.models.user import User
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest
+from app.services.permissions import room_permission_service
 from app.services.role_service import get_primary_role
 
 
@@ -59,6 +63,36 @@ def _load_target_user(db: Session, payload: RoomKickoutCreateRequest) -> User | 
     return None
 
 
+def active_kickout_for_user(
+    db: Session,
+    *,
+    room_public_id: str,
+    user: User,
+) -> RoomKickout | None:
+    now = datetime.utcnow()
+    public_user_id = str(user.public_user_id)
+    return (
+        db.query(RoomKickout)
+        .filter(RoomKickout.room_public_id == room_public_id)
+        .filter(RoomKickout.is_active.is_(True))
+        .filter(
+            (RoomKickout.target_user_id == user.id)
+            | (RoomKickout.target_public_user_id == public_user_id)
+        )
+        .filter(
+            (RoomKickout.is_permanent.is_(True))
+            | (RoomKickout.blocked_until.is_(None))
+            | (RoomKickout.blocked_until > now)
+        )
+        .order_by(RoomKickout.created_at.desc(), RoomKickout.id.desc())
+        .first()
+    )
+
+
+def is_user_kicked_out(db: Session, *, room_public_id: str, user: User) -> bool:
+    return active_kickout_for_user(db, room_public_id=room_public_id, user=user) is not None
+
+
 def _role_power(role: RoleName) -> int:
     return ROLE_POWER.get(role, 0)
 
@@ -72,14 +106,22 @@ def _assert_target_can_be_kicked(
     room_public_id: str,
     payload: RoomKickoutCreateRequest,
     actor: User | None,
+    *,
+    actor_can_manage_room: bool = False,
 ) -> None:
+    if actor is None:
+        raise HTTPException(status_code=401, detail="Login required to kick a room user")
+
     public_id = (payload.target_public_user_id or "").strip()
     if public_id in _PROTECTED_PUBLIC_USER_IDS:
         raise HTTPException(status_code=403, detail="Founder Owner cannot be kicked from any chatroom")
 
     target_user = _load_target_user(db, payload)
     if target_user is None:
-        return
+        raise HTTPException(status_code=404, detail="Kickout target user could not be resolved")
+
+    if target_user.id == actor.id:
+        raise HTTPException(status_code=400, detail="You cannot kick yourself from the room")
 
     room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
     is_channel_host = bool(room and room.owner_user_id == target_user.id)
@@ -92,6 +134,9 @@ def _assert_target_can_be_kicked(
 
     if target_role == RoleName.OWNER:
         raise HTTPException(status_code=403, detail="Owner accounts cannot be kicked from any chatroom")
+
+    if actor_can_manage_room and target_role == RoleName.USER and not bool(target_user.is_protected):
+        return
 
     # Founder Owner and Owner can kick channel hosts, room admins, normal users,
     # and lower official/staff accounts. They still cannot kick Founder/Owner.
@@ -108,6 +153,54 @@ def _assert_target_can_be_kicked(
     if target_role in _OFFICIAL_STAFF_ROLES:
         raise HTTPException(status_code=403, detail="Official/staff accounts cannot be kicked by room admins or lower roles")
 
+    if not actor_can_manage_room and not room_permission_service.can_kick_room_user(db, actor, target_user):
+        raise HTTPException(status_code=403, detail="You do not have permission to kick this user")
+
+
+def deactivate_room_user_for_kickout(
+    db: Session,
+    *,
+    room_public_id: str,
+    target: User,
+    actor_user_id: int | None = None,
+) -> None:
+    now = datetime.utcnow()
+    room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+    if room is not None:
+        participant = (
+            db.query(RoomParticipant)
+            .filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == target.id)
+            .first()
+        )
+        if participant is not None:
+            participant.is_active = False
+            participant.left_at = now
+            participant.last_seen_at = now
+
+        for seat in (
+            db.query(RoomSeatState)
+            .filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == target.id)
+            .all()
+        ):
+            seat.occupant_user_id = None
+            seat.mic_enabled = False
+            seat.admin_muted = False
+            seat.left_at = now
+            seat.updated_by_user_id = actor_user_id
+
+    for presence in (
+        db.query(UserRoomPresence)
+        .filter(
+            UserRoomPresence.room_public_id == room_public_id,
+            UserRoomPresence.user_id == target.id,
+            UserRoomPresence.is_active.is_(True),
+        )
+        .all()
+    ):
+        presence.is_active = False
+        presence.left_at = now
+        presence.last_heartbeat_at = now
+
 
 def create_room_kickout(
     db: Session,
@@ -115,16 +208,20 @@ def create_room_kickout(
     payload: RoomKickoutCreateRequest,
     actor_user_id: int | None = None,
     actor_public_user_id: str | None = None,
+    actor_can_manage_room: bool = False,
 ) -> RoomKickout:
     actor = db.query(User).filter(User.id == actor_user_id).first() if actor_user_id is not None else None
-    _assert_target_can_be_kicked(db, room_public_id, payload, actor)
+    _assert_target_can_be_kicked(db, room_public_id, payload, actor, actor_can_manage_room=actor_can_manage_room)
+    target = _load_target_user(db, payload)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Kickout target user could not be resolved")
     blocked_until, is_permanent = _calculate_blocked_until(payload.duration.value)
 
     kickout = RoomKickout(
         room_public_id=room_public_id,
-        target_user_id=payload.target_user_id,
-        target_public_user_id=payload.target_public_user_id,
-        target_display_name=payload.target_display_name,
+        target_user_id=target.id,
+        target_public_user_id=str(target.public_user_id),
+        target_display_name=payload.target_display_name or target.display_name or target.username,
         created_by_user_id=actor_user_id,
         created_by_public_user_id=actor_public_user_id,
         duration=payload.duration.value,
@@ -135,9 +232,42 @@ def create_room_kickout(
     )
 
     db.add(kickout)
+    deactivate_room_user_for_kickout(
+        db,
+        room_public_id=room_public_id,
+        target=target,
+        actor_user_id=actor_user_id,
+    )
     db.commit()
     db.refresh(kickout)
     return kickout
+
+
+def create_room_kickout_for_user(
+    db: Session,
+    *,
+    room_public_id: str,
+    target: User,
+    actor: User,
+    duration: str,
+    reason: str | None,
+    actor_can_manage_room: bool,
+) -> RoomKickout:
+    payload = RoomKickoutCreateRequest(
+        target_user_id=target.id,
+        target_public_user_id=str(target.public_user_id),
+        target_display_name=target.display_name or target.username,
+        duration=duration,
+        reason=reason,
+    )
+    return create_room_kickout(
+        db=db,
+        room_public_id=room_public_id,
+        payload=payload,
+        actor_user_id=actor.id,
+        actor_public_user_id=str(actor.public_user_id),
+        actor_can_manage_room=actor_can_manage_room,
+    )
 
 
 def list_active_room_kickouts(

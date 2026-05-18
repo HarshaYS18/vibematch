@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.models.presence import UserRoomPresence
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, RoomSeatState
@@ -99,6 +100,14 @@ def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = N
         participant.is_active = False
         participant.left_at = current_time
         participant.last_seen_at = current_time
+    db.query(UserRoomPresence).filter(
+        UserRoomPresence.room_public_id == room.room_public_id,
+        UserRoomPresence.user_id.in_(stale_user_ids),
+        UserRoomPresence.is_active.is_(True),
+    ).update(
+        {UserRoomPresence.is_active: False, UserRoomPresence.left_at: current_time},
+        synchronize_session=False,
+    )
     seats = db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id.in_(stale_user_ids)).all()
     for seat in seats:
         released_user_id = seat.occupant_user_id
@@ -178,6 +187,81 @@ def pending_room_member_requests(db: Session, room: Room) -> list[dict[str, Any]
     return requests
 
 
+def _latest_seat_application_decision_after(db: Session, room: Room, pending_event: RoomRealtimeEvent) -> RoomRealtimeEvent | None:
+    event_types = [
+        "seat.application.rejected",
+        "seat.taken",
+        "seat.left",
+        "room.user.kicked",
+        "room.left",
+    ]
+    query = db.query(RoomRealtimeEvent).filter(
+        RoomRealtimeEvent.room_id == room.id,
+        RoomRealtimeEvent.id > pending_event.id,
+        RoomRealtimeEvent.event_type.in_(event_types),
+    )
+    query = query.filter(
+        (RoomRealtimeEvent.target_user_id == pending_event.actor_user_id)
+        | (RoomRealtimeEvent.actor_user_id == pending_event.actor_user_id)
+    )
+    return query.order_by(RoomRealtimeEvent.id.desc()).first()
+
+
+def pending_seat_applications(db: Session, room: Room) -> list[dict[str, Any]]:
+    now = datetime.utcnow()
+    pending_events = (
+        db.query(RoomRealtimeEvent)
+        .filter(RoomRealtimeEvent.room_id == room.id, RoomRealtimeEvent.event_type == "seat.application.requested")
+        .order_by(RoomRealtimeEvent.id.asc())
+        .all()
+    )
+    requests: list[dict[str, Any]] = []
+    seen_keys: set[tuple[int, int]] = set()
+    seats = {seat.seat_index: seat for seat in ensure_room_seats(db, room)}
+    for event in pending_events:
+        actor_user_id = event.actor_user_id
+        payload = event.payload or {}
+        try:
+            seat_index = int(payload.get("seat_index"))
+        except Exception:
+            continue
+        if actor_user_id is None:
+            continue
+        key = (actor_user_id, seat_index)
+        if key in seen_keys:
+            continue
+        try:
+            expires_at = datetime.fromisoformat(str(payload.get("expires_at"))) if payload.get("expires_at") else None
+        except Exception:
+            expires_at = None
+        if expires_at is not None and expires_at < now:
+            continue
+        if _latest_seat_application_decision_after(db, room, event) is not None:
+            continue
+        seat = seats.get(seat_index)
+        if seat is None or seat.is_locked or seat.occupant_user_id is not None:
+            continue
+        user = db.query(User).filter(User.id == actor_user_id).first()
+        requests.append(
+            {
+                "id": payload.get("id") or str(event.id),
+                "request_id": event.id,
+                "room_id": room.room_public_id,
+                "seat_index": seat_index,
+                "applicant_user_id": actor_user_id,
+                "applicant_backend_user_id": actor_user_id,
+                "applicant_public_user_id": user.public_user_id if user else actor_user_id,
+                "applicant_name": (user.display_name or user.username or str(user.public_user_id)) if user else "Vibe User",
+                "applicant_avatar_url": user.avatar_url if user else None,
+                "created_at": payload.get("created_at") or (event.created_at.isoformat() if event.created_at else None),
+                "expires_at": payload.get("expires_at"),
+                "status": "pending",
+            }
+        )
+        seen_keys.add(key)
+    return requests
+
+
 def room_participant_type(is_host: bool, is_room_admin: bool, is_room_member: bool) -> str:
     if is_host:
         return "owner"
@@ -206,6 +290,7 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
     participants = active_participants(db, room)
     seats = ensure_room_seats(db, room)
     member_requests = pending_room_member_requests(db, room)
+    seat_applications = pending_seat_applications(db, room)
     pending_user_ids = {int(request["backend_user_id"]) for request in member_requests if request.get("backend_user_id") is not None}
     public_online_count = len([participant for participant in participants if participant.visible_in_online_count])
     internal_online_count = len(participants)
@@ -232,7 +317,7 @@ def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[st
         public_participants.append(participant_data)
         peers.append({"peer_id": participant_data["peer_id"], "user_id": str(participant_data["backend_user_id"]), "backend_user_id": participant_data["backend_user_id"], "public_user_id": participant_data["public_user_id"], "room_user_key": participant_data["room_user_key"], "display_name": participant_data["display_name"], "avatar_url": participant_data["avatar_url"], "is_host": participant_data["is_host"], "is_room_owner": participant_data["is_room_owner"], "is_room_admin": participant_data["is_room_admin"], "is_room_member": participant_data["is_room_member"], "has_pending_room_member_request": participant_data["has_pending_room_member_request"], "membership_request_status": participant_data["membership_request_status"], "participant_type": participant_data["participant_type"], "role_label": participant_data["role_label"], "seat_index": participant_data["seat_index"], "mic_enabled": participant_data["mic_enabled"], "admin_muted": participant_data["admin_muted"]})
 
-    payload: dict[str, Any] = {"room_id": room.room_public_id, "room_public_id": room.room_public_id, "database_room_id": room.id, "owner_user_id": room.owner_user_id, "name": room.name, "subtitle": room.subtitle, "avatar_url": room.avatar_url, "cover_photo_url": room.cover_photo_url, "language": room.language, "mode": room.mode, "room_type": room.room_type, "online_count": public_online_count, "public_online_count": public_online_count, "internal_online_count": internal_online_count, "active_presence_score": trending_score, "trending_score": trending_score, "active_participant_count": public_online_count, "internal_active_participant_count": internal_online_count, "active_seated_count": seated_count, "is_active": room.is_active, "is_secret": room.is_secret, "is_locked": room.is_locked, "is_members_only": room.is_members_only, "allow_screenshots": room.allow_screenshots, "room_images_enabled": room.room_images_enabled, "guest_messages_enabled": room.guest_messages_enabled, "apply_only_mode_enabled": room.apply_only_mode_enabled, "background_theme_id": room.background_theme_id, "seat_layout_id": normalize_layout(room.seat_layout_id), "seat_count": seat_count_for_layout(room.seat_layout_id), "announcement_text": room.announcement_text, "state_version": room_sequence(db, room), "updated_at": room.updated_at.isoformat() if room.updated_at else None, "seats": [seat_payload(seat, room.room_public_id) for seat in seats], "locked_seat_indexes": [seat.seat_index for seat in seats if seat.is_locked], "participants": public_participants, "internal_participants": internal_participants, "pending_room_member_requests": member_requests, "pending_room_member_request_count": len(member_requests), "peers": peers, "peer_count": len(public_participants)}
+    payload: dict[str, Any] = {"room_id": room.room_public_id, "room_public_id": room.room_public_id, "database_room_id": room.id, "owner_user_id": room.owner_user_id, "name": room.name, "subtitle": room.subtitle, "avatar_url": room.avatar_url, "cover_photo_url": room.cover_photo_url, "language": room.language, "mode": room.mode, "room_type": room.room_type, "online_count": public_online_count, "public_online_count": public_online_count, "internal_online_count": internal_online_count, "active_presence_score": trending_score, "trending_score": trending_score, "active_participant_count": public_online_count, "internal_active_participant_count": internal_online_count, "active_seated_count": seated_count, "is_active": room.is_active, "is_secret": room.is_secret, "is_locked": room.is_locked, "is_members_only": room.is_members_only, "allow_screenshots": room.allow_screenshots, "room_images_enabled": room.room_images_enabled, "guest_messages_enabled": room.guest_messages_enabled, "apply_only_mode_enabled": room.apply_only_mode_enabled, "background_theme_id": room.background_theme_id, "seat_layout_id": normalize_layout(room.seat_layout_id), "seat_count": seat_count_for_layout(room.seat_layout_id), "announcement_text": room.announcement_text, "state_version": room_sequence(db, room), "updated_at": room.updated_at.isoformat() if room.updated_at else None, "seats": [seat_payload(seat, room.room_public_id) for seat in seats], "locked_seat_indexes": [seat.seat_index for seat in seats if seat.is_locked], "participants": public_participants, "internal_participants": internal_participants, "pending_room_member_requests": member_requests, "pending_room_member_request_count": len(member_requests), "pending_seat_applications": seat_applications, "pending_seat_application_count": len(seat_applications), "peers": peers, "peer_count": len(public_participants)}
     if include_chat:
         payload["recent_messages"] = recent_chat_messages(db, room)
     return payload

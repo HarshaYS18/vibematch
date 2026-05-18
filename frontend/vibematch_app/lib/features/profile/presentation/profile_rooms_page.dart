@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../rooms/presentation/live_room_page.dart';
+import '../../../core/navigation/vm_navigator.dart';
 import '../data/profile_rooms_repository.dart';
 
 class ProfileRoomsPage extends StatelessWidget {
@@ -72,16 +72,13 @@ class ProfileRoomsPage extends StatelessWidget {
                         final room = rooms[index];
                         return _RoomCard(
                           room: room,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => LiveRoomPage(
-                                roomName: room.roomName,
-                                roomId: room.roomId,
-                                language: room.language,
-                                modeTitle: room.modeTitle,
-                                onlineCount: room.onlineCount,
-                              ),
-                            ),
+                          onTap: () => VmNavigator.openLiveRoom(
+                            context,
+                            roomName: room.roomName,
+                            roomId: room.roomId,
+                            language: room.language,
+                            modeTitle: room.modeTitle,
+                            onlineCount: room.onlineCount,
                           ),
                         );
                       },
@@ -330,4 +327,3 @@ IconData _roleIcon(ProfileRoomRole role) {
       return Icons.group_rounded;
   }
 }
-

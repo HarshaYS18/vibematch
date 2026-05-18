@@ -14,6 +14,7 @@ class VmNavigator {
     required String modeTitle,
     required int onlineCount,
     CurrentUser? currentUser,
+    String? lockPassword,
   }) {
     return Navigator.pushNamed<T>(
       context,
@@ -25,6 +26,7 @@ class VmNavigator {
         modeTitle: modeTitle,
         onlineCount: onlineCount,
         currentUser: currentUser,
+        lockPassword: lockPassword,
       ),
     );
   }

@@ -114,6 +114,7 @@ class LiveRoomRouteArgs {
   final String modeTitle;
   final int onlineCount;
   final CurrentUser? currentUser;
+  final String? lockPassword;
 
   const LiveRoomRouteArgs({
     required this.roomName,
@@ -122,6 +123,7 @@ class LiveRoomRouteArgs {
     required this.modeTitle,
     required this.onlineCount,
     this.currentUser,
+    this.lockPassword,
   });
 }
 

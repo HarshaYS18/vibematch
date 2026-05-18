@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../presentation/live_room_models.dart';
@@ -111,8 +112,16 @@ class LiveRoomPresenceRepository {
     publishParticipant(nextUser);
   }
 
-  Future<LiveRoomPresenceSnapshot> joinRoom(String roomId) =>
-      _postSnapshot('/rooms/$roomId/join');
+  Future<LiveRoomPresenceSnapshot> joinRoom(
+    String roomId, {
+    String? lockPassword,
+  }) => _postSnapshot(
+    '/rooms/$roomId/join',
+    body: {
+      if (lockPassword != null && lockPassword.trim().isNotEmpty)
+        'lock_password': lockPassword.trim(),
+    },
+  );
 
   Future<LiveRoomPresenceSnapshot> heartbeat(String roomId) =>
       _postSnapshot('/rooms/$roomId/heartbeat');
@@ -196,8 +205,27 @@ class LiveRoomPresenceRepository {
     return user;
   }
 
-  Future<LiveRoomPresenceSnapshot> _postSnapshot(String path) async {
-    final response = await _apiClient.postMap(path, headers: _headers());
+  Future<LiveRoomPresenceSnapshot> _postSnapshot(
+    String path, {
+    Object? body,
+  }) async {
+    late final Map<String, dynamic> response;
+    try {
+      response = await _apiClient.postMap(
+        path,
+        headers: _headers(),
+        body: body,
+      );
+    } on ApiException catch (error) {
+      final body = error.body;
+      if (body is Map<String, dynamic>) {
+        final detail = body['detail'];
+        if (detail != null && detail.toString().trim().isNotEmpty) {
+          throw Exception(detail.toString().trim());
+        }
+      }
+      rethrow;
+    }
     final snapshot = LiveRoomPresenceSnapshot.fromJoinJson(response);
     publishParticipants(snapshot.participants, roomId: snapshot.roomId);
     return snapshot;

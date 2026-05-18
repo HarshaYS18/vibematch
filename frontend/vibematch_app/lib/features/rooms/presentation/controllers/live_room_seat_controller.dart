@@ -272,7 +272,8 @@ class LiveRoomSeatController {
   }
 
   String _preferredRoomUserIdFromPeer(LiveMediaPeerSnapshot peer) {
-    final publicId = _publicUserIdFromAny(peer.peerId) ?? _publicUserIdFromAny(peer.userId);
+    final publicId =
+        _publicUserIdFromAny(peer.peerId) ?? _publicUserIdFromAny(peer.userId);
     if (publicId != null) return 'user_$publicId';
     return peer.userId;
   }
@@ -285,7 +286,9 @@ class LiveRoomSeatController {
 
   bool _isFounderId(String userId) {
     final aliases = _identityAliases(userId);
-    return aliases.contains('6922022') || aliases.contains('user_6922022') || aliases.contains('founder_owner');
+    return aliases.contains('6922022') ||
+        aliases.contains('user_6922022') ||
+        aliases.contains('founder_owner');
   }
 
   int _roomPower(SeatUser user) {
@@ -320,7 +323,9 @@ class LiveRoomSeatController {
   bool _canRemoveTarget(SeatUser target) => _canModerateTarget(target);
 
   SeatUser? _findRoomParticipant(String userId) {
-    final seated = roomUsers.firstWhereOrNull((user) => _sameRoomUserId(user.id, userId));
+    final seated = roomUsers.firstWhereOrNull(
+      (user) => _sameRoomUserId(user.id, userId),
+    );
     if (seated != null) return seated;
 
     final presence = LiveRoomPresenceRepository.currentParticipantsForRoom(
@@ -332,14 +337,17 @@ class LiveRoomSeatController {
     if (snapshot == null) return null;
 
     final peer = snapshot.peers.firstWhereOrNull(
-      (item) => _sameRoomUserId(item.userId, userId) || _sameRoomUserId(item.peerId, userId),
+      (item) =>
+          _sameRoomUserId(item.userId, userId) ||
+          _sameRoomUserId(item.peerId, userId),
     );
     if (peer == null) return null;
 
     return _seatUserFromPeer(peer: peer);
   }
 
-  int? _publicUserIdFromRoomUserId(String userId) => _publicUserIdFromAny(userId);
+  int? _publicUserIdFromRoomUserId(String userId) =>
+      _publicUserIdFromAny(userId);
 
   void _publishParticipantRole(SeatUser user) {
     LiveRoomPresenceRepository.publishParticipant(user);
@@ -487,27 +495,11 @@ class LiveRoomSeatController {
     }
 
     selectedSeatIndex = null;
-    messages.insert(
-      0,
-      ChatEntry(
-        senderName: currentUser.name,
-        senderId: currentUser.id,
-        senderAvatarUrl: currentUser.avatarUrl,
-        message: 'has applied for seat ${index + 1}',
-        vipLevel: currentUser.vipLevel,
-        sendingLevel: currentUser.sendingLevel,
-        receivingLevel: currentUser.receivingLevel,
-        isSeatApplication: true,
-        seatIndex: index,
-        applicationCreatedAt: now,
-        applicationExpiresAt: now.add(seatApplicationExpiry),
-      ),
-    );
-
+    _seatApplyCooldownUntil[currentUser.id] = now.add(seatApplicationCooldown);
     LiveRoomMediaSignalingService.instance.sendSeatApplicationRequest(
       seatIndex: index,
     );
-
+    onToast('Seat request sent');
     onChanged();
   }
 
@@ -613,6 +605,13 @@ class LiveRoomSeatController {
       _seatApplyCooldownUntil[latestEntry.senderId!] = DateTime.now().add(
         seatApplicationCooldown,
       );
+      final seatIndex = latestEntry.seatIndex;
+      if (seatIndex != null) {
+        LiveRoomMediaSignalingService.instance.rejectSeatApplication(
+          targetUserId: latestEntry.senderId!,
+          seatIndex: seatIndex,
+        );
+      }
     }
     messages[index] = latestEntry.copyWith(
       message:
@@ -630,7 +629,10 @@ class LiveRoomSeatController {
       return;
     }
     if (index < 0 || index >= seats.length) return;
-    final wasCurrentUserSeat = _sameRoomUserId(seats[index].user?.id, currentUser.id);
+    final wasCurrentUserSeat = _sameRoomUserId(
+      seats[index].user?.id,
+      currentUser.id,
+    );
     seats[index] = seats[index].copyWith(locked: true, clearUser: true);
     selectedSeatIndex = null;
     LiveRoomMediaSignalingService.instance.lockSeat(seatIndex: index);
@@ -674,7 +676,9 @@ class LiveRoomSeatController {
   }
 
   void toggleMic() {
-    final index = seats.indexWhere((seat) => _sameRoomUserId(seat.user?.id, currentUser.id));
+    final index = seats.indexWhere(
+      (seat) => _sameRoomUserId(seat.user?.id, currentUser.id),
+    );
     final localUser = index >= 0 ? seats[index].user : null;
     if (localUser == null) return;
     if (localUser.adminMuted) {
@@ -687,7 +691,9 @@ class LiveRoomSeatController {
   }
 
   void toggleSelfMute(String userId) {
-    final index = seats.indexWhere((seat) => _sameRoomUserId(seat.user?.id, userId));
+    final index = seats.indexWhere(
+      (seat) => _sameRoomUserId(seat.user?.id, userId),
+    );
     if (index < 0) return;
     final user = seats[index].user!;
     if (!_sameRoomUserId(user.id, currentUser.id)) {
@@ -704,7 +710,9 @@ class LiveRoomSeatController {
   }
 
   void toggleAdminMute(String userId) {
-    final index = seats.indexWhere((seat) => _sameRoomUserId(seat.user?.id, userId));
+    final index = seats.indexWhere(
+      (seat) => _sameRoomUserId(seat.user?.id, userId),
+    );
     if (index < 0) return;
     final user = seats[index].user!;
     if (!_canAdminMuteTarget(user)) {

@@ -1,10 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../auth/models/current_user.dart';
-import '../controllers/live_room_lifecycle_controller.dart';
-import 'live_room_page.dart';
+import 'live_room_presence_shell_page.dart';
 
 class LiveRoomEntryPage extends StatefulWidget {
   const LiveRoomEntryPage({
@@ -29,29 +26,15 @@ class LiveRoomEntryPage extends StatefulWidget {
 }
 
 class _LiveRoomEntryPageState extends State<LiveRoomEntryPage> {
-  final LiveRoomLifecycleController _lifecycleController = LiveRoomLifecycleController();
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_lifecycleController.join(widget.roomId));
-  }
-
-  @override
-  void dispose() {
-    unawaited(_lifecycleController.leave());
-    _lifecycleController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return LiveRoomPage(
+    return LiveRoomPresenceShellPage(
       roomName: widget.roomName,
       roomId: widget.roomId,
       language: widget.language,
       modeTitle: widget.modeTitle,
-      onlineCount: widget.onlineCount,
+      initialOnlineCount: widget.onlineCount,
+      currentUser: widget.currentUser,
     );
   }
 }

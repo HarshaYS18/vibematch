@@ -2,30 +2,23 @@ import '../../data/room_moderation_repository.dart';
 import '../live_room_models.dart';
 
 class LiveRoomModerationController {
-  LiveRoomModerationController({
-    required this.currentUser,
-    RoomModerationRepository? repository,
-  }) : _repository = repository ?? RoomModerationRepository();
+  LiveRoomModerationController({required this.currentUser});
 
   final SeatUser currentUser;
-  final RoomModerationRepository _repository;
-  final Set<String> _locallyKickedOutUserIds = <String>{};
 
   bool isLocallyKickedOut(String userId) {
-    return _locallyKickedOutUserIds.contains(userId);
+    return false;
   }
 
   int safeOnlineCount({
     required int backendOnlineCount,
     required int visibleRoomUsersCount,
   }) {
+    if (backendOnlineCount >= 0) return backendOnlineCount;
     return visibleRoomUsersCount < 0 ? 0 : visibleRoomUsersCount;
   }
 
-  bool canKickOutUser({
-    required SeatUser target,
-    required bool canManageRoom,
-  }) {
+  bool canKickOutUser({required SeatUser target, required bool canManageRoom}) {
     if (target.id == currentUser.id) return false;
 
     final viewerRole = _platformRoomRole(currentUser);
@@ -33,7 +26,8 @@ class LiveRoomModerationController {
 
     // Founder Owner / Super Owner and Owner must get moderation action access
     // even when they are not room admins. Backend still validates every kick.
-    final viewerIsTopOfficial = viewerRole == _RoomPlatformRole.superOwner ||
+    final viewerIsTopOfficial =
+        viewerRole == _RoomPlatformRole.superOwner ||
         viewerRole == _RoomPlatformRole.owner;
 
     if (!canManageRoom && !viewerIsTopOfficial) return false;
@@ -75,27 +69,11 @@ class LiveRoomModerationController {
       );
     }
 
-    try {
-      await _repository.kickOutUser(
-        roomId: roomId,
-        targetUserId: target.id,
-        targetDisplayName: target.name,
-        duration: duration,
-        reason: 'Room kickout from mini profile',
-      );
-
-      _locallyKickedOutUserIds.add(target.id);
-
-      return LiveRoomModerationResult(
-        removedUserId: target.id,
-        systemMessage:
-            '${currentUser.name} removed ${target.name} from the room for ${duration.label}',
-      );
-    } catch (_) {
-      return const LiveRoomModerationResult(
-        toastMessage: 'Kick out failed. Check backend connection and permissions.',
-      );
-    }
+    return LiveRoomModerationResult(
+      removedUserId: target.id,
+      systemMessage:
+          '${currentUser.name} requested removal of ${target.name} for ${duration.label}',
+    );
   }
 
   _RoomPlatformRole _platformRoomRole(SeatUser user) {
@@ -131,9 +109,7 @@ class LiveRoomModerationController {
     return _RoomPlatformRole.normal;
   }
 
-  void dispose() {
-    _repository.close();
-  }
+  void dispose() {}
 }
 
 enum _RoomPlatformRole { normal, official, owner, superOwner }

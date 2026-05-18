@@ -248,8 +248,32 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
+  void acceptSeatInvite({required int seatIndex}) {
+    if (seatIndex < 0) return;
+    seatInvite.value = null;
+    LiveRoomAudioService.instance.takeSeat(seatIndex);
+    _send('seat_invite/accept', <String, Object?>{'seat_index': seatIndex});
+  }
+
+  void rejectSeatInvite({required int seatIndex}) {
+    if (seatIndex < 0) return;
+    _send('seat_invite/reject', <String, Object?>{'seat_index': seatIndex});
+    seatInvite.value = null;
+  }
+
   void clearSeatInvite() {
     seatInvite.value = null;
+  }
+
+  void rejectSeatApplication({
+    required int seatIndex,
+    required String targetUserId,
+  }) {
+    if (seatIndex < 0 || targetUserId.trim().isEmpty) return;
+    _send('seat_application/reject', <String, Object?>{
+      'seat_index': seatIndex,
+      'target_user_id': targetUserId,
+    });
   }
 
   void leaveSeat() {
@@ -866,6 +890,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       }
 
       if (type == 'room/kicked' || type == 'room/join_blocked') {
+        if (type == 'room/kicked' && !_payloadTargetsCurrentUser(payload)) {
+          final roomData = payload['room'];
+          if (roomData is Map<String, dynamic>) {
+            roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
+          }
+          return;
+        }
         unawaited(
           _disconnectAfterServerRemoval(
             block: LiveMediaRoomBlock.fromJson(payload, type: type),
@@ -1141,6 +1172,40 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       targetPeerId: targetPeerId,
       muted: muted,
     );
+  }
+
+  bool _payloadTargetsCurrentUser(Map<String, dynamic> payload) {
+    final currentUserId = _currentUser?.id ?? _activeLoggedInSeatUser?.id;
+    final currentPeerId = _peerId;
+    final targetValues = <String>[
+      payload['target_user_id']?.toString() ?? '',
+      payload['target_backend_user_id']?.toString() ?? '',
+      payload['target_public_user_id']?.toString() ?? '',
+      payload['target_peer_id']?.toString() ?? '',
+    ].where((value) => value.trim().isNotEmpty).toList();
+    if (targetValues.isEmpty) return true;
+    for (final value in targetValues) {
+      if (currentUserId != null &&
+          _identityAliases(value).contains(currentUserId)) {
+        return true;
+      }
+      if (currentPeerId != null && value == currentPeerId) return true;
+    }
+    return false;
+  }
+
+  Set<String> _identityAliases(String rawId) {
+    final value = rawId.trim();
+    if (value.isEmpty) return <String>{};
+    final aliases = <String>{value, value.toLowerCase()};
+    final match = RegExp(r'(?:^|_)user_(\d+)$').firstMatch(value);
+    if (match != null) {
+      aliases.add(match.group(1)!);
+      aliases.add('user_${match.group(1)!}');
+    }
+    final direct = int.tryParse(value);
+    if (direct != null) aliases.add('user_$direct');
+    return aliases;
   }
 
   void _enforceAdminMuteIfCurrentUser({

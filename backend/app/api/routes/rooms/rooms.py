@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
+from app.realtime.connection_manager import room_realtime_connections
 from app.schemas.room_settings import RoomAccessSettingsUpdateRequest, RoomAnnouncementUpdateRequest, RoomBackgroundUpdateRequest, RoomSeatLayoutUpdateRequest, RoomSettingsResponse
 from app.schemas.room_theme import (
     CustomRoomBackgroundSubmitRequest,
@@ -41,6 +42,7 @@ from app.services.rooms.room_service import (
     set_room_member,
 )
 from app.services.rooms.room_state_service import normalize_layout
+from app.services.rooms import room_state_service
 from app.services.rooms.room_theme_service import (
     apply_room_theme,
     decide_custom_background_review,
@@ -209,7 +211,7 @@ def get_room_settings(room_public_id: str, db: Session = Depends(get_db)) -> Roo
 
 
 @router.patch("/{room_public_id}/settings", response_model=RoomSettingsResponse)
-def update_room_settings(room_public_id: str, payload: RoomAccessSettingsUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RoomSettingsResponse:
+async def update_room_settings(room_public_id: str, payload: RoomAccessSettingsUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RoomSettingsResponse:
     room = _get_room_for_update(db, room_public_id, current_user)
     if payload.language is not None:
         room.language = payload.language.strip()
@@ -221,6 +223,12 @@ def update_room_settings(room_public_id: str, payload: RoomAccessSettingsUpdateR
     db.add(room)
     db.commit()
     db.refresh(room)
+    snapshot = room_state_service.room_snapshot(db, room)
+    db.commit()
+    await room_realtime_connections.broadcast_room(
+        room.room_public_id,
+        {"type": "room_settings/updated", "payload": {"room_id": room.room_public_id, "room": snapshot}},
+    )
     return _room_settings_response(room)
 
 
@@ -357,8 +365,19 @@ def remove_room_admin(room_public_id: str, public_user_id: int, db: Session = De
 
 
 @router.post("/{room_public_id}/kickouts", response_model=RoomKickoutResponse)
-def kickout_room_user(room_public_id: str, payload: RoomKickoutCreateRequest, db: Session = Depends(get_db)):
-    return create_room_kickout(db=db, room_public_id=room_public_id, payload=payload)
+def kickout_room_user(room_public_id: str, payload: RoomKickoutCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room = db.query(Room).filter(Room.room_public_id == room_public_id, Room.is_active.is_(True)).first()
+    if room is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    actor_can_manage_room = _can_manage_room(db, room, current_user)
+    return create_room_kickout(
+        db=db,
+        room_public_id=room_public_id,
+        payload=payload,
+        actor_user_id=current_user.id,
+        actor_public_user_id=str(current_user.public_user_id),
+        actor_can_manage_room=actor_can_manage_room,
+    )
 
 
 @router.get("/{room_public_id}/kickouts", response_model=list[RoomKickoutResponse])

@@ -9,11 +9,14 @@ from app.models.follow import UserFollow
 from app.models.presence import UserRoomPresence
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
+from app.models.room_realtime_state import RoomSeatState
 from app.models.user import User
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
 from app.services import economy_level_service, profile_service
+from app.services.permissions import room_permission_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
+from app.services.rooms.room_kickout_service import active_kickout_for_user
 
 # Backend truth: a user is considered inside a room only while room heartbeat is fresh.
 # After 5 minutes without room heartbeat, backend closes the active participant row.
@@ -211,21 +214,43 @@ def _upsert_saved_participant(db: Session, room: Room, user: User, *, is_member:
     return participant
 
 
+def _active_kickout_detail(db: Session, room: Room, user: User) -> str | None:
+    kickout = active_kickout_for_user(db, room_public_id=room.room_public_id, user=user)
+    if kickout is None:
+        return None
+    if kickout.is_permanent:
+        return "You are blocked from this room until the host/admin removes the block."
+    if kickout.blocked_until is not None:
+        return f"You are blocked from this room until {kickout.blocked_until.isoformat()} UTC."
+    return "You are blocked from this room."
+
+
 def _can_enter_room(db: Session, room: Room, user: User, lock_password: str | None = None) -> bool:
+    if active_kickout_for_user(db, room_public_id=room.room_public_id, user=user) is not None:
+        return False
     if _can_manage_room_db(db, room, user):
+        return True
+    if room_permission_service.can_force_join_room(db, user):
         return True
     participant = _existing_participant(db, room, user)
     approved = participant is not None and (participant.is_member or participant.is_room_admin)
     if approved:
         return True
-    if room.is_secret or room.is_members_only:
+    if room.is_secret:
+        return room_permission_service.can_override_secret_room(db, user)
+    if room.is_members_only:
         return False
     if room.is_locked:
-        return _lock_password_matches(room, lock_password)
+        if participant is not None and participant.is_active:
+            return True
+        return room_permission_service.can_override_locked_room(db, user) or _lock_password_matches(room, lock_password)
     return True
 
 
-def _room_access_denied_message(room: Room, *, lock_password: str | None = None) -> str:
+def _room_access_denied_message(db: Session, room: Room, user: User, *, lock_password: str | None = None) -> str:
+    kickout_detail = _active_kickout_detail(db, room, user)
+    if kickout_detail is not None:
+        return kickout_detail
     if room.is_secret:
         return "This Secret Vibe room is invite-only."
     if room.is_members_only:
@@ -235,6 +260,14 @@ def _room_access_denied_message(room: Room, *, lock_password: str | None = None)
             return "This room is locked. Enter the room lock or use an invite from the channel owner/admin."
         return "Incorrect room lock. Try again or ask the channel owner/admin for an invite."
     return "Room not found or not accessible"
+
+
+def assert_room_entry_allowed(db: Session, room: Room, user: User, lock_password: str | None = None) -> None:
+    if not _can_enter_room(db, room, user, lock_password=lock_password):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_room_access_denied_message(db, room, user, lock_password=lock_password),
+        )
 
 
 def _get_room_or_404(db: Session, room_public_id: str) -> Room:
@@ -284,21 +317,12 @@ def _active_room_user_ids(db: Session, room: Room, cutoff: datetime) -> set[int]
         .filter(
             RoomParticipant.room_id == room.id,
             RoomParticipant.is_active.is_(True),
+            RoomParticipant.visible_in_online_count.is_(True),
             RoomParticipant.last_seen_at >= cutoff,
         )
         .all()
     }
-    presence_ids = {
-        row[0]
-        for row in db.query(UserRoomPresence.user_id)
-        .filter(
-            UserRoomPresence.room_public_id == room.room_public_id,
-            UserRoomPresence.is_active.is_(True),
-            UserRoomPresence.last_heartbeat_at >= cutoff,
-        )
-        .all()
-    }
-    return participant_ids | presence_ids
+    return participant_ids
 
 
 def _refresh_room_online_count(db: Session, room: Room) -> int:
@@ -448,8 +472,7 @@ def join_room(db: Session, room_public_id: str, current_user: User, lock_passwor
     room = get_room_model_by_public_id(db, room_public_id)
     if not room:
         return None
-    if not _can_enter_room(db, room, current_user, lock_password=lock_password):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_room_access_denied_message(room, lock_password=lock_password))
+    assert_room_entry_allowed(db, room, current_user, lock_password=lock_password)
 
     previous = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == current_user.id).first()
     was_active = previous.is_active if previous is not None else False
@@ -467,6 +490,7 @@ def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> Room
     room = get_room_model_by_public_id(db, room_public_id)
     if not room:
         return None
+    assert_room_entry_allowed(db, room, current_user)
     participant = _existing_participant(db, room, current_user)
     if participant is None or not participant.is_active:
         participant = _upsert_active_participant(db, room, current_user)
@@ -485,11 +509,26 @@ def leave_room(db: Session, room_public_id: str, current_user: User) -> RoomLeav
     room = get_room_model_by_public_id(db, room_public_id)
     if not room:
         return None
+    now = datetime.utcnow()
     participant = _existing_participant(db, room, current_user)
     if participant is not None:
         participant.is_active = False
-        participant.left_at = datetime.utcnow()
-        participant.last_seen_at = datetime.utcnow()
+        participant.left_at = now
+        participant.last_seen_at = now
+    db.query(UserRoomPresence).filter(
+        UserRoomPresence.room_public_id == room.room_public_id,
+        UserRoomPresence.user_id == current_user.id,
+        UserRoomPresence.is_active.is_(True),
+    ).update(
+        {UserRoomPresence.is_active: False, UserRoomPresence.left_at: now, UserRoomPresence.last_heartbeat_at: now},
+        synchronize_session=False,
+    )
+    for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == current_user.id).all():
+        seat.occupant_user_id = None
+        seat.mic_enabled = False
+        seat.admin_muted = False
+        seat.left_at = now
+        seat.updated_by_user_id = current_user.id
     count = _refresh_room_online_count(db, room)
     db.commit()
     return RoomLeaveResponse(room_id=room.room_public_id, online_count=count, left=True)

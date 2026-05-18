@@ -107,6 +107,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   Timer? _seatInviteAutoHideTimer;
   Timer? _hostSeatOneTimer;
   Timer? _hostSeatOneRetryTimer;
+  VoidCallback? _seatInviteListener;
   VoidCallback? _roomMembershipListener;
   VoidCallback? _roomMemberRequestListener;
 
@@ -169,8 +170,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       _currentMembershipStatus == LiveRoomMembershipStatus.pending;
 
   int get _safeOnlineCount {
+    final backendOnlineCount =
+        LiveRoomMediaSignalingService.instance.roomSnapshot.value?.peerCount ??
+        widget.onlineCount;
     return _moderationController.safeOnlineCount(
-      backendOnlineCount: widget.onlineCount,
+      backendOnlineCount: backendOnlineCount,
       visibleRoomUsersCount: _roomUsers.length,
     );
   }
@@ -182,6 +186,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       if (mounted) setState(() {});
     };
     LiveRoomMembershipService.snapshots.addListener(_roomMembershipListener!);
+    _seatInviteListener = _handleSeatInviteUpdate;
+    LiveRoomMediaSignalingService.instance.seatInvite.addListener(
+      _seatInviteListener!,
+    );
     _roomMemberRequestListener = () {
       if (mounted) setState(() {});
     };
@@ -288,6 +296,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     if (requestListener != null) {
       LiveRoomMemberRequestService.instance.pendingRequests.removeListener(
         requestListener,
+      );
+    }
+    final seatInviteListener = _seatInviteListener;
+    if (seatInviteListener != null) {
+      LiveRoomMediaSignalingService.instance.seatInvite.removeListener(
+        seatInviteListener,
       );
     }
     _messageController.dispose();

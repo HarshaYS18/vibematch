@@ -217,8 +217,23 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type == "room/join":
-                    snapshot = room_action_service.join_room(db, room, user, payload) if user is not None else room_state_service.room_snapshot(db, room)
-                    db.commit()
+                    try:
+                        snapshot = room_action_service.join_room(db, room, user, payload) if user is not None else room_state_service.room_snapshot(db, room)
+                        db.commit()
+                    except HTTPException as exc:
+                        db.rollback()
+                        await room_realtime_connections.send_json(
+                            websocket,
+                            {
+                                "type": "room/join_blocked",
+                                "payload": {
+                                    "room_id": room_id,
+                                    "reason": str(exc.detail),
+                                    "status_code": exc.status_code,
+                                },
+                            },
+                        )
+                        continue
                     if not (user is not None and snapshot.get("internal_participants") and any(int(item.get("backend_user_id") or 0) == user.id and item.get("is_stealth") is True for item in snapshot.get("internal_participants", []))):
                         await _broadcast_snapshot(room_id, "room/joined", snapshot)
                     await room_realtime_connections.send_json(websocket, _event_payload("room.snapshot", room_id, snapshot))
@@ -231,8 +246,23 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type == "room/heartbeat":
-                    snapshot = room_action_service.heartbeat_room(db, room, user) if user is not None else room_state_service.room_snapshot(db, room, include_chat=False)
-                    db.commit()
+                    try:
+                        snapshot = room_action_service.heartbeat_room(db, room, user) if user is not None else room_state_service.room_snapshot(db, room, include_chat=False)
+                        db.commit()
+                    except HTTPException as exc:
+                        db.rollback()
+                        await room_realtime_connections.send_json(
+                            websocket,
+                            {
+                                "type": "room/join_blocked",
+                                "payload": {
+                                    "room_id": room_id,
+                                    "reason": str(exc.detail),
+                                    "status_code": exc.status_code,
+                                },
+                            },
+                        )
+                        continue
                     await room_realtime_connections.send_json(websocket, _event_payload("room.snapshot", room_id, snapshot))
                     continue
 
@@ -264,7 +294,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type == "seat/take" and user is not None:
-                    snapshot = room_action_service.take_seat(db, room, user, _int_payload(payload, "seat_index"))
+                    snapshot = room_action_service.take_or_request_seat(db, room, user, _int_payload(payload, "seat_index"))
                     db.commit()
                     await _broadcast_snapshot(room_id, "seat/updated", snapshot)
                     continue
@@ -291,8 +321,26 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                             **_user_identity_payload(room_id, "inviter", user),
                             **_user_identity_payload(room_id, "target", target),
                         }
-                        await room_realtime_connections.broadcast_room(room_id, {"type": "seat_invite/received", "payload": invite_payload})
+                        await room_realtime_connections.send_room_user(room_id, target.id, {"type": "seat_invite/received", "payload": invite_payload})
                     await _broadcast_snapshot(room_id, "seat_invite/sent", snapshot, {"target_user_id": target.id if target else None, "seat_index": seat_index})
+                    continue
+
+                if event_type == "seat_invite/accept" and user is not None:
+                    seat_index = _int_payload(payload, "seat_index")
+                    snapshot = room_action_service.accept_seat_invite(db, room, user, seat_index)
+                    db.commit()
+                    await _broadcast_snapshot(room_id, "seat/updated", snapshot)
+                    continue
+
+                if event_type == "seat_invite/reject" and user is not None:
+                    seat_index = _int_payload(payload, "seat_index")
+                    snapshot = room_action_service.reject_seat_invite(db, room, user, seat_index)
+                    db.commit()
+                    await room_realtime_connections.send_room_user(
+                        room_id,
+                        user.id,
+                        _event_payload("seat_invite/rejected", room_id, snapshot, {"seat_index": seat_index}),
+                    )
                     continue
 
                 if event_type == "seat_application/request" and user is not None:
@@ -321,9 +369,9 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     await _broadcast_snapshot(room_id, "seat_application/rejected", snapshot, {"target_user_id": target.id if target else None, "seat_index": seat_index})
                     continue
 
-                if event_type == "admin/seat_assign":
+                if event_type == "admin/seat_assign" and user is not None:
                     target = _target_user(db, payload)
-                    snapshot = room_action_service.take_seat(db, room, target, _int_payload(payload, "seat_index"), actor_user_id=active_user_id) if target else room_state_service.room_snapshot(db, room)
+                    snapshot = room_action_service.assign_seat(db, room, user, target, _int_payload(payload, "seat_index")) if target else room_state_service.room_snapshot(db, room)
                     db.commit()
                     await _broadcast_snapshot(room_id, "seat/updated", snapshot)
                     continue
@@ -356,7 +404,7 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     snapshot = room_action_service.kick_user(db, room, user, target, reason=reason, duration=duration) if target else room_state_service.room_snapshot(db, room)
                     db.commit()
                     if target is not None:
-                        await room_realtime_connections.broadcast_room(room_id, {"type": "room/kicked", "payload": {"room_id": room_id, "room": snapshot, "reason": reason, "duration": duration, **_user_identity_payload(room_id, "target", target)}})
+                        await room_realtime_connections.send_room_user(room_id, target.id, {"type": "room/kicked", "payload": {"room_id": room_id, "room": snapshot, "reason": reason, "duration": duration, **_user_identity_payload(room_id, "target", target)}})
                     await _broadcast_snapshot(room_id, "room/peer_left", snapshot, {"target_user_id": target.id if target else None})
                     continue
 

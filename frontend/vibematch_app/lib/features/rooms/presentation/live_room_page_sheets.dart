@@ -329,7 +329,10 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
 
   void _resolveJoinRequest(SeatUser user, {required bool approved}) {
     if (!_viewerCanManageAdmins) {
-      RoomToast.show(context, 'Only channel host can approve room member requests');
+      RoomToast.show(
+        context,
+        'Only channel host can approve room member requests',
+      );
       return;
     }
     if (approved) {
@@ -341,7 +344,9 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     }
     RoomToast.show(
       context,
-      approved ? '${user.name} approved as room member' : '${user.name} rejected',
+      approved
+          ? '${user.name} approved as room member'
+          : '${user.name} rejected',
     );
   }
 
@@ -353,7 +358,6 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       builder: (context) => LiveRoomPrivacySheet(
         currentMode: _privacyMode,
         onModeChanged: (mode) {
-          _roomStateController.setPrivacyMode(mode);
           _insertSystemMessage(
             _settingsController.privacyModeSystemMessage(mode),
           );
@@ -534,8 +538,9 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                                 ? Image.network(
                                     theme.imageUrl!,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(Icons.image_rounded),
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Icon(Icons.image_rounded),
                                   )
                                 : const Icon(
                                     Icons.wallpaper_rounded,

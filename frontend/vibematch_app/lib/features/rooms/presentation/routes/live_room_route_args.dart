@@ -8,6 +8,7 @@ class LiveRoomRouteViewArgs {
     required this.modeTitle,
     required this.onlineCount,
     this.currentUser,
+    this.lockPassword,
   });
 
   final String roomName;
@@ -16,4 +17,5 @@ class LiveRoomRouteViewArgs {
   final String modeTitle;
   final int onlineCount;
   final CurrentUser? currentUser;
+  final String? lockPassword;
 }

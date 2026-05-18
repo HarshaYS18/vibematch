@@ -7,6 +7,7 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.presence import UserRoomPresence
 from app.models.room import Room
+from app.models.room_participant import RoomParticipant
 from app.models.user import User
 from app.schemas.presence import (
     PresenceBatchRequest,
@@ -42,6 +43,18 @@ def _active_room_presence(db: Session, user_id: int) -> UserRoomPresence | None:
 
 def _active_room_count(db: Session, room_public_id: str) -> int:
     cutoff = _now() - timedelta(seconds=_ROOM_ACTIVE_WINDOW_SECONDS)
+    room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+    if room is not None:
+        return (
+            db.query(RoomParticipant.id)
+            .filter(
+                RoomParticipant.room_id == room.id,
+                RoomParticipant.is_active.is_(True),
+                RoomParticipant.visible_in_online_count.is_(True),
+                RoomParticipant.last_seen_at >= cutoff,
+            )
+            .count()
+        )
     return (
         db.query(UserRoomPresence.id)
         .filter(
@@ -69,18 +82,10 @@ def _sync_room_discovery_state(
 
     active_count = _active_room_count(db, room_public_id)
     room.name = room_name or room.name
-    if room_mode:
-        room.mode = room_mode
-        normalized = room_mode.strip().lower()
-        room.is_secret = is_secret or "secret" in normalized or "private" in normalized
-        room.is_locked = "lock" in normalized
-        room.is_members_only = "member" in normalized
-    else:
-        room.is_secret = is_secret
     if owner_user_id is not None and room.owner_user_id is None:
         room.owner_user_id = owner_user_id
     room.is_active = True
-    room.online_count = max(active_count, 1)
+    room.online_count = active_count
     room.trending_score = max(int(room.trending_score or 0), room.online_count)
     room.updated_at = _now()
     db.add(room)
@@ -150,6 +155,9 @@ def _upsert_room_presence(
     is_secret: bool,
 ) -> UserRoomPresence:
     _close_other_active_room_presence(db, current_user.id, except_room_public_id=room_public_id)
+    canonical_room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+    canonical_is_secret = canonical_room.is_secret if canonical_room is not None else is_secret
+    canonical_room_mode = canonical_room.mode if canonical_room is not None else room_mode
 
     room = (
         db.query(UserRoomPresence)
@@ -167,8 +175,8 @@ def _upsert_room_presence(
             user_id=current_user.id,
             room_public_id=room_public_id,
             room_name=room_name,
-            room_mode=room_mode,
-            is_secret=is_secret,
+            room_mode=canonical_room_mode,
+            is_secret=canonical_is_secret,
             is_active=True,
             entered_at=now,
             last_heartbeat_at=now,
@@ -177,8 +185,8 @@ def _upsert_room_presence(
         db.flush()
     else:
         room.room_name = room_name
-        room.room_mode = room_mode
-        room.is_secret = is_secret
+        room.room_mode = canonical_room_mode
+        room.is_secret = canonical_is_secret
         room.last_heartbeat_at = now
         db.add(room)
         db.flush()
@@ -187,8 +195,8 @@ def _upsert_room_presence(
         db,
         room_public_id=room_public_id,
         room_name=room_name,
-        room_mode=room_mode,
-        is_secret=is_secret,
+        room_mode=canonical_room_mode,
+        is_secret=canonical_is_secret,
         owner_user_id=current_user.id,
     )
     return room

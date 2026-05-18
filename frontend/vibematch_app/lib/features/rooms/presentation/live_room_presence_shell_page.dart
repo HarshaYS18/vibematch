@@ -20,6 +20,7 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
     required this.modeTitle,
     required this.initialOnlineCount,
     this.currentUser,
+    this.lockPassword,
     this.initialBackgroundTheme,
     this.restoreState,
   });
@@ -30,6 +31,7 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
   final String modeTitle;
   final int initialOnlineCount;
   final CurrentUser? currentUser;
+  final String? lockPassword;
   final RoomBackgroundTheme? initialBackgroundTheme;
   final LiveRoomRestoreState? restoreState;
 
@@ -87,7 +89,10 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       _presenceError = null;
     });
     try {
-      final snapshot = await _presenceRepository.joinRoom(widget.roomId);
+      final snapshot = await _presenceRepository.joinRoom(
+        widget.roomId,
+        lockPassword: widget.lockPassword,
+      );
       if (!mounted) return;
       _seedIdentityFromPresence(snapshot);
       setState(() {
@@ -226,6 +231,56 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
         backgroundColor: Color(0xFF120D1F),
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFF12C7B7)),
+        ),
+      );
+    }
+
+    if (_presenceError != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF120D1F),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.lock_rounded,
+                    color: Color(0xFFE84C72),
+                    size: 42,
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Room access blocked',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _presenceError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.maybePop(context),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: const Text('Back'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       );
     }

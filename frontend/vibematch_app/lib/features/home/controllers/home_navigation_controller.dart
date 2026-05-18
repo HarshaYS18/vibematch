@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
 import '../../auth/models/current_user.dart';
 import '../../create/presentation/create_page.dart';
+import '../../rooms/data/room_api_service.dart';
 import '../models/home_banner.dart';
 import '../models/home_room.dart';
 import '../presentation/widgets/home_language_sheet.dart';
@@ -17,7 +20,10 @@ class HomeNavigationController {
     try {
       final primaryRole = activeUser?.primaryRole?.toString().toLowerCase();
       final roles = activeUser?.roles;
-      if (primaryRole == 'founder_owner' || primaryRole == 'super_owner' || primaryRole == 'owner') return true;
+      if (primaryRole == 'founder_owner' ||
+          primaryRole == 'super_owner' ||
+          primaryRole == 'owner')
+        return true;
       if (roles is Iterable) {
         return roles.any((role) {
           final normalized = role.toString().toLowerCase();
@@ -70,18 +76,29 @@ class HomeNavigationController {
     }
 
     if (existingRoom != null) {
-      enterRoom(context: context, room: existingRoom, currentUser: currentUser);
+      await _joinAndEnter(
+        context: context,
+        room: existingRoom,
+        currentUser: currentUser,
+      );
       return;
     }
 
-    await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => CreatePage(currentUser: currentUser)));
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => CreatePage(currentUser: currentUser)),
+    );
     if (!context.mounted) return;
     await controller.refreshAfterRoomCreation();
     if (!context.mounted) return;
 
     final createdRoom = controller.myCreatedRoom;
     if (createdRoom != null) {
-      enterRoom(context: context, room: createdRoom, currentUser: currentUser);
+      await _joinAndEnter(
+        context: context,
+        room: createdRoom,
+        currentUser: currentUser,
+      );
       return;
     }
     showToast(context, 'Room saved. Pull to refresh if it does not appear.');
@@ -92,26 +109,24 @@ class HomeNavigationController {
     required HomeRoom room,
     required CurrentUser? currentUser,
   }) {
-    final mode = room.mode.toLowerCase();
-    if (mode.contains('secret')) {
-      showToast(context, 'No permission to enter this Secret Vibe room');
+    if (room.mode.toLowerCase().contains('lock')) {
+      openLockedRoomSheet(
+        context: context,
+        room: room,
+        currentUser: currentUser,
+      );
       return;
     }
-    if (mode.contains('member')) {
-      showToast(context, 'Members Only room. Membership approval required.');
-      return;
-    }
-    if (mode.contains('lock')) {
-      openLockedRoomSheet(context: context, room: room, currentUser: currentUser);
-      return;
-    }
-    enterRoom(context: context, room: room, currentUser: currentUser);
+    unawaited(
+      _joinAndEnter(context: context, room: room, currentUser: currentUser),
+    );
   }
 
   static void enterRoom({
     required BuildContext context,
     required HomeRoom room,
     required CurrentUser? currentUser,
+    String? lockPassword,
   }) {
     VmNavigator.openLiveRoom(
       context,
@@ -121,7 +136,75 @@ class HomeNavigationController {
       modeTitle: room.mode,
       onlineCount: room.onlineCount,
       currentUser: currentUser,
+      lockPassword: lockPassword,
     );
+  }
+
+  static Future<bool> _joinAndEnter({
+    required BuildContext context,
+    required HomeRoom room,
+    required CurrentUser? currentUser,
+    String? lockPassword,
+  }) async {
+    if (currentUser == null) {
+      showToast(context, 'Login session not ready. Refresh and try again.');
+      return false;
+    }
+    try {
+      final snapshot = await const RoomApiService().joinRoom(
+        room.id,
+        lockPassword: lockPassword,
+      );
+      if (!context.mounted) return false;
+      final joinedRoom = snapshot.room;
+      enterRoom(
+        context: context,
+        room: HomeRoom(
+          id: room.id,
+          name: room.name,
+          subtitle: room.subtitle,
+          language: room.language,
+          mode: joinedRoom.mode,
+          type: room.type,
+          onlineCount: joinedRoom.onlineCount,
+          trendingScore: room.trendingScore,
+          followedFriendsInside: room.followedFriendsInside,
+          coverPhotoUrl: room.coverPhotoUrl,
+        ),
+        currentUser: currentUser,
+        lockPassword: lockPassword,
+      );
+      return true;
+    } catch (error) {
+      if (!context.mounted) return false;
+      final message = error.toString().replaceFirst('Exception: ', '');
+      if (message.toLowerCase().contains('locked') &&
+          (lockPassword == null || lockPassword.trim().isEmpty)) {
+        openLockedRoomSheet(
+          context: context,
+          room: room,
+          currentUser: currentUser,
+        );
+        return false;
+      }
+      showToast(context, _entryBlockedMessage(message));
+      return false;
+    }
+  }
+
+  static String _entryBlockedMessage(String backendMessage) {
+    final normalized = backendMessage.toLowerCase();
+    if (normalized.contains('members-only') ||
+        normalized.contains('members only')) {
+      return 'Members Only room. Membership approval required.';
+    }
+    if (normalized.contains('secret')) {
+      return 'This Secret Vibe room is private or invite-only.';
+    }
+    if (normalized.contains('incorrect') || normalized.contains('wrong')) {
+      return 'Wrong password.';
+    }
+    return backendMessage;
   }
 
   static void openLockedRoomSheet({
@@ -135,8 +218,53 @@ class HomeNavigationController {
       isScrollControlled: true,
       builder: (_) => HomeLockedRoomSheet(
         room: room,
-        onWrongPassword: () => showToast(context, 'Wrong password.'),
-        onPasswordAccepted: () => enterRoom(context: context, room: room, currentUser: currentUser),
+        onSubmitPassword: (password) async {
+          if (currentUser == null) {
+            showToast(
+              context,
+              'Login session not ready. Refresh and try again.',
+            );
+            return false;
+          }
+          try {
+            final snapshot = await const RoomApiService().joinRoom(
+              room.id,
+              lockPassword: password,
+            );
+            final joinedRoom = snapshot.room;
+            Future<void>.delayed(const Duration(milliseconds: 120), () {
+              if (!context.mounted) return;
+              enterRoom(
+                context: context,
+                room: HomeRoom(
+                  id: room.id,
+                  name: room.name,
+                  subtitle: room.subtitle,
+                  language: room.language,
+                  mode: joinedRoom.mode,
+                  type: room.type,
+                  onlineCount: joinedRoom.onlineCount,
+                  trendingScore: room.trendingScore,
+                  followedFriendsInside: room.followedFriendsInside,
+                  coverPhotoUrl: room.coverPhotoUrl,
+                ),
+                currentUser: currentUser,
+                lockPassword: password,
+              );
+            });
+            return true;
+          } catch (error) {
+            if (context.mounted) {
+              showToast(
+                context,
+                _entryBlockedMessage(
+                  error.toString().replaceFirst('Exception: ', ''),
+                ),
+              );
+            }
+            return false;
+          }
+        },
       ),
     );
   }

@@ -80,35 +80,40 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
   }) {
     Navigator.pop(context);
     _clearRoomFocus();
+    final sent = _seatController.inviteUserToSeat(
+      seatIndex: seatIndex,
+      invitedUser: invitedUser,
+    );
+    if (sent) {
+      RoomToast.show(context, 'Seat invite sent to ${invitedUser.name}');
+    }
+  }
 
+  void _handleSeatInviteUpdate() {
+    final invite = LiveRoomMediaSignalingService.instance.seatInvite.value;
     _seatInviteAutoHideTimer?.cancel();
+    _seatInviteAutoHideTimer = null;
 
+    if (invite == null || invite.roomId != _roomId || invite.seatIndex < 0) {
+      if (_pendingSeatInvite != null && mounted) {
+        _setRoomState(() => _pendingSeatInvite = null);
+      }
+      return;
+    }
+
+    if (!mounted) return;
     _setRoomState(() {
       _pendingSeatInvite = _PendingSeatInvite(
-        inviterName: _currentUser.name,
-        invitedUser: invitedUser,
-        seatIndex: seatIndex,
+        inviterName: invite.inviterName,
+        invitedUser: _currentUser,
+        seatIndex: invite.seatIndex,
       );
     });
-
     _seatInviteAutoHideTimer = Timer(const Duration(seconds: 15), () {
       if (!mounted) return;
-      final activeInvite = _pendingSeatInvite;
-      if (activeInvite == null ||
-          activeInvite.invitedUser.id != invitedUser.id ||
-          activeInvite.seatIndex != seatIndex) {
-        return;
-      }
-
-      _setRoomState(() {
-        _pendingSeatInvite = null;
-      });
+      LiveRoomMediaSignalingService.instance.clearSeatInvite();
+      _setRoomState(() => _pendingSeatInvite = null);
     });
-
-    RoomToast.show(
-      context,
-      '${_currentUser.name} invited ${invitedUser.name} to seat ${seatIndex + 1}',
-    );
   }
 
   void _rejectSeatInvite() {
@@ -121,31 +126,20 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     _setRoomState(() {
       _pendingSeatInvite = null;
     });
-
-    RoomToast.show(
-      context,
-      '${invite.invitedUser.name} rejected the seat invite',
+    LiveRoomMediaSignalingService.instance.rejectSeatInvite(
+      seatIndex: invite.seatIndex,
     );
+
+    RoomToast.show(context, 'Seat invite rejected');
   }
 
   void _acceptSeatInvite() {
     final invite = _pendingSeatInvite;
     if (invite == null) return;
 
-    final accepted = _seatController.inviteUserToSeat(
+    LiveRoomMediaSignalingService.instance.acceptSeatInvite(
       seatIndex: invite.seatIndex,
-      invitedUser: invite.invitedUser,
     );
-
-    if (!accepted) {
-      _seatInviteAutoHideTimer?.cancel();
-      _seatInviteAutoHideTimer = null;
-
-      _setRoomState(() {
-        _pendingSeatInvite = null;
-      });
-      return;
-    }
 
     _seatInviteAutoHideTimer?.cancel();
     _seatInviteAutoHideTimer = null;
@@ -153,6 +147,7 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     _setRoomState(() {
       _pendingSeatInvite = null;
     });
+    LiveRoomMediaSignalingService.instance.clearSeatInvite();
   }
 
   void _openRoomShareSheet() {
@@ -357,7 +352,10 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     if (systemMessage != null) _insertSystemMessage(systemMessage);
     final removedUserId = result.removedUserId;
     if (removedUserId != null) {
-      _seatController.removeUserFromRoom(removedUserId);
+      _seatController.kickUserFromRoom(
+        userId: removedUserId,
+        duration: duration.apiValue,
+      );
     }
     final toastMessage = result.toastMessage;
     if (toastMessage != null) RoomToast.show(context, toastMessage);

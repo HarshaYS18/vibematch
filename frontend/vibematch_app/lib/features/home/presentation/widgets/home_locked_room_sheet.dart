@@ -7,13 +7,11 @@ class HomeLockedRoomSheet extends StatefulWidget {
   const HomeLockedRoomSheet({
     super.key,
     required this.room,
-    required this.onPasswordAccepted,
-    required this.onWrongPassword,
+    required this.onSubmitPassword,
   });
 
   final HomeRoom room;
-  final VoidCallback onPasswordAccepted;
-  final VoidCallback onWrongPassword;
+  final Future<bool> Function(String password) onSubmitPassword;
 
   @override
   State<HomeLockedRoomSheet> createState() => _HomeLockedRoomSheetState();
@@ -22,6 +20,7 @@ class HomeLockedRoomSheet extends StatefulWidget {
 class _HomeLockedRoomSheetState extends State<HomeLockedRoomSheet> {
   final TextEditingController _passwordController = TextEditingController();
   bool _passwordVisible = false;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -44,7 +43,11 @@ class _HomeLockedRoomSheetState extends State<HomeLockedRoomSheet> {
               color: const Color(0xFFC99A3B).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(Icons.lock_rounded, color: Color(0xFFC99A3B), size: 32),
+            child: const Icon(
+              Icons.lock_rounded,
+              color: Color(0xFFC99A3B),
+              size: 32,
+            ),
           ),
           const SizedBox(height: 14),
           const Text(
@@ -70,15 +73,27 @@ class _HomeLockedRoomSheetState extends State<HomeLockedRoomSheet> {
             controller: _passwordController,
             obscureText: !_passwordVisible,
             keyboardType: TextInputType.number,
-            style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: Color(0xFF251538),
+              fontWeight: FontWeight.w900,
+            ),
             decoration: InputDecoration(
               hintText: 'Enter password',
-              hintStyle: const TextStyle(color: Color(0xFF9B8CA5), fontWeight: FontWeight.w600),
-              prefixIcon: const Icon(Icons.lock_rounded, color: Color(0xFFC99A3B)),
+              hintStyle: const TextStyle(
+                color: Color(0xFF9B8CA5),
+                fontWeight: FontWeight.w600,
+              ),
+              prefixIcon: const Icon(
+                Icons.lock_rounded,
+                color: Color(0xFFC99A3B),
+              ),
               suffixIcon: IconButton(
-                onPressed: () => setState(() => _passwordVisible = !_passwordVisible),
+                onPressed: () =>
+                    setState(() => _passwordVisible = !_passwordVisible),
                 icon: Icon(
-                  _passwordVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  _passwordVisible
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
                   color: const Color(0xFF7B6A86),
                 ),
               ),
@@ -94,7 +109,10 @@ class _HomeLockedRoomSheetState extends State<HomeLockedRoomSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
-                borderSide: const BorderSide(color: Color(0xFFC99A3B), width: 1.5),
+                borderSide: const BorderSide(
+                  color: Color(0xFFC99A3B),
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -102,7 +120,7 @@ class _HomeLockedRoomSheetState extends State<HomeLockedRoomSheet> {
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Mock password: 1234',
+              'Ask the host/admin for this room lock.',
               style: TextStyle(
                 color: Color(0xFF9B8CA5),
                 fontSize: 11.5,
@@ -117,7 +135,7 @@ class _HomeLockedRoomSheetState extends State<HomeLockedRoomSheet> {
                 child: HomeSecondaryButton(
                   text: 'Cancel',
                   icon: Icons.close_rounded,
-                  onTap: () => Navigator.pop(context),
+                  onTap: _submitting ? () {} : () => Navigator.pop(context),
                 ),
               ),
               const SizedBox(width: 12),
@@ -125,14 +143,19 @@ class _HomeLockedRoomSheetState extends State<HomeLockedRoomSheet> {
                 child: HomePrimaryButton(
                   text: 'Enter',
                   icon: Icons.lock_open_rounded,
-                  onTap: () {
-                    if (_passwordController.text.trim() != '1234') {
-                      widget.onWrongPassword();
-                      return;
-                    }
-                    Navigator.pop(context);
-                    widget.onPasswordAccepted();
-                  },
+                  onTap: _submitting
+                      ? () {}
+                      : () async {
+                          final password = _passwordController.text.trim();
+                          if (password.isEmpty) return;
+                          setState(() => _submitting = true);
+                          final entered = await widget.onSubmitPassword(
+                            password,
+                          );
+                          if (!mounted) return;
+                          setState(() => _submitting = false);
+                          if (entered) Navigator.pop(context);
+                        },
                 ),
               ),
             ],
