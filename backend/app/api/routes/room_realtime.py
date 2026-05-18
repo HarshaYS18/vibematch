@@ -455,7 +455,6 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         **_user_identity_payload(room_id, "applicant", user),
                     }
                     await room_realtime_connections.broadcast_room(room_id, {"type": "seat_application/received", "payload": application_payload})
-                    await room_realtime_connections.broadcast_room(room_id, _system_event_payload(room_id, "seat_application_requested", f"{_display_name(user, 'A user')} applied for seat {seat_index + 1}", actor=user, target=user, seat_index=seat_index))
                     await _broadcast_snapshot(room_id, "seat_application/requested", snapshot, {"applicant_user_id": user.id, "seat_index": seat_index})
                     continue
 
