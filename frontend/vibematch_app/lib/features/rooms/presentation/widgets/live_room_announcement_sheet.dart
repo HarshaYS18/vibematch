@@ -62,13 +62,7 @@ class LiveRoomAnnouncementSheet extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  final message = controller.text.trim();
-                  if (message.isNotEmpty) {
-                    roomBroadcastAnnouncementNotifier.value = message;
-                  }
-                  onSubmit(message);
-                },
+                onPressed: () => onSubmit(controller.text.trim()),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: RoomColors.plum,
                   foregroundColor: Colors.white,
