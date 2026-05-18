@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'room_info_sheet.dart';
 import 'room_theme.dart';
 
 class LiveRoomAnnouncementSheet extends StatelessWidget {
@@ -34,7 +33,7 @@ class LiveRoomAnnouncementSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SheetHandle(),
+            const _SheetHandle(),
             const SizedBox(height: 16),
             const Text(
               'Broad Announcement',
@@ -75,6 +74,24 @@ class LiveRoomAnnouncementSheet extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 42,
+        height: 4,
+        decoration: BoxDecoration(
+          color: RoomColors.softLine,
+          borderRadius: BorderRadius.circular(99),
         ),
       ),
     );
