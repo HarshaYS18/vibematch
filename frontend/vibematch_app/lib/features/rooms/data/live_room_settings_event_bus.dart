@@ -19,6 +19,7 @@ class LiveRoomSettingsEvent {
     this.guestMessagesEnabled,
     this.actorUserId = '',
     this.actorName = '',
+    this.roomName = '',
     this.backgroundThemeId = '',
     this.seatLayoutId = '',
     this.announcementText = '',
@@ -34,6 +35,7 @@ class LiveRoomSettingsEvent {
   final bool? guestMessagesEnabled;
   final String actorUserId;
   final String actorName;
+  final String roomName;
   final String backgroundThemeId;
   final String seatLayoutId;
   final String announcementText;
@@ -53,6 +55,7 @@ class LiveRoomSettingsEvent {
       guestMessagesEnabled: _nullableBool(json['guest_messages_enabled'] ?? json['guestMessagesEnabled'] ?? roomMap['guest_messages_enabled'] ?? roomMap['guestMessagesEnabled']),
       actorUserId: json['actor_user_id']?.toString() ?? '',
       actorName: json['actor_name']?.toString() ?? '',
+      roomName: json['name']?.toString() ?? json['room_name']?.toString() ?? json['roomName']?.toString() ?? roomMap['name']?.toString() ?? roomMap['room_name']?.toString() ?? roomMap['roomName']?.toString() ?? '',
       backgroundThemeId: json['background_theme_id']?.toString() ?? json['backgroundThemeId']?.toString() ?? roomMap['background_theme_id']?.toString() ?? roomMap['backgroundThemeId']?.toString() ?? '',
       seatLayoutId: json['seat_layout_id']?.toString() ?? json['seatLayoutId']?.toString() ?? roomMap['seat_layout_id']?.toString() ?? roomMap['seatLayoutId']?.toString() ?? '',
       announcementText: json['announcement_text']?.toString() ?? json['announcementText']?.toString() ?? roomMap['announcement_text']?.toString() ?? roomMap['announcementText']?.toString() ?? '',
