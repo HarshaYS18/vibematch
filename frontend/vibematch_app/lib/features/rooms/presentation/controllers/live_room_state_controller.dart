@@ -48,12 +48,8 @@ class LiveRoomStateController extends ChangeNotifier {
       _preserveInitialSnapshotOnFirstLoad = true;
       _preserveInitialBackgroundOnFirstLoad = true;
     }
-    ActiveRoomContext.setActiveRoom(roomPublicId: _roomId, roomName: _roomName);
+    _syncRoomIdentity();
     activeRoomBackgroundTheme.value = _selectedBackgroundTheme;
-    LiveRoomMediaSignalingService.instance.configureRoom(
-      roomId: _roomId,
-      roomName: _roomName,
-    );
     LiveRoomRestrictionsService.update(
       roomImagesEnabled: _roomImagesEnabled,
       guestMessagesEnabled: _guestMessagesEnabled,
@@ -137,6 +133,12 @@ class LiveRoomStateController extends ChangeNotifier {
     var changed = false;
     var restrictionsChanged = false;
 
+    final nextRoomName = event.roomName.trim();
+    if (nextRoomName.isNotEmpty && nextRoomName != _roomName) {
+      _applyRoomName(nextRoomName, notify: false);
+      changed = true;
+    }
+
     final nextApplyOnlyModeEnabled = event.applyOnlyModeEnabled;
     if (nextApplyOnlyModeEnabled != null &&
         nextApplyOnlyModeEnabled != _applyOnlyModeEnabled) {
@@ -210,16 +212,42 @@ class LiveRoomStateController extends ChangeNotifier {
     }
   }
 
-  void renameRoom(String value) {
-    final nextValue = value.trim();
-    if (nextValue.isEmpty || nextValue == _roomName) return;
-    _roomName = nextValue;
+  void _syncRoomIdentity() {
     ActiveRoomContext.setActiveRoom(roomPublicId: _roomId, roomName: _roomName);
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: _roomId,
       roomName: _roomName,
     );
-    notifyListeners();
+  }
+
+  void _applyRoomName(String value, {bool notify = true}) {
+    final nextValue = value.trim();
+    if (nextValue.isEmpty || nextValue == _roomName) return;
+    _roomName = nextValue;
+    _syncRoomIdentity();
+    if (notify) notifyListeners();
+  }
+
+  void renameRoom(String value) => _applyRoomName(value);
+
+  Future<void> setRoomName(String value) async {
+    final nextValue = value.trim();
+    if (nextValue.isEmpty || nextValue == _roomName) return;
+    final previousName = _roomName;
+    _applyRoomName(nextValue);
+    try {
+      final settings = await _settingsRepository.updateRoomName(
+        roomPublicId: _roomId,
+        name: nextValue,
+      );
+      final serverName = settings.name?.trim();
+      if (serverName != null && serverName.isNotEmpty) {
+        _applyRoomName(serverName);
+      }
+    } catch (_) {
+      _applyRoomName(previousName);
+      rethrow;
+    }
   }
 
   void updateRoomId(String value) {
@@ -228,11 +256,7 @@ class LiveRoomStateController extends ChangeNotifier {
     final oldRoomId = _roomId;
     _roomId = nextValue;
     ActiveRoomContext.clearIfMatches(oldRoomId);
-    ActiveRoomContext.setActiveRoom(roomPublicId: _roomId, roomName: _roomName);
-    LiveRoomMediaSignalingService.instance.configureRoom(
-      roomId: _roomId,
-      roomName: _roomName,
-    );
+    _syncRoomIdentity();
     notifyListeners();
   }
 
@@ -409,6 +433,12 @@ class LiveRoomStateController extends ChangeNotifier {
     var restrictionsChanged = false;
     final preserveInitial = preserveInitialSnapshot || _preserveInitialSnapshotOnFirstLoad;
 
+    final nextRoomName = settings.name?.trim();
+    if (nextRoomName != null && nextRoomName.isNotEmpty && nextRoomName != _roomName) {
+      _applyRoomName(nextRoomName, notify: false);
+      changed = true;
+    }
+
     final backgroundThemeId = settings.backgroundThemeId.trim();
     final theme = _themeFromId(backgroundThemeId);
     final shouldPreserveInitialBackground =
@@ -538,27 +568,29 @@ class LiveRoomStateController extends ChangeNotifier {
         });
   }
 
-  void setRoomAnnouncement(String value) {
+  Future<void> setRoomAnnouncement(String value) async {
     final nextValue = value.trim();
     if (nextValue == _announcementText) return;
+    final previousAnnouncement = _announcementText;
     _announcementText = nextValue;
     notifyListeners();
 
-    _settingsRepository
-        .updateAnnouncement(roomPublicId: _roomId, announcementText: nextValue)
-        .then((settings) {
-          final announcement = settings.announcementText ?? '';
-          if (announcement != _announcementText) {
-            _announcementText = announcement;
-            notifyListeners();
-          }
-          LiveRoomMediaSignalingService.instance.setRoomAnnouncement(
-            announcement,
-          );
-        })
-        .catchError((_) {
-          LiveRoomMediaSignalingService.instance.setRoomAnnouncement(nextValue);
-        });
+    try {
+      final settings = await _settingsRepository.updateAnnouncement(
+        roomPublicId: _roomId,
+        announcementText: nextValue,
+      );
+      final announcement = settings.announcementText ?? '';
+      if (announcement != _announcementText) {
+        _announcementText = announcement;
+        notifyListeners();
+      }
+      LiveRoomMediaSignalingService.instance.setRoomAnnouncement(announcement);
+    } catch (_) {
+      _announcementText = previousAnnouncement;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   String _privacyModeToBackendMode(RoomPrivacyMode value) {
