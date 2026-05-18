@@ -72,19 +72,32 @@ class RoomTopBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            RoundRoomButton(icon: Icons.arrow_back_rounded, onTap: onBack, size: 28, iconSize: 16, background: Colors.black.withValues(alpha: 0.24)),
-            const SizedBox(width: 5),
-            Flexible(
-              fit: FlexFit.loose,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                widthFactor: 1,
-                child: ConstrainedBox(
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const backButtonWidth = 28.0;
+            const actionButtonWidth = 27.0;
+            const gap = 5.0;
+            final actionCount = 1 + (canManageAnnouncement ? 1 : 0) + (canManageRoom ? 1 : 0);
+            final reservedForActions =
+                backButtonWidth + gap + (actionButtonWidth * actionCount) + (gap * actionCount);
+            final maxPillWidth = (constraints.maxWidth - reservedForActions).clamp(96.0, constraints.maxWidth);
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                RoundRoomButton(
+                  icon: Icons.arrow_back_rounded,
+                  onTap: onBack,
+                  size: 28,
+                  iconSize: 16,
+                  background: Colors.black.withValues(alpha: 0.24),
+                ),
+                const SizedBox(width: gap),
+                ConstrainedBox(
                   constraints: BoxConstraints(
-                    minWidth: 112,
-                    maxWidth: MediaQuery.sizeOf(context).width * 0.56,
+                    minWidth: 96,
+                    maxWidth: maxPillWidth,
                   ),
                   child: _RoomNamePill(
                     roomName: roomName,
@@ -98,19 +111,37 @@ class RoomTopBar extends StatelessWidget {
                     joinRequestPending: joinRequestPending,
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 5),
-            RoundRoomButton(icon: Icons.send_rounded, onTap: onShare, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
-            if (canManageAnnouncement) ...[
-              const SizedBox(width: 5),
-              RoundRoomButton(icon: Icons.campaign_rounded, onTap: onAnnouncement, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
-            ],
-            if (canManageRoom) ...[
-              const SizedBox(width: 5),
-              RoundRoomButton(icon: Icons.settings_rounded, onTap: onSettings, size: 27, iconSize: 14, background: Colors.black.withValues(alpha: 0.20)),
-            ],
-          ],
+                const SizedBox(width: gap),
+                RoundRoomButton(
+                  icon: Icons.send_rounded,
+                  onTap: onShare,
+                  size: 27,
+                  iconSize: 14,
+                  background: Colors.black.withValues(alpha: 0.20),
+                ),
+                if (canManageAnnouncement) ...[
+                  const SizedBox(width: gap),
+                  RoundRoomButton(
+                    icon: Icons.campaign_rounded,
+                    onTap: onAnnouncement,
+                    size: 27,
+                    iconSize: 14,
+                    background: Colors.black.withValues(alpha: 0.20),
+                  ),
+                ],
+                if (canManageRoom) ...[
+                  const SizedBox(width: gap),
+                  RoundRoomButton(
+                    icon: Icons.settings_rounded,
+                    onTap: onSettings,
+                    size: 27,
+                    iconSize: 14,
+                    background: Colors.black.withValues(alpha: 0.20),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
         const SizedBox(height: 5),
         Row(
@@ -118,7 +149,11 @@ class RoomTopBar extends StatelessWidget {
             const SizedBox(width: 2),
             _TrophyButton(onTap: openRankings),
             const SizedBox(width: 5),
-            _DynamicRoomLevelBadge(roomPublicId: roomId, fallbackLevel: roomLevel, onTap: onRoomLevelTap),
+            _DynamicRoomLevelBadge(
+              roomPublicId: roomId,
+              fallbackLevel: roomLevel,
+              onTap: onRoomLevelTap,
+            ),
             const SizedBox(width: 5),
             _OnlineButton(count: onlineCount, onTap: onUsersTap),
           ],
@@ -132,12 +167,32 @@ class RoomTopBar extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RoomInfoSheet(roomName: roomName, roomId: roomId, language: language, privacyMode: privacyMode, canManageAdmins: canManageAdmins, admins: admins, availableAdminUsers: availableAdminUsers, onAddAdmin: onAddAdmin, onRemoveAdmin: onRemoveAdmin, onRemoveRoomMember: onRemoveRoomMember),
+      builder: (_) => RoomInfoSheet(
+        roomName: roomName,
+        roomId: roomId,
+        language: language,
+        privacyMode: privacyMode,
+        canManageAdmins: canManageAdmins,
+        admins: admins,
+        availableAdminUsers: availableAdminUsers,
+        onAddAdmin: onAddAdmin,
+        onRemoveAdmin: onRemoveAdmin,
+        onRemoveRoomMember: onRemoveRoomMember,
+      ),
     );
   }
 
   void _openDefaultRoomRankings(BuildContext context) {
-    showModalBottomSheet<void>(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => RoomContributionRankingsSheet(roomName: roomName, roomPublicId: roomId, users: const <SeatUser>[]));
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RoomContributionRankingsSheet(
+        roomName: roomName,
+        roomPublicId: roomId,
+        users: const <SeatUser>[],
+      ),
+    );
   }
 }
 
@@ -175,37 +230,120 @@ class _RoomNamePill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 28,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), color: Colors.black.withValues(alpha: 0.34), border: Border.all(color: Colors.white.withValues(alpha: 0.11)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 11, offset: const Offset(0, 5))]),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Flexible(
-          fit: FlexFit.loose,
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
-            child: InkWell(
-              borderRadius: BorderRadius.horizontal(left: const Radius.circular(999), right: Radius.circular(canEditRoomName || _showTrailingSlot ? 0 : 999)),
-              onTap: onInfoTap,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8, right: 4),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [_PrivacyIcon(mode: privacyMode), const SizedBox(width: 5), Flexible(child: Text(_cleanRoomName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.01, height: 1))), const SizedBox(width: 3), Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.72), size: 13)]),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: Colors.black.withValues(alpha: 0.34),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.11)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 11,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            fit: FlexFit.loose,
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
+              child: InkWell(
+                borderRadius: BorderRadius.horizontal(
+                  left: const Radius.circular(999),
+                  right: Radius.circular(canEditRoomName || _showTrailingSlot ? 0 : 999),
+                ),
+                onTap: onInfoTap,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8, right: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _PrivacyIcon(mode: privacyMode),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          _cleanRoomName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.01,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 3),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white.withValues(alpha: 0.72),
+                        size: 13,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        if (canEditRoomName) ...[
-          Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
-          Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onEditRoomName, child: const SizedBox(width: 26, height: 28, child: Center(child: Icon(Icons.edit_rounded, color: RoomColors.aqua, size: 13))))),
+          if (canEditRoomName) ...[
+            Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
+            Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onEditRoomName,
+                child: const SizedBox(
+                  width: 26,
+                  height: 28,
+                  child: Center(
+                    child: Icon(Icons.edit_rounded, color: RoomColors.aqua, size: 13),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (_showTrailingSlot) ...[
+            Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
+            if (_showMemberIcon)
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: Center(
+                  child: Icon(Icons.verified_user_rounded, color: RoomColors.aqua, size: 15),
+                ),
+              )
+            else if (_showPendingIcon)
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: Center(
+                  child: Icon(Icons.hourglass_top_rounded, color: RoomColors.gold, size: 15),
+                ),
+              )
+            else
+              Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onJoinTap,
+                  child: const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Center(
+                      child: Icon(Icons.add_rounded, color: RoomColors.aqua, size: 17),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ],
-        if (_showTrailingSlot) ...[
-          Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
-          if (_showMemberIcon)
-            const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.verified_user_rounded, color: RoomColors.aqua, size: 15)))
-          else if (_showPendingIcon)
-            const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.hourglass_top_rounded, color: RoomColors.gold, size: 15)))
-          else
-            Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onJoinTap, child: const SizedBox(width: 28, height: 28, child: Center(child: Icon(Icons.add_rounded, color: RoomColors.aqua, size: 17))))),
-        ],
-      ]),
+      ),
     );
   }
 }
@@ -216,7 +354,16 @@ class _PrivacyIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = mode == RoomPrivacyMode.open ? RoomColors.aqua : RoomColors.gold;
-    return Container(width: 16, height: 16, decoration: BoxDecoration(color: color.withValues(alpha: 0.15), shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.24), width: 0.7)), child: Icon(mode.icon, color: color, size: 9));
+    return Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withValues(alpha: 0.24), width: 0.7),
+      ),
+      child: Icon(mode.icon, color: color, size: 9),
+    );
   }
 }
 
@@ -230,7 +377,10 @@ class _DynamicRoomLevelBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<RoomLevelSummary>(
-      future: RoomLevelService.instance.fetchRoomLevel(roomPublicId: roomPublicId, fallbackLevel: fallbackLevel),
+      future: RoomLevelService.instance.fetchRoomLevel(
+        roomPublicId: roomPublicId,
+        fallbackLevel: fallbackLevel,
+      ),
       builder: (context, snapshot) {
         final level = snapshot.data?.level ?? fallbackLevel;
         return _RoomLevelBadge(level: level <= 0 ? 1 : level, onTap: onTap);
@@ -244,14 +394,83 @@ class _RoomLevelBadge extends StatelessWidget {
   final int level;
   final VoidCallback? onTap;
   @override
-  Widget build(BuildContext context) => Material(color: Colors.transparent, borderRadius: BorderRadius.circular(999), child: InkWell(borderRadius: BorderRadius.circular(999), onTap: onTap, child: Container(height: 28, padding: const EdgeInsets.symmetric(horizontal: 7), decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), gradient: LinearGradient(colors: [RoomColors.gold.withValues(alpha: 0.28), RoomColors.violet.withValues(alpha: 0.20)]), border: Border.all(color: RoomColors.gold.withValues(alpha: 0.26))), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.local_fire_department_rounded, color: RoomColors.gold, size: 12), const SizedBox(width: 3), Text('Lv.$level', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, height: 1))]))));
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(999),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 7),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          gradient: LinearGradient(
+            colors: [
+              RoomColors.gold.withValues(alpha: 0.28),
+              RoomColors.violet.withValues(alpha: 0.20),
+            ],
+          ),
+          border: Border.all(color: RoomColors.gold.withValues(alpha: 0.26)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.local_fire_department_rounded, color: RoomColors.gold, size: 12),
+            const SizedBox(width: 3),
+            Text(
+              'Lv.$level',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _TrophyButton extends StatelessWidget {
   const _TrophyButton({required this.onTap});
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => Material(color: Colors.transparent, shape: const CircleBorder(), child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: Container(width: 28, height: 28, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [RoomColors.gold.withValues(alpha: 0.94), RoomColors.coral.withValues(alpha: 0.82)]), border: Border.all(color: Colors.white.withValues(alpha: 0.22)), boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.16), blurRadius: 11, offset: const Offset(0, 4))]), child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 14))));
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    shape: const CircleBorder(),
+    child: InkWell(
+      customBorder: const CircleBorder(),
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              RoomColors.gold.withValues(alpha: 0.94),
+              RoomColors.coral.withValues(alpha: 0.82),
+            ],
+          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+          boxShadow: [
+            BoxShadow(
+              color: RoomColors.gold.withValues(alpha: 0.16),
+              blurRadius: 11,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 14),
+      ),
+    ),
+  );
 }
 
 class _OnlineButton extends StatelessWidget {
@@ -259,5 +478,36 @@ class _OnlineButton extends StatelessWidget {
   final int count;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => Material(color: Colors.transparent, borderRadius: BorderRadius.circular(999), child: InkWell(borderRadius: BorderRadius.circular(999), onTap: onTap, child: Container(height: 28, padding: const EdgeInsets.symmetric(horizontal: 8), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white.withValues(alpha: 0.10))), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.groups_rounded, color: RoomColors.aqua, size: 12), const SizedBox(width: 3), Text('$count', style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900))]))));
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(999),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.30),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.groups_rounded, color: RoomColors.aqua, size: 12),
+            const SizedBox(width: 3),
+            Text(
+              '$count',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
