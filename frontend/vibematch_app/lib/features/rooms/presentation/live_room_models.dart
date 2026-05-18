@@ -319,7 +319,7 @@ class ChatEntry {
       (applicationExpiresAt != null &&
           DateTime.now().isAfter(applicationExpiresAt!));
   bool get applicationResolved =>
-      applicationApproved || applicationRejected || applicationTimedOut;
+      applicationApproved || applicationRejected || applicationExpired;
   bool get isImageMessage => imageUrl?.trim().isNotEmpty ?? false;
   ChatEntry copyWith({
     String? message,
