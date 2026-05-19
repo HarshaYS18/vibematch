@@ -1,9 +1,13 @@
 import { z } from 'zod';
 
 export const joinRoomSchema = z.object({
-  roomPublicId: z.string().min(1).max(80),
+  roomPublicId: z.string().min(1).max(80).optional(),
+  roomId: z.string().min(1).max(80).optional(),
   deviceId: z.string().max(255).optional(),
-});
+}).transform((value) => ({
+  ...value,
+  roomPublicId: value.roomPublicId ?? value.roomId ?? '',
+}));
 
 export const createTransportSchema = z.object({
   direction: z.enum(['send', 'recv']),
@@ -22,6 +26,7 @@ export const produceSchema = z.object({
 });
 
 export const consumeSchema = z.object({
+  transportId: z.string().min(1).optional(),
   producerId: z.string().min(1),
   rtpCapabilities: z.unknown(),
 });
@@ -36,6 +41,7 @@ export const consumerActionSchema = z.object({
 
 export const leaveRoomSchema = z.object({
   roomPublicId: z.string().min(1).max(80).optional(),
+  roomId: z.string().min(1).max(80).optional(),
 });
 
 export const socketAuthSchema = z.object({
