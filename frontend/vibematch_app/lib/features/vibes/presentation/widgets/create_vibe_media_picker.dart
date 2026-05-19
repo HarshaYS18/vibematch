@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../models/vibe_models.dart';
 
@@ -54,7 +56,7 @@ class CreateVibeMediaPicker extends StatelessWidget {
                         if (hasFile && type == VibeMediaType.photo && selectedPreviewBytes != null)
                           Image.memory(selectedPreviewBytes!, fit: BoxFit.cover)
                         else if (hasFile && type == VibeMediaType.video)
-                          _VideoFilePreview(name: selectedName, bytes: selectedBytes)
+                          _LocalVideoPreview(file: selectedFile!)
                         else
                           _MediaPrompt(picking: picking, uploading: uploading),
                         if (hasFile) const _PreviewGradient(),
@@ -136,11 +138,78 @@ class CreateVibeMediaSourceSheet extends StatelessWidget {
   }
 }
 
-class _VideoFilePreview extends StatelessWidget {
-  const _VideoFilePreview({required this.name, required this.bytes});
+class _LocalVideoPreview extends StatefulWidget {
+  const _LocalVideoPreview({required this.file});
 
-  final String? name;
-  final int? bytes;
+  final XFile file;
+
+  @override
+  State<_LocalVideoPreview> createState() => _LocalVideoPreviewState();
+}
+
+class _LocalVideoPreviewState extends State<_LocalVideoPreview> {
+  VideoPlayerController? _controller;
+  bool _ready = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LocalVideoPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path || oldWidget.file.name != widget.file.name) {
+      _controller?.dispose();
+      _controller = null;
+      _ready = false;
+      _hasError = false;
+      _initializeController();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _initializeController() {
+    final uri = Uri.tryParse(widget.file.path);
+    if (!kIsWeb || uri == null) {
+      _hasError = true;
+      return;
+    }
+    final controller = VideoPlayerController.networkUrl(uri);
+    _controller = controller
+      ..setLooping(true)
+      ..setVolume(0)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _ready = true);
+        _controller?.play();
+      }).catchError((_) {
+        if (mounted) setState(() => _hasError = true);
+      });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (_hasError) return _VideoFallback(name: widget.file.name);
+    if (controller == null || !_ready) return const Center(child: CircularProgressIndicator(color: Color(0xFF111015), strokeWidth: 2.6));
+    return FittedBox(
+      fit: BoxFit.cover,
+      child: SizedBox(width: controller.value.size.width, height: controller.value.size.height, child: VideoPlayer(controller)),
+    );
+  }
+}
+
+class _VideoFallback extends StatelessWidget {
+  const _VideoFallback({required this.name});
+  final String name;
 
   @override
   Widget build(BuildContext context) {
@@ -153,32 +222,13 @@ class _VideoFilePreview extends StatelessWidget {
         ),
       ),
       child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 86,
-                height: 86,
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.28))),
-                child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 52),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                name?.trim().isNotEmpty == true ? name!.trim() : 'Selected video',
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                bytes == null ? 'Ready to upload' : _formatBytes(bytes!),
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 12, fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 62),
+            const SizedBox(height: 10),
+            Text(name.trim().isEmpty ? 'Selected video' : name.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+          ],
         ),
       ),
     );
