@@ -38,6 +38,13 @@ class InboxController extends ChangeNotifier {
   bool strangersCanMessage = true;
   bool strangersCanMentionInVibes = true;
   String? _activeConversationId;
+  final Map<String, String> _remoteActivityByConversationId = <String, String>{};
+
+  String? remoteActivityForConversation(String conversationId) {
+    final value = _remoteActivityByConversationId[conversationId];
+    if (value == null || value == 'idle') return null;
+    return value;
+  }
 
   bool get backupEnabled => backupStatus.isEnabled;
   ChatBackupFrequency get backupFrequency => backupStatus.frequency;
@@ -280,6 +287,30 @@ class InboxController extends ChangeNotifier {
       case 'inbox_conversation_updated':
         loadFromBackend();
         break;
+      case 'inbox_presence_updated':
+        loadFromBackend();
+        break;
+      case 'inbox_typing_start':
+        final conversationId = event['conversation_id']?.toString();
+        if (conversationId != null && event['user_id'] != null) {
+          _setRemoteActivity(conversationId, 'typing');
+        }
+        break;
+      case 'inbox_typing_stop':
+        final conversationId = event['conversation_id']?.toString();
+        if (conversationId != null && event['user_id'] != null) {
+          _setRemoteActivity(conversationId, 'idle');
+        }
+        break;
+      case 'inbox_chat_activity':
+      case 'chat_activity':
+        final conversationId = event['conversation_id']?.toString();
+        final activity = event['activity']?.toString();
+        final isMine = event['is_mine'] == true || event['from_self'] == true;
+        if (conversationId != null && activity != null && !isMine) {
+          _setRemoteActivity(conversationId, activity);
+        }
+        break;
       case 'inbox_messages_read':
         final conversationId = event['conversation_id']?.toString();
         if (conversationId != null) _setConversationUnread(conversationId, 0);
@@ -293,6 +324,31 @@ class InboxController extends ChangeNotifier {
       default:
         break;
     }
+  }
+
+  void sendChatActivity({
+    required String conversationId,
+    required String activity,
+  }) {
+    _socketService.sendChatActivity(
+      conversationId: conversationId,
+      activity: activity,
+    );
+  }
+
+  void _setRemoteActivity(String conversationId, String activity) {
+    if (activity == 'idle') {
+      _remoteActivityByConversationId.remove(conversationId);
+    } else {
+      _remoteActivityByConversationId[conversationId] = activity;
+      Future<void>.delayed(const Duration(seconds: 5), () {
+        if (_remoteActivityByConversationId[conversationId] == activity) {
+          _remoteActivityByConversationId.remove(conversationId);
+          _safeNotify();
+        }
+      });
+    }
+    _safeNotify();
   }
 
   Future<InboxConversation?> createDirectConversation({
