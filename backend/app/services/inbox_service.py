@@ -357,6 +357,7 @@ def apply_monitor_action(db: Session, report: InboxReport, action_label: str) ->
 def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
     metadata = message.metadata_json or {}
     invite_room_id = metadata.get("invite_room_id") or metadata.get("room_public_id") or message.conversation.room_public_id
+    media_expired = metadata.get("media_expired") is True
     return {
         "id": message.public_id,
         "sender": message.sender_name,
@@ -374,6 +375,10 @@ def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
         "love_bond_request_id": metadata.get("love_bond_request_id"),
         "love_bond_card_name": metadata.get("love_bond_card_name") or metadata.get("card_name"),
         "love_bond_status": metadata.get("love_bond_status") or metadata.get("status"),
+        "attachment_url": message.attachment_url or metadata.get("expired_media_url"),
+        "media_expired": media_expired,
+        "expired_media_url": metadata.get("expired_media_url"),
+        "local_first_allowed": bool(metadata.get("local_first_allowed")) or media_expired,
         "created_at": message.created_at.isoformat() if message.created_at else None,
     }
 
