@@ -1,9 +1,13 @@
-import type { Consumer } from 'mediasoup/node/lib/ConsumerTypes';
-import type { Producer } from 'mediasoup/node/lib/ProducerTypes';
-import type { RtpCapabilities } from 'mediasoup/node/lib/RtpParameters';
-import type { WebRtcTransport } from 'mediasoup/node/lib/WebRtcTransportTypes';
 import { config } from '../config.js';
-import type { PeerState, RoomState, TransportDirection, VerifiedMediaUser } from '../types/mediaTypes.js';
+import type {
+  MediaConsumer,
+  MediaProducer,
+  MediaWebRtcTransport,
+  PeerState,
+  RoomState,
+  TransportDirection,
+  VerifiedMediaUser,
+} from '../types/mediaTypes.js';
 import type { WorkerManager } from './workerManager.js';
 
 export class RoomManager {
@@ -51,10 +55,10 @@ export class RoomManager {
       deviceId: params.deviceId,
       roomPublicId: params.room.roomPublicId,
       joinedAt: Date.now(),
-      transports: new Map<string, WebRtcTransport>(),
+      transports: new Map<string, MediaWebRtcTransport>(),
       transportDirections: new Map<string, TransportDirection>(),
-      producers: new Map<string, Producer>(),
-      consumers: new Map<string, Consumer>(),
+      producers: new Map<string, MediaProducer>(),
+      consumers: new Map<string, MediaConsumer>(),
     };
     params.room.peers.set(params.socketId, peer);
     params.room.lastActiveAt = Date.now();
@@ -76,7 +80,7 @@ export class RoomManager {
     return undefined;
   }
 
-  getRtpCapabilities(room: RoomState): RtpCapabilities {
+  getRtpCapabilities(room: RoomState): unknown {
     return room.router.rtpCapabilities;
   }
 
@@ -84,7 +88,7 @@ export class RoomManager {
     room: RoomState;
     peer: PeerState;
     direction: TransportDirection;
-  }): Promise<WebRtcTransport> {
+  }): Promise<MediaWebRtcTransport> {
     const transport = await params.room.router.createWebRtcTransport({
       listenIps: [
         {
