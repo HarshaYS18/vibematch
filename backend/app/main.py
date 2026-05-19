@@ -34,6 +34,7 @@ from app.api.routes import (
     lucky_coins,
     lucky_gifts,
     media,
+    media_realtime_auth,
     moderation,
     mvp_core,
     mvp_economy,
@@ -258,6 +259,7 @@ app.include_router(inbox_backup_google.router)
 app.include_router(love_bonds.router)
 app.include_router(relationship_exp.router)
 app.include_router(inbox_ws.router)
+app.include_router(media_realtime_auth.router)
 app.include_router(room_realtime.router)
 app.include_router(room_realtime_commands.router)
 app.include_router(experience.router)
