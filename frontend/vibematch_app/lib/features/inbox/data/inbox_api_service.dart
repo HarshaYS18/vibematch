@@ -373,6 +373,11 @@ class InboxApiService {
       loveBondRequestId: _nullableString(json['love_bond_request_id']),
       loveBondCardName: _nullableString(json['love_bond_card_name']),
       loveBondStatus: _nullableString(json['love_bond_status']),
+      attachmentUrl: _nullableString(json['attachment_url']),
+      localAttachmentPath: _nullableString(json['local_attachment_path']),
+      mediaExpired: json['media_expired'] == true,
+      expiredMediaUrl: _nullableString(json['expired_media_url']),
+      localFirstAllowed: json['local_first_allowed'] == true,
     );
   }
 
