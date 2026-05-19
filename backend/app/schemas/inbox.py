@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 
@@ -19,6 +19,10 @@ class InboxMessageResponse(BaseModel):
     love_bond_request_id: str | None = None
     love_bond_card_name: str | None = None
     love_bond_status: str | None = None
+    attachment_url: str | None = None
+    media_expired: bool = False
+    expired_media_url: str | None = None
+    local_first_allowed: bool = False
     created_at: datetime | None = None
 
 
@@ -199,4 +203,3 @@ class InboxBackupJobResponse(BaseModel):
     error_message: str | None = None
     created_at: str | None = None
     completed_at: str | None = None
-
