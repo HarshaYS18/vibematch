@@ -24,11 +24,25 @@ class MediaUploadApiService {
     return _upload(endpoint: '/media/vibes', file: file);
   }
 
+  Future<MediaUploadResult> uploadChatImage(File file) {
+    return _upload(endpoint: '/media/chat-image', file: file);
+  }
+
   Future<MediaUploadResult> uploadVibeMediaXFile(XFile file) async {
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) throw Exception('Selected media is empty.');
     return _uploadBytes(
       endpoint: '/media/vibes',
+      bytes: bytes,
+      filename: _safeFilename(file.name),
+    );
+  }
+
+  Future<MediaUploadResult> uploadChatImageXFile(XFile file) async {
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) throw Exception('Selected image is empty.');
+    return _uploadBytes(
+      endpoint: '/media/chat-image',
       bytes: bytes,
       filename: _safeFilename(file.name),
     );
