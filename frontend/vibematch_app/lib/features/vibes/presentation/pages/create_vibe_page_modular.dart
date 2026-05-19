@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -33,7 +33,8 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   bool _pickingMedia = false;
   bool _uploadingMedia = false;
   bool _publishing = false;
-  File? _selectedMediaFile;
+  XFile? _selectedMediaFile;
+  Uint8List? _selectedMediaPreviewBytes;
   String? _uploadedMediaUrl;
   String? _selectedMediaName;
   int? _selectedMediaBytes;
@@ -78,15 +79,20 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
     try {
       final picked = sourceType == VibeMediaType.video ? await _picker.pickVideo(source: ImageSource.gallery) : await _picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
       if (picked == null) return;
-      final file = File(picked.path);
-      final size = await file.length();
+      final bytes = await picked.readAsBytes();
+      final size = bytes.length;
+      if (size <= 0) {
+        _showAction('Selected media is empty.');
+        return;
+      }
       if (size > 20 * 1024 * 1024) {
         _showAction('Vibe media must be 20 MB or smaller.');
         return;
       }
       setState(() {
         _selectedType = sourceType;
-        _selectedMediaFile = file;
+        _selectedMediaFile = picked;
+        _selectedMediaPreviewBytes = sourceType == VibeMediaType.photo ? bytes : null;
         _uploadedMediaUrl = null;
         _selectedMediaName = picked.name;
         _selectedMediaBytes = size;
@@ -112,7 +118,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
     if (_uploadedMediaUrl != null && _uploadedMediaUrl!.trim().isNotEmpty) return _uploadedMediaUrl;
     setState(() => _uploadingMedia = true);
     try {
-      final result = await _uploadApi.uploadVibeMedia(file);
+      final result = await _uploadApi.uploadVibeMediaXFile(file);
       if (result.url.trim().isEmpty) throw Exception('Upload completed without a media URL.');
       if (mounted) setState(() => _uploadedMediaUrl = result.url);
       return result.url;
@@ -174,6 +180,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
                   : _selectedType);
       if (mode == CreateVibeMode.text) {
         _selectedMediaFile = null;
+        _selectedMediaPreviewBytes = null;
         _uploadedMediaUrl = null;
         _selectedMediaName = null;
         _selectedMediaBytes = null;
@@ -184,6 +191,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   void _clearMedia() {
     setState(() {
       _selectedMediaFile = null;
+      _selectedMediaPreviewBytes = null;
       _uploadedMediaUrl = null;
       _selectedMediaName = null;
       _selectedMediaBytes = null;
@@ -222,6 +230,8 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
             CreateVibeMediaPicker(
               type: _selectedType,
               selectedFile: _selectedMediaFile,
+              selectedPreviewBytes: _selectedMediaPreviewBytes,
+              selectedName: _selectedMediaName,
               selectedBytes: _selectedMediaBytes,
               picking: _pickingMedia,
               uploading: _uploadingMedia,
