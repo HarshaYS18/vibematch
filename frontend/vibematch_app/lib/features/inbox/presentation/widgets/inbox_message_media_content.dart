@@ -1,0 +1,239 @@
+import 'package:flutter/material.dart';
+
+import '../../models/inbox_models.dart';
+
+class InboxMessageMediaContent extends StatelessWidget {
+  const InboxMessageMediaContent({super.key, required this.message, required this.mine});
+
+  final InboxMessage message;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (message.type) {
+      InboxMessageType.image => _InboxImageMedia(message: message, mine: mine),
+      InboxMessageType.document => _InboxFileMedia(message: message, mine: mine, icon: Icons.description_rounded, title: _cleanAttachmentLabel(message.text, fallback: 'Document')),
+      InboxMessageType.voice => _InboxFileMedia(message: message, mine: mine, icon: Icons.mic_rounded, title: _cleanAttachmentLabel(message.text, fallback: 'Voice message')),
+      _ => Text(
+          message.text,
+          style: TextStyle(
+            color: mine ? Colors.white : const Color(0xFF251538),
+            fontSize: 13.2,
+            height: 1.32,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+    };
+  }
+}
+
+class _InboxImageMedia extends StatefulWidget {
+  const _InboxImageMedia({required this.message, required this.mine});
+
+  final InboxMessage message;
+  final bool mine;
+
+  @override
+  State<_InboxImageMedia> createState() => _InboxImageMediaState();
+}
+
+class _InboxImageMediaState extends State<_InboxImageMedia> {
+  bool _remoteFailed = false;
+
+  @override
+  void didUpdateWidget(covariant _InboxImageMedia oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.effectiveRemoteMediaUrl != widget.message.effectiveRemoteMediaUrl || oldWidget.message.localAttachmentPath != widget.message.localAttachmentPath) {
+      _remoteFailed = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localPath = widget.message.localAttachmentPath?.trim();
+    final remoteUrl = widget.message.effectiveRemoteMediaUrl?.trim();
+    final source = _usableImageSource(localPath) ?? _usableImageSource(remoteUrl);
+
+    if (source == null || _remoteFailed) {
+      return _ExpiredMediaCard(message: widget.message, mine: widget.mine, icon: Icons.image_not_supported_rounded);
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
+        children: [
+          SizedBox(
+            width: 252,
+            height: 188,
+            child: _imageForSource(
+              source,
+              onError: () {
+                if (!mounted) return;
+                setState(() => _remoteFailed = true);
+              },
+            ),
+          ),
+          if (widget.message.mediaExpired)
+            Positioned(
+              left: 8,
+              bottom: 8,
+              child: _LocalFirstBadge(localAvailable: _usableImageSource(localPath) != null),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InboxFileMedia extends StatelessWidget {
+  const _InboxFileMedia({required this.message, required this.mine, required this.icon, required this.title});
+
+  final InboxMessage message;
+  final bool mine;
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLocalCopy = message.hasLocalAttachmentPath;
+    final hasRemoteCopy = message.hasAttachmentUrl || (message.expiredMediaUrl?.trim().isNotEmpty ?? false);
+    if (message.mediaExpired && !hasLocalCopy && !hasRemoteCopy) {
+      return _ExpiredMediaCard(message: message, mine: mine, icon: icon);
+    }
+    final subtitle = message.mediaExpired
+        ? (hasLocalCopy ? 'Saved on this device' : 'Server copy expired')
+        : (hasLocalCopy ? 'Local copy available' : 'Tap to open when download is wired');
+    return Container(
+      width: 252,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF8F5FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFE9DDF5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF7C3AED).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: mine ? Colors.white : const Color(0xFF7C3AED), size: 22),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white : const Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: mine ? Colors.white70 : const Color(0xFF9B8CA5), size: 19),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExpiredMediaCard extends StatelessWidget {
+  const _ExpiredMediaCard({required this.message, required this.mine, required this.icon});
+
+  final InboxMessage message;
+  final bool mine;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final localAllowed = message.localFirstAllowed || message.mediaExpired;
+    return Container(
+      width: 252,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFFECACA)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: mine ? Colors.white : const Color(0xFFE84C72), size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Media expired', style: TextStyle(color: mine ? Colors.white : const Color(0xFF7F1D1D), fontSize: 12.5, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(
+                  localAllowed ? 'Server copy was removed. It will show if saved on this device.' : 'This media is no longer available.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF991B1B), fontSize: 10.5, fontWeight: FontWeight.w800, height: 1.2),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocalFirstBadge extends StatelessWidget {
+  const _LocalFirstBadge({required this.localAvailable});
+
+  final bool localAvailable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(localAvailable ? Icons.phone_android_rounded : Icons.schedule_rounded, color: Colors.white, size: 12),
+          const SizedBox(width: 4),
+          Text(localAvailable ? 'On device' : 'Server expired', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _imageForSource(String source, {required VoidCallback onError}) {
+  if (source.startsWith('assets/')) {
+    return Image.asset(source, fit: BoxFit.cover, errorBuilder: (_, _, _) {
+      onError();
+      return const SizedBox.shrink();
+    });
+  }
+  return Image.network(source, fit: BoxFit.cover, errorBuilder: (_, _, _) {
+    onError();
+    return const SizedBox.shrink();
+  });
+}
+
+String? _usableImageSource(String? value) {
+  final source = value?.trim();
+  if (source == null || source.isEmpty) return null;
+  if (source.startsWith('http://') || source.startsWith('https://') || source.startsWith('assets/')) return source;
+  return null;
+}
+
+String _cleanAttachmentLabel(String value, {required String fallback}) {
+  final cleaned = value
+      .replaceFirst('📷', '')
+      .replaceFirst('🎙', '')
+      .replaceFirst('📄', '')
+      .trim();
+  if (cleaned.isEmpty || cleaned.toLowerCase() == 'media expired') return fallback;
+  return cleaned;
+}
