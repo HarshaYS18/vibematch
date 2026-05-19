@@ -89,7 +89,7 @@ class StrangerRequestsPage extends StatelessWidget {
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(12, 16, 12, 28),
                         itemCount: requests.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        separatorBuilder: (context, index) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final request = requests[index];
                           return InboxConversationCard(
