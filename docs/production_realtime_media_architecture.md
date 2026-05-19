@@ -40,17 +40,9 @@ These folders are legacy/reference only and must not be started as production se
 - Flutter remote audio renderers remain mounted in the visible page tree as tiny `RTCVideoView` widgets.
 - Flutter Web no longer forces speakerphone output routing.
 
-## Seat Action Pill Fix
+## Seat Action Pill
 
-Room owner/admin seat taps now surface a compact floating seat action pill without shifting the seat layout.
-
-Supported visible actions:
-
-- Empty unlocked seat: Switch, Invite, Mute, Lock
-- Empty locked seat: Unlock, Invite
-- Occupied seat: Profile, Mute/Unmute
-
-Normal users still use the existing take-seat/apply-seat path and do not see admin-only controls.
+The live-room seat UI should keep the established admin action pill. Media work must not redesign or replace that pill. Normal users still use the existing take-seat/apply-seat path and do not see admin-only controls.
 
 ## Deferred Work
 
