@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
-import type { Consumer, Producer, WebRtcTransport } from 'mediasoup/node/lib/types';
+import type { Producer, WebRtcTransport } from 'mediasoup/node/lib/types.js';
 import { config } from '../config.js';
 import { extractBearerToken, MediaAuthorizationError, verifyMediaAction } from '../auth/fastapiVerifier.js';
 import type { Ack, MediaAction, PeerState } from '../types/mediaTypes.js';
@@ -84,7 +84,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
       await safeAck(ack, async () => {
         const input = createTransportSchema.parse(payload);
         const peer = requirePeer(roomManager, socket.id);
-        await verifyPeerAction(peer, input.direction === 'send' ? 'create_transport' : 'create_transport');
+        await verifyPeerAction(peer, 'create_transport');
         const room = requireRoom(roomManager, peer.roomPublicId);
         const transport = await roomManager.createWebRtcTransport({ room, peer, direction: input.direction });
         return serializeTransport(transport);
