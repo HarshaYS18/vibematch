@@ -13,12 +13,14 @@ from app.models.cdn_media import (
     CdnMediaUploadStatus,
     MediaSafetySetting,
 )
+from app.models.inbox import InboxMessage
 from app.models.user import User
 from app.services.audit_log_service import create_admin_log
 
 
 LOCAL_STATIC_PREFIX = "/static/uploads/"
 DEFAULT_INBOX_RETENTION_DAYS = 7
+INBOX_EXPIRED_PLACEHOLDER = "Media expired"
 
 
 def object_key_from_public_url(public_url: str) -> str:
@@ -209,6 +211,23 @@ def mark_media_deleted(
     return asset
 
 
+def _expire_inbox_message_references(db: Session, asset: CdnMediaAsset, now: datetime) -> int:
+    messages = db.query(InboxMessage).filter(InboxMessage.attachment_url == asset.public_url).all()
+    updated = 0
+    for message in messages:
+        metadata = dict(message.metadata_json or {})
+        metadata["media_expired"] = True
+        metadata["expired_media_id"] = asset.public_id
+        metadata["media_expired_at"] = now.isoformat()
+        message.attachment_url = None
+        if message.message_type in {"image", "voice", "document"}:
+            message.text = INBOX_EXPIRED_PLACEHOLDER
+        message.metadata_json = metadata
+        db.add(message)
+        updated += 1
+    return updated
+
+
 def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int | None = None) -> dict:
     now = datetime.utcnow()
     assets = (
@@ -223,12 +242,14 @@ def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int 
     )
     deleted = 0
     failed = 0
+    placeholders = 0
     for asset in assets:
         try:
             asset.upload_status = CdnMediaUploadStatus.EXPIRED.value
             asset.deletion_status = CdnMediaDeletionStatus.DELETED.value
             asset.is_active_reference = False
             asset.deleted_at = now
+            placeholders += _expire_inbox_message_references(db, asset, now)
             try_delete_local_object(asset.object_key)
             db.add(asset)
             deleted += 1
@@ -244,7 +265,7 @@ def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int 
         action="INBOX_MEDIA_EXPIRY_CLEANUP_RUN",
         resource_type="cdn_media_cleanup",
         reason="manual_or_scheduled_cleanup",
-        metadata_json={"checked": len(assets), "deleted": deleted, "failed": failed},
+        metadata_json={"checked": len(assets), "deleted": deleted, "failed": failed, "placeholders": placeholders},
     )
     return {"checked": len(assets), "deleted": deleted, "failed": failed}
 
