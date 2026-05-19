@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
-import type { Producer, WebRtcTransport } from 'mediasoup/node/lib/types.js';
+import type { Producer, WebRtcTransport } from 'mediasoup';
 import { config } from '../config.js';
 import { extractBearerToken, MediaAuthorizationError, verifyMediaAction } from '../auth/fastapiVerifier.js';
 import type { Ack, MediaAction, PeerState } from '../types/mediaTypes.js';
