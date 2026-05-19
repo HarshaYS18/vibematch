@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.models.room import Room
 from app.models.user import User
-from app.services import role_service
+from app.services import ban_service, role_service
 
 MEDIA_REALTIME_ACTIONS = {
     "join_room",
@@ -14,6 +14,19 @@ MEDIA_REALTIME_ACTIONS = {
     "resume_producer",
     "close_producer",
     "leave_room",
+    "join_seat",
+    "leave_seat",
+}
+
+_MEDIA_ACTIONS_REQUIRING_ROOM = {
+    "join_room",
+    "create_transport",
+    "connect_transport",
+    "produce_audio",
+    "consume_audio",
+    "pause_producer",
+    "resume_producer",
+    "close_producer",
     "join_seat",
     "leave_seat",
 }
@@ -95,8 +108,30 @@ def verify_media_realtime_request(
             room=None,
             device_id=device_id,
         )
+    if ban_service.is_device_banned(db, device_id):
+        return _payload(
+            allowed=False,
+            reason="Device is banned.",
+            user=user,
+            room_public_id=room_public_id,
+            requested_action=action,
+            permissions=[],
+            room=None,
+            device_id=device_id,
+        )
 
     room = _room_lookup(db, room_public_id)
+    if action in _MEDIA_ACTIONS_REQUIRING_ROOM and not room_public_id:
+        return _payload(
+            allowed=False,
+            reason="room_public_id is required for this media action.",
+            user=user,
+            room_public_id=room_public_id,
+            requested_action=action,
+            permissions=[],
+            room=None,
+            device_id=device_id,
+        )
     if room_public_id and room is None:
         return _payload(
             allowed=False,
@@ -106,6 +141,17 @@ def verify_media_realtime_request(
             requested_action=action,
             permissions=[],
             room=None,
+            device_id=device_id,
+        )
+    if room is not None and not room.is_active:
+        return _payload(
+            allowed=False,
+            reason="Room is inactive.",
+            user=user,
+            room_public_id=room_public_id,
+            requested_action=action,
+            permissions=[],
+            room=room,
             device_id=device_id,
         )
 
@@ -157,6 +203,9 @@ def _payload(
         "mediasoup_context": {
             "room_public_id": getattr(room, "room_public_id", room_public_id),
             "room_name": getattr(room, "name", None),
+            "room_is_secret": bool(getattr(room, "is_secret", False)),
+            "room_is_locked": bool(getattr(room, "is_locked", False)),
+            "room_is_members_only": bool(getattr(room, "is_members_only", False)),
             "device_id_present": bool((device_id or "").strip()),
             "must_ignore_client_user_id": True,
             "must_ignore_client_roles": True,
