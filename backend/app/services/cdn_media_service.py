@@ -161,6 +161,26 @@ def find_active_asset_by_url(db: Session, public_url: str) -> CdnMediaAsset | No
     )
 
 
+def link_media_to_entity(
+    db: Session,
+    *,
+    public_url: str | None,
+    linked_entity_type: CdnMediaLinkedEntityType,
+    linked_entity_id: str,
+) -> CdnMediaAsset | None:
+    if not public_url:
+        return None
+    asset = db.query(CdnMediaAsset).filter(CdnMediaAsset.public_url == public_url).order_by(CdnMediaAsset.id.desc()).first()
+    if not asset:
+        return None
+    asset.linked_entity_type = linked_entity_type.value
+    asset.linked_entity_id = linked_entity_id
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
 def mark_media_deleted(
     db: Session,
     *,
