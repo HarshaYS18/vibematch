@@ -140,6 +140,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         const peer = requirePeer(roomManager, socket.id);
         mediaLog('produce.received', socket.id, { roomPublicId: peer.roomPublicId, transportId: input.transportId, kind: input.kind });
         await verifyPeerAction(peer, 'produce_audio');
+        closeExistingPeerProducers(peer, socket);
         const transport = requireTransport(peer, input.transportId);
         const producer = await transport.produce({
           kind: input.kind,
@@ -282,6 +283,17 @@ async function verifyPeerAction(peer: PeerState, requestedAction: MediaAction) {
     roomPublicId: peer.roomPublicId,
     deviceId: peer.deviceId,
   });
+}
+
+function closeExistingPeerProducers(peer: PeerState, socket: { to(room: string): { emit(event: string, payload: unknown): void } }): void {
+  const existingProducerIds = [...peer.producers.keys()];
+  for (const producerId of existingProducerIds) {
+    const producer = peer.producers.get(producerId);
+    producer?.close();
+    peer.producers.delete(producerId);
+    socket.to(peer.roomPublicId).emit('producerClosed', { producerId, peerId: peer.socketId });
+    mediaLog('producer.duplicateClosed', peer.socketId, { producerId });
+  }
 }
 
 function requireSocketAuth(raw: unknown): { bearerToken: string; deviceId?: string } {
