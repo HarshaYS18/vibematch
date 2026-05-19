@@ -36,6 +36,7 @@ from app.api.routes import (
     lucky_gifts,
     media,
     media_realtime_auth,
+    media_safety_admin,
     moderation,
     mvp_core,
     mvp_economy,
@@ -67,6 +68,7 @@ from app.models import (
     AuthIdentity,
     CallParticipant,
     CallSession,
+    CdnMediaAsset,
     CoinPoolLedger,
     CoinSaleOrder,
     CoinSupplyPool,
@@ -96,6 +98,7 @@ from app.models import (
     LoveBond,
     LoveBondInventory,
     LoveBondRequest,
+    MediaSafetySetting,
     MvpFeatureState,
     ProfileVisit,
     ProfileDisplayAudit,
@@ -246,6 +249,7 @@ app.include_router(app_source_registry.router)
 app.include_router(users.router)
 app.include_router(role_badges.router)
 app.include_router(admin.router)
+app.include_router(media_safety_admin.router)
 app.include_router(moderation.router)
 app.include_router(super_owner.router)
 app.include_router(control_center.router)
