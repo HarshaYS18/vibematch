@@ -22,10 +22,12 @@ MAX_ROOM_COVER_BYTES = 10 * 1024 * 1024
 MAX_ROOM_BACKGROUND_BYTES = 15 * 1024 * 1024
 MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_CHAT_DOCUMENT_BYTES = 20 * 1024 * 1024
+MAX_CHAT_VOICE_BYTES = 10 * 1024 * 1024
 MAX_HOME_BANNER_BYTES = 10 * 1024 * 1024
 MAX_VIBE_MEDIA_BYTES = 20 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
+ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/mp3", "audio/mp4", "audio/aac", "audio/wav", "audio/x-wav", "audio/webm", "audio/ogg", "audio/m4a"}
 ALLOWED_DOCUMENT_TYPES = {
     "application/pdf",
     "text/plain",
@@ -63,6 +65,14 @@ def _content_type_from_filename(filename: str) -> str | None:
         ".mp4": "video/mp4",
         ".webm": "video/webm",
         ".mov": "video/quicktime",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".aac": "audio/aac",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".oga": "audio/ogg",
+        ".opus": "audio/ogg",
+        ".weba": "audio/webm",
         ".pdf": "application/pdf",
         ".txt": "text/plain",
         ".csv": "text/csv",
@@ -96,6 +106,15 @@ def _safe_extension(filename: str, content_type: str) -> str:
         "video/mp4": ".mp4",
         "video/webm": ".webm",
         "video/quicktime": ".mov",
+        "audio/mpeg": ".mp3",
+        "audio/mp3": ".mp3",
+        "audio/mp4": ".m4a",
+        "audio/aac": ".aac",
+        "audio/wav": ".wav",
+        "audio/x-wav": ".wav",
+        "audio/webm": ".weba",
+        "audio/ogg": ".ogg",
+        "audio/m4a": ".m4a",
         "application/pdf": ".pdf",
         "text/plain": ".txt",
         "text/csv": ".csv",
@@ -114,6 +133,8 @@ def _media_kind_from_content_type(content_type: str) -> str:
         return "video"
     if content_type.startswith("image/"):
         return "image"
+    if content_type.startswith("audio/"):
+        return "audio"
     return "document"
 
 
@@ -261,6 +282,13 @@ async def upload_chat_image(request: Request, file: UploadFile = File(...), curr
 @router.post("/chat-document", response_model=MediaUploadResponse)
 async def upload_chat_document(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     result, object_key = await _save_upload(file, folder=f"chat_documents/user_{current_user.id}", max_size=MAX_CHAT_DOCUMENT_BYTES, allowed_types=ALLOWED_DOCUMENT_TYPES, request=request)
+    asset = cdn_media_service.register_uploaded_media(db, owner=current_user, media_type=CdnMediaType.INBOX_MEDIA, public_url=result.url, object_key=object_key, mime_type=result.content_type, size_bytes=result.size_bytes, linked_entity_type=CdnMediaLinkedEntityType.INBOX_MESSAGE)
+    return _with_asset(result, asset)
+
+
+@router.post("/chat-voice", response_model=MediaUploadResponse)
+async def upload_chat_voice(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    result, object_key = await _save_upload(file, folder=f"chat_voice/user_{current_user.id}", max_size=MAX_CHAT_VOICE_BYTES, allowed_types=ALLOWED_AUDIO_TYPES, request=request)
     asset = cdn_media_service.register_uploaded_media(db, owner=current_user, media_type=CdnMediaType.INBOX_MEDIA, public_url=result.url, object_key=object_key, mime_type=result.content_type, size_bytes=result.size_bytes, linked_entity_type=CdnMediaLinkedEntityType.INBOX_MESSAGE)
     return _with_asset(result, asset)
 
