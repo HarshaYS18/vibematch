@@ -6,6 +6,7 @@ import 'game_pool_management_page.dart';
 import 'game_props_page.dart';
 import 'gift_catalog_editor_page.dart';
 import 'inbox_lock_owner_reset_page.dart';
+import 'media_safety_control_center_page.dart';
 import '../../profile/presentation/control_center/vibes_reports_review_page.dart';
 
 class ControlCenterHubPage extends StatelessWidget {
@@ -93,6 +94,23 @@ class ControlCenterHubPage extends StatelessWidget {
             gradient: const [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ControlCenterPage()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _HubOptionCard(
+            icon: Icons.security_rounded,
+            title: 'Media & Safety',
+            subtitle:
+                'CDN media records, review queues, OpenAI safety settings and inbox media expiry.',
+            gradient: const [
+              Color(0xFF251538),
+              Color(0xFF6D5DF6),
+              Color(0xFF12C7B7),
+            ],
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const MediaSafetyControlCenterPage(),
+              ),
             ),
           ),
           const SizedBox(height: 12),
