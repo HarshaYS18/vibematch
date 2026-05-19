@@ -31,7 +31,7 @@ def _room_lookup(db: Session, room_public_id: str | None) -> Room | None:
     clean = (room_public_id or "").strip()
     if not clean:
         return None
-    return db.query(Room).filter(Room.public_id == clean).first()
+    return db.query(Room).filter(Room.room_public_id == clean).first()
 
 
 def _permission_set(action: str) -> list[str]:
@@ -155,7 +155,7 @@ def _payload(
         "requested_action": requested_action,
         "permissions": permissions,
         "mediasoup_context": {
-            "room_public_id": getattr(room, "public_id", room_public_id),
+            "room_public_id": getattr(room, "room_public_id", room_public_id),
             "room_name": getattr(room, "name", None),
             "device_id_present": bool((device_id or "").strip()),
             "must_ignore_client_user_id": True,
