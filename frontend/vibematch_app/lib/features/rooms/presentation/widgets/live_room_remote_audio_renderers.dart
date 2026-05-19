@@ -9,51 +9,56 @@ class LiveRoomRemoteAudioRenderers extends StatefulWidget {
   const LiveRoomRemoteAudioRenderers({super.key});
 
   @override
-  State<LiveRoomRemoteAudioRenderers> createState() => _LiveRoomRemoteAudioRenderersState();
+  State<LiveRoomRemoteAudioRenderers> createState() =>
+      _LiveRoomRemoteAudioRenderersState();
 }
 
-class _LiveRoomRemoteAudioRenderersState extends State<LiveRoomRemoteAudioRenderers> {
+class _LiveRoomRemoteAudioRenderersState
+    extends State<LiveRoomRemoteAudioRenderers> {
   Timer? _audioRouteRefreshTimer;
   bool _audioRouteRefreshRunning = false;
 
   @override
   void initState() {
     super.initState();
-    LiveRoomAudioService.instance.remoteAudioRenderers.addListener(_syncAudioRouteRefreshTimer);
+    LiveRoomAudioService.instance.remoteAudioRenderers.addListener(
+      _syncAudioRouteRefreshTimer,
+    );
     _syncAudioRouteRefreshTimer();
   }
 
   @override
   void dispose() {
-    LiveRoomAudioService.instance.remoteAudioRenderers.removeListener(_syncAudioRouteRefreshTimer);
+    LiveRoomAudioService.instance.remoteAudioRenderers.removeListener(
+      _syncAudioRouteRefreshTimer,
+    );
     _audioRouteRefreshTimer?.cancel();
     super.dispose();
   }
 
   void _syncAudioRouteRefreshTimer() {
-    final hasRemoteAudio = LiveRoomAudioService.instance.remoteAudioRenderers.value.isNotEmpty;
+    final hasRemoteAudio =
+        LiveRoomAudioService.instance.remoteAudioRenderers.value.isNotEmpty;
     if (!hasRemoteAudio) {
       _audioRouteRefreshTimer?.cancel();
       _audioRouteRefreshTimer = null;
       return;
     }
 
-    unawaited(_preferBluetoothOrSystemAudioRoute());
+    unawaited(_preferSystemAudioRoute());
     _audioRouteRefreshTimer ??= Timer.periodic(
       const Duration(seconds: 3),
-      (_) => unawaited(_preferBluetoothOrSystemAudioRoute()),
+      (_) => unawaited(_preferSystemAudioRoute()),
     );
   }
 
-  Future<void> _preferBluetoothOrSystemAudioRoute() async {
+  Future<void> _preferSystemAudioRoute() async {
     if (_audioRouteRefreshRunning) return;
     _audioRouteRefreshRunning = true;
     try {
-      // Do not force loudspeaker for WebRTC room audio.
-      // On Android this lets the OS route audio to a connected Bluetooth headset/speaker.
       await Helper.setSpeakerphoneOn(false);
     } catch (_) {
-      // Audio route calls can fail on web/desktop or unsupported devices. Room audio should continue.
+      // Audio route calls can fail on web/desktop or unsupported devices.
     } finally {
       _audioRouteRefreshRunning = false;
     }
@@ -66,25 +71,32 @@ class _LiveRoomRemoteAudioRenderersState extends State<LiveRoomRemoteAudioRender
       builder: (context, renderers, _) {
         if (renderers.isEmpty) return const SizedBox.shrink();
 
+        // Keep the audio elements mounted inside the visible page tree.
+        // On Flutter Web, fully off-screen WebRTC media elements can fail to
+        // autoplay or attach audio output in some browser/device combinations.
         return Positioned(
-          left: -120,
-          top: -120,
-          width: 80,
-          height: 80,
+          left: 0,
+          top: 0,
+          width: 1,
+          height: 1,
           child: IgnorePointer(
-            child: Stack(
-              children: [
-                for (final renderer in renderers)
-                  SizedBox(
-                    width: 80,
-                    height: 80,
-                    child: RTCVideoView(
-                      renderer,
-                      mirror: false,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+            child: Opacity(
+              opacity: 0.01,
+              child: Stack(
+                children: [
+                  for (final renderer in renderers)
+                    SizedBox(
+                      width: 1,
+                      height: 1,
+                      child: RTCVideoView(
+                        renderer,
+                        mirror: false,
+                        objectFit:
+                            RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         );
