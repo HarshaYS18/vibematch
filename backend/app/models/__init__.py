@@ -12,6 +12,15 @@ from app.models.room_kickout import RoomKickout, RoomKickoutDuration
 from app.models.room_theme import RoomTheme, RoomThemeOwnershipType, RoomThemeReview, RoomThemeReviewStatus, UserRoomThemeInventory
 from app.models.store import StoreAssetManifest, StoreCategory, StoreItem, StoreItemCategory, UserStoreInventory
 from app.models.home_banner import HomeBanner, HomeBannerPlacement, HomeBannerTarget
+from app.models.cdn_media import (
+    CdnMediaAsset,
+    CdnMediaDeletionStatus,
+    CdnMediaLinkedEntityType,
+    CdnMediaModerationStatus,
+    CdnMediaType,
+    CdnMediaUploadStatus,
+    MediaSafetySetting,
+)
 from app.models.cricket import (
     CricketMatch,
     CricketMatchStatus,
