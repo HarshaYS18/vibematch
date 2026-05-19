@@ -1154,7 +1154,8 @@ class _MessageActionsSheet extends StatelessWidget {
           _ActionTile(icon: Icons.copy_rounded, title: 'Copy', onTap: onCopy),
           _ActionTile(icon: message.isStarred ? Icons.star_rounded : Icons.star_border_rounded, title: message.isStarred ? 'Unstar' : 'Star', onTap: onStar),
           _ActionTile(icon: Icons.shortcut_rounded, title: 'Forward', onTap: onForward),
-          _ActionTile(icon: Icons.delete_rounded, title: 'Delete for me', onTap: onDelete, danger: true),
+          if (message.canUnsend)
+            _ActionTile(icon: Icons.undo_rounded, title: 'Unsend', onTap: onDelete, danger: true),
         ]),
       );
 }

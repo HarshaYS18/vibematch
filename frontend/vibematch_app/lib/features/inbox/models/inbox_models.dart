@@ -193,6 +193,7 @@ class InboxConversation {
     required this.unreadCount,
     required this.isOnline,
     required this.lastSeenText,
+    this.lastSeenAt,
     required this.colors,
     required this.messages,
     this.avatarUrl,
@@ -220,6 +221,7 @@ class InboxConversation {
   final int unreadCount;
   final bool isOnline;
   final String lastSeenText;
+  final DateTime? lastSeenAt;
   final List<Color> colors;
   final List<InboxMessage> messages;
   final String? currentRoomName;
@@ -248,7 +250,58 @@ class InboxConversation {
   String get safePresenceText {
     final roomStatus = roomPresence.safeRoomStatusText;
     if (roomStatus != null) return roomStatus;
-    return lastSeenText;
+    if (isOnline) return 'online';
+    return _localLastSeenText();
+  }
+
+  String _localLastSeenText() {
+    final seen = lastSeenAt;
+    if (seen == null) return lastSeenText;
+
+    final now = DateTime.now();
+    final timeLabel = _formatLocal12h(seen);
+
+    if (_isSameDate(seen, now)) {
+      return 'last seen at $timeLabel';
+    }
+
+    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    if (_isSameDate(seen, yesterday)) {
+      return 'last seen yesterday at $timeLabel';
+    }
+
+    return 'last seen ${_monthLabel(seen.month)} ${seen.day} at $timeLabel';
+  }
+
+  bool _isSameDate(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _formatLocal12h(DateTime value) {
+    final suffix = value.hour < 12 ? 'am' : 'pm';
+    var hour = value.hour % 12;
+    if (hour == 0) hour = 12;
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute $suffix';
+  }
+
+  String _monthLabel(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    if (month < 1 || month > 12) return '';
+    return months[month - 1];
   }
 
   String get listPreviewText {
@@ -267,6 +320,7 @@ class InboxConversation {
     int? unreadCount,
     bool? isOnline,
     String? lastSeenText,
+    DateTime? lastSeenAt,
     List<Color>? colors,
     List<InboxMessage>? messages,
     String? currentRoomName,
@@ -293,6 +347,7 @@ class InboxConversation {
       unreadCount: unreadCount ?? this.unreadCount,
       isOnline: isOnline ?? this.isOnline,
       lastSeenText: lastSeenText ?? this.lastSeenText,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       colors: colors ?? this.colors,
       messages: messages ?? this.messages,
       currentRoomName: currentRoomName ?? this.currentRoomName,
@@ -334,6 +389,7 @@ class InboxMessage {
     this.mediaExpired = false,
     this.expiredMediaUrl,
     this.localFirstAllowed = false,
+    this.createdAt,
   });
 
   final String? id;
@@ -357,6 +413,13 @@ class InboxMessage {
   final bool mediaExpired;
   final String? expiredMediaUrl;
   final bool localFirstAllowed;
+  final DateTime? createdAt;
+
+  bool get canUnsend {
+    final created = createdAt;
+    if (!isMine || isSystem || created == null) return false;
+    return DateTime.now().difference(created) <= const Duration(hours: 1);
+  }
 
   bool get isInvite =>
       inviteRoomName != null ||
@@ -393,6 +456,7 @@ class InboxMessage {
     bool? mediaExpired,
     String? expiredMediaUrl,
     bool? localFirstAllowed,
+    DateTime? createdAt,
   }) {
     return InboxMessage(
       id: id ?? this.id,
@@ -416,6 +480,7 @@ class InboxMessage {
       mediaExpired: mediaExpired ?? this.mediaExpired,
       expiredMediaUrl: expiredMediaUrl ?? this.expiredMediaUrl,
       localFirstAllowed: localFirstAllowed ?? this.localFirstAllowed,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

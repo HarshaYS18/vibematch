@@ -260,7 +260,7 @@ class InboxApiService {
       ),
       headers: await _headers(),
     );
-    _throwIfFailed(response, 'delete message');
+    _throwIfFailed(response, 'unsend message');
   }
 
   Future<InboxReportTask> submitReport({
@@ -351,6 +351,7 @@ class InboxApiService {
       unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
       isOnline: json['is_online'] == true,
       lastSeenText: json['last_seen_text']?.toString() ?? 'offline',
+      lastSeenAt: _dateTimeValue(json['last_seen_at']),
       colors: colors,
       messages: (json['messages'] as List<dynamic>? ?? const [])
           .whereType<Map<String, dynamic>>()
@@ -391,6 +392,7 @@ class InboxApiService {
       mediaExpired: json['media_expired'] == true,
       expiredMediaUrl: _nullableString(json['expired_media_url']),
       localFirstAllowed: json['local_first_allowed'] == true,
+      createdAt: _dateTimeValue(json['created_at']),
     );
   }
 
@@ -475,6 +477,13 @@ class InboxApiService {
     }
   }
 
+
+  DateTime? _dateTimeValue(Object? value) {
+    if (value == null) return null;
+    final raw = value.toString().trim();
+    if (raw.isEmpty) return null;
+    return DateTime.tryParse(raw)?.toLocal();
+  }
 
   int _intValue(Object? value) {
     if (value is int) return value;

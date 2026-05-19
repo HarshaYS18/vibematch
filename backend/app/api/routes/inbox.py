@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -343,12 +345,38 @@ async def delete_message(conversation_id: str, message_id: str, db: Session = De
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    message = next((item for item in conversation.messages if item.public_id == message_id), None)
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if message.sender_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only unsend your own messages.")
+
+    if message.sender_user_id is None or message.message_type == "system" or conversation.is_official:
+        raise HTTPException(status_code=403, detail="This message cannot be unsent.")
+
+    if message.created_at is None:
+        raise HTTPException(status_code=403, detail="This message can no longer be unsent.")
+
+    unsend_deadline = message.created_at + timedelta(hours=1)
+    if datetime.utcnow() > unsend_deadline:
+        raise HTTPException(status_code=403, detail="Messages can only be unsent within 1 hour.")
+
     deleted = inbox_service.delete_message(db, conversation, message_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Message not found")
-    await inbox_ws_manager.broadcast_to_users(inbox_service.participant_user_ids(conversation), {"event": "inbox_message_deleted", "conversation_id": conversation.public_id, "message_id": message_id})
+
+    await inbox_ws_manager.broadcast_to_users(
+        inbox_service.participant_user_ids(conversation),
+        {
+            "event": "inbox_message_deleted",
+            "conversation_id": conversation.public_id,
+            "message_id": message_id,
+        },
+    )
     await _broadcast_conversation(conversation)
-    return {"status": "deleted"}
+    return {"status": "unsent"}
 
 
 @router.post("/conversations/{conversation_id}/reports", response_model=InboxReportTaskResponse)
