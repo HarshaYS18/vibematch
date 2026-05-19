@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -5,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../app/app_routes.dart';
 import '../../../media/data/media_upload_api_service.dart';
 import '../../data/inbox_api_service.dart';
+import '../../data/inbox_voice_recorder_service.dart';
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_message_media_content.dart';
@@ -35,10 +37,12 @@ class _InboxChatPageState extends State<InboxChatPage> {
   final ImagePicker _imagePicker = ImagePicker();
   final MediaUploadApiService _mediaUploadApi = const MediaUploadApiService();
   final InboxApiService _inboxApi = InboxApiService();
+  final InboxVoiceRecorderService _voiceRecorder = InboxVoiceRecorderService();
   String? _replyToText;
   bool _sendingImage = false;
   bool _sendingDocument = false;
   bool _sendingVoice = false;
+  bool _recordingVoice = false;
 
   InboxConversation get _conversation => widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
 
@@ -60,6 +64,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
     widget.controller.removeListener(_handleChanged);
     _textController.dispose();
     _scrollController.dispose();
+    unawaited(_voiceRecorder.dispose());
     super.dispose();
   }
 
@@ -259,44 +264,64 @@ class _InboxChatPageState extends State<InboxChatPage> {
     return raw.isEmpty ? 'Image send failed. Please try again.' : raw;
   }
 
-  Future<void> _pickAndSendVoiceAttachment() async {
-    if (_readOnly || _sendingVoice) return;
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: false,
-        type: FileType.custom,
-        allowedExtensions: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'weba'],
-        withData: true,
-        withReadStream: false,
-      );
-      final file = result?.files.single;
-      if (file == null) return;
+  void _showHoldToRecordHint() {
+    if (_readOnly) return;
+    _showToast('Hold the mic to record. Release to send.');
+  }
 
-      final bytes = file.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        _showToast('Could not read selected voice file.');
+  Future<void> _startVoiceRecording() async {
+    if (_readOnly || _sendingVoice || _recordingVoice) return;
+    try {
+      final started = await _voiceRecorder.start();
+      if (!started) {
+        _showToast('Microphone permission is needed to record voice.');
         return;
       }
-      if (bytes.length > 10 * 1024 * 1024) {
+      if (mounted) {
+        setState(() => _recordingVoice = true);
+        _showToast('Recording... release to send.');
+      }
+    } catch (error) {
+      if (mounted) _showToast(_friendlyVoiceError(error));
+    }
+  }
+
+  Future<void> _stopAndSendVoiceRecording() async {
+    if (!_recordingVoice) return;
+    setState(() {
+      _recordingVoice = false;
+      _sendingVoice = true;
+    });
+
+    try {
+      final recorded = await _voiceRecorder.stop();
+      if (recorded == null || recorded.bytes.isEmpty) {
+        _showToast('No voice recording found.');
+        return;
+      }
+      if (recorded.isTooShort) {
+        _showToast('Voice message is too short.');
+        return;
+      }
+      if (recorded.isTooLarge) {
         _showToast('Voice message must be 10 MB or smaller.');
         return;
       }
 
-      setState(() => _sendingVoice = true);
-      _showToast('Uploading voice message...');
+      _showToast('Sending voice message...');
 
       final uploaded = await _mediaUploadApi.uploadChatVoiceBytes(
-        bytes: bytes,
-        filename: file.name,
+        bytes: recorded.bytes,
+        filename: recorded.filename,
       );
       if (uploaded.url.trim().isEmpty) {
         throw Exception('Upload completed without voice URL.');
       }
 
-      final sizeLabel = _formatAttachmentBytes(bytes.length);
+      final durationLabel = _formatVoiceDuration(recorded.duration);
       await _inboxApi.sendMessage(
         conversationId: _conversation.id,
-        text: '🎙 Voice message • $sizeLabel',
+        text: '🎙 Voice message • $durationLabel',
         type: 'voice',
         attachmentUrl: uploaded.url,
       );
@@ -310,11 +335,28 @@ class _InboxChatPageState extends State<InboxChatPage> {
     }
   }
 
+  Future<void> _cancelVoiceRecording() async {
+    if (!_recordingVoice) return;
+    await _voiceRecorder.cancel();
+    if (mounted) {
+      setState(() => _recordingVoice = false);
+      _showToast('Voice recording cancelled.');
+    }
+  }
+
+  String _formatVoiceDuration(Duration duration) {
+    final totalSeconds = duration.inSeconds.clamp(0, 599);
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    if (minutes <= 0) return '0:${seconds.toString().padLeft(2, '0')}';
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
   String _friendlyVoiceError(Object error) {
     final raw = error.toString().replaceFirst('Exception: ', '').trim();
-    if (raw.contains('413')) return 'Voice file is too large. Choose audio under 10 MB.';
+    if (raw.contains('413')) return 'Voice file is too large. Keep it under 10 MB.';
     if (raw.contains('401') || raw.toLowerCase().contains('login')) return 'Session expired. Login again before sending voice.';
-    if (raw.contains('400') && raw.toLowerCase().contains('unsupported')) return 'Unsupported audio type. Use MP3, M4A, AAC, WAV, OGG, OPUS, or WEBM audio.';
+    if (raw.toLowerCase().contains('permission')) return 'Microphone permission is needed to record voice.';
     if (raw.toLowerCase().contains('failed to fetch') || raw.toLowerCase().contains('xmlhttprequest')) return 'Upload failed. Check FastAPI is running and try again.';
     return raw.isEmpty ? 'Voice send failed. Please try again.' : raw;
   }
@@ -449,7 +491,12 @@ class _InboxChatPageState extends State<InboxChatPage> {
               controller: _textController,
               onAttachTap: _openAttachmentSheet,
               onEmojiTap: _openEmojiPack,
-              onVoiceTap: () => _pickAndSendVoiceAttachment(),
+              recordingVoice: _recordingVoice,
+              sendingVoice: _sendingVoice,
+              onVoiceTap: _showHoldToRecordHint,
+              onVoiceLongPressStart: _startVoiceRecording,
+              onVoiceLongPressEnd: _stopAndSendVoiceRecording,
+              onVoiceLongPressCancel: _cancelVoiceRecording,
               onSendTap: _sendText,
             ),
           ],
@@ -775,12 +822,29 @@ class _ReplyPreview extends StatelessWidget {
 }
 
 class _ChatInputBar extends StatelessWidget {
-  const _ChatInputBar({required this.readOnly, required this.controller, required this.onAttachTap, required this.onEmojiTap, required this.onVoiceTap, required this.onSendTap});
+  const _ChatInputBar({
+    required this.readOnly,
+    required this.controller,
+    required this.recordingVoice,
+    required this.sendingVoice,
+    required this.onAttachTap,
+    required this.onEmojiTap,
+    required this.onVoiceTap,
+    required this.onVoiceLongPressStart,
+    required this.onVoiceLongPressEnd,
+    required this.onVoiceLongPressCancel,
+    required this.onSendTap,
+  });
   final bool readOnly;
   final TextEditingController controller;
+  final bool recordingVoice;
+  final bool sendingVoice;
   final VoidCallback onAttachTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onVoiceTap;
+  final VoidCallback onVoiceLongPressStart;
+  final VoidCallback onVoiceLongPressEnd;
+  final VoidCallback onVoiceLongPressCancel;
   final VoidCallback onSendTap;
   @override
   Widget build(BuildContext context) => Container(
@@ -797,7 +861,31 @@ class _ChatInputBar extends StatelessWidget {
             ),
           ),
           IconButton(onPressed: readOnly ? null : onAttachTap, icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF7C3AED))),
-          IconButton(onPressed: readOnly ? null : onVoiceTap, icon: const Icon(Icons.mic_rounded, color: Color(0xFF7C3AED))),
+          GestureDetector(
+            onTap: readOnly ? null : onVoiceTap,
+            onLongPressStart: readOnly || sendingVoice ? null : (_) => onVoiceLongPressStart(),
+            onLongPressEnd: readOnly || sendingVoice ? null : (_) => onVoiceLongPressEnd(),
+            onLongPressCancel: readOnly || sendingVoice ? null : onVoiceLongPressCancel,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 42,
+              height: 42,
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: recordingVoice ? const Color(0xFFE84C72) : const Color(0xFF7C3AED).withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                sendingVoice
+                    ? Icons.hourglass_top_rounded
+                    : recordingVoice
+                        ? Icons.stop_rounded
+                        : Icons.mic_rounded,
+                color: recordingVoice ? Colors.white : const Color(0xFF7C3AED),
+                size: 21,
+              ),
+            ),
+          ),
           InkWell(borderRadius: BorderRadius.circular(999), onTap: readOnly ? null : onSendTap, child: Container(width: 42, height: 42, decoration: BoxDecoration(gradient: readOnly ? null : const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFFF4F9A)]), color: readOnly ? const Color(0xFFB8A8BD) : null, shape: BoxShape.circle), child: const Icon(Icons.send_rounded, color: Colors.white, size: 18))),
         ]),
       );
