@@ -11,6 +11,7 @@ DEFAULT_COLORS = ["#6D5DF6", "#E84C72"]
 TEAM_PUBLIC_ID_PREFIX = "team_official"
 OFFICIAL_TEAM_NAME = "FunKey Team"
 OFFICIAL_TEAM_AVATAR_TEXT = "FK"
+OFFICIAL_TEAM_LOGO_ASSET = "assets/branding/funkey_logo.png"
 
 
 def _public_id(prefix: str) -> str:
@@ -49,6 +50,15 @@ def _avatar_text(title: str) -> str:
     return f"{parts[0][0]}{parts[1][0]}".upper()
 
 
+def _official_team_metadata(existing: dict | None = None) -> dict:
+    metadata = dict(existing or {})
+    metadata["colors"] = ["#008069", "#25D366"]
+    metadata["avatar_url"] = OFFICIAL_TEAM_LOGO_ASSET
+    metadata["avatar_asset"] = OFFICIAL_TEAM_LOGO_ASSET
+    metadata["brand_name"] = "FunKey"
+    return metadata
+
+
 def _other_participant_user(conversation: InboxConversation, current_user: User) -> User | None:
     for participant in conversation.participants:
         if participant.user_id != current_user.id:
@@ -73,13 +83,15 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
         .first()
     )
     if conversation:
-        if conversation.title != OFFICIAL_TEAM_NAME or conversation.avatar_text != OFFICIAL_TEAM_AVATAR_TEXT:
+        needs_update = (
+            conversation.title != OFFICIAL_TEAM_NAME
+            or conversation.avatar_text != OFFICIAL_TEAM_AVATAR_TEXT
+            or (conversation.metadata_json or {}).get("avatar_url") != OFFICIAL_TEAM_LOGO_ASSET
+        )
+        if needs_update:
             conversation.title = OFFICIAL_TEAM_NAME
             conversation.avatar_text = OFFICIAL_TEAM_AVATAR_TEXT
-            metadata = dict(conversation.metadata_json or {})
-            metadata.setdefault("colors", ["#008069", "#25D366"])
-            metadata["brand_name"] = "FunKey"
-            conversation.metadata_json = metadata
+            conversation.metadata_json = _official_team_metadata(conversation.metadata_json)
             db.add(conversation)
             db.commit()
             db.refresh(conversation)
@@ -89,10 +101,7 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
     if conversation:
         conversation.title = OFFICIAL_TEAM_NAME
         conversation.avatar_text = OFFICIAL_TEAM_AVATAR_TEXT
-        metadata = dict(conversation.metadata_json or {})
-        metadata.setdefault("colors", ["#008069", "#25D366"])
-        metadata["brand_name"] = "FunKey"
-        conversation.metadata_json = metadata
+        conversation.metadata_json = _official_team_metadata(conversation.metadata_json)
         participant = db.query(InboxParticipant).filter(InboxParticipant.conversation_id == conversation.id, InboxParticipant.user_id == user.id).first()
         if participant is None:
             db.add(InboxParticipant(conversation_id=conversation.id, user_id=user.id))
@@ -107,7 +116,7 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
         avatar_text=OFFICIAL_TEAM_AVATAR_TEXT,
         conversation_type=InboxConversationType.OFFICIAL.value,
         is_official=True,
-        metadata_json={"colors": ["#008069", "#25D366"], "avatar_url": None, "brand_name": "FunKey"},
+        metadata_json=_official_team_metadata(),
     )
     db.add(conversation)
 
@@ -119,6 +128,7 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
         if existing:
             existing.title = OFFICIAL_TEAM_NAME
             existing.avatar_text = OFFICIAL_TEAM_AVATAR_TEXT
+            existing.metadata_json = _official_team_metadata(existing.metadata_json)
             participant = db.query(InboxParticipant).filter(InboxParticipant.conversation_id == existing.id, InboxParticipant.user_id == user.id).first()
             if participant is None:
                 db.add(InboxParticipant(conversation_id=existing.id, user_id=user.id))
