@@ -50,6 +50,9 @@ class InboxConversationResponse(BaseModel):
     chat_streak_count: int = 0
     chat_streak_active_today: bool = False
     secret_drift_enabled: bool = False
+    chat_theme: str = "pearl"
+    wallpaper_key: str = "premium_pearl"
+    wallpaper_url: str | None = None
 
 
 class InboxConversationListResponse(BaseModel):
@@ -79,6 +82,7 @@ class InboxSendMessageRequest(BaseModel):
 class InboxMessageActionRequest(BaseModel):
     reaction: str | None = None
     is_starred: bool | None = None
+    text: str | None = Field(default=None, min_length=1, max_length=4000)
 
 
 class InboxConversationStateRequest(BaseModel):
@@ -90,6 +94,44 @@ class InboxConversationStateRequest(BaseModel):
 
 class InboxSecretDriftRequest(BaseModel):
     enabled: bool
+
+
+class InboxConversationThemeRequest(BaseModel):
+    chat_theme: str | None = Field(default=None, max_length=64)
+    wallpaper_key: str | None = Field(default=None, max_length=80)
+    wallpaper_url: str | None = Field(default=None, max_length=700)
+
+
+class InboxPreferenceResponse(BaseModel):
+    strangers_can_message: bool = True
+    strangers_can_mention_in_vibes: bool = True
+    read_receipts_enabled: bool = True
+    online_visibility: str = "everyone"
+    last_seen_visibility: str = "everyone"
+    typing_activity_visibility: str = "everyone"
+    story_visibility: str = "friends"
+    device_unlock_enabled: bool = False
+    default_chat_theme: str = "pearl"
+    default_wallpaper_key: str = "premium_pearl"
+    default_wallpaper_url: str | None = None
+
+
+class InboxPreferenceUpdateRequest(BaseModel):
+    strangers_can_message: bool | None = None
+    strangers_can_mention_in_vibes: bool | None = None
+    read_receipts_enabled: bool | None = None
+    online_visibility: str | None = None
+    last_seen_visibility: str | None = None
+    typing_activity_visibility: str | None = None
+    story_visibility: str | None = None
+    device_unlock_enabled: bool | None = None
+    default_chat_theme: str | None = None
+    default_wallpaper_key: str | None = None
+    default_wallpaper_url: str | None = None
+
+
+class InboxDeleteForMeResponse(BaseModel):
+    status: str = "deleted_for_me"
 
 
 class InboxReportCreateRequest(BaseModel):
