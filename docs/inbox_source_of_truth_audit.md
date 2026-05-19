@@ -40,6 +40,16 @@ Backend files found/reused:
   - DTOs for media realtime verification.
 - `backend/app/services/media_realtime_auth_service.py`
   - Business logic for JWT-backed media realtime access checks.
+- `backend/app/services/permissions/media_room_permission_service.py`
+  - Central media/room permission resolver used by `/media-realtime/verify`.
+- `backend/app/models/call_session.py`
+  - Call session and call participant tables.
+- `backend/app/schemas/call_session.py`
+  - DTOs for call session routes.
+- `backend/app/services/call_session_service.py`
+  - Call session lifecycle service.
+- `backend/app/api/routes/calls.py`
+  - Thin call session routes.
 
 ## Duplicate sources found
 
@@ -47,7 +57,7 @@ No separate duplicate user/profile/badge/room models were added inside Inbox dur
 
 Existing Inbox already had feature-local `InboxConversation` and `InboxMessage` models. They remain as Inbox DTO/view models because the current frontend and backend are already wired around them. New cross-feature call/presence/notification concepts were not duplicated in Inbox; they were added to shared sources.
 
-No actual mediasoup Node/signaling server implementation was found in this repository branch, so produce/consume/createTransport handlers were not patched directly here. Instead, a backend source-of-truth verification endpoint and Flutter client wrapper were added for the external mediasoup signaling service to use before any media action.
+No actual mediasoup Node/signaling server implementation was found in this repository branch, so produce/consume/createTransport handlers were not patched directly here. Instead, backend source-of-truth verification and Flutter client wrappers were added for the external mediasoup signaling service to use before any media action.
 
 ## Canonical source chosen
 
@@ -55,6 +65,7 @@ Canonical shared communication contracts:
 - `frontend/vibematch_app/lib/shared/communication/vm_communication_models.dart`
 - `frontend/vibematch_app/lib/shared/communication/vm_notification_payload_factory.dart`
 - `frontend/vibematch_app/lib/shared/communication/vm_media_realtime_auth_service.dart`
+- `frontend/vibematch_app/lib/shared/communication/vm_call_api_service.dart`
 
 These files are the shared source of truth for:
 - call type/status/session references
@@ -64,11 +75,13 @@ These files are the shared source of truth for:
 - room presence visibility/safe display rules
 - safe notification/quick-reply payload construction for message, room invite, team/system, stranger request, and call events
 - Flutter-side media realtime verification client for joining/progressing mediasoup actions
+- Flutter-side call session API client
 
 Canonical media realtime auth source:
 - `backend/app/api/routes/media_realtime_auth.py`
 - `backend/app/schemas/media_realtime_auth.py`
 - `backend/app/services/media_realtime_auth_service.py`
+- `backend/app/services/permissions/media_room_permission_service.py`
 
 This source is for mediasoup/signaling JWT verification before actions like:
 - `join_room`
@@ -82,6 +95,12 @@ This source is for mediasoup/signaling JWT verification before actions like:
 - `join_seat`
 - `leave_seat`
 - `leave_room`
+
+Canonical call session source:
+- `backend/app/models/call_session.py`
+- `backend/app/schemas/call_session.py`
+- `backend/app/services/call_session_service.py`
+- `backend/app/api/routes/calls.py`
 
 Existing shared visual source reused:
 - `frontend/vibematch_app/lib/shared/gradient_names/gradient_name_text.dart`
@@ -98,6 +117,7 @@ Added:
 - `frontend/vibematch_app/lib/shared/communication/vm_communication_models.dart`
 - `frontend/vibematch_app/lib/shared/communication/vm_notification_payload_factory.dart`
 - `frontend/vibematch_app/lib/shared/communication/vm_media_realtime_auth_service.dart`
+- `frontend/vibematch_app/lib/shared/communication/vm_call_api_service.dart`
 - `frontend/vibematch_app/lib/features/inbox/presentation/widgets/swipe_reply_message.dart`
 - `frontend/vibematch_app/lib/features/inbox/presentation/pages/stranger_requests_page.dart`
 - `frontend/vibematch_app/lib/features/inbox/presentation/pages/inbox_calling_page.dart`
@@ -135,10 +155,19 @@ Reused existing backend:
 
 Added backend foundation:
 - `POST /media-realtime/verify`
+- `POST /calls`
+- `GET /calls`
+- `GET /calls/{call_public_id}`
+- `PATCH /calls/{call_public_id}/participant`
+- `POST /calls/{call_public_id}/end`
 
-`POST /media-realtime/verify` uses normal Bearer JWT auth through `get_current_user`, returns backend-trusted user identity/roles, checks active user, banned user, active device ban, required room id for room actions, room existence, and room active status. The external mediasoup signaling service must ignore any client-sent user id, role, or permission claims.
+`POST /media-realtime/verify` uses normal Bearer JWT auth through `get_current_user`, returns backend-trusted user identity/roles, checks active user, banned user, active device ban, required room id for room actions, room existence, room active status, kickout status, locked/Secret Vibe/members-only access, apply-only mic restrictions, seat/admin-mute restrictions, and official/owner/admin/member context. The external mediasoup signaling service must ignore any client-sent user id, role, or permission claims.
 
-No backend DB migration was added in this pass.
+New DB tables:
+- `call_sessions`
+- `call_participants`
+
+No Alembic migration was added in this pass; current project pattern uses `Base.metadata.create_all` plus runtime guards for local beta/dev testing.
 
 ## What is fully wired now
 
@@ -159,17 +188,19 @@ No backend DB migration was added in this pass.
 - Shared notification payload factory exists for message, room invite, system/team, stranger request, call, and quick-reply payload contracts.
 - FastAPI now exposes a JWT-protected media realtime verification endpoint for external mediasoup/signaling integration.
 - Flutter has a shared media realtime verification client that can be used by future live-room/call signaling code before mediasoup actions.
+- Backend call session/participant tables and routes exist for direct/group audio/video call lifecycle foundation.
+- Flutter has a shared call API client for call session create/list/get/participant/end flows.
 
 ## What remains mocked/deferred
 
 - Native closed-app incoming call overlay.
-- Real call session backend/media wiring for direct calls, 1v1 video, and group calls.
+- Actual device push notification provider wiring, such as FCM/APNs.
 - Actual Node/mediasoup signaling server handler patching; no mediasoup server source was found in this branch.
+- WebRTC/mediasoup media transport connection code for direct calls/group calls.
 - Push notifications and quick reply action execution.
-- Full message notification contracts on backend.
+- Full message notification delivery worker/service.
 - Cloud chat wallpapers and custom wallpaper picker.
 - Backend-enforced stranger request accept/reject workflow beyond existing conversation state/report/block behavior.
-- Backend safe presence flags for Secret Vibe/stealth presence need a canonical backend payload when room presence source is finalized.
 - Full group chat backend and group topic tabs.
 - Story privacy backend and story reply feeds.
 - Message recall API; current delete action remains existing delete-for-user/server delete behavior.
@@ -202,13 +233,18 @@ No backend DB migration was added in this pass.
 24. Verify unsupported `requested_action` returns `allowed=false`.
 25. Verify banned device id returns `allowed=false`.
 26. Verify room-required actions without `room_public_id` return `allowed=false`.
+27. Verify kicked-out users receive `allowed=false`.
+28. Verify locked/Secret Vibe/members-only rooms reject unauthorized users.
+29. Verify `POST /calls` creates a call session.
+30. Verify `PATCH /calls/{call_public_id}/participant` updates join/mute/camera state.
+31. Verify `POST /calls/{call_public_id}/end` ends a call and writes duration when answered.
 
 ## Verification notes
 
 Requested verification commands:
 - `flutter analyze`
 - `flutter test test/widget_test.dart`
-- `python -m compileall app` because backend files changed in the media realtime auth chunk
+- `python -m compileall app` because backend files changed
 - `git diff --check`
 
-The GitHub connector used here can edit repository files but cannot run Flutter/terminal verification inside the private repository workspace. Run the above commands locally before merging or continuing backend/native notification work.
+The GitHub connector used here can edit repository files but cannot run Flutter/terminal verification inside the private repository workspace. Run the above commands locally before merging or continuing native notification/mediasoup signaling work.
