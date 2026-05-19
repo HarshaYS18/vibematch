@@ -32,7 +32,8 @@ class GiftGalleryPager extends StatelessWidget {
       itemCount: categories.length,
       onPageChanged: (index) {
         final category = categories[index];
-        if (category.key != selectedCategoryKey) onCategoryChanged(category.key);
+        if (category.key != selectedCategoryKey)
+          onCategoryChanged(category.key);
       },
       itemBuilder: (context, index) {
         final category = categories[index];
@@ -51,22 +52,30 @@ class GiftGalleryPager extends StatelessWidget {
           );
         }
 
-        return GridView.builder(
-          padding: EdgeInsets.zero,
+        final pages = _giftPages(filtered);
+        return PageView.builder(
           physics: const BouncingScrollPhysics(),
-          itemCount: filtered.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
-            childAspectRatio: 0.92,
-          ),
-          itemBuilder: (context, giftIndex) {
-            final gift = filtered[giftIndex];
-            return CompactGiftCard(
-              gift: gift,
-              selected: selectedGift?.id == gift.id,
-              onTap: () => onGiftSelected(gift),
+          itemCount: pages.length,
+          itemBuilder: (context, pageIndex) {
+            final pageItems = pages[pageIndex];
+            return GridView.builder(
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: pageItems.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 9,
+                crossAxisSpacing: 9,
+                childAspectRatio: 1.02,
+              ),
+              itemBuilder: (context, giftIndex) {
+                final gift = pageItems[giftIndex];
+                return CompactGiftCard(
+                  gift: gift,
+                  selected: selectedGift?.id == gift.id,
+                  onTap: () => onGiftSelected(gift),
+                );
+              },
             );
           },
         );
@@ -76,7 +85,11 @@ class GiftGalleryPager extends StatelessWidget {
 
   List<GiftItem> _orderedGiftsForCategory(String categoryKey) {
     final filtered = gifts
-        .where((gift) => (gift.categoryKey ?? gift.category.label.toLowerCase()) == categoryKey)
+        .where(
+          (gift) =>
+              (gift.categoryKey ?? gift.category.label.toLowerCase()) ==
+              categoryKey,
+        )
         .toList();
     if (categoryKey != 'lucky') return filtered;
 
@@ -86,5 +99,14 @@ class GiftGalleryPager extends StatelessWidget {
       return 0;
     });
     return filtered;
+  }
+
+  List<List<GiftItem>> _giftPages(List<GiftItem> source) {
+    final pages = <List<GiftItem>>[];
+    for (var index = 0; index < source.length; index += 6) {
+      final end = index + 6 > source.length ? source.length : index + 6;
+      pages.add(source.sublist(index, end));
+    }
+    return pages.isEmpty ? const <List<GiftItem>>[] : pages;
   }
 }

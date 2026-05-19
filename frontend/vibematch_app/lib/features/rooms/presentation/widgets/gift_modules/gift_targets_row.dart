@@ -19,20 +19,22 @@ class GiftTargetsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allSelected = users.isNotEmpty && selectedUserIds.length == users.length;
+    final allSelected =
+        users.isNotEmpty && selectedUserIds.length == users.length;
 
     return SizedBox(
-      height: 36,
+      height: 58,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: users.length + 1,
-        separatorBuilder: (context, index) => const SizedBox(width: 7),
+        separatorBuilder: (context, index) => const SizedBox(width: 9),
         itemBuilder: (context, index) {
           if (index == 0) {
             return _GiftTargetAvatar(
               selected: allSelected,
               label: 'All',
               colors: const [RoomColors.gold, RoomColors.coral],
+              avatarUrl: null,
               onTap: onAllTap,
             );
           }
@@ -41,6 +43,7 @@ class GiftTargetsRow extends StatelessWidget {
             selected: selectedUserIds.contains(user.id),
             label: avatarLetter(user.name),
             colors: user.avatarColors,
+            avatarUrl: user.avatarUrl,
             onTap: () => onUserTap(user.id),
           );
         },
@@ -50,11 +53,18 @@ class GiftTargetsRow extends StatelessWidget {
 }
 
 class _GiftTargetAvatar extends StatelessWidget {
-  const _GiftTargetAvatar({required this.selected, required this.label, required this.colors, required this.onTap});
+  const _GiftTargetAvatar({
+    required this.selected,
+    required this.label,
+    required this.colors,
+    required this.avatarUrl,
+    required this.onTap,
+  });
 
   final bool selected;
   final String label;
   final List<Color> colors;
+  final String? avatarUrl;
   final VoidCallback onTap;
 
   @override
@@ -62,18 +72,67 @@ class _GiftTargetAvatar extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 36,
-        height: 36,
+        width: 52,
+        height: 52,
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: selected ? RoomColors.gold : Colors.white24, width: selected ? 2 : 1),
+          border: Border.all(
+            color: selected ? RoomColors.gold : Colors.white24,
+            width: selected ? 2.2 : 1,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: RoomColors.gold.withValues(alpha: 0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
         ),
         child: Container(
           alignment: Alignment.center,
-          decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: colors)),
-          child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(colors: colors),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: _AvatarImageOrLabel(avatarUrl: avatarUrl, label: label),
         ),
+      ),
+    );
+  }
+}
+
+class _AvatarImageOrLabel extends StatelessWidget {
+  const _AvatarImageOrLabel({required this.avatarUrl, required this.label});
+
+  final String? avatarUrl;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = avatarUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) => _label(),
+      );
+    }
+    return _label();
+  }
+
+  Widget _label() {
+    return Text(
+      label,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
       ),
     );
   }

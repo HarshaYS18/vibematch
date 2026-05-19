@@ -53,21 +53,31 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
   late final PageController _categoryPageController;
 
   int _pageIndexFor(String categoryKey) {
-    final index = widget.categories.indexWhere((category) => category.key == categoryKey);
+    final index = widget.categories.indexWhere(
+      (category) => category.key == categoryKey,
+    );
     return index < 0 ? 0 : index;
   }
 
   @override
   void initState() {
     super.initState();
-    _categoryPageController = PageController(initialPage: _pageIndexFor(widget.selectedCategoryKey));
+    _categoryPageController = PageController(
+      initialPage: _pageIndexFor(widget.selectedCategoryKey),
+    );
   }
 
   @override
   void didUpdateWidget(covariant GiftPanelModular oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((oldWidget.selectedCategoryKey != widget.selectedCategoryKey || oldWidget.categories.length != widget.categories.length) && _categoryPageController.hasClients) {
-      _categoryPageController.animateToPage(_pageIndexFor(widget.selectedCategoryKey), duration: const Duration(milliseconds: 180), curve: Curves.easeOutCubic);
+    if ((oldWidget.selectedCategoryKey != widget.selectedCategoryKey ||
+            oldWidget.categories.length != widget.categories.length) &&
+        _categoryPageController.hasClients) {
+      _categoryPageController.animateToPage(
+        _pageIndexFor(widget.selectedCategoryKey),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+      );
     }
   }
 
@@ -81,38 +91,64 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
   Widget build(BuildContext context) {
     final gift = widget.selectedGift;
     final isLuckyPacket = gift?.id == 'lucky_packet';
-    final isLucky = widget.selectedCategoryKey == 'lucky' || gift?.giftType == 'lucky';
-    final comboOptions = GiftPanelConstants.allowedCombos(isLucky: isLucky, minCombo: gift?.minCombo ?? 1, maxCombo: gift?.maxCombo ?? 999);
-    final comboValue = isLuckyPacket ? 1 : (comboOptions.contains(widget.selectedCombo) ? widget.selectedCombo : comboOptions.first);
+    final isLucky =
+        widget.selectedCategoryKey == 'lucky' || gift?.giftType == 'lucky';
+    final comboOptions = GiftPanelConstants.allowedCombos(
+      isLucky: isLucky,
+      minCombo: gift?.minCombo ?? 1,
+      maxCombo: gift?.maxCombo ?? 999,
+    );
+    final comboValue = isLuckyPacket
+        ? 1
+        : (comboOptions.contains(widget.selectedCombo)
+              ? widget.selectedCombo
+              : comboOptions.first);
+
+    final seatedUsers = widget.users
+        .where((user) => user.publicUserId != null)
+        .toList(growable: false);
 
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.414,
+      height: MediaQuery.sizeOf(context).height * 0.52,
       child: Container(
-        padding: EdgeInsets.fromLTRB(10, 7, 10, MediaQuery.paddingOf(context).bottom + 8),
-        decoration: const BoxDecoration(color: Color(0xFF12101D), borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+        padding: EdgeInsets.fromLTRB(
+          12,
+          8,
+          12,
+          MediaQuery.paddingOf(context).bottom + 10,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFF12101D),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SheetHandle(width: 42),
             const SizedBox(height: 6),
+            GiftTargetsRow(
+              users: seatedUsers,
+              selectedUserIds: widget.selectedReceiverIds,
+              onAllTap: () => widget.onReceiverToggle('__all__'),
+              onUserTap: widget.onReceiverToggle,
+            ),
+            const SizedBox(height: 9),
             GiftPanelHeader(
               categories: widget.categories,
               selectedCategoryKey: widget.selectedCategoryKey,
               onCategoryChanged: (categoryKey) {
                 widget.onCategoryChanged(categoryKey);
-                _categoryPageController.animateToPage(_pageIndexFor(categoryKey), duration: const Duration(milliseconds: 180), curve: Curves.easeOutCubic);
+                _categoryPageController.animateToPage(
+                  _pageIndexFor(categoryKey),
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                );
               },
-              onStoreTap: () => RoomToast.show(context, 'Store / inventory opened'),
+              onStoreTap: () =>
+                  RoomToast.show(context, 'Store / inventory opened'),
               onLuckyRankingsTap: widget.onLuckyRankingsTap,
             ),
-            const SizedBox(height: 7),
-            GiftTargetsRow(
-              users: widget.users,
-              selectedUserIds: widget.selectedReceiverIds,
-              onAllTap: () => widget.onReceiverToggle('__all__'),
-              onUserTap: widget.onReceiverToggle,
-            ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 9),
             Expanded(
               child: GiftGalleryPager(
                 controller: _categoryPageController,
@@ -131,7 +167,13 @@ class _GiftPanelModularState extends State<GiftPanelModular> {
               coinBalance: widget.coinBalance,
               comboEnabled: !isLuckyPacket && comboOptions.length > 1,
               onSend: widget.onSend,
-              onComboChanged: (combo) => widget.onComboChanged(GiftPanelConstants.clampCombo(combo: combo, minCombo: gift?.minCombo ?? 1, maxCombo: gift?.maxCombo ?? 999)),
+              onComboChanged: (combo) => widget.onComboChanged(
+                GiftPanelConstants.clampCombo(
+                  combo: combo,
+                  minCombo: gift?.minCombo ?? 1,
+                  maxCombo: gift?.maxCombo ?? 999,
+                ),
+              ),
               onRecharge: widget.onRecharge,
             ),
           ],

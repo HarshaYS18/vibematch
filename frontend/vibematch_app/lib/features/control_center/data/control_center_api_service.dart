@@ -675,6 +675,7 @@ class ControlCenterEconomyRuleSet {
     required this.title,
     required this.maxLevel,
     required this.levelCount,
+    required this.levels,
   });
   final int id;
   final String trackKey;
@@ -682,17 +683,50 @@ class ControlCenterEconomyRuleSet {
   final String title;
   final int maxLevel;
   final int levelCount;
+  final List<ControlCenterEconomyRuleLevel> levels;
   factory ControlCenterEconomyRuleSet.fromJson(Map<String, dynamic> json) {
     final levels = json['levels'];
+    final parsedLevels = levels is List
+        ? levels
+              .whereType<Map<String, dynamic>>()
+              .map(ControlCenterEconomyRuleLevel.fromJson)
+              .toList(growable: false)
+        : const <ControlCenterEconomyRuleLevel>[];
     return ControlCenterEconomyRuleSet(
       id: _int(json['id']),
       trackKey: json['track_key']?.toString() ?? '',
       version: _int(json['version']),
       title: json['title']?.toString() ?? '',
       maxLevel: _int(json['max_level']),
-      levelCount: levels is List ? levels.length : 0,
+      levelCount: parsedLevels.length,
+      levels: parsedLevels,
     );
   }
+}
+
+class ControlCenterEconomyRuleLevel {
+  const ControlCenterEconomyRuleLevel({
+    required this.level,
+    required this.requiredExp,
+    required this.requiredCoinValue,
+  });
+
+  final int level;
+  final int requiredExp;
+  final int requiredCoinValue;
+
+  factory ControlCenterEconomyRuleLevel.fromJson(Map<String, dynamic> json) =>
+      ControlCenterEconomyRuleLevel(
+        level: _int(json['level']),
+        requiredExp: _int(json['required_exp']),
+        requiredCoinValue: _int(json['required_coin_value']),
+      );
+
+  Map<String, dynamic> toRuleJson({int? requiredCoins}) => {
+    'level': level,
+    'required_exp': requiredCoins ?? requiredExp,
+    'required_coin_value': requiredCoins ?? requiredCoinValue,
+  };
 }
 
 class ControlCenterStoreCategory {
@@ -723,6 +757,10 @@ class ControlCenterStoreItem {
     required this.itemType,
     required this.priceCoins,
     required this.active,
+    required this.sortOrder,
+    this.assetUrl,
+    this.thumbnailUrl,
+    this.imageUrl,
   });
   final String itemId;
   final String name;
@@ -730,6 +768,21 @@ class ControlCenterStoreItem {
   final String itemType;
   final int priceCoins;
   final bool active;
+  final int sortOrder;
+  final String? assetUrl;
+  final String? thumbnailUrl;
+  final String? imageUrl;
+
+  String get displayAssetUrl {
+    final primary = assetUrl?.trim();
+    if (primary != null && primary.isNotEmpty) return primary;
+    final image = imageUrl?.trim();
+    if (image != null && image.isNotEmpty) return image;
+    final thumb = thumbnailUrl?.trim();
+    if (thumb != null && thumb.isNotEmpty) return thumb;
+    return '';
+  }
+
   factory ControlCenterStoreItem.fromJson(Map<String, dynamic> json) =>
       ControlCenterStoreItem(
         itemId: json['item_id']?.toString() ?? '',
@@ -738,6 +791,10 @@ class ControlCenterStoreItem {
         itemType: json['item_type']?.toString() ?? '',
         priceCoins: _int(json['price_coins']),
         active: json['is_active'] != false,
+        sortOrder: _int(json['sort_order']),
+        assetUrl: _text(json['cdn_asset_url']),
+        thumbnailUrl: _text(json['thumbnail_url']),
+        imageUrl: _text(json['image_url']),
       );
 }
 
@@ -761,4 +818,10 @@ int _int(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+String? _text(Object? value) {
+  final text = value?.toString().trim();
+  if (text == null || text.isEmpty || text == 'null') return null;
+  return text;
 }

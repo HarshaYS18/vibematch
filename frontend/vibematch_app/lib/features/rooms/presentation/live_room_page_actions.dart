@@ -472,7 +472,7 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     LiveRoomGiftActionsModule.openGiftPanel(
       context: context,
       giftController: _giftController,
-      roomUsers: _allRoomUsers,
+      roomUsers: _roomUsers,
     );
   }
 

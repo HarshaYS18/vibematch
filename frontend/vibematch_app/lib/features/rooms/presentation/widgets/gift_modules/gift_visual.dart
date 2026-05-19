@@ -9,6 +9,7 @@ class GiftVisual extends StatelessWidget {
     this.assetUrl,
     this.size = 36,
     this.padding = 5,
+    this.square = false,
   });
 
   final IconData icon;
@@ -17,6 +18,7 @@ class GiftVisual extends StatelessWidget {
   final String? assetUrl;
   final double size;
   final double padding;
+  final bool square;
 
   @override
   Widget build(BuildContext context) {
@@ -32,10 +34,8 @@ class GiftVisual extends StatelessWidget {
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
             gaplessPlayback: true,
-            errorBuilder: (context, error, stackTrace) => _localOrIcon(
-              cleanPath,
-              visualSize,
-            ),
+            errorBuilder: (context, error, stackTrace) =>
+                _localOrIcon(cleanPath, visualSize),
           )
         : _localOrIcon(cleanPath, visualSize);
 
@@ -44,7 +44,8 @@ class GiftVisual extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
+        shape: square ? BoxShape.rectangle : BoxShape.circle,
+        borderRadius: square ? BorderRadius.circular(14) : null,
         gradient: LinearGradient(colors: colors),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.34),
@@ -63,7 +64,8 @@ class GiftVisual extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipOval(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(square ? 13 : size / 2),
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -102,10 +104,6 @@ class GiftVisual extends StatelessWidget {
   }
 
   Widget _iconFallback() {
-    return Icon(
-      icon,
-      color: Colors.white,
-      size: size * 0.46,
-    );
+    return Icon(icon, color: Colors.white, size: size * 0.46);
   }
 }
