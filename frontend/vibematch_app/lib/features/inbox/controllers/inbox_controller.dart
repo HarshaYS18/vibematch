@@ -544,6 +544,57 @@ class InboxController extends ChangeNotifier {
     }
   }
 
+  Future<void> retryFailedMessage({
+    required String conversationId,
+    required InboxMessage message,
+  }) async {
+    if (!message.isMine || message.status != InboxMessageStatus.failed) return;
+
+    final retrying = message.copyWith(status: InboxMessageStatus.sending, time: 'Now');
+
+    _updateMessage(
+      conversationId: conversationId,
+      message: message,
+      mapper: (_) => retrying,
+    );
+
+    try {
+      final sent = await _apiService.sendMessage(
+        conversationId: conversationId,
+        text: retrying.text,
+        type: _messageTypeApiValue(retrying.type),
+        replyToText: retrying.replyToText,
+        inviteRoomName: retrying.inviteRoomName,
+        inviteRoomId: retrying.inviteRoomId,
+        attachmentUrl: retrying.attachmentUrl,
+      );
+      _replaceLocalMessage(conversationId, retrying, sent);
+    } catch (error) {
+      errorMessage = error.toString();
+      _updateMessage(
+        conversationId: conversationId,
+        message: retrying,
+        mapper: (item) => item.copyWith(status: InboxMessageStatus.failed),
+      );
+    }
+  }
+
+  String _messageTypeApiValue(InboxMessageType type) {
+    return switch (type) {
+      InboxMessageType.image => 'image',
+      InboxMessageType.voice => 'voice',
+      InboxMessageType.document => 'document',
+      InboxMessageType.location => 'location',
+      InboxMessageType.contact => 'contact',
+      InboxMessageType.roomInvite => 'room_invite',
+      InboxMessageType.relationshipRequest => 'relationship_request',
+      InboxMessageType.system => 'system',
+      InboxMessageType.storyReply => 'story_reply',
+      InboxMessageType.callLog => 'call_log',
+      InboxMessageType.text => 'text',
+    };
+  }
+
   void addMockAttachment({
     required String conversationId,
     required InboxMessageType type,

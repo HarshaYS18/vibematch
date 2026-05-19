@@ -478,6 +478,9 @@ class _InboxChatPageState extends State<InboxChatPage> {
                         onJoinInviteTap: message.isInvite ? () => _openInvitedRoom(message) : null,
                         onAcceptLoveBondTap: message.isLoveBondRequest ? () => _acceptLoveBondRequest(message) : null,
                         onRejectLoveBondTap: message.isLoveBondRequest ? () => _rejectLoveBondRequest(message) : null,
+                        onRetryFailedTap: message.isMine && message.status == InboxMessageStatus.failed
+                            ? () => widget.controller.retryFailedMessage(conversationId: _conversation.id, message: message)
+                            : null,
                       ),
                     );
                   },
@@ -586,7 +589,15 @@ class _HeaderAvatarText extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, required this.conversation, required this.onLongPress, required this.onJoinInviteTap, required this.onAcceptLoveBondTap, required this.onRejectLoveBondTap});
+  const _MessageBubble({
+    required this.message,
+    required this.conversation,
+    required this.onLongPress,
+    required this.onJoinInviteTap,
+    required this.onAcceptLoveBondTap,
+    required this.onRejectLoveBondTap,
+    required this.onRetryFailedTap,
+  });
 
   final InboxMessage message;
   final InboxConversation conversation;
@@ -594,6 +605,7 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onJoinInviteTap;
   final VoidCallback? onAcceptLoveBondTap;
   final VoidCallback? onRejectLoveBondTap;
+  final VoidCallback? onRetryFailedTap;
 
   bool get _hasMediaContent => message.type == InboxMessageType.image || message.type == InboxMessageType.document || message.type == InboxMessageType.voice;
 
@@ -650,7 +662,14 @@ class _MessageBubble extends StatelessWidget {
                         const SizedBox(width: 4),
                       ],
                       Text(message.time, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF9B8CA5), fontSize: 10.3, fontWeight: FontWeight.w800)),
-                      if (mine) ...[const SizedBox(width: 5), _ReadReceipt(status: message.status)],
+                      if (mine) ...[
+                        const SizedBox(width: 5),
+                        _ReadReceipt(status: message.status, mine: mine),
+                        if (message.status == InboxMessageStatus.failed && onRetryFailedTap != null) ...[
+                          const SizedBox(width: 6),
+                          _RetryChip(onTap: onRetryFailedTap!),
+                        ],
+                      ],
                     ],
                   ),
                 ],
@@ -795,13 +814,92 @@ class _StatusPill extends StatelessWidget {
 }
 
 class _ReadReceipt extends StatelessWidget {
-  const _ReadReceipt({required this.status});
+  const _ReadReceipt({required this.status, required this.mine});
+
   final InboxMessageStatus status;
+  final bool mine;
+
   @override
   Widget build(BuildContext context) {
-    final icon = switch (status) { InboxMessageStatus.sending => Icons.schedule_rounded, InboxMessageStatus.sent => Icons.check_rounded, InboxMessageStatus.delivered => Icons.done_all_rounded, InboxMessageStatus.read => Icons.done_all_rounded, InboxMessageStatus.failed => Icons.error_outline_rounded };
-    final color = status == InboxMessageStatus.read ? const Color(0xFF2DD4BF) : Colors.white70;
-    return Icon(icon, color: color, size: 14);
+    final icon = switch (status) {
+      InboxMessageStatus.sending => Icons.schedule_rounded,
+      InboxMessageStatus.sent => Icons.check_rounded,
+      InboxMessageStatus.delivered => Icons.done_all_rounded,
+      InboxMessageStatus.read => Icons.done_all_rounded,
+      InboxMessageStatus.failed => Icons.error_outline_rounded,
+    };
+
+    final label = switch (status) {
+      InboxMessageStatus.sending => 'Sending',
+      InboxMessageStatus.sent => 'Sent',
+      InboxMessageStatus.delivered => 'Delivered',
+      InboxMessageStatus.read => 'Read',
+      InboxMessageStatus.failed => 'Failed',
+    };
+
+    final color = switch (status) {
+      InboxMessageStatus.read => const Color(0xFF2DD4BF),
+      InboxMessageStatus.failed => const Color(0xFFFFD1DC),
+      _ => mine ? Colors.white70 : const Color(0xFF9B8CA5),
+    };
+
+    return Tooltip(
+      message: label,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 14),
+          if (status == InboxMessageStatus.sending || status == InboxMessageStatus.failed) ...[
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 9.8,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RetryChip extends StatelessWidget {
+  const _RetryChip({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.32)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.refresh_rounded, color: Colors.white, size: 11),
+            SizedBox(width: 3),
+            Text(
+              'Retry',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 9.8,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
