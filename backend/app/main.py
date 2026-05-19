@@ -215,6 +215,7 @@ def _ensure_runtime_schema() -> None:
                 "MANAGE_GIFT_CATEGORIES",
             ]:
                 connection.execute(text(f"ALTER TYPE specialpermissionname ADD VALUE IF NOT EXISTS '{permission}'"))
+            connection.execute(text("ALTER TABLE cdn_media_assets ALTER COLUMN public_user_id TYPE BIGINT"))
         for statement in statements:
             connection.execute(text(statement))
 
