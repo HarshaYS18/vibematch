@@ -47,6 +47,11 @@ from app.models.inbox import (
     InboxLockOtp,
     InboxLockOtpPurpose,
 )
+from app.models.inbox_preferences import (
+    InboxConversationUserSetting,
+    InboxMessageUserState,
+    InboxUserPreference,
+)
 from app.models.inbox_backup import (
     InboxBackupSetting,
     InboxBackupJob,
