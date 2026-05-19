@@ -84,6 +84,13 @@ class LiveRoomLeaveActionsModule {
     if (!navigationController.canExitRoom(
       exitingRoom: roomStateController.exitingRoom,
     )) {
+      if (roomStateController.exitingRoom) {
+        _popRoomRouteAfterLeave(
+          roomNavigator: Navigator.of(context),
+          roomStateController: roomStateController,
+          mountedGetter: mountedGetter,
+        );
+      }
       return;
     }
 
@@ -96,23 +103,55 @@ class LiveRoomLeaveActionsModule {
     // A real leave must release the current seat first so re-entry comes back
     // as audience unless the user explicitly takes a seat again.
     LiveRoomMediaSignalingService.instance.leaveSeat();
-    unawaited(
-      Future<void>.delayed(const Duration(milliseconds: 120), () {
-        return LiveRoomMediaSignalingService.instance.leaveRoom();
-      }),
-    );
+    unawaited(_leaveMediaRoomBestEffort());
     Navigator.pop(sheetContext);
 
-    if (!mountedGetter()) return;
-
-    roomStateController.setAllowRoomPop(true);
-
-    Future<void>.delayed(const Duration(milliseconds: 180), () {
-      if (!mountedGetter()) return;
-      roomNavigator.maybePop();
-    });
+    _popRoomRouteAfterLeave(
+      roomNavigator: roomNavigator,
+      roomStateController: roomStateController,
+      mountedGetter: mountedGetter,
+    );
   }
 
+  static Future<void> _leaveMediaRoomBestEffort() async {
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await LiveRoomMediaSignalingService.instance.leaveRoom().timeout(
+        const Duration(seconds: 4),
+      );
+    } catch (_) {
+      // Leaving the visible room route must not be blocked by socket cleanup.
+    }
+  }
+
+  static void _popRoomRouteAfterLeave({
+    required NavigatorState roomNavigator,
+    required LiveRoomStateController roomStateController,
+    required bool Function() mountedGetter,
+  }) {
+    if (!mountedGetter()) return;
+    roomStateController.setAllowRoomPop(true);
+
+    void tryPop(int attempt) {
+      if (!mountedGetter()) return;
+      if (roomNavigator.canPop()) {
+        roomNavigator.pop();
+        return;
+      }
+
+      if (attempt < 3) {
+        Future<void>.delayed(
+          const Duration(milliseconds: 90),
+          () => tryPop(attempt + 1),
+        );
+        return;
+      }
+
+      roomStateController.setExitingRoom(false);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => tryPop(0));
+  }
   static void _stayAndMinimize({
     required BuildContext context,
     required BuildContext sheetContext,
@@ -161,3 +200,4 @@ class LiveRoomLeaveActionsModule {
     });
   }
 }
+
