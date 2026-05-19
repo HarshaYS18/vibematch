@@ -106,7 +106,7 @@ class _InboxFileMedia extends StatelessWidget {
         : (hasLocalCopy ? 'Local copy available' : 'Tap to open');
     final canOpen = hasLocalCopy || hasRemoteCopy;
     return InkWell(
-      onTap: canOpen ? () => _openAttachment(context, message) : null,
+      onTap: canOpen ? () => _confirmAndOpenAttachment(context, message, title) : null,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: 252,
@@ -214,6 +214,89 @@ class _LocalFirstBadge extends StatelessWidget {
   }
 }
 
+class _OpenAttachmentSheet extends StatelessWidget {
+  const _OpenAttachmentSheet({required this.message, required this.title, required this.target});
+
+  final InboxMessage message;
+  final String title;
+  final String target;
+
+  @override
+  Widget build(BuildContext context) {
+    final isZip = title.toLowerCase().endsWith('.zip') || target.toLowerCase().contains('.zip');
+    final isExpiredServerCopy = message.mediaExpired && !message.hasLocalAttachmentPath;
+    final warning = isZip
+        ? 'ZIP files can contain risky files. Open only if you trust the sender.'
+        : isExpiredServerCopy
+            ? 'The server copy may already be expired. This will open only if your device or browser can still access it.'
+            : 'Open files only from people you trust.';
+    return Container(
+      margin: const EdgeInsets.all(14),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(color: const Color(0xFF7C3AED).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)),
+                child: Icon(isZip ? Icons.folder_zip_rounded : Icons.description_rounded, color: const Color(0xFF7C3AED)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Open attachment?', style: TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 3),
+                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isZip ? const Color(0xFFFFF7ED) : const Color(0xFFF8F5FF),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: isZip ? const Color(0xFFFED7AA) : const Color(0xFFE9DDF5)),
+            ),
+            child: Text(warning, style: TextStyle(color: isZip ? const Color(0xFF9A3412) : const Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w800, height: 1.25)),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), side: const BorderSide(color: Color(0xFFE9DDF5))),
+                  child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w900)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF251538), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 17),
+                  label: const Text('Open', style: TextStyle(fontWeight: FontWeight.w900)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 Widget _imageForSource(String source, {required VoidCallback onError}) {
   if (source.startsWith('assets/')) {
     return Image.asset(source, fit: BoxFit.cover, errorBuilder: (_, _, _) {
@@ -234,7 +317,7 @@ String? _usableImageSource(String? value) {
   return null;
 }
 
-Future<void> _openAttachment(BuildContext context, InboxMessage message) async {
+Future<void> _confirmAndOpenAttachment(BuildContext context, InboxMessage message, String title) async {
   final localPath = message.localAttachmentPath?.trim();
   final remoteUrl = message.effectiveRemoteMediaUrl?.trim();
   final target = (localPath != null && localPath.isNotEmpty) ? localPath : remoteUrl;
@@ -248,6 +331,13 @@ Future<void> _openAttachment(BuildContext context, InboxMessage message) async {
     _showOpenSnack(context, 'This attachment path cannot be opened yet.');
     return;
   }
+
+  final confirmed = await showModalBottomSheet<bool>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _OpenAttachmentSheet(message: message, title: title, target: target),
+  );
+  if (confirmed != true || !context.mounted) return;
 
   final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
   if (!opened && context.mounted) {
