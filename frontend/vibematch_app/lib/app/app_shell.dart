@@ -72,7 +72,8 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
-    VibeMediaPlaybackGate.feedPlaybackPaused.value = true;
+    VibeMediaPlaybackGate.setTabPaused(true);
+    VibeMediaPlaybackGate.clearPauseLocks();
     _userSyncSubscription?.cancel();
     _signedOutSubscription?.cancel();
     _presenceHeartbeatTimer?.cancel();
@@ -83,7 +84,7 @@ class _AppShellState extends State<AppShell> {
 
   void _syncVibesPlaybackWithActiveTab() {
     final isVibesTabActive = _selectedTab == VmMainTab.vibes;
-    VibeMediaPlaybackGate.feedPlaybackPaused.value = !isVibesTabActive;
+    VibeMediaPlaybackGate.setTabPaused(!isVibesTabActive);
     if (isVibesTabActive) {
       WidgetsBinding.instance.addPostFrameCallback((_) => VibeMediaPlaybackGate.notifyFeedScrolled());
     }
@@ -252,73 +253,80 @@ class _VibeBottomNav extends StatelessWidget {
   final bool isTestingAsFounder;
   final ValueChanged<VmMainTab> onTabSelected;
 
-  static const Color deepPlum = Color(0xFF251538);
-  static const Color softBorder = Color(0xFFECE2D8);
-  static const Color aqua = Color(0xFF12C7B7);
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, bottomPadding + 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFAF7F1),
+        border: Border(top: BorderSide(color: Color(0xFFECE2D8))),
+      ),
+      child: Row(
+        children: [
+          _BottomNavItem(tab: VmMainTab.home, selectedTab: selectedTab, onTap: onTabSelected),
+          _BottomNavItem(tab: VmMainTab.vibes, selectedTab: selectedTab, onTap: onTabSelected),
+          _CreateRoomButton(isTestingAsFounder: isTestingAsFounder),
+          _BottomNavItem(tab: VmMainTab.inbox, selectedTab: selectedTab, onTap: onTabSelected),
+          _BottomNavItem(tab: VmMainTab.me, selectedTab: selectedTab, onTap: onTabSelected),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomNavItem extends StatelessWidget {
+  const _BottomNavItem({required this.tab, required this.selectedTab, required this.onTap});
+
+  final VmMainTab tab;
+  final VmMainTab selectedTab;
+  final ValueChanged<VmMainTab> onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 3, 12, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: softBorder),
-          boxShadow: [BoxShadow(color: deepPlum.withValues(alpha: 0.07), blurRadius: 18, offset: const Offset(0, 7))],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(icon: VMIcons.home, label: VmMainTab.home.label, active: selectedTab == VmMainTab.home, onTap: () => onTabSelected(VmMainTab.home)),
-            _NavItem(icon: VMIcons.vibes, label: VmMainTab.vibes.label, active: selectedTab == VmMainTab.vibes, onTap: () => onTabSelected(VmMainTab.vibes)),
-            _NavItem(icon: VMIcons.inbox, label: VmMainTab.inbox.label, active: selectedTab == VmMainTab.inbox, onTap: () => onTabSelected(VmMainTab.inbox)),
-            _NavItem(icon: isTestingAsFounder ? VMIcons.admin : VMIcons.profile, label: VmMainTab.me.label, active: selectedTab == VmMainTab.me, onTap: () => onTabSelected(VmMainTab.me)),
-          ],
+    final isSelected = selectedTab == tab;
+    return Expanded(
+      child: InkWell(
+        onTap: () => onTap(tab),
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(tab.icon, size: 25, color: isSelected ? const Color(0xFF4A2A63) : const Color(0xFF9A8DA6)),
+              const SizedBox(height: 3),
+              Text(tab.label, style: TextStyle(color: isSelected ? const Color(0xFF4A2A63) : const Color(0xFF9A8DA6), fontSize: 11, fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700)),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap});
+class _CreateRoomButton extends StatelessWidget {
+  const _CreateRoomButton({required this.isTestingAsFounder});
 
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  static const Color deepPlum = Color(0xFF251538);
-  static const Color muted = Color(0xFF8C8198);
-  static const Color aqua = Color(0xFF12C7B7);
+  final bool isTestingAsFounder;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(15),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.1) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: active ? deepPlum : muted),
-            const SizedBox(height: 1),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 9,
-                height: 1.0,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active ? deepPlum : muted,
-              ),
+    return Expanded(
+      child: Center(
+        child: InkWell(
+          onTap: () => Navigator.of(context).pushNamed(AppRoutes.createRoom),
+          borderRadius: BorderRadius.circular(26),
+          child: Container(
+            width: 54,
+            height: 46,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(23),
+              gradient: const LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)]),
+              boxShadow: [BoxShadow(color: const Color(0xFF12C7B7).withValues(alpha: 0.26), blurRadius: 18, offset: const Offset(0, 8))],
             ),
-          ],
+            child: const Icon(VmIcons.add, color: Colors.white, size: 28),
+          ),
         ),
       ),
     );
