@@ -1,7 +1,7 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../models/vibe_models.dart';
 
@@ -10,6 +10,8 @@ class CreateVibeMediaPicker extends StatelessWidget {
     super.key,
     required this.type,
     required this.selectedFile,
+    required this.selectedPreviewBytes,
+    required this.selectedName,
     required this.selectedBytes,
     required this.picking,
     required this.uploading,
@@ -19,7 +21,9 @@ class CreateVibeMediaPicker extends StatelessWidget {
   });
 
   final VibeMediaType type;
-  final File? selectedFile;
+  final XFile? selectedFile;
+  final Uint8List? selectedPreviewBytes;
+  final String? selectedName;
   final int? selectedBytes;
   final bool picking;
   final bool uploading;
@@ -47,10 +51,10 @@ class CreateVibeMediaPicker extends StatelessWidget {
                   : Stack(
                       fit: StackFit.expand,
                       children: [
-                        if (hasFile && type == VibeMediaType.photo)
-                          Image.file(selectedFile!, fit: BoxFit.cover)
+                        if (hasFile && type == VibeMediaType.photo && selectedPreviewBytes != null)
+                          Image.memory(selectedPreviewBytes!, fit: BoxFit.cover)
                         else if (hasFile && type == VibeMediaType.video)
-                          _LocalVideoPreview(file: selectedFile!)
+                          _VideoFilePreview(name: selectedName, bytes: selectedBytes)
                         else
                           _MediaPrompt(picking: picking, uploading: uploading),
                         if (hasFile) const _PreviewGradient(),
@@ -132,63 +136,51 @@ class CreateVibeMediaSourceSheet extends StatelessWidget {
   }
 }
 
-class _LocalVideoPreview extends StatefulWidget {
-  const _LocalVideoPreview({required this.file});
+class _VideoFilePreview extends StatelessWidget {
+  const _VideoFilePreview({required this.name, required this.bytes});
 
-  final File file;
-
-  @override
-  State<_LocalVideoPreview> createState() => _LocalVideoPreviewState();
-}
-
-class _LocalVideoPreviewState extends State<_LocalVideoPreview> {
-  VideoPlayerController? _controller;
-  bool _ready = false;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeController();
-  }
-
-  @override
-  void didUpdateWidget(covariant _LocalVideoPreview oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.file.path != widget.file.path) {
-      _controller?.dispose();
-      _ready = false;
-      _hasError = false;
-      _initializeController();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  void _initializeController() {
-    _controller = VideoPlayerController.file(widget.file)
-      ..setLooping(true)
-      ..initialize().then((_) {
-        if (!mounted) return;
-        setState(() => _ready = true);
-        _controller?.play();
-      }).catchError((_) {
-        if (mounted) setState(() => _hasError = true);
-      });
-  }
+  final String? name;
+  final int? bytes;
 
   @override
   Widget build(BuildContext context) {
-    final controller = _controller;
-    if (_hasError) return const Center(child: Icon(Icons.movie_creation_rounded, color: Color(0xFF111015), size: 54));
-    if (controller == null || !_ready) return const Center(child: CircularProgressIndicator(color: Color(0xFF111015), strokeWidth: 2.6));
-    return FittedBox(
-      fit: BoxFit.cover,
-      child: SizedBox(width: controller.value.size.width, height: controller.value.size.height, child: VideoPlayer(controller)),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF111015), Color(0xFF251538), Color(0xFF6D5DF6)],
+        ),
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 86,
+                height: 86,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.28))),
+                child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 52),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                name?.trim().isNotEmpty == true ? name!.trim() : 'Selected video',
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                bytes == null ? 'Ready to upload' : _formatBytes(bytes!),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 12, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
