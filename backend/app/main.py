@@ -9,6 +9,7 @@ from app.api.routes import (
     admin,
     app_source_registry,
     auth,
+    calls,
     coin_sales,
     control_center,
     economy,
@@ -64,6 +65,8 @@ from app.database import Base, engine
 from app.models import (
     AdminLog,
     AuthIdentity,
+    CallParticipant,
+    CallSession,
     CoinPoolLedger,
     CoinSaleOrder,
     CoinSupplyPool,
@@ -259,6 +262,7 @@ app.include_router(inbox_backup_google.router)
 app.include_router(love_bonds.router)
 app.include_router(relationship_exp.router)
 app.include_router(inbox_ws.router)
+app.include_router(calls.router)
 app.include_router(media_realtime_auth.router)
 app.include_router(room_realtime.router)
 app.include_router(room_realtime_commands.router)
