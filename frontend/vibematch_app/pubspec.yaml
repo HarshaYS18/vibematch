@@ -45,6 +45,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/branding/
     - assets/icons/
     - assets/images/branding/
     - assets/images/vip_badges/
