@@ -84,6 +84,22 @@ export class RoomManager {
     return room.router.rtpCapabilities;
   }
 
+  serializeProducers(room: RoomState): Array<Record<string, unknown>> {
+    const producers: Array<Record<string, unknown>> = [];
+    for (const peer of room.peers.values()) {
+      for (const producer of peer.producers.values()) {
+        producers.push({
+          producerId: producer.id,
+          id: producer.id,
+          peerId: peer.socketId,
+          kind: producer.kind,
+          publicUserId: peer.user.public_user_id,
+        });
+      }
+    }
+    return producers;
+  }
+
   async createWebRtcTransport(params: {
     room: RoomState;
     peer: PeerState;
