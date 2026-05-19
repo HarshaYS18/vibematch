@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
@@ -23,6 +24,16 @@ class MediaUploadApiService {
     return _upload(endpoint: '/media/vibes', file: file);
   }
 
+  Future<MediaUploadResult> uploadVibeMediaXFile(XFile file) async {
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) throw Exception('Selected media is empty.');
+    return _uploadBytes(
+      endpoint: '/media/vibes',
+      bytes: bytes,
+      filename: _safeFilename(file.name),
+    );
+  }
+
   Future<MediaUploadResult> _upload({required String endpoint, required File file}) async {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -40,6 +51,31 @@ class MediaUploadApiService {
     }
 
     return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<MediaUploadResult> _uploadBytes({required String endpoint, required List<int> bytes, required String filename}) async {
+    final token = authApiService.cachedAccessToken;
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Please login again before uploading media.');
+    }
+
+    final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpoint)))
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Media upload failed (${response.statusCode}): ${response.body}');
+    }
+
+    return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  String _safeFilename(String raw) {
+    final cleaned = raw.trim().replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    if (cleaned.isEmpty) return 'funkey_vibe_media.jpg';
+    return cleaned.contains('.') ? cleaned : '$cleaned.jpg';
   }
 }
 
