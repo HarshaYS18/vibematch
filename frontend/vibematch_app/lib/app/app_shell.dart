@@ -44,6 +44,7 @@ class _AppShellState extends State<AppShell> {
   int _homeRefreshNonce = 0;
   int _backPressCount = 0;
   Timer? _backPressResetTimer;
+  bool _sessionLogoutInFlight = false;
 
   CurrentUser get _activeUser => _syncedUser;
 
@@ -100,8 +101,15 @@ class _AppShellState extends State<AppShell> {
   Future<void> _sendPresenceHeartbeat() async {
     try {
       await _presenceApi.heartbeat();
-    } catch (_) {
-      // Heartbeat should never block app navigation. Auth/API errors are handled elsewhere.
+    } catch (error) {
+      final message = error.toString().toLowerCase();
+      final sessionInvalid =
+          message.contains('session replaced') ||
+          message.contains('invalid or expired token') ||
+          message.contains('please login again');
+      if (!sessionInvalid || _sessionLogoutInFlight) return;
+      _sessionLogoutInFlight = true;
+      await widget.onLogoutPressed();
     }
   }
 

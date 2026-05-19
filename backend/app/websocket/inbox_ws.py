@@ -7,10 +7,24 @@ class InboxWebSocketManager:
         self._staff_user_ids: set[int] = set()
 
     async def connect(self, user_id: int, websocket: WebSocket, is_staff: bool = False) -> None:
+        await self.disconnect_existing_user(user_id, reason="inbox_session_replaced")
         await websocket.accept()
         self._connections.setdefault(user_id, set()).add(websocket)
         if is_staff:
             self._staff_user_ids.add(user_id)
+
+    async def disconnect_existing_user(self, user_id: int, reason: str = "session_replaced") -> None:
+        sockets = list(self._connections.get(user_id, set()))
+        for socket in sockets:
+            try:
+                await socket.send_json({"event": "session_replaced", "reason": reason})
+            except Exception:
+                pass
+            try:
+                await socket.close(code=4409)
+            except Exception:
+                pass
+            self.disconnect(user_id, socket)
 
     def disconnect(self, user_id: int, websocket: WebSocket) -> None:
         sockets = self._connections.get(user_id)

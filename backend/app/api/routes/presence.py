@@ -16,6 +16,7 @@ from app.schemas.presence import (
     PresenceResponse,
     RoomPresenceEnterRequest,
 )
+from app.services.rooms.room_service import close_other_active_room_sessions
 
 router = APIRouter(prefix="/presence", tags=["Presence"])
 
@@ -92,30 +93,7 @@ def _sync_room_discovery_state(
 
 
 def _close_other_active_room_presence(db: Session, user_id: int, except_room_public_id: str | None = None) -> None:
-    active_items = (
-        db.query(UserRoomPresence)
-        .filter(
-            UserRoomPresence.user_id == user_id,
-            UserRoomPresence.is_active.is_(True),
-        )
-        .all()
-    )
-    now = _now()
-    changed_room_ids: set[str] = set()
-    for item in active_items:
-        if except_room_public_id is not None and item.room_public_id == except_room_public_id:
-            continue
-        item.is_active = False
-        item.left_at = now
-        changed_room_ids.add(item.room_public_id)
-
-    for room_public_id in changed_room_ids:
-        room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
-        if room is None:
-            continue
-        room.online_count = _active_room_count(db, room_public_id)
-        room.updated_at = now
-        db.add(room)
+    close_other_active_room_sessions(db, user_id, except_room_public_id=except_room_public_id)
 
 
 def _presence_payload(user: User, room: UserRoomPresence | None, viewer: User | None = None) -> PresenceResponse:

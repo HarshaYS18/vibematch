@@ -34,6 +34,11 @@ class InboxSocketService {
           if (raw is! String) return;
           final decoded = jsonDecode(raw);
           if (decoded is Map<String, dynamic>) {
+            if (decoded['event'] == 'session_replaced') {
+              unawaited(_authApiService.logout());
+              disconnect();
+              return;
+            }
             onEvent(decoded);
           }
         },

@@ -88,6 +88,7 @@ class RoomJoinResponse(BaseModel):
     participants: list[RoomParticipantUserResponse] = Field(default_factory=list)
     joined_user: RoomParticipantUserResponse | None = None
     should_show_entered_message: bool = False
+    closed_room_ids: list[str] = Field(default_factory=list)
 
 
 class RoomLeaveResponse(BaseModel):

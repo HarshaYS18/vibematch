@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.room import Room, RoomMode
@@ -11,7 +12,7 @@ from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, R
 from app.models.user import User
 from app.services.permissions import room_permission_service
 from app.services.rooms.room_kickout_service import create_room_kickout_for_user, deactivate_room_user_for_kickout
-from app.services.rooms.room_service import assert_room_entry_allowed
+from app.services.rooms.room_service import assert_room_entry_allowed, close_other_active_room_sessions, deactivate_user_in_room, mark_user_room_presence_active, user_has_active_room_conflict
 from app.services.rooms.room_state_service import ensure_room_seats, normalize_layout, room_sequence, room_snapshot, seat_count_for_layout
 
 SEAT_APPLICATION_EXPIRY_SECONDS = 20
@@ -186,38 +187,35 @@ def _seat_application_cooldown_remaining(db: Session, room: Room, user: User) ->
 
 def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     assert_room_entry_allowed(db, room, user, lock_password=str((payload or {}).get("lock_password") or "") or None)
+    closed_room_ids = close_other_active_room_sessions(db, user.id, except_room_public_id=room.room_public_id)
     participant = _ensure_room_participant(db, room, user, payload)
+    mark_user_room_presence_active(db, room, user)
     _auto_place_host_admin_if_needed(db, room, user, participant)
     record_room_event(db, room, "room.joined", actor_user_id=user.id, payload={**(payload or {}), "is_stealth": participant.is_stealth})
     db.flush()
-    return room_snapshot(db, room)
+    snapshot = room_snapshot(db, room)
+    if closed_room_ids:
+        snapshot["_closed_room_ids"] = sorted(closed_room_ids)
+    return snapshot
 
 
 def heartbeat_room(db: Session, room: Room, user: User) -> dict[str, Any]:
     assert_room_entry_allowed(db, room, user)
+    if user_has_active_room_conflict(db, user.id, room.room_public_id):
+        deactivate_user_in_room(db, room, user.id)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account is already active in another chatroom")
     participant = _room_participant(db, room, user)
     if participant:
         participant.is_active = True
         participant.last_seen_at = datetime.utcnow()
         participant.left_at = None
+        mark_user_room_presence_active(db, room, user)
     db.flush()
     return room_snapshot(db, room, include_chat=False)
 
 
 def leave_room(db: Session, room: Room, user: User, release_seat: bool = False) -> dict[str, Any]:
-    now = datetime.utcnow()
-    participant = _room_participant(db, room, user)
-    if participant:
-        participant.is_active = False
-        participant.left_at = now
-        participant.last_seen_at = now
-    if release_seat:
-        for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == user.id).all():
-            seat.occupant_user_id = None
-            seat.mic_enabled = False
-            seat.admin_muted = False
-            seat.left_at = now
-            seat.updated_by_user_id = user.id
+    deactivate_user_in_room(db, room, user.id, release_seats=release_seat)
     record_room_event(db, room, "room.left", actor_user_id=user.id, payload={"release_seat": release_seat})
     db.flush()
     return room_snapshot(db, room)

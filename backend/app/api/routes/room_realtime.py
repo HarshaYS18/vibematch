@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.orm import Session
 from starlette.websockets import WebSocketState
 
@@ -295,6 +295,12 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                 if event_type == "room/join":
                     try:
                         snapshot = room_action_service.join_room(db, room, user, payload) if user is not None else room_state_service.room_snapshot(db, room)
+                        closed_room_ids = list(snapshot.pop("_closed_room_ids", []) or []) if isinstance(snapshot, dict) else []
+                        closed_room_snapshots: dict[str, dict[str, Any]] = {}
+                        for closed_room_id in closed_room_ids:
+                            closed_room = room_state_service.get_room_by_public_id(db, str(closed_room_id))
+                            if closed_room is not None:
+                                closed_room_snapshots[str(closed_room_id)] = room_state_service.room_snapshot(db, closed_room)
                         db.commit()
                     except HTTPException as exc:
                         db.rollback()
@@ -310,6 +316,21 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                             },
                         )
                         continue
+                    if user is not None:
+                        for closed_room_id, closed_snapshot in closed_room_snapshots.items():
+                            await room_realtime_connections.broadcast_room(
+                                closed_room_id,
+                                _event_payload(
+                                    "room/peer_left",
+                                    closed_room_id,
+                                    closed_snapshot,
+                                    {
+                                        "target_user_id": user.id,
+                                        "target_public_user_id": user.public_user_id,
+                                        "reason": "joined_another_room",
+                                    },
+                                ),
+                            )
                     if not _snapshot_user_is_stealth(snapshot, user):
                         await _broadcast_snapshot(room_id, "room/joined", snapshot)
                         if user is not None:
@@ -328,7 +349,10 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         snapshot = room_action_service.heartbeat_room(db, room, user) if user is not None else room_state_service.room_snapshot(db, room, include_chat=False)
                         db.commit()
                     except HTTPException as exc:
-                        db.rollback()
+                        if exc.status_code == status.HTTP_409_CONFLICT:
+                            db.commit()
+                        else:
+                            db.rollback()
                         await room_realtime_connections.send_json(
                             websocket,
                             {

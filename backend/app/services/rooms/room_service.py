@@ -345,6 +345,152 @@ def _refresh_room_online_count(db: Session, room: Room) -> int:
     return count
 
 
+def deactivate_user_in_room(
+    db: Session,
+    room: Room,
+    user_id: int,
+    *,
+    release_seats: bool = True,
+    now: datetime | None = None,
+) -> None:
+    now = now or datetime.utcnow()
+    participant = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user_id).first()
+    if participant is not None:
+        participant.is_active = False
+        participant.left_at = now
+        participant.last_seen_at = now
+    db.query(UserRoomPresence).filter(
+        UserRoomPresence.room_public_id == room.room_public_id,
+        UserRoomPresence.user_id == user_id,
+        UserRoomPresence.is_active.is_(True),
+    ).update(
+        {UserRoomPresence.is_active: False, UserRoomPresence.left_at: now, UserRoomPresence.last_heartbeat_at: now},
+        synchronize_session=False,
+    )
+    if release_seats:
+        for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == user_id).all():
+            seat.occupant_user_id = None
+            seat.mic_enabled = False
+            seat.admin_muted = False
+            seat.left_at = now
+            seat.updated_by_user_id = user_id
+    _refresh_room_online_count(db, room)
+    db.flush()
+
+
+def close_other_active_room_sessions(db: Session, user_id: int, except_room_public_id: str | None = None) -> set[str]:
+    now = datetime.utcnow()
+    changed_room_ids: set[str] = set()
+    room_ids: set[int] = set()
+
+    active_participants = (
+        db.query(RoomParticipant)
+        .join(Room, Room.id == RoomParticipant.room_id)
+        .filter(RoomParticipant.user_id == user_id, RoomParticipant.is_active.is_(True))
+        .all()
+    )
+    for participant in active_participants:
+        room = participant.room
+        if room is None:
+            continue
+        if except_room_public_id is not None and room.room_public_id == except_room_public_id:
+            continue
+        participant.is_active = False
+        participant.left_at = now
+        participant.last_seen_at = now
+        changed_room_ids.add(room.room_public_id)
+        room_ids.add(room.id)
+
+    active_presence = (
+        db.query(UserRoomPresence)
+        .filter(UserRoomPresence.user_id == user_id, UserRoomPresence.is_active.is_(True))
+        .all()
+    )
+    for presence in active_presence:
+        if except_room_public_id is not None and presence.room_public_id == except_room_public_id:
+            continue
+        presence.is_active = False
+        presence.left_at = now
+        presence.last_heartbeat_at = now
+        changed_room_ids.add(presence.room_public_id)
+
+    if room_ids:
+        for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id.in_(room_ids), RoomSeatState.occupant_user_id == user_id).all():
+            seat.occupant_user_id = None
+            seat.mic_enabled = False
+            seat.admin_muted = False
+            seat.left_at = now
+            seat.updated_by_user_id = user_id
+
+    for room_public_id in changed_room_ids:
+        room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+        if room is not None:
+            _refresh_room_online_count(db, room)
+
+    db.flush()
+    return changed_room_ids
+
+
+def user_has_active_room_conflict(db: Session, user_id: int, room_public_id: str) -> bool:
+    cutoff = datetime.utcnow() - _ACTIVE_PARTICIPANT_WINDOW
+    active_participant = (
+        db.query(RoomParticipant.id)
+        .join(Room, Room.id == RoomParticipant.room_id)
+        .filter(
+            RoomParticipant.user_id == user_id,
+            RoomParticipant.is_active.is_(True),
+            RoomParticipant.last_seen_at >= cutoff,
+            Room.room_public_id != room_public_id,
+        )
+        .first()
+    )
+    if active_participant is not None:
+        return True
+    active_presence = (
+        db.query(UserRoomPresence.id)
+        .filter(
+            UserRoomPresence.user_id == user_id,
+            UserRoomPresence.is_active.is_(True),
+            UserRoomPresence.last_heartbeat_at >= cutoff,
+            UserRoomPresence.room_public_id != room_public_id,
+        )
+        .first()
+    )
+    return active_presence is not None
+
+
+def mark_user_room_presence_active(db: Session, room: Room, user: User) -> None:
+    now = datetime.utcnow()
+    presence = (
+        db.query(UserRoomPresence)
+        .filter(
+            UserRoomPresence.user_id == user.id,
+            UserRoomPresence.room_public_id == room.room_public_id,
+            UserRoomPresence.is_active.is_(True),
+        )
+        .first()
+    )
+    if presence is None:
+        presence = UserRoomPresence(
+            user_id=user.id,
+            room_public_id=room.room_public_id,
+            room_name=room.name or "Live Room",
+            room_mode=room.mode,
+            is_secret=bool(room.is_secret),
+            is_active=True,
+            entered_at=now,
+            last_heartbeat_at=now,
+        )
+        db.add(presence)
+    else:
+        presence.room_name = room.name or presence.room_name
+        presence.room_mode = room.mode
+        presence.is_secret = bool(room.is_secret)
+        presence.last_heartbeat_at = now
+        presence.left_at = None
+    db.flush()
+
+
 def cleanup_stale_room_participants(db: Session) -> int:
     now = datetime.utcnow()
     cutoff = now - _ACTIVE_PARTICIPANT_WINDOW
@@ -482,16 +628,18 @@ def join_room(db: Session, room_public_id: str, current_user: User, lock_passwor
         return None
     assert_room_entry_allowed(db, room, current_user, lock_password=lock_password)
 
+    closed_room_ids = close_other_active_room_sessions(db, current_user.id, except_room_public_id=room.room_public_id)
     previous = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == current_user.id).first()
     was_active = previous.is_active if previous is not None else False
     participant = _upsert_active_participant(db, room, current_user)
+    mark_user_room_presence_active(db, room, current_user)
     _refresh_room_online_count(db, room)
     db.commit()
     db.refresh(room)
     db.refresh(participant)
     participants = roster_participants(db, room)
     db.commit()
-    return RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=not was_active)
+    return RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=not was_active, closed_room_ids=sorted(closed_room_ids))
 
 
 def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinResponse | None:
@@ -499,12 +647,17 @@ def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> Room
     if not room:
         return None
     assert_room_entry_allowed(db, room, current_user)
+    if user_has_active_room_conflict(db, current_user.id, room.room_public_id):
+        deactivate_user_in_room(db, room, current_user.id)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account is already active in another chatroom")
     participant = _existing_participant(db, room, current_user)
     if participant is None or not participant.is_active:
         participant = _upsert_active_participant(db, room, current_user)
     else:
         participant.last_seen_at = datetime.utcnow()
         current_user.last_seen_at = participant.last_seen_at
+    mark_user_room_presence_active(db, room, current_user)
     _refresh_room_online_count(db, room)
     db.commit()
     db.refresh(room)
@@ -518,26 +671,8 @@ def leave_room(db: Session, room_public_id: str, current_user: User) -> RoomLeav
     if not room:
         return None
     now = datetime.utcnow()
-    participant = _existing_participant(db, room, current_user)
-    if participant is not None:
-        participant.is_active = False
-        participant.left_at = now
-        participant.last_seen_at = now
-    db.query(UserRoomPresence).filter(
-        UserRoomPresence.room_public_id == room.room_public_id,
-        UserRoomPresence.user_id == current_user.id,
-        UserRoomPresence.is_active.is_(True),
-    ).update(
-        {UserRoomPresence.is_active: False, UserRoomPresence.left_at: now, UserRoomPresence.last_heartbeat_at: now},
-        synchronize_session=False,
-    )
-    for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == current_user.id).all():
-        seat.occupant_user_id = None
-        seat.mic_enabled = False
-        seat.admin_muted = False
-        seat.left_at = now
-        seat.updated_by_user_id = current_user.id
-    count = _refresh_room_online_count(db, room)
+    deactivate_user_in_room(db, room, current_user.id, now=now)
+    count = int(room.online_count or 0)
     db.commit()
     return RoomLeaveResponse(room_id=room.room_public_id, online_count=count, left=True)
 

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token
+from app.api.routes.users import get_current_user_from_token
 from app.database import get_db
 from app.models.role import RoleName
 from app.models.user import User
@@ -12,13 +12,10 @@ router = APIRouter(tags=["Inbox WebSocket"])
 
 
 async def _user_from_token(token: str, db: Session) -> User | None:
-    payload = decode_access_token(token)
-    if not payload:
+    try:
+        return get_current_user_from_token(db, token)
+    except (HTTPException, ValueError):
         return None
-    user_id = payload.get("sub")
-    if not user_id:
-        return None
-    return db.query(User).filter(User.id == int(user_id)).first()
 
 
 def _is_staff_for_inbox(user: User) -> bool:

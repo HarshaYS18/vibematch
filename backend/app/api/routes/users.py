@@ -25,12 +25,7 @@ _ALLOWED_MARITAL = {"single", "married", "committed", "divorced"}
 _ALLOWED_MARITAL_PREFS = {"any", "single", "married", "committed", "divorced"}
 
 
-def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> User:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid Authorization header")
-    token = authorization.replace("Bearer ", "").strip()
+def get_current_user_from_token(db: Session, token: str) -> User:
     payload = decode_access_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -44,7 +39,20 @@ def get_current_user(authorization: str | None = Header(default=None), db: Sessi
         raise HTTPException(status_code=403, detail="User is banned")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User is inactive")
+    token_device_id = str(payload.get("device_id") or "").strip()
+    active_device_id = (user.last_device_id or "").strip()
+    if active_device_id and token_device_id != active_device_id:
+        raise HTTPException(status_code=401, detail="Session replaced by a newer login")
     return user
+
+
+def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> User:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+    token = authorization.replace("Bearer ", "").strip()
+    return get_current_user_from_token(db, token)
 
 
 def _clean_optional(value: str | None) -> str | None:

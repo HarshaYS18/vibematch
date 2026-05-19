@@ -32,11 +32,30 @@ class _AuthGateState extends State<AuthGate> {
   bool _needsProfileSetup = false;
   String? _error;
   CurrentUser? _currentUser;
+  StreamSubscription<void>? _signedOutSubscription;
 
   @override
   void initState() {
     super.initState();
+    _signedOutSubscription = AuthUserRealtimeService.instance.signedOut.listen(
+      (_) => _handleSessionSignedOut(),
+    );
     _checkSavedLogin();
+  }
+
+  @override
+  void dispose() {
+    _signedOutSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _handleSessionSignedOut() {
+    if (!mounted) return;
+    setState(() {
+      _currentUser = null;
+      _needsProfileSetup = false;
+      _error = 'Signed out because this account was opened on another device.';
+    });
   }
 
   Future<void> _checkSavedLogin() async {

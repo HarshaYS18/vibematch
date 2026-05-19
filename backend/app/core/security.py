@@ -31,7 +31,7 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(subject: str, expires_minutes: Optional[int] = None) -> str:
+def create_access_token(subject: str, expires_minutes: Optional[int] = None, device_id: str | None = None) -> str:
     expire_minutes = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
     expire = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
 
@@ -40,6 +40,8 @@ def create_access_token(subject: str, expires_minutes: Optional[int] = None) -> 
         "exp": expire,
         "type": "access",
     }
+    if device_id:
+        payload["device_id"] = device_id
 
     return jwt.encode(
         payload,

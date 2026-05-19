@@ -170,6 +170,28 @@ async def _broadcast_room_settings(room: Room, db: Session, extra: dict | None =
     )
 
 
+async def _broadcast_closed_room_sessions(db: Session, room_ids: list[str], user: User) -> None:
+    for room_id in room_ids:
+        room = db.query(Room).filter(Room.room_public_id == room_id, Room.is_active.is_(True)).first()
+        if room is None:
+            continue
+        snapshot = room_state_service.room_snapshot(db, room)
+        db.commit()
+        await room_realtime_connections.broadcast_room(
+            room_id,
+            {
+                "type": "room/peer_left",
+                "payload": {
+                    "room_id": room_id,
+                    "room": snapshot,
+                    "target_user_id": user.id,
+                    "target_public_user_id": user.public_user_id,
+                    "reason": "joined_another_room",
+                },
+            },
+        )
+
+
 @router.post("", response_model=RoomDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_live_room(payload: RoomCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return create_room(db=db, current_user=current_user, payload=payload)
@@ -348,10 +370,11 @@ def update_room_mode(room_public_id: str, payload: RoomModeUpdateRequest, db: Se
 
 
 @router.post("/{room_public_id}/join", response_model=RoomJoinResponse)
-def join_live_room(room_public_id: str, payload: RoomJoinRequest | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def join_live_room(room_public_id: str, payload: RoomJoinRequest | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     joined = join_room(db=db, room_public_id=room_public_id, current_user=current_user, lock_password=payload.lock_password if payload else None)
     if joined is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found or not accessible")
+    await _broadcast_closed_room_sessions(db, joined.closed_room_ids, current_user)
     return joined
 
 
