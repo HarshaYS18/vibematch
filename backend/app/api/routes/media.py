@@ -21,10 +21,23 @@ MAX_ROOM_AVATAR_BYTES = 10 * 1024 * 1024
 MAX_ROOM_COVER_BYTES = 10 * 1024 * 1024
 MAX_ROOM_BACKGROUND_BYTES = 15 * 1024 * 1024
 MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_CHAT_DOCUMENT_BYTES = 20 * 1024 * 1024
 MAX_HOME_BANNER_BYTES = 10 * 1024 * 1024
 MAX_VIBE_MEDIA_BYTES = 20 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
+ALLOWED_DOCUMENT_TYPES = {
+    "application/pdf",
+    "text/plain",
+    "text/csv",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/zip",
+}
 GENERIC_MULTIPART_TYPES = {"", "application/octet-stream", "text/plain"}
 
 
@@ -50,6 +63,16 @@ def _content_type_from_filename(filename: str) -> str | None:
         ".mp4": "video/mp4",
         ".webm": "video/webm",
         ".mov": "video/quicktime",
+        ".pdf": "application/pdf",
+        ".txt": "text/plain",
+        ".csv": "text/csv",
+        ".doc": "application/msword",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".xls": "application/vnd.ms-excel",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".ppt": "application/vnd.ms-powerpoint",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".zip": "application/zip",
     }.get(suffix)
 
 
@@ -73,7 +96,25 @@ def _safe_extension(filename: str, content_type: str) -> str:
         "video/mp4": ".mp4",
         "video/webm": ".webm",
         "video/quicktime": ".mov",
+        "application/pdf": ".pdf",
+        "text/plain": ".txt",
+        "text/csv": ".csv",
+        "application/msword": ".doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+        "application/vnd.ms-excel": ".xls",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+        "application/vnd.ms-powerpoint": ".ppt",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+        "application/zip": ".zip",
     }.get(content_type, ".bin")
+
+
+def _media_kind_from_content_type(content_type: str) -> str:
+    if content_type.startswith("video/"):
+        return "video"
+    if content_type.startswith("image/"):
+        return "image"
+    return "document"
 
 
 def _absolute_url(request: Request, path: str) -> str:
@@ -111,7 +152,7 @@ async def _save_upload(
     return (
         MediaUploadResponse(
             url=_absolute_url(request, public_path),
-            media_type="video" if content_type.startswith("video/") else "image",
+            media_type=_media_kind_from_content_type(content_type),
             content_type=content_type,
             size_bytes=size,
         ),
@@ -213,6 +254,13 @@ async def upload_home_banner(request: Request, file: UploadFile = File(...), cur
 @router.post("/chat-image", response_model=MediaUploadResponse)
 async def upload_chat_image(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     result, object_key = await _save_upload(file, folder=f"chat_images/user_{current_user.id}", max_size=MAX_CHAT_IMAGE_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
+    asset = cdn_media_service.register_uploaded_media(db, owner=current_user, media_type=CdnMediaType.INBOX_MEDIA, public_url=result.url, object_key=object_key, mime_type=result.content_type, size_bytes=result.size_bytes, linked_entity_type=CdnMediaLinkedEntityType.INBOX_MESSAGE)
+    return _with_asset(result, asset)
+
+
+@router.post("/chat-document", response_model=MediaUploadResponse)
+async def upload_chat_document(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    result, object_key = await _save_upload(file, folder=f"chat_documents/user_{current_user.id}", max_size=MAX_CHAT_DOCUMENT_BYTES, allowed_types=ALLOWED_DOCUMENT_TYPES, request=request)
     asset = cdn_media_service.register_uploaded_media(db, owner=current_user, media_type=CdnMediaType.INBOX_MEDIA, public_url=result.url, object_key=object_key, mime_type=result.content_type, size_bytes=result.size_bytes, linked_entity_type=CdnMediaLinkedEntityType.INBOX_MESSAGE)
     return _with_asset(result, asset)
 
