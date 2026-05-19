@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
+from app.models.cdn_media import CdnMediaLinkedEntityType
 from app.models.follow import UserFollow
 from app.models.inbox import InboxMessageType
 from app.models.user import User
@@ -31,7 +32,7 @@ from app.schemas.vibes import (
     VibeShareCreateRequest,
     VibeShareResponse,
 )
-from app.services import inbox_service, notification_service
+from app.services import cdn_media_service, inbox_service, notification_service
 
 router = APIRouter(prefix="/vibes", tags=["Vibes"])
 
@@ -251,6 +252,20 @@ def review_vibe_report(report_id: int, payload: VibeReportReviewRequest, db: Ses
     if payload.delete_post:
         report.post.is_deleted = True
         report.status = "ACTION_TAKEN"
+        cdn_media_service.link_media_to_entity(
+            db,
+            public_url=report.post.media_url,
+            linked_entity_type=CdnMediaLinkedEntityType.VIBES_POST,
+            linked_entity_id=str(report.post.id),
+        )
+        asset = cdn_media_service.link_media_to_entity(
+            db,
+            public_url=report.post.media_url,
+            linked_entity_type=CdnMediaLinkedEntityType.VIBES_POST,
+            linked_entity_id=str(report.post.id),
+        )
+        if asset:
+            cdn_media_service.mark_media_deleted(db, asset=asset, actor_user_id=current_user.id, reason="vibe_report_action_taken")
     db.commit()
     db.refresh(report)
     return VibeReportResponse(id=report.id, post_id=report.post_id, reason=report.reason, status=report.status, created_at=report.created_at)
@@ -265,6 +280,12 @@ def create_vibe(payload: VibePostCreateRequest, db: Session = Depends(get_db), c
     db.add(post)
     db.commit()
     db.refresh(post)
+    cdn_media_service.link_media_to_entity(
+        db,
+        public_url=post.media_url,
+        linked_entity_type=CdnMediaLinkedEntityType.VIBES_POST,
+        linked_entity_id=str(post.id),
+    )
     _send_vibe_notifications(db, post, current_user, normalized_mentions, payload.uses_mention_all)
     db.refresh(post)
     return _post_response(db, post, current_user)
@@ -403,6 +424,14 @@ def delete_vibe(post_id: int, db: Session = Depends(get_db), current_user: User 
     post = _get_visible_post_or_404(db, post_id)
     if post.author_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the author can delete this Vibe")
+    asset = cdn_media_service.link_media_to_entity(
+        db,
+        public_url=post.media_url,
+        linked_entity_type=CdnMediaLinkedEntityType.VIBES_POST,
+        linked_entity_id=str(post.id),
+    )
+    if asset:
+        cdn_media_service.mark_media_deleted(db, asset=asset, actor_user_id=current_user.id, reason="vibe_deleted_by_author")
     post.is_deleted = True
     db.commit()
     return VibeDeleteResponse(post_id=post_id, deleted=True)
