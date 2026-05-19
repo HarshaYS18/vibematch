@@ -96,6 +96,15 @@ async def _broadcast_message(conversation: InboxConversation, message, event: st
         )
 
 
+async def _broadcast_message_updates(conversation: InboxConversation, messages) -> None:
+    if not messages:
+        return
+    for message in messages:
+        await _broadcast_message(conversation, message, event="inbox_message_updated")
+
+
+
+
 async def _broadcast_report_task(report: InboxReport) -> None:
     payload = inbox_service.report_to_dict(report)
     await inbox_ws_manager.broadcast_all_staff({"event": "inbox_report_task_updated", "task": payload})
@@ -230,8 +239,15 @@ def owner_reset_lock_by_visible_id(request: InboxLockOwnerResetByIdentifierReque
 
 
 @router.get("/conversations", response_model=InboxConversationListResponse)
-def list_my_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def list_my_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     conversations = inbox_service.list_conversations(db, current_user)
+    delivered_by_conversation: dict[int, list] = {}
+    for conversation in conversations:
+        delivered = inbox_service.mark_messages_delivered_for_user(db, conversation, current_user)
+        if delivered:
+            delivered_by_conversation[conversation.id] = delivered
+    for conversation in conversations:
+        await _broadcast_message_updates(conversation, delivered_by_conversation.get(conversation.id, []))
     return InboxConversationListResponse(conversations=[InboxConversationResponse(**_conversation_payload(item, current_user)) for item in conversations])
 
 
@@ -274,10 +290,12 @@ async def send_room_invite_by_public_id(public_user_id: int, request: InboxRoomI
 
 
 @router.get("/conversations/{conversation_id}", response_model=InboxConversationResponse)
-def get_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def get_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    read_updates = inbox_service.mark_messages_read_for_user(db, conversation, current_user)
+    await _broadcast_message_updates(conversation, read_updates)
     return InboxConversationResponse(**_conversation_payload(conversation, current_user))
 
 

@@ -58,6 +58,9 @@ class _InboxChatPageState extends State<InboxChatPage> {
     super.initState();
     widget.controller.markConversationRead(widget.conversation.id);
     widget.controller.addListener(_handleChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(widget.controller.openConversationFromBackend(widget.conversation.id));
+    });
   }
 
   @override

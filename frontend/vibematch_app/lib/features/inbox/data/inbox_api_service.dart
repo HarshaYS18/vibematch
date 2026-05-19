@@ -148,6 +148,17 @@ class InboxApiService {
         .toList();
   }
 
+  Future<InboxConversation> getConversation(String conversationId) async {
+    final response = await http.get(
+      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId')),
+      headers: await _headers(),
+    );
+    _throwIfFailed(response, 'load conversation');
+    return conversationFromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
   Future<InboxConversation> createDirectConversation({
     required int targetUserId,
   }) async {

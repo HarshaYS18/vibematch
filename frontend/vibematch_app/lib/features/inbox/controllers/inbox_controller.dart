@@ -319,6 +319,16 @@ class InboxController extends ChangeNotifier {
     return null;
   }
 
+  Future<void> openConversationFromBackend(String conversationId) async {
+    try {
+      final updated = await _apiService.getConversation(conversationId);
+      _upsertConversation(updated);
+      notifyListeners();
+    } catch (_) {
+      markConversationRead(conversationId);
+    }
+  }
+
   void markConversationRead(String conversationId) {
     _activeConversationId = conversationId;
     _setConversationUnread(conversationId, 0);

@@ -355,8 +355,6 @@ def apply_monitor_action(db: Session, report: InboxReport, action_label: str) ->
 
 
 def _chat_streak_participant_user_ids(conversation: InboxConversation) -> set[int]:
-    if conversation.conversation_type != InboxConversationType.CHAT.value:
-        return set()
     if conversation.is_official:
         return set()
     return {
@@ -364,6 +362,15 @@ def _chat_streak_participant_user_ids(conversation: InboxConversation) -> set[in
         for participant in conversation.participants
         if participant.user_id is not None
     }
+
+
+def _chat_streak_day(value: datetime):
+    # Current app-local day basis. Later this should use each user's saved timezone.
+    return (value + timedelta(hours=5, minutes=30)).date()
+
+
+def _chat_streak_today():
+    return _chat_streak_day(datetime.utcnow())
 
 
 def _two_way_streak_days(
@@ -380,7 +387,7 @@ def _two_way_streak_days(
             continue
         if message.sender_user_id not in participant_ids:
             continue
-        day = message.created_at.date()
+        day = _chat_streak_day(message.created_at)
         senders_by_day.setdefault(day, set()).add(message.sender_user_id)
 
     return sorted(
@@ -394,7 +401,7 @@ def _chat_streak_count(conversation: InboxConversation, messages: list[InboxMess
     if not two_way_days:
         return 0
 
-    today = datetime.utcnow().date()
+    today = _chat_streak_today()
     latest_day = two_way_days[0]
     if latest_day < today - timedelta(days=1):
         return 0
@@ -412,8 +419,61 @@ def _chat_streak_count(conversation: InboxConversation, messages: list[InboxMess
 
 
 def _chat_streak_active_today(conversation: InboxConversation, messages: list[InboxMessage]) -> bool:
-    today = datetime.utcnow().date()
-    return today in _two_way_streak_days(conversation, messages)
+    return _chat_streak_today() in _two_way_streak_days(conversation, messages)
+
+
+def mark_messages_delivered_for_user(
+    db: Session,
+    conversation: InboxConversation,
+    user: User,
+) -> list[InboxMessage]:
+    changed: list[InboxMessage] = []
+    for message in conversation.messages:
+        if message.sender_user_id is None:
+            continue
+        if message.sender_user_id == user.id:
+            continue
+        if message.status == InboxMessageStatus.SENT.value:
+            message.status = InboxMessageStatus.DELIVERED.value
+            changed.append(message)
+    if changed:
+        db.commit()
+        for message in changed:
+            db.refresh(message)
+    return changed
+
+
+def mark_messages_read_for_user(
+    db: Session,
+    conversation: InboxConversation,
+    user: User,
+) -> list[InboxMessage]:
+    changed: list[InboxMessage] = []
+    latest_message_id: int | None = None
+
+    for message in conversation.messages:
+        latest_message_id = message.id
+        if message.sender_user_id is None:
+            continue
+        if message.sender_user_id == user.id:
+            continue
+        if message.status != InboxMessageStatus.READ.value:
+            message.status = InboxMessageStatus.READ.value
+            changed.append(message)
+
+    participant = next((item for item in conversation.participants if item.user_id == user.id), None)
+    if participant is not None:
+        participant.unread_count = 0
+        participant.last_read_message_id = latest_message_id
+
+    if changed or participant is not None:
+        db.commit()
+        for message in changed:
+            db.refresh(message)
+
+    return changed
+
+
 
 
 def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
