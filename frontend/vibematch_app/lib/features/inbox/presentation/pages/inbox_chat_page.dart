@@ -37,6 +37,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
   final InboxApiService _inboxApi = InboxApiService();
   String? _replyToText;
   bool _sendingImage = false;
+  bool _sendingDocument = false;
 
   InboxConversation get _conversation => widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
 
@@ -137,20 +138,71 @@ class _InboxChatPageState extends State<InboxChatPage> {
   }
 
   Future<void> _pickDocumentAttachment() async {
-    if (_readOnly) return;
+    if (_readOnly || _sendingDocument) return;
     try {
-      final result = await FilePicker.platform.pickFiles(allowMultiple: false, type: FileType.any, withData: false, withReadStream: false);
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip'],
+        withData: true,
+        withReadStream: false,
+      );
       final file = result?.files.single;
       if (file == null) return;
-      widget.controller.addPickedDocumentAttachment(
-        conversationId: _conversation.id,
-        fileName: file.name,
-        sizeBytes: file.size,
-        filePath: file.path,
+
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _showToast('Could not read selected document.');
+        return;
+      }
+      if (bytes.length > 20 * 1024 * 1024) {
+        _showToast('Inbox document must be 20 MB or smaller.');
+        return;
+      }
+
+      setState(() => _sendingDocument = true);
+      _showToast('Uploading document...');
+
+      final uploaded = await _mediaUploadApi.uploadChatDocumentBytes(
+        bytes: bytes,
+        filename: file.name,
       );
-    } catch (_) {
-      _showToast('Document picker failed. Please try again.');
+      if (uploaded.url.trim().isEmpty) {
+        throw Exception('Upload completed without document URL.');
+      }
+
+      final sizeLabel = _formatAttachmentBytes(bytes.length);
+      await _inboxApi.sendMessage(
+        conversationId: _conversation.id,
+        text: '📄 ${file.name} • $sizeLabel',
+        type: 'document',
+        attachmentUrl: uploaded.url,
+      );
+
+      await widget.controller.loadFromBackend();
+      if (mounted) _showToast('Document sent.');
+    } catch (error) {
+      if (mounted) _showToast(_friendlyDocumentError(error));
+    } finally {
+      if (mounted) setState(() => _sendingDocument = false);
     }
+  }
+
+  String _formatAttachmentBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(kb >= 100 ? 0 : 1)} KB';
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB';
+  }
+
+  String _friendlyDocumentError(Object error) {
+    final raw = error.toString().replaceFirst('Exception: ', '').trim();
+    if (raw.contains('413')) return 'Document is too large. Choose a file under 20 MB.';
+    if (raw.contains('401') || raw.toLowerCase().contains('login')) return 'Session expired. Login again before sending document.';
+    if (raw.contains('400') && raw.toLowerCase().contains('unsupported')) return 'Unsupported document type. Use PDF, TXT, CSV, Word, Excel, PowerPoint, or ZIP.';
+    if (raw.toLowerCase().contains('failed to fetch') || raw.toLowerCase().contains('xmlhttprequest')) return 'Upload failed. Check FastAPI is running and try again.';
+    return raw.isEmpty ? 'Document send failed. Please try again.' : raw;
   }
 
 
