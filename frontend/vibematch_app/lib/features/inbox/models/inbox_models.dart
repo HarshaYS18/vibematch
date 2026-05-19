@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/communication/vm_communication_models.dart';
+
 enum InboxConversationType {
   official('Official'),
   chat('Chat'),
   roomInvite('Room Invite'),
-  stranger('Stranger');
+  stranger('Stranger'),
+  group('Group'),
+  storyReply('Story Reply'),
+  callLog('Call');
 
   const InboxConversationType(this.label);
 
@@ -50,6 +55,8 @@ enum InboxMessageType {
   roomInvite,
   relationshipRequest,
   system,
+  storyReply,
+  callLog,
 }
 
 enum InboxMessageStatus { sending, sent, delivered, read, failed }
@@ -191,11 +198,14 @@ class InboxConversation {
     this.avatarUrl,
     this.currentRoomName,
     this.currentRoomId,
+    this.roomPresence = const VmRoomPresenceSnapshot(),
     this.isLockedByBackend = false,
     this.isBlocked = false,
     this.isMuted = false,
     this.isPinned = false,
     this.isArchived = false,
+    this.isStrangerHub = false,
+    this.requestCount = 0,
   });
 
   final String id;
@@ -212,18 +222,35 @@ class InboxConversation {
   final List<InboxMessage> messages;
   final String? currentRoomName;
   final String? currentRoomId;
+  final VmRoomPresenceSnapshot roomPresence;
   final bool isLockedByBackend;
   final bool isBlocked;
   final bool isMuted;
   final bool isPinned;
   final bool isArchived;
+  final bool isStrangerHub;
+  final int requestCount;
 
   bool get isOfficial => type == InboxConversationType.official;
   bool get isStranger => type == InboxConversationType.stranger;
   bool get isRoomInvite => type == InboxConversationType.roomInvite;
-  bool get isMutualFollowChat =>
-      type == InboxConversationType.chat && !isStranger;
+  bool get isGroup => type == InboxConversationType.group;
+  bool get isStoryReply => type == InboxConversationType.storyReply;
+  bool get isCallLog => type == InboxConversationType.callLog;
+  bool get isMutualFollowChat => type == InboxConversationType.chat && !isStranger;
   bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+
+  String get safePresenceText {
+    final roomStatus = roomPresence.safeRoomStatusText;
+    if (roomStatus != null) return roomStatus;
+    return lastSeenText;
+  }
+
+  String get listPreviewText {
+    if (isLockedByBackend) return 'Locked chat • tap to unlock';
+    if (isStrangerHub) return '$requestCount message request${requestCount == 1 ? '' : 's'} waiting';
+    return subtitle;
+  }
 
   InboxConversation copyWith({
     String? title,
@@ -239,11 +266,14 @@ class InboxConversation {
     List<InboxMessage>? messages,
     String? currentRoomName,
     String? currentRoomId,
+    VmRoomPresenceSnapshot? roomPresence,
     bool? isLockedByBackend,
     bool? isBlocked,
     bool? isMuted,
     bool? isPinned,
     bool? isArchived,
+    bool? isStrangerHub,
+    int? requestCount,
   }) {
     return InboxConversation(
       id: id,
@@ -260,11 +290,14 @@ class InboxConversation {
       messages: messages ?? this.messages,
       currentRoomName: currentRoomName ?? this.currentRoomName,
       currentRoomId: currentRoomId ?? this.currentRoomId,
+      roomPresence: roomPresence ?? this.roomPresence,
       isLockedByBackend: isLockedByBackend ?? this.isLockedByBackend,
       isBlocked: isBlocked ?? this.isBlocked,
       isMuted: isMuted ?? this.isMuted,
       isPinned: isPinned ?? this.isPinned,
       isArchived: isArchived ?? this.isArchived,
+      isStrangerHub: isStrangerHub ?? this.isStrangerHub,
+      requestCount: requestCount ?? this.requestCount,
     );
   }
 }
@@ -312,6 +345,7 @@ class InboxMessage {
       type == InboxMessageType.roomInvite;
   bool get isLoveBondRequest =>
       loveBondRequestId != null || type == InboxMessageType.relationshipRequest;
+  bool get isSystem => type == InboxMessageType.system;
 
   InboxMessage copyWith({
     String? id,
