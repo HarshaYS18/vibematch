@@ -41,6 +41,8 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   String? _uploadedMediaUrl;
   String? _selectedMediaName;
   int? _selectedMediaBytes;
+  String? _uploadErrorMessage;
+  String? _postingStatusText;
 
   bool get _isTextMode => _selectedType == VibeMediaType.text;
   bool get _isMediaMode => !_isTextMode;
@@ -76,11 +78,24 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
       ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF111015)));
   }
 
+  String _friendlyError(Object error) {
+    final raw = error.toString().replaceFirst('Exception: ', '').trim();
+    if (raw.contains('413')) return 'This file is too large. Choose media under 20 MB.';
+    if (raw.contains('401') || raw.toLowerCase().contains('login')) return 'Session expired. Login again before posting.';
+    if (raw.contains('400') && raw.toLowerCase().contains('unsupported')) return 'Unsupported media type. Choose JPG, PNG, WEBP, GIF, MP4, WEBM, or MOV.';
+    if (raw.toLowerCase().contains('failed to fetch') || raw.toLowerCase().contains('xmlhttprequest')) return 'Upload failed. Check FastAPI is running and try again.';
+    return raw.isEmpty ? 'Something went wrong. Please try again.' : raw;
+  }
+
   Future<void> _pickMedia() async {
     if (_isTextMode || _pickingMedia || _uploadingMedia || _publishing) return;
     final sourceType = await _openMediaSourceSheet();
     if (sourceType == null || !mounted) return;
-    setState(() => _pickingMedia = true);
+    setState(() {
+      _pickingMedia = true;
+      _uploadErrorMessage = null;
+      _postingStatusText = null;
+    });
     try {
       final picked = sourceType == VibeMediaType.video ? await _picker.pickVideo(source: ImageSource.gallery) : await _picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
       if (picked == null) return;
@@ -101,9 +116,13 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
         _uploadedMediaUrl = null;
         _selectedMediaName = picked.name;
         _selectedMediaBytes = size;
+        _uploadErrorMessage = null;
+        _postingStatusText = null;
       });
     } catch (error) {
-      _showAction(error.toString().replaceFirst('Exception: ', ''));
+      final message = _friendlyError(error);
+      setState(() => _uploadErrorMessage = message);
+      _showAction(message);
     } finally {
       if (mounted) setState(() => _pickingMedia = false);
     }
@@ -121,12 +140,30 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
     final file = _selectedMediaFile;
     if (_isTextMode || file == null) return null;
     if (_uploadedMediaUrl != null && _uploadedMediaUrl!.trim().isNotEmpty) return _uploadedMediaUrl;
-    setState(() => _uploadingMedia = true);
+    setState(() {
+      _uploadingMedia = true;
+      _uploadErrorMessage = null;
+      _postingStatusText = 'Uploading media...';
+    });
     try {
       final result = await _uploadApi.uploadVibeMediaXFile(file);
       if (result.url.trim().isEmpty) throw Exception('Upload completed without a media URL.');
-      if (mounted) setState(() => _uploadedMediaUrl = result.url);
+      if (mounted) {
+        setState(() {
+          _uploadedMediaUrl = result.url;
+          _postingStatusText = 'Media uploaded. Publishing Vibe...';
+        });
+      }
       return result.url;
+    } catch (error) {
+      final message = _friendlyError(error);
+      if (mounted) {
+        setState(() {
+          _uploadErrorMessage = message;
+          _postingStatusText = null;
+        });
+      }
+      rethrow;
     } finally {
       if (mounted) setState(() => _uploadingMedia = false);
     }
@@ -138,9 +175,14 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
     if (_captionController.usesMentionAll && !widget.canUseMentionAllToday) return _showAction('@all is limited to 2 posts per day.');
     if (_isMediaMode && _selectedMediaFile == null) return _showAction('Choose photo or video before sharing.');
     if (_publishing || _uploadingMedia) return;
-    setState(() => _publishing = true);
+    setState(() {
+      _publishing = true;
+      _uploadErrorMessage = null;
+      _postingStatusText = _isMediaMode ? 'Preparing upload...' : 'Publishing Vibe...';
+    });
     try {
       final mediaUrl = await _uploadSelectedMediaIfNeeded();
+      if (mounted) setState(() => _postingStatusText = 'Publishing Vibe...');
       final currentUser = _authApi.cachedUser;
       final visibleName = currentUser?.displayName?.trim().isNotEmpty == true
           ? currentUser!.displayName!.trim()
@@ -168,7 +210,14 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
       ));
       if (mounted) Navigator.pop(context);
     } catch (error) {
-      if (mounted) _showAction(error.toString().replaceFirst('Exception: ', ''));
+      final message = _friendlyError(error);
+      if (mounted) {
+        setState(() {
+          _uploadErrorMessage = message;
+          _postingStatusText = null;
+        });
+        _showAction(message);
+      }
     } finally {
       if (mounted) setState(() => _publishing = false);
     }
@@ -189,6 +238,8 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
         _uploadedMediaUrl = null;
         _selectedMediaName = null;
         _selectedMediaBytes = null;
+        _uploadErrorMessage = null;
+        _postingStatusText = null;
       }
     });
   }
@@ -200,6 +251,8 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
       _uploadedMediaUrl = null;
       _selectedMediaName = null;
       _selectedMediaBytes = null;
+      _uploadErrorMessage = null;
+      _postingStatusText = null;
       if (_selectedType != VibeMediaType.text) _selectedType = VibeMediaType.photo;
     });
   }
@@ -213,7 +266,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
         backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.white,
-        leading: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Color(0xFF111015), size: 28)),
+        leading: IconButton(onPressed: busy ? null : () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Color(0xFF111015), size: 28)),
         title: const Text('New Vibe', style: TextStyle(color: Color(0xFF111015), fontSize: 18, fontWeight: FontWeight.w900)),
         actions: [
           TextButton(
@@ -231,7 +284,7 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 26),
           children: [
-            CreateVibeTypeTabs(selectedMode: _isTextMode ? CreateVibeMode.text : CreateVibeMode.media, onSelected: _selectMode),
+            CreateVibeTypeTabs(selectedMode: _isTextMode ? CreateVibeMode.text : CreateVibeMode.media, onSelected: busy ? (_) {} : _selectMode),
             CreateVibeMediaPicker(
               type: _selectedType,
               selectedFile: _selectedMediaFile,
@@ -244,14 +297,20 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
               onTap: () => unawaited(_pickMedia()),
               onClear: _clearMedia,
             ),
-            CreateVibeCaptionBox(controller: _captionController, commentsEnabled: _commentsEnabled, onToggleComments: () => setState(() => _commentsEnabled = !_commentsEnabled)),
+            if (_postingStatusText != null || _uploadErrorMessage != null)
+              CreateVibeStatusBanner(
+                message: _uploadErrorMessage ?? _postingStatusText ?? '',
+                isError: _uploadErrorMessage != null,
+                onRetry: _uploadErrorMessage != null && _isMediaMode && _selectedMediaFile != null && !busy ? () => unawaited(_publish()) : null,
+              ),
+            CreateVibeCaptionBox(controller: _captionController, commentsEnabled: _commentsEnabled, onToggleComments: busy ? () {} : () => setState(() => _commentsEnabled = !_commentsEnabled)),
             if (_captionController.hasMentionTrigger)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: SocialMentionPicker(query: _captionController.activeMentionQuery, onSelected: (user) => setState(() => _captionController.insertMention(user.username))),
               ),
             CreateVibeMentionRow(usesMentionAll: _captionController.usesMentionAll, mentions: _captionController.validMentions, commentsEnabled: _commentsEnabled, canUseMentionAllToday: widget.canUseMentionAllToday),
-            Padding(padding: const EdgeInsets.fromLTRB(14, 16, 14, 0), child: CreateVibeShareButton(enabled: _canPublish, busy: busy, onTap: () => unawaited(_publish()))),
+            Padding(padding: const EdgeInsets.fromLTRB(14, 16, 14, 0), child: CreateVibeShareButton(enabled: _canPublish, busy: busy, statusText: _postingStatusText, onTap: () => unawaited(_publish()))),
           ],
         ),
       ),
