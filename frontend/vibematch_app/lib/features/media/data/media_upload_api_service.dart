@@ -32,6 +32,10 @@ class MediaUploadApiService {
     return _upload(endpoint: '/media/chat-document', file: file);
   }
 
+  Future<MediaUploadResult> uploadChatVoice(File file) {
+    return _upload(endpoint: '/media/chat-voice', file: file);
+  }
+
   Future<MediaUploadResult> uploadVibeMediaXFile(XFile file) async {
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) throw Exception('Selected media is empty.');
@@ -56,6 +60,15 @@ class MediaUploadApiService {
     if (bytes.isEmpty) throw Exception('Selected document is empty.');
     return _uploadBytes(
       endpoint: '/media/chat-document',
+      bytes: bytes,
+      filename: _safeFilename(filename),
+    );
+  }
+
+  Future<MediaUploadResult> uploadChatVoiceBytes({required List<int> bytes, required String filename}) async {
+    if (bytes.isEmpty) throw Exception('Selected voice file is empty.');
+    return _uploadBytes(
+      endpoint: '/media/chat-voice',
       bytes: bytes,
       filename: _safeFilename(filename),
     );
