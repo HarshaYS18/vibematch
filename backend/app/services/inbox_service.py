@@ -359,6 +359,17 @@ def send_message(
         message_metadata["expires_at"] = _utc_iso_z(expires_at)
         message.metadata_json = message_metadata
 
+    if _secret_drift_enabled(conversation):
+        message_metadata = dict(message.metadata_json or {})
+        message_metadata["secret_drift"] = True
+        message_metadata["secret_drift_created_at"] = _utc_iso_z(datetime.utcnow())
+        message.metadata_json = message_metadata
+
+        conversation_metadata = _conversation_metadata(conversation)
+        conversation_metadata["secret_drift_closed_by"] = []
+        conversation_metadata["secret_drift_last_message_at"] = _utc_iso_z(datetime.utcnow())
+        conversation.metadata_json = conversation_metadata
+
     conversation.updated_at = datetime.utcnow()
     if message_type == InboxMessageType.ROOM_INVITE.value:
         conversation.current_room_name = invite_room_name
@@ -675,6 +686,141 @@ def set_disappearing_mode(
 
 
 
+def _conversation_metadata(conversation: InboxConversation) -> dict:
+    return dict(conversation.metadata_json or {})
+
+
+def _secret_drift_enabled(conversation: InboxConversation) -> bool:
+    metadata = _conversation_metadata(conversation)
+    return metadata.get("secret_drift_enabled") is True
+
+
+def _is_secret_drift_message(message: InboxMessage) -> bool:
+    metadata = message.metadata_json or {}
+    return metadata.get("secret_drift") is True
+
+
+def clear_secret_drift_messages(
+    db: Session,
+    conversation: InboxConversation,
+) -> int:
+    cleared_count = 0
+    for message in list(conversation.messages):
+        if _is_secret_drift_message(message):
+            db.delete(message)
+            cleared_count += 1
+
+    if cleared_count > 0:
+        metadata = _conversation_metadata(conversation)
+        metadata["secret_drift_closed_by"] = []
+        metadata["secret_drift_last_cleared_at"] = _utc_iso_z(datetime.utcnow())
+        conversation.metadata_json = metadata
+        conversation.updated_at = datetime.utcnow()
+        db.add(conversation)
+
+    return cleared_count
+
+
+def set_secret_drift_mode(
+    db: Session,
+    conversation: InboxConversation,
+    enabled: bool,
+    started_by_user_id: int | None = None,
+) -> InboxConversation:
+    metadata = _conversation_metadata(conversation)
+
+    if enabled:
+        metadata["secret_drift_enabled"] = True
+        metadata["secret_drift_closed_by"] = []
+        metadata["secret_drift_started_by"] = started_by_user_id
+        metadata["secret_drift_started_at"] = _utc_iso_z(datetime.utcnow())
+        conversation.metadata_json = metadata
+        conversation.updated_at = datetime.utcnow()
+        db.add(conversation)
+        db.commit()
+        db.refresh(conversation)
+        return conversation
+
+    # Turning Secret Drift OFF is a no-trace clear for all Secret Drift messages.
+    clear_secret_drift_messages(db, conversation)
+    metadata = _conversation_metadata(conversation)
+    metadata["secret_drift_enabled"] = False
+    metadata["secret_drift_closed_by"] = []
+    metadata["secret_drift_ended_at"] = _utc_iso_z(datetime.utcnow())
+    conversation.metadata_json = metadata
+    conversation.updated_at = datetime.utcnow()
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+def mark_secret_drift_open(
+    db: Session,
+    conversation: InboxConversation,
+    user: User,
+) -> InboxConversation:
+    if not _secret_drift_enabled(conversation):
+        return conversation
+    metadata = _conversation_metadata(conversation)
+    closed_by = set(metadata.get("secret_drift_closed_by") or [])
+    if user.id in closed_by:
+        closed_by.discard(user.id)
+        metadata["secret_drift_closed_by"] = sorted(closed_by)
+        conversation.metadata_json = metadata
+        conversation.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(conversation)
+    return conversation
+
+
+def mark_secret_drift_closed_and_clear(
+    db: Session,
+    conversation: InboxConversation,
+    user: User,
+) -> bool:
+    if not _secret_drift_enabled(conversation):
+        return False
+
+    participant_ids = set(participant_user_ids(conversation))
+    if len(participant_ids) < 2:
+        return False
+
+    metadata = _conversation_metadata(conversation)
+    closed_by = set(metadata.get("secret_drift_closed_by") or [])
+    closed_by.add(user.id)
+    closed_by = closed_by.intersection(participant_ids)
+
+    metadata["secret_drift_closed_by"] = sorted(closed_by)
+    metadata["secret_drift_last_closed_at"] = _utc_iso_z(datetime.utcnow())
+    conversation.metadata_json = metadata
+    conversation.updated_at = datetime.utcnow()
+    db.add(conversation)
+
+    should_clear = participant_ids.issubset(closed_by)
+
+    if should_clear:
+        clear_secret_drift_messages(db, conversation)
+        metadata = _conversation_metadata(conversation)
+        metadata["secret_drift_enabled"] = False
+        metadata["secret_drift_closed_by"] = []
+        metadata["secret_drift_last_cleared_at"] = _utc_iso_z(datetime.utcnow())
+        metadata["secret_drift_auto_ended_at"] = _utc_iso_z(datetime.utcnow())
+        conversation.metadata_json = metadata
+        conversation.updated_at = datetime.utcnow()
+        db.add(conversation)
+
+    db.commit()
+    db.refresh(conversation)
+    return should_clear
+
+
+def _visible_messages(messages: list[InboxMessage]) -> list[InboxMessage]:
+    return list(messages)
+
+
+
+
 def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
     metadata = message.metadata_json or {}
     invite_room_id = metadata.get("invite_room_id") or metadata.get("room_public_id") or message.conversation.room_public_id
@@ -752,8 +898,7 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
         "is_archived": conversation.is_archived,
         "chat_streak_count": streak_count,
         "chat_streak_active_today": streak_active_today,
-        "disappearing_mode_enabled": _disappearing_mode_enabled(conversation),
-        "disappearing_ttl_seconds": _disappearing_ttl_seconds(conversation),
+        "secret_drift_enabled": _secret_drift_enabled(conversation),
     }
 
 
