@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../data/love_bond_api_service.dart';
+import '../../../store/presentation/store_page.dart';
 import 'love_bond_detail_page.dart';
 import 'love_bonds_slots_store.dart';
 import 'models/love_bond_models.dart';
@@ -14,21 +16,42 @@ class LoveBondsPage extends StatefulWidget {
 }
 
 class _LoveBondsPageState extends State<LoveBondsPage> {
-  LoveBondsSlotsState? _slotState;
-  bool _busy = false;
+  static const LoveBondApiService _api = LoveBondApiService();
 
-  List<LoveBondCardData> get _bonds => mockLoveBondCards;
+  LoveBondsSlotsState? _slotState;
+  final List<LoveBondCardData> _bonds = [];
+  bool _busy = false;
+  bool _loadingBonds = false;
 
   @override
   void initState() {
     super.initState();
     _loadSlots();
+    _loadBackendBonds();
   }
 
   Future<void> _loadSlots() async {
     final state = await LoveBondsSlotsStore.load();
     if (!mounted) return;
     setState(() => _slotState = state);
+  }
+
+  Future<void> _loadBackendBonds() async {
+    setState(() => _loadingBonds = true);
+    try {
+      final bonds = await _api.listMyBonds();
+      if (!mounted) return;
+      setState(() {
+        _bonds
+          ..clear()
+          ..addAll(bonds.map(_bondCardFromDto));
+        _loadingBonds = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loadingBonds = false);
+      _showAction(context, error.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   void _showAction(BuildContext context, String message) {
@@ -73,7 +96,9 @@ class _LoveBondsPageState extends State<LoveBondsPage> {
   }
 
   void _openCreateBond() {
-    _showAction(context, 'Create bond flow will open from Love/Brother/Sister/Bestie card purchase and acceptance flow.');
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const StorePage()))
+        .then((_) => _loadBackendBonds());
   }
 
   @override
@@ -130,6 +155,10 @@ class _LoveBondsPageState extends State<LoveBondsPage> {
                       nextSlotPriceCoins: slots.nextSlotPriceCoins,
                     ),
                     const SizedBox(height: 18),
+                    if (_loadingBonds) ...[
+                      const Center(child: CircularProgressIndicator(color: Colors.white)),
+                      const SizedBox(height: 18),
+                    ],
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -409,6 +438,76 @@ class _SlotBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.30), borderRadius: BorderRadius.circular(999)), child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)));
   }
+}
+
+LoveBondCardData _bondCardFromDto(LoveBondDto dto) {
+  final type = _typeFromCardType(dto.cardType);
+  final program = const LoveBondProgramRepository().programForType(type: type);
+  final current = program.currentLevelForScore(dto.loveScore);
+  final next = program.nextLevelForScore(dto.loveScore);
+  final colors = _colorsForType(type);
+  final initials = _initials(dto.partnerName);
+  return LoveBondCardData(
+    id: dto.id,
+    partnerPublicUserId: dto.partnerPublicUserId,
+    startedAt: DateTime.tryParse(dto.startedAt ?? ''),
+    type: type,
+    title: current.title,
+    level: dto.level > 0 ? dto.level : current.level,
+    displayName: '${dto.partnerName} - ${type.defaultTitle}',
+    partnerName: dto.partnerName,
+    primaryColor: colors.$1,
+    secondaryColor: colors.$2,
+    icon: _iconForType(type),
+    badgeIcon: _badgeIconForType(type),
+    leftAvatarInitial: initials,
+    rightAvatarInitial: initials,
+    loveScore: dto.loveScore,
+    nextLevelLoveScore: next.requiredLoveScore,
+    rewardIds: current.rewardIds,
+    privilegeIds: current.privilegeIds,
+  );
+}
+
+LoveBondType _typeFromCardType(String cardType) {
+  return switch (cardType.trim().toLowerCase()) {
+    'bestie' => LoveBondType.bestie,
+    'brother' || 'sibling' => LoveBondType.brother,
+    'sister' => LoveBondType.sister,
+    _ => LoveBondType.lover,
+  };
+}
+
+(Color, Color) _colorsForType(LoveBondType type) {
+  return switch (type) {
+    LoveBondType.lover => (const Color(0xFFFF5AAA), const Color(0xFFFFC2DC)),
+    LoveBondType.bestie => (const Color(0xFF9C5CFF), const Color(0xFFE2CCFF)),
+    LoveBondType.brother => (const Color(0xFF4C8DFF), const Color(0xFFCFE2FF)),
+    LoveBondType.sister => (const Color(0xFFFFA93D), const Color(0xFFFFE0A8)),
+  };
+}
+
+IconData _iconForType(LoveBondType type) {
+  return switch (type) {
+    LoveBondType.lover => Icons.home_rounded,
+    LoveBondType.bestie => Icons.night_shelter_rounded,
+    LoveBondType.brother => Icons.sports_esports_rounded,
+    LoveBondType.sister => Icons.diamond_rounded,
+  };
+}
+
+IconData _badgeIconForType(LoveBondType type) {
+  return switch (type) {
+    LoveBondType.lover || LoveBondType.bestie => Icons.favorite_rounded,
+    LoveBondType.brother => Icons.bolt_rounded,
+    LoveBondType.sister => Icons.local_florist_rounded,
+  };
+}
+
+String _initials(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return 'V';
+  return trimmed[0].toUpperCase();
 }
 
 String _formatCoins(int value) {

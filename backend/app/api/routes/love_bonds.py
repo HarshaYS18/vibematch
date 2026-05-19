@@ -24,7 +24,8 @@ def get_my_love_bond_inventory(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    items = love_bond_service.seed_inventory(db, current_user)
+    love_bond_service.expire_stale_requests(db, current_user)
+    items = love_bond_service.list_inventory(db, current_user)
     return LoveBondInventoryResponse(
         items=[love_bond_service.inventory_to_dict(item) for item in items],
     )
@@ -74,6 +75,7 @@ def list_pending_love_bond_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    love_bond_service.expire_stale_requests(db, current_user)
     requests = (
         db.query(LoveBondRequest)
         .filter(
@@ -133,6 +135,7 @@ def list_my_love_bonds(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    love_bond_service.expire_stale_requests(db, current_user)
     bonds = love_bond_service.list_active_bonds_for_user(db, current_user)
     return LoveBondListResponse(
         bonds=[LoveBondResponse(**love_bond_service.bond_to_dict(item, current_user)) for item in bonds],
@@ -149,6 +152,7 @@ def list_public_love_bonds(
     if target_user is None:
         raise HTTPException(status_code=404, detail="User not found.")
 
+    love_bond_service.expire_stale_requests(db, target_user)
     bonds = love_bond_service.list_active_bonds_for_user(db, target_user)
     return LoveBondListResponse(
         bonds=[LoveBondResponse(**love_bond_service.bond_to_dict(item, target_user)) for item in bonds],

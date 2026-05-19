@@ -15,22 +15,12 @@ class LoveBondDetailPage extends StatelessWidget {
   String get _daysLabel => 'Days Together';
 
   int get _daysCount {
-    return switch (bond.type) {
-      LoveBondType.lover => 1540,
-      LoveBondType.bestie => 826,
-      LoveBondType.brother => 412,
-      LoveBondType.sister => 318,
-    };
+    final startedAt = bond.startedAt;
+    if (startedAt == null) return 0;
+    return DateTime.now().difference(startedAt).inDays.clamp(0, 99999).toInt();
   }
 
-  int get _scoreValue {
-    return switch (bond.type) {
-      LoveBondType.lover => 159469,
-      LoveBondType.bestie => 88420,
-      LoveBondType.brother => 46350,
-      LoveBondType.sister => 52180,
-    };
-  }
+  int get _scoreValue => bond.loveScore;
 
   void _showAction(BuildContext context, String message) {
     ScaffoldMessenger.of(context)

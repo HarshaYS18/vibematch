@@ -24,6 +24,7 @@ class _EconomyStoreControlCenterPageState
     'room_background',
     'gift',
     'gift_category',
+    'love_bond_card',
     'event_asset',
     'badge',
     'theme',

@@ -19,6 +19,7 @@ class StoreItemCategory(str, Enum):
     PROFILE_THEME = "profile_theme"
     GIFT = "gift"
     GIFT_CATEGORY = "gift_category"
+    LOVE_BOND_CARD = "love_bond_card"
     EVENT_ASSET = "event_asset"
     BADGE = "badge"
     THEME = "theme"

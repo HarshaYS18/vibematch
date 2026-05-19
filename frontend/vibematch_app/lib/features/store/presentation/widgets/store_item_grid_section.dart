@@ -54,8 +54,18 @@ class _StoreItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final priceLabel = item.isFree ? 'Free' : '${compactCoins(item.priceCoins)} coins';
-    final validityLabel = item.isTimed ? '${item.durationDays} days validity' : 'Permanent validity';
-    final buttonText = item.isOwned ? 'Owned' : item.isFree ? 'Claim free' : 'Buy now';
+    final validityLabel = item.isConsumable
+        ? 'Inventory card'
+        : item.isTimed
+            ? '${item.durationDays} days validity'
+            : 'Permanent validity';
+    final buttonText = item.isOwned && !item.isConsumable
+        ? 'Owned'
+        : item.isConsumable
+            ? 'Buy card'
+            : item.isFree
+                ? 'Claim free'
+                : 'Buy now';
 
     return Container(
       decoration: BoxDecoration(
@@ -142,7 +152,7 @@ class _StoreItemCard extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: item.isOwned ? null : onPurchase,
+                    onPressed: item.isOwned && !item.isConsumable ? null : onPurchase,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF251538),
                       disabledBackgroundColor: const Color(0xFFEDE3D7),

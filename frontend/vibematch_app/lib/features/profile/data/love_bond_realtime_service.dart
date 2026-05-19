@@ -241,11 +241,7 @@ class LoveBondRealtimeService {
     if (inventoryByPublicUserId.value.containsKey(publicUserId)) return;
 
     final next = Map<int, List<LoveBondInventoryItem>>.from(inventoryByPublicUserId.value);
-    next[publicUserId] = const [
-      LoveBondInventoryItem(cardType: LoveBondType.lover, cardName: 'Love', quantity: 1),
-      LoveBondInventoryItem(cardType: LoveBondType.bestie, cardName: 'Bestie', quantity: 1),
-      LoveBondInventoryItem(cardType: LoveBondType.brother, cardName: 'Sibling', quantity: 1),
-    ];
+    next[publicUserId] = const <LoveBondInventoryItem>[];
     inventoryByPublicUserId.value = next;
   }
 

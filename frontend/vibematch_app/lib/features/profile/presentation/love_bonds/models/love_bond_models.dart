@@ -310,6 +310,9 @@ class LoveBondCardData {
     this.nextLevelLoveScore = 0,
     this.rewardIds = const [],
     this.privilegeIds = const [],
+    this.id,
+    this.partnerPublicUserId,
+    this.startedAt,
   });
 
   final LoveBondType type;
@@ -327,6 +330,9 @@ class LoveBondCardData {
   final int nextLevelLoveScore;
   final List<String> rewardIds;
   final List<String> privilegeIds;
+  final String? id;
+  final int? partnerPublicUserId;
+  final DateTime? startedAt;
 }
 
 class LoveBondTaskData {

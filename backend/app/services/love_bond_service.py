@@ -1,5 +1,6 @@
 ﻿from datetime import datetime
 from uuid import uuid4
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -47,33 +48,6 @@ def display_card_name(card_type: str) -> str:
 
 
 def seed_inventory(db: Session, user: User) -> list[LoveBondInventory]:
-    existing = {
-        item.card_type: item
-        for item in db.query(LoveBondInventory).filter(
-            LoveBondInventory.user_id == user.id,
-            LoveBondInventory.is_active.is_(True),
-        )
-    }
-
-    created = False
-    for card_type, card_name in DEFAULT_CARD_NAMES.items():
-        if card_type in existing:
-            continue
-        db.add(
-            LoveBondInventory(
-                user_id=user.id,
-                card_type=card_type,
-                card_name=card_name,
-                quantity=1,
-                reserved_quantity=0,
-                source="default_seed",
-            )
-        )
-        created = True
-
-    if created:
-        db.commit()
-
     return list_inventory(db, user)
 
 
@@ -91,7 +65,6 @@ def list_inventory(db: Session, user: User) -> list[LoveBondInventory]:
 
 def _inventory_item_for_update(db: Session, user: User, card_type: str) -> LoveBondInventory:
     normalized = normalize_card_type(card_type)
-    seed_inventory(db, user)
     item = (
         db.query(LoveBondInventory)
         .filter(
@@ -107,6 +80,79 @@ def _inventory_item_for_update(db: Session, user: User, card_type: str) -> LoveB
     return item
 
 
+def grant_inventory_card(
+    db: Session,
+    user: User,
+    card_type: str,
+    quantity: int = 1,
+    source: str = "store_purchase",
+) -> LoveBondInventory:
+    normalized = normalize_card_type(card_type)
+    if quantity <= 0:
+        raise ValueError("Quantity must be positive.")
+    item = (
+        db.query(LoveBondInventory)
+        .filter(
+            LoveBondInventory.user_id == user.id,
+            LoveBondInventory.card_type == normalized,
+            LoveBondInventory.is_active.is_(True),
+        )
+        .with_for_update()
+        .first()
+    )
+    if item is None:
+        item = LoveBondInventory(
+            user_id=user.id,
+            card_type=normalized,
+            card_name=display_card_name(normalized),
+            quantity=0,
+            reserved_quantity=0,
+            source=source,
+        )
+        db.add(item)
+        db.flush()
+    item.quantity += quantity
+    item.source = source
+    return item
+
+
+def expire_stale_requests(db: Session, user: User | None = None) -> int:
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    query = db.query(LoveBondRequest).filter(
+        LoveBondRequest.status == LoveBondRequestStatus.PENDING.value,
+        LoveBondRequest.created_at <= cutoff,
+    )
+    if user is not None:
+        query = query.filter(
+            (LoveBondRequest.sender_user_id == user.id) | (LoveBondRequest.receiver_user_id == user.id)
+        )
+    expired = query.with_for_update().all()
+    for request in expired:
+        item = (
+            db.query(LoveBondInventory)
+            .filter(
+                LoveBondInventory.user_id == request.sender_user_id,
+                LoveBondInventory.card_type == request.card_type,
+                LoveBondInventory.is_active.is_(True),
+            )
+            .with_for_update()
+            .first()
+        )
+        if item is not None and item.reserved_quantity > 0:
+            item.reserved_quantity -= 1
+        request.status = LoveBondRequestStatus.CANCELLED.value
+        request.responded_at = datetime.utcnow()
+        if request.inbox_message:
+            metadata = dict(request.inbox_message.metadata_json or {})
+            metadata["status"] = LoveBondRequestStatus.CANCELLED.value
+            metadata["expired_after_hours"] = 24
+            request.inbox_message.metadata_json = metadata
+            request.inbox_message.text = f"{request.card_name} request expired. The card returned to inventory."
+    if expired:
+        db.commit()
+    return len(expired)
+
+
 def _available_quantity(item: LoveBondInventory) -> int:
     return max(0, item.quantity - item.reserved_quantity)
 
@@ -117,6 +163,7 @@ def send_love_bond_request(
     receiver: User,
     card_type: str,
 ) -> LoveBondRequest:
+    expire_stale_requests(db, sender)
     if sender.id == receiver.id:
         raise ValueError("You cannot send a relationship card to yourself.")
 

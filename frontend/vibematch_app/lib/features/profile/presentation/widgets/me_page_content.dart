@@ -335,7 +335,15 @@ class _MePageContentState extends State<MePageContent> {
   void _openFamily(BuildContext context) {
     final family = _family;
     if (family == null || !family.shouldShow) {
-      _showAction(context, 'You are not in a family yet.');
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (_) => const FamilyModularPage(
+                openCurrentFamily: false,
+              ),
+            ),
+          )
+          .then((_) => _loadRealData());
       return;
     }
     Navigator.of(context)

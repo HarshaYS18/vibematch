@@ -30,6 +30,7 @@ class StoreItem {
     required this.itemId,
     required this.name,
     required this.category,
+    required this.itemType,
     required this.priceCoins,
     required this.isOwned,
     required this.isEquipped,
@@ -46,6 +47,7 @@ class StoreItem {
   final String itemId;
   final String name;
   final String category;
+  final String itemType;
   final String? description;
   final int priceCoins;
   final int? durationDays;
@@ -60,17 +62,19 @@ class StoreItem {
 
   bool get isFree => priceCoins <= 0;
   bool get isTimed => durationDays != null && durationDays! > 0;
+  bool get isConsumable => category == 'love_bond_card' || itemType == 'love_bond_card';
 
   factory StoreItem.fromJson(Map<String, dynamic> json) {
     return StoreItem(
       itemId: json['item_id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Store Item',
       category: json['category']?.toString() ?? 'misc',
+      itemType: json['item_type']?.toString() ?? 'store_item',
       description: _nullableString(json['description']),
       priceCoins: int.tryParse(json['price_coins']?.toString() ?? '') ?? 0,
       durationDays: int.tryParse(json['duration_days']?.toString() ?? ''),
       assetPath: _nullableString(json['asset_path']),
-      imageUrl: _nullableString(json['image_url']),
+      imageUrl: _nullableString(json['image_url']) ?? _nullableString(json['thumbnail_url']) ?? _nullableString(json['cdn_asset_url']),
       previewUrl: _nullableString(json['preview_url']),
       linkedThemeId: _nullableString(json['linked_theme_id']),
       isOwned: json['is_owned'] == true,
@@ -85,6 +89,7 @@ class StoreItem {
       itemId: itemId,
       name: name,
       category: category,
+      itemType: itemType,
       description: description,
       priceCoins: priceCoins,
       durationDays: durationDays,
@@ -241,6 +246,7 @@ String storeCategoryLabel(String category) {
     'chat_bubble' => 'Chat Bubbles',
     'entrance_effect' => 'Entrance Effects',
     'profile_theme' => 'Profile Themes',
+    'love_bond_card' => 'Love & Bonds',
     'badge' => 'Badges',
     _ => category.replaceAll('_', ' ').trim(),
   };
@@ -253,6 +259,7 @@ String storeCategoryShortLabel(String category) {
     'chat_bubble' => 'Bubble',
     'entrance_effect' => 'Entry',
     'profile_theme' => 'Theme',
+    'love_bond_card' => 'Bond',
     'badge' => 'Badge',
     _ => category.replaceAll('_', ' ').trim(),
   };

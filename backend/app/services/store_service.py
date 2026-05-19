@@ -19,6 +19,7 @@ from app.schemas.store import (
     StoreCatalogResponse,
     StoreItemResponse,
 )
+from app.services import love_bond_service
 from app.services.rooms import room_theme_service
 
 # Avatar frames and chat bubbles are 30-day ownership items by default.
@@ -183,6 +184,39 @@ DEFAULT_STORE_ITEMS: list[dict[str, Any]] = [
         "asset_path": "assets/images/store/badges/top_supporter.webp",
         "sort_order": 190,
     },
+    {
+        "item_id": "bond_card_love",
+        "name": "Love Bond Card",
+        "category": StoreItemCategory.LOVE_BOND_CARD.value,
+        "item_type": StoreItemCategory.LOVE_BOND_CARD.value,
+        "description": "Send a Love relationship request. Returned to inventory if rejected or expired.",
+        "price_coins": 50_000,
+        "ownership_type": "consumable",
+        "metadata_json": {"card_type": "love"},
+        "sort_order": 200,
+    },
+    {
+        "item_id": "bond_card_bestie",
+        "name": "Bestie Bond Card",
+        "category": StoreItemCategory.LOVE_BOND_CARD.value,
+        "item_type": StoreItemCategory.LOVE_BOND_CARD.value,
+        "description": "Send a Bestie relationship request. Returned to inventory if rejected or expired.",
+        "price_coins": 30_000,
+        "ownership_type": "consumable",
+        "metadata_json": {"card_type": "bestie"},
+        "sort_order": 210,
+    },
+    {
+        "item_id": "bond_card_sibling",
+        "name": "Sibling Bond Card",
+        "category": StoreItemCategory.LOVE_BOND_CARD.value,
+        "item_type": StoreItemCategory.LOVE_BOND_CARD.value,
+        "description": "Send a Sibling relationship request. Returned to inventory if rejected or expired.",
+        "price_coins": 30_000,
+        "ownership_type": "consumable",
+        "metadata_json": {"card_type": "sibling"},
+        "sort_order": 220,
+    },
 ]
 
 CATEGORY_ORDER = [
@@ -192,6 +226,7 @@ CATEGORY_ORDER = [
     StoreItemCategory.ENTRANCE_EFFECT.value,
     StoreItemCategory.PROFILE_THEME.value,
     StoreItemCategory.BADGE.value,
+    StoreItemCategory.LOVE_BOND_CARD.value,
 ]
 
 _TIMED_CATEGORIES = {StoreItemCategory.AVATAR_FRAME.value, StoreItemCategory.CHAT_BUBBLE.value}
@@ -269,9 +304,47 @@ def _grant_linked_room_theme_inventory(db: Session, *, user_id: int, theme_id: s
         db.add(UserRoomThemeInventory(user_id=user_id, theme_id=theme_id, source="store_purchase"))
 
 
+def _is_love_bond_card(item: StoreItem) -> bool:
+    return item.category == StoreItemCategory.LOVE_BOND_CARD.value or item.item_type == StoreItemCategory.LOVE_BOND_CARD.value
+
+
+def _love_bond_card_type(item: StoreItem) -> str:
+    metadata = item.metadata_json or {}
+    if isinstance(metadata, dict) and metadata.get("card_type"):
+        return str(metadata["card_type"])
+    item_suffix = item.item_id.replace("bond_card_", "", 1)
+    return item_suffix if item_suffix != item.item_id else "love"
+
+
+def _debit_wallet_for_item(db: Session, user: User, item: StoreItem) -> None:
+    wallet = _wallet_for_update(db, user.id)
+    price = int(item.price_coins or 0)
+    if price <= 0:
+        return
+    if wallet.coin_balance < price:
+        raise HTTPException(status_code=400, detail="Insufficient coins to purchase this item")
+    before = wallet.coin_balance
+    wallet.coin_balance -= price
+    wallet.lifetime_coins_spent += price
+    db.add(
+        WalletLedger(
+            user_id=user.id,
+            currency_type=EconomyCurrency.COIN.value,
+            direction=EconomyDirection.DEBIT.value,
+            amount=price,
+            before_balance=before,
+            after_balance=wallet.coin_balance,
+            source_type="STORE_PURCHASE",
+            source_id=item.item_id,
+            created_by_user_id=user.id,
+            reason=f"Purchased store item {item.name}",
+        )
+    )
+
+
 def _item_payload(db: Session, item: StoreItem, user_id: int) -> StoreItemResponse:
     inventory = _inventory_for_item(db, user_id, item.item_id)
-    is_owned = inventory is not None or item.price_coins <= 0
+    is_owned = False if _is_love_bond_card(item) else inventory is not None or item.price_coins <= 0
     return StoreItemResponse(
         item_id=item.item_id,
         name=item.name,
@@ -327,32 +400,23 @@ def purchase(db: Session, user: User, item_id: str) -> StoreItemResponse:
     item = db.query(StoreItem).filter(StoreItem.item_id == item_id, StoreItem.is_active.is_(True)).first()
     if item is None:
         raise HTTPException(status_code=404, detail="Store item not found")
+    if _is_love_bond_card(item):
+        _debit_wallet_for_item(db, user, item)
+        love_bond_service.grant_inventory_card(
+            db,
+            user=user,
+            card_type=_love_bond_card_type(item),
+            quantity=1,
+            source="store_purchase",
+        )
+        db.commit()
+        return _item_payload(db, item, user.id)
+
     existing = _inventory_for_item(db, user.id, item.item_id)
     if existing is not None:
         return _item_payload(db, item, user.id)
 
-    wallet = _wallet_for_update(db, user.id)
-    price = int(item.price_coins or 0)
-    if price > 0:
-        if wallet.coin_balance < price:
-            raise HTTPException(status_code=400, detail="Insufficient coins to purchase this item")
-        before = wallet.coin_balance
-        wallet.coin_balance -= price
-        wallet.lifetime_coins_spent += price
-        db.add(
-            WalletLedger(
-                user_id=user.id,
-                currency_type=EconomyCurrency.COIN.value,
-                direction=EconomyDirection.DEBIT.value,
-                amount=price,
-                before_balance=before,
-                after_balance=wallet.coin_balance,
-                source_type="STORE_PURCHASE",
-                source_id=item.item_id,
-                created_by_user_id=user.id,
-                reason=f"Purchased store item {item.name}",
-            )
-        )
+    _debit_wallet_for_item(db, user, item)
 
     if item.category == StoreItemCategory.ROOM_BACKGROUND.value and item.linked_theme_id:
         _grant_linked_room_theme_inventory(db, user_id=user.id, theme_id=item.linked_theme_id)

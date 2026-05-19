@@ -223,6 +223,8 @@ class FamilyController extends ChangeNotifier {
   Future<void> _requestJoinOnBackend(String familyId) async {
     try {
       await _api.requestJoinFamily(familyId: familyId);
+      joinRequestPending = false;
+      await hydrateFromBackend();
       backendError = null;
       notifyListeners();
     } catch (error) {
