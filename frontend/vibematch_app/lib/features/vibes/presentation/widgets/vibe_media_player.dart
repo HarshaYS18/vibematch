@@ -39,6 +39,8 @@ class VibeMediaPlayer extends StatelessWidget {
       return GestureDetector(
         onDoubleTap: onDoubleTap,
         child: _NetworkVideoPlayer(
+          key: ValueKey('vibe_video_${vibe.id ?? mediaUrl}'),
+          videoKey: '${vibe.id ?? mediaUrl.hashCode}',
           url: mediaUrl,
           respectFeedPause: respectFeedPause,
           autoplay: autoplay,
@@ -60,8 +62,9 @@ class VibeMediaPlayer extends StatelessWidget {
 }
 
 class _NetworkVideoPlayer extends StatefulWidget {
-  const _NetworkVideoPlayer({required this.url, required this.respectFeedPause, required this.autoplay});
+  const _NetworkVideoPlayer({required this.videoKey, required this.url, required this.respectFeedPause, required this.autoplay, super.key});
 
+  final String videoKey;
   final String url;
   final bool respectFeedPause;
   final bool autoplay;
@@ -75,6 +78,7 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   bool _isReady = false;
   bool _hasError = false;
   bool _showPlayButton = true;
+  bool _manualPlayRequested = false;
 
   @override
   void initState() {
@@ -82,7 +86,40 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
     if (widget.respectFeedPause) {
       VibeMediaPlaybackGate.feedPlaybackPaused.addListener(_handlePlaybackGateChanged);
       VibeMediaPlaybackGate.feedScrollTick.addListener(_handleScrollTick);
+      VibeMediaPlaybackGate.activeFeedVideoKey.addListener(_handleActiveVideoChanged);
     }
+    _initializeController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncAutoplayWithVisibility());
+  }
+
+  @override
+  void didUpdateWidget(covariant _NetworkVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url || oldWidget.videoKey != widget.videoKey) {
+      VibeMediaPlaybackGate.releaseActiveFeedVideo(oldWidget.videoKey);
+      _controller?.dispose();
+      _controller = null;
+      _isReady = false;
+      _hasError = false;
+      _showPlayButton = true;
+      _manualPlayRequested = false;
+      _initializeController();
+    }
+  }
+
+  @override
+  void dispose() {
+    VibeMediaPlaybackGate.releaseActiveFeedVideo(widget.videoKey);
+    if (widget.respectFeedPause) {
+      VibeMediaPlaybackGate.feedPlaybackPaused.removeListener(_handlePlaybackGateChanged);
+      VibeMediaPlaybackGate.feedScrollTick.removeListener(_handleScrollTick);
+      VibeMediaPlaybackGate.activeFeedVideoKey.removeListener(_handleActiveVideoChanged);
+    }
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _initializeController() {
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..setLooping(true)
       ..initialize().then((_) {
@@ -92,22 +129,11 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
       }).catchError((_) {
         if (mounted) setState(() => _hasError = true);
       });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncAutoplayWithVisibility());
-  }
-
-  @override
-  void dispose() {
-    if (widget.respectFeedPause) {
-      VibeMediaPlaybackGate.feedPlaybackPaused.removeListener(_handlePlaybackGateChanged);
-      VibeMediaPlaybackGate.feedScrollTick.removeListener(_handleScrollTick);
-    }
-    _controller?.dispose();
-    super.dispose();
   }
 
   void _handlePlaybackGateChanged() {
     if (VibeMediaPlaybackGate.feedPlaybackPaused.value) {
-      _pauseForVisibility();
+      _pauseForVisibility(resetManualPlay: false);
       return;
     }
     _syncAutoplayWithVisibility();
@@ -115,6 +141,12 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
 
   void _handleScrollTick() {
     _syncAutoplayWithVisibility();
+  }
+
+  void _handleActiveVideoChanged() {
+    if (VibeMediaPlaybackGate.activeFeedVideoKey.value != widget.videoKey) {
+      _pauseForVisibility(resetManualPlay: false);
+    }
   }
 
   bool _shouldAutoplayNow() {
@@ -144,17 +176,20 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   void _syncAutoplayWithVisibility() {
     final controller = _controller;
     if (!mounted || controller == null || !_isReady) return;
-    if (_shouldAutoplayNow()) {
+    final shouldPlay = _manualPlayRequested || _shouldAutoplayNow();
+    if (shouldPlay && !VibeMediaPlaybackGate.feedPlaybackPaused.value) {
+      VibeMediaPlaybackGate.claimActiveFeedVideo(widget.videoKey);
       if (!controller.value.isPlaying) controller.play();
       if (_showPlayButton) setState(() => _showPlayButton = false);
     } else {
-      _pauseForVisibility();
+      _pauseForVisibility(resetManualPlay: false);
     }
   }
 
-  void _pauseForVisibility() {
+  void _pauseForVisibility({required bool resetManualPlay}) {
     final controller = _controller;
     if (controller == null || !_isReady) return;
+    if (resetManualPlay) _manualPlayRequested = false;
     if (controller.value.isPlaying) controller.pause();
     if (!_showPlayButton && mounted) setState(() => _showPlayButton = true);
   }
@@ -163,9 +198,13 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
     final controller = _controller;
     if (controller == null || !_isReady) return;
     if (controller.value.isPlaying) {
+      _manualPlayRequested = false;
+      VibeMediaPlaybackGate.releaseActiveFeedVideo(widget.videoKey);
       controller.pause();
       setState(() => _showPlayButton = true);
     } else {
+      _manualPlayRequested = true;
+      VibeMediaPlaybackGate.claimActiveFeedVideo(widget.videoKey);
       controller.play();
       setState(() => _showPlayButton = false);
     }
