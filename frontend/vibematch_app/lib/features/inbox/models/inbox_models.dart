@@ -320,6 +320,11 @@ class InboxMessage {
     this.loveBondRequestId,
     this.loveBondCardName,
     this.loveBondStatus,
+    this.attachmentUrl,
+    this.localAttachmentPath,
+    this.mediaExpired = false,
+    this.expiredMediaUrl,
+    this.localFirstAllowed = false,
   });
 
   final String? id;
@@ -338,6 +343,11 @@ class InboxMessage {
   final String? loveBondRequestId;
   final String? loveBondCardName;
   final String? loveBondStatus;
+  final String? attachmentUrl;
+  final String? localAttachmentPath;
+  final bool mediaExpired;
+  final String? expiredMediaUrl;
+  final bool localFirstAllowed;
 
   bool get isInvite =>
       inviteRoomName != null ||
@@ -346,6 +356,9 @@ class InboxMessage {
   bool get isLoveBondRequest =>
       loveBondRequestId != null || type == InboxMessageType.relationshipRequest;
   bool get isSystem => type == InboxMessageType.system;
+  bool get hasAttachmentUrl => attachmentUrl != null && attachmentUrl!.trim().isNotEmpty;
+  bool get hasLocalAttachmentPath => localAttachmentPath != null && localAttachmentPath!.trim().isNotEmpty;
+  String? get effectiveRemoteMediaUrl => attachmentUrl?.trim().isNotEmpty == true ? attachmentUrl!.trim() : expiredMediaUrl?.trim();
 
   InboxMessage copyWith({
     String? id,
@@ -366,6 +379,11 @@ class InboxMessage {
     String? loveBondRequestId,
     String? loveBondCardName,
     String? loveBondStatus,
+    String? attachmentUrl,
+    String? localAttachmentPath,
+    bool? mediaExpired,
+    String? expiredMediaUrl,
+    bool? localFirstAllowed,
   }) {
     return InboxMessage(
       id: id ?? this.id,
@@ -384,6 +402,11 @@ class InboxMessage {
       loveBondRequestId: loveBondRequestId ?? this.loveBondRequestId,
       loveBondCardName: loveBondCardName ?? this.loveBondCardName,
       loveBondStatus: loveBondStatus ?? this.loveBondStatus,
+      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      localAttachmentPath: localAttachmentPath ?? this.localAttachmentPath,
+      mediaExpired: mediaExpired ?? this.mediaExpired,
+      expiredMediaUrl: expiredMediaUrl ?? this.expiredMediaUrl,
+      localFirstAllowed: localFirstAllowed ?? this.localFirstAllowed,
     );
   }
 }
