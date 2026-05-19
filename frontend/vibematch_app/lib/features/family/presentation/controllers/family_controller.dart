@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/family_api_service.dart';
-import '../../data/family_mock_data.dart';
-import '../../models/family_id.dart';
 import '../../models/family_level_models.dart';
 import '../../models/family_ui_models.dart';
+import '../../../social/data/social_api_service.dart';
+import '../../../social/models/social_user.dart';
 
 class FamilyController extends ChangeNotifier {
   FamilyController({
@@ -14,19 +14,33 @@ class FamilyController extends ChangeNotifier {
     FamilyProfileUiModel? initialProfile,
     bool initialIsOwner = false,
     bool initialIsAdmin = false,
-  })  : profile = initialProfile ?? FamilyMockData.profile(),
-        rankings = [...FamilyMockData.rankings],
-        members = [...FamilyMockData.members],
-        inviteFriends = [...FamilyMockData.inviteFriends],
-        messages = [...FamilyMockData.chats],
-        hasFamily = initialHasFamily,
-        isOwner = initialIsOwner,
-        isAdmin = initialIsAdmin {
+  }) : profile = initialProfile ?? _emptyFamilyProfile,
+       rankings = <FamilyRankUiModel>[],
+       members = <FamilyMemberUiModel>[],
+       inviteFriends = <FamilyInviteFriendUiModel>[],
+       messages = <FamilyChatUiModel>[],
+       hasFamily = initialHasFamily,
+       isOwner = initialIsOwner,
+       isAdmin = initialIsAdmin {
     unawaited(hydrateFromBackend());
+    unawaited(refreshInviteCandidates());
   }
 
   static const FamilyLevelEngine _levelEngine = FamilyLevelEngine();
   static const FamilyApiService _api = FamilyApiService();
+  static const SocialApiService _socialApi = SocialApiService();
+  static const FamilyProfileUiModel _emptyFamilyProfile = FamilyProfileUiModel(
+    id: '',
+    name: '',
+    minimumVipLabel: '',
+    memberCount: 0,
+    maxMembers: 0,
+    rankLabel: '',
+    ownerUserId: '',
+    quarterCarryExp: 0,
+    giftCoinsThisQuarter: 0,
+    timeMinutesToday: 0,
+  );
 
   FamilyProfileUiModel profile;
   final List<FamilyRankUiModel> rankings;
@@ -44,19 +58,24 @@ class FamilyController extends ChangeNotifier {
   String? backendError;
   FamilyRankingPeriod selectedRankingPeriod = FamilyRankingPeriod.weekly;
 
-  FamilyInviteActorType get inviteActorType => (isOwner || isAdmin) ? FamilyInviteActorType.ownerAdmin : FamilyInviteActorType.member;
+  FamilyInviteActorType get inviteActorType => (isOwner || isAdmin)
+      ? FamilyInviteActorType.ownerAdmin
+      : FamilyInviteActorType.member;
   bool get canSelectMoreInvites => selectedInviteUserIds.length < 10;
 
   FamilyExpBreakdown get expBreakdown => _levelEngine.buildBreakdown(
-        quarterCarryExp: profile.quarterCarryExp,
-        giftCoinsSpent: profile.giftCoinsThisQuarter,
-        familyTimeMinutesToday: profile.timeMinutesToday,
-      );
+    quarterCarryExp: profile.quarterCarryExp,
+    giftCoinsSpent: profile.giftCoinsThisQuarter,
+    familyTimeMinutesToday: profile.timeMinutesToday,
+  );
 
-  FamilyLevelProgress get levelProgress => _levelEngine.progressForExp(expBreakdown.totalExp);
+  FamilyLevelProgress get levelProgress =>
+      _levelEngine.progressForExp(expBreakdown.totalExp);
 
-  int get adminCapacity => _levelEngine.adminCapacityForLevel(levelProgress.level);
-  int get adminCount => members.where((member) => member.role == FamilyRole.admin).length;
+  int get adminCapacity =>
+      _levelEngine.adminCapacityForLevel(levelProgress.level);
+  int get adminCount =>
+      members.where((member) => member.role == FamilyRole.admin).length;
 
   Future<void> hydrateFromBackend() async {
     loadingBackend = true;
@@ -71,19 +90,16 @@ class FamilyController extends ChangeNotifier {
       final backendProfile = response.profile;
       if (backendProfile != null) {
         profile = backendProfile;
+      } else if (!hasFamily) {
+        profile = _emptyFamilyProfile;
       }
-      if (response.members.isNotEmpty) {
-        members
-          ..clear()
-          ..addAll(response.members);
-      }
-      if (response.rankings.isNotEmpty) {
-        rankings
-          ..clear()
-          ..addAll(response.rankings);
-      } else {
-        unawaited(refreshRankings());
-      }
+      members
+        ..clear()
+        ..addAll(response.members);
+      rankings
+        ..clear()
+        ..addAll(response.rankings);
+      if (response.rankings.isEmpty) unawaited(refreshRankings());
       loadingBackend = false;
       backendError = null;
       notifyListeners();
@@ -109,11 +125,9 @@ class FamilyController extends ChangeNotifier {
     notifyListeners();
     try {
       final backendRankings = await _api.getRankings(period: activePeriod);
-      if (backendRankings.isNotEmpty) {
-        rankings
-          ..clear()
-          ..addAll(backendRankings);
-      }
+      rankings
+        ..clear()
+        ..addAll(backendRankings);
       loadingRankings = false;
       backendError = null;
       notifyListeners();
@@ -128,13 +142,29 @@ class FamilyController extends ChangeNotifier {
     if (profile.id.trim().isEmpty) return;
     try {
       final backendMembers = await _api.getMembers(familyId: profile.id);
-      if (backendMembers.isEmpty) return;
       members
         ..clear()
         ..addAll(backendMembers);
       notifyListeners();
     } catch (_) {
       // Keep current member list if backend is unavailable.
+    }
+  }
+
+  Future<void> refreshInviteCandidates() async {
+    try {
+      final friends = await _socialApi.listFriendUsers();
+      inviteFriends
+        ..clear()
+        ..addAll(friends.map(_inviteFriendFromSocialUser));
+      selectedInviteUserIds.removeWhere(
+        (id) => inviteFriends.every((friend) => friend.userId != id),
+      );
+      notifyListeners();
+    } catch (_) {
+      inviteFriends.clear();
+      selectedInviteUserIds.clear();
+      notifyListeners();
     }
   }
 
@@ -146,38 +176,36 @@ class FamilyController extends ChangeNotifier {
   }
 
   void createFamily({required String name, required String minimumVipLabel}) {
-    profile = FamilyProfileUiModel(
-      id: FamilyId.generateMock(prefix: 'VMF'),
-      name: name,
-      minimumVipLabel: minimumVipLabel,
-      memberCount: 1,
-      maxMembers: 200,
-      rankLabel: 'Unranked',
-      ownerUserId: 'current_user',
-      quarterCarryExp: 0,
-      giftCoinsThisQuarter: 0,
-      timeMinutesToday: 0,
-    );
-    hasFamily = true;
-    isOwner = true;
-    isAdmin = true;
+    if (loadingBackend) return;
+    loadingBackend = true;
+    backendError = null;
     joinRequestPending = false;
     notifyListeners();
 
-    unawaited(_createFamilyOnBackend(name: name, minimumVipLabel: minimumVipLabel));
+    unawaited(
+      _createFamilyOnBackend(name: name, minimumVipLabel: minimumVipLabel),
+    );
   }
 
-  Future<void> _createFamilyOnBackend({required String name, required String minimumVipLabel}) async {
+  Future<void> _createFamilyOnBackend({
+    required String name,
+    required String minimumVipLabel,
+  }) async {
     try {
-      final backendProfile = await _api.createFamily(name: name, minimumVipLabel: minimumVipLabel);
+      final backendProfile = await _api.createFamily(
+        name: name,
+        minimumVipLabel: minimumVipLabel,
+      );
       profile = backendProfile;
       hasFamily = true;
       isOwner = true;
       isAdmin = true;
+      loadingBackend = false;
       backendError = null;
       notifyListeners();
       unawaited(refreshMembers());
     } catch (error) {
+      loadingBackend = false;
       backendError = error.toString().replaceFirst('Exception: ', '');
       notifyListeners();
     }
@@ -198,39 +226,16 @@ class FamilyController extends ChangeNotifier {
       backendError = null;
       notifyListeners();
     } catch (error) {
+      joinRequestPending = false;
       backendError = error.toString().replaceFirst('Exception: ', '');
       notifyListeners();
     }
   }
 
-  void mockApproveJoinRequest() {
-    if (!joinRequestPending) return;
-    hasFamily = true;
-    isOwner = false;
-    isAdmin = false;
-    joinRequestPending = false;
-    notifyListeners();
-  }
-
-  void mockRejectJoinRequest() {
-    joinRequestPending = false;
-    notifyListeners();
-  }
-
   void applyAdminSelection(Set<String> adminUserIds) {
     final cappedAdminIds = adminUserIds.take(adminCapacity).toSet();
-    for (var index = 0; index < members.length; index++) {
-      final member = members[index];
-      if (member.role == FamilyRole.owner) continue;
-      members[index] = FamilyMemberUiModel(
-        userId: member.userId,
-        name: member.name,
-        role: cappedAdminIds.contains(member.userId) ? FamilyRole.admin : FamilyRole.member,
-        contributionExp: member.contributionExp,
-        avatarGradient: member.avatarGradient,
-        isFollowing: member.isFollowing,
-      );
-    }
+    loadingBackend = true;
+    backendError = null;
     notifyListeners();
 
     unawaited(_setAdminsOnBackend(cappedAdminIds));
@@ -239,9 +244,12 @@ class FamilyController extends ChangeNotifier {
   Future<void> _setAdminsOnBackend(Set<String> adminUserIds) async {
     try {
       await _api.setAdmins(familyId: profile.id, adminUserIds: adminUserIds);
+      await refreshMembers();
+      loadingBackend = false;
       backendError = null;
       notifyListeners();
     } catch (error) {
+      loadingBackend = false;
       backendError = error.toString().replaceFirst('Exception: ', '');
       notifyListeners();
     }
@@ -263,7 +271,9 @@ class FamilyController extends ChangeNotifier {
   }
 
   List<FamilyInviteFriendUiModel> selectedInviteFriends() {
-    return inviteFriends.where((friend) => selectedInviteUserIds.contains(friend.userId)).toList();
+    return inviteFriends
+        .where((friend) => selectedInviteUserIds.contains(friend.userId))
+        .toList();
   }
 
   void markInvitesSent() {
@@ -287,10 +297,8 @@ class FamilyController extends ChangeNotifier {
 
   void exitFamily() {
     final oldFamilyId = profile.id;
-    hasFamily = false;
-    isOwner = false;
-    isAdmin = false;
-    joinRequestPending = false;
+    loadingBackend = true;
+    backendError = null;
     notifyListeners();
 
     unawaited(_leaveFamilyOnBackend(oldFamilyId));
@@ -299,9 +307,12 @@ class FamilyController extends ChangeNotifier {
   Future<void> _leaveFamilyOnBackend(String familyId) async {
     try {
       await _api.leaveFamily(familyId: familyId);
+      _clearCurrentFamily();
+      loadingBackend = false;
       backendError = null;
       notifyListeners();
     } catch (error) {
+      loadingBackend = false;
       backendError = error.toString().replaceFirst('Exception: ', '');
       notifyListeners();
     }
@@ -309,10 +320,8 @@ class FamilyController extends ChangeNotifier {
 
   void disbandFamily() {
     final oldFamilyId = profile.id;
-    hasFamily = false;
-    isOwner = false;
-    isAdmin = false;
-    joinRequestPending = false;
+    loadingBackend = true;
+    backendError = null;
     notifyListeners();
 
     unawaited(_disbandFamilyOnBackend(oldFamilyId));
@@ -321,18 +330,42 @@ class FamilyController extends ChangeNotifier {
   Future<void> _disbandFamilyOnBackend(String familyId) async {
     try {
       await _api.disbandFamily(familyId: familyId);
+      _clearCurrentFamily();
+      loadingBackend = false;
       backendError = null;
       notifyListeners();
     } catch (error) {
+      loadingBackend = false;
       backendError = error.toString().replaceFirst('Exception: ', '');
       notifyListeners();
     }
   }
 
-  void sendMessage(String text) {
+  bool sendMessage(String text) {
     final clean = text.trim();
-    if (clean.isEmpty || !hasFamily) return;
-    messages.insert(0, FamilyChatUiModel(senderName: 'You', message: clean, timeLabel: 'Now', isMine: true));
+    if (clean.isEmpty || !hasFamily) return false;
+    backendError = 'Family chat is waiting for a backend message endpoint.';
     notifyListeners();
+    return false;
   }
+
+  void _clearCurrentFamily() {
+    profile = _emptyFamilyProfile;
+    hasFamily = false;
+    isOwner = false;
+    isAdmin = false;
+    joinRequestPending = false;
+    members.clear();
+    messages.clear();
+  }
+}
+
+FamilyInviteFriendUiModel _inviteFriendFromSocialUser(SocialUser user) {
+  return FamilyInviteFriendUiModel(
+    userId: user.publicUserId?.toString() ?? user.id,
+    name: user.displayName,
+    statusLabel: user.isOnline ? 'Online friend' : 'Friend',
+    avatarGradient: user.colors,
+    isMutualFriend: true,
+  );
 }

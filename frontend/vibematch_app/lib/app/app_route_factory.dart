@@ -6,7 +6,7 @@ import '../features/banner_manager/presentation/banner_manager_page.dart';
 import '../features/control_center/presentation/control_center_page.dart';
 import '../features/events/presentation/events_page.dart';
 import '../features/experience/presentation/experience_detail_page.dart';
-import '../features/family/presentation/family_page.dart';
+import '../features/family/presentation/family_modular_page.dart';
 import '../features/love_bond/presentation/love_bond_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/public_profile_page.dart';
@@ -90,7 +90,7 @@ class AppRouteFactory {
       case VmRoutes.settings:
         return _buildRoute(settings, const SettingsPage());
       case VmRoutes.family:
-        return _buildRoute(settings, const FamilyPage());
+        return _buildRoute(settings, const FamilyModularPage());
       case VmRoutes.loveBond:
         return _buildRoute(settings, const LoveBondPage());
       case VmRoutes.vip:

@@ -57,7 +57,16 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: FamilyRedesignColors.ink, content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: FamilyRedesignColors.ink,
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
   }
 
   void _openInviteFlow() {
@@ -83,7 +92,9 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
         ? 'When a user accepts, owners/admins will receive an approval request. Approve = join, reject = invite link invalid.'
         : 'When a user accepts, they join directly and owners/admins receive a system notification.';
     _controller.markInvitesSent();
-    _toast('Sent $count family invite${count == 1 ? '' : 's'} through Inbox. $flow');
+    _toast(
+      'Sent $count family invite${count == 1 ? '' : 's'} through Inbox. $flow',
+    );
   }
 
   void _openFamilyList() {
@@ -105,7 +116,10 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
       builder: (_) => CreateFamilySheet(
         onCreate: (name, minimumVipLabel) {
           Navigator.pop(context);
-          _controller.createFamily(name: name, minimumVipLabel: minimumVipLabel);
+          _controller.createFamily(
+            name: name,
+            minimumVipLabel: minimumVipLabel,
+          );
         },
       ),
     );
@@ -113,12 +127,16 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
 
   void _openRankedFamily(FamilyRankUiModel family) {
     _controller.openFamilyFromRanking(family);
-    _toast('Opened ${family.name}. Join request can be sent from the ranking list.');
+    _toast(
+      'Opened ${family.name}. Join request can be sent from the ranking list.',
+    );
   }
 
   void _requestJoinRankedFamily(FamilyRankUiModel family) {
     _controller.requestJoinFamily(family: family);
-    _toast('System notification sent to ${family.name} owner/admins: you want to join this family.');
+    _toast(
+      'System notification sent to ${family.name} owner/admins: you want to join this family.',
+    );
   }
 
   void _openDisbandConfirmation() {
@@ -147,7 +165,9 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
         adminCapacity: _controller.adminCapacity,
         onSave: (selectedAdminIds) {
           _controller.applyAdminSelection(selectedAdminIds);
-          _toast('Family admins updated. ${selectedAdminIds.length}/${_controller.adminCapacity} selected.');
+          _toast(
+            'Family admins updated. ${selectedAdminIds.length}/${_controller.adminCapacity} selected.',
+          );
         },
       ),
     );
@@ -182,13 +202,22 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => FamilyLevelDetailsSheet(level: _controller.levelProgress, exp: _controller.expBreakdown),
+      builder: (_) => FamilyLevelDetailsSheet(
+        level: _controller.levelProgress,
+        exp: _controller.expBreakdown,
+      ),
     );
   }
 
   void _sendChat() {
-    _controller.sendMessage(_chatController.text);
-    _chatController.clear();
+    final sent = _controller.sendMessage(_chatController.text);
+    if (sent) {
+      _chatController.clear();
+    } else if (_chatController.text.trim().isNotEmpty) {
+      _toast(
+        'Family chat will be enabled when the backend message endpoint is available.',
+      );
+    }
   }
 
   @override
