@@ -23,6 +23,11 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
 
     if (seat.user == null && _viewerCanManageRoom) {
       _seatController.toggleSelectedSeat(index);
+      return;
+    }
+
+    if (seat.user != null && _viewerCanManageRoom) {
+      _seatController.toggleSelectedSeat(index);
     }
   }
 
@@ -30,6 +35,18 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     final user = _seatController.seats[index].user;
     if (user == null) return;
     _openMiniProfile(user, index);
+  }
+
+  void _toggleSeatAdminMute(int index) {
+    final seat = index >= 0 && index < _seatController.seats.length
+        ? _seatController.seats[index]
+        : null;
+    final user = seat?.user;
+    if (user == null) {
+      RoomToast.show(context, 'No active mic on this seat yet');
+      return;
+    }
+    _seatController.toggleAdminMute(user.id);
   }
 
   void _approveSeatApplication(ChatEntry entry) {
@@ -170,6 +187,7 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
 
   void _dismissRoomOverlays() {
     dismissRoomSeatActionPill();
+    _seatController.clearSelectedSeat();
     _clearRoomFocus();
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
@@ -45,6 +46,8 @@ class _LiveRoomRemoteAudioRenderersState
       return;
     }
 
+    // ignore: avoid_print
+    print('[VibeMatchAudio] remote renderer count=${LiveRoomAudioService.instance.remoteAudioRenderers.value.length}');
     unawaited(_preferSystemAudioRoute());
     _audioRouteRefreshTimer ??= Timer.periodic(
       const Duration(seconds: 3),
@@ -53,6 +56,7 @@ class _LiveRoomRemoteAudioRenderersState
   }
 
   Future<void> _preferSystemAudioRoute() async {
+    if (kIsWeb) return;
     if (_audioRouteRefreshRunning) return;
     _audioRouteRefreshRunning = true;
     try {

@@ -417,6 +417,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   onUserTap: _onUserTap,
                   onInvite: _inviteSeat,
                   onSwitch: _seatController.occupySeat,
+                  onMuteSeat: _toggleSeatAdminMute,
                   onLock: _seatController.lockSeat,
                   onUnlock: _seatController.unlockSeat,
                   onApplySeat: _applyForSeat,

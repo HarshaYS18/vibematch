@@ -24,6 +24,7 @@ class RoomSeatLayout extends StatelessWidget {
     required this.onUserTap,
     required this.onInvite,
     required this.onSwitch,
+    required this.onMuteSeat,
     required this.onLock,
     required this.onUnlock,
     required this.onApply,
@@ -43,6 +44,7 @@ class RoomSeatLayout extends StatelessWidget {
   final ValueChanged<int> onUserTap;
   final ValueChanged<int> onInvite;
   final ValueChanged<int> onSwitch;
+  final ValueChanged<int> onMuteSeat;
   final ValueChanged<int> onLock;
   final ValueChanged<int> onUnlock;
   final ValueChanged<int> onApply;
@@ -77,6 +79,17 @@ class RoomSeatLayout extends StatelessWidget {
                         onTap: () => _handleSeatTap(index),
                       ),
                     ),
+                  if (canManageSeats &&
+                      selectedSeatIndex != null &&
+                      selectedSeatIndex! >= 0 &&
+                      selectedSeatIndex! < seats.length)
+                    _buildSeatActionPill(
+                      context: context,
+                      seatIndex: selectedSeatIndex!,
+                      spec: spec,
+                      width: width,
+                      layoutHeight: layoutHeight,
+                    ),
                 ],
               ),
             );
@@ -96,8 +109,50 @@ class RoomSeatLayout extends StatelessWidget {
       }
       onSeatTap(index);
     } else {
+      if (canManageSeats) {
+        onSeatTap(index);
+        return;
+      }
       onUserTap(index);
     }
+  }
+
+  Widget _buildSeatActionPill({
+    required BuildContext context,
+    required int seatIndex,
+    required SeatLayoutSpec spec,
+    required double width,
+    required double layoutHeight,
+  }) {
+    final seat = seats[seatIndex];
+    final offset = _seatOffset(seatIndex, spec, width);
+    final pillWidth = width < 260 ? width - 8 : 252.0;
+    const pillHeight = 42.0;
+    final left = (offset.dx - pillWidth / 2)
+        .clamp(4.0, width - pillWidth - 4.0)
+        .toDouble();
+    final below = offset.dy + 57;
+    final top = below + pillHeight > layoutHeight
+        ? (offset.dy - pillHeight - 4)
+            .clamp(0.0, layoutHeight - pillHeight)
+            .toDouble()
+        : below;
+
+    return Positioned(
+      left: left,
+      top: top,
+      width: pillWidth,
+      height: pillHeight,
+      child: _SeatActionPill(
+        seat: seat,
+        onProfile: () => onUserTap(seatIndex),
+        onInvite: () => onInvite(seatIndex),
+        onSwitch: () => onSwitch(seatIndex),
+        onMute: () => onMuteSeat(seatIndex),
+        onLock: () => onLock(seatIndex),
+        onUnlock: () => onUnlock(seatIndex),
+      ),
+    );
   }
 
   Offset _seatOffset(int index, SeatLayoutSpec spec, double width) {
@@ -153,6 +208,114 @@ class _SeatTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SeatActionPill extends StatelessWidget {
+  const _SeatActionPill({
+    required this.seat,
+    required this.onProfile,
+    required this.onInvite,
+    required this.onSwitch,
+    required this.onMute,
+    required this.onLock,
+    required this.onUnlock,
+  });
+
+  final RoomSeat seat;
+  final VoidCallback onProfile;
+  final VoidCallback onInvite;
+  final VoidCallback onSwitch;
+  final VoidCallback onMute;
+  final VoidCallback onLock;
+  final VoidCallback onUnlock;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = seat.user;
+    final actions = <_SeatActionData>[];
+
+    if (user == null) {
+      if (seat.locked) {
+        actions.add(_SeatActionData(icon: Icons.lock_open_rounded, label: 'Unlock', onTap: onUnlock));
+        actions.add(_SeatActionData(icon: Icons.person_add_alt_1_rounded, label: 'Invite', onTap: onInvite));
+      } else {
+        actions.add(_SeatActionData(icon: Icons.swap_horiz_rounded, label: 'Switch', onTap: onSwitch));
+        actions.add(_SeatActionData(icon: Icons.person_add_alt_1_rounded, label: 'Invite', onTap: onInvite));
+        actions.add(_SeatActionData(icon: Icons.mic_off_rounded, label: 'Mute', onTap: onMute));
+        actions.add(_SeatActionData(icon: Icons.lock_rounded, label: 'Lock', onTap: onLock));
+      }
+    } else {
+      actions.add(_SeatActionData(icon: Icons.person_rounded, label: 'Profile', onTap: onProfile));
+      actions.add(_SeatActionData(
+        icon: user.adminMuted ? Icons.mic_rounded : Icons.mic_off_rounded,
+        label: user.adminMuted ? 'Unmute' : 'Mute',
+        onTap: onMute,
+      ));
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xF31C1228),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            for (final action in actions)
+              Expanded(
+                child: InkWell(
+                  onTap: action.onTap,
+                  borderRadius: BorderRadius.circular(999),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(action.icon, color: Colors.white, size: 14),
+                        const SizedBox(height: 1),
+                        Text(
+                          action.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.86),
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SeatActionData {
+  const _SeatActionData({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 }
 
 class _SeatAvatar extends StatelessWidget {

@@ -54,6 +54,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.onUserTap,
     required this.onInvite,
     required this.onSwitch,
+    required this.onMuteSeat,
     required this.onLock,
     required this.onUnlock,
     required this.onApplySeat,
@@ -110,6 +111,7 @@ class LiveRoomBody extends StatelessWidget {
   final ValueChanged<int> onUserTap;
   final ValueChanged<int> onInvite;
   final ValueChanged<int> onSwitch;
+  final ValueChanged<int> onMuteSeat;
   final ValueChanged<int> onLock;
   final ValueChanged<int> onUnlock;
   final ValueChanged<int> onApplySeat;
@@ -211,6 +213,7 @@ class LiveRoomBody extends StatelessWidget {
                       onUserTap: onUserTap,
                       onInvite: onInvite,
                       onSwitch: onSwitch,
+                      onMuteSeat: onMuteSeat,
                       onLock: onLock,
                       onUnlock: onUnlock,
                       onApply: onApplySeat,

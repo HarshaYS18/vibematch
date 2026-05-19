@@ -2,7 +2,7 @@ import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import { config } from '../config.js';
 import { extractBearerToken, MediaAuthorizationError, verifyMediaAction } from '../auth/fastapiVerifier.js';
-import type { Ack, MediaAction, MediaProducer, MediaWebRtcTransport, PeerState } from '../types/mediaTypes.js';
+import type { Ack, MediaAction, MediaConsumer, MediaProducer, MediaWebRtcTransport, PeerState, RoomState } from '../types/mediaTypes.js';
 import type { RoomManager } from '../mediasoup/roomManager.js';
 import {
   connectTransportSchema,
@@ -50,6 +50,20 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         const input = joinRoomSchema.parse(payload);
         const auth = requireSocketAuth(socket.data.auth);
         mediaLog('joinRoom.received', socket.id, { roomPublicId: input.roomPublicId });
+        const existingPeer = roomManager.getPeer(socket.id);
+        if (existingPeer?.roomPublicId === input.roomPublicId) {
+          const existingRoom = requireRoom(roomManager, existingPeer.roomPublicId);
+          await socket.join(existingRoom.roomPublicId);
+          mediaLog('joinRoom.reused', socket.id, { roomPublicId: existingRoom.roomPublicId });
+          return joinRoomPayload(roomManager, existingRoom, existingPeer);
+        }
+        if (existingPeer) {
+          const closed = roomManager.closePeer(socket.id);
+          if (closed.roomPublicId) {
+            await socket.leave(closed.roomPublicId);
+            socket.to(closed.roomPublicId).emit('peerLeft', { socketId: socket.id, peerId: socket.id, producerIds: closed.producerIds });
+          }
+        }
         const verified = await verifyMediaAction({
           bearerToken: auth.bearerToken,
           requestedAction: 'join_room',
@@ -68,21 +82,12 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
           user: verified.user,
           bearerToken: auth.bearerToken,
           deviceId: input.deviceId ?? auth.deviceId,
+          permissions: verified.permissions,
+          mediasoupContext: verified.mediasoup_context,
         });
         await socket.join(room.roomPublicId);
         socket.to(room.roomPublicId).emit('peerJoined', publicPeer(peer));
-        const roomPayload = {
-          seats: [],
-          producers: roomManager.serializeProducers?.(room) ?? [],
-        };
-        return {
-          roomPublicId: room.roomPublicId,
-          rtpCapabilities: roomManager.getRtpCapabilities(room),
-          room: roomPayload,
-          peer: publicPeer(peer),
-          permissions: verified.permissions,
-          mediasoupContext: verified.mediasoup_context,
-        };
+        return joinRoomPayload(roomManager, room, peer);
       });
     });
 
@@ -102,8 +107,9 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         mediaLog('transport.create.received', socket.id, { roomPublicId: peer.roomPublicId, direction: input.direction });
         await verifyPeerAction(peer, 'create_transport');
         const room = requireRoom(roomManager, peer.roomPublicId);
+        const existingTransport = roomManager.getTransportByDirection(peer, input.direction);
         const transport = await roomManager.createWebRtcTransport({ room, peer, direction: input.direction });
-        mediaLog('transport.create.ok', socket.id, { transportId: transport.id, direction: input.direction });
+        mediaLog(existingTransport ? 'transport.reused' : 'transport.create.ok', socket.id, { transportId: transport.id, direction: input.direction });
         return { params: serializeTransport(transport), ...serializeTransport(transport) };
       });
     });
@@ -115,7 +121,12 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         mediaLog('transport.connect.received', socket.id, { transportId: input.transportId });
         await verifyPeerAction(peer, 'connect_transport');
         const transport = requireTransport(peer, input.transportId);
+        if (peer.connectedTransportIds.has(transport.id)) {
+          mediaLog('transport.connect.reused', socket.id, { transportId: transport.id });
+          return { transportId: transport.id };
+        }
         await transport.connect({ dtlsParameters: input.dtlsParameters as never });
+        peer.connectedTransportIds.add(transport.id);
         mediaLog('transport.connect.ok', socket.id, { transportId: transport.id });
         return { transportId: transport.id };
       });
@@ -128,7 +139,12 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         mediaLog('transport.connectLegacy.received', socket.id, { transportId: input.transportId });
         await verifyPeerAction(peer, 'connect_transport');
         const transport = requireTransport(peer, input.transportId);
+        if (peer.connectedTransportIds.has(transport.id)) {
+          mediaLog('transport.connectLegacy.reused', socket.id, { transportId: transport.id });
+          return { transportId: transport.id };
+        }
         await transport.connect({ dtlsParameters: input.dtlsParameters as never });
+        peer.connectedTransportIds.add(transport.id);
         mediaLog('transport.connectLegacy.ok', socket.id, { transportId: transport.id });
         return { transportId: transport.id };
       });
@@ -140,7 +156,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         const peer = requirePeer(roomManager, socket.id);
         mediaLog('produce.received', socket.id, { roomPublicId: peer.roomPublicId, transportId: input.transportId, kind: input.kind });
         await verifyPeerAction(peer, 'produce_audio');
-        closeExistingPeerProducers(peer, socket);
+        closeExistingPeerProducers(roomManager, peer, socket);
         const transport = requireTransport(peer, input.transportId);
         const producer = await transport.produce({
           kind: input.kind,
@@ -169,6 +185,12 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         mediaLog('consume.received', socket.id, { roomPublicId: peer.roomPublicId, producerId: input.producerId });
         await verifyPeerAction(peer, 'consume_audio');
         const room = requireRoom(roomManager, peer.roomPublicId);
+        const existingConsumerId = peer.consumerProducerIds.get(input.producerId);
+        const existingConsumer = existingConsumerId ? peer.consumers.get(existingConsumerId) : undefined;
+        if (existingConsumer) {
+          mediaLog('consume.reused', socket.id, { consumerId: existingConsumer.id, producerId: input.producerId });
+          return serializeConsumer(existingConsumer, input.producerId);
+        }
         if (!room.router.canConsume({ producerId: input.producerId, rtpCapabilities: input.rtpCapabilities as never })) {
           throw new Error('Cannot consume this producer with provided RTP capabilities.');
         }
@@ -181,21 +203,13 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
           paused: true,
         });
         peer.consumers.set(consumer.id, consumer);
-        consumer.on('@close', () => peer.consumers.delete(consumer.id));
+        peer.consumerProducerIds.set(input.producerId, consumer.id);
+        consumer.on('@close', () => {
+          peer.consumers.delete(consumer.id);
+          peer.consumerProducerIds.delete(input.producerId);
+        });
         mediaLog('consume.ok', socket.id, { consumerId: consumer.id, producerId: input.producerId });
-        return {
-          params: {
-            id: consumer.id,
-            consumerId: consumer.id,
-            producerId: input.producerId,
-            kind: consumer.kind,
-            rtpParameters: consumer.rtpParameters,
-          },
-          consumerId: consumer.id,
-          producerId: input.producerId,
-          kind: consumer.kind,
-          rtpParameters: consumer.rtpParameters,
-        };
+        return serializeConsumer(consumer, input.producerId);
       });
     });
 
@@ -285,12 +299,17 @@ async function verifyPeerAction(peer: PeerState, requestedAction: MediaAction) {
   });
 }
 
-function closeExistingPeerProducers(peer: PeerState, socket: { to(room: string): { emit(event: string, payload: unknown): void } }): void {
+function closeExistingPeerProducers(
+  roomManager: RoomManager,
+  peer: PeerState,
+  socket: { to(room: string): { emit(event: string, payload: unknown): void } },
+): void {
   const existingProducerIds = [...peer.producers.keys()];
   for (const producerId of existingProducerIds) {
     const producer = peer.producers.get(producerId);
     producer?.close();
     peer.producers.delete(producerId);
+    roomManager.closeConsumersForProducer(peer.roomPublicId, producerId);
     socket.to(peer.roomPublicId).emit('producerClosed', { producerId, peerId: peer.socketId });
     mediaLog('producer.duplicateClosed', peer.socketId, { producerId });
   }
@@ -330,6 +349,35 @@ function serializeTransport(transport: MediaWebRtcTransport) {
     iceCandidates: transport.iceCandidates,
     dtlsParameters: transport.dtlsParameters,
     sctpParameters: transport.sctpParameters,
+  };
+}
+
+function serializeConsumer(consumer: MediaConsumer, producerId: string) {
+  const params = {
+    id: consumer.id,
+    consumerId: consumer.id,
+    producerId,
+    kind: consumer.kind,
+    rtpParameters: consumer.rtpParameters,
+  };
+  return {
+    params,
+    ...params,
+  };
+}
+
+function joinRoomPayload(roomManager: RoomManager, room: RoomState, peer: PeerState) {
+  const roomPayload = {
+    seats: [],
+    producers: roomManager.serializeProducers?.(room) ?? [],
+  };
+  return {
+    roomPublicId: room.roomPublicId,
+    rtpCapabilities: roomManager.getRtpCapabilities(room),
+    room: roomPayload,
+    peer: publicPeer(peer),
+    permissions: peer.permissions,
+    mediasoupContext: peer.mediasoupContext,
   };
 }
 

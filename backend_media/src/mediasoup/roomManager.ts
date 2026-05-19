@@ -44,6 +44,8 @@ export class RoomManager {
     user: VerifiedMediaUser;
     bearerToken: string;
     deviceId?: string;
+    permissions?: string[];
+    mediasoupContext?: Record<string, unknown>;
   }): PeerState {
     const existing = params.room.peers.get(params.socketId);
     if (existing) return existing;
@@ -55,10 +57,14 @@ export class RoomManager {
       deviceId: params.deviceId,
       roomPublicId: params.room.roomPublicId,
       joinedAt: Date.now(),
+      permissions: params.permissions ?? [],
+      mediasoupContext: params.mediasoupContext ?? {},
       transports: new Map<string, MediaWebRtcTransport>(),
       transportDirections: new Map<string, TransportDirection>(),
+      connectedTransportIds: new Set<string>(),
       producers: new Map<string, MediaProducer>(),
       consumers: new Map<string, MediaConsumer>(),
+      consumerProducerIds: new Map<string, string>(),
     };
     params.room.peers.set(params.socketId, peer);
     params.room.lastActiveAt = Date.now();
@@ -143,6 +149,7 @@ export class RoomManager {
     transport.on('@close', () => {
       params.peer.transports.delete(transport.id);
       params.peer.transportDirections.delete(transport.id);
+      params.peer.connectedTransportIds.delete(transport.id);
     });
 
     return transport;
@@ -173,6 +180,27 @@ export class RoomManager {
     if (!producer) return false;
     producer.close();
     peer.producers.delete(producerId);
+    this.closeConsumersForProducer(peer.roomPublicId, producerId);
     return true;
+  }
+
+  closeConsumersForProducer(roomPublicId: string, producerId: string): string[] {
+    const room = this.rooms.get(roomPublicId);
+    if (!room) return [];
+
+    const closedConsumerIds: string[] = [];
+    for (const peer of room.peers.values()) {
+      const consumerId = peer.consumerProducerIds.get(producerId);
+      if (!consumerId) continue;
+      const consumer = peer.consumers.get(consumerId);
+      if (consumer) {
+        consumer.close();
+        closedConsumerIds.push(consumerId);
+      }
+      peer.consumers.delete(consumerId);
+      peer.consumerProducerIds.delete(producerId);
+    }
+    room.lastActiveAt = Date.now();
+    return closedConsumerIds;
   }
 }

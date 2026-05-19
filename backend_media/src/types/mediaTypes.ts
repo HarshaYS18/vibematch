@@ -23,6 +23,7 @@ export interface MediaProducer {
 export interface MediaConsumer {
   id: string;
   kind: string;
+  producerId: string;
   rtpParameters: unknown;
   resume(): Promise<void>;
   close(): void;
@@ -99,10 +100,14 @@ export interface PeerState {
   deviceId?: string;
   roomPublicId: string;
   joinedAt: number;
+  permissions: string[];
+  mediasoupContext: Record<string, unknown>;
   transports: Map<string, MediaWebRtcTransport>;
   transportDirections: Map<string, TransportDirection>;
+  connectedTransportIds: Set<string>;
   producers: Map<string, MediaProducer>;
   consumers: Map<string, MediaConsumer>;
+  consumerProducerIds: Map<string, string>;
 }
 
 export interface RoomState {
