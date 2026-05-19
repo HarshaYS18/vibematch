@@ -38,6 +38,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
   String? _replyToText;
   bool _sendingImage = false;
   bool _sendingDocument = false;
+  bool _sendingVoice = false;
 
   InboxConversation get _conversation => widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
 
@@ -258,6 +259,66 @@ class _InboxChatPageState extends State<InboxChatPage> {
     return raw.isEmpty ? 'Image send failed. Please try again.' : raw;
   }
 
+  Future<void> _pickAndSendVoiceAttachment() async {
+    if (_readOnly || _sendingVoice) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'weba'],
+        withData: true,
+        withReadStream: false,
+      );
+      final file = result?.files.single;
+      if (file == null) return;
+
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _showToast('Could not read selected voice file.');
+        return;
+      }
+      if (bytes.length > 10 * 1024 * 1024) {
+        _showToast('Voice message must be 10 MB or smaller.');
+        return;
+      }
+
+      setState(() => _sendingVoice = true);
+      _showToast('Uploading voice message...');
+
+      final uploaded = await _mediaUploadApi.uploadChatVoiceBytes(
+        bytes: bytes,
+        filename: file.name,
+      );
+      if (uploaded.url.trim().isEmpty) {
+        throw Exception('Upload completed without voice URL.');
+      }
+
+      final sizeLabel = _formatAttachmentBytes(bytes.length);
+      await _inboxApi.sendMessage(
+        conversationId: _conversation.id,
+        text: '🎙 Voice message • $sizeLabel',
+        type: 'voice',
+        attachmentUrl: uploaded.url,
+      );
+
+      await widget.controller.loadFromBackend();
+      if (mounted) _showToast('Voice message sent.');
+    } catch (error) {
+      if (mounted) _showToast(_friendlyVoiceError(error));
+    } finally {
+      if (mounted) setState(() => _sendingVoice = false);
+    }
+  }
+
+  String _friendlyVoiceError(Object error) {
+    final raw = error.toString().replaceFirst('Exception: ', '').trim();
+    if (raw.contains('413')) return 'Voice file is too large. Choose audio under 10 MB.';
+    if (raw.contains('401') || raw.toLowerCase().contains('login')) return 'Session expired. Login again before sending voice.';
+    if (raw.contains('400') && raw.toLowerCase().contains('unsupported')) return 'Unsupported audio type. Use MP3, M4A, AAC, WAV, OGG, OPUS, or WEBM audio.';
+    if (raw.toLowerCase().contains('failed to fetch') || raw.toLowerCase().contains('xmlhttprequest')) return 'Upload failed. Check FastAPI is running and try again.';
+    return raw.isEmpty ? 'Voice send failed. Please try again.' : raw;
+  }
+
   Future<void> _openAttachmentSheet() async {
     if (_readOnly) return;
     await showModalBottomSheet<void>(
@@ -388,7 +449,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
               controller: _textController,
               onAttachTap: _openAttachmentSheet,
               onEmojiTap: _openEmojiPack,
-              onVoiceTap: () => widget.controller.addMockAttachment(conversationId: conversation.id, type: InboxMessageType.voice),
+              onVoiceTap: () => _pickAndSendVoiceAttachment(),
               onSendTap: _sendText,
             ),
           ],
