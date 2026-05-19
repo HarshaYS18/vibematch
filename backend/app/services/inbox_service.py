@@ -156,20 +156,147 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
     return conversation
 
 
+def _direct_pair_key(conversation: InboxConversation) -> tuple[int, int] | None:
+    if conversation.is_official:
+        return None
+    participant_ids = sorted(participant_user_ids(conversation))
+    if len(participant_ids) != 2:
+        return None
+    return (participant_ids[0], participant_ids[1])
+
+
+def _merge_duplicate_direct_conversations_for_user(db: Session, user: User) -> None:
+    conversations = (
+        db.query(InboxConversation)
+        .join(InboxParticipant)
+        .filter(
+            InboxParticipant.user_id == user.id,
+            InboxParticipant.is_deleted_for_user.is_(False),
+            InboxConversation.is_official.is_(False),
+        )
+        .order_by(InboxConversation.created_at.asc(), InboxConversation.updated_at.asc())
+        .all()
+    )
+
+    grouped: dict[tuple[int, int], list[InboxConversation]] = {}
+    for conversation in conversations:
+        pair_key = _direct_pair_key(conversation)
+        if pair_key is None:
+            continue
+        grouped.setdefault(pair_key, []).append(conversation)
+
+    changed = False
+
+    for pair_conversations in grouped.values():
+        if len(pair_conversations) <= 1:
+            continue
+
+        pair_conversations.sort(key=lambda item: (item.created_at, item.id))
+        main = pair_conversations[0]
+        duplicates = pair_conversations[1:]
+
+        if main.conversation_type != InboxConversationType.CHAT.value:
+            main.conversation_type = InboxConversationType.CHAT.value
+            changed = True
+
+        for duplicate in duplicates:
+            for message in list(duplicate.messages):
+                message.conversation_id = main.id
+                changed = True
+
+            if not main.current_room_name and duplicate.current_room_name:
+                main.current_room_name = duplicate.current_room_name
+            if not main.room_public_id and duplicate.room_public_id:
+                main.room_public_id = duplicate.room_public_id
+
+            main.is_muted = main.is_muted or duplicate.is_muted
+            main.is_pinned = main.is_pinned or duplicate.is_pinned
+            main.is_archived = main.is_archived and duplicate.is_archived
+            main.updated_at = max(main.updated_at, duplicate.updated_at)
+
+            main_metadata = dict(main.metadata_json or {})
+            duplicate_metadata = dict(duplicate.metadata_json or {})
+            for key, value in duplicate_metadata.items():
+                main_metadata.setdefault(key, value)
+            main.metadata_json = main_metadata
+
+            db.delete(duplicate)
+            changed = True
+
+    if changed:
+        db.commit()
+
+
+
+
 def list_conversations(db: Session, user: User) -> list[InboxConversation]:
     ensure_team_conversation(db, user)
-    return db.query(InboxConversation).join(InboxParticipant).filter(InboxParticipant.user_id == user.id, InboxParticipant.is_deleted_for_user.is_(False)).order_by(InboxConversation.is_pinned.desc(), InboxConversation.updated_at.desc()).all()
+    _merge_duplicate_direct_conversations_for_user(db, user)
+    return (
+        db.query(InboxConversation)
+        .join(InboxParticipant)
+        .filter(
+            InboxParticipant.user_id == user.id,
+            InboxParticipant.is_deleted_for_user.is_(False),
+        )
+        .order_by(InboxConversation.is_pinned.desc(), InboxConversation.updated_at.desc())
+        .all()
+    )
 
 
 def get_conversation_for_user(db: Session, user: User, conversation_public_id: str) -> InboxConversation | None:
     return db.query(InboxConversation).join(InboxParticipant).filter(InboxConversation.public_id == conversation_public_id, InboxParticipant.user_id == user.id).first()
 
 
+def _same_direct_pair(conversation: InboxConversation, user_a_id: int, user_b_id: int) -> bool:
+    if conversation.is_official:
+        return False
+    participant_ids = set(participant_user_ids(conversation))
+    return participant_ids == {user_a_id, user_b_id}
+
+
+def _dedupe_conversations_for_user(conversations: list[InboxConversation]) -> list[InboxConversation]:
+    visible: list[InboxConversation] = []
+    seen_pairs: set[tuple[int, int]] = set()
+
+    for conversation in conversations:
+        if not conversation.is_official:
+            participant_ids = sorted(participant_user_ids(conversation))
+            if len(participant_ids) == 2:
+                pair_key = (participant_ids[0], participant_ids[1])
+                if pair_key in seen_pairs:
+                    continue
+                seen_pairs.add(pair_key)
+
+        visible.append(conversation)
+
+    return visible
+
+
+
+
 def create_direct_conversation(db: Session, current_user: User, target_user: User) -> InboxConversation:
-    current_conversations = db.query(InboxConversation).join(InboxParticipant).filter(InboxConversation.conversation_type == InboxConversationType.CHAT.value, InboxParticipant.user_id == current_user.id).all()
-    for conversation in current_conversations:
-        ids = set(participant_user_ids(conversation))
-        if current_user.id in ids and target_user.id in ids:
+    _merge_duplicate_direct_conversations_for_user(db, current_user)
+
+    existing_conversations = (
+        db.query(InboxConversation)
+        .join(InboxParticipant)
+        .filter(
+            InboxConversation.is_official.is_(False),
+            InboxParticipant.user_id.in_([current_user.id, target_user.id]),
+        )
+        .all()
+    )
+
+    for conversation in existing_conversations:
+        pair_key = _direct_pair_key(conversation)
+        if pair_key == tuple(sorted([current_user.id, target_user.id])):
+            if conversation.conversation_type != InboxConversationType.CHAT.value:
+                conversation.conversation_type = InboxConversationType.CHAT.value
+                conversation.updated_at = datetime.utcnow()
+                db.add(conversation)
+                db.commit()
+                db.refresh(conversation)
             return conversation
 
     title = _display_name(target_user)
@@ -182,7 +309,10 @@ def create_direct_conversation(db: Session, current_user: User, target_user: Use
     )
     db.add(conversation)
     db.flush()
-    db.add_all([InboxParticipant(conversation_id=conversation.id, user_id=current_user.id), InboxParticipant(conversation_id=conversation.id, user_id=target_user.id)])
+    db.add_all([
+        InboxParticipant(conversation_id=conversation.id, user_id=current_user.id),
+        InboxParticipant(conversation_id=conversation.id, user_id=target_user.id),
+    ])
     db.commit()
     db.refresh(conversation)
     return conversation
@@ -222,9 +352,15 @@ def send_message(
         attachment_url=attachment_url,
         metadata_json=message_metadata or None,
     )
+    if _disappearing_mode_enabled(conversation):
+        expires_at = datetime.utcnow() + timedelta(seconds=_disappearing_ttl_seconds(conversation))
+        message_metadata = dict(message.metadata_json or {})
+        message_metadata["disappearing"] = True
+        message_metadata["expires_at"] = _utc_iso_z(expires_at)
+        message.metadata_json = message_metadata
+
     conversation.updated_at = datetime.utcnow()
     if message_type == InboxMessageType.ROOM_INVITE.value:
-        conversation.conversation_type = InboxConversationType.ROOM_INVITE.value
         conversation.current_room_name = invite_room_name
         conversation.room_public_id = invite_room_id
     db.add(message)
@@ -477,6 +613,68 @@ def mark_messages_read_for_user(
 
 
 
+def _conversation_metadata(conversation: InboxConversation) -> dict:
+    return dict(conversation.metadata_json or {})
+
+
+def _disappearing_mode_enabled(conversation: InboxConversation) -> bool:
+    metadata = _conversation_metadata(conversation)
+    return metadata.get("disappearing_mode_enabled") is True
+
+
+def _disappearing_ttl_seconds(conversation: InboxConversation) -> int:
+    metadata = _conversation_metadata(conversation)
+    raw = metadata.get("disappearing_ttl_seconds") or 86400
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = 86400
+    return max(60, min(value, 604800))
+
+
+def _message_expires_at(message: InboxMessage) -> datetime | None:
+    metadata = message.metadata_json or {}
+    raw = metadata.get("expires_at")
+    if raw is None:
+        return None
+    if isinstance(raw, datetime):
+        return raw
+    if isinstance(raw, str):
+        cleaned = raw.removesuffix("Z")
+        try:
+            return datetime.fromisoformat(cleaned)
+        except ValueError:
+            return None
+    return None
+
+
+def _is_message_expired(message: InboxMessage) -> bool:
+    expires_at = _message_expires_at(message)
+    return expires_at is not None and datetime.utcnow() >= expires_at
+
+
+def _visible_messages(messages: list[InboxMessage]) -> list[InboxMessage]:
+    return [message for message in messages if not _is_message_expired(message)]
+
+
+def set_disappearing_mode(
+    db: Session,
+    conversation: InboxConversation,
+    enabled: bool,
+    ttl_seconds: int = 86400,
+) -> InboxConversation:
+    metadata = _conversation_metadata(conversation)
+    metadata["disappearing_mode_enabled"] = bool(enabled)
+    metadata["disappearing_ttl_seconds"] = max(60, min(int(ttl_seconds or 86400), 604800))
+    conversation.metadata_json = metadata
+    conversation.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+
+
 def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
     metadata = message.metadata_json or {}
     invite_room_id = metadata.get("invite_room_id") or metadata.get("room_public_id") or message.conversation.room_public_id
@@ -516,7 +714,7 @@ def _utc_iso_z(value: datetime | None) -> str | None:
 
 def conversation_to_dict(conversation: InboxConversation, current_user: User) -> dict:
     participant = next((item for item in conversation.participants if item.user_id == current_user.id), None)
-    messages = list(conversation.messages)
+    messages = _visible_messages(list(conversation.messages))
     last_message = messages[-1] if messages else None
     metadata = conversation.metadata_json or {}
     other_user = _other_participant_user(conversation, current_user)
@@ -554,6 +752,8 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
         "is_archived": conversation.is_archived,
         "chat_streak_count": streak_count,
         "chat_streak_active_today": streak_active_today,
+        "disappearing_mode_enabled": _disappearing_mode_enabled(conversation),
+        "disappearing_ttl_seconds": _disappearing_ttl_seconds(conversation),
     }
 
 
