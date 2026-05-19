@@ -33,8 +33,10 @@ These folders are legacy/reference only and must not be started as production se
 - Duplicate consume requests return the existing consumer payload and log `[media] consume.reused`.
 - Duplicate mic producers are replaced by closing the old producer and notifying the room once.
 - Disconnect, leave, close producer, and duplicate producer replacement clean producer/consumer/transport state.
+- `backend_media` now logs the mediasoup listen/announced IP on startup. Local dev defaults to auto-detecting the LAN IPv4 address when `MEDIASOUP_ANNOUNCED_IP` is empty, because advertising `127.0.0.1` makes WebRTC signaling succeed while remote devices cannot receive RTP.
 - Flutter audio join now has an in-flight guard.
 - Flutter receive transport creation and consume loops are idempotent.
+- Flutter treats the server `produce` ack as the canonical mic producer state, preventing the producer watchdog from creating a second mic producer after a successful ack.
 - Flutter remote audio renderers remain mounted in the visible page tree as tiny `RTCVideoView` widgets.
 - Flutter Web no longer forces speakerphone output routing.
 

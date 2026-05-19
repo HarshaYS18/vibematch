@@ -36,6 +36,9 @@ const io = createSocketServer(httpServer, roomManager);
 
 httpServer.listen(config.port, config.host, () => {
   console.log(`[media] service running on http://${config.host}:${config.port}`);
+  console.log(
+    `[media] mediasoup listenIp=${config.mediasoup.listenIp} announcedIp=${config.mediasoup.announcedIp} rtcPorts=${config.mediasoup.minPort}-${config.mediasoup.maxPort}`,
+  );
 });
 
 async function shutdown(signal: string) {

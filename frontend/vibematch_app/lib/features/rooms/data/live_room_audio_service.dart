@@ -24,6 +24,7 @@ class LiveRoomAudioService {
   dynamic _recvTransport;
   dynamic _audioProducer;
   dynamic _routerRtpCapabilities;
+  String? _serverAudioProducerId;
   Timer? _produceRetryTimer;
   Timer? _recoveryTimer;
   Timer? _activeSpeakerSilenceTimer;
@@ -477,6 +478,7 @@ class LiveRoomAudioService {
           _cancelProduceRetry();
           _produceRetryCount = 0;
           _rebuildSendPipelineOnRetry = false;
+          _serverAudioProducerId ??= producer.id;
           _audioProducer = producer;
           audioPublishing.value = true;
           _debug('audio producer callback id=${producer.id} kind=${producer.kind}');
@@ -496,6 +498,15 @@ class LiveRoomAudioService {
           });
           if (produceAck['ok'] == true) {
             final producerId = produceAck['producerId']?.toString() ?? produceAck['id']?.toString() ?? '';
+            if (producerId.isEmpty) {
+              data['errback']('produce failed: missing producer id');
+              return;
+            }
+            _serverAudioProducerId = producerId;
+            _cancelProduceRetry();
+            _produceRetryCount = 0;
+            _rebuildSendPipelineOnRetry = false;
+            audioPublishing.value = true;
             data['callback'](producerId);
             _debug('produce ack producer=$producerId');
           } else {
@@ -605,7 +616,7 @@ class LiveRoomAudioService {
   }
 
   Future<void> _ensurePublishingAudio() async {
-    if (_producerCreating || _audioProducer != null) return;
+    if (_producerCreating || _audioProducer != null || _serverAudioProducerId != null) return;
     if (!_seated || _selfMuted || _localAudioStream == null) return;
     _producerCreating = true;
     try {
@@ -614,7 +625,7 @@ class LiveRoomAudioService {
       final transport = _sendTransport;
       final stream = _localAudioStream;
       if (transport == null || stream == null) return;
-      if (!_seated || _selfMuted || _audioProducer != null) return;
+      if (!_seated || _selfMuted || _audioProducer != null || _serverAudioProducerId != null) return;
       final audioTracks = stream.getAudioTracks();
       if (audioTracks.isEmpty) throw Exception('No local audio track available');
       final audioTrack = audioTracks.first;
@@ -629,6 +640,7 @@ class LiveRoomAudioService {
           _cancelProduceRetry();
           _produceRetryCount = 0;
           _rebuildSendPipelineOnRetry = false;
+          _serverAudioProducerId ??= maybeProducer.id;
           _audioProducer = maybeProducer;
           audioPublishing.value = true;
           _debug('audio publishing started producer=${maybeProducer.id}');
@@ -643,8 +655,10 @@ class LiveRoomAudioService {
         _debug('$error\n$stackTrace');
         rethrow;
       }
-      _debug('audio produce requested');
-      _scheduleProduceRetry('producer callback watchdog', rebuildPipeline: true);
+      _debug('audio produce requested serverProducer=$_serverAudioProducerId localProducer=${_audioProducer?.id}');
+      if (_serverAudioProducerId == null && _audioProducer == null) {
+        _scheduleProduceRetry('producer callback watchdog', rebuildPipeline: true);
+      }
     } catch (error) {
       if (_isRecoverableProduceStartupError(error.toString())) {
         _debug('audio produce recoverable outer error; rebuilding send pipeline and retrying');
@@ -663,7 +677,7 @@ class LiveRoomAudioService {
   }
 
   void _scheduleProduceRetry(String reason, {bool rebuildPipeline = false}) {
-    if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null) return;
+    if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null || _serverAudioProducerId != null) return;
     if (rebuildPipeline) _rebuildSendPipelineOnRetry = true;
     if (_produceRetryTimer?.isActive ?? false) return;
     if (_produceRetryCount >= 3) {
@@ -674,14 +688,14 @@ class LiveRoomAudioService {
     _debug('audio produce retry scheduled #$_produceRetryCount reason=$reason rebuild=$_rebuildSendPipelineOnRetry');
     _produceRetryTimer = Timer(Duration(milliseconds: 700 + (_produceRetryCount * 400)), () {
       _produceRetryTimer = null;
-      if (!_seated || _selfMuted || _audioProducer != null) return;
+      if (!_seated || _selfMuted || _audioProducer != null || _serverAudioProducerId != null) return;
       _debug('audio produce retry running #$_produceRetryCount rebuild=$_rebuildSendPipelineOnRetry');
       unawaited(_runProduceRetry());
     });
   }
 
   Future<void> _runProduceRetry() async {
-    if (!_seated || _selfMuted || _audioProducer != null) return;
+    if (!_seated || _selfMuted || _audioProducer != null || _serverAudioProducerId != null) return;
     if (_rebuildSendPipelineOnRetry) {
       _rebuildSendPipelineOnRetry = false;
       _debug('audio produce retry rebuilding mic stream and send transport');
@@ -691,7 +705,7 @@ class LiveRoomAudioService {
       if (!_seated || _selfMuted) return;
       await _startLocalMicCapture();
     }
-    if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null) return;
+    if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null || _serverAudioProducerId != null) return;
     await _ensurePublishingAudio();
   }
 
@@ -850,11 +864,21 @@ class LiveRoomAudioService {
 
   Future<void> _stopAudioProducer() async {
     final producer = _audioProducer;
-    if (producer == null) return;
+    final serverProducerId = _serverAudioProducerId;
+    if (producer == null && serverProducerId == null) return;
     _audioProducer = null;
+    _serverAudioProducerId = null;
     try {
       producer.close();
     } catch (_) {}
+    if (serverProducerId != null && serverProducerId.isNotEmpty && _canSendRoomEvent()) {
+      final ack = await _emitWithAckFuture('closeProducer', <String, Object?>{
+        'roomId': _roomId,
+        'peerId': _peerId,
+        'producerId': serverProducerId,
+      });
+      if (ack['ok'] != true) _debug('server producer close failed producer=$serverProducerId ack=$ack');
+    }
     audioPublishing.value = false;
     _removeActiveSpeaker(_peerId);
     _debug('audio producer closed locally');
@@ -881,6 +905,7 @@ class LiveRoomAudioService {
     _sendTransport = null;
     _sendTransportWarmupUntil = null;
     _cancelProduceRetry();
+    _serverAudioProducerId = null;
     try {
       transport?.close();
     } catch (_) {}
