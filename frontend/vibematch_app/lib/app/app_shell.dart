@@ -54,6 +54,7 @@ class _AppShellState extends State<AppShell> {
   Timer? _globalForegroundDismissTimer;
   String? _pendingInboxOpenConversationId;
   int _pendingInboxOpenRequestNonce = 0;
+  String? _activeInboxConversationId;
   Timer? _backPressResetTimer;
   bool _sessionLogoutInFlight = false;
 
@@ -127,6 +128,7 @@ class _AppShellState extends State<AppShell> {
     for (final conversation in _inboxController.conversations) {
       if (conversation.messages.isEmpty) continue;
       if (conversation.isMuted || conversation.isLockedByBackend) continue;
+      if (conversation.id == _activeInboxConversationId) continue;
 
       final message = conversation.messages.last;
       if (message.isMine) continue;
@@ -237,6 +239,9 @@ class _AppShellState extends State<AppShell> {
         controller: _inboxController,
         openConversationId: _pendingInboxOpenConversationId,
         openConversationRequestNonce: _pendingInboxOpenRequestNonce,
+        onActiveConversationChanged: (conversationId) {
+          _activeInboxConversationId = conversationId;
+        },
       ),
       MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser),
     ];

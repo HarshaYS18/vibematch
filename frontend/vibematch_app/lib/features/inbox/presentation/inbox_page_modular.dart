@@ -20,12 +20,14 @@ class InboxPage extends StatefulWidget {
     this.controller,
     this.openConversationId,
     this.openConversationRequestNonce = 0,
+    this.onActiveConversationChanged,
   });
 
   final bool openPagesInOverlay;
   final InboxController? controller;
   final String? openConversationId;
   final int openConversationRequestNonce;
+  final ValueChanged<String?>? onActiveConversationChanged;
 
   @override
   State<InboxPage> createState() => _InboxPageState();
@@ -36,6 +38,7 @@ class _InboxPageState extends State<InboxPage> {
   late final bool _ownsController;
   Widget? _panelOverlay;
   int _lastHandledOpenConversationRequestNonce = 0;
+  String? _activeConversationId;
 
   @override
   void initState() {
@@ -83,6 +86,7 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _closePanelOverlay() {
+    _clearActiveConversationForShell();
     if (!widget.openPagesInOverlay) {
       Navigator.pop(context);
       return;
@@ -92,6 +96,7 @@ class _InboxPageState extends State<InboxPage> {
 
   void _handleBackInsideOverlay() {
     if (_panelOverlay != null) {
+      _clearActiveConversationForShell();
       setState(() => _panelOverlay = null);
       return;
     }
@@ -274,7 +279,30 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _openChat(InboxConversation conversation) {
-    _openInboxSubPage(InboxChatPage(conversation: conversation, controller: _controller, onMoreTap: () => _showChatOptions(conversation), onBackTap: _closePanelOverlay));
+    _activeConversationId = conversation.id;
+    widget.onActiveConversationChanged?.call(conversation.id);
+
+    final page = InboxChatPage(
+      conversation: conversation,
+      controller: _controller,
+      onMoreTap: () => _showChatOptions(conversation),
+      onBackTap: _closePanelOverlay,
+    );
+
+    if (!widget.openPagesInOverlay) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) {
+        _clearActiveConversationForShell();
+      });
+      return;
+    }
+
+    _openInboxSubPage(page);
+  }
+
+  void _clearActiveConversationForShell() {
+    if (_activeConversationId == null) return;
+    _activeConversationId = null;
+    widget.onActiveConversationChanged?.call(null);
   }
 
   void _openSearch() {
