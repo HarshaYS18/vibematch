@@ -1,4 +1,4 @@
-import type { Consumer, Producer, Router, WebRtcTransport } from 'mediasoup/node/lib/types';
+import type { Consumer, Producer, Router, WebRtcTransport } from 'mediasoup/node/lib/types.js';
 
 export type MediaAction =
   | 'join_room'
