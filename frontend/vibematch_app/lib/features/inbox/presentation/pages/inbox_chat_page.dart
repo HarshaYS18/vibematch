@@ -1,7 +1,10 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/app_routes.dart';
+import '../../../media/data/media_upload_api_service.dart';
+import '../../data/inbox_api_service.dart';
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_message_media_content.dart';
@@ -29,7 +32,11 @@ class InboxChatPage extends StatefulWidget {
 class _InboxChatPageState extends State<InboxChatPage> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _imagePicker = ImagePicker();
+  final MediaUploadApiService _mediaUploadApi = const MediaUploadApiService();
+  final InboxApiService _inboxApi = InboxApiService();
   String? _replyToText;
+  bool _sendingImage = false;
 
   InboxConversation get _conversation => widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
 
@@ -146,6 +153,59 @@ class _InboxChatPageState extends State<InboxChatPage> {
     }
   }
 
+
+  Future<void> _pickAndSendImageAttachment() async {
+    if (_readOnly || _sendingImage) return;
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 92,
+      );
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      if (bytes.isEmpty) {
+        _showToast('Selected image is empty.');
+        return;
+      }
+      if (bytes.length > 10 * 1024 * 1024) {
+        _showToast('Inbox image must be 10 MB or smaller.');
+        return;
+      }
+
+      setState(() => _sendingImage = true);
+      _showToast('Uploading image...');
+
+      final uploaded = await _mediaUploadApi.uploadChatImageXFile(picked);
+      if (uploaded.url.trim().isEmpty) {
+        throw Exception('Upload completed without image URL.');
+      }
+
+      await _inboxApi.sendMessage(
+        conversationId: _conversation.id,
+        text: '📷 Photo attached',
+        type: 'image',
+        attachmentUrl: uploaded.url,
+      );
+
+      await widget.controller.loadFromBackend();
+      if (mounted) _showToast('Image sent.');
+    } catch (error) {
+      if (mounted) _showToast(_friendlyImageError(error));
+    } finally {
+      if (mounted) setState(() => _sendingImage = false);
+    }
+  }
+
+  String _friendlyImageError(Object error) {
+    final raw = error.toString().replaceFirst('Exception: ', '').trim();
+    if (raw.contains('413')) return 'Image is too large. Choose an image under 10 MB.';
+    if (raw.contains('401') || raw.toLowerCase().contains('login')) return 'Session expired. Login again before sending image.';
+    if (raw.contains('400') && raw.toLowerCase().contains('unsupported')) return 'Unsupported image type. Choose JPG, PNG, WEBP, or GIF.';
+    if (raw.toLowerCase().contains('failed to fetch') || raw.toLowerCase().contains('xmlhttprequest')) return 'Upload failed. Check FastAPI is running and try again.';
+    return raw.isEmpty ? 'Image send failed. Please try again.' : raw;
+  }
+
   Future<void> _openAttachmentSheet() async {
     if (_readOnly) return;
     await showModalBottomSheet<void>(
@@ -156,6 +216,10 @@ class _InboxChatPageState extends State<InboxChatPage> {
           Navigator.pop(context);
           if (type == InboxMessageType.document) {
             await _pickDocumentAttachment();
+            return;
+          }
+          if (type == InboxMessageType.image) {
+            await _pickAndSendImageAttachment();
             return;
           }
           widget.controller.addMockAttachment(conversationId: _conversation.id, type: type);
