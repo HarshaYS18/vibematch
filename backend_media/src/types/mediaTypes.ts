@@ -1,8 +1,3 @@
-import type { Consumer } from 'mediasoup/node/lib/ConsumerTypes';
-import type { Producer } from 'mediasoup/node/lib/ProducerTypes';
-import type { Router } from 'mediasoup/node/lib/RouterTypes';
-import type { WebRtcTransport } from 'mediasoup/node/lib/WebRtcTransportTypes';
-
 export type MediaAction =
   | 'join_room'
   | 'create_transport'
@@ -15,6 +10,59 @@ export type MediaAction =
   | 'leave_room';
 
 export type TransportDirection = 'send' | 'recv';
+
+export interface MediaProducer {
+  id: string;
+  kind: string;
+  pause(): Promise<void>;
+  resume(): Promise<void>;
+  close(): void;
+  on(event: '@close', handler: () => void): void;
+}
+
+export interface MediaConsumer {
+  id: string;
+  kind: string;
+  rtpParameters: unknown;
+  resume(): Promise<void>;
+  close(): void;
+  on(event: '@close', handler: () => void): void;
+}
+
+export interface MediaWebRtcTransport {
+  id: string;
+  iceParameters: unknown;
+  iceCandidates: unknown;
+  dtlsParameters: unknown;
+  sctpParameters?: unknown;
+  connect(options: { dtlsParameters: never }): Promise<void>;
+  produce(options: {
+    kind: 'audio';
+    rtpParameters: never;
+    appData?: Record<string, unknown>;
+  }): Promise<MediaProducer>;
+  consume(options: {
+    producerId: string;
+    rtpCapabilities: never;
+    paused?: boolean;
+  }): Promise<MediaConsumer>;
+  close(): void;
+  on(event: 'dtlsstatechange', handler: (state: string) => void): void;
+  on(event: '@close', handler: () => void): void;
+}
+
+export interface MediaRouter {
+  rtpCapabilities: unknown;
+  createWebRtcTransport(options: Record<string, unknown>): Promise<MediaWebRtcTransport>;
+  canConsume(options: { producerId: string; rtpCapabilities: never }): boolean;
+  close(): void;
+}
+
+export interface MediaWorker {
+  createRouter(options: Record<string, unknown>): Promise<MediaRouter>;
+  close(): void;
+  on(event: 'died', handler: () => void): void;
+}
 
 export interface VerifiedMediaUser {
   user_id: number;
@@ -51,15 +99,15 @@ export interface PeerState {
   deviceId?: string;
   roomPublicId: string;
   joinedAt: number;
-  transports: Map<string, WebRtcTransport>;
+  transports: Map<string, MediaWebRtcTransport>;
   transportDirections: Map<string, TransportDirection>;
-  producers: Map<string, Producer>;
-  consumers: Map<string, Consumer>;
+  producers: Map<string, MediaProducer>;
+  consumers: Map<string, MediaConsumer>;
 }
 
 export interface RoomState {
   roomPublicId: string;
-  router: Router;
+  router: MediaRouter;
   peers: Map<string, PeerState>;
   createdAt: number;
   lastActiveAt: number;
