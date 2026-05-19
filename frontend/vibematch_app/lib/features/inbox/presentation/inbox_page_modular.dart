@@ -515,7 +515,7 @@ class _PremiumStoryRail extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         scrollDirection: Axis.horizontal,
         itemCount: conversations.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           if (index == 0) return const _StoryBubble(label: 'My Story', avatarText: '+', colors: [Color(0xFF12C7B7), Color(0xFF7C3AED)]);
           final item = conversations[index - 1];
@@ -541,7 +541,7 @@ class _PremiumFilterRail extends StatelessWidget {
   final String selectedFilter;
   final ValueChanged<String> onChanged;
   @override
-  Widget build(BuildContext context) => SizedBox(height: 48, child: ListView.separated(padding: const EdgeInsets.symmetric(horizontal: 14), scrollDirection: Axis.horizontal, itemCount: filters.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (context, index) { final filter = filters[index]; final selected = filter == selectedFilter; return ChoiceChip(label: Text(filter), selected: selected, onSelected: (_) => onChanged(filter), selectedColor: const Color(0xFF251538), backgroundColor: Colors.white, labelStyle: TextStyle(color: selected ? Colors.white : const Color(0xFF5E4B6F), fontWeight: FontWeight.w900, fontSize: 12), side: BorderSide(color: selected ? const Color(0xFF251538) : const Color(0xFFE5DDF1))); }));
+  Widget build(BuildContext context) => SizedBox(height: 48, child: ListView.separated(padding: const EdgeInsets.symmetric(horizontal: 14), scrollDirection: Axis.horizontal, itemCount: filters.length, separatorBuilder: (context, index) => const SizedBox(width: 8), itemBuilder: (context, index) { final filter = filters[index]; final selected = filter == selectedFilter; return ChoiceChip(label: Text(filter), selected: selected, onSelected: (selected) => onChanged(filter), selectedColor: const Color(0xFF251538), backgroundColor: Colors.white, labelStyle: TextStyle(color: selected ? Colors.white : const Color(0xFF5E4B6F), fontWeight: FontWeight.w900, fontSize: 12), side: BorderSide(color: selected ? const Color(0xFF251538) : const Color(0xFFE5DDF1))); }));
 }
 
 class _InboxChatOptionsSheet extends StatelessWidget {
