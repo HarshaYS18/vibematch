@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.inbox import InboxConversation, InboxConversationType, InboxMessage, InboxMessageStatus, InboxMessageType, InboxParticipant, InboxReport, InboxReportStatus
 from app.models.user import User
+from app.websocket.inbox_ws import inbox_ws_manager
 
 DEFAULT_COLORS = ["#6D5DF6", "#E84C72"]
 TEAM_PUBLIC_ID_PREFIX = "team_official"
@@ -501,8 +502,16 @@ def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
         "media_expired": media_expired,
         "expired_media_url": metadata.get("expired_media_url"),
         "local_first_allowed": bool(metadata.get("local_first_allowed")) or media_expired,
-        "created_at": message.created_at.isoformat() if message.created_at else None,
+        "created_at": _utc_iso_z(message.created_at),
     }
+
+
+def _utc_iso_z(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+
+
 
 
 def conversation_to_dict(conversation: InboxConversation, current_user: User) -> dict:
@@ -516,6 +525,11 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
     avatar_url = other_user.avatar_url if uses_live_user_profile else metadata.get("avatar_url")
     streak_count = _chat_streak_count(conversation, messages)
     streak_active_today = _chat_streak_active_today(conversation, messages)
+    other_user_online = inbox_ws_manager.is_user_online(other_user.id if other_user is not None else None)
+    last_seen_at = inbox_ws_manager.last_seen_at(other_user.id if other_user is not None else None)
+    if last_seen_at is None and other_user is not None:
+        last_seen_at = getattr(other_user, "last_login_at", None)
+    last_seen_text = "online" if other_user_online else "offline"
 
     return {
         "id": conversation.public_id,
@@ -526,8 +540,9 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
         "avatar_url": avatar_url,
         "type": conversation.conversation_type,
         "unread_count": participant.unread_count if participant else 0,
-        "is_online": False,
-        "last_seen_text": "offline",
+        "is_online": other_user_online,
+        "last_seen_text": last_seen_text,
+        "last_seen_at": _utc_iso_z(last_seen_at),
         "colors": metadata.get("colors") or DEFAULT_COLORS,
         "messages": [message_to_dict(message, current_user) for message in messages],
         "current_room_name": conversation.current_room_name,
