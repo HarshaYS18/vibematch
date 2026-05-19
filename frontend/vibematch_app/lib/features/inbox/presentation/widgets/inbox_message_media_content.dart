@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,7 +17,7 @@ class InboxMessageMediaContent extends StatelessWidget {
     return switch (message.type) {
       InboxMessageType.image => _InboxImageMedia(message: message, mine: mine),
       InboxMessageType.document => _InboxFileMedia(message: message, mine: mine, icon: Icons.description_rounded, title: _cleanAttachmentLabel(message.text, fallback: 'Document')),
-      InboxMessageType.voice => _InboxFileMedia(message: message, mine: mine, icon: Icons.mic_rounded, title: _cleanAttachmentLabel(message.text, fallback: 'Voice message')),
+      InboxMessageType.voice => _InboxVoiceMedia(message: message, mine: mine, title: _cleanAttachmentLabel(message.text, fallback: 'Voice message')),
       _ => Text(
           message.text,
           style: TextStyle(
@@ -142,6 +145,165 @@ class _InboxFileMedia extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _InboxVoiceMedia extends StatefulWidget {
+  const _InboxVoiceMedia({required this.message, required this.mine, required this.title});
+
+  final InboxMessage message;
+  final bool mine;
+  final String title;
+
+  @override
+  State<_InboxVoiceMedia> createState() => _InboxVoiceMediaState();
+}
+
+class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
+  final AudioPlayer _player = AudioPlayer();
+  StreamSubscription<PlayerState>? _stateSubscription;
+  StreamSubscription<void>? _completeSubscription;
+  bool _playing = false;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateSubscription = _player.onPlayerStateChanged.listen((state) {
+      if (!mounted) return;
+      setState(() {
+        _playing = state == PlayerState.playing;
+        if (state == PlayerState.playing || state == PlayerState.paused || state == PlayerState.stopped || state == PlayerState.completed) {
+          _loading = false;
+        }
+      });
+    });
+    _completeSubscription = _player.onPlayerComplete.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _playing = false;
+        _loading = false;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_stateSubscription?.cancel());
+    unawaited(_completeSubscription?.cancel());
+    unawaited(_player.dispose());
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    final target = _voiceTarget(widget.message);
+    if (target == null) {
+      _showOpenSnack(context, 'This voice message is no longer available.');
+      return;
+    }
+    if (_playing) {
+      await _player.pause();
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      await _player.stop();
+      await _player.play(_audioSource(target));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _showOpenSnack(context, 'Could not play voice message.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final target = _voiceTarget(widget.message);
+    if (target == null) {
+      return _ExpiredMediaCard(message: widget.message, mine: widget.mine, icon: Icons.mic_off_rounded);
+    }
+    final subtitle = widget.message.mediaExpired
+        ? (widget.message.hasLocalAttachmentPath ? 'Saved on this device' : 'Server copy expired')
+        : (_playing ? 'Playing voice message' : 'Tap to play');
+    return InkWell(
+      onTap: _toggle,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 252,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: widget.mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF8F5FF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: widget.mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFE9DDF5)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: _playing ? const Color(0xFF12C7B7) : (widget.mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF7C3AED).withValues(alpha: 0.12)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: _loading
+                  ? Padding(
+                      padding: const EdgeInsets.all(11),
+                      child: CircularProgressIndicator(strokeWidth: 2.3, color: widget.mine ? Colors.white : const Color(0xFF7C3AED)),
+                    )
+                  : Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: _playing || widget.mine ? Colors.white : const Color(0xFF7C3AED), size: 24),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: widget.mine ? Colors.white : const Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(child: _VoiceWaveform(active: _playing, mine: widget.mine)),
+                      const SizedBox(width: 8),
+                      Text(_durationFromTitle(widget.title), style: TextStyle(color: widget.mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: widget.mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceWaveform extends StatelessWidget {
+  const _VoiceWaveform({required this.active, required this.mine});
+
+  final bool active;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? const Color(0xFF12C7B7) : (mine ? Colors.white70 : const Color(0xFF9B8CA5));
+    const heights = [8.0, 13.0, 18.0, 11.0, 15.0, 9.0, 17.0, 12.0, 20.0, 10.0, 14.0, 8.0];
+    return Row(
+      children: heights
+          .map((height) => Expanded(
+                child: Align(
+                  alignment: Alignment.center,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: active ? height : height * 0.56,
+                    margin: const EdgeInsets.symmetric(horizontal: 1.4),
+                    decoration: BoxDecoration(color: color.withValues(alpha: active ? 0.95 : 0.62), borderRadius: BorderRadius.circular(999)),
+                  ),
+                ),
+              ))
+          .toList(),
     );
   }
 }
@@ -343,6 +505,25 @@ Future<void> _confirmAndOpenAttachment(BuildContext context, InboxMessage messag
   if (!opened && context.mounted) {
     _showOpenSnack(context, 'Could not open attachment.');
   }
+}
+
+Source _audioSource(String target) {
+  if (target.startsWith('http://') || target.startsWith('https://')) return UrlSource(target);
+  if (target.startsWith('file://')) return DeviceFileSource(Uri.parse(target).toFilePath());
+  return DeviceFileSource(target);
+}
+
+String? _voiceTarget(InboxMessage message) {
+  final localPath = message.localAttachmentPath?.trim();
+  if (localPath != null && localPath.isNotEmpty) return localPath;
+  final remoteUrl = message.effectiveRemoteMediaUrl?.trim();
+  if (remoteUrl != null && remoteUrl.isNotEmpty) return remoteUrl;
+  return null;
+}
+
+String _durationFromTitle(String title) {
+  final match = RegExp(r'(\d{1,2}:\d{2})').firstMatch(title);
+  return match?.group(1) ?? '0:00';
 }
 
 Uri? _attachmentUri(String target) {
