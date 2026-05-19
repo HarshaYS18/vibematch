@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/inbox_models.dart';
 
@@ -102,39 +103,44 @@ class _InboxFileMedia extends StatelessWidget {
     }
     final subtitle = message.mediaExpired
         ? (hasLocalCopy ? 'Saved on this device' : 'Server copy expired')
-        : (hasLocalCopy ? 'Local copy available' : 'Tap to open when download is wired');
-    return Container(
-      width: 252,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF8F5FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFE9DDF5)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF7C3AED).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
+        : (hasLocalCopy ? 'Local copy available' : 'Tap to open');
+    final canOpen = hasLocalCopy || hasRemoteCopy;
+    return InkWell(
+      onTap: canOpen ? () => _openAttachment(context, message) : null,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 252,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF8F5FF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFE9DDF5)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: mine ? Colors.white : const Color(0xFF7C3AED), size: 22),
             ),
-            child: Icon(icon, color: mine ? Colors.white : const Color(0xFF7C3AED), size: 22),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white : const Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 3),
-                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w800)),
-              ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white : const Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 3),
+                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                ],
+              ),
             ),
-          ),
-          Icon(Icons.chevron_right_rounded, color: mine ? Colors.white70 : const Color(0xFF9B8CA5), size: 19),
-        ],
+            Icon(canOpen ? Icons.open_in_new_rounded : Icons.chevron_right_rounded, color: mine ? Colors.white70 : const Color(0xFF9B8CA5), size: 18),
+          ],
+        ),
       ),
     );
   }
@@ -226,6 +232,48 @@ String? _usableImageSource(String? value) {
   if (source == null || source.isEmpty) return null;
   if (source.startsWith('http://') || source.startsWith('https://') || source.startsWith('assets/')) return source;
   return null;
+}
+
+Future<void> _openAttachment(BuildContext context, InboxMessage message) async {
+  final localPath = message.localAttachmentPath?.trim();
+  final remoteUrl = message.effectiveRemoteMediaUrl?.trim();
+  final target = (localPath != null && localPath.isNotEmpty) ? localPath : remoteUrl;
+  if (target == null || target.isEmpty) {
+    _showOpenSnack(context, 'This attachment is no longer available.');
+    return;
+  }
+
+  final uri = _attachmentUri(target);
+  if (uri == null) {
+    _showOpenSnack(context, 'This attachment path cannot be opened yet.');
+    return;
+  }
+
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!opened && context.mounted) {
+    _showOpenSnack(context, 'Could not open attachment.');
+  }
+}
+
+Uri? _attachmentUri(String target) {
+  if (target.startsWith('http://') || target.startsWith('https://')) return Uri.tryParse(target);
+  if (target.startsWith('file://')) return Uri.tryParse(target);
+  if (target.startsWith('/') || RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(target)) {
+    return Uri.file(target);
+  }
+  return null;
+}
+
+void _showOpenSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF251538),
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+      ),
+    );
 }
 
 String _cleanAttachmentLabel(String value, {required String fallback}) {
