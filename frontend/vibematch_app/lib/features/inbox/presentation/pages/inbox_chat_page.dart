@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/app_routes.dart';
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
+import '../widgets/inbox_message_media_content.dart';
 import '../widgets/social_emoji_pack_sheet.dart';
 import '../widgets/swipe_reply_message.dart';
 
@@ -370,6 +371,8 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onAcceptLoveBondTap;
   final VoidCallback? onRejectLoveBondTap;
 
+  bool get _hasMediaContent => message.type == InboxMessageType.image || message.type == InboxMessageType.document || message.type == InboxMessageType.voice;
+
   @override
   Widget build(BuildContext context) {
     final mine = message.isMine;
@@ -407,6 +410,8 @@ class _MessageBubble extends StatelessWidget {
                     _InviteCard(message: message, onTap: onJoinInviteTap)
                   else if (message.isSystem)
                     _SystemMessageCard(text: message.text)
+                  else if (_hasMediaContent)
+                    InboxMessageMediaContent(message: message, mine: mine)
                   else
                     Text(
                       message.text,
