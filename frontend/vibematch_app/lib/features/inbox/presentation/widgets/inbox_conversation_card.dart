@@ -18,20 +18,34 @@ class InboxConversationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activityText = conversation.currentRoomName == null
-        ? conversation.lastSeenText
-        : 'In chatroom: ${conversation.currentRoomName}';
-
+    final preview = conversation.listPreviewText;
+    final isHub = conversation.isStrangerHub;
     return Material(
       color: Colors.transparent,
       child: InkWell(
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 9, 12, 9),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isHub ? const Color(0xFFFFB020).withValues(alpha: 0.34) : const Color(0xFFEDE7F6),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E1230).withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
           child: Row(
             children: [
-              _WhatsAppAvatar(conversation: conversation),
+              _PremiumAvatar(conversation: conversation),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -46,58 +60,59 @@ class InboxConversationCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textStyle: TextStyle(
-                              color: const Color(0xFF111B21),
-                              fontSize: 16,
-                              fontWeight: conversation.unreadCount > 0 ? FontWeight.w800 : FontWeight.w600,
-                              letterSpacing: -0.15,
+                              color: const Color(0xFF1D1230),
+                              fontSize: 15.5,
+                              fontWeight: conversation.unreadCount > 0 ? FontWeight.w900 : FontWeight.w800,
+                              letterSpacing: -0.18,
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           conversation.time,
                           style: TextStyle(
-                            color: conversation.unreadCount > 0 ? const Color(0xFF25D366) : const Color(0xFF667781),
-                            fontSize: 11.5,
-                            fontWeight: conversation.unreadCount > 0 ? FontWeight.w800 : FontWeight.w500,
+                            color: conversation.unreadCount > 0 ? const Color(0xFF7C3AED) : const Color(0xFF9B8CA5),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Row(
                       children: [
                         if (conversation.isPinned) ...[
-                          const Icon(Icons.push_pin_rounded, color: Color(0xFF667781), size: 14),
+                          const Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 14),
                           const SizedBox(width: 4),
                         ],
                         if (conversation.isMuted) ...[
-                          const Icon(Icons.volume_off_rounded, color: Color(0xFF667781), size: 14),
+                          const Icon(Icons.volume_off_rounded, color: Color(0xFF9B8CA5), size: 14),
                           const SizedBox(width: 4),
                         ],
                         if (conversation.isLockedByBackend) ...[
-                          const Icon(Icons.lock_rounded, color: Color(0xFF667781), size: 13),
+                          const Icon(Icons.lock_rounded, color: Color(0xFF7B6A86), size: 14),
                           const SizedBox(width: 4),
                         ],
                         Expanded(
                           child: Text(
-                            conversation.subtitle,
+                            preview,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: conversation.unreadCount > 0 ? const Color(0xFF111B21) : const Color(0xFF667781),
-                              fontSize: 13.2,
-                              fontWeight: conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
+                              color: conversation.isLockedByBackend ? const Color(0xFF7B6A86) : const Color(0xFF5E4B6F),
+                              fontSize: 12.6,
+                              fontWeight: conversation.unreadCount > 0 ? FontWeight.w800 : FontWeight.w600,
                               height: 1.15,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 7),
                         if (conversation.unreadCount > 0)
                           Container(
-                            constraints: const BoxConstraints(minWidth: 21, minHeight: 21),
+                            margin: const EdgeInsets.only(left: 8),
+                            constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                             decoration: const BoxDecoration(
-                              color: Color(0xFF25D366),
+                              gradient: LinearGradient(colors: [Color(0xFFFF4F9A), Color(0xFF7C3AED)]),
                               shape: BoxShape.circle,
                             ),
                             child: Center(
@@ -109,17 +124,17 @@ class InboxConversationCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
-                        _TypeDot(conversation: conversation),
-                        const SizedBox(width: 5),
+                        _TypePill(conversation: conversation),
+                        const SizedBox(width: 7),
                         Expanded(
                           child: Text(
-                            activityText,
+                            conversation.safePresenceText,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Color(0xFF8696A0), fontSize: 11.2, fontWeight: FontWeight.w500),
+                            style: const TextStyle(color: Color(0xFF8B7A99), fontSize: 11.2, fontWeight: FontWeight.w700),
                           ),
                         ),
                       ],
@@ -135,8 +150,8 @@ class InboxConversationCard extends StatelessWidget {
   }
 }
 
-class _WhatsAppAvatar extends StatelessWidget {
-  const _WhatsAppAvatar({required this.conversation});
+class _PremiumAvatar extends StatelessWidget {
+  const _PremiumAvatar({required this.conversation});
 
   final InboxConversation conversation;
 
@@ -146,30 +161,43 @@ class _WhatsAppAvatar extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Container(
-          width: 52,
-          height: 52,
+          width: 54,
+          height: 54,
+          padding: const EdgeInsets.all(2),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(colors: conversation.colors),
+            boxShadow: [
+              BoxShadow(
+                color: conversation.colors.last.withValues(alpha: 0.22),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-          clipBehavior: Clip.antiAlias,
-          child: conversation.hasAvatarUrl
-              ? Image.network(
-                  conversation.avatarUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _AvatarInitials(conversation: conversation),
-                )
-              : _AvatarInitials(conversation: conversation),
+          child: Container(
+            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            padding: const EdgeInsets.all(2),
+            child: ClipOval(
+              child: conversation.hasAvatarUrl
+                  ? Image.network(
+                      conversation.avatarUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _AvatarInitials(conversation: conversation),
+                    )
+                  : _AvatarInitials(conversation: conversation),
+            ),
+          ),
         ),
-        if (conversation.isOnline)
+        if (conversation.isOnline && !conversation.isStrangerHub)
           Positioned(
-            right: 0,
-            bottom: 1,
+            right: 1,
+            bottom: 2,
             child: Container(
-              width: 13,
-              height: 13,
+              width: 14,
+              height: 14,
               decoration: BoxDecoration(
-                color: const Color(0xFF25D366),
+                color: const Color(0xFF18D17B),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
@@ -180,14 +208,14 @@ class _WhatsAppAvatar extends StatelessWidget {
             right: -2,
             top: -2,
             child: Container(
-              width: 18,
-              height: 18,
+              width: 19,
+              height: 19,
               decoration: BoxDecoration(
-                color: const Color(0xFF00A884),
+                color: const Color(0xFF2DD4BF),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: const Icon(Icons.verified_rounded, color: Colors.white, size: 10),
+              child: const Icon(Icons.verified_rounded, color: Colors.white, size: 11),
             ),
           ),
       ],
@@ -202,29 +230,48 @@ class _AvatarInitials extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        conversation.avatarText,
-        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+    return DecoratedBox(
+      decoration: BoxDecoration(gradient: LinearGradient(colors: conversation.colors)),
+      child: Center(
+        child: Text(
+          conversation.avatarText,
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+        ),
       ),
     );
   }
 }
 
-class _TypeDot extends StatelessWidget {
-  const _TypeDot({required this.conversation});
+class _TypePill extends StatelessWidget {
+  const _TypePill({required this.conversation});
 
   final InboxConversation conversation;
 
   @override
   Widget build(BuildContext context) {
-    final color = conversation.isOfficial
-        ? const Color(0xFF00A884)
+    final (label, color, icon) = conversation.isOfficial
+        ? ('Team', const Color(0xFF0F766E), Icons.verified_rounded)
         : conversation.isStranger
-            ? const Color(0xFFFFB020)
+            ? ('Request', const Color(0xFFD97706), Icons.shield_rounded)
             : conversation.isRoomInvite
-                ? const Color(0xFF53BDEB)
-                : const Color(0xFF25D366);
-    return Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+                ? ('Invite', const Color(0xFF2563EB), Icons.meeting_room_rounded)
+                : conversation.isGroup
+                    ? ('Group', const Color(0xFF7C3AED), Icons.groups_rounded)
+                    : ('Friend', const Color(0xFF059669), Icons.favorite_rounded);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(label, style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
   }
 }
