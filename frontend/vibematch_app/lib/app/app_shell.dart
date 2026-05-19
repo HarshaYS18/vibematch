@@ -172,10 +172,6 @@ class _AppShellState extends State<AppShell> {
         behavior: SnackBarBehavior.floating,
       ),
     );
-
-    // Intentionally do not close the app from swipe-back/gesture. This prevents
-    // accidental app exit during beta testing. Later we can add explicit Exit
-    // button if needed.
   }
 
   @override
@@ -266,7 +262,7 @@ class _VibeBottomNav extends StatelessWidget {
         children: [
           _BottomNavItem(tab: VmMainTab.home, selectedTab: selectedTab, onTap: onTabSelected),
           _BottomNavItem(tab: VmMainTab.vibes, selectedTab: selectedTab, onTap: onTabSelected),
-          _CreateRoomButton(isTestingAsFounder: isTestingAsFounder),
+          const _CreateRoomButton(),
           _BottomNavItem(tab: VmMainTab.inbox, selectedTab: selectedTab, onTap: onTabSelected),
           _BottomNavItem(tab: VmMainTab.me, selectedTab: selectedTab, onTap: onTabSelected),
         ],
@@ -282,6 +278,15 @@ class _BottomNavItem extends StatelessWidget {
   final VmMainTab selectedTab;
   final ValueChanged<VmMainTab> onTap;
 
+  IconData get _icon {
+    return switch (tab) {
+      VmMainTab.home => VMIcons.home,
+      VmMainTab.vibes => VMIcons.vibes,
+      VmMainTab.inbox => VMIcons.inbox,
+      VmMainTab.me => VMIcons.profile,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSelected = selectedTab == tab;
@@ -294,7 +299,7 @@ class _BottomNavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(tab.icon, size: 25, color: isSelected ? const Color(0xFF4A2A63) : const Color(0xFF9A8DA6)),
+              Icon(_icon, size: 25, color: isSelected ? const Color(0xFF4A2A63) : const Color(0xFF9A8DA6)),
               const SizedBox(height: 3),
               Text(tab.label, style: TextStyle(color: isSelected ? const Color(0xFF4A2A63) : const Color(0xFF9A8DA6), fontSize: 11, fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700)),
             ],
@@ -306,16 +311,14 @@ class _BottomNavItem extends StatelessWidget {
 }
 
 class _CreateRoomButton extends StatelessWidget {
-  const _CreateRoomButton({required this.isTestingAsFounder});
-
-  final bool isTestingAsFounder;
+  const _CreateRoomButton();
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Center(
         child: InkWell(
-          onTap: () => Navigator.of(context).pushNamed(AppRoutes.createRoom),
+          onTap: () => Navigator.of(context).pushNamed(VmRoutes.create),
           borderRadius: BorderRadius.circular(26),
           child: Container(
             width: 54,
@@ -325,7 +328,7 @@ class _CreateRoomButton extends StatelessWidget {
               gradient: const LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)]),
               boxShadow: [BoxShadow(color: const Color(0xFF12C7B7).withValues(alpha: 0.26), blurRadius: 18, offset: const Offset(0, 8))],
             ),
-            child: const Icon(VmIcons.add, color: Colors.white, size: 28),
+            child: const Icon(VMIcons.create, color: Colors.white, size: 28),
           ),
         ),
       ),
