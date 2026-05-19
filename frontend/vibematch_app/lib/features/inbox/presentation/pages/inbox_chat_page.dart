@@ -679,6 +679,11 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mine = message.isMine;
+    final showInlineReceipt = mine &&
+        !_hasMediaContent &&
+        !message.isLoveBondRequest &&
+        !message.isInvite &&
+        !message.isSystem;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -716,9 +721,29 @@ class _MessageBubble extends StatelessWidget {
                   else if (_hasMediaContent)
                     InboxMessageMediaContent(message: message, mine: mine)
                   else
-                    Text(
-                      message.text,
-                      style: TextStyle(color: mine ? Colors.white : const Color(0xFF251538), fontSize: 13.2, height: 1.32, fontWeight: FontWeight.w700),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            message.text,
+                            style: TextStyle(
+                              color: mine ? Colors.white : const Color(0xFF251538),
+                              fontSize: 13.2,
+                              height: 1.32,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (showInlineReceipt) ...[
+                          const SizedBox(width: 5),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 1),
+                            child: _ReadReceipt(status: message.status, mine: mine),
+                          ),
+                        ],
+                      ],
                     ),
                   const SizedBox(height: 6),
                   Row(
@@ -739,8 +764,8 @@ class _MessageBubble extends StatelessWidget {
                         ),
                       ],
                       if (mine) ...[
-                        if (showTime) const SizedBox(width: 5),
-                        _ReadReceipt(status: message.status, mine: mine),
+                        if (showTime && !showInlineReceipt) const SizedBox(width: 5),
+                        if (!showInlineReceipt) _ReadReceipt(status: message.status, mine: mine),
                         if (message.status == InboxMessageStatus.failed && onRetryFailedTap != null) ...[
                           const SizedBox(width: 6),
                           _RetryChip(onTap: onRetryFailedTap!),
