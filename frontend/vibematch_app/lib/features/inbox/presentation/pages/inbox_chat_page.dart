@@ -58,6 +58,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
     super.initState();
     widget.controller.markConversationRead(widget.conversation.id);
     widget.controller.addListener(_handleChanged);
+    _textController.addListener(_handleTextInputChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(widget.controller.openConversationFromBackend(widget.conversation.id));
     });
@@ -67,6 +68,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
   void dispose() {
     widget.controller.clearActiveConversation(widget.conversation.id);
     widget.controller.removeListener(_handleChanged);
+    _textController.removeListener(_handleTextInputChanged);
     _textController.dispose();
     _scrollController.dispose();
     unawaited(_voiceRecorder.dispose());
@@ -77,6 +79,11 @@ class _InboxChatPageState extends State<InboxChatPage> {
     if (!mounted) return;
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+  }
+
+  void _handleTextInputChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _jumpToBottom() {
@@ -456,6 +463,16 @@ class _InboxChatPageState extends State<InboxChatPage> {
     );
   }
 
+  String _chatStatusText(InboxConversation conversation) {
+    if (_recordingVoice) return 'recording voice...';
+    if (_sendingVoice) return 'sending audio...';
+    if (_sendingImage) return 'sending photo...';
+    if (_sendingDocument) return 'sending document...';
+    if (_textController.text.trim().isNotEmpty) return 'typing...';
+    if (conversation.isOnline) return 'online';
+    return conversation.safePresenceText;
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversation = _conversation;
@@ -467,6 +484,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
           children: [
             _ChatHeader(
               conversation: conversation,
+              statusText: _chatStatusText(conversation),
               onBackTap: widget.onBackTap ?? () => Navigator.pop(context),
               onMoreTap: widget.onMoreTap,
               onVoiceCallTap: () => _openCallPlaceholder(video: false),
@@ -536,9 +554,10 @@ class _InboxChatPageState extends State<InboxChatPage> {
 }
 
 class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({required this.conversation, required this.onBackTap, required this.onMoreTap, required this.onVoiceCallTap, required this.onVideoCallTap});
+  const _ChatHeader({required this.conversation, required this.statusText, required this.onBackTap, required this.onMoreTap, required this.onVoiceCallTap, required this.onVideoCallTap});
 
   final InboxConversation conversation;
+  final String statusText;
   final VoidCallback onBackTap;
   final VoidCallback onMoreTap;
   final VoidCallback onVoiceCallTap;
@@ -587,7 +606,7 @@ class _ChatHeader extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  conversation.safePresenceText,
+                  statusText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 11.2, fontWeight: FontWeight.w700),

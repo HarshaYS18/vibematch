@@ -254,6 +254,9 @@ class InboxController extends ChangeNotifier {
         if (conversationId != null && rawMessage is Map<String, dynamic>) {
           final message = _apiService.messageFromJson(rawMessage);
           _appendOrReconcileMessage(conversationId, message);
+          if (!message.isMine && _activeConversationId == conversationId) {
+            Future<void>.microtask(() => openConversationFromBackend(conversationId));
+          }
         }
         break;
       case 'inbox_message_updated':
