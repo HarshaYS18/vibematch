@@ -1,4 +1,4 @@
-import type { Consumer, Producer, RtpCapabilities, WebRtcTransport } from 'mediasoup/node/lib/types';
+import type { Consumer, Producer, RtpCapabilities, WebRtcTransport } from 'mediasoup/node/lib/types.js';
 import { config } from '../config.js';
 import type { PeerState, RoomState, TransportDirection, VerifiedMediaUser } from '../types/mediaTypes.js';
 import type { WorkerManager } from './workerManager.js';
@@ -99,7 +99,7 @@ export class RoomManager {
     params.peer.transportDirections.set(transport.id, params.direction);
     params.room.lastActiveAt = Date.now();
 
-    transport.on('dtlsstatechange', (state) => {
+    transport.on('dtlsstatechange', (state: string) => {
       if (state === 'closed') transport.close();
     });
     transport.on('@close', () => {
