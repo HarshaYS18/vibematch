@@ -35,6 +35,7 @@ This pass is intentionally a foundation pass. Stable live-room entry, privacy, s
 
 ## Canonical Sources After This Pass
 
+- App/tab source registry: `GET /app/source-of-truth/master` and owner-only `GET /control-center/source-of-truth`. The full per-tab audit lives in `docs/application_source_of_truth_tabs_audit.md`.
 - Economy balances: `user_wallets` and `wallet_ledger`.
 - VIP/SVIP visible status: `user_vip_statuses`, derived from wallet ledger using active `economy_rule_sets`.
 - Sent/received/room levels: `user_experience_statuses`, `room_experience_statuses`, and active `economy_rule_sets`.

@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from app.api.routes import (
     admin,
+    app_source_registry,
     auth,
     coin_sales,
     control_center,
@@ -237,6 +238,7 @@ def health():
 
 
 app.include_router(auth.router)
+app.include_router(app_source_registry.router)
 app.include_router(users.router)
 app.include_router(role_badges.router)
 app.include_router(admin.router)

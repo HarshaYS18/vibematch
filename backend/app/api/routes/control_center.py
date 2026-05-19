@@ -7,7 +7,8 @@ from app.models.special_permission import SpecialPermission, SpecialPermissionNa
 from app.models.user import User
 from app.schemas.control_center import EconomyRuleSetUpdateRequest, ManifestImportRequest, StoreCategoryUpsertRequest, StoreItemUpsertRequest
 from app.schemas.profile_display import StealthGrantRequest, StealthStateResponse, StealthToggleRequest
-from app.services import economy_rules_service, profile_display_service, store_control_center_service
+from app.schemas.app_source_registry import AppSourceRegistryResponse
+from app.services import app_source_registry_service, economy_rules_service, profile_display_service, store_control_center_service
 from app.services.audit_log_service import create_admin_log
 from app.services.permissions import room_permission_service
 from app.services.role_service import get_primary_role
@@ -20,6 +21,12 @@ router = APIRouter(prefix="/control-center", tags=["Control Center"])
 def _owner_control(actor: User) -> None:
     if get_primary_role(actor) not in {RoleName.FOUNDER_OWNER, RoleName.OWNER, RoleName.SUPERADMIN}:
         raise HTTPException(status_code=403, detail="Control Center owner access required")
+
+
+@router.get("/source-of-truth", response_model=AppSourceRegistryResponse)
+def get_source_of_truth_registry(current_user: User = Depends(get_current_user)):
+    _owner_control(current_user)
+    return app_source_registry_service.get_app_source_registry()
 
 
 @router.get("/economy/rules")
