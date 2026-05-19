@@ -1,5 +1,6 @@
 import * as mediasoup from 'mediasoup';
-import type { Router, Worker } from 'mediasoup';
+import type { Router } from 'mediasoup/node/lib/RouterTypes';
+import type { Worker } from 'mediasoup/node/lib/WorkerTypes';
 import { config } from '../config.js';
 
 const mediaCodecs = [
