@@ -305,7 +305,7 @@ class _AssetCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             child: asset.publicUrl.isEmpty
                 ? Container(width: 52, height: 52, color: const Color(0xFFEDE3D7), child: const Icon(Icons.image_rounded))
-                : Image.network(asset.publicUrl, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: 52, height: 52, color: const Color(0xFFEDE3D7), child: const Icon(Icons.broken_image_rounded))),
+                : Image.network(asset.publicUrl, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(width: 52, height: 52, color: const Color(0xFFEDE3D7), child: const Icon(Icons.broken_image_rounded))),
           ),
           const SizedBox(width: 12),
           Expanded(
