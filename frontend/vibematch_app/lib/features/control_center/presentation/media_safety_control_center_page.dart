@@ -646,7 +646,7 @@ class _DropdownRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: DropdownButtonFormField<String>(
-          value: items.containsKey(value) ? value : items.keys.first,
+          initialValue: items.containsKey(value) ? value : items.keys.first,
           decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
           items: [for (final item in items.entries) DropdownMenuItem(value: item.key, child: Text(item.value))],
           onChanged: (next) {
