@@ -1,4 +1,7 @@
-import type { Consumer, Producer, RtpCapabilities, WebRtcTransport } from 'mediasoup';
+import type { Consumer } from 'mediasoup/node/lib/ConsumerTypes';
+import type { Producer } from 'mediasoup/node/lib/ProducerTypes';
+import type { RtpCapabilities } from 'mediasoup/node/lib/RtpParameters';
+import type { WebRtcTransport } from 'mediasoup/node/lib/WebRtcTransportTypes';
 import { config } from '../config.js';
 import type { PeerState, RoomState, TransportDirection, VerifiedMediaUser } from '../types/mediaTypes.js';
 import type { WorkerManager } from './workerManager.js';
