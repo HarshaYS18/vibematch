@@ -173,6 +173,28 @@ class InboxApiService {
     );
   }
 
+  Future<InboxConversation> updateSecretDrift({
+    required String conversationId,
+    required bool enabled,
+  }) async {
+    final response = await http.patch(
+      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/secret-drift')),
+      headers: await _headers(),
+      body: jsonEncode({'enabled': enabled}),
+    );
+    _throwIfFailed(response, 'update Secret Drift');
+    return conversationFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<void> closeSecretDriftSession(String conversationId) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/conversations/$conversationId/secret-drift/close')),
+      headers: await _headers(),
+      body: jsonEncode({}),
+    );
+    _throwIfFailed(response, 'close Secret Drift session');
+  }
+
   Future<InboxConversation> updateConversationState({
     required String conversationId,
     bool? isMuted,
@@ -366,6 +388,7 @@ class InboxApiService {
       isArchived: json['is_archived'] == true,
       chatStreakCount: _intValue(json['chat_streak_count']),
       chatStreakActiveToday: json['chat_streak_active_today'] == true,
+      secretDriftEnabled: json['secret_drift_enabled'] == true,
     );
   }
 

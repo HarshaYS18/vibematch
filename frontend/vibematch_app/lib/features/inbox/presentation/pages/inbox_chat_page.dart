@@ -67,6 +67,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
   @override
   void dispose() {
+    unawaited(widget.controller.closeSecretDriftSession(conversation: _conversation));
     widget.controller.clearActiveConversation(widget.conversation.id);
     widget.controller.removeListener(_handleChanged);
     _textController.removeListener(_handleTextInputChanged);
@@ -479,6 +480,42 @@ class _InboxChatPageState extends State<InboxChatPage> {
     );
   }
 
+  void _openChatMoreSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ChatMoreSheet(
+        conversation: _conversation,
+        onDisappearingTap: () {
+          Navigator.pop(context);
+          unawaited(_toggleSecretDrift());
+        },
+        onOriginalMoreTap: widget.onMoreTap,
+      ),
+    );
+  }
+
+  Future<void> _handleBackFromChat() async {
+    final conversation = _conversation;
+    if (conversation.secretDriftEnabled) {
+      await widget.controller.closeSecretDriftSession(conversation: conversation);
+    }
+    if (!mounted) return;
+    final customBack = widget.onBackTap;
+    if (customBack != null) {
+      customBack();
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _toggleSecretDrift() async {
+    await widget.controller.toggleSecretDrift(conversation: _conversation);
+    if (!mounted) return;
+    final enabled = !_conversation.secretDriftEnabled;
+    _showToast(enabled ? 'Secret Drift enabled.' : 'Secret Drift disabled.');
+  }
+
   void _openCallPlaceholder({required bool video}) {
     showModalBottomSheet<void>(
       context: context,
@@ -521,11 +558,13 @@ class _InboxChatPageState extends State<InboxChatPage> {
             _ChatHeader(
               conversation: conversation,
               statusText: _chatStatusText(conversation),
-              onBackTap: widget.onBackTap ?? () => Navigator.pop(context),
-              onMoreTap: widget.onMoreTap,
+              onBackTap: () => unawaited(_handleBackFromChat()),
+              onMoreTap: _openChatMoreSheet,
               onVoiceCallTap: () => _openCallPlaceholder(video: false),
               onVideoCallTap: () => _openCallPlaceholder(video: true),
             ),
+            if (conversation.secretDriftEnabled)
+              _SecretDriftBanner(label: conversation.secretDriftLabel),
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
@@ -1061,6 +1100,78 @@ class _ReplyPreview extends StatelessWidget {
           child: Row(children: [Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w800))), IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded, size: 18))]),
         ),
       );
+}
+
+class _SecretDriftBanner extends StatelessWidget {
+  const _SecretDriftBanner({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFDBA74)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.timer_rounded, color: Color(0xFFEA580C), size: 17),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF7C2D12),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatMoreSheet extends StatelessWidget {
+  const _ChatMoreSheet({
+    required this.conversation,
+    required this.onDisappearingTap,
+    required this.onOriginalMoreTap,
+  });
+
+  final InboxConversation conversation;
+  final VoidCallback onDisappearingTap;
+  final VoidCallback onOriginalMoreTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(14),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ActionTile(
+            icon: conversation.secretDriftEnabled ? Icons.timer_off_rounded : Icons.timer_rounded,
+            title: conversation.secretDriftEnabled ? 'Turn off Secret Drift' : 'Turn on Secret Drift',
+            onTap: onDisappearingTap,
+          ),
+          _ActionTile(
+            icon: Icons.more_horiz_rounded,
+            title: 'More chat options',
+            onTap: onOriginalMoreTap,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ChatInputBar extends StatelessWidget {

@@ -278,6 +278,13 @@ class InboxController extends ChangeNotifier {
           );
         }
         break;
+      case 'inbox_secret_drift_cleared':
+        final conversationId = event['conversation_id']?.toString();
+        if (conversationId != null) {
+          _remoteActivityByConversationId.remove(conversationId);
+          loadFromBackend();
+        }
+        break;
       case 'inbox_message_deleted':
         final conversationId = event['conversation_id']?.toString();
         final messageId = event['message_id']?.toString();
@@ -385,6 +392,33 @@ class InboxController extends ChangeNotifier {
       notifyListeners();
     } catch (_) {
       markConversationRead(conversationId);
+    }
+  }
+
+  Future<void> toggleSecretDrift({
+    required InboxConversation conversation,
+  }) async {
+    try {
+      final updated = await _apiService.updateSecretDrift(
+        conversationId: conversation.id,
+        enabled: !conversation.secretDriftEnabled,
+      );
+      _upsertConversation(updated);
+      _safeNotify();
+    } catch (error) {
+      errorMessage = error.toString();
+      _safeNotify();
+    }
+  }
+
+  Future<void> closeSecretDriftSession({
+    required InboxConversation conversation,
+  }) async {
+    if (!conversation.secretDriftEnabled) return;
+    try {
+      await _apiService.closeSecretDriftSession(conversation.id);
+    } catch (_) {
+      // Best-effort close. Do not block page disposal/navigation.
     }
   }
 

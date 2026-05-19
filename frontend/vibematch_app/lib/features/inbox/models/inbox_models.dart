@@ -209,6 +209,7 @@ class InboxConversation {
     this.requestCount = 0,
     this.chatStreakCount = 0,
     this.chatStreakActiveToday = false,
+    this.secretDriftEnabled = false,
   });
 
   final String id;
@@ -236,6 +237,7 @@ class InboxConversation {
   final int requestCount;
   final int chatStreakCount;
   final bool chatStreakActiveToday;
+  final bool secretDriftEnabled;
 
   bool get isOfficial => type == InboxConversationType.official;
   bool get isStranger => type == InboxConversationType.stranger;
@@ -246,6 +248,7 @@ class InboxConversation {
   bool get isMutualFollowChat => type == InboxConversationType.chat && !isStranger;
   bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
   bool get hasChatStreak => chatStreakCount > 0;
+  String get secretDriftLabel => 'Secret Drift is on';
 
   String get safePresenceText {
     final roomStatus = roomPresence.safeRoomStatusText;
@@ -335,6 +338,7 @@ class InboxConversation {
     int? requestCount,
     int? chatStreakCount,
     bool? chatStreakActiveToday,
+    bool? secretDriftEnabled,
   }) {
     return InboxConversation(
       id: id,
@@ -362,6 +366,7 @@ class InboxConversation {
       requestCount: requestCount ?? this.requestCount,
       chatStreakCount: chatStreakCount ?? this.chatStreakCount,
       chatStreakActiveToday: chatStreakActiveToday ?? this.chatStreakActiveToday,
+      secretDriftEnabled: secretDriftEnabled ?? this.secretDriftEnabled,
     );
   }
 }

@@ -37,6 +37,7 @@ class InboxConversationResponse(BaseModel):
     unread_count: int = 0
     is_online: bool = False
     last_seen_text: str = "offline"
+    last_seen_at: datetime | None = None
     colors: list[str] = Field(default_factory=list)
     messages: list[InboxMessageResponse] = Field(default_factory=list)
     current_room_name: str | None = None
@@ -48,6 +49,7 @@ class InboxConversationResponse(BaseModel):
     is_archived: bool = False
     chat_streak_count: int = 0
     chat_streak_active_today: bool = False
+    secret_drift_enabled: bool = False
 
 
 class InboxConversationListResponse(BaseModel):
@@ -84,6 +86,10 @@ class InboxConversationStateRequest(BaseModel):
     is_pinned: bool | None = None
     is_locked: bool | None = None
     is_blocked: bool | None = None
+
+
+class InboxSecretDriftRequest(BaseModel):
+    enabled: bool
 
 
 class InboxReportCreateRequest(BaseModel):

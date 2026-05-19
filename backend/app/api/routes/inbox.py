@@ -36,6 +36,7 @@ from app.schemas.inbox import (
     InboxReportTaskListResponse,
     InboxReportTaskResponse,
     InboxRoomInviteRequest,
+    InboxSecretDriftRequest,
     InboxSendMessageRequest,
 )
 from app.services import inbox_backup_service, inbox_lock_service, inbox_service, role_service
@@ -296,6 +297,7 @@ async def get_conversation(conversation_id: str, db: Session = Depends(get_db), 
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    conversation = inbox_service.mark_secret_drift_open(db, conversation, current_user)
     read_updates = inbox_service.mark_messages_read_for_user(db, conversation, current_user)
     await _broadcast_message_updates(conversation, read_updates)
     return InboxConversationResponse(**_conversation_payload(conversation, current_user))
@@ -315,6 +317,52 @@ async def send_message(conversation_id: str, request: InboxSendMessageRequest, d
     await _broadcast_message(conversation, message)
     await _broadcast_conversation(conversation)
     return InboxMessageResponse(**payload)
+
+
+@router.patch("/conversations/{conversation_id}/secret-drift", response_model=InboxConversationResponse)
+async def update_secret_drift(conversation_id: str, request: InboxSecretDriftRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if conversation.is_official:
+        raise HTTPException(status_code=403, detail="Secret Drift is not available for official chats.")
+
+    conversation = inbox_service.set_secret_drift_mode(
+        db=db,
+        conversation=conversation,
+        enabled=request.enabled,
+        started_by_user_id=current_user.id,
+    )
+    await _broadcast_conversation(conversation)
+    if not request.enabled:
+        await inbox_ws_manager.broadcast_to_users(
+            inbox_service.participant_user_ids(conversation),
+            {
+                "event": "inbox_secret_drift_cleared",
+                "conversation_id": conversation.public_id,
+            },
+        )
+    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
+
+
+@router.post("/conversations/{conversation_id}/secret-drift/close")
+async def close_secret_drift_session(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    cleared = inbox_service.mark_secret_drift_closed_and_clear(db, conversation, current_user)
+    await _broadcast_conversation(conversation)
+    if cleared:
+        await inbox_ws_manager.broadcast_to_users(
+            inbox_service.participant_user_ids(conversation),
+            {
+                "event": "inbox_secret_drift_cleared",
+                "conversation_id": conversation.public_id,
+            },
+        )
+    return {"status": "closed", "cleared": cleared}
+
 
 
 @router.patch("/conversations/{conversation_id}/state", response_model=InboxConversationResponse)
