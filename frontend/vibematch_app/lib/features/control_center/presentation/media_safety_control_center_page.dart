@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -131,6 +132,95 @@ class _MediaSafetyControlCenterPageState
       _toast(
         'Cleanup checked ${result.checked}, deleted ${result.deleted}, failed ${result.failed}.',
       );
+    });
+  }
+
+  Future<void> _editSetting(MediaSafetySetting setting) async {
+    final jsonController = TextEditingController(
+      text: const JsonEncoder.withIndent('  ').convert(setting.valueJson),
+    );
+    final descriptionController = TextEditingController(
+      text: setting.description ?? '',
+    );
+    final formKey = GlobalKey<FormState>();
+    final result = await showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit ${setting.key.replaceAll('_', ' ')}'),
+        content: SizedBox(
+          width: 520,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: jsonController,
+                  minLines: 8,
+                  maxLines: 12,
+                  decoration: const InputDecoration(
+                    labelText: 'Policy JSON',
+                    helperText: 'Keep this valid JSON. Changes are audit-logged.',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    try {
+                      final decoded = jsonDecode(value ?? '{}');
+                      if (decoded is! Map<String, dynamic>) {
+                        return 'Policy must be a JSON object';
+                      }
+                      return null;
+                    } catch (_) {
+                      return 'Invalid JSON';
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() != true) return;
+              Navigator.of(context).pop({
+                'description': descriptionController.text.trim(),
+                'value': jsonDecode(jsonController.text) as Map<String, dynamic>,
+              });
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    jsonController.dispose();
+    descriptionController.dispose();
+    if (result == null) return;
+    final reason = await _askReason(
+      title: 'Confirm setting update?',
+      hint: 'Updated ${setting.key} from Media & Safety Control Center',
+    );
+    if (reason == null) return;
+    await _runAction(() async {
+      await _api.updateSetting(
+        key: setting.key,
+        valueJson: result['value']! as Map<String, dynamic>,
+        description: result['description']?.toString(),
+        reason: reason,
+      );
+      _toast('Setting updated.');
     });
   }
 
@@ -311,7 +401,11 @@ class _MediaSafetyControlCenterPageState
               const SizedBox(height: 14),
               const _SectionHeader(title: 'Safety settings'),
               const SizedBox(height: 8),
-              for (final setting in _settings.take(4)) _SettingCard(setting: setting),
+              for (final setting in _settings.take(4))
+                _SettingCard(
+                  setting: setting,
+                  onTap: () => unawaited(_editSetting(setting)),
+                ),
               const SizedBox(height: 14),
               const _SectionHeader(title: 'Recent media assets'),
               const SizedBox(height: 8),
@@ -430,34 +524,43 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _SettingCard extends StatelessWidget {
-  const _SettingCard({required this.setting});
+  const _SettingCard({required this.setting, required this.onTap});
   final MediaSafetySetting setting;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFEDE3D7)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.settings_suggest_rounded, color: Color(0xFF12C7B7)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(setting.key.replaceAll('_', ' '), style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                const SizedBox(height: 3),
-                Text(setting.description ?? setting.valueJson.toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)),
-              ],
-            ),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFEDE3D7)),
           ),
-        ],
+          child: Row(
+            children: [
+              const Icon(Icons.settings_suggest_rounded, color: Color(0xFF12C7B7)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(setting.key.replaceAll('_', ' '), style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 3),
+                    Text(setting.description ?? setting.valueJson.toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.edit_rounded, color: Color(0xFF8C8198)),
+            ],
+          ),
+        ),
       ),
     );
   }
