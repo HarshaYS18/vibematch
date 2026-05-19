@@ -1,10 +1,8 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
-import type { Producer } from 'mediasoup/node/lib/ProducerTypes';
-import type { WebRtcTransport } from 'mediasoup/node/lib/WebRtcTransportTypes';
 import { config } from '../config.js';
 import { extractBearerToken, MediaAuthorizationError, verifyMediaAction } from '../auth/fastapiVerifier.js';
-import type { Ack, MediaAction, PeerState } from '../types/mediaTypes.js';
+import type { Ack, MediaAction, MediaProducer, MediaWebRtcTransport, PeerState } from '../types/mediaTypes.js';
 import type { RoomManager } from '../mediasoup/roomManager.js';
 import {
   connectTransportSchema,
@@ -211,7 +209,7 @@ async function producerAction(
   payload: unknown,
   ack: Ack | undefined,
   action: MediaAction,
-  handler: (producer: Producer) => Promise<void>,
+  handler: (producer: MediaProducer) => Promise<void>,
 ): Promise<void> {
   await safeAck(ack, async () => {
     const input = producerActionSchema.parse(payload);
@@ -254,13 +252,13 @@ function requireRoom(roomManager: RoomManager, roomPublicId: string) {
   return room;
 }
 
-function requireTransport(peer: PeerState, transportId: string): WebRtcTransport {
+function requireTransport(peer: PeerState, transportId: string): MediaWebRtcTransport {
   const transport = peer.transports.get(transportId);
   if (!transport) throw new Error('Transport not found.');
   return transport;
 }
 
-function serializeTransport(transport: WebRtcTransport) {
+function serializeTransport(transport: MediaWebRtcTransport) {
   return {
     id: transport.id,
     iceParameters: transport.iceParameters,
