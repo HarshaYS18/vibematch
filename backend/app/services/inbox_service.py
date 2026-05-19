@@ -354,26 +354,54 @@ def apply_monitor_action(db: Session, report: InboxReport, action_label: str) ->
     return report
 
 
-def _chat_streak_count(messages: list[InboxMessage]) -> int:
-    user_message_days = sorted(
-        {
-            message.created_at.date()
-            for message in messages
-            if message.created_at is not None and message.sender_user_id is not None
-        },
+def _chat_streak_participant_user_ids(conversation: InboxConversation) -> set[int]:
+    if conversation.conversation_type != InboxConversationType.CHAT.value:
+        return set()
+    if conversation.is_official:
+        return set()
+    return {
+        participant.user_id
+        for participant in conversation.participants
+        if participant.user_id is not None
+    }
+
+
+def _two_way_streak_days(
+    conversation: InboxConversation,
+    messages: list[InboxMessage],
+) -> list:
+    participant_ids = _chat_streak_participant_user_ids(conversation)
+    if len(participant_ids) != 2:
+        return []
+
+    senders_by_day: dict = {}
+    for message in messages:
+        if message.created_at is None or message.sender_user_id is None:
+            continue
+        if message.sender_user_id not in participant_ids:
+            continue
+        day = message.created_at.date()
+        senders_by_day.setdefault(day, set()).add(message.sender_user_id)
+
+    return sorted(
+        [day for day, sender_ids in senders_by_day.items() if participant_ids.issubset(sender_ids)],
         reverse=True,
     )
-    if not user_message_days:
+
+
+def _chat_streak_count(conversation: InboxConversation, messages: list[InboxMessage]) -> int:
+    two_way_days = _two_way_streak_days(conversation, messages)
+    if not two_way_days:
         return 0
 
     today = datetime.utcnow().date()
-    latest_day = user_message_days[0]
+    latest_day = two_way_days[0]
     if latest_day < today - timedelta(days=1):
         return 0
 
     streak = 1
     expected_day = latest_day - timedelta(days=1)
-    for day in user_message_days[1:]:
+    for day in two_way_days[1:]:
         if day == expected_day:
             streak += 1
             expected_day -= timedelta(days=1)
@@ -383,14 +411,9 @@ def _chat_streak_count(messages: list[InboxMessage]) -> int:
     return streak
 
 
-def _chat_streak_active_today(messages: list[InboxMessage]) -> bool:
+def _chat_streak_active_today(conversation: InboxConversation, messages: list[InboxMessage]) -> bool:
     today = datetime.utcnow().date()
-    return any(
-        message.created_at is not None
-        and message.sender_user_id is not None
-        and message.created_at.date() == today
-        for message in messages
-    )
+    return today in _two_way_streak_days(conversation, messages)
 
 
 def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
@@ -431,8 +454,8 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
     uses_live_user_profile = not conversation.is_official and other_user is not None
     title = _display_name(other_user) if uses_live_user_profile else conversation.title
     avatar_url = other_user.avatar_url if uses_live_user_profile else metadata.get("avatar_url")
-    streak_count = _chat_streak_count(messages)
-    streak_active_today = _chat_streak_active_today(messages)
+    streak_count = _chat_streak_count(conversation, messages)
+    streak_active_today = _chat_streak_active_today(conversation, messages)
 
     return {
         "id": conversation.public_id,
