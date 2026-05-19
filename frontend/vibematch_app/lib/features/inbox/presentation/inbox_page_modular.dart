@@ -18,10 +18,14 @@ class InboxPage extends StatefulWidget {
     super.key,
     this.openPagesInOverlay = false,
     this.controller,
+    this.openConversationId,
+    this.openConversationRequestNonce = 0,
   });
 
   final bool openPagesInOverlay;
   final InboxController? controller;
+  final String? openConversationId;
+  final int openConversationRequestNonce;
 
   @override
   State<InboxPage> createState() => _InboxPageState();
@@ -31,6 +35,7 @@ class _InboxPageState extends State<InboxPage> {
   late final InboxController _controller;
   late final bool _ownsController;
   Widget? _panelOverlay;
+  int _lastHandledOpenConversationRequestNonce = 0;
 
   @override
   void initState() {
@@ -43,6 +48,27 @@ class _InboxPageState extends State<InboxPage> {
         if (mounted) _controller.loadFromBackend();
       });
     }
+  }
+
+
+  @override
+  void didUpdateWidget(covariant InboxPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _handleRequestedConversationOpen();
+  }
+
+  void _handleRequestedConversationOpen() {
+    final conversationId = widget.openConversationId;
+    if (conversationId == null || conversationId.isEmpty) return;
+    if (widget.openConversationRequestNonce == _lastHandledOpenConversationRequestNonce) return;
+
+    _lastHandledOpenConversationRequestNonce = widget.openConversationRequestNonce;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final conversation = _controller.conversationById(conversationId);
+      if (conversation == null) return;
+      _openConversation(conversation);
+    });
   }
 
   @override

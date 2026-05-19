@@ -52,6 +52,8 @@ class _AppShellState extends State<AppShell> {
   InboxConversation? _globalForegroundConversation;
   InboxMessage? _globalForegroundMessage;
   Timer? _globalForegroundDismissTimer;
+  String? _pendingInboxOpenConversationId;
+  int _pendingInboxOpenRequestNonce = 0;
   Timer? _backPressResetTimer;
   bool _sessionLogoutInFlight = false;
 
@@ -159,8 +161,21 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _openGlobalForegroundNotification() {
-    _dismissGlobalForegroundNotification();
-    _selectTab(VmMainTab.inbox);
+    final conversation = _globalForegroundConversation;
+    if (conversation == null) {
+      _selectTab(VmMainTab.inbox);
+      return;
+    }
+
+    _globalForegroundDismissTimer?.cancel();
+    setState(() {
+      _pendingInboxOpenConversationId = conversation.id;
+      _pendingInboxOpenRequestNonce += 1;
+      _globalForegroundConversation = null;
+      _globalForegroundMessage = null;
+      _selectedTab = VmMainTab.inbox;
+    });
+    _syncVibesPlaybackWithActiveTab();
   }
 
   void _syncVibesPlaybackWithActiveTab() {
@@ -218,7 +233,11 @@ class _AppShellState extends State<AppShell> {
     return [
       HomePage(key: ValueKey('home_$_homeRefreshNonce'), user: activeUser, currentUser: activeUser),
       const VibesPage(),
-      InboxPage(controller: _inboxController),
+      InboxPage(
+        controller: _inboxController,
+        openConversationId: _pendingInboxOpenConversationId,
+        openConversationRequestNonce: _pendingInboxOpenRequestNonce,
+      ),
       MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser),
     ];
   }
