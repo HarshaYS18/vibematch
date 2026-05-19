@@ -34,12 +34,20 @@ Backend files found/reused:
   - Existing thin routes for lock, conversations, messages, state, reports, room invites.
 - `backend/app/websocket/inbox_ws.py`
   - Existing Inbox realtime manager.
+- `backend/app/api/routes/media_realtime_auth.py`
+  - FastAPI media realtime verification endpoint for mediasoup/signaling servers.
+- `backend/app/schemas/media_realtime_auth.py`
+  - DTOs for media realtime verification.
+- `backend/app/services/media_realtime_auth_service.py`
+  - Business logic for JWT-backed media realtime access checks.
 
 ## Duplicate sources found
 
 No separate duplicate user/profile/badge/room models were added inside Inbox during this pass.
 
 Existing Inbox already had feature-local `InboxConversation` and `InboxMessage` models. They remain as Inbox DTO/view models because the current frontend and backend are already wired around them. New cross-feature call/presence/notification concepts were not duplicated in Inbox; they were added to shared sources.
+
+No actual mediasoup Node/signaling server implementation was found in this repository branch, so produce/consume/createTransport handlers were not patched directly here. Instead, a backend source-of-truth verification endpoint was added for the external mediasoup signaling service to call before any media action.
 
 ## Canonical source chosen
 
@@ -54,6 +62,24 @@ These files are the shared source of truth for:
 - quick reply payload contracts
 - room presence visibility/safe display rules
 - safe notification/quick-reply payload construction for message, room invite, team/system, stranger request, and call events
+
+Canonical media realtime auth source:
+- `backend/app/api/routes/media_realtime_auth.py`
+- `backend/app/schemas/media_realtime_auth.py`
+- `backend/app/services/media_realtime_auth_service.py`
+
+This source is for mediasoup/signaling JWT verification before actions like:
+- `join_room`
+- `create_transport`
+- `connect_transport`
+- `produce_audio`
+- `consume_audio`
+- `pause_producer`
+- `resume_producer`
+- `close_producer`
+- `join_seat`
+- `leave_seat`
+- `leave_room`
 
 Existing shared visual source reused:
 - `frontend/vibematch_app/lib/shared/gradient_names/gradient_name_text.dart`
@@ -94,7 +120,7 @@ Reused:
 
 ## Backend routes/tables added or reused
 
-Reused existing backend only in this pass:
+Reused existing backend:
 - `GET /inbox/conversations`
 - `POST /inbox/conversations/direct`
 - `PATCH /inbox/conversations/{conversation_id}/state`
@@ -104,7 +130,12 @@ Reused existing backend only in this pass:
 - `POST /inbox/conversations/{conversation_id}/reports`
 - Inbox lock and backup routes already present.
 
-No backend DB migration was added in this pass. The existing backend already contains Inbox tables/routes/services and this task focused on safe UI/source-of-truth foundation.
+Added backend foundation:
+- `POST /media-realtime/verify`
+
+`POST /media-realtime/verify` uses normal Bearer JWT auth through `get_current_user`, returns backend-trusted user identity/roles, and gives the external mediasoup signaling service a verified media context. The signaling service must ignore any client-sent user id, role, or permission claims.
+
+No backend DB migration was added in this pass.
 
 ## What is fully wired now
 
@@ -123,11 +154,13 @@ No backend DB migration was added in this pass. The existing backend already con
 - Call buttons show safe call foundation placeholder UI rather than claiming native call support.
 - Reusable call UI screens exist for incoming overlay, active calling, and call summary.
 - Shared notification payload factory exists for message, room invite, system/team, stranger request, call, and quick-reply payload contracts.
+- FastAPI now exposes a JWT-protected media realtime verification endpoint for external mediasoup/signaling integration.
 
 ## What remains mocked/deferred
 
 - Native closed-app incoming call overlay.
 - Real call session backend/media wiring for direct calls, 1v1 video, and group calls.
+- Actual Node/mediasoup signaling server handler patching; no mediasoup server source was found in this branch.
 - Push notifications and quick reply action execution.
 - Full message notification contracts on backend.
 - Cloud chat wallpapers and custom wallpaper picker.
@@ -160,15 +193,16 @@ No backend DB migration was added in this pass. The existing backend already con
 19. Tap voice/video call icons; confirm placeholder call foundation sheet opens.
 20. Confirm no Secret Vibe room name is displayed unless backend provides it as safe public room presence.
 21. Open/import `InboxIncomingCallOverlay`, `InboxCallingPage`, and `InboxCallSummaryPage` in a temporary test harness before wiring real call routes.
+22. Verify `POST /media-realtime/verify` with a valid Bearer token and room id.
+23. Verify `POST /media-realtime/verify` rejects missing/invalid/expired Bearer token through existing `get_current_user` auth.
+24. Verify unsupported `requested_action` returns `allowed=false`.
 
 ## Verification notes
 
 Requested verification commands:
 - `flutter analyze`
 - `flutter test test/widget_test.dart`
-- `python -m compileall app` if backend changed
+- `python -m compileall app` because backend files changed in the media realtime auth chunk
 - `git diff --check`
-
-Backend Python files were not modified in this pass, so backend compile was not required by the changed file set.
 
 The GitHub connector used here can edit repository files but cannot run Flutter/terminal verification inside the private repository workspace. Run the above commands locally before merging or continuing backend/native notification work.
