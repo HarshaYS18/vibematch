@@ -52,6 +52,69 @@ class MediaSafetyApiService {
         .toList(growable: false);
   }
 
+  Future<MediaSafetySetting> updateSetting({
+    required String key,
+    required Map<String, dynamic> valueJson,
+    String? description,
+    String reason = 'Media Safety Control Center update',
+  }) async {
+    final json = await _apiClient.patchMap(
+      '/admin/media-safety/settings/$key',
+      headers: _headers(),
+      body: {
+        'value_json': valueJson,
+        'description': description,
+        'reason': reason,
+      },
+    );
+    return MediaSafetySetting.fromJson(json);
+  }
+
+  Future<CdnMediaAsset> approveAsset({
+    required String mediaId,
+    required String reason,
+  }) async {
+    final json = await _apiClient.postMap(
+      '/admin/media-safety/assets/$mediaId/approve',
+      headers: _headers(),
+      body: {'reason': reason},
+    );
+    return CdnMediaAsset.fromJson(json);
+  }
+
+  Future<CdnMediaAsset> rejectAsset({
+    required String mediaId,
+    required String reason,
+  }) async {
+    final json = await _apiClient.postMap(
+      '/admin/media-safety/assets/$mediaId/reject',
+      headers: _headers(),
+      body: {'reason': reason},
+    );
+    return CdnMediaAsset.fromJson(json);
+  }
+
+  Future<CdnMediaAsset> retryDelete({
+    required String mediaId,
+    required String reason,
+  }) async {
+    final json = await _apiClient.postMap(
+      '/admin/media-safety/assets/$mediaId/retry-delete',
+      headers: _headers(),
+      body: {'reason': reason},
+    );
+    return CdnMediaAsset.fromJson(json);
+  }
+
+  Future<MediaCleanupResult> cleanupExpiredInboxMedia({int limit = 100}) async {
+    final json = await _apiClient.postMap(
+      '/admin/media-safety/cleanup/inbox-expired',
+      headers: _headers(),
+      queryParameters: {'limit': '$limit'},
+    );
+    return MediaCleanupResult.fromJson(json);
+  }
+
   Map<String, String> _headers() {
     final token = _authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
@@ -134,6 +197,8 @@ class CdnMediaAsset {
 
   String get title => '${mediaType.replaceAll('_', ' ')} • $uploadStatus';
   String get subtitle => 'User ${publicUserId ?? '-'} • ${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+  bool get canReview => uploadStatus != 'deleted' && deletionStatus == 'active';
+  bool get canRetryDelete => deletionStatus == 'failed' || deletionStatus == 'deletion_failed';
 
   factory CdnMediaAsset.fromJson(Map<String, dynamic> json) => CdnMediaAsset(
         publicId: json['public_id']?.toString() ?? '',
@@ -177,6 +242,25 @@ class MediaSafetySetting {
             : <String, dynamic>{},
         description: _text(json['description']),
         updatedAt: json['updated_at']?.toString() ?? '',
+      );
+}
+
+class MediaCleanupResult {
+  const MediaCleanupResult({
+    required this.checked,
+    required this.deleted,
+    required this.failed,
+  });
+
+  final int checked;
+  final int deleted;
+  final int failed;
+
+  factory MediaCleanupResult.fromJson(Map<String, dynamic> json) =>
+      MediaCleanupResult(
+        checked: _int(json['checked']),
+        deleted: _int(json['deleted']),
+        failed: _int(json['failed']),
       );
 }
 
