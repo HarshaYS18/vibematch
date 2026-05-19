@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -66,7 +66,7 @@ class CdnMediaAsset(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     public_id: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     owner_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
-    public_user_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    public_user_id: Mapped[int | None] = mapped_column(BigInteger, index=True, nullable=True)
 
     media_type: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
     object_key: Mapped[str] = mapped_column(String(700), unique=True, index=True, nullable=False)
