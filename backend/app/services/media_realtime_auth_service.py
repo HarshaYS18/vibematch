@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.room import Room
 from app.models.user import User
 from app.services import ban_service, role_service
+from app.services.permissions.media_room_permission_service import evaluate_media_room_permission
 
 MEDIA_REALTIME_ACTIONS = {
     "join_room",
@@ -155,11 +156,31 @@ def verify_media_realtime_request(
             device_id=device_id,
         )
 
-    # This foundation is intentionally conservative. Detailed locked-room,
-    # Secret Vibe, kickout, mute, seat, and hidden-presence checks should be
-    # delegated to the central room permission service when the mediasoup server
-    # is moved into this repo or connected to this endpoint.
     permissions = _permission_set(action)
+    permission_context: dict = {}
+    if room is not None and action in _MEDIA_ACTIONS_REQUIRING_ROOM:
+        decision = evaluate_media_room_permission(
+            db=db,
+            user=user,
+            room=room,
+            action=action,
+            device_id=device_id,
+        )
+        permission_context = decision.context
+        if not decision.allowed:
+            return _payload(
+                allowed=False,
+                reason=decision.reason,
+                user=user,
+                room_public_id=room_public_id,
+                requested_action=action,
+                permissions=decision.permissions,
+                room=room,
+                device_id=device_id,
+                permission_context=permission_context,
+            )
+        permissions = [*permissions, *decision.permissions]
+
     return _payload(
         allowed=True,
         reason=None,
@@ -169,6 +190,7 @@ def verify_media_realtime_request(
         permissions=permissions,
         room=room,
         device_id=device_id,
+        permission_context=permission_context,
     )
 
 
@@ -182,6 +204,7 @@ def _payload(
     permissions: list[str],
     room: Room | None,
     device_id: str | None,
+    permission_context: dict | None = None,
 ) -> dict:
     return {
         "allowed": allowed,
@@ -199,14 +222,16 @@ def _payload(
         },
         "room_public_id": room_public_id,
         "requested_action": requested_action,
-        "permissions": permissions,
+        "permissions": list(dict.fromkeys(permissions)),
         "mediasoup_context": {
             "room_public_id": getattr(room, "room_public_id", room_public_id),
             "room_name": getattr(room, "name", None),
             "room_is_secret": bool(getattr(room, "is_secret", False)),
             "room_is_locked": bool(getattr(room, "is_locked", False)),
             "room_is_members_only": bool(getattr(room, "is_members_only", False)),
+            "room_apply_only_mode_enabled": bool(getattr(room, "apply_only_mode_enabled", False)),
             "device_id_present": bool((device_id or "").strip()),
+            "permission_context": permission_context or {},
             "must_ignore_client_user_id": True,
             "must_ignore_client_roles": True,
             "server_verified_identity": True,
