@@ -45,6 +45,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
   bool _recordingVoice = false;
   bool _showMessageTimes = false;
   double _timeRevealDrag = 0;
+  String? _lastSentActivity;
 
   InboxConversation get _conversation => widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
 
@@ -81,11 +82,6 @@ class _InboxChatPageState extends State<InboxChatPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
   }
 
-  void _handleTextInputChanged() {
-    if (!mounted) return;
-    setState(() {});
-  }
-
   void _jumpToBottom() {
     if (!_scrollController.hasClients) return;
     _scrollController.animateTo(
@@ -110,6 +106,34 @@ class _InboxChatPageState extends State<InboxChatPage> {
     }
   }
 
+  void _sendActivity(String activity) {
+    if (_lastSentActivity == activity) return;
+    _lastSentActivity = activity;
+    widget.controller.sendChatActivity(
+      conversationId: _conversation.id,
+      activity: activity,
+    );
+  }
+
+  void _sendIdleActivity() {
+    if (_lastSentActivity == 'idle') return;
+    _lastSentActivity = 'idle';
+    widget.controller.sendChatActivity(
+      conversationId: _conversation.id,
+      activity: 'idle',
+    );
+  }
+
+  void _handleTextInputChanged() {
+    if (!mounted) return;
+    if (_textController.text.trim().isNotEmpty) {
+      _sendActivity('typing');
+    } else {
+      _sendIdleActivity();
+    }
+    setState(() {});
+  }
+
   void _sendText() {
     if (_readOnly) return;
     widget.controller.sendTextMessage(
@@ -118,6 +142,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
       replyToText: _replyToText,
     );
     _textController.clear();
+    _sendIdleActivity();
     setState(() => _replyToText = null);
   }
 
@@ -464,13 +489,24 @@ class _InboxChatPageState extends State<InboxChatPage> {
   }
 
   String _chatStatusText(InboxConversation conversation) {
-    if (_recordingVoice) return 'recording voice...';
-    if (_sendingVoice) return 'sending audio...';
-    if (_sendingImage) return 'sending photo...';
-    if (_sendingDocument) return 'sending document...';
-    if (_textController.text.trim().isNotEmpty) return 'typing...';
+    final remoteActivity = widget.controller.remoteActivityForConversation(conversation.id);
+    if (remoteActivity != null) return _activityLabel(remoteActivity);
+
     if (conversation.isOnline) return 'online';
     return conversation.safePresenceText;
+  }
+
+  String _activityLabel(String activity) {
+    return switch (activity) {
+      'typing' => 'typing...',
+      'recording_voice' => 'recording voice...',
+      'sending_audio' => 'sending audio...',
+      'sending_photo' => 'sending photo...',
+      'sending_video' => 'sending video...',
+      'sending_document' => 'sending document...',
+      'listening_audio' => 'listening to audio...',
+      _ => activity.replaceAll('_', ' '),
+    };
   }
 
   @override

@@ -56,11 +56,28 @@ class InboxSocketService {
   }
 
   void sendTypingStart(String conversationId) {
-    sendRaw({'event': 'typing_start', 'conversation_id': conversationId});
+    sendChatActivity(conversationId: conversationId, activity: 'typing');
   }
 
   void sendTypingStop(String conversationId) {
-    sendRaw({'event': 'typing_stop', 'conversation_id': conversationId});
+    sendChatActivity(conversationId: conversationId, activity: 'idle');
+  }
+
+  void sendChatActivity({
+    required String conversationId,
+    required String activity,
+  }) {
+    sendRaw({
+      'event': 'chat_activity',
+      'conversation_id': conversationId,
+      'activity': activity,
+    });
+
+    if (activity == 'typing') {
+      sendRaw({'event': 'typing_start', 'conversation_id': conversationId});
+    } else if (activity == 'idle') {
+      sendRaw({'event': 'typing_stop', 'conversation_id': conversationId});
+    }
   }
 
   void markRead(String conversationId) {

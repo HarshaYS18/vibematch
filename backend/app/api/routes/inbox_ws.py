@@ -29,6 +29,16 @@ def _is_staff_for_inbox(user: User) -> bool:
     }
 
 
+async def _broadcast_presence(user_id: int, is_online: bool) -> None:
+    await inbox_ws_manager.broadcast_all_users(
+        {
+            "event": "inbox_presence_updated",
+            "user_id": user_id,
+            "is_online": is_online,
+        }
+    )
+
+
 @router.websocket("/ws/inbox")
 async def inbox_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
     token = websocket.query_params.get("token")
@@ -42,6 +52,7 @@ async def inbox_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
         return
 
     await inbox_ws_manager.connect(user.id, websocket, is_staff=_is_staff_for_inbox(user))
+    await _broadcast_presence(user.id, True)
     try:
         while True:
             payload = await websocket.receive_json()
@@ -59,9 +70,24 @@ async def inbox_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
                 continue
 
             participant_ids = inbox_service.participant_user_ids(conversation)
-            if event == "typing_start":
+            recipient_ids = [participant_id for participant_id in participant_ids if participant_id != user.id]
+
+            if event == "chat_activity":
+                activity = str(payload.get("activity") or "idle").strip() or "idle"
                 await inbox_ws_manager.broadcast_to_users(
-                    participant_ids,
+                    recipient_ids,
+                    {
+                        "event": "inbox_chat_activity",
+                        "conversation_id": conversation.public_id,
+                        "activity": activity,
+                        "user_id": user.id,
+                        "display_name": user.display_name or user.username or str(user.public_user_id),
+                        "from_self": False,
+                    },
+                )
+            elif event == "typing_start":
+                await inbox_ws_manager.broadcast_to_users(
+                    recipient_ids,
                     {
                         "event": "inbox_typing_start",
                         "conversation_id": conversation.public_id,
@@ -71,7 +97,7 @@ async def inbox_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
                 )
             elif event == "typing_stop":
                 await inbox_ws_manager.broadcast_to_users(
-                    participant_ids,
+                    recipient_ids,
                     {
                         "event": "inbox_typing_stop",
                         "conversation_id": conversation.public_id,
@@ -95,6 +121,8 @@ async def inbox_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
                 )
     except WebSocketDisconnect:
         inbox_ws_manager.disconnect(user.id, websocket)
+        await _broadcast_presence(user.id, False)
     except Exception:
         inbox_ws_manager.disconnect(user.id, websocket)
+        await _broadcast_presence(user.id, False)
         await websocket.close(code=1011)
