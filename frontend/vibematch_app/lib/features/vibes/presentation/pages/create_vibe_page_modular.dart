@@ -11,6 +11,7 @@ import '../../controllers/vibe_mention_controller.dart';
 import '../../models/vibe_models.dart';
 import '../widgets/create_vibe_form_widgets.dart';
 import '../widgets/create_vibe_media_picker.dart';
+import '../widgets/vibe_media_playback_gate.dart';
 
 class CreateVibePageModular extends StatefulWidget {
   const CreateVibePageModular({super.key, required this.canUseMentionAllToday, required this.onPublish});
@@ -23,6 +24,8 @@ class CreateVibePageModular extends StatefulWidget {
 }
 
 class _CreateVibePageModularState extends State<CreateVibePageModular> {
+  static const String _composerPauseLockKey = 'vibes_composer_open';
+
   final VibeMentionTextController _captionController = VibeMentionTextController();
   final ImagePicker _picker = ImagePicker();
   final MediaUploadApiService _uploadApi = const MediaUploadApiService();
@@ -51,11 +54,13 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   @override
   void initState() {
     super.initState();
+    VibeMediaPlaybackGate.acquirePauseLock(_composerPauseLockKey);
     _captionController.addListener(_onCaptionChanged);
   }
 
   @override
   void dispose() {
+    VibeMediaPlaybackGate.releasePauseLock(_composerPauseLockKey);
     _captionController.removeListener(_onCaptionChanged);
     _captionController.dispose();
     super.dispose();
