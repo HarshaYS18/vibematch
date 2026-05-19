@@ -310,7 +310,7 @@ class _ChatHeader extends StatelessWidget {
             child: ClipOval(
               child: avatarUrl == null || avatarUrl.isEmpty
                   ? _HeaderAvatarText(conversation: conversation)
-                  : Image.network(avatarUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _HeaderAvatarText(conversation: conversation)),
+                  : Image.network(avatarUrl, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => _HeaderAvatarText(conversation: conversation)),
             ),
           ),
           const SizedBox(width: 10),
