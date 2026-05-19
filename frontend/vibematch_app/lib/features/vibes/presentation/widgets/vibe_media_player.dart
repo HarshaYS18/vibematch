@@ -36,11 +36,12 @@ class VibeMediaPlayer extends StatelessWidget {
       );
     }
     if (vibe.mediaType == VibeMediaType.video) {
+      final resolvedVideoKey = vibe.id.trim().isNotEmpty ? vibe.id.trim() : mediaUrl.hashCode.toString();
       return GestureDetector(
         onDoubleTap: onDoubleTap,
         child: _NetworkVideoPlayer(
-          key: ValueKey('vibe_video_${vibe.id ?? mediaUrl}'),
-          videoKey: '${vibe.id ?? mediaUrl.hashCode}',
+          key: ValueKey('vibe_video_$resolvedVideoKey'),
+          videoKey: resolvedVideoKey,
           url: mediaUrl,
           respectFeedPause: respectFeedPause,
           autoplay: autoplay,
