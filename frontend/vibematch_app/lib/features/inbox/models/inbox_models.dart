@@ -206,6 +206,8 @@ class InboxConversation {
     this.isArchived = false,
     this.isStrangerHub = false,
     this.requestCount = 0,
+    this.chatStreakCount = 0,
+    this.chatStreakActiveToday = false,
   });
 
   final String id;
@@ -230,6 +232,8 @@ class InboxConversation {
   final bool isArchived;
   final bool isStrangerHub;
   final int requestCount;
+  final int chatStreakCount;
+  final bool chatStreakActiveToday;
 
   bool get isOfficial => type == InboxConversationType.official;
   bool get isStranger => type == InboxConversationType.stranger;
@@ -239,6 +243,7 @@ class InboxConversation {
   bool get isCallLog => type == InboxConversationType.callLog;
   bool get isMutualFollowChat => type == InboxConversationType.chat && !isStranger;
   bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+  bool get hasChatStreak => chatStreakCount > 0;
 
   String get safePresenceText {
     final roomStatus = roomPresence.safeRoomStatusText;
@@ -274,6 +279,8 @@ class InboxConversation {
     bool? isArchived,
     bool? isStrangerHub,
     int? requestCount,
+    int? chatStreakCount,
+    bool? chatStreakActiveToday,
   }) {
     return InboxConversation(
       id: id,
@@ -298,6 +305,8 @@ class InboxConversation {
       isArchived: isArchived ?? this.isArchived,
       isStrangerHub: isStrangerHub ?? this.isStrangerHub,
       requestCount: requestCount ?? this.requestCount,
+      chatStreakCount: chatStreakCount ?? this.chatStreakCount,
+      chatStreakActiveToday: chatStreakActiveToday ?? this.chatStreakActiveToday,
     );
   }
 }

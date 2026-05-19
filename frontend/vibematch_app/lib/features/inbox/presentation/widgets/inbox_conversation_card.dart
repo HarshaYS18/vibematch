@@ -129,6 +129,10 @@ class InboxConversationCard extends StatelessWidget {
                       children: [
                         _TypePill(conversation: conversation),
                         const SizedBox(width: 7),
+                        if (conversation.hasChatStreak) ...[
+                          _ChatStreakPill(conversation: conversation),
+                          const SizedBox(width: 7),
+                        ],
                         Expanded(
                           child: Text(
                             conversation.safePresenceText,
@@ -270,6 +274,44 @@ class _TypePill extends StatelessWidget {
           Icon(icon, size: 10, color: color),
           const SizedBox(width: 3),
           Text(label, style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _ChatStreakPill extends StatelessWidget {
+  const _ChatStreakPill({required this.conversation});
+
+  final InboxConversation conversation;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = conversation.chatStreakActiveToday
+        ? const Color(0xFFFF6B00)
+        : const Color(0xFF9B8CA5);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: activeColor.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: activeColor.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.local_fire_department_rounded, size: 11, color: activeColor),
+          const SizedBox(width: 3),
+          Text(
+            '${conversation.chatStreakCount}',
+            style: TextStyle(
+              color: activeColor,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );

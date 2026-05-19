@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -354,6 +354,45 @@ def apply_monitor_action(db: Session, report: InboxReport, action_label: str) ->
     return report
 
 
+def _chat_streak_count(messages: list[InboxMessage]) -> int:
+    user_message_days = sorted(
+        {
+            message.created_at.date()
+            for message in messages
+            if message.created_at is not None and message.sender_user_id is not None
+        },
+        reverse=True,
+    )
+    if not user_message_days:
+        return 0
+
+    today = datetime.utcnow().date()
+    latest_day = user_message_days[0]
+    if latest_day < today - timedelta(days=1):
+        return 0
+
+    streak = 1
+    expected_day = latest_day - timedelta(days=1)
+    for day in user_message_days[1:]:
+        if day == expected_day:
+            streak += 1
+            expected_day -= timedelta(days=1)
+            continue
+        if day < expected_day:
+            break
+    return streak
+
+
+def _chat_streak_active_today(messages: list[InboxMessage]) -> bool:
+    today = datetime.utcnow().date()
+    return any(
+        message.created_at is not None
+        and message.sender_user_id is not None
+        and message.created_at.date() == today
+        for message in messages
+    )
+
+
 def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
     metadata = message.metadata_json or {}
     invite_room_id = metadata.get("invite_room_id") or metadata.get("room_public_id") or message.conversation.room_public_id
@@ -392,6 +431,9 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
     uses_live_user_profile = not conversation.is_official and other_user is not None
     title = _display_name(other_user) if uses_live_user_profile else conversation.title
     avatar_url = other_user.avatar_url if uses_live_user_profile else metadata.get("avatar_url")
+    streak_count = _chat_streak_count(messages)
+    streak_active_today = _chat_streak_active_today(messages)
+
     return {
         "id": conversation.public_id,
         "title": title,
@@ -412,6 +454,8 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
         "is_muted": conversation.is_muted,
         "is_pinned": conversation.is_pinned,
         "is_archived": conversation.is_archived,
+        "chat_streak_count": streak_count,
+        "chat_streak_active_today": streak_active_today,
     }
 
 

@@ -46,6 +46,8 @@ class InboxConversationResponse(BaseModel):
     is_muted: bool = False
     is_pinned: bool = False
     is_archived: bool = False
+    chat_streak_count: int = 0
+    chat_streak_active_today: bool = False
 
 
 class InboxConversationListResponse(BaseModel):

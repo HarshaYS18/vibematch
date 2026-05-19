@@ -560,11 +560,21 @@ class _ChatHeader extends StatelessWidget {
                       const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 15),
                   ],
                 ),
-                Text(
-                  conversation.safePresenceText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 11.2, fontWeight: FontWeight.w700),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        conversation.safePresenceText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 11.2, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    if (conversation.hasChatStreak) ...[
+                      const SizedBox(width: 6),
+                      _HeaderChatStreakPill(conversation: conversation),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -572,6 +582,44 @@ class _ChatHeader extends StatelessWidget {
           IconButton(onPressed: onVoiceCallTap, icon: const Icon(Icons.call_rounded, color: Colors.white, size: 20)),
           IconButton(onPressed: onVideoCallTap, icon: const Icon(Icons.videocam_rounded, color: Colors.white, size: 21)),
           IconButton(onPressed: onMoreTap, icon: const Icon(Icons.more_vert_rounded, color: Colors.white)),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _HeaderChatStreakPill extends StatelessWidget {
+  const _HeaderChatStreakPill({required this.conversation});
+
+  final InboxConversation conversation;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = conversation.chatStreakActiveToday
+        ? const Color(0xFFFFA000)
+        : const Color(0xFFCDBCE7);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.local_fire_department_rounded, color: color, size: 12),
+          const SizedBox(width: 3),
+          Text(
+            '${conversation.chatStreakCount}',
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );

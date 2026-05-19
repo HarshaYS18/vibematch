@@ -352,6 +352,8 @@ class InboxApiService {
       isMuted: json['is_muted'] == true,
       isPinned: json['is_pinned'] == true,
       isArchived: json['is_archived'] == true,
+      chatStreakCount: _intValue(json['chat_streak_count']),
+      chatStreakActiveToday: json['chat_streak_active_today'] == true,
     );
   }
 
@@ -460,6 +462,14 @@ class InboxApiService {
       default:
         return InboxReportStatus.pendingCsReview;
     }
+  }
+
+
+  int _intValue(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 
   Color _colorFromHex(String value) {
