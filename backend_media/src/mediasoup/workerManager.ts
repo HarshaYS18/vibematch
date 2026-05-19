@@ -1,7 +1,6 @@
 import * as mediasoup from 'mediasoup';
-import type { Router } from 'mediasoup/node/lib/RouterTypes';
-import type { Worker } from 'mediasoup/node/lib/WorkerTypes';
 import { config } from '../config.js';
+import type { MediaRouter, MediaWorker } from '../types/mediaTypes.js';
 
 const mediaCodecs = [
   {
@@ -13,15 +12,15 @@ const mediaCodecs = [
 ];
 
 export class WorkerManager {
-  private worker: Worker | null = null;
+  private worker: MediaWorker | null = null;
 
   async start(): Promise<void> {
-    this.worker = await mediasoup.createWorker({
+    this.worker = (await mediasoup.createWorker({
       rtcMinPort: config.mediasoup.minPort,
       rtcMaxPort: config.mediasoup.maxPort,
       logLevel: 'warn',
       logTags: ['ice', 'dtls', 'rtp', 'srtp', 'rtcp'],
-    });
+    })) as unknown as MediaWorker;
 
     this.worker.on('died', () => {
       console.error('[mediasoup] worker died; exiting process for supervisor restart.');
@@ -29,7 +28,7 @@ export class WorkerManager {
     });
   }
 
-  async createRouter(): Promise<Router> {
+  async createRouter(): Promise<MediaRouter> {
     const worker = this.requireWorker();
     return worker.createRouter({ mediaCodecs });
   }
@@ -39,7 +38,7 @@ export class WorkerManager {
     this.worker = null;
   }
 
-  private requireWorker(): Worker {
+  private requireWorker(): MediaWorker {
     if (!this.worker) {
       throw new Error('mediasoup worker is not started.');
     }
