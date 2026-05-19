@@ -126,12 +126,49 @@ class CreateVibeMentionRow extends StatelessWidget {
   }
 }
 
+class CreateVibeStatusBanner extends StatelessWidget {
+  const CreateVibeStatusBanner({super.key, required this.message, required this.isError, this.onRetry});
+
+  final String message;
+  final bool isError;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isError ? const Color(0xFFE84C72) : const Color(0xFF12C7B7);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          if (isError)
+            Icon(Icons.error_outline_rounded, color: color, size: 19)
+          else
+            SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: color, strokeWidth: 2.2)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message, style: const TextStyle(color: Color(0xFF111015), fontSize: 12.5, fontWeight: FontWeight.w900))),
+          if (onRetry != null) ...[
+            const SizedBox(width: 10),
+            TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900))),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class CreateVibeShareButton extends StatelessWidget {
-  const CreateVibeShareButton({super.key, required this.enabled, required this.busy, required this.onTap});
+  const CreateVibeShareButton({super.key, required this.enabled, required this.busy, required this.onTap, this.statusText});
 
   final bool enabled;
   final bool busy;
   final VoidCallback onTap;
+  final String? statusText;
 
   @override
   Widget build(BuildContext context) {
@@ -146,7 +183,14 @@ class CreateVibeShareButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
         ),
         child: busy
-            ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2))
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2)),
+                  const SizedBox(width: 10),
+                  Text(statusText?.trim().isNotEmpty == true ? statusText!.trim() : 'Posting...', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                ],
+              )
             : Text(
                 'Share Vibe',
                 style: TextStyle(color: enabled ? Colors.white : const Color(0xFF8C8198), fontWeight: FontWeight.w900),
