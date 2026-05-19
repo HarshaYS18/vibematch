@@ -1,9 +1,7 @@
-import 'dart:async';
-
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../data/inbox_voice_playback_coordinator.dart';
 import '../../models/inbox_models.dart';
 
 class InboxMessageMediaContent extends StatelessWidget {
@@ -161,39 +159,22 @@ class _InboxVoiceMedia extends StatefulWidget {
 }
 
 class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
-  final AudioPlayer _player = AudioPlayer();
-  StreamSubscription<PlayerState>? _stateSubscription;
-  StreamSubscription<void>? _completeSubscription;
-  bool _playing = false;
-  bool _loading = false;
+  final InboxVoicePlaybackCoordinator _coordinator = InboxVoicePlaybackCoordinator.instance;
 
   @override
   void initState() {
     super.initState();
-    _stateSubscription = _player.onPlayerStateChanged.listen((state) {
-      if (!mounted) return;
-      setState(() {
-        _playing = state == PlayerState.playing;
-        if (state == PlayerState.playing || state == PlayerState.paused || state == PlayerState.stopped || state == PlayerState.completed) {
-          _loading = false;
-        }
-      });
-    });
-    _completeSubscription = _player.onPlayerComplete.listen((_) {
-      if (!mounted) return;
-      setState(() {
-        _playing = false;
-        _loading = false;
-      });
-    });
+    _coordinator.addListener(_handlePlaybackChanged);
   }
 
   @override
   void dispose() {
-    unawaited(_stateSubscription?.cancel());
-    unawaited(_completeSubscription?.cancel());
-    unawaited(_player.dispose());
+    _coordinator.removeListener(_handlePlaybackChanged);
     super.dispose();
+  }
+
+  void _handlePlaybackChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _toggle() async {
@@ -202,18 +183,10 @@ class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
       _showOpenSnack(context, 'This voice message is no longer available.');
       return;
     }
-    if (_playing) {
-      await _player.pause();
-      return;
-    }
-
-    setState(() => _loading = true);
     try {
-      await _player.stop();
-      await _player.play(_audioSource(target));
+      await _coordinator.toggle(key: _voiceKey(widget.message), target: target);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
       _showOpenSnack(context, 'Could not play voice message.');
     }
   }
@@ -224,9 +197,13 @@ class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
     if (target == null) {
       return _ExpiredMediaCard(message: widget.message, mine: widget.mine, icon: Icons.mic_off_rounded);
     }
+    final state = _coordinator.state;
+    final active = state.isActive(_voiceKey(widget.message));
+    final playing = active && state.isPlaying;
+    final loading = active && state.isLoading;
     final subtitle = widget.message.mediaExpired
         ? (widget.message.hasLocalAttachmentPath ? 'Saved on this device' : 'Server copy expired')
-        : (_playing ? 'Playing voice message' : 'Tap to play');
+        : (playing ? 'Playing voice message' : 'Tap to play');
     return InkWell(
       onTap: _toggle,
       borderRadius: BorderRadius.circular(16),
@@ -244,15 +221,15 @@ class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: _playing ? const Color(0xFF12C7B7) : (widget.mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF7C3AED).withValues(alpha: 0.12)),
+                color: playing ? const Color(0xFF12C7B7) : (widget.mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF7C3AED).withValues(alpha: 0.12)),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: _loading
+              child: loading
                   ? Padding(
                       padding: const EdgeInsets.all(11),
                       child: CircularProgressIndicator(strokeWidth: 2.3, color: widget.mine ? Colors.white : const Color(0xFF7C3AED)),
                     )
-                  : Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: _playing || widget.mine ? Colors.white : const Color(0xFF7C3AED), size: 24),
+                  : Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing || widget.mine ? Colors.white : const Color(0xFF7C3AED), size: 24),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -263,7 +240,7 @@ class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Expanded(child: _VoiceWaveform(active: _playing, mine: widget.mine)),
+                      Expanded(child: _VoiceWaveform(active: playing, mine: widget.mine)),
                       const SizedBox(width: 8),
                       Text(_durationFromTitle(widget.title), style: TextStyle(color: widget.mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w900)),
                     ],
@@ -507,10 +484,8 @@ Future<void> _confirmAndOpenAttachment(BuildContext context, InboxMessage messag
   }
 }
 
-Source _audioSource(String target) {
-  if (target.startsWith('http://') || target.startsWith('https://')) return UrlSource(target);
-  if (target.startsWith('file://')) return DeviceFileSource(Uri.parse(target).toFilePath());
-  return DeviceFileSource(target);
+String _voiceKey(InboxMessage message) {
+  return message.id ?? message.effectiveRemoteMediaUrl ?? message.localAttachmentPath ?? message.text;
 }
 
 String? _voiceTarget(InboxMessage message) {
