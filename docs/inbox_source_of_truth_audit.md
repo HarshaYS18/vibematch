@@ -12,6 +12,8 @@ Frontend entry point:
   - Main Inbox screen/controller integration.
 - `frontend/vibematch_app/lib/features/inbox/presentation/pages/inbox_chat_page.dart`
   - Direct chat UI, input bar, attachments, reactions, local call foundation placeholder.
+- `frontend/vibematch_app/lib/features/inbox/presentation/pages/inbox_calling_page.dart`
+  - Reusable call foundation UI for incoming overlay, active call, and call summary screens.
 - `frontend/vibematch_app/lib/features/inbox/presentation/widgets/inbox_conversation_card.dart`
   - Conversation row/card UI.
 - `frontend/vibematch_app/lib/features/inbox/models/inbox_models.dart`
@@ -37,19 +39,21 @@ Backend files found/reused:
 
 No separate duplicate user/profile/badge/room models were added inside Inbox during this pass.
 
-Existing Inbox already had feature-local `InboxConversation` and `InboxMessage` models. They remain as Inbox DTO/view models because the current frontend and backend are already wired around them. New cross-feature call/presence/notification concepts were not duplicated in Inbox; they were added to a shared source.
+Existing Inbox already had feature-local `InboxConversation` and `InboxMessage` models. They remain as Inbox DTO/view models because the current frontend and backend are already wired around them. New cross-feature call/presence/notification concepts were not duplicated in Inbox; they were added to shared sources.
 
 ## Canonical source chosen
 
 Canonical shared communication contracts:
 - `frontend/vibematch_app/lib/shared/communication/vm_communication_models.dart`
+- `frontend/vibematch_app/lib/shared/communication/vm_notification_payload_factory.dart`
 
-This file is the shared source of truth for:
+These files are the shared source of truth for:
 - call type/status/session references
 - call participant references
 - notification payload type/contracts
 - quick reply payload contracts
 - room presence visibility/safe display rules
+- safe notification/quick-reply payload construction for message, room invite, team/system, stranger request, and call events
 
 Existing shared visual source reused:
 - `frontend/vibematch_app/lib/shared/gradient_names/gradient_name_text.dart`
@@ -64,8 +68,10 @@ Existing backend source reused:
 
 Added:
 - `frontend/vibematch_app/lib/shared/communication/vm_communication_models.dart`
+- `frontend/vibematch_app/lib/shared/communication/vm_notification_payload_factory.dart`
 - `frontend/vibematch_app/lib/features/inbox/presentation/widgets/swipe_reply_message.dart`
 - `frontend/vibematch_app/lib/features/inbox/presentation/pages/stranger_requests_page.dart`
+- `frontend/vibematch_app/lib/features/inbox/presentation/pages/inbox_calling_page.dart`
 
 Updated:
 - `frontend/vibematch_app/lib/features/inbox/models/inbox_models.dart`
@@ -115,6 +121,8 @@ No backend DB migration was added in this pass. The existing backend already con
 - Swipe-to-reply now physically moves the message body during drag and snaps back after release.
 - Reply preview activates after swipe threshold or action sheet reply.
 - Call buttons show safe call foundation placeholder UI rather than claiming native call support.
+- Reusable call UI screens exist for incoming overlay, active calling, and call summary.
+- Shared notification payload factory exists for message, room invite, system/team, stranger request, call, and quick-reply payload contracts.
 
 ## What remains mocked/deferred
 
@@ -151,6 +159,7 @@ No backend DB migration was added in this pass. The existing backend already con
 18. Tap room invite card; confirm live room route opens.
 19. Tap voice/video call icons; confirm placeholder call foundation sheet opens.
 20. Confirm no Secret Vibe room name is displayed unless backend provides it as safe public room presence.
+21. Open/import `InboxIncomingCallOverlay`, `InboxCallingPage`, and `InboxCallSummaryPage` in a temporary test harness before wiring real call routes.
 
 ## Verification notes
 
