@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +9,8 @@ from app.models.user import User
 
 DEFAULT_COLORS = ["#6D5DF6", "#E84C72"]
 TEAM_PUBLIC_ID_PREFIX = "team_official"
+OFFICIAL_TEAM_NAME = "FunKey Team"
+OFFICIAL_TEAM_AVATAR_TEXT = "FK"
 
 
 def _public_id(prefix: str) -> str:
@@ -34,14 +36,14 @@ def _time_label(value: datetime | None) -> str:
 
 def _display_name(user: User | None) -> str:
     if user is None:
-        return "Vibe Match Team"
+        return OFFICIAL_TEAM_NAME
     return user.display_name or user.username or f"User {user.public_user_id}"
 
 
 def _avatar_text(title: str) -> str:
     parts = [part for part in title.strip().split(" ") if part]
     if not parts:
-        return "VM"
+        return OFFICIAL_TEAM_AVATAR_TEXT
     if len(parts) == 1:
         return parts[0][:2].upper()
     return f"{parts[0][0]}{parts[1][0]}".upper()
@@ -71,24 +73,41 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
         .first()
     )
     if conversation:
-        return conversation
-
-    conversation = db.query(InboxConversation).filter(InboxConversation.public_id == user_team_public_id).first()
-    if conversation:
-        participant = db.query(InboxParticipant).filter(InboxParticipant.conversation_id == conversation.id, InboxParticipant.user_id == user.id).first()
-        if participant is None:
-            db.add(InboxParticipant(conversation_id=conversation.id, user_id=user.id))
+        if conversation.title != OFFICIAL_TEAM_NAME or conversation.avatar_text != OFFICIAL_TEAM_AVATAR_TEXT:
+            conversation.title = OFFICIAL_TEAM_NAME
+            conversation.avatar_text = OFFICIAL_TEAM_AVATAR_TEXT
+            metadata = dict(conversation.metadata_json or {})
+            metadata.setdefault("colors", ["#008069", "#25D366"])
+            metadata["brand_name"] = "FunKey"
+            conversation.metadata_json = metadata
+            db.add(conversation)
             db.commit()
             db.refresh(conversation)
         return conversation
 
+    conversation = db.query(InboxConversation).filter(InboxConversation.public_id == user_team_public_id).first()
+    if conversation:
+        conversation.title = OFFICIAL_TEAM_NAME
+        conversation.avatar_text = OFFICIAL_TEAM_AVATAR_TEXT
+        metadata = dict(conversation.metadata_json or {})
+        metadata.setdefault("colors", ["#008069", "#25D366"])
+        metadata["brand_name"] = "FunKey"
+        conversation.metadata_json = metadata
+        participant = db.query(InboxParticipant).filter(InboxParticipant.conversation_id == conversation.id, InboxParticipant.user_id == user.id).first()
+        if participant is None:
+            db.add(InboxParticipant(conversation_id=conversation.id, user_id=user.id))
+        db.add(conversation)
+        db.commit()
+        db.refresh(conversation)
+        return conversation
+
     conversation = InboxConversation(
         public_id=user_team_public_id,
-        title="Vibe Match Team",
-        avatar_text="VM",
+        title=OFFICIAL_TEAM_NAME,
+        avatar_text=OFFICIAL_TEAM_AVATAR_TEXT,
         conversation_type=InboxConversationType.OFFICIAL.value,
         is_official=True,
-        metadata_json={"colors": ["#008069", "#25D366"], "avatar_url": None},
+        metadata_json={"colors": ["#008069", "#25D366"], "avatar_url": None, "brand_name": "FunKey"},
     )
     db.add(conversation)
 
@@ -98,11 +117,14 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
         db.rollback()
         existing = db.query(InboxConversation).filter(InboxConversation.public_id == user_team_public_id).first()
         if existing:
+            existing.title = OFFICIAL_TEAM_NAME
+            existing.avatar_text = OFFICIAL_TEAM_AVATAR_TEXT
             participant = db.query(InboxParticipant).filter(InboxParticipant.conversation_id == existing.id, InboxParticipant.user_id == user.id).first()
             if participant is None:
                 db.add(InboxParticipant(conversation_id=existing.id, user_id=user.id))
-                db.commit()
-                db.refresh(existing)
+            db.add(existing)
+            db.commit()
+            db.refresh(existing)
             return existing
         raise
 
@@ -112,9 +134,9 @@ def ensure_team_conversation(db: Session, user: User) -> InboxConversation:
             public_id=_public_id("msg"),
             conversation_id=conversation.id,
             sender_user_id=None,
-            sender_name="Vibe Match Team",
+            sender_name=OFFICIAL_TEAM_NAME,
             message_type=InboxMessageType.SYSTEM.value,
-            text="Welcome to Vibe Match Team. Official safety, account, report, and system updates appear here.",
+            text="Welcome to FunKey Team. Official safety, account, report, and system updates appear here.",
             status=InboxMessageStatus.READ.value,
         )
     )
@@ -241,7 +263,7 @@ def send_room_invite_message(
 
 def send_team_system_message(db: Session, user: User, text: str) -> InboxMessage:
     conversation = ensure_team_conversation(db, user)
-    message = InboxMessage(public_id=_public_id("system"), conversation_id=conversation.id, sender_user_id=None, sender_name="Vibe Match Team", message_type=InboxMessageType.SYSTEM.value, text=text, status=InboxMessageStatus.READ.value)
+    message = InboxMessage(public_id=_public_id("system"), conversation_id=conversation.id, sender_user_id=None, sender_name=OFFICIAL_TEAM_NAME, message_type=InboxMessageType.SYSTEM.value, text=text, status=InboxMessageStatus.READ.value)
     conversation.updated_at = datetime.utcnow()
     db.add(message)
     db.commit()
