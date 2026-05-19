@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../controllers/inbox_controller.dart';
@@ -11,89 +9,51 @@ import 'pages/inbox_settings_page.dart';
 import 'pages/locked_chats_page.dart';
 import 'pages/stranger_requests_page.dart';
 import 'widgets/inbox_conversation_card.dart';
-import 'widgets/inbox_foreground_notification_banner.dart';
 import 'widgets/inbox_lock_flow_sheets.dart';
 import 'widgets/inbox_passcode_sheet.dart';
 import 'widgets/report_conversation_sheet.dart';
 
 class InboxPage extends StatefulWidget {
-  const InboxPage({super.key, this.openPagesInOverlay = false});
+  const InboxPage({
+    super.key,
+    this.openPagesInOverlay = false,
+    this.controller,
+  });
 
   final bool openPagesInOverlay;
+  final InboxController? controller;
 
   @override
   State<InboxPage> createState() => _InboxPageState();
 }
 
 class _InboxPageState extends State<InboxPage> {
-  final InboxController _controller = InboxController();
+  late final InboxController _controller;
+  late final bool _ownsController;
   Widget? _panelOverlay;
-  InboxConversation? _foregroundConversation;
-  InboxMessage? _foregroundMessage;
-  String? _lastForegroundMessageKey;
-  Timer? _foregroundDismissTimer;
 
   @override
   void initState() {
     super.initState();
+    _controller = widget.controller ?? InboxController();
+    _ownsController = widget.controller == null;
     _controller.addListener(_handleControllerChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _controller.loadFromBackend();
-    });
+    if (_ownsController) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _controller.loadFromBackend();
+      });
+    }
   }
 
   @override
   void dispose() {
-    _foregroundDismissTimer?.cancel();
     _controller.removeListener(_handleControllerChanged);
-    _controller.dispose();
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 
   void _handleControllerChanged() {
-    _maybeShowForegroundNotification();
     if (mounted) setState(() {});
-  }
-
-  void _maybeShowForegroundNotification() {
-    for (final conversation in _controller.conversations) {
-      if (conversation.messages.isEmpty) continue;
-      final message = conversation.messages.last;
-      if (message.isMine) continue;
-      if (conversation.isMuted || conversation.isLockedByBackend) continue;
-
-      final key = '${conversation.id}:${message.id ?? message.text}:${message.time}';
-      if (key == _lastForegroundMessageKey) return;
-
-      _lastForegroundMessageKey = key;
-      _foregroundConversation = conversation;
-      _foregroundMessage = message;
-
-      _foregroundDismissTimer?.cancel();
-      _foregroundDismissTimer = Timer(const Duration(seconds: 4), () {
-        if (!mounted) return;
-        setState(() {
-          _foregroundConversation = null;
-          _foregroundMessage = null;
-        });
-      });
-      return;
-    }
-  }
-
-  void _dismissForegroundNotification() {
-    _foregroundDismissTimer?.cancel();
-    setState(() {
-      _foregroundConversation = null;
-      _foregroundMessage = null;
-    });
-  }
-
-  void _openForegroundNotification() {
-    final conversation = _foregroundConversation;
-    if (conversation == null) return;
-    _dismissForegroundNotification();
-    _openConversation(conversation);
   }
 
   void _closePanelOverlay() {
@@ -454,18 +414,6 @@ class _InboxPageState extends State<InboxPage> {
             ),
           ),
         ),
-        if (_foregroundConversation != null && _foregroundMessage != null && _panelOverlay == null)
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            child: InboxForegroundNotificationBanner(
-              conversation: _foregroundConversation!,
-              message: _foregroundMessage!,
-              onTap: _openForegroundNotification,
-              onClose: _dismissForegroundNotification,
-            ),
-          ),
         if (_panelOverlay != null)
           Positioned.fill(
             child: Material(

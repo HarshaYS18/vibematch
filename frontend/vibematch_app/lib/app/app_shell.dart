@@ -7,7 +7,10 @@ import '../core/session/vm_session_cleanup_service.dart';
 import '../features/auth/data/auth_api_service.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/home/presentation/home_page_modular.dart';
+import '../features/inbox/controllers/inbox_controller.dart';
+import '../features/inbox/models/inbox_models.dart';
 import '../features/inbox/presentation/inbox_page_modular.dart';
+import '../features/inbox/presentation/widgets/inbox_foreground_notification_banner.dart';
 import '../features/profile/presentation/me_page.dart';
 import '../features/presence/data/presence_api_service.dart';
 import '../features/rooms/data/live_room_media_signaling_service.dart';
@@ -43,6 +46,12 @@ class _AppShellState extends State<AppShell> {
   Timer? _presenceHeartbeatTimer;
   int _homeRefreshNonce = 0;
   int _backPressCount = 0;
+  final InboxController _inboxController = InboxController();
+  bool _inboxRealtimeReady = false;
+  String? _lastGlobalInboxMessageKey;
+  InboxConversation? _globalForegroundConversation;
+  InboxMessage? _globalForegroundMessage;
+  Timer? _globalForegroundDismissTimer;
   Timer? _backPressResetTimer;
   bool _sessionLogoutInFlight = false;
 
@@ -59,6 +68,8 @@ class _AppShellState extends State<AppShell> {
     _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onUserSynced);
     _signedOutSubscription = AuthUserRealtimeService.instance.signedOut.listen((_) => _handleSignedOut());
     _startPresenceHeartbeat();
+    _inboxController.addListener(_handleGlobalInboxChanged);
+    unawaited(_startGlobalInboxRealtime());
     unawaited(WalletRealtimeSyncService.instance.start());
   }
 
@@ -78,8 +89,78 @@ class _AppShellState extends State<AppShell> {
     _signedOutSubscription?.cancel();
     _presenceHeartbeatTimer?.cancel();
     _backPressResetTimer?.cancel();
+    _globalForegroundDismissTimer?.cancel();
+    _inboxController.removeListener(_handleGlobalInboxChanged);
+    _inboxController.dispose();
     unawaited(WalletRealtimeSyncService.instance.stop());
     super.dispose();
+  }
+
+  Future<void> _startGlobalInboxRealtime() async {
+    await _inboxController.loadFromBackend();
+    _lastGlobalInboxMessageKey = _latestIncomingInboxKey();
+    _inboxRealtimeReady = true;
+  }
+
+  String? _latestIncomingInboxKey() {
+    for (final conversation in _inboxController.conversations) {
+      if (conversation.messages.isEmpty) continue;
+      final message = conversation.messages.last;
+      if (message.isMine) continue;
+      return _globalInboxMessageKey(conversation, message);
+    }
+    return null;
+  }
+
+  String _globalInboxMessageKey(
+    InboxConversation conversation,
+    InboxMessage message,
+  ) {
+    return '${conversation.id}:${message.id ?? message.text}:${message.time}';
+  }
+
+  void _handleGlobalInboxChanged() {
+    if (!_inboxRealtimeReady || !mounted) return;
+
+    for (final conversation in _inboxController.conversations) {
+      if (conversation.messages.isEmpty) continue;
+      if (conversation.isMuted || conversation.isLockedByBackend) continue;
+
+      final message = conversation.messages.last;
+      if (message.isMine) continue;
+
+      final key = _globalInboxMessageKey(conversation, message);
+      if (key == _lastGlobalInboxMessageKey) return;
+
+      _lastGlobalInboxMessageKey = key;
+      _globalForegroundConversation = conversation;
+      _globalForegroundMessage = message;
+
+      _globalForegroundDismissTimer?.cancel();
+      _globalForegroundDismissTimer = Timer(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        setState(() {
+          _globalForegroundConversation = null;
+          _globalForegroundMessage = null;
+        });
+      });
+
+      setState(() {});
+      return;
+    }
+  }
+
+  void _dismissGlobalForegroundNotification() {
+    _globalForegroundDismissTimer?.cancel();
+    setState(() {
+      _globalForegroundConversation = null;
+      _globalForegroundMessage = null;
+    });
+  }
+
+  void _openGlobalForegroundNotification() {
+    _dismissGlobalForegroundNotification();
+    _selectTab(VmMainTab.inbox);
   }
 
   void _syncVibesPlaybackWithActiveTab() {
@@ -137,7 +218,7 @@ class _AppShellState extends State<AppShell> {
     return [
       HomePage(key: ValueKey('home_$_homeRefreshNonce'), user: activeUser, currentUser: activeUser),
       const VibesPage(),
-      const InboxPage(),
+      InboxPage(controller: _inboxController),
       MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser),
     ];
   }
@@ -185,6 +266,18 @@ class _AppShellState extends State<AppShell> {
           children: [
             IndexedStack(index: _selectedTab.tabIndex, children: _pages),
             const _LiveRoomMiniBubbleLayer(),
+            if (_globalForegroundConversation != null && _globalForegroundMessage != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: InboxForegroundNotificationBanner(
+                  conversation: _globalForegroundConversation!,
+                  message: _globalForegroundMessage!,
+                  onTap: _openGlobalForegroundNotification,
+                  onClose: _dismissGlobalForegroundNotification,
+                ),
+              ),
           ],
         ),
         bottomNavigationBar: _VibeBottomNav(selectedTab: _selectedTab, isTestingAsFounder: _isTestingAsFounder, onTabSelected: _selectTab),
