@@ -26,30 +26,40 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
   io.use((socket, next) => {
     const parsed = socketAuthSchema.safeParse(socket.handshake.auth);
     if (!parsed.success) {
+      mediaLog('auth.rejected', socket.id, { reason: 'missing_token' });
       next(new Error('Missing media socket auth token.'));
       return;
     }
     const bearerToken = extractBearerToken(parsed.data.token);
     if (!bearerToken) {
+      mediaLog('auth.rejected', socket.id, { reason: 'invalid_token' });
       next(new Error('Invalid media socket auth token.'));
       return;
     }
     socket.data.auth = { bearerToken, deviceId: parsed.data.deviceId };
+    mediaLog('auth.accepted', socket.id, { deviceIdPresent: Boolean(parsed.data.deviceId) });
     next();
   });
 
   io.on('connection', (socket) => {
+    mediaLog('socket.connected', socket.id);
     socket.emit('connected', { socketId: socket.id });
 
     socket.on('joinRoom', async (payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('joinRoom', socket.id, ack, async () => {
         const input = joinRoomSchema.parse(payload);
         const auth = requireSocketAuth(socket.data.auth);
+        mediaLog('joinRoom.received', socket.id, { roomPublicId: input.roomPublicId });
         const verified = await verifyMediaAction({
           bearerToken: auth.bearerToken,
           requestedAction: 'join_room',
           roomPublicId: input.roomPublicId,
           deviceId: input.deviceId ?? auth.deviceId,
+        });
+        mediaLog('joinRoom.verified', socket.id, {
+          roomPublicId: input.roomPublicId,
+          publicUserId: verified.user.public_user_id,
+          permissions: verified.permissions,
         });
         const room = await roomManager.getOrCreateRoom(input.roomPublicId);
         const peer = roomManager.ensurePeer({
@@ -61,9 +71,14 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         });
         await socket.join(room.roomPublicId);
         socket.to(room.roomPublicId).emit('peerJoined', publicPeer(peer));
+        const roomPayload = {
+          seats: [],
+          producers: roomManager.serializeProducers?.(room) ?? [],
+        };
         return {
           roomPublicId: room.roomPublicId,
           rtpCapabilities: roomManager.getRtpCapabilities(room),
+          room: roomPayload,
           peer: publicPeer(peer),
           permissions: verified.permissions,
           mediasoupContext: verified.mediasoup_context,
@@ -72,39 +87,58 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
     });
 
     socket.on('getRouterRtpCapabilities', async (_payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('getRouterRtpCapabilities', socket.id, ack, async () => {
         const peer = requirePeer(roomManager, socket.id);
         const room = requireRoom(roomManager, peer.roomPublicId);
+        mediaLog('rtpCapabilities.sent', socket.id, { roomPublicId: room.roomPublicId });
         return { rtpCapabilities: roomManager.getRtpCapabilities(room) };
       });
     });
 
     socket.on('createWebRtcTransport', async (payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('createWebRtcTransport', socket.id, ack, async () => {
         const input = createTransportSchema.parse(payload);
         const peer = requirePeer(roomManager, socket.id);
+        mediaLog('transport.create.received', socket.id, { roomPublicId: peer.roomPublicId, direction: input.direction });
         await verifyPeerAction(peer, 'create_transport');
         const room = requireRoom(roomManager, peer.roomPublicId);
         const transport = await roomManager.createWebRtcTransport({ room, peer, direction: input.direction });
-        return serializeTransport(transport);
+        mediaLog('transport.create.ok', socket.id, { transportId: transport.id, direction: input.direction });
+        return { params: serializeTransport(transport), ...serializeTransport(transport) };
       });
     });
 
     socket.on('connectWebRtcTransport', async (payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('connectWebRtcTransport', socket.id, ack, async () => {
         const input = connectTransportSchema.parse(payload);
         const peer = requirePeer(roomManager, socket.id);
+        mediaLog('transport.connect.received', socket.id, { transportId: input.transportId });
         await verifyPeerAction(peer, 'connect_transport');
         const transport = requireTransport(peer, input.transportId);
         await transport.connect({ dtlsParameters: input.dtlsParameters as never });
+        mediaLog('transport.connect.ok', socket.id, { transportId: transport.id });
+        return { transportId: transport.id };
+      });
+    });
+
+    socket.on('connectTransport', async (payload: unknown, ack?: Ack) => {
+      await safeAck('connectTransport', socket.id, ack, async () => {
+        const input = connectTransportSchema.parse(payload);
+        const peer = requirePeer(roomManager, socket.id);
+        mediaLog('transport.connectLegacy.received', socket.id, { transportId: input.transportId });
+        await verifyPeerAction(peer, 'connect_transport');
+        const transport = requireTransport(peer, input.transportId);
+        await transport.connect({ dtlsParameters: input.dtlsParameters as never });
+        mediaLog('transport.connectLegacy.ok', socket.id, { transportId: transport.id });
         return { transportId: transport.id };
       });
     });
 
     socket.on('produce', async (payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('produce', socket.id, ack, async () => {
         const input = produceSchema.parse(payload);
         const peer = requirePeer(roomManager, socket.id);
+        mediaLog('produce.received', socket.id, { roomPublicId: peer.roomPublicId, transportId: input.transportId, kind: input.kind });
         await verifyPeerAction(peer, 'produce_audio');
         const transport = requireTransport(peer, input.transportId);
         const producer = await transport.produce({
@@ -114,25 +148,31 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         });
         peer.producers.set(producer.id, producer);
         producer.on('@close', () => peer.producers.delete(producer.id));
-        socket.to(peer.roomPublicId).emit('newProducer', {
+        const producerPayload = {
           producerId: producer.id,
+          id: producer.id,
           kind: producer.kind,
+          peerId: peer.socketId,
           peer: publicPeer(peer),
-        });
-        return { producerId: producer.id };
+        };
+        socket.to(peer.roomPublicId).emit('newProducer', producerPayload);
+        mediaLog('produce.ok', socket.id, { producerId: producer.id, kind: producer.kind });
+        return producerPayload;
       });
     });
 
     socket.on('consume', async (payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('consume', socket.id, ack, async () => {
         const input = consumeSchema.parse(payload);
         const peer = requirePeer(roomManager, socket.id);
+        mediaLog('consume.received', socket.id, { roomPublicId: peer.roomPublicId, producerId: input.producerId });
         await verifyPeerAction(peer, 'consume_audio');
         const room = requireRoom(roomManager, peer.roomPublicId);
         if (!room.router.canConsume({ producerId: input.producerId, rtpCapabilities: input.rtpCapabilities as never })) {
           throw new Error('Cannot consume this producer with provided RTP capabilities.');
         }
-        const recvTransport = [...peer.transports.values()].find((transport) => peer.transportDirections.get(transport.id) === 'recv');
+        const requestedTransport = input.transportId ? peer.transports.get(input.transportId) : undefined;
+        const recvTransport = requestedTransport ?? [...peer.transports.values()].find((transport) => peer.transportDirections.get(transport.id) === 'recv');
         if (!recvTransport) throw new Error('No recv transport found for consumer.');
         const consumer = await recvTransport.consume({
           producerId: input.producerId,
@@ -141,7 +181,15 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         });
         peer.consumers.set(consumer.id, consumer);
         consumer.on('@close', () => peer.consumers.delete(consumer.id));
+        mediaLog('consume.ok', socket.id, { consumerId: consumer.id, producerId: input.producerId });
         return {
+          params: {
+            id: consumer.id,
+            consumerId: consumer.id,
+            producerId: input.producerId,
+            kind: consumer.kind,
+            rtpParameters: consumer.rtpParameters,
+          },
           consumerId: consumer.id,
           producerId: input.producerId,
           kind: consumer.kind,
@@ -151,12 +199,13 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
     });
 
     socket.on('resumeConsumer', async (payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('resumeConsumer', socket.id, ack, async () => {
         const input = consumerActionSchema.parse(payload);
         const peer = requirePeer(roomManager, socket.id);
         const consumer = peer.consumers.get(input.consumerId);
         if (!consumer) throw new Error('Consumer not found.');
         await consumer.resume();
+        mediaLog('consumer.resume.ok', socket.id, { consumerId: consumer.id });
         return { consumerId: consumer.id };
       });
     });
@@ -170,32 +219,35 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
     });
 
     socket.on('closeProducer', async (payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('closeProducer', socket.id, ack, async () => {
         const input = producerActionSchema.parse(payload);
         const peer = requirePeer(roomManager, socket.id);
         await verifyPeerAction(peer, 'close_producer');
         if (!roomManager.closeProducer(peer, input.producerId)) throw new Error('Producer not found.');
-        socket.to(peer.roomPublicId).emit('producerClosed', { producerId: input.producerId });
+        socket.to(peer.roomPublicId).emit('producerClosed', { producerId: input.producerId, peerId: peer.socketId });
+        mediaLog('producer.close.ok', socket.id, { producerId: input.producerId });
         return { producerId: input.producerId };
       });
     });
 
     socket.on('leaveRoom', async (payload: unknown, ack?: Ack) => {
-      await safeAck(ack, async () => {
+      await safeAck('leaveRoom', socket.id, ack, async () => {
         leaveRoomSchema.parse(payload ?? {});
         const closed = roomManager.closePeer(socket.id);
         if (closed.roomPublicId) {
           await socket.leave(closed.roomPublicId);
-          socket.to(closed.roomPublicId).emit('peerLeft', { socketId: socket.id, producerIds: closed.producerIds });
+          socket.to(closed.roomPublicId).emit('peerLeft', { socketId: socket.id, peerId: socket.id, producerIds: closed.producerIds });
         }
+        mediaLog('leaveRoom.ok', socket.id, closed);
         return { left: true };
       });
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
       const closed = roomManager.closePeer(socket.id);
+      mediaLog('socket.disconnected', socket.id, { reason, ...closed });
       if (closed.roomPublicId) {
-        socket.to(closed.roomPublicId).emit('peerLeft', { socketId: socket.id, producerIds: closed.producerIds });
+        socket.to(closed.roomPublicId).emit('peerLeft', { socketId: socket.id, peerId: socket.id, producerIds: closed.producerIds });
       }
     });
   });
@@ -211,13 +263,14 @@ async function producerAction(
   action: MediaAction,
   handler: (producer: MediaProducer) => Promise<void>,
 ): Promise<void> {
-  await safeAck(ack, async () => {
+  await safeAck(action, socketId, ack, async () => {
     const input = producerActionSchema.parse(payload);
     const peer = requirePeer(roomManager, socketId);
     await verifyPeerAction(peer, action);
     const producer = peer.producers.get(input.producerId);
     if (!producer) throw new Error('Producer not found.');
     await handler(producer);
+    mediaLog(`producer.${action}.ok`, socketId, { producerId: producer.id });
     return { producerId: producer.id };
   });
 }
@@ -271,6 +324,7 @@ function serializeTransport(transport: MediaWebRtcTransport) {
 function publicPeer(peer: PeerState) {
   return {
     socketId: peer.socketId,
+    peerId: peer.socketId,
     publicUserId: peer.user.public_user_id,
     displayName: peer.user.display_name,
     avatarUrl: peer.user.avatar_url,
@@ -279,16 +333,29 @@ function publicPeer(peer: PeerState) {
   };
 }
 
-async function safeAck<T>(ack: Ack<T> | undefined, handler: () => Promise<T>): Promise<void> {
+async function safeAck<T>(eventName: string, socketId: string, ack: Ack<T> | undefined, handler: () => Promise<T>): Promise<void> {
   try {
     const data = await handler();
-    ack?.({ ok: true, data });
+    ack?.(ackPayload(data));
   } catch (error) {
     const message = error instanceof MediaAuthorizationError
       ? error.reason ?? error.message
       : error instanceof Error
         ? error.message
         : 'Unknown media signaling error.';
+    mediaLog(`${eventName}.failed`, socketId, { error: message });
     ack?.({ ok: false, error: message });
   }
+}
+
+function ackPayload<T>(data: T): { ok: true; data: T; [key: string]: unknown } {
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return { ok: true, ...(data as Record<string, unknown>), data };
+  }
+  return { ok: true, data };
+}
+
+function mediaLog(event: string, socketId: string, data: Record<string, unknown> = {}): void {
+  const payload = Object.keys(data).length ? ` ${JSON.stringify(data)}` : '';
+  console.log(`[media] ${event} socket=${socketId}${payload}`);
 }
