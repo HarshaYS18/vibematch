@@ -47,13 +47,14 @@ No separate duplicate user/profile/badge/room models were added inside Inbox dur
 
 Existing Inbox already had feature-local `InboxConversation` and `InboxMessage` models. They remain as Inbox DTO/view models because the current frontend and backend are already wired around them. New cross-feature call/presence/notification concepts were not duplicated in Inbox; they were added to shared sources.
 
-No actual mediasoup Node/signaling server implementation was found in this repository branch, so produce/consume/createTransport handlers were not patched directly here. Instead, a backend source-of-truth verification endpoint was added for the external mediasoup signaling service to call before any media action.
+No actual mediasoup Node/signaling server implementation was found in this repository branch, so produce/consume/createTransport handlers were not patched directly here. Instead, a backend source-of-truth verification endpoint and Flutter client wrapper were added for the external mediasoup signaling service to use before any media action.
 
 ## Canonical source chosen
 
 Canonical shared communication contracts:
 - `frontend/vibematch_app/lib/shared/communication/vm_communication_models.dart`
 - `frontend/vibematch_app/lib/shared/communication/vm_notification_payload_factory.dart`
+- `frontend/vibematch_app/lib/shared/communication/vm_media_realtime_auth_service.dart`
 
 These files are the shared source of truth for:
 - call type/status/session references
@@ -62,6 +63,7 @@ These files are the shared source of truth for:
 - quick reply payload contracts
 - room presence visibility/safe display rules
 - safe notification/quick-reply payload construction for message, room invite, team/system, stranger request, and call events
+- Flutter-side media realtime verification client for joining/progressing mediasoup actions
 
 Canonical media realtime auth source:
 - `backend/app/api/routes/media_realtime_auth.py`
@@ -95,6 +97,7 @@ Existing backend source reused:
 Added:
 - `frontend/vibematch_app/lib/shared/communication/vm_communication_models.dart`
 - `frontend/vibematch_app/lib/shared/communication/vm_notification_payload_factory.dart`
+- `frontend/vibematch_app/lib/shared/communication/vm_media_realtime_auth_service.dart`
 - `frontend/vibematch_app/lib/features/inbox/presentation/widgets/swipe_reply_message.dart`
 - `frontend/vibematch_app/lib/features/inbox/presentation/pages/stranger_requests_page.dart`
 - `frontend/vibematch_app/lib/features/inbox/presentation/pages/inbox_calling_page.dart`
@@ -133,7 +136,7 @@ Reused existing backend:
 Added backend foundation:
 - `POST /media-realtime/verify`
 
-`POST /media-realtime/verify` uses normal Bearer JWT auth through `get_current_user`, returns backend-trusted user identity/roles, and gives the external mediasoup signaling service a verified media context. The signaling service must ignore any client-sent user id, role, or permission claims.
+`POST /media-realtime/verify` uses normal Bearer JWT auth through `get_current_user`, returns backend-trusted user identity/roles, checks active user, banned user, active device ban, required room id for room actions, room existence, and room active status. The external mediasoup signaling service must ignore any client-sent user id, role, or permission claims.
 
 No backend DB migration was added in this pass.
 
@@ -155,6 +158,7 @@ No backend DB migration was added in this pass.
 - Reusable call UI screens exist for incoming overlay, active calling, and call summary.
 - Shared notification payload factory exists for message, room invite, system/team, stranger request, call, and quick-reply payload contracts.
 - FastAPI now exposes a JWT-protected media realtime verification endpoint for external mediasoup/signaling integration.
+- Flutter has a shared media realtime verification client that can be used by future live-room/call signaling code before mediasoup actions.
 
 ## What remains mocked/deferred
 
@@ -196,6 +200,8 @@ No backend DB migration was added in this pass.
 22. Verify `POST /media-realtime/verify` with a valid Bearer token and room id.
 23. Verify `POST /media-realtime/verify` rejects missing/invalid/expired Bearer token through existing `get_current_user` auth.
 24. Verify unsupported `requested_action` returns `allowed=false`.
+25. Verify banned device id returns `allowed=false`.
+26. Verify room-required actions without `room_public_id` return `allowed=false`.
 
 ## Verification notes
 
