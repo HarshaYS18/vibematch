@@ -914,33 +914,18 @@ class _ReadReceipt extends StatelessWidget {
     };
 
     final color = switch (status) {
-      InboxMessageStatus.read => const Color(0xFF2DD4BF),
+      InboxMessageStatus.read => const Color(0xFF34D5FF),
       InboxMessageStatus.failed => const Color(0xFFFFD1DC),
       _ => mine ? Colors.white70 : const Color(0xFF9B8CA5),
     };
 
     return Tooltip(
       message: label,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 14),
-          if (status == InboxMessageStatus.sending || status == InboxMessageStatus.failed) ...[
-            const SizedBox(width: 3),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 9.8,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ],
-      ),
+      child: Icon(icon, color: color, size: 13.5),
     );
   }
 }
+
 
 class _RetryChip extends StatelessWidget {
   const _RetryChip({required this.onTap});
