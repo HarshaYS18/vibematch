@@ -217,11 +217,10 @@ def _expire_inbox_message_references(db: Session, asset: CdnMediaAsset, now: dat
     for message in messages:
         metadata = dict(message.metadata_json or {})
         metadata["media_expired"] = True
+        metadata["expired_media_url"] = asset.public_url
         metadata["expired_media_id"] = asset.public_id
         metadata["media_expired_at"] = now.isoformat()
-        message.attachment_url = None
-        if message.message_type in {"image", "voice", "document"}:
-            message.text = INBOX_EXPIRED_PLACEHOLDER
+        metadata["local_first_allowed"] = True
         message.metadata_json = metadata
         db.add(message)
         updated += 1
