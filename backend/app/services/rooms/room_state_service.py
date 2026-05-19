@@ -78,6 +78,7 @@ def _visible_count_query(db: Session, room: Room) -> int:
 
 
 def sync_room_live_counters(db: Session, room: Room) -> tuple[int, int, int]:
+    cleanup_orphaned_seat_occupants(db, room)
     public_count = _visible_count_query(db, room)
     seated_count = int(db.query(func.count(RoomSeatState.id)).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id.isnot(None)).scalar() or 0)
     trending_score = calculate_room_trending_score(public_count, seated_count)
@@ -88,11 +89,59 @@ def sync_room_live_counters(db: Session, room: Room) -> tuple[int, int, int]:
     return public_count, seated_count, trending_score
 
 
+def cleanup_orphaned_seat_occupants(db: Session, room: Room, now: datetime | None = None) -> list[int]:
+    """Release seats whose occupant is not an active participant in this room.
+
+    This protects seat switching from ghost seats after browser refreshes,
+    duplicate sessions, or a user leaving without a clean seat release.
+    """
+    current_time = now or datetime.utcnow()
+    active_user_ids = {
+        user_id
+        for (user_id,) in db.query(RoomParticipant.user_id)
+        .filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True))
+        .all()
+    }
+    orphaned_seats = (
+        db.query(RoomSeatState)
+        .filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id.isnot(None))
+        .all()
+    )
+    released_user_ids: list[int] = []
+    for seat in orphaned_seats:
+        if seat.occupant_user_id in active_user_ids:
+            continue
+        released_user_id = int(seat.occupant_user_id)
+        seat.occupant_user_id = None
+        seat.mic_enabled = False
+        seat.admin_muted = False
+        seat.left_at = current_time
+        seat.updated_by_user_id = released_user_id
+        released_user_ids.append(released_user_id)
+    if released_user_ids:
+        for user_id in sorted(set(released_user_ids)):
+            db.add(
+                RoomRealtimeEvent(
+                    room_id=room.id,
+                    room_public_id=room.room_public_id,
+                    event_type="seat.orphaned_released",
+                    actor_user_id=user_id,
+                    target_user_id=user_id,
+                    payload={"reason": "seat_occupant_not_active_participant"},
+                    sequence=_next_sequence(db, room),
+                )
+            )
+        room.updated_at = current_time
+        db.flush()
+    return released_user_ids
+
+
 def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = None) -> list[int]:
     current_time = now or datetime.utcnow()
     cutoff = current_time - timedelta(seconds=ROOM_STALE_PRESENCE_TIMEOUT_SECONDS)
     stale_participants = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at.isnot(None), RoomParticipant.last_seen_at < cutoff).all()
     if not stale_participants:
+        cleanup_orphaned_seat_occupants(db, room, current_time)
         sync_room_live_counters(db, room)
         return []
     stale_user_ids = [participant.user_id for participant in stale_participants]
@@ -118,6 +167,7 @@ def cleanup_stale_participants(db: Session, room: Room, now: datetime | None = N
         seat.updated_by_user_id = released_user_id
     for user_id in stale_user_ids:
         db.add(RoomRealtimeEvent(room_id=room.id, room_public_id=room.room_public_id, event_type="room.participant_stale_removed", actor_user_id=user_id, target_user_id=user_id, payload={"reason": "presence_timeout", "timeout_seconds": ROOM_STALE_PRESENCE_TIMEOUT_SECONDS}, sequence=_next_sequence(db, room)))
+    cleanup_orphaned_seat_occupants(db, room, current_time)
     sync_room_live_counters(db, room)
     room.updated_at = current_time
     db.flush()
@@ -288,6 +338,7 @@ def participant_payload(room: Room, participant: RoomParticipant, seat: RoomSeat
 def room_snapshot(db: Session, room: Room, include_chat: bool = True) -> dict[str, Any]:
     seats = ensure_room_seats(db, room)
     participants = active_participants(db, room)
+    cleanup_orphaned_seat_occupants(db, room)
     seats = ensure_room_seats(db, room)
     member_requests = pending_room_member_requests(db, room)
     seat_applications = pending_seat_applications(db, room)
