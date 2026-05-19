@@ -87,8 +87,18 @@ class LiveRoomAudioService {
     _sendJoinRoom();
   }
 
-  void takeSeat(int seatIndex) {
+  void takeSeat(int seatIndex, {bool? micEnabled}) {
     if (seatIndex < 0) return;
+    if (micEnabled != null) {
+      _desiredSelfMuted = !micEnabled;
+      _selfMuted = !micEnabled;
+      if (_selfMuted) {
+        _cancelProduceRetry();
+        _removeActiveSpeaker(_peerId);
+      } else {
+        _produceRetryCount = 0;
+      }
+    }
     _desiredSeatIndex = seatIndex;
     _applyLocalSeatSnapshot(seatIndex);
     _seated = true;
@@ -386,9 +396,7 @@ class LiveRoomAudioService {
     final desiredSeat = _desiredSeatIndex;
     if (desiredSeat != null) {
       _debug('restoring desired audio seat=$desiredSeat muted=$_desiredSelfMuted');
-      takeSeat(desiredSeat);
-      await Future<void>.delayed(const Duration(milliseconds: 220));
-      setSelfMuted(_desiredSelfMuted);
+      takeSeat(desiredSeat, micEnabled: !_desiredSelfMuted);
     }
   }
 

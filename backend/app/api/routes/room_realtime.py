@@ -372,7 +372,13 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if event_type == "seat/take" and user is not None:
-                    snapshot = room_action_service.take_or_request_seat(db, room, user, _int_payload(payload, "seat_index"))
+                    snapshot = room_action_service.take_or_request_seat(
+                        db,
+                        room,
+                        user,
+                        _int_payload(payload, "seat_index"),
+                        mic_enabled=_bool_payload(payload, "mic_enabled", False),
+                    )
                     db.commit()
                     await _broadcast_snapshot(room_id, "seat/updated", snapshot)
                     continue

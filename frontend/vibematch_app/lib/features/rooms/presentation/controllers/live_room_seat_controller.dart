@@ -401,8 +401,10 @@ class LiveRoomSeatController {
       return;
     }
     selectedSeatIndex = null;
-    LiveRoomMediaSignalingService.instance.takeSeat(index);
-    LiveRoomMediaSignalingService.instance.setMicEnabled(!micMuted);
+    LiveRoomMediaSignalingService.instance.takeSeat(
+      index,
+      micEnabled: !micMuted,
+    );
     onChanged();
   }
 

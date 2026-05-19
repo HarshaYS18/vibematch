@@ -272,7 +272,14 @@ def remove_room_member(db: Session, room: Room, actor: User, target: User) -> di
     return room_snapshot(db, room)
 
 
-def take_seat(db: Session, room: Room, user: User, seat_index: int, actor_user_id: int | None = None) -> dict[str, Any]:
+def take_seat(
+    db: Session,
+    room: Room,
+    user: User,
+    seat_index: int,
+    actor_user_id: int | None = None,
+    mic_enabled: bool = False,
+) -> dict[str, Any]:
     participant = _room_participant(db, room, user)
     if participant and participant.is_stealth:
         return room_snapshot(db, room)
@@ -295,7 +302,7 @@ def take_seat(db: Session, room: Room, user: User, seat_index: int, actor_user_i
             seat.left_at = now
         if seat.seat_index == seat_index:
             seat.occupant_user_id = user.id
-            seat.mic_enabled = False
+            seat.mic_enabled = mic_enabled
             seat.admin_muted = False
             seat.occupied_at = now
             seat.left_at = None
@@ -409,10 +416,16 @@ def kick_user(db: Session, room: Room, actor: User, target: User, reason: str = 
     return room_snapshot(db, room)
 
 
-def take_or_request_seat(db: Session, room: Room, user: User, seat_index: int) -> dict[str, Any]:
+def take_or_request_seat(
+    db: Session,
+    room: Room,
+    user: User,
+    seat_index: int,
+    mic_enabled: bool = False,
+) -> dict[str, Any]:
     if room.apply_only_mode_enabled and not _is_room_manager(db, room, user):
         return request_seat_application(db, room, user, seat_index)
-    return take_seat(db, room, user, seat_index)
+    return take_seat(db, room, user, seat_index, mic_enabled=mic_enabled)
 
 
 def _has_pending_seat_invite(db: Session, room: Room, user: User, seat_index: int) -> bool:

@@ -227,13 +227,15 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     await _joinRoomInternal(reason: 'join requested');
   }
 
-  void takeSeat(int seatIndex) {
+  void takeSeat(int seatIndex, {bool? micEnabled}) {
     if (seatIndex < 0) return;
 
     seatInvite.value = null;
-    LiveRoomAudioService.instance.takeSeat(seatIndex);
+    LiveRoomAudioService.instance.takeSeat(seatIndex, micEnabled: micEnabled);
 
-    _send('seat/take', <String, Object?>{'seat_index': seatIndex});
+    final payload = <String, Object?>{'seat_index': seatIndex};
+    if (micEnabled != null) payload['mic_enabled'] = micEnabled;
+    _send('seat/take', payload);
   }
 
   void sendSeatInvite({required int seatIndex, required String targetUserId}) {

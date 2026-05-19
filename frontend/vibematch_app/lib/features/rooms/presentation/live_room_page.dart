@@ -152,9 +152,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       _usersController.buildAvailableAdminUsers(_allRoomUsers);
   List<SeatUser> get _pendingRoomMemberRequests =>
       LiveRoomMemberRequestService.instance.pendingRequests.value;
-  bool get _viewerCanManageRoom =>
-      _currentUser.isHost || _currentUser.isRoomAdmin;
-  bool get _viewerCanManageAdmins => _currentUser.isHost;
+  bool get _viewerCanManageRoom {
+    final activeUser = _currentUser;
+    final roomSnapshotUser = _seatController.currentUser;
+    return activeUser.isHost ||
+        activeUser.isRoomAdmin ||
+        roomSnapshotUser.isHost ||
+        roomSnapshotUser.isRoomAdmin;
+  }
+
+  bool get _viewerCanManageAdmins =>
+      _currentUser.isHost || _seatController.currentUser.isHost;
 
   LiveRoomMembershipStatus get _currentMembershipStatus {
     return LiveRoomMembershipService.statusFor(
