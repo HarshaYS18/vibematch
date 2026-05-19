@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -27,22 +28,28 @@ class InboxVoiceRecorderService {
 
   Future<bool> start() async {
     final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission) return false;
+    if (!hasPermission && !kIsWeb) return false;
 
     final dir = await getTemporaryDirectory();
     final path = '${dir.path}/funkey_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
     _startedAt = DateTime.now();
     _currentPath = path;
 
-    await _recorder.start(
-      const RecordConfig(
-        encoder: AudioEncoder.aacLc,
-        bitRate: 64000,
-        sampleRate: 44100,
-      ),
-      path: path,
-    );
-    return true;
+    try {
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 64000,
+          sampleRate: 44100,
+        ),
+        path: path,
+      );
+      return true;
+    } catch (_) {
+      _startedAt = null;
+      _currentPath = null;
+      return false;
+    }
   }
 
   Future<InboxVoiceRecordingResult?> stop() async {
