@@ -16,6 +16,7 @@ class _MediaSafetyControlCenterPageState
     extends State<MediaSafetyControlCenterPage> {
   final MediaSafetyApiService _api = MediaSafetyApiService();
   bool _busy = true;
+  bool _actionBusy = false;
   String? _error;
   MediaSafetyDashboard? _dashboard;
   List<MediaSafetySetting> _settings = const [];
@@ -62,15 +63,198 @@ class _MediaSafetyControlCenterPageState
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: danger ? const Color(0xFFE84C72) : const Color(0xFF251538),
+        backgroundColor:
+            danger ? const Color(0xFFE84C72) : const Color(0xFF251538),
       ),
     );
   }
 
-  void _showActionPlaceholder(String label) {
-    _toast('$label controls are backend-backed and will be expanded in the next chunk.');
+  Future<String?> _askReason({required String title, required String hint}) async {
+    final controller = TextEditingController(text: hint);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Reason',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.trim().length < 2) return null;
+    return result.trim();
+  }
+
+  Future<void> _runAction(Future<void> Function() action) async {
+    if (_actionBusy) return;
+    setState(() => _actionBusy = true);
+    try {
+      await action();
+      await _load();
+    } catch (error) {
+      _toast(error.toString().replaceFirst('Exception: ', ''), danger: true);
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _cleanupInboxMedia() async {
+    final reason = await _askReason(
+      title: 'Run inbox media cleanup?',
+      hint: 'Manual cleanup from Media & Safety Control Center',
+    );
+    if (reason == null) return;
+    await _runAction(() async {
+      final result = await _api.cleanupExpiredInboxMedia(limit: 100);
+      _toast(
+        'Cleanup checked ${result.checked}, deleted ${result.deleted}, failed ${result.failed}.',
+      );
+    });
+  }
+
+  Future<void> _approveAsset(CdnMediaAsset asset) async {
+    final reason = await _askReason(
+      title: 'Approve media?',
+      hint: 'Approved after Super Owner review',
+    );
+    if (reason == null) return;
+    await _runAction(() async {
+      await _api.approveAsset(mediaId: asset.publicId, reason: reason);
+      _toast('Media approved.');
+    });
+  }
+
+  Future<void> _rejectAsset(CdnMediaAsset asset) async {
+    final reason = await _askReason(
+      title: 'Reject and remove media?',
+      hint: 'Rejected after Super Owner review',
+    );
+    if (reason == null) return;
+    await _runAction(() async {
+      await _api.rejectAsset(mediaId: asset.publicId, reason: reason);
+      _toast('Media rejected and marked for deletion.');
+    });
+  }
+
+  Future<void> _retryDelete(CdnMediaAsset asset) async {
+    final reason = await _askReason(
+      title: 'Retry CDN delete?',
+      hint: 'Retry deletion from Media & Safety Control Center',
+    );
+    if (reason == null) return;
+    await _runAction(() async {
+      await _api.retryDelete(mediaId: asset.publicId, reason: reason);
+      _toast('Deletion retry completed.');
+    });
+  }
+
+  void _showAssetSheet(CdnMediaAsset asset) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFFFAF7F1),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                asset.title,
+                style: const TextStyle(
+                  color: Color(0xFF251538),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                asset.objectKey,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF7B6A86),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: _actionBusy
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            unawaited(_approveAsset(asset));
+                          },
+                    icon: const Icon(Icons.verified_rounded),
+                    label: const Text('Approve'),
+                  ),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFE84C72),
+                    ),
+                    onPressed: _actionBusy
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            unawaited(_rejectAsset(asset));
+                          },
+                    icon: const Icon(Icons.block_rounded),
+                    label: const Text('Reject'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _actionBusy
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            unawaited(_retryDelete(asset));
+                          },
+                    icon: const Icon(Icons.delete_sweep_rounded),
+                    label: const Text('Retry delete'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'All actions are backend permission-checked and audit-logged.',
+                style: TextStyle(
+                  color: Color(0xFF7B6A86),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -88,6 +272,11 @@ class _MediaSafetyControlCenterPageState
         ),
         actions: [
           IconButton(
+            tooltip: 'Run inbox cleanup',
+            onPressed: _busy || _actionBusy ? null : () => unawaited(_cleanupInboxMedia()),
+            icon: const Icon(Icons.cleaning_services_rounded),
+          ),
+          IconButton(
             tooltip: 'Refresh',
             onPressed: _busy ? null : () => unawaited(_load()),
             icon: const Icon(Icons.refresh_rounded),
@@ -100,7 +289,7 @@ class _MediaSafetyControlCenterPageState
           physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 120),
           children: [
-            _HeroCard(onManageSettings: () => _showActionPlaceholder('Settings')),
+            _HeroCard(onRunCleanup: () => unawaited(_cleanupInboxMedia())),
             const SizedBox(height: 14),
             if (_busy) const _LoadingCard(),
             if (_error != null) _ErrorCard(message: _error!, onRetry: () => unawaited(_load())),
@@ -120,23 +309,16 @@ class _MediaSafetyControlCenterPageState
                 ],
               ),
               const SizedBox(height: 14),
-              _SectionHeader(
-                title: 'Safety settings',
-                actionLabel: 'Manage',
-                onAction: () => _showActionPlaceholder('Media Safety settings'),
-              ),
+              const _SectionHeader(title: 'Safety settings'),
               const SizedBox(height: 8),
               for (final setting in _settings.take(4)) _SettingCard(setting: setting),
               const SizedBox(height: 14),
-              _SectionHeader(
-                title: 'Recent media assets',
-                actionLabel: 'Review queue',
-                onAction: () => _showActionPlaceholder('Review queue'),
-              ),
+              const _SectionHeader(title: 'Recent media assets'),
               const SizedBox(height: 8),
               if (_assets.isEmpty)
                 const _EmptyCard(message: 'No media records yet. Upload a profile photo, cover, chat image, or Vibe media to populate this dashboard.'),
-              for (final asset in _assets) _AssetCard(asset: asset),
+              for (final asset in _assets)
+                _AssetCard(asset: asset, onTap: () => _showAssetSheet(asset)),
             ],
           ],
         ),
@@ -146,8 +328,8 @@ class _MediaSafetyControlCenterPageState
 }
 
 class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.onManageSettings});
-  final VoidCallback onManageSettings;
+  const _HeroCard({required this.onRunCleanup});
+  final VoidCallback onRunCleanup;
 
   @override
   Widget build(BuildContext context) {
@@ -195,9 +377,9 @@ class _HeroCard extends StatelessWidget {
               foregroundColor: const Color(0xFF251538),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             ),
-            onPressed: onManageSettings,
-            icon: const Icon(Icons.tune_rounded),
-            label: const Text('Manage policies', style: TextStyle(fontWeight: FontWeight.w900)),
+            onPressed: onRunCleanup,
+            icon: const Icon(Icons.cleaning_services_rounded),
+            label: const Text('Run inbox cleanup', style: TextStyle(fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -235,18 +417,14 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.actionLabel, required this.onAction});
+  const _SectionHeader({required this.title});
   final String title;
-  final String actionLabel;
-  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900))),
-        TextButton(onPressed: onAction, child: Text(actionLabel, style: const TextStyle(fontWeight: FontWeight.w900))),
-      ],
+    return Text(
+      title,
+      style: const TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900),
     );
   }
 }
@@ -286,48 +464,56 @@ class _SettingCard extends StatelessWidget {
 }
 
 class _AssetCard extends StatelessWidget {
-  const _AssetCard({required this.asset});
+  const _AssetCard({required this.asset, required this.onTap});
   final CdnMediaAsset asset;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFEDE3D7)),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: asset.publicUrl.isEmpty
-                ? Container(width: 52, height: 52, color: const Color(0xFFEDE3D7), child: const Icon(Icons.image_rounded))
-                : Image.network(asset.publicUrl, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(width: 52, height: 52, color: const Color(0xFFEDE3D7), child: const Icon(Icons.broken_image_rounded))),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFEDE3D7)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(asset.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                const SizedBox(height: 3),
-                Text(asset.subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 5),
-                Wrap(
-                  spacing: 5,
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: asset.publicUrl.isEmpty
+                    ? Container(width: 52, height: 52, color: const Color(0xFFEDE3D7), child: const Icon(Icons.image_rounded))
+                    : Image.network(asset.publicUrl, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(width: 52, height: 52, color: const Color(0xFFEDE3D7), child: const Icon(Icons.broken_image_rounded))),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _TinyChip(label: asset.moderationStatus),
-                    _TinyChip(label: asset.deletionStatus),
+                    Text(asset.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 3),
+                    Text(asset.subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 5,
+                      children: [
+                        _TinyChip(label: asset.moderationStatus),
+                        _TinyChip(label: asset.deletionStatus),
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF8C8198)),
+            ],
           ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF8C8198)),
-        ],
+        ),
       ),
     );
   }
