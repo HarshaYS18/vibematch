@@ -24,7 +24,7 @@ from app.schemas.cdn_media import (
     MediaSafetySettingResponse,
     MediaSafetySettingUpdateRequest,
 )
-from app.services import cdn_media_service
+from app.services import cdn_media_service, inbox_service
 from app.services.audit_log_service import create_admin_log
 
 
@@ -40,6 +40,23 @@ def _asset_or_404(db: Session, media_id: str) -> CdnMediaAsset:
     if not asset:
         raise HTTPException(status_code=404, detail="Media asset not found")
     return asset
+
+
+def _asset_owner(db: Session, asset: CdnMediaAsset) -> User | None:
+    if asset.owner_user_id is None:
+        return None
+    return db.query(User).filter(User.id == asset.owner_user_id).first()
+
+
+def _friendly_media_type(asset: CdnMediaAsset) -> str:
+    return asset.media_type.replace("_", " ")
+
+
+def _send_media_team_message(db: Session, *, asset: CdnMediaAsset, text: str) -> None:
+    owner = _asset_owner(db, asset)
+    if owner is None:
+        return
+    inbox_service.send_team_system_message(db, owner, text)
 
 
 @router.get("/dashboard", response_model=CdnMediaDashboardResponse)
@@ -160,6 +177,11 @@ def approve_media_asset(
         reason=payload.reason,
         metadata_json={"media_type": asset.media_type},
     )
+    _send_media_team_message(
+        db,
+        asset=asset,
+        text=f"Your {_friendly_media_type(asset)} was approved after review.",
+    )
     return asset
 
 
@@ -189,6 +211,11 @@ def reject_media_asset(
         resource_id=asset.public_id,
         reason=payload.reason,
         metadata_json={"media_type": asset.media_type},
+    )
+    _send_media_team_message(
+        db,
+        asset=asset,
+        text=f"Your {_friendly_media_type(asset)} was rejected after review and removed. Reason: {payload.reason}",
     )
     db.refresh(asset)
     return asset
