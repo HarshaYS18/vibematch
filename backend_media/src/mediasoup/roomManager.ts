@@ -100,11 +100,26 @@ export class RoomManager {
     return producers;
   }
 
+  getTransportByDirection(
+    peer: PeerState,
+    direction: TransportDirection,
+  ): MediaWebRtcTransport | undefined {
+    return [...peer.transports.values()].find(
+      (transport) => peer.transportDirections.get(transport.id) === direction,
+    );
+  }
+
   async createWebRtcTransport(params: {
     room: RoomState;
     peer: PeerState;
     direction: TransportDirection;
   }): Promise<MediaWebRtcTransport> {
+    const existing = this.getTransportByDirection(params.peer, params.direction);
+    if (existing) {
+      params.room.lastActiveAt = Date.now();
+      return existing;
+    }
+
     const transport = await params.room.router.createWebRtcTransport({
       listenIps: [
         {
