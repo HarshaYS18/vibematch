@@ -43,6 +43,8 @@ class _InboxChatPageState extends State<InboxChatPage> {
   bool _sendingDocument = false;
   bool _sendingVoice = false;
   bool _recordingVoice = false;
+  bool _showMessageTimes = false;
+  double _timeRevealDrag = 0;
 
   InboxConversation get _conversation => widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
 
@@ -81,6 +83,21 @@ class _InboxChatPageState extends State<InboxChatPage> {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  void _handleTimeRevealPointerMove(PointerMoveEvent event) {
+    if (event.delta.dx <= 0 || event.delta.dx.abs() < event.delta.dy.abs()) return;
+    _timeRevealDrag += event.delta.dx;
+    if (_timeRevealDrag > 18 && !_showMessageTimes && mounted) {
+      setState(() => _showMessageTimes = true);
+    }
+  }
+
+  void _clearTimeReveal() {
+    _timeRevealDrag = 0;
+    if (_showMessageTimes && mounted) {
+      setState(() => _showMessageTimes = false);
+    }
   }
 
   void _sendText() {
@@ -468,19 +485,25 @@ class _InboxChatPageState extends State<InboxChatPage> {
                   separatorBuilder: (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final message = messages[index];
-                    return SwipeReplyMessage(
-                      isMine: message.isMine,
+                    return Listener(
+                      onPointerMove: _handleTimeRevealPointerMove,
+                      onPointerUp: (_) => _clearTimeReveal(),
+                      onPointerCancel: (_) => _clearTimeReveal(),
+                      child: SwipeReplyMessage(
+                        isMine: message.isMine,
                       onReply: () => setState(() => _replyToText = message.text),
-                      child: _MessageBubble(
-                        message: message,
+                        child: _MessageBubble(
+                          showTime: _showMessageTimes,
+                          message: message,
                         conversation: conversation,
                         onLongPress: () => _openMessageActions(message),
                         onJoinInviteTap: message.isInvite ? () => _openInvitedRoom(message) : null,
                         onAcceptLoveBondTap: message.isLoveBondRequest ? () => _acceptLoveBondRequest(message) : null,
-                        onRejectLoveBondTap: message.isLoveBondRequest ? () => _rejectLoveBondRequest(message) : null,
-                        onRetryFailedTap: message.isMine && message.status == InboxMessageStatus.failed
-                            ? () => widget.controller.retryFailedMessage(conversationId: _conversation.id, message: message)
-                            : null,
+                          onRejectLoveBondTap: message.isLoveBondRequest ? () => _rejectLoveBondRequest(message) : null,
+                          onRetryFailedTap: message.isMine && message.status == InboxMessageStatus.failed
+                              ? () => widget.controller.retryFailedMessage(conversationId: _conversation.id, message: message)
+                              : null,
+                        ),
                       ),
                     );
                   },
@@ -560,25 +583,19 @@ class _ChatHeader extends StatelessWidget {
                       const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 15),
                   ],
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        conversation.safePresenceText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 11.2, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    if (conversation.hasChatStreak) ...[
-                      const SizedBox(width: 6),
-                      _HeaderChatStreakPill(conversation: conversation),
-                    ],
-                  ],
+                Text(
+                  conversation.safePresenceText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 11.2, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
           ),
+          if (conversation.hasChatStreak) ...[
+            _HeaderChatStreakPill(conversation: conversation),
+            const SizedBox(width: 4),
+          ],
           IconButton(onPressed: onVoiceCallTap, icon: const Icon(Icons.call_rounded, color: Colors.white, size: 20)),
           IconButton(onPressed: onVideoCallTap, icon: const Icon(Icons.videocam_rounded, color: Colors.white, size: 21)),
           IconButton(onPressed: onMoreTap, icon: const Icon(Icons.more_vert_rounded, color: Colors.white)),
@@ -638,6 +655,7 @@ class _HeaderAvatarText extends StatelessWidget {
 
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
+    required this.showTime,
     required this.message,
     required this.conversation,
     required this.onLongPress,
@@ -647,6 +665,7 @@ class _MessageBubble extends StatelessWidget {
     required this.onRetryFailedTap,
   });
 
+  final bool showTime;
   final InboxMessage message;
   final InboxConversation conversation;
   final VoidCallback onLongPress;
@@ -709,9 +728,18 @@ class _MessageBubble extends StatelessWidget {
                         Icon(Icons.star_rounded, color: mine ? Colors.white70 : const Color(0xFFC99A3B), size: 12),
                         const SizedBox(width: 4),
                       ],
-                      Text(message.time, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF9B8CA5), fontSize: 10.3, fontWeight: FontWeight.w800)),
+                      if (showTime) ...[
+                        Text(
+                          '${mine ? 'You' : message.sender} • ${message.time}',
+                          style: TextStyle(
+                            color: mine ? Colors.white70 : const Color(0xFF9B8CA5),
+                            fontSize: 10.3,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                       if (mine) ...[
-                        const SizedBox(width: 5),
+                        if (showTime) const SizedBox(width: 5),
                         _ReadReceipt(status: message.status, mine: mine),
                         if (message.status == InboxMessageStatus.failed && onRetryFailedTap != null) ...[
                           const SizedBox(width: 6),
