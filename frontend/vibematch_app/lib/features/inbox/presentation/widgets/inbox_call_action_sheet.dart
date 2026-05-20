@@ -4,6 +4,7 @@ import '../../controllers/inbox_call_controller.dart';
 import '../../models/inbox_call_models.dart';
 import '../../models/inbox_models.dart';
 import '../pages/inbox_active_call_page.dart';
+import 'inbox_light_premium_tokens.dart';
 
 class InboxCallActionSheet extends StatefulWidget {
   const InboxCallActionSheet({
@@ -66,7 +67,7 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
+          backgroundColor: InboxLightPremiumTokens.ink,
           content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
         ),
       );
@@ -135,7 +136,7 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
                         widget.conversation.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900),
+                        style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 18, fontWeight: FontWeight.w900),
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -143,8 +144,8 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
                             ? 'Official team chats use support workflows, not direct calls.'
                             : callInProgress
                                 ? 'A call is already active. End it before starting another one.'
-                                : 'Start a direct Inbox call. Media routing will attach to WebRTC/mediasoup gateway.',
-                        style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w700),
+                                : 'Start a direct Inbox call.',
+                        style: const TextStyle(color: InboxLightPremiumTokens.muted, fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -160,7 +161,7 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
                     title: 'Voice call',
                     subtitle: callInProgress ? 'Busy' : callDisabled ? 'Unavailable' : 'Audio only',
                     busy: _busy || disabled,
-                    color: const Color(0xFF12C7B7),
+                    color: InboxLightPremiumTokens.aqua,
                     onTap: () => _startCall(InboxCallType.audio),
                   ),
                 ),
@@ -171,7 +172,7 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
                     title: 'Video call',
                     subtitle: callInProgress ? 'Busy' : callDisabled ? 'Unavailable' : 'Camera call',
                     busy: _busy || disabled,
-                    color: const Color(0xFF8C5CF6),
+                    color: InboxLightPremiumTokens.violet,
                     onTap: () => _startCall(InboxCallType.video),
                   ),
                 ),
@@ -183,7 +184,7 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
                 callDisabled
                     ? 'Official team chats cannot be called.'
                     : 'Active call in progress.',
-                style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11.5, fontWeight: FontWeight.w900),
+                style: const TextStyle(color: InboxLightPremiumTokens.danger, fontSize: 11.5, fontWeight: FontWeight.w900),
               ),
             ],
           ],
@@ -234,9 +235,9 @@ class _CallActionButton extends StatelessWidget {
                 child: Icon(icon, color: Colors.white, size: 22),
               ),
               const SizedBox(height: 10),
-              Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900)),
+              Text(title, style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 13.5, fontWeight: FontWeight.w900)),
               const SizedBox(height: 3),
-              Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 10.8, fontWeight: FontWeight.w700)),
+              Text(subtitle, style: const TextStyle(color: InboxLightPremiumTokens.muted, fontSize: 10.8, fontWeight: FontWeight.w700)),
             ],
           ),
         ),

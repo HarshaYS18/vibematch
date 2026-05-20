@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../data/inbox_preferences_api_service.dart';
+import 'inbox_light_premium_tokens.dart';
 
 class InboxPasscodeSheet extends StatefulWidget {
   const InboxPasscodeSheet({
@@ -146,24 +147,24 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
             children: [
               Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
               const SizedBox(height: 16),
-              Container(width: 62, height: 62, decoration: BoxDecoration(color: const Color(0xFF251538), borderRadius: BorderRadius.circular(22)), child: const Icon(Icons.lock_rounded, color: Colors.white, size: 30)),
+              Container(width: 62, height: 62, decoration: BoxDecoration(color: InboxLightPremiumTokens.ink, borderRadius: BorderRadius.circular(22)), child: const Icon(Icons.lock_rounded, color: Colors.white, size: 30)),
               const SizedBox(height: 13),
-              Text(widget.title, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontSize: 21, fontWeight: FontWeight.w900)),
+              Text(widget.title, textAlign: TextAlign.center, style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 21, fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
-              Text(widget.subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700)),
+              Text(widget.subtitle, textAlign: TextAlign.center, style: const TextStyle(color: InboxLightPremiumTokens.muted, fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
               if (_deviceUnlockAllowed && _canUseBiometrics) ...[
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _biometricBusy ? null : _unlockWithBiometrics,
-                    style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF251538), padding: const EdgeInsets.symmetric(vertical: 13), side: const BorderSide(color: Color(0xFFECE2D8)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
-                    icon: _biometricBusy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF251538))) : const Icon(Icons.fingerprint_rounded, size: 22),
+                    style: OutlinedButton.styleFrom(foregroundColor: InboxLightPremiumTokens.ink, padding: const EdgeInsets.symmetric(vertical: 13), side: const BorderSide(color: InboxLightPremiumTokens.warmBorder), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
+                    icon: _biometricBusy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: InboxLightPremiumTokens.ink)) : const Icon(Icons.fingerprint_rounded, size: 22),
                     label: const Text('Unlock with device', style: TextStyle(fontWeight: FontWeight.w900)),
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Row(children: [Expanded(child: Divider(color: Color(0xFFECE2D8))), Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('or', style: TextStyle(color: Color(0xFF9B8CA5), fontWeight: FontWeight.w800))), Expanded(child: Divider(color: Color(0xFFECE2D8)))]),
+                const Row(children: [Expanded(child: Divider(color: InboxLightPremiumTokens.warmBorder)), Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('or', style: TextStyle(color: InboxLightPremiumTokens.softMuted, fontWeight: FontWeight.w800))), Expanded(child: Divider(color: InboxLightPremiumTokens.warmBorder))]),
                 const SizedBox(height: 12),
               ],
               TextField(
@@ -172,17 +173,17 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _submit(),
-                style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900),
+                style: const TextStyle(color: InboxLightPremiumTokens.ink, fontWeight: FontWeight.w900),
                 decoration: InputDecoration(
                   hintText: 'Enter Inbox lock',
                   errorText: _error,
-                  prefixIcon: const Icon(Icons.password_rounded, color: Color(0xFF8C5CF6)),
+                  prefixIcon: const Icon(Icons.password_rounded, color: InboxLightPremiumTokens.violet),
                   suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded)),
                   filled: true,
-                  fillColor: const Color(0xFFFAF7F1),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF8C5CF6), width: 1.4)),
+                  fillColor: InboxLightPremiumTokens.page,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: InboxLightPremiumTokens.warmBorder)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: InboxLightPremiumTokens.warmBorder)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: InboxLightPremiumTokens.violet, width: 1.4)),
                 ),
               ),
               const SizedBox(height: 14),
@@ -190,7 +191,7 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: _busy ? null : _submit,
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF251538), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
+                  style: FilledButton.styleFrom(backgroundColor: InboxLightPremiumTokens.ink, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
                   icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.lock_open_rounded, size: 18),
                   label: const Text('Unlock', style: TextStyle(fontWeight: FontWeight.w900)),
                 ),

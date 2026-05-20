@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
+import '../widgets/inbox_light_premium_tokens.dart';
+import '../widgets/inbox_time_formatters.dart';
 
 class InboxSearchPage extends StatefulWidget {
   const InboxSearchPage({
@@ -41,12 +43,18 @@ class _InboxSearchPageState extends State<InboxSearchPage> {
   @override
   Widget build(BuildContext context) {
     final query = _searchController.text.trim();
-    final chatResults = _results.where((item) => item.matchType == InboxSearchMatchType.chat).toList();
-    final friendResults = _results.where((item) => item.matchType == InboxSearchMatchType.mutualFollow).toList();
-    final messageResults = _results.where((item) => item.matchType == InboxSearchMatchType.message).toList();
+    final chatResults = _results
+        .where((item) => item.matchType == InboxSearchMatchType.chat)
+        .toList();
+    final friendResults = _results
+        .where((item) => item.matchType == InboxSearchMatchType.mutualFollow)
+        .toList();
+    final messageResults = _results
+        .where((item) => item.matchType == InboxSearchMatchType.message)
+        .toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F1),
+      backgroundColor: InboxLightPremiumTokens.page,
       body: SafeArea(
         child: Column(
           children: [
@@ -60,30 +68,30 @@ class _InboxSearchPageState extends State<InboxSearchPage> {
               child: query.isEmpty
                   ? const _SearchEmptyHint()
                   : _results.isEmpty
-                      ? _NoSearchResults(query: query)
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          children: [
-                            _ResultSection(
-                              title: 'Chats',
-                              results: chatResults,
-                              query: query,
-                              onOpenConversation: widget.onOpenConversation,
-                            ),
-                            _ResultSection(
-                              title: 'Friends',
-                              results: friendResults,
-                              query: query,
-                              onOpenConversation: widget.onOpenConversation,
-                            ),
-                            _ResultSection(
-                              title: 'Messages',
-                              results: messageResults,
-                              query: query,
-                              onOpenConversation: widget.onOpenConversation,
-                            ),
-                          ],
+                  ? _NoSearchResults(query: query)
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      children: [
+                        _ResultSection(
+                          title: 'Chats',
+                          results: chatResults,
+                          query: query,
+                          onOpenConversation: widget.onOpenConversation,
                         ),
+                        _ResultSection(
+                          title: 'Friends',
+                          results: friendResults,
+                          query: query,
+                          onOpenConversation: widget.onOpenConversation,
+                        ),
+                        _ResultSection(
+                          title: 'Messages',
+                          results: messageResults,
+                          query: query,
+                          onOpenConversation: widget.onOpenConversation,
+                        ),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -110,14 +118,19 @@ class _SearchHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 10, 14, 10),
       decoration: const BoxDecoration(
-        color: Color(0xFFFAF7F1),
-        border: Border(bottom: BorderSide(color: Color(0xFFECE2D8))),
+        color: InboxLightPremiumTokens.page,
+        border: Border(
+          bottom: BorderSide(color: InboxLightPremiumTokens.warmBorder),
+        ),
       ),
       child: Row(
         children: [
           IconButton(
             onPressed: onBackTap,
-            icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF251538)),
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: InboxLightPremiumTokens.ink,
+            ),
           ),
           Expanded(
             child: TextField(
@@ -125,26 +138,37 @@ class _SearchHeader extends StatelessWidget {
               autofocus: true,
               onChanged: onChanged,
               style: const TextStyle(
-                color: Color(0xFF251538),
+                color: InboxLightPremiumTokens.ink,
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
               ),
               decoration: InputDecoration(
                 hintText: 'Search chats or messages',
                 hintStyle: const TextStyle(
-                  color: Color(0xFF9B8CA5),
+                  color: InboxLightPremiumTokens.softMuted,
                   fontWeight: FontWeight.w700,
                 ),
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF7B6A86), size: 20),
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: InboxLightPremiumTokens.muted,
+                  size: 20,
+                ),
                 suffixIcon: controller.text.isEmpty
                     ? null
                     : IconButton(
                         onPressed: onClearTap,
-                        icon: const Icon(Icons.close_rounded, color: Color(0xFF7B6A86), size: 20),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: InboxLightPremiumTokens.muted,
+                          size: 20,
+                        ),
                       ),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 11,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
                   borderSide: BorderSide.none,
@@ -185,7 +209,7 @@ class _ResultSection extends StatelessWidget {
             child: Text(
               title,
               style: const TextStyle(
-                color: Color(0xFF7B6A86),
+                color: InboxLightPremiumTokens.muted,
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
               ),
@@ -236,7 +260,10 @@ class _SearchResultTile extends StatelessWidget {
               child: Center(
                 child: Text(
                   conversation.avatarText,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ),
@@ -253,16 +280,18 @@ class _SearchResultTile extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Color(0xFF251538),
+                            color: InboxLightPremiumTokens.ink,
                             fontSize: 13.5,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
                       Text(
-                        result.message?.time ?? conversation.time,
+                        inboxLocalTimeLabel(
+                          result.message?.time ?? conversation.time,
+                        ),
                         style: const TextStyle(
-                          color: Color(0xFF9B8CA5),
+                          color: InboxLightPremiumTokens.softMuted,
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
                         ),
@@ -333,7 +362,7 @@ class _HighlightedPreview extends StatelessWidget {
           TextSpan(
             text: match,
             style: const TextStyle(
-              color: Color(0xFF251538),
+              color: InboxLightPremiumTokens.ink,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -354,7 +383,7 @@ class _SearchEmptyHint extends StatelessWidget {
         'Search chats, friends, and message text',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Color(0xFF7B6A86),
+          color: InboxLightPremiumTokens.muted,
           fontSize: 13,
           fontWeight: FontWeight.w800,
         ),
@@ -375,7 +404,7 @@ class _NoSearchResults extends StatelessWidget {
         'No results for “$query”',
         textAlign: TextAlign.center,
         style: const TextStyle(
-          color: Color(0xFF7B6A86),
+          color: InboxLightPremiumTokens.muted,
           fontSize: 13,
           fontWeight: FontWeight.w800,
         ),

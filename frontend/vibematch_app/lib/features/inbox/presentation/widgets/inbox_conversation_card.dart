@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../shared/gradient_names/gradient_name_style.dart';
 import '../../../../shared/gradient_names/gradient_name_text.dart';
 import '../../models/inbox_models.dart';
+import 'inbox_light_premium_tokens.dart';
+import 'inbox_time_formatters.dart';
 
 class InboxConversationCard extends StatelessWidget {
   const InboxConversationCard({
@@ -20,36 +22,60 @@ class InboxConversationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final preview = conversation.listPreviewText;
     final isHub = conversation.isStrangerHub;
+    final hasUnread = conversation.unreadCount > 0;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2.5),
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.fromLTRB(10, 9, 12, 9),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.96),
-            borderRadius: BorderRadius.circular(20),
+            gradient: isHub
+                ? LinearGradient(
+                    colors: [
+                      const Color(0xFFFFF5E8),
+                      const Color(0xFFFFF7FB),
+                      InboxLightPremiumTokens.pink.withValues(alpha: 0.08),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFFFFFFFF), Color(0xFFFFFBFF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: isHub
-                  ? const Color(0xFFFFB020).withValues(alpha: 0.30)
-                  : const Color(0xFFEDE7F6),
+                  ? InboxLightPremiumTokens.warning.withValues(alpha: 0.28)
+                  : InboxLightPremiumTokens.border,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF1E1230).withValues(alpha: 0.045),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
+                color: InboxLightPremiumTokens.ink.withValues(
+                  alpha: hasUnread ? 0.095 : 0.055,
+                ),
+                blurRadius: hasUnread ? 22 : 16,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.80),
+                blurRadius: 1,
+                offset: const Offset(0, -1),
               ),
             ],
           ),
           child: Row(
             children: [
               _PremiumAvatar(conversation: conversation),
-              const SizedBox(width: 10),
+              const SizedBox(width: 11),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -66,12 +92,12 @@ class InboxConversationCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textStyle: TextStyle(
-                              color: const Color(0xFF1D1230),
-                              fontSize: 14.4,
-                              fontWeight: conversation.unreadCount > 0
+                              color: InboxLightPremiumTokens.ink,
+                              fontSize: 14.8,
+                              fontWeight: hasUnread
                                   ? FontWeight.w900
                                   : FontWeight.w800,
-                              letterSpacing: -0.16,
+                              letterSpacing: -0.18,
                             ),
                           ),
                         ),
@@ -81,35 +107,52 @@ class InboxConversationCard extends StatelessWidget {
                         ],
                         const SizedBox(width: 7),
                         Text(
-                          conversation.time,
+                          inboxLocalTimeLabel(conversation.time),
                           style: TextStyle(
-                            color: conversation.unreadCount > 0
-                                ? const Color(0xFF7C3AED)
-                                : const Color(0xFF9B8CA5),
-                            fontSize: 10.4,
-                            fontWeight: FontWeight.w800,
+                            color: hasUnread
+                                ? InboxLightPremiumTokens.violet
+                                : InboxLightPremiumTokens.softMuted,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         if (conversation.isPinned) ...[
-                          const Icon(Icons.push_pin_rounded, color: Color(0xFFC99A3B), size: 13),
-                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.push_pin_rounded,
+                            color: InboxLightPremiumTokens.gold,
+                            size: 13,
+                          ),
+                          const SizedBox(width: 4),
                         ],
                         if (conversation.isMuted) ...[
-                          const Icon(Icons.volume_off_rounded, color: Color(0xFF9B8CA5), size: 13),
-                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.volume_off_rounded,
+                            color: InboxLightPremiumTokens.muted,
+                            size: 13,
+                          ),
+                          const SizedBox(width: 4),
                         ],
                         if (conversation.isLockedByBackend) ...[
-                          const Icon(Icons.lock_rounded, color: Color(0xFF7B6A86), size: 13),
-                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.lock_rounded,
+                            color: InboxLightPremiumTokens.violet,
+                            size: 13,
+                          ),
+                          const SizedBox(width: 4),
                         ],
-                        if (conversation.isStranger && !conversation.isStrangerHub) ...[
-                          const Icon(Icons.shield_rounded, color: Color(0xFFD97706), size: 13),
-                          const SizedBox(width: 3),
+                        if (conversation.isStranger &&
+                            !conversation.isStrangerHub) ...[
+                          const Icon(
+                            Icons.shield_rounded,
+                            color: Color(0xFFD97706),
+                            size: 13,
+                          ),
+                          const SizedBox(width: 4),
                         ],
                         Expanded(
                           child: Text(
@@ -117,27 +160,39 @@ class InboxConversationCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: conversation.isLockedByBackend
-                                  ? const Color(0xFF7B6A86)
-                                  : const Color(0xFF5E4B6F),
-                              fontSize: 12.1,
-                              fontWeight: conversation.unreadCount > 0
+                              color: hasUnread
+                                  ? const Color(0xFF352045)
+                                  : InboxLightPremiumTokens.muted,
+                              fontSize: 12.25,
+                              fontWeight: hasUnread
                                   ? FontWeight.w800
                                   : FontWeight.w600,
-                              height: 1.1,
+                              height: 1.14,
                             ),
                           ),
                         ),
-                        if (conversation.unreadCount > 0)
+                        if (hasUnread)
                           Container(
-                            margin: const EdgeInsets.only(left: 7),
-                            constraints: const BoxConstraints(minWidth: 19, minHeight: 19),
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFFFF4F9A), Color(0xFF7C3AED)],
-                              ),
+                            margin: const EdgeInsets.only(left: 8),
+                            constraints: const BoxConstraints(
+                              minWidth: 20,
+                              minHeight: 20,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2.5,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: InboxLightPremiumTokens.primaryGradient,
                               shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: InboxLightPremiumTokens.pink
+                                      .withValues(alpha: 0.22),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Center(
                               child: Text(
@@ -146,7 +201,7 @@ class InboxConversationCard extends StatelessWidget {
                                     : '${conversation.unreadCount}',
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 9.3,
+                                  fontSize: 9.5,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
@@ -154,6 +209,31 @@ class InboxConversationCard extends StatelessWidget {
                           ),
                       ],
                     ),
+                    if (isHub) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: InboxLightPremiumTokens.warning,
+                            size: 13,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${conversation.requestCount} request${conversation.requestCount == 1 ? '' : 's'} protected separately',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF9A5B00),
+                                fontSize: 10.8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -172,27 +252,35 @@ class _PremiumAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = conversation.isStrangerHub
+        ? InboxLightPremiumTokens.warning
+        : conversation.colors.last;
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
-          width: 48,
-          height: 48,
-          padding: const EdgeInsets.all(2),
+          width: 50,
+          height: 50,
+          padding: const EdgeInsets.all(2.4),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: LinearGradient(colors: conversation.colors),
+            gradient: SweepGradient(
+              colors: [...conversation.colors, conversation.colors.first],
+            ),
             boxShadow: [
               BoxShadow(
-                color: conversation.colors.last.withValues(alpha: 0.18),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
+                color: accent.withValues(alpha: 0.22),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
           child: Container(
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            padding: const EdgeInsets.all(2),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            padding: const EdgeInsets.all(2.2),
             child: ClipOval(
               child: conversation.hasAvatarUrl
                   ? Image.network(
@@ -215,7 +303,7 @@ class _PremiumAvatar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFF18D17B),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: Colors.white, width: 2.2),
               ),
             ),
           ),
@@ -224,14 +312,18 @@ class _PremiumAvatar extends StatelessWidget {
             right: -2,
             top: -2,
             child: Container(
-              width: 18,
-              height: 18,
+              width: 19,
+              height: 19,
               decoration: BoxDecoration(
-                color: const Color(0xFF2DD4BF),
+                gradient: InboxLightPremiumTokens.aquaGradient,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: const Icon(Icons.verified_rounded, color: Colors.white, size: 10),
+              child: const Icon(
+                Icons.verified_rounded,
+                color: Colors.white,
+                size: 10.5,
+              ),
             ),
           ),
       ],
@@ -247,13 +339,15 @@ class _AvatarInitials extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(gradient: LinearGradient(colors: conversation.colors)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: conversation.colors),
+      ),
       child: Center(
         child: Text(
           conversation.avatarText,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 14,
+            fontSize: 14.5,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -271,19 +365,23 @@ class _ChatStreakPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final activeColor = conversation.chatStreakActiveToday
         ? const Color(0xFFFF6B00)
-        : const Color(0xFF9B8CA5);
+        : InboxLightPremiumTokens.softMuted;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
       decoration: BoxDecoration(
-        color: activeColor.withValues(alpha: 0.11),
+        color: activeColor.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: activeColor.withValues(alpha: 0.18)),
+        border: Border.all(color: activeColor.withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.local_fire_department_rounded, size: 11, color: activeColor),
+          Icon(
+            Icons.local_fire_department_rounded,
+            size: 11,
+            color: activeColor,
+          ),
           const SizedBox(width: 2),
           Text(
             '${conversation.chatStreakCount}',

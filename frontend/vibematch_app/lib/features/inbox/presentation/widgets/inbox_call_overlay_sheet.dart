@@ -70,7 +70,7 @@ class InboxCallOverlaySheet extends StatelessWidget {
               ),
             const SizedBox(height: 14),
             const Text(
-              'Call signaling is modeled for Inbox now. Media session can attach to WebRTC/mediasoup when backend call gateway is connected.',
+              'Stay here while the call connects.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Color(0xFF9B8CA5), fontSize: 11.2, height: 1.35, fontWeight: FontWeight.w700),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_conversation_card.dart';
+import '../widgets/inbox_light_premium_tokens.dart';
 
 class LockedChatsPage extends StatelessWidget {
   const LockedChatsPage({
@@ -20,7 +21,7 @@ class LockedChatsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F1),
+      backgroundColor: InboxLightPremiumTokens.page,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -35,13 +36,13 @@ class LockedChatsPage extends StatelessWidget {
                       child: Text(
                         'Locked Chats',
                         style: TextStyle(
-                          color: Color(0xFF251538),
+                          color: InboxLightPremiumTokens.ink,
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                    const Icon(Icons.lock_rounded, color: Color(0xFF4A2A63)),
+                    const Icon(Icons.lock_rounded, color: InboxLightPremiumTokens.ink),
                   ],
                 ),
               ),
@@ -53,12 +54,12 @@ class LockedChatsPage extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: const Color(0xFFECE2D8)),
+                  border: Border.all(color: InboxLightPremiumTokens.warmBorder),
                 ),
                 child: const Text(
                   'These chats are hidden from the normal Inbox. This is backend account-level lock, so it follows the account on every device.',
                   style: TextStyle(
-                    color: Color(0xFF7B6A86),
+                    color: InboxLightPremiumTokens.muted,
                     fontSize: 12,
                     height: 1.35,
                     fontWeight: FontWeight.w700,
@@ -72,7 +73,7 @@ class LockedChatsPage extends StatelessWidget {
                 child: Center(
                   child: Text(
                     'No locked chats',
-                    style: TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800),
+                    style: TextStyle(color: InboxLightPremiumTokens.muted, fontWeight: FontWeight.w800),
                   ),
                 ),
               )

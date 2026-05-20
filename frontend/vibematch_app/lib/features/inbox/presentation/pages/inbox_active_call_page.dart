@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/inbox_call_controller.dart';
 import '../../data/inbox_call_media_bridge.dart';
 import '../../models/inbox_call_models.dart';
+import '../widgets/inbox_light_premium_tokens.dart';
 
 class InboxActiveCallPage extends StatefulWidget {
   const InboxActiveCallPage({
@@ -42,7 +43,9 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
   void _handleCallChanged() {
     if (!mounted || _closingFromRemote) return;
     final active = widget.callController.activeCall;
-    if (active != null && active.id == widget.initialSession.id && !active.isTerminal) {
+    if (active != null &&
+        active.id == widget.initialSession.id &&
+        !active.isTerminal) {
       if (active.isConnected) {
         _maybeJoinMedia();
       }
@@ -58,11 +61,12 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
 
   Future<void> _maybeJoinMedia() async {
     final session = widget.callController.activeCall ?? widget.initialSession;
-    if (!mounted || _mediaJoining || _mediaReady || !session.isConnected) return;
+    if (!mounted || _mediaJoining || _mediaReady || !session.isConnected)
+      return;
     final roomId = session.roomId;
     if (roomId == null || roomId.trim().isEmpty) {
       setState(() {
-        _mediaError = 'Missing mediasoup room id for this call.';
+        _mediaError = 'Missing audio room for this call.';
       });
       return;
     }
@@ -104,14 +108,20 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
     return AnimatedBuilder(
       animation: widget.callController,
       builder: (context, _) {
-        final session = widget.callController.activeCall ?? widget.initialSession;
-        final connected = session.isConnected;
+        final session =
+            widget.callController.activeCall ?? widget.initialSession;
         final colors = session.isVideo
-            ? const [Color(0xFF6D5DF6), Color(0xFFFF4F9A)]
-            : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)];
+            ? const [
+                InboxLightPremiumTokens.violetDeep,
+                InboxLightPremiumTokens.pink,
+              ]
+            : const [
+                InboxLightPremiumTokens.aqua,
+                InboxLightPremiumTokens.violetDeep,
+              ];
 
         return Scaffold(
-          backgroundColor: const Color(0xFF080512),
+          backgroundColor: InboxLightPremiumTokens.page,
           body: SafeArea(
             child: Container(
               width: double.infinity,
@@ -119,7 +129,10 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
                 gradient: RadialGradient(
                   center: Alignment.topCenter,
                   radius: 1.12,
-                  colors: [colors.first.withValues(alpha: 0.28), const Color(0xFF080512)],
+                  colors: [
+                    colors.first.withValues(alpha: 0.28),
+                    InboxLightPremiumTokens.ink,
+                  ],
                 ),
               ),
               child: Column(
@@ -174,10 +187,10 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          connected ? 'Connected' : session.statusLabel,
+                          _heroStatusLabel(session),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            color: Color(0xFF2DD4BF),
+                            color: InboxLightPremiumTokens.aqua,
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
                           ),
@@ -208,6 +221,13 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
   }
 }
 
+String _heroStatusLabel(InboxCallSession session) {
+  if (session.isOutgoing && session.isRinging) return 'Calling...';
+  if (session.isIncoming && session.isRinging) return 'Ringing...';
+  if (session.isConnected) return 'Connected';
+  return session.statusLabel;
+}
+
 class _MediaStatusPill extends StatelessWidget {
   const _MediaStatusPill({
     required this.session,
@@ -227,14 +247,14 @@ class _MediaStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final error = mediaError;
     final label = error != null
-        ? 'Media join failed. Tap to retry.'
+        ? 'Audio connection failed. Tap to retry.'
         : mediaReady
-            ? 'Live audio connected • ${session.roomId}'
-            : mediaJoining
-                ? 'Joining mediasoup audio...'
-                : session.isConnected
-                    ? 'Preparing mediasoup audio...'
-                    : 'Waiting for answer • ${session.roomId ?? 'no media room yet'}';
+        ? 'Live audio connected'
+        : mediaJoining
+        ? 'Joining audio...'
+        : session.isConnected
+        ? 'Preparing audio...'
+        : 'Waiting for answer';
 
     return InkWell(
       onTap: error == null ? null : onRetry,
@@ -248,7 +268,7 @@ class _MediaStatusPill extends StatelessWidget {
           border: Border.all(
             color: error == null
                 ? Colors.white.withValues(alpha: 0.10)
-                : const Color(0xFFE84C72).withValues(alpha: 0.55),
+                : InboxLightPremiumTokens.danger.withValues(alpha: 0.55),
           ),
         ),
         child: Row(
@@ -258,16 +278,21 @@ class _MediaStatusPill extends StatelessWidget {
               const SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2DD4BF)),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: InboxLightPremiumTokens.aqua,
+                ),
               )
             else
               Icon(
                 error == null
                     ? mediaReady
-                        ? Icons.graphic_eq_rounded
-                        : Icons.router_rounded
+                          ? Icons.graphic_eq_rounded
+                          : Icons.router_rounded
                     : Icons.error_outline_rounded,
-                color: error == null ? const Color(0xFF2DD4BF) : const Color(0xFFE84C72),
+                color: error == null
+                    ? InboxLightPremiumTokens.aqua
+                    : InboxLightPremiumTokens.danger,
                 size: 16,
               ),
             const SizedBox(width: 8),
@@ -305,13 +330,21 @@ class _CallTopBar extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 26),
+            icon: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white,
+              size: 26,
+            ),
           ),
           Expanded(
             child: Text(
               session.isVideo ? 'Video call' : 'Voice call',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           Container(
@@ -323,7 +356,11 @@ class _CallTopBar extends StatelessWidget {
             ),
             child: Text(
               session.iconLabel,
-              style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 10.5, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Color(0xFFCDBCE7),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -349,8 +386,6 @@ class _CallControls extends StatefulWidget {
 
 class _CallControlsState extends State<_CallControls> {
   bool _muted = false;
-  bool _speaker = true;
-  bool _camera = true;
   bool _ending = false;
 
   Future<void> _toggleMute() async {
@@ -369,7 +404,12 @@ class _CallControlsState extends State<_CallControls> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(18, 10, 18, 20 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+        18,
+        10,
+        18,
+        20 + MediaQuery.paddingOf(context).bottom,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -380,20 +420,9 @@ class _CallControlsState extends State<_CallControls> {
             onTap: _toggleMute,
           ),
           _ControlButton(
-            icon: _speaker ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-            label: 'Speaker',
-            active: _speaker,
-            onTap: () => setState(() => _speaker = !_speaker),
-          ),
-          if (widget.session.isVideo)
-            _ControlButton(
-              icon: _camera ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-              label: 'Camera',
-              active: _camera,
-              onTap: () => setState(() => _camera = !_camera),
-            ),
-          _ControlButton(
-            icon: _ending ? Icons.hourglass_top_rounded : Icons.call_end_rounded,
+            icon: _ending
+                ? Icons.hourglass_top_rounded
+                : Icons.call_end_rounded,
             label: 'End',
             danger: true,
             onTap: _end,
@@ -422,11 +451,11 @@ class _ControlButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = danger
-        ? const Color(0xFFE84C72)
+        ? InboxLightPremiumTokens.danger
         : active
-            ? const Color(0xFF12C7B7)
-            : Colors.white.withValues(alpha: 0.12);
-    final iconColor = danger || active ? Colors.white : const Color(0xFFCDBCE7);
+        ? InboxLightPremiumTokens.aqua
+        : Colors.white.withValues(alpha: 0.12);
+    final iconColor = danger || active ? Colors.white : Color(0xFFEFE7FF);
 
     return InkWell(
       onTap: onTap,
@@ -443,7 +472,11 @@ class _ControlButton extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 11, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: Color(0xFFCDBCE7),
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ],
       ),

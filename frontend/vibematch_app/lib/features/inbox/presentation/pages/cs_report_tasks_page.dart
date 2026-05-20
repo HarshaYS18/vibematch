@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
+import '../widgets/inbox_light_premium_tokens.dart';
 
 class CsReportTasksPage extends StatefulWidget {
   const CsReportTasksPage({
@@ -40,7 +41,7 @@ class _CsReportTasksPageState extends State<CsReportTasksPage> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
+          backgroundColor: InboxLightPremiumTokens.ink,
           content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
         ),
       );
@@ -66,7 +67,7 @@ class _CsReportTasksPageState extends State<CsReportTasksPage> {
     final tasks = widget.controller.reportTasks;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F1),
+      backgroundColor: InboxLightPremiumTokens.page,
       body: SafeArea(
         child: Column(
           children: [
@@ -80,9 +81,9 @@ class _CsReportTasksPageState extends State<CsReportTasksPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('CS Report Tasks', style: TextStyle(color: Color(0xFF251538), fontSize: 22, fontWeight: FontWeight.w900)),
+                        Text('CS Report Tasks', style: TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 22, fontWeight: FontWeight.w900)),
                         SizedBox(height: 2),
-                        Text('Review reports and escalate valid cases', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w800)),
+                        Text('Review reports and escalate valid cases', style: TextStyle(color: InboxLightPremiumTokens.muted, fontSize: 12, fontWeight: FontWeight.w800)),
                       ],
                     ),
                   ),
@@ -148,8 +149,8 @@ class _ReportTaskCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFECE2D8)),
-        boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.045), blurRadius: 18, offset: const Offset(0, 8))],
+        border: Border.all(color: InboxLightPremiumTokens.warmBorder),
+        boxShadow: [BoxShadow(color: InboxLightPremiumTokens.ink.withValues(alpha: 0.045), blurRadius: 18, offset: const Offset(0, 8))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,7 +171,7 @@ class _ReportTaskCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Report against ${task.reportedUserName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 14.5, fontWeight: FontWeight.w900)),
+                    Text('Report against ${task.reportedUserName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 14.5, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 3),
                     Text(task.status.label, style: TextStyle(color: _statusColor(task.status), fontSize: 11, fontWeight: FontWeight.w900)),
                   ],
@@ -179,11 +180,11 @@ class _ReportTaskCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text('Reason: ${task.reason}', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w800)),
+          Text('Reason: ${task.reason}', style: const TextStyle(color: InboxLightPremiumTokens.muted, fontSize: 12, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))),
+            decoration: BoxDecoration(color: InboxLightPremiumTokens.page, borderRadius: BorderRadius.circular(16), border: Border.all(color: InboxLightPremiumTokens.warmBorder)),
             child: Column(
               children: task.snapshot.take(4).map((message) {
                 return Padding(
@@ -191,8 +192,8 @@ class _ReportTaskCard extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(width: 58, child: Text(message.sender, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 10.5, fontWeight: FontWeight.w900))),
-                      Expanded(child: Text(message.text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w700))),
+                      SizedBox(width: 58, child: Text(message.sender, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 10.5, fontWeight: FontWeight.w900))),
+                      Expanded(child: Text(message.text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: InboxLightPremiumTokens.muted, fontSize: 10.5, fontWeight: FontWeight.w700))),
                     ],
                   ),
                 );
@@ -201,7 +202,7 @@ class _ReportTaskCard extends StatelessWidget {
           ),
           if (task.csNote != null || task.monitorAction != null) ...[
             const SizedBox(height: 9),
-            Text(task.monitorAction ?? task.csNote!, style: const TextStyle(color: Color(0xFF251538), fontSize: 11.5, fontWeight: FontWeight.w900)),
+            Text(task.monitorAction ?? task.csNote!, style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 11.5, fontWeight: FontWeight.w900)),
           ],
           const SizedBox(height: 12),
           if (onReject != null || onAccept != null)
@@ -209,11 +210,11 @@ class _ReportTaskCard extends StatelessWidget {
               children: [
                 Expanded(child: _TaskButton(label: 'Reject', icon: Icons.close_rounded, color: const Color(0xFF8C8198), onTap: onReject)),
                 const SizedBox(width: 8),
-                Expanded(child: _TaskButton(label: 'Accept', icon: Icons.check_rounded, color: const Color(0xFF12C7B7), onTap: onAccept)),
+                Expanded(child: _TaskButton(label: 'Accept', icon: Icons.check_rounded, color: InboxLightPremiumTokens.aqua, onTap: onAccept)),
               ],
             )
           else if (onMonitorAction != null)
-            _TaskButton(label: 'Monitor action', icon: Icons.gavel_rounded, color: const Color(0xFFE84C72), onTap: onMonitorAction),
+            _TaskButton(label: 'Monitor action', icon: Icons.gavel_rounded, color: InboxLightPremiumTokens.danger, onTap: onMonitorAction),
         ],
       ),
     );
@@ -244,7 +245,7 @@ class _MonitorActionSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Monitor action for ${task.reportedUserName}', style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900)),
+          Text('Monitor action for ${task.reportedUserName}', style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 17, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
           ...actions.map((action) {
             return InkWell(
@@ -254,8 +255,8 @@ class _MonitorActionSheet extends StatelessWidget {
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))),
-                child: Text(action, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w900)),
+                decoration: BoxDecoration(color: InboxLightPremiumTokens.page, borderRadius: BorderRadius.circular(16), border: Border.all(color: InboxLightPremiumTokens.warmBorder)),
+                child: Text(action, style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 13, fontWeight: FontWeight.w900)),
               ),
             );
           }),
@@ -311,8 +312,8 @@ class _RoundButton extends StatelessWidget {
       child: Container(
         width: 40,
         height: 40,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))),
-        child: Icon(icon, color: const Color(0xFF251538), size: 20),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: InboxLightPremiumTokens.warmBorder)),
+        child: Icon(icon, color: InboxLightPremiumTokens.ink, size: 20),
       ),
     );
   }
@@ -327,8 +328,8 @@ class _CountPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(color: const Color(0xFFE84C72).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFE84C72).withValues(alpha: 0.18))),
-      child: Text('$count', style: const TextStyle(color: Color(0xFFE84C72), fontSize: 12, fontWeight: FontWeight.w900)),
+      decoration: BoxDecoration(color: InboxLightPremiumTokens.danger.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(999), border: Border.all(color: InboxLightPremiumTokens.danger.withValues(alpha: 0.18))),
+      child: Text('$count', style: const TextStyle(color: InboxLightPremiumTokens.danger, fontSize: 12, fontWeight: FontWeight.w900)),
     );
   }
 }
@@ -339,7 +340,7 @@ class _EmptyTasks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Center(
-      child: Text('No report tasks yet', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 14, fontWeight: FontWeight.w800)),
+      child: Text('No report tasks yet', style: TextStyle(color: InboxLightPremiumTokens.muted, fontSize: 14, fontWeight: FontWeight.w800)),
     );
   }
 }
@@ -347,13 +348,13 @@ class _EmptyTasks extends StatelessWidget {
 Color _statusColor(InboxReportStatus status) {
   switch (status) {
     case InboxReportStatus.pendingCsReview:
-      return const Color(0xFFC99A3B);
+      return InboxLightPremiumTokens.gold;
     case InboxReportStatus.rejectedByCs:
       return const Color(0xFF8C8198);
     case InboxReportStatus.acceptedEscalated:
-      return const Color(0xFF12C7B7);
+      return InboxLightPremiumTokens.aqua;
     case InboxReportStatus.monitorActionTaken:
-      return const Color(0xFFE84C72);
+      return InboxLightPremiumTokens.danger;
   }
 }
 

@@ -74,25 +74,66 @@ class InboxChatThemePickerSheet extends StatelessWidget {
       top: false,
       child: Container(
         margin: const EdgeInsets.all(14),
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          16 + MediaQuery.paddingOf(context).bottom,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(30),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 30,
+              offset: const Offset(0, 14),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999)))),
+            Center(
+              child: Container(
+                width: 42,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0D5CB),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
             const SizedBox(height: 14),
-            const Text('Chat theme', style: TextStyle(color: Color(0xFF251538), fontSize: 20, fontWeight: FontWeight.w900)),
+            const Text(
+              'Chat theme',
+              style: TextStyle(
+                color: Color(0xFF251538),
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             const SizedBox(height: 5),
-            const Text('Choose a backend-saved wallpaper/theme for this chat. Store inventory can replace these choices later.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12.2, height: 1.35, fontWeight: FontWeight.w700)),
+            const Text(
+              'Set the mood for this chat with a synced wallpaper and bubble backdrop.',
+              style: TextStyle(
+                color: Color(0xFF7B6A86),
+                fontSize: 12.2,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 12),
             ...inboxChatThemeChoices.map((choice) {
-              final selected = choice.key == currentThemeKey || choice.wallpaperKey == currentWallpaperKey;
-              return _ThemeTile(choice: choice, selected: selected, onTap: () => onSelected(choice));
+              final selected =
+                  choice.key == currentThemeKey ||
+                  choice.wallpaperKey == currentWallpaperKey;
+              return _ThemeTile(
+                choice: choice,
+                selected: selected,
+                onTap: () => onSelected(choice),
+              );
             }),
           ],
         ),
@@ -102,7 +143,11 @@ class InboxChatThemePickerSheet extends StatelessWidget {
 }
 
 class _ThemeTile extends StatelessWidget {
-  const _ThemeTile({required this.choice, required this.selected, required this.onTap});
+  const _ThemeTile({
+    required this.choice,
+    required this.selected,
+    required this.onTap,
+  });
   final InboxChatThemeChoice choice;
   final bool selected;
   final VoidCallback onTap;
@@ -118,7 +163,10 @@ class _ThemeTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFF8F5FF) : const Color(0xFFFAF7F1),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? const Color(0xFF7C3AED) : const Color(0xFFECE2D8), width: selected ? 1.4 : 1),
+          border: Border.all(
+            color: selected ? const Color(0xFF7C3AED) : const Color(0xFFECE2D8),
+            width: selected ? 1.4 : 1,
+          ),
         ),
         child: Row(
           children: [
@@ -127,7 +175,11 @@ class _ThemeTile extends StatelessWidget {
               height: 48,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(colors: choice.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                gradient: LinearGradient(
+                  colors: choice.colors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
             ),
             const SizedBox(width: 11),
@@ -135,13 +187,34 @@ class _ThemeTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(choice.label, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900)),
+                  Text(
+                    choice.label,
+                    style: const TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   const SizedBox(height: 3),
-                  Text(choice.subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.2, fontWeight: FontWeight.w700)),
+                  Text(
+                    choice.subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF7B6A86),
+                      fontSize: 11.2,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),
-            Icon(selected ? Icons.check_circle_rounded : Icons.chevron_right_rounded, color: selected ? const Color(0xFF12C7B7) : const Color(0xFF9B8CA5)),
+            Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.chevron_right_rounded,
+              color: selected
+                  ? const Color(0xFF12C7B7)
+                  : const Color(0xFF9B8CA5),
+            ),
           ],
         ),
       ),
