@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 
 class InboxPasscodeSheet extends StatefulWidget {
   const InboxPasscodeSheet({
@@ -8,6 +9,7 @@ class InboxPasscodeSheet extends StatefulWidget {
     required this.onValidate,
     required this.onUnlocked,
     this.onRecoverTap,
+    this.deviceUnlockEnabled = false,
   });
 
   final String title;
@@ -15,6 +17,7 @@ class InboxPasscodeSheet extends StatefulWidget {
   final Future<bool> Function(String passcode) onValidate;
   final VoidCallback onUnlocked;
   final VoidCallback? onRecoverTap;
+  final bool deviceUnlockEnabled;
 
   @override
   State<InboxPasscodeSheet> createState() => _InboxPasscodeSheetState();
@@ -22,14 +25,63 @@ class InboxPasscodeSheet extends StatefulWidget {
 
 class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
   final TextEditingController _controller = TextEditingController();
+  final LocalAuthentication _localAuth = LocalAuthentication();
   bool _obscure = true;
   bool _busy = false;
+  bool _biometricBusy = false;
+  bool _canUseBiometrics = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometricAvailability();
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    if (!widget.deviceUnlockEnabled) return;
+    try {
+      final supported = await _localAuth.isDeviceSupported();
+      final canCheck = await _localAuth.canCheckBiometrics;
+      if (!mounted) return;
+      setState(() => _canUseBiometrics = supported || canCheck);
+    } catch (_) {
+      if (mounted) setState(() => _canUseBiometrics = false);
+    }
+  }
+
+  Future<void> _unlockWithBiometrics() async {
+    if (!widget.deviceUnlockEnabled || !_canUseBiometrics || _biometricBusy) return;
+    setState(() {
+      _biometricBusy = true;
+      _error = null;
+    });
+    try {
+      final ok = await _localAuth.authenticate(
+        localizedReason: 'Unlock your locked Vibe Match chats',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+          useErrorDialogs: true,
+        ),
+      );
+      if (!mounted) return;
+      if (ok) {
+        widget.onUnlocked();
+      } else {
+        setState(() => _error = 'Device unlock cancelled.');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Device unlock is not available on this device.');
+    } finally {
+      if (mounted) setState(() => _biometricBusy = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -83,6 +135,20 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
               const SizedBox(height: 6),
               Text(widget.subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
+              if (widget.deviceUnlockEnabled && _canUseBiometrics) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _biometricBusy ? null : _unlockWithBiometrics,
+                    style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF251538), padding: const EdgeInsets.symmetric(vertical: 13), side: const BorderSide(color: Color(0xFFECE2D8)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
+                    icon: _biometricBusy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF251538))) : const Icon(Icons.fingerprint_rounded, size: 22),
+                    label: const Text('Unlock with device', style: TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Row(children: [Expanded(child: Divider(color: Color(0xFFECE2D8))), Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('or', style: TextStyle(color: Color(0xFF9B8CA5), fontWeight: FontWeight.w800))), Expanded(child: Divider(color: Color(0xFFECE2D8)))]),
+                const SizedBox(height: 12),
+              ],
               TextField(
                 controller: _controller,
                 obscureText: _obscure,
