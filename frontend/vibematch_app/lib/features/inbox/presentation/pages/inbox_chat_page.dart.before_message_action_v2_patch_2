@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/app_routes.dart';
@@ -11,7 +10,6 @@ import '../../data/inbox_voice_recorder_service.dart';
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_message_media_content.dart';
-import '../widgets/inbox_message_action_sheet_v2.dart';
 import '../widgets/social_emoji_pack_sheet.dart';
 import '../widgets/swipe_reply_message.dart';
 
@@ -448,72 +446,39 @@ class _InboxChatPageState extends State<InboxChatPage> {
     if (mounted) _showToast('Relationship request rejected.');
   }
 
-  Future<void> _openMessageActions(InboxMessage message) async {
-    final result = await showInboxMessageActionSheetV2(
+  void _openMessageActions(InboxMessage message) {
+    showModalBottomSheet<void>(
       context: context,
-      message: message,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MessageActionsSheet(
+        message: message,
+        onReply: () {
+          Navigator.pop(context);
+          setState(() => _replyToText = message.text);
+        },
+        onCopy: () {
+          Navigator.pop(context);
+          _showToast('Copy mapped locally. Clipboard wiring later.');
+        },
+        onStar: () {
+          Navigator.pop(context);
+          widget.controller.toggleStarMessage(conversationId: _conversation.id, message: message);
+        },
+        onForward: () {
+          Navigator.pop(context);
+          widget.controller.forwardMessage(fromConversationId: _conversation.id, message: message);
+        },
+        onDelete: () {
+          Navigator.pop(context);
+          widget.controller.deleteMessage(conversationId: _conversation.id, message: message);
+        },
+        onReaction: (reaction) {
+          Navigator.pop(context);
+          widget.controller.setReaction(conversationId: _conversation.id, message: message, reaction: reaction);
+        },
+      ),
     );
-    if (!mounted || result == null) return;
-
-    switch (result.action) {
-      case InboxMessageAction.reply:
-        setState(() => _replyToText = message.text);
-        break;
-      case InboxMessageAction.copy:
-        await Clipboard.setData(ClipboardData(text: message.text));
-        if (mounted) _showToast('Message copied.');
-        break;
-      case InboxMessageAction.star:
-        await widget.controller.toggleStarMessage(
-          conversationId: _conversation.id,
-          message: message,
-        );
-        break;
-      case InboxMessageAction.forward:
-        widget.controller.forwardMessage(
-          fromConversationId: _conversation.id,
-          message: message,
-        );
-        if (mounted) _showToast('Forward mapped locally.');
-        break;
-      case InboxMessageAction.edit:
-        final editedText = result.editedText?.trim();
-        if (editedText == null || editedText.isEmpty) return;
-        await widget.controller.editTextMessage(
-          conversationId: _conversation.id,
-          message: message,
-          text: editedText,
-        );
-        if (mounted) _showToast('Message updated.');
-        break;
-      case InboxMessageAction.removeForMe:
-        await widget.controller.deleteMessageForMe(
-          conversationId: _conversation.id,
-          message: message,
-        );
-        if (mounted) _showToast('Removed for you.');
-        break;
-      case InboxMessageAction.unsend:
-        await widget.controller.deleteMessage(
-          conversationId: _conversation.id,
-          message: message,
-        );
-        if (mounted) _showToast('Message unsent.');
-        break;
-      case InboxMessageAction.react:
-        final reaction = result.reaction;
-        if (reaction == null) return;
-        await widget.controller.setReaction(
-          conversationId: _conversation.id,
-          message: message,
-          reaction: reaction,
-        );
-        break;
-      case InboxMessageAction.cancel:
-        break;
-    }
   }
-
 
   void _openChatMoreSheet() {
     showModalBottomSheet<void>(
@@ -1275,6 +1240,33 @@ class _ChatInputBar extends StatelessWidget {
             ),
           ),
           InkWell(borderRadius: BorderRadius.circular(999), onTap: readOnly ? null : onSendTap, child: Container(width: 42, height: 42, decoration: BoxDecoration(gradient: readOnly ? null : const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFFF4F9A)]), color: readOnly ? const Color(0xFFB8A8BD) : null, shape: BoxShape.circle), child: const Icon(Icons.send_rounded, color: Colors.white, size: 18))),
+        ]),
+      );
+}
+
+class _MessageActionsSheet extends StatelessWidget {
+  const _MessageActionsSheet({required this.message, required this.onReply, required this.onCopy, required this.onStar, required this.onForward, required this.onDelete, required this.onReaction});
+  final InboxMessage message;
+  final VoidCallback onReply;
+  final VoidCallback onCopy;
+  final VoidCallback onStar;
+  final VoidCallback onForward;
+  final VoidCallback onDelete;
+  final ValueChanged<String> onReaction;
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.all(14),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: ['❤️', '😂', '😮', '🙏', '🔥'].map((reaction) => InkWell(borderRadius: BorderRadius.circular(999), onTap: () => onReaction(reaction), child: Padding(padding: const EdgeInsets.all(9), child: Text(reaction, style: const TextStyle(fontSize: 23))))).toList()),
+          const SizedBox(height: 10),
+          _ActionTile(icon: Icons.reply_rounded, title: 'Reply', onTap: onReply),
+          _ActionTile(icon: Icons.copy_rounded, title: 'Copy', onTap: onCopy),
+          _ActionTile(icon: message.isStarred ? Icons.star_rounded : Icons.star_border_rounded, title: message.isStarred ? 'Unstar' : 'Star', onTap: onStar),
+          _ActionTile(icon: Icons.shortcut_rounded, title: 'Forward', onTap: onForward),
+          if (message.canUnsend)
+            _ActionTile(icon: Icons.undo_rounded, title: 'Unsend', onTap: onDelete, danger: true),
         ]),
       );
 }

@@ -8,11 +8,11 @@ import '../data/inbox_api_service.dart';
 import '../models/inbox_models.dart';
 
 class InboxMessageToolsApiService {
-  InboxMessageToolsApiService({
-    AuthApiService? authApiService,
-    InboxApiService? inboxApiService,
-  })  : _authApiService = authApiService ?? AuthApiService(),
-        _inboxApiService = inboxApiService ?? InboxApiService();
+  const InboxMessageToolsApiService({
+    AuthApiService authApiService = const AuthApiService(),
+    InboxApiService inboxApiService = const InboxApiService(),
+  })  : _authApiService = authApiService,
+        _inboxApiService = inboxApiService;
 
   final AuthApiService _authApiService;
   final InboxApiService _inboxApiService;

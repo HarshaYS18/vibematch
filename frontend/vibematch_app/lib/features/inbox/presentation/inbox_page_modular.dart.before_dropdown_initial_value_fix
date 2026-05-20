@@ -761,9 +761,9 @@ class _CreateStorySheetState extends State<_CreateStorySheet> {
           const SizedBox(height: 10),
           TextField(controller: _caption, maxLength: 500, decoration: const InputDecoration(labelText: 'Caption', border: OutlineInputBorder())),
           Row(children: [
-            Expanded(child: DropdownButtonFormField<String>(initialValue: _mediaType, items: const [DropdownMenuItem(value: 'image', child: Text('Image')), DropdownMenuItem(value: 'video', child: Text('Video'))], onChanged: (value) => setState(() => _mediaType = value ?? 'image'), decoration: const InputDecoration(labelText: 'Type'))),
+            Expanded(child: DropdownButtonFormField<String>(value: _mediaType, items: const [DropdownMenuItem(value: 'image', child: Text('Image')), DropdownMenuItem(value: 'video', child: Text('Video'))], onChanged: (value) => setState(() => _mediaType = value ?? 'image'), decoration: const InputDecoration(labelText: 'Type'))),
             const SizedBox(width: 10),
-            Expanded(child: DropdownButtonFormField<String>(initialValue: _visibility, items: const [DropdownMenuItem(value: 'friends', child: Text('Friends')), DropdownMenuItem(value: 'everyone', child: Text('Everyone')), DropdownMenuItem(value: 'nobody', child: Text('Only me'))], onChanged: (value) => setState(() => _visibility = value ?? 'friends'), decoration: const InputDecoration(labelText: 'Privacy'))),
+            Expanded(child: DropdownButtonFormField<String>(value: _visibility, items: const [DropdownMenuItem(value: 'friends', child: Text('Friends')), DropdownMenuItem(value: 'everyone', child: Text('Everyone')), DropdownMenuItem(value: 'nobody', child: Text('Only me'))], onChanged: (value) => setState(() => _visibility = value ?? 'friends'), decoration: const InputDecoration(labelText: 'Privacy'))),
           ]),
           const SizedBox(height: 14),
           SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final mediaUrl = _url.text.trim(); if (mediaUrl.isEmpty) return; Navigator.pop(context, _StoryDraft(mediaUrl: mediaUrl, mediaType: _mediaType, visibility: _visibility, caption: _caption.text.trim().isEmpty ? null : _caption.text.trim())); }, child: const Text('Post story'))),

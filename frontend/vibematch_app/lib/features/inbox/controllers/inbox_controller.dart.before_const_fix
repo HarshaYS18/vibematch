@@ -18,7 +18,7 @@ class InboxController extends ChangeNotifier {
   }) : _apiService = apiService ?? InboxApiService(),
        _backupApiService = backupApiService ?? const InboxBackupApiService(),
        _preferencesApiService = preferencesApiService ?? const InboxPreferencesApiService(),
-       _messageToolsApiService = messageToolsApiService ?? InboxMessageToolsApiService(),
+       _messageToolsApiService = messageToolsApiService ?? const InboxMessageToolsApiService(),
        _socketService = socketService ?? InboxSocketService();
 
   final InboxApiService _apiService;
