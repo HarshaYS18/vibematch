@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../data/inbox_preferences_api_service.dart';
+
 class InboxPasscodeSheet extends StatefulWidget {
   const InboxPasscodeSheet({
     super.key,
@@ -26,16 +28,18 @@ class InboxPasscodeSheet extends StatefulWidget {
 class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
   final TextEditingController _controller = TextEditingController();
   final LocalAuthentication _localAuth = LocalAuthentication();
+  final InboxPreferencesApiService _preferencesApi = const InboxPreferencesApiService();
   bool _obscure = true;
   bool _busy = false;
   bool _biometricBusy = false;
+  bool _deviceUnlockAllowed = false;
   bool _canUseBiometrics = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _checkBiometricAvailability();
+    _bootstrapDeviceUnlock();
   }
 
   @override
@@ -44,8 +48,21 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
     super.dispose();
   }
 
+  Future<void> _bootstrapDeviceUnlock() async {
+    var allowed = widget.deviceUnlockEnabled;
+    try {
+      final preferences = await _preferencesApi.loadPreferences();
+      allowed = allowed || preferences.deviceUnlockEnabled;
+    } catch (_) {
+      // Keep constructor-provided value if settings cannot be loaded yet.
+    }
+    if (!mounted) return;
+    setState(() => _deviceUnlockAllowed = allowed);
+    await _checkBiometricAvailability();
+  }
+
   Future<void> _checkBiometricAvailability() async {
-    if (!widget.deviceUnlockEnabled) return;
+    if (!_deviceUnlockAllowed) return;
     try {
       final supported = await _localAuth.isDeviceSupported();
       final canCheck = await _localAuth.canCheckBiometrics;
@@ -57,7 +74,7 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
   }
 
   Future<void> _unlockWithBiometrics() async {
-    if (!widget.deviceUnlockEnabled || !_canUseBiometrics || _biometricBusy) return;
+    if (!_deviceUnlockAllowed || !_canUseBiometrics || _biometricBusy) return;
     setState(() {
       _biometricBusy = true;
       _error = null;
@@ -135,7 +152,7 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
               const SizedBox(height: 6),
               Text(widget.subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
-              if (widget.deviceUnlockEnabled && _canUseBiometrics) ...[
+              if (_deviceUnlockAllowed && _canUseBiometrics) ...[
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
