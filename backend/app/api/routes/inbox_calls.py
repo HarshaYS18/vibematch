@@ -6,18 +6,29 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.inbox_calls import (
     InboxCallDecisionRequest,
+    InboxCallMediaContractResponse,
     InboxCallResponse,
     InboxCallStartRequest,
     InboxCallSummaryMessageResponse,
 )
-from app.services import inbox_call_service, inbox_service
+from app.services import inbox_call_contract_service, inbox_call_service, inbox_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/calls", tags=["Inbox Calls"])
 
 
-def _response(call) -> InboxCallResponse:
-    return InboxCallResponse(**inbox_call_service.call_to_dict(call))
+def _response(call, *, current_user: User | None = None, conversation=None) -> InboxCallResponse:
+    payload = inbox_call_service.call_to_dict(call)
+    if current_user is not None:
+        payload["media_contract"] = inbox_call_contract_service.media_join_contract(call, user_id=current_user.id)
+        if conversation is not None:
+            payload["push_contract"] = inbox_call_contract_service.push_payload_for_call(
+                conversation,
+                call,
+                event="inbox_call_state",
+                receiver_user_id=current_user.id,
+            )
+    return InboxCallResponse(**payload)
 
 
 async def _broadcast_call(conversation, call, event: str) -> None:
@@ -30,6 +41,13 @@ async def _broadcast_call(conversation, call, event: str) -> None:
                 "conversation_id": conversation.public_id,
                 "from_self": participant.user_id == call.started_by_user_id,
                 "call": call_payload,
+                "push_contract": inbox_call_contract_service.push_payload_for_call(
+                    conversation,
+                    call,
+                    event=event,
+                    receiver_user_id=participant.user_id,
+                ),
+                "media_contract": inbox_call_contract_service.media_join_contract(call, user_id=participant.user_id),
             },
         )
 
@@ -62,14 +80,12 @@ async def start_call(
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.is_official:
-        raise HTTPException(status_code=403, detail="Calls are not available for official team chats.")
     try:
         call = inbox_call_service.start_call(db, conversation, current_user, request.call_type.value)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     await _broadcast_call(conversation, call, "inbox_call_started")
-    return _response(call)
+    return _response(call, current_user=current_user, conversation=conversation)
 
 
 @router.post("/conversations/{conversation_id}/{call_id}/accept", response_model=InboxCallResponse)
@@ -90,7 +106,27 @@ async def accept_call(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     await _broadcast_call(conversation, call, "inbox_call_accepted")
-    return _response(call)
+    return _response(call, current_user=current_user, conversation=conversation)
+
+
+@router.get("/conversations/{conversation_id}/{call_id}/media-contract", response_model=InboxCallMediaContractResponse)
+def get_media_contract(
+    conversation_id: str,
+    call_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    call = inbox_call_service.get_call_for_conversation(db, conversation, call_id)
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+    return InboxCallMediaContractResponse(
+        call_id=call.call_public_id,
+        conversation_id=conversation.public_id,
+        media_contract=inbox_call_contract_service.media_join_contract(call, user_id=current_user.id),
+    )
 
 
 @router.post("/conversations/{conversation_id}/{call_id}/decline", response_model=InboxCallResponse)
@@ -113,7 +149,7 @@ async def decline_call(
         raise HTTPException(status_code=400, detail=str(error)) from error
     await _broadcast_call(conversation, call, "inbox_call_declined")
     await _broadcast_summary(conversation, message)
-    return _response(call)
+    return _response(call, current_user=current_user, conversation=conversation)
 
 
 @router.post("/conversations/{conversation_id}/{call_id}/end", response_model=InboxCallResponse)
@@ -136,7 +172,7 @@ async def end_call(
         raise HTTPException(status_code=400, detail=str(error)) from error
     await _broadcast_call(conversation, call, "inbox_call_ended")
     await _broadcast_summary(conversation, message)
-    return _response(call)
+    return _response(call, current_user=current_user, conversation=conversation)
 
 
 @router.post("/conversations/{conversation_id}/{call_id}/missed", response_model=InboxCallSummaryMessageResponse)
