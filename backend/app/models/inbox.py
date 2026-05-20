@@ -23,6 +23,8 @@ class InboxMessageType(str, Enum):
     ROOM_INVITE = "room_invite"
     RELATIONSHIP_REQUEST = "relationship_request"
     SYSTEM = "system"
+    STORY_REPLY = "story_reply"
+    CALL_LOG = "call_log"
 
 
 class InboxMessageStatus(str, Enum):
