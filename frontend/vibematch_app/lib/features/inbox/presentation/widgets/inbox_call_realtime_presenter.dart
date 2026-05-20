@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/inbox_call_controller.dart';
 import '../../models/inbox_call_models.dart';
+import '../pages/inbox_active_call_page.dart';
 import 'inbox_call_overlay_sheet.dart';
 
 class InboxCallRealtimePresenter extends StatefulWidget {
@@ -22,6 +23,7 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
   String? _shownCallId;
   String? _lastSummaryCallId;
   bool _incomingSheetOpen = false;
+  bool _activeCallPageOpen = false;
 
   @override
   void initState() {
@@ -38,6 +40,7 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
     _shownCallId = null;
     _lastSummaryCallId = null;
     _incomingSheetOpen = false;
+    _activeCallPageOpen = false;
   }
 
   @override
@@ -88,6 +91,8 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
             onAccept: () async {
               await widget.callController.acceptActiveCall();
               if (context.mounted) Navigator.pop(context);
+              final active = widget.callController.activeCall;
+              if (mounted && active != null) _openActiveCallPage(active);
             },
             onDecline: () async {
               await widget.callController.declineActiveCall(reason: 'declined');
@@ -102,6 +107,22 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
       ),
     );
     _incomingSheetOpen = false;
+    if (mounted) _showLatestSummaryToast();
+  }
+
+  Future<void> _openActiveCallPage(InboxCallSession session) async {
+    if (_activeCallPageOpen || !mounted) return;
+    _activeCallPageOpen = true;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => InboxActiveCallPage(
+          callController: widget.callController,
+          initialSession: session,
+        ),
+      ),
+    );
+    _activeCallPageOpen = false;
     if (mounted) _showLatestSummaryToast();
   }
 
@@ -139,7 +160,7 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
             if (session != null && !session.isIncoming)
               InboxMiniCallOverlay(
                 session: session,
-                onTap: () => _showIncomingCall(session),
+                onTap: () => _openActiveCallPage(session),
                 onEnd: () => widget.callController.endActiveCall(reason: 'ended'),
               ),
           ],
