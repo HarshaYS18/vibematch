@@ -6,6 +6,7 @@ import '../data/inbox_message_tools_api_service.dart';
 import '../data/inbox_preferences_api_service.dart';
 import '../../profile/data/love_bond_realtime_service.dart';
 import '../data/inbox_socket_service.dart';
+import 'inbox_call_controller.dart';
 import '../models/inbox_models.dart';
 
 class InboxController extends ChangeNotifier {
@@ -15,17 +16,23 @@ class InboxController extends ChangeNotifier {
     InboxPreferencesApiService? preferencesApiService,
     InboxMessageToolsApiService? messageToolsApiService,
     InboxSocketService? socketService,
+    InboxCallController? callController,
   }) : _apiService = apiService ?? InboxApiService(),
        _backupApiService = backupApiService ?? const InboxBackupApiService(),
        _preferencesApiService = preferencesApiService ?? const InboxPreferencesApiService(),
        _messageToolsApiService = messageToolsApiService ?? InboxMessageToolsApiService(),
-       _socketService = socketService ?? InboxSocketService();
+       _socketService = socketService ?? InboxSocketService(),
+       _callController = callController ?? InboxCallController();
 
   final InboxApiService _apiService;
   final InboxBackupApiService _backupApiService;
   final InboxPreferencesApiService _preferencesApiService;
   final InboxMessageToolsApiService _messageToolsApiService;
   final InboxSocketService _socketService;
+  final InboxCallController _callController;
+
+  InboxCallController get callController => _callController;
+
   String selectedFilter = 'All';
   bool lockedVaultUnlocked = false;
   bool isLoading = false;
@@ -139,6 +146,7 @@ class InboxController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _socketService.disconnect();
+    _callController.dispose();
     super.dispose();
   }
 
@@ -306,6 +314,8 @@ class InboxController extends ChangeNotifier {
   }
 
   void _handleRealtimeEvent(Map<String, dynamic> event) {
+    if (_handleCallRealtimeEvent(event)) return;
+
     final name = event['event']?.toString();
     switch (name) {
       case 'inbox_message_created':
@@ -386,6 +396,31 @@ class InboxController extends ChangeNotifier {
       default:
         break;
     }
+  }
+
+  bool _handleCallRealtimeEvent(Map<String, dynamic> event) {
+    final name = event['event']?.toString();
+    const callEvents = <String>{
+      'inbox_call_started',
+      'inbox_call_accepted',
+      'inbox_call_declined',
+      'inbox_call_ended',
+      'inbox_call_missed',
+    };
+    if (!callEvents.contains(name)) return false;
+
+    var conversationId = event['conversation_id']?.toString();
+    final rawCall = event['call'];
+    if ((conversationId == null || conversationId.isEmpty || conversationId == 'null') && rawCall is Map<String, dynamic>) {
+      conversationId = rawCall['conversation_id']?.toString();
+    }
+    if (conversationId == null || conversationId.isEmpty || conversationId == 'null') return true;
+
+    final conversation = conversationById(conversationId);
+    if (conversation == null) return true;
+
+    _callController.handleRealtimeEvent(event: event, conversation: conversation);
+    return true;
   }
 
   void sendChatActivity({

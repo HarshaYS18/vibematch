@@ -12,6 +12,8 @@ import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_message_media_content.dart';
 import '../widgets/inbox_message_action_sheet_v2.dart';
+import '../widgets/inbox_call_action_sheet.dart';
+import '../widgets/inbox_call_realtime_presenter.dart';
 import '../widgets/inbox_chat_theme_picker_sheet.dart';
 import '../widgets/social_emoji_pack_sheet.dart';
 import '../widgets/swipe_reply_message.dart';
@@ -552,12 +554,15 @@ class _InboxChatPageState extends State<InboxChatPage> {
     _showToast(enabled ? 'Secret Drift enabled.' : 'Secret Drift disabled.');
   }
 
-  void _openCallPlaceholder({required bool video}) {
+  void _openCallSheet() {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _CallFoundationSheet(conversation: _conversation, isVideo: video),
+      builder: (_) => InboxCallActionSheet(
+        conversation: _conversation,
+        callController: widget.controller.callController,
+      ),
     );
   }
 
@@ -596,8 +601,10 @@ class _InboxChatPageState extends State<InboxChatPage> {
     final conversation = _conversation;
     final messages = conversation.messages;
     final chatTheme = _resolvedChatTheme(conversation);
-    return Scaffold(
-      backgroundColor: const Color(0xFF12091F),
+    return InboxCallRealtimePresenter(
+      callController: widget.controller.callController,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF12091F),
       body: SafeArea(
         child: Column(
           children: [
@@ -606,8 +613,8 @@ class _InboxChatPageState extends State<InboxChatPage> {
               statusText: _chatStatusText(conversation),
               onBackTap: () => unawaited(_handleBackFromChat()),
               onMoreTap: _openChatMoreSheet,
-              onVoiceCallTap: () => _openCallPlaceholder(video: false),
-              onVideoCallTap: () => _openCallPlaceholder(video: true),
+              onVoiceCallTap: _openCallSheet,
+              onVideoCallTap: _openCallSheet,
             ),
             if (conversation.secretDriftEnabled)
               _SecretDriftBanner(label: conversation.secretDriftLabel),
@@ -670,6 +677,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -1325,36 +1333,3 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-class _CallFoundationSheet extends StatelessWidget {
-  const _CallFoundationSheet({required this.conversation, required this.isVideo});
-  final InboxConversation conversation;
-  final bool isVideo;
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.all(14),
-        padding: EdgeInsets.fromLTRB(18, 18, 18, 18 + MediaQuery.paddingOf(context).bottom),
-        decoration: BoxDecoration(color: const Color(0xFF12091F), borderRadius: BorderRadius.circular(30)),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 74, height: 74, decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: conversation.colors)), child: Center(child: Text(conversation.avatarText, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)))),
-          const SizedBox(height: 12),
-          Text(isVideo ? 'Video call foundation' : 'Audio call foundation', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          Text('Incoming screen, active call screen, summary screen and notification contracts are prepared as shared models. Native call overlay will be wired later.', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.3)),
-          const SizedBox(height: 16),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            _CallButton(icon: Icons.call_end_rounded, color: const Color(0xFFE84C72), onTap: () => Navigator.pop(context)),
-            const SizedBox(width: 18),
-            _CallButton(icon: isVideo ? Icons.videocam_rounded : Icons.call_rounded, color: const Color(0xFF18D17B), onTap: () => Navigator.pop(context)),
-          ]),
-        ]),
-      );
-}
-
-class _CallButton extends StatelessWidget {
-  const _CallButton({required this.icon, required this.color, required this.onTap});
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(999), child: Container(width: 54, height: 54, decoration: BoxDecoration(color: color, shape: BoxShape.circle), child: Icon(icon, color: Colors.white)));
-}
