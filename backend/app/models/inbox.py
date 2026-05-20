@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
@@ -152,11 +152,10 @@ class InboxLockOtp(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     mobile_number: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     otp_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    debug_otp_plaintext: Mapped[str | None] = mapped_column(String(12), nullable=True)
     purpose: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     is_used: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
     user = relationship("User")
-
-
