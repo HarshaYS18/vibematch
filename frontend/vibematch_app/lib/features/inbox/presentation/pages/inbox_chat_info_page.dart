@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../controllers/inbox_call_controller.dart';
 import '../../models/inbox_models.dart';
+import '../widgets/inbox_call_action_sheet.dart';
 
 class InboxChatInfoPage extends StatefulWidget {
   const InboxChatInfoPage({
@@ -21,10 +23,45 @@ class InboxChatInfoPage extends StatefulWidget {
 }
 
 class _InboxChatInfoPageState extends State<InboxChatInfoPage> {
+  final InboxCallController _callController = InboxCallController();
   String _selected = 'Media';
 
   List<InboxMessage> get _media => widget.conversation.messages.where((message) => message.type == InboxMessageType.image || message.type == InboxMessageType.voice || message.type == InboxMessageType.document).toList().reversed.toList();
   List<InboxMessage> get _starred => widget.conversation.messages.where((message) => message.isStarred).toList().reversed.toList();
+
+  @override
+  void dispose() {
+    _callController.dispose();
+    super.dispose();
+  }
+
+  void _openCallSheet() {
+    if (widget.conversation.isOfficial) {
+      _toast('Official team chats cannot be called.');
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => InboxCallActionSheet(
+        conversation: widget.conversation,
+        callController: _callController,
+      ),
+    );
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF251538),
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,10 +97,12 @@ class _InboxChatInfoPageState extends State<InboxChatInfoPage> {
             Row(
               children: [
                 Expanded(child: _InfoAction(icon: Icons.search_rounded, label: 'Search', onTap: widget.onSearchTap)),
-                const SizedBox(width: 10),
+                const SizedBox(width: 9),
+                Expanded(child: _InfoAction(icon: Icons.call_rounded, label: 'Call', onTap: _openCallSheet)),
+                const SizedBox(width: 9),
                 Expanded(child: _InfoAction(icon: Icons.wallpaper_rounded, label: 'Theme', onTap: widget.onThemeTap)),
-                const SizedBox(width: 10),
-                Expanded(child: _InfoAction(icon: Icons.notifications_off_rounded, label: conversation.isMuted ? 'Muted' : 'Mute', onTap: () {})),
+                const SizedBox(width: 9),
+                Expanded(child: _InfoAction(icon: Icons.notifications_off_rounded, label: conversation.isMuted ? 'Muted' : 'Mute', onTap: () => _toast('Mute is controlled from chat options.'))),
               ],
             ),
             const SizedBox(height: 16),
