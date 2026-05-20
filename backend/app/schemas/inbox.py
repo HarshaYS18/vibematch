@@ -134,6 +134,33 @@ class InboxDeleteForMeResponse(BaseModel):
     status: str = "deleted_for_me"
 
 
+class InboxStoryResponse(BaseModel):
+    id: str
+    owner_user_id: int
+    owner_name: str
+    owner_avatar_url: str | None = None
+    media_url: str
+    media_type: str = "image"
+    caption: str | None = None
+    visibility: str = "friends"
+    view_count: int = 0
+    is_mine: bool = False
+    is_viewed: bool = False
+    created_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+class InboxStoryListResponse(BaseModel):
+    stories: list[InboxStoryResponse]
+
+
+class InboxStoryCreateRequest(BaseModel):
+    media_url: str = Field(min_length=1, max_length=700)
+    media_type: str = Field(default="image", max_length=32)
+    caption: str | None = Field(default=None, max_length=500)
+    visibility: str = Field(default="friends", max_length=32)
+
+
 class InboxReportCreateRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
