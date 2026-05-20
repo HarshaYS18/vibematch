@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/inbox_call_controller.dart';
 import '../../models/inbox_call_models.dart';
 
-class InboxActiveCallPage extends StatelessWidget {
+class InboxActiveCallPage extends StatefulWidget {
   const InboxActiveCallPage({
     super.key,
     required this.callController,
@@ -14,11 +14,43 @@ class InboxActiveCallPage extends StatelessWidget {
   final InboxCallSession initialSession;
 
   @override
+  State<InboxActiveCallPage> createState() => _InboxActiveCallPageState();
+}
+
+class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
+  bool _closingFromRemote = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.callController.addListener(_handleCallChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.callController.removeListener(_handleCallChanged);
+    super.dispose();
+  }
+
+  void _handleCallChanged() {
+    if (!mounted || _closingFromRemote) return;
+    final active = widget.callController.activeCall;
+    if (active != null && active.id == widget.initialSession.id && !active.isTerminal) {
+      return;
+    }
+    _closingFromRemote = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).maybePop();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: callController,
+      animation: widget.callController,
       builder: (context, _) {
-        final session = callController.activeCall ?? initialSession;
+        final session = widget.callController.activeCall ?? widget.initialSession;
         final connected = session.isConnected;
         final colors = session.isVideo
             ? const [Color(0xFF6D5DF6), Color(0xFFFF4F9A)]
@@ -124,7 +156,7 @@ class InboxActiveCallPage extends StatelessWidget {
                   _CallControls(
                     session: session,
                     onEnd: () async {
-                      await callController.endActiveCall(reason: 'ended');
+                      await widget.callController.endActiveCall(reason: 'ended');
                       if (context.mounted) Navigator.pop(context);
                     },
                   ),
