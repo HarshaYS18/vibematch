@@ -37,7 +37,7 @@ class InboxConversationCard extends StatelessWidget {
         onTap: onTap,
         onLongPress: onLongPress,
         child: Container(
-          minHeight: 68,
+          constraints: const BoxConstraints(minHeight: 68),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
           decoration: BoxDecoration(
             color: isHub ? const Color(0xFFFFFBF2) : _surface,
