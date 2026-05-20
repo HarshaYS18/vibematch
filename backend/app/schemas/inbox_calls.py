@@ -40,6 +40,8 @@ class InboxCallResponse(BaseModel):
     duration_seconds: int | None = None
     end_reason: str | None = None
     mediasoup_room_id: str | None = None
+    media_contract: dict | None = None
+    push_contract: dict | None = None
 
 
 class InboxCallSummaryMessageResponse(BaseModel):
@@ -49,3 +51,9 @@ class InboxCallSummaryMessageResponse(BaseModel):
     call_id: str
     status: InboxCallStatus
     duration_seconds: int | None = None
+
+
+class InboxCallMediaContractResponse(BaseModel):
+    call_id: str
+    conversation_id: str
+    media_contract: dict
