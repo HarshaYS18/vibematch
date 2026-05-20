@@ -13,6 +13,8 @@ from app.models.vip_status import UserVipStatus
 from app.schemas.super_owner import (
     SuperOwnerActionResponse,
     SuperOwnerCustomIdRequest,
+    SuperOwnerInboxLockCodeRequest,
+    SuperOwnerInboxLockCodeResponse,
     SuperOwnerLevelAdjustmentRequest,
     SuperOwnerLogResponse,
     SuperOwnerMintCoinsRequest,
@@ -25,6 +27,7 @@ from app.schemas.super_owner import (
     SuperOwnerVipResponse,
     SuperOwnerWalletResponse,
 )
+from app.services import inbox_lock_service
 from app.services.audit_log_service import create_admin_log
 from app.services.economy_service import get_or_create_coin_pool, get_or_create_wallet, mint_to_pool
 from app.services.role_service import get_primary_role
@@ -50,6 +53,22 @@ def _wallet_response(user_id: int, db: Session) -> SuperOwnerWalletResponse:
 
 def _target_user(db: Session, target_user_id: int) -> User:
     user = db.query(User).filter(User.id == target_user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    return user
+
+
+def _target_user_by_identifier(db: Session, value: str) -> User:
+    clean = (value or "").strip()
+    if not clean:
+        raise HTTPException(status_code=400, detail="User identifier is required")
+    query = db.query(User)
+    if clean.isdigit():
+        numeric = int(clean)
+        user = query.filter((User.id == numeric) | (User.public_user_id == numeric) | (User.display_custom_id == numeric)).first()
+        if user:
+            return user
+    user = query.filter((User.username == clean) | (User.email == clean)).first()
     if not user:
         raise HTTPException(status_code=404, detail="Target user not found")
     return user
@@ -100,6 +119,15 @@ def assign_custom_id(payload: SuperOwnerCustomIdRequest, db: Session = Depends(g
     db.commit()
     create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=target.id, action="SUPER_OWNER_CUSTOM_ID_ASSIGNED", resource_type="user", resource_id=str(target.id), reason=payload.reason, metadata_json={"display_custom_id": payload.display_custom_id})
     return SuperOwnerActionResponse(message="Custom ID updated", resource_id=str(target.id))
+
+
+@router.post("/inbox-lock/code", response_model=SuperOwnerInboxLockCodeResponse)
+def set_inbox_lock_code(payload: SuperOwnerInboxLockCodeRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    require_super_owner(current_user)
+    target = _target_user_by_identifier(db, payload.user_identifier)
+    setting = inbox_lock_service.owner_reset_lock(db, target, payload.lock_code)
+    create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=target.id, action="SUPER_OWNER_INBOX_LOCK_CODE_SET", resource_type="inbox_lock_setting", resource_id=str(setting.id), reason=payload.reason, metadata_json={"mode": payload.mode, "public_user_id": target.public_user_id, "display_custom_id": target.display_custom_id})
+    return SuperOwnerInboxLockCodeResponse(message="Inbox lock setup/reset code updated", user_id=target.id, public_user_id=target.public_user_id, display_custom_id=target.display_custom_id, username=target.username, display_name=target.display_name, lock_enabled=setting.is_enabled, recovery_requested=setting.recovery_requested, mode=payload.mode)
 
 
 @router.post("/stealth", response_model=SuperOwnerActionResponse)
