@@ -41,7 +41,6 @@ class _InboxPageState extends State<InboxPage> {
   static const _bg = Color(0xFFFAFAFA);
   static const _ink = Color(0xFF111114);
   static const _muted = Color(0xFF71717A);
-  static const _line = Color(0xFFEDEDEF);
   static const _blue = Color(0xFF3797F0);
 
   late final InboxController _controller;
@@ -483,7 +482,7 @@ class _InboxPageState extends State<InboxPage> {
         opaque: true,
         transitionDuration: const Duration(milliseconds: 180),
         reverseTransitionDuration: const Duration(milliseconds: 140),
-        pageBuilder: (_, animation, __) => FadeTransition(
+        pageBuilder: (context, animation, child) => FadeTransition(
           opacity: animation,
           child: _StoryViewerPage(
             stories: stories,
@@ -745,7 +744,7 @@ class _StoryRailV3 extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         scrollDirection: Axis.horizontal,
         itemCount: stories.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           if (index == 0) {
             return _StoryBubbleV3.create(onTap: onCreateStory);
@@ -770,7 +769,7 @@ class _StoryBubbleV3 extends StatelessWidget {
     final item = story;
     final isCreate = item == null;
     final viewed = item?.isViewed ?? false;
-    final label = isCreate ? 'Your story' : item!.ownerName;
+    final label = isCreate ? 'Your story' : item.ownerName;
     final avatarUrl = item?.ownerAvatarUrl;
     final initial = isCreate ? '+' : _initial(label);
 
@@ -807,7 +806,7 @@ class _StoryBubbleV3 extends StatelessWidget {
                           ? Image.network(
                               avatarUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _StoryInitial(initial: initial),
+                              errorBuilder: (context, error, stackTrace) => _StoryInitial(initial: initial),
                             )
                           : _StoryInitial(initial: initial),
                 ),
@@ -867,7 +866,7 @@ class _FilterTabsV3 extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: filters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 22),
+        separatorBuilder: (context, index) => const SizedBox(width: 22),
         itemBuilder: (context, index) {
           final filter = filters[index];
           final selected = filter == selectedFilter;
@@ -974,7 +973,7 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
                     ? Image.network(
                         story.mediaUrl,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Center(
+                        errorBuilder: (context, error, stackTrace) => const Center(
                           child: Icon(Icons.broken_image_outlined, color: Colors.white70, size: 42),
                         ),
                       )
@@ -1045,7 +1044,7 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
                   right: 16,
                   bottom: 32,
                   child: Text(
-                    story.caption!.trim(),
+                    story.caption?.trim() ?? '',
                     style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600, height: 1.3),
                   ),
                 ),
@@ -1149,7 +1148,7 @@ class _CreateStorySheetV3State extends State<_CreateStorySheetV3> {
                   const Spacer(),
                   PopupMenuButton<String>(
                     onSelected: (value) => setState(() => _visibility = value),
-                    itemBuilder: (_) => const [
+                    itemBuilder: (context) => const [
                       PopupMenuItem(value: 'friends', child: Text('Friends')),
                       PopupMenuItem(value: 'everyone', child: Text('Everyone')),
                       PopupMenuItem(value: 'nobody', child: Text('Only me')),
@@ -1294,7 +1293,7 @@ class _SheetRow extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 20),
               const SizedBox(width: 13),
-              Expanded(child: Text(label, style: TextStyle(color: color, fontSize: 14.5, fontWeight: FontWeight.w650))),
+              Expanded(child: Text(label, style: TextStyle(color: color, fontSize: 14.5, fontWeight: FontWeight.w600))),
             ],
           ),
         ),
