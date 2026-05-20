@@ -52,6 +52,7 @@ from app.models.inbox_preferences import (
     InboxMessageUserState,
     InboxUserPreference,
 )
+from app.models.inbox_story import InboxStory, InboxStoryView
 from app.models.inbox_backup import (
     InboxBackupSetting,
     InboxBackupJob,
