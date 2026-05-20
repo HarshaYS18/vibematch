@@ -19,6 +19,13 @@ class InboxActiveCallPage extends StatefulWidget {
 }
 
 class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
+  static const _bg = Color(0xFF07070A);
+  static const _ink = Colors.white;
+  static const _muted = Color(0xFFB8B8C2);
+  static const _blue = Color(0xFF3797F0);
+  static const _green = Color(0xFF22C55E);
+  static const _red = Color(0xFFEF4444);
+
   final InboxCallMediaBridge _mediaBridge = InboxCallMediaBridge();
   bool _closingFromRemote = false;
   bool _mediaJoining = false;
@@ -43,9 +50,7 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
     if (!mounted || _closingFromRemote) return;
     final active = widget.callController.activeCall;
     if (active != null && active.id == widget.initialSession.id && !active.isTerminal) {
-      if (active.isConnected) {
-        _maybeJoinMedia();
-      }
+      if (active.isConnected) _maybeJoinMedia();
       return;
     }
     _closingFromRemote = true;
@@ -61,9 +66,7 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
     if (!mounted || _mediaJoining || _mediaReady || !session.isConnected) return;
     final roomId = session.roomId;
     if (roomId == null || roomId.trim().isEmpty) {
-      setState(() {
-        _mediaError = 'Missing mediasoup room id for this call.';
-      });
+      setState(() => _mediaError = 'Couldn’t connect call. Try again.');
       return;
     }
 
@@ -79,12 +82,12 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
         _mediaReady = true;
         _mediaJoining = false;
       });
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _mediaReady = false;
         _mediaJoining = false;
-        _mediaError = error.toString();
+        _mediaError = 'Couldn’t connect call. Try again.';
       });
     }
   }
@@ -99,107 +102,54 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
     await _mediaBridge.setMuted(muted);
   }
 
+  String _callStateLabel(InboxCallSession session) {
+    if (_mediaError != null) return _mediaError!;
+    if (session.isConnected) {
+      if (_mediaJoining) return 'Connecting...';
+      if (_mediaReady) return 'Connected';
+      return 'Connecting...';
+    }
+    final label = session.statusLabel.trim();
+    if (label.toLowerCase().contains('ring')) return 'Ringing...';
+    if (label.toLowerCase().contains('connect')) return 'Connecting...';
+    return label.isEmpty ? 'Calling...' : label;
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.callController,
       builder: (context, _) {
         final session = widget.callController.activeCall ?? widget.initialSession;
-        final connected = session.isConnected;
-        final colors = session.isVideo
-            ? const [Color(0xFF6D5DF6), Color(0xFFFF4F9A)]
-            : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)];
-
         return Scaffold(
-          backgroundColor: const Color(0xFF080512),
+          backgroundColor: _bg,
           body: SafeArea(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.topCenter,
-                  radius: 1.12,
-                  colors: [colors.first.withValues(alpha: 0.28), const Color(0xFF080512)],
-                ),
-              ),
-              child: Column(
-                children: [
-                  _CallTopBar(session: session),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 136,
-                          height: 136,
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(colors: colors),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colors.last.withValues(alpha: 0.32),
-                                blurRadius: 42,
-                                spreadRadius: 4,
-                              ),
-                            ],
-                          ),
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF1A102A),
+            child: Stack(
+              children: [
+                Positioned.fill(child: _CallBackdrop(session: session)),
+                Column(
+                  children: [
+                    _CallTopBar(session: session),
+                    Expanded(
+                      child: session.isVideo
+                          ? _VideoCallBody(
+                              session: session,
+                              stateLabel: _callStateLabel(session),
+                              mediaError: _mediaError,
+                              onRetry: _maybeJoinMedia,
+                            )
+                          : _VoiceCallBody(
+                              session: session,
+                              stateLabel: _callStateLabel(session),
+                              mediaError: _mediaError,
+                              mediaJoining: _mediaJoining,
+                              onRetry: _maybeJoinMedia,
                             ),
-                            child: Center(
-                              child: Text(
-                                session.peerAvatarText,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 42,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          session.peerName,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 27,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          connected ? 'Connected' : session.statusLabel,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF2DD4BF),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _MediaStatusPill(
-                          session: session,
-                          mediaJoining: _mediaJoining,
-                          mediaReady: _mediaReady,
-                          mediaError: _mediaError,
-                          onRetry: _maybeJoinMedia,
-                        ),
-                      ],
                     ),
-                  ),
-                  _CallControls(
-                    session: session,
-                    onMuteChanged: _setMuted,
-                    onEnd: _endCall,
-                  ),
-                ],
-              ),
+                    _CallControls(session: session, onMuteChanged: _setMuted, onEnd: _endCall),
+                  ],
+                ),
+              ],
             ),
           ),
         );
@@ -208,86 +158,24 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
   }
 }
 
-class _MediaStatusPill extends StatelessWidget {
-  const _MediaStatusPill({
-    required this.session,
-    required this.mediaJoining,
-    required this.mediaReady,
-    required this.mediaError,
-    required this.onRetry,
-  });
+class _CallBackdrop extends StatelessWidget {
+  const _CallBackdrop({required this.session});
 
   final InboxCallSession session;
-  final bool mediaJoining;
-  final bool mediaReady;
-  final String? mediaError;
-  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final error = mediaError;
-    final label = error != null
-        ? 'Media join failed. Tap to retry.'
-        : mediaReady
-            ? 'Live audio connected • ${session.roomId}'
-            : mediaJoining
-                ? 'Joining mediasoup audio...'
-                : session.isConnected
-                    ? 'Preparing mediasoup audio...'
-                    : 'Waiting for answer • ${session.roomId ?? 'no media room yet'}';
-
-    return InkWell(
-      onTap: error == null ? null : onRetry,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 28),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: error == null
-                ? Colors.white.withValues(alpha: 0.10)
-                : const Color(0xFFE84C72).withValues(alpha: 0.55),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (mediaJoining)
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2DD4BF)),
-              )
-            else
-              Icon(
-                error == null
-                    ? mediaReady
-                        ? Icons.graphic_eq_rounded
-                        : Icons.router_rounded
-                    : Icons.error_outline_rounded,
-                color: error == null ? const Color(0xFF2DD4BF) : const Color(0xFFE84C72),
-                size: 16,
-              ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFFCDBCE7),
-                  fontSize: 12,
-                  height: 1.35,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: session.isVideo
+              ? const [Color(0xFF15151A), Color(0xFF07070A)]
+              : const [Color(0xFF111827), Color(0xFF07070A)],
         ),
       ),
+      child: const SizedBox.expand(),
     );
   }
 }
@@ -300,44 +188,236 @@ class _CallTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 14, 6),
+      padding: const EdgeInsets.fromLTRB(8, 8, 12, 4),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 26),
+            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 28),
           ),
           Expanded(
             child: Text(
               session.isVideo ? 'Video call' : 'Voice call',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
+              style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-            ),
-            child: Text(
-              session.iconLabel,
-              style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 10.5, fontWeight: FontWeight.w900),
-            ),
-          ),
+          const SizedBox(width: 48),
         ],
       ),
     );
   }
 }
 
+class _VoiceCallBody extends StatelessWidget {
+  const _VoiceCallBody({required this.session, required this.stateLabel, required this.mediaError, required this.mediaJoining, required this.onRetry});
+
+  final InboxCallSession session;
+  final String stateLabel;
+  final String? mediaError;
+  final bool mediaJoining;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _RingingAvatar(session: session, active: !session.isConnected || mediaJoining),
+            const SizedBox(height: 26),
+            Text(
+              session.peerName,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _InboxActiveCallPageState._ink, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+            ),
+            const SizedBox(height: 8),
+            _StateText(label: stateLabel, error: mediaError != null, onRetry: mediaError == null ? null : onRetry),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RingingAvatar extends StatefulWidget {
+  const _RingingAvatar({required this.session, required this.active});
+
+  final InboxCallSession session;
+  final bool active;
+
+  @override
+  State<_RingingAvatar> createState() => _RingingAvatarState();
+}
+
+class _RingingAvatarState extends State<_RingingAvatar> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300));
+    if (widget.active) _controller.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _RingingAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    } else if (!widget.active && _controller.isAnimating) {
+      _controller.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final value = widget.active ? _controller.value : 0.0;
+        return Container(
+          width: 148 + (value * 18),
+          height: 148 + (value * 18),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.04 + value * 0.04),
+          ),
+          child: Center(child: child),
+        );
+      },
+      child: CircleAvatar(
+        radius: 64,
+        backgroundColor: Colors.white.withValues(alpha: 0.12),
+        child: Text(
+          widget.session.peerAvatarText,
+          style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoCallBody extends StatelessWidget {
+  const _VideoCallBody({required this.session, required this.stateLabel, required this.mediaError, required this.onRetry});
+
+  final InboxCallSession session;
+  final String stateLabel;
+  final String? mediaError;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111114),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 48,
+                  backgroundColor: Colors.white.withValues(alpha: 0.12),
+                  child: Text(session.peerAvatarText, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)),
+                ),
+                const SizedBox(height: 16),
+                Text(session.peerName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                _StateText(label: stateLabel, error: mediaError != null, onRetry: mediaError == null ? null : onRetry),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          right: 24,
+          top: 24,
+          child: Container(
+            width: 108,
+            height: 150,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 10))],
+            ),
+            child: const Center(
+              child: Icon(Icons.person_rounded, color: Colors.white70, size: 34),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StateText extends StatelessWidget {
+  const _StateText({required this.label, required this.error, required this.onRetry});
+
+  final String label;
+  final bool error;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onRetry,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: error ? _InboxActiveCallPageState._red.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!error)
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(color: _InboxActiveCallPageState._green, shape: BoxShape.circle),
+              )
+            else
+              const Icon(Icons.error_outline_rounded, color: _InboxActiveCallPageState._red, size: 15),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: error ? _InboxActiveCallPageState._red : _InboxActiveCallPageState._muted,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CallControls extends StatefulWidget {
-  const _CallControls({
-    required this.session,
-    required this.onMuteChanged,
-    required this.onEnd,
-  });
+  const _CallControls({required this.session, required this.onMuteChanged, required this.onEnd});
 
   final InboxCallSession session;
   final Future<void> Function(bool muted) onMuteChanged;
@@ -368,50 +448,27 @@ class _CallControlsState extends State<_CallControls> {
 
   @override
   Widget build(BuildContext context) {
+    final controls = <Widget>[
+      _ControlButton(icon: _muted ? Icons.mic_off_rounded : Icons.mic_rounded, label: _muted ? 'Muted' : 'Mute', active: _muted, onTap: _toggleMute),
+      _ControlButton(icon: _speaker ? Icons.volume_up_rounded : Icons.volume_off_rounded, label: 'Speaker', active: _speaker, onTap: () => setState(() => _speaker = !_speaker)),
+      if (widget.session.isVideo)
+        _ControlButton(icon: _camera ? Icons.videocam_rounded : Icons.videocam_off_rounded, label: 'Camera', active: !_camera, onTap: () => setState(() => _camera = !_camera)),
+      _ControlButton(icon: _ending ? Icons.hourglass_top_rounded : Icons.call_end_rounded, label: 'End', danger: true, onTap: _end),
+    ];
+
     return Padding(
       padding: EdgeInsets.fromLTRB(18, 10, 18, 20 + MediaQuery.paddingOf(context).bottom),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _ControlButton(
-            icon: _muted ? Icons.mic_off_rounded : Icons.mic_rounded,
-            label: _muted ? 'Muted' : 'Mute',
-            active: _muted,
-            onTap: _toggleMute,
-          ),
-          _ControlButton(
-            icon: _speaker ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-            label: 'Speaker',
-            active: _speaker,
-            onTap: () => setState(() => _speaker = !_speaker),
-          ),
-          if (widget.session.isVideo)
-            _ControlButton(
-              icon: _camera ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-              label: 'Camera',
-              active: _camera,
-              onTap: () => setState(() => _camera = !_camera),
-            ),
-          _ControlButton(
-            icon: _ending ? Icons.hourglass_top_rounded : Icons.call_end_rounded,
-            label: 'End',
-            danger: true,
-            onTap: _end,
-          ),
-        ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(28)),
+        child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: controls),
       ),
     );
   }
 }
 
 class _ControlButton extends StatelessWidget {
-  const _ControlButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.active = false,
-    this.danger = false,
-  });
+  const _ControlButton({required this.icon, required this.label, required this.onTap, this.active = false, this.danger = false});
 
   final IconData icon;
   final String label;
@@ -421,13 +478,11 @@ class _ControlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = danger
-        ? const Color(0xFFE84C72)
+    final background = danger
+        ? _InboxActiveCallPageState._red
         : active
-            ? const Color(0xFF12C7B7)
+            ? _InboxActiveCallPageState._blue
             : Colors.white.withValues(alpha: 0.12);
-    final iconColor = danger || active ? Colors.white : const Color(0xFFCDBCE7);
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
@@ -435,16 +490,13 @@ class _ControlButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 23),
+            width: danger ? 62 : 56,
+            height: danger ? 62 : 56,
+            decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+            child: Icon(icon, color: Colors.white, size: danger ? 25 : 22),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 11, fontWeight: FontWeight.w900),
-          ),
+          const SizedBox(height: 7),
+          Text(label, style: const TextStyle(color: _InboxActiveCallPageState._muted, fontSize: 11, fontWeight: FontWeight.w700)),
         ],
       ),
     );
