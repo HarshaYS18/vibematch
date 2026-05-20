@@ -5,17 +5,26 @@ import '../models/inbox_call_models.dart';
 import '../models/inbox_models.dart';
 
 class InboxCallController extends ChangeNotifier {
-  InboxCallController({InboxCallApiService? apiService}) : _apiService = apiService ?? const InboxCallApiService();
+  InboxCallController({InboxCallApiService? apiService})
+    : _apiService = apiService ?? const InboxCallApiService();
 
   final InboxCallApiService _apiService;
   InboxCallSession? _activeCall;
+  InboxCallSummaryMessage? _lastSummary;
   bool _busy = false;
   String? _errorMessage;
 
   InboxCallSession? get activeCall => _activeCall;
+  InboxCallSummaryMessage? get lastSummary => _lastSummary;
   bool get hasActiveCall => _activeCall != null;
   bool get busy => _busy;
   String? get errorMessage => _errorMessage;
+
+  InboxCallSession? activeCallForConversation(String conversationId) {
+    final session = _activeCall;
+    if (session == null || session.conversationId != conversationId) return null;
+    return session;
+  }
 
   Future<InboxCallSession?> startCall({
     required InboxConversation conversation,
@@ -31,6 +40,7 @@ class InboxCallController extends ChangeNotifier {
         peerAvatarText: conversation.avatarText,
       );
       _activeCall = session;
+      _lastSummary = null;
       _errorMessage = null;
       notifyListeners();
       return session;
@@ -49,6 +59,7 @@ class InboxCallController extends ChangeNotifier {
     _setBusy(true);
     try {
       _activeCall = await _apiService.acceptCall(session: session);
+      _lastSummary = null;
       _errorMessage = null;
       notifyListeners();
     } catch (error) {
@@ -64,7 +75,11 @@ class InboxCallController extends ChangeNotifier {
     if (session == null || _busy) return;
     _setBusy(true);
     try {
-      await _apiService.declineCall(session: session, reason: reason ?? 'declined');
+      final ended = await _apiService.declineCall(
+        session: session,
+        reason: reason ?? 'declined',
+      );
+      _lastSummary = _summaryFromSession(ended);
       _activeCall = null;
       _errorMessage = null;
       notifyListeners();
@@ -81,7 +96,11 @@ class InboxCallController extends ChangeNotifier {
     if (session == null || _busy) return;
     _setBusy(true);
     try {
-      await _apiService.endCall(session: session, reason: reason ?? 'ended');
+      final ended = await _apiService.endCall(
+        session: session,
+        reason: reason ?? 'ended',
+      );
+      _lastSummary = _summaryFromSession(ended);
       _activeCall = null;
       _errorMessage = null;
       notifyListeners();
@@ -99,6 +118,11 @@ class InboxCallController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clearLastSummary() {
+    _lastSummary = null;
+    notifyListeners();
+  }
+
   void handleRealtimeEvent({
     required Map<String, dynamic> event,
     required InboxConversation conversation,
@@ -107,14 +131,20 @@ class InboxCallController extends ChangeNotifier {
     final rawCall = event['call'];
     if (rawCall is! Map<String, dynamic>) return;
 
+    final fromSelf = event['from_self'] == true || event['is_mine'] == true;
+    final direction = fromSelf
+        ? InboxCallDirection.outgoing
+        : InboxCallDirection.incoming;
+
     switch (eventName) {
       case 'inbox_call_started':
         _activeCall = _apiService.callFromRealtimeJson(
           rawCall,
           peerName: conversation.title,
           peerAvatarText: conversation.avatarText,
-          direction: InboxCallDirection.incoming,
+          direction: direction,
         );
+        _lastSummary = null;
         _errorMessage = null;
         notifyListeners();
         break;
@@ -123,14 +153,22 @@ class InboxCallController extends ChangeNotifier {
           rawCall,
           peerName: conversation.title,
           peerAvatarText: conversation.avatarText,
-          direction: _activeCall?.direction ?? InboxCallDirection.outgoing,
+          direction: _activeCall?.direction ?? direction,
         );
+        _lastSummary = null;
         _errorMessage = null;
         notifyListeners();
         break;
       case 'inbox_call_declined':
       case 'inbox_call_ended':
       case 'inbox_call_missed':
+        final session = _apiService.callFromRealtimeJson(
+          rawCall,
+          peerName: conversation.title,
+          peerAvatarText: conversation.avatarText,
+          direction: _activeCall?.direction ?? direction,
+        );
+        _lastSummary = _summaryFromSession(session);
         _activeCall = null;
         _errorMessage = null;
         notifyListeners();
@@ -149,6 +187,19 @@ class InboxCallController extends ChangeNotifier {
       type: session.type,
       direction: session.direction,
       status: status,
+      label: session.statusLabel,
+      createdAt: DateTime.now(),
+      duration: session.duration,
+    );
+  }
+
+  InboxCallSummaryMessage _summaryFromSession(InboxCallSession session) {
+    return InboxCallSummaryMessage(
+      callId: session.id,
+      conversationId: session.conversationId,
+      type: session.type,
+      direction: session.direction,
+      status: session.status,
       label: session.statusLabel,
       createdAt: DateTime.now(),
       duration: session.duration,
