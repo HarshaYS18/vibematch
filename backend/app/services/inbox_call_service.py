@@ -37,6 +37,14 @@ def _is_video(call: CallSession) -> bool:
     return call.call_type in {CallSessionType.DIRECT_VIDEO, CallSessionType.GROUP_VIDEO}
 
 
+def _active_call_statuses() -> set[CallSessionStatus]:
+    return {
+        CallSessionStatus.RINGING,
+        CallSessionStatus.CONNECTING,
+        CallSessionStatus.ACTIVE,
+    }
+
+
 def _status_for_response(status: CallSessionStatus) -> str:
     return {
         CallSessionStatus.RINGING: "ringing",
@@ -76,6 +84,18 @@ def call_to_dict(call: CallSession) -> dict:
 
 
 def start_call(db: Session, conversation: InboxConversation, caller: User, call_type: str) -> CallSession:
+    existing = (
+        db.query(CallSession)
+        .filter(
+            CallSession.conversation_id == conversation.id,
+            CallSession.status.in_(_active_call_statuses()),
+        )
+        .order_by(CallSession.started_at.desc())
+        .first()
+    )
+    if existing is not None:
+        raise ValueError("A call is already active in this conversation.")
+
     is_video = call_type == "video"
     peers = peer_ids(conversation, caller)
     if not peers:
