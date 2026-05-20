@@ -326,6 +326,12 @@ class _InboxPageState extends State<InboxPage> {
     _showPasscodeGate(title: 'Locked chats', subtitle: 'Enter your Inbox lock before viewing locked conversations.', onUnlocked: _openLockedVaultPage);
   }
 
+  Future<void> _handleInboxPullDown() async {
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (!mounted) return;
+    _openLockedVault();
+  }
+
   void _openLockedVaultPage() {
     _openInboxSubPage(LockedChatsPage(conversations: _controller.lockedConversations, onOpenConversation: _openConversation, onShowOptions: _showChatOptions, onBackTap: _closePanelOverlay));
   }
@@ -442,11 +448,11 @@ class _InboxPageState extends State<InboxPage> {
           ),
           body: SafeArea(
             child: RefreshIndicator(
-              color: const Color(0xFF7C3AED),
-              onRefresh: () async {
-                await _controller.loadFromBackend();
-                _refreshStories();
-              },
+              color: const Color(0xFF251538),
+              displacement: 64,
+              edgeOffset: 8,
+              strokeWidth: 2.7,
+              onRefresh: _handleInboxPullDown,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                 slivers: [
@@ -541,7 +547,7 @@ class _InstagramInboxHeader extends StatelessWidget {
               _TopIcon(icon: Icons.settings_rounded, onTap: onSettingsTap),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             children: [
               _InboxPill(label: unreadCount == 0 ? 'No unread' : '$unreadCount unread', icon: Icons.mark_chat_unread_rounded, onTap: onSearchTap),
@@ -551,7 +557,35 @@ class _InstagramInboxHeader extends StatelessWidget {
               if (reportTaskCount > 0) _InboxPill(label: '$reportTaskCount CS', icon: Icons.support_agent_rounded, onTap: onReportsTap),
             ],
           ),
+          const SizedBox(height: 8),
+          _PullDownHint(lockedCount: lockedCount, onTap: onLockedTap),
         ],
+      ),
+    );
+  }
+}
+
+class _PullDownHint extends StatelessWidget {
+  const _PullDownHint({required this.lockedCount, required this.onTap});
+  final int lockedCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(color: const Color(0xFFF4EFE8), borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFE6D8CA))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.keyboard_double_arrow_down_rounded, color: Color(0xFF251538), size: 16),
+            const SizedBox(width: 5),
+            Text(lockedCount == 0 ? 'Pull down to open locked chats' : 'Pull down for $lockedCount locked chat${lockedCount == 1 ? '' : 's'}', style: const TextStyle(color: Color(0xFF5E4B6F), fontSize: 11, fontWeight: FontWeight.w900)),
+          ],
+        ),
       ),
     );
   }
