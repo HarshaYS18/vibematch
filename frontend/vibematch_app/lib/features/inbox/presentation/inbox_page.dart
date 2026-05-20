@@ -1,1 +1,1 @@
-export 'inbox_page_modular.dart';
+export 'inbox_page_v3.dart';
