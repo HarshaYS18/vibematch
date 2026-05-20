@@ -596,7 +596,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
       backgroundColor: Colors.transparent,
       builder: (_) => _ChatMoreSheet(
         conversation: _conversation,
-        onDisappearingTap: () {
+        onDriftTap: () {
           Navigator.pop(context);
           unawaited(_toggleSecretDrift());
         },
@@ -810,14 +810,6 @@ class _InboxChatPageState extends State<InboxChatPage> {
                   ),
                 ),
               ),
-              if (!_readOnly)
-                _SecretDriftSwipeActivator(
-                  active: conversation.secretDriftEnabled,
-                  onActivated: () => _toggleSecretDrift(
-                    fromCoach:
-                        !conversation.secretDriftEnabled && _showDriftCoach,
-                  ),
-                ),
               if (_replyToText != null)
                 _ReplyPreview(
                   text: _replyToText!,
@@ -826,6 +818,11 @@ class _InboxChatPageState extends State<InboxChatPage> {
               _ChatInputBar(
                 readOnly: _readOnly,
                 driftMode: conversation.secretDriftEnabled,
+                showDriftHint: _showDriftCoach,
+                onDriftSwipe: () => _toggleSecretDrift(
+                  fromCoach:
+                      !conversation.secretDriftEnabled && _showDriftCoach,
+                ),
                 controller: _textController,
                 onAttachTap: _openAttachmentSheet,
                 onEmojiTap: _openEmojiPack,
@@ -2115,231 +2112,15 @@ class _ReplyPreview extends StatelessWidget {
   );
 }
 
-class _SecretDriftSwipeActivator extends StatefulWidget {
-  const _SecretDriftSwipeActivator({
-    required this.active,
-    required this.onActivated,
-  });
-
-  final bool active;
-  final Future<void> Function() onActivated;
-
-  @override
-  State<_SecretDriftSwipeActivator> createState() =>
-      _SecretDriftSwipeActivatorState();
-}
-
-class _SecretDriftSwipeActivatorState
-    extends State<_SecretDriftSwipeActivator> {
-  double _drag = 0;
-  bool _arming = false;
-
-  static const double _threshold = 62;
-
-  double get _progress => (_drag / _threshold).clamp(0, 1).toDouble();
-
-  void _handleDragUpdate(DragUpdateDetails details) {
-    if (_arming) return;
-    final delta = details.delta.dy;
-    if (delta >= 0) {
-      setState(() => _drag = (_drag - delta * 0.45).clamp(0, _threshold));
-      return;
-    }
-    setState(() => _drag = (_drag - delta).clamp(0, _threshold));
-  }
-
-  Future<void> _handleDragEnd([DragEndDetails? _]) async {
-    if (_arming) return;
-    if (_progress < 1) {
-      setState(() => _drag = 0);
-      return;
-    }
-    setState(() => _arming = true);
-    await HapticFeedback.lightImpact();
-    try {
-      await widget.onActivated();
-    } finally {
-      if (mounted) {
-        setState(() {
-          _drag = 0;
-          _arming = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = _progress;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onVerticalDragUpdate: _handleDragUpdate,
-      onVerticalDragEnd: _handleDragEnd,
-      onVerticalDragCancel: () => setState(() => _drag = 0),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 5, 12, 7),
-        color: widget.active ? InboxLightPremiumTokens.ink : Colors.white,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: widget.active
-                  ? [
-                      const Color(0xFF211133),
-                      Color.lerp(
-                        const Color(0xFF211133),
-                        InboxLightPremiumTokens.violetDeep,
-                        progress,
-                      )!,
-                    ]
-                  : [
-                      InboxLightPremiumTokens.pearl,
-                      Color.lerp(
-                        InboxLightPremiumTokens.pearl,
-                        const Color(0xFFF1E7FF),
-                        progress,
-                      )!,
-                    ],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Color.lerp(
-                InboxLightPremiumTokens.border,
-                InboxLightPremiumTokens.violet,
-                progress,
-              )!,
-            ),
-            boxShadow: [
-              if (progress > 0)
-                BoxShadow(
-                  color: const Color(
-                    0xFF7C3AED,
-                  ).withValues(alpha: 0.10 + (progress * 0.10)),
-                  blurRadius: 16,
-                  offset: const Offset(0, 7),
-                ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(
-                        0xFF7C3AED,
-                      ).withValues(alpha: 0.22 + (progress * 0.34)),
-                      const Color(
-                        0xFFFF4F9A,
-                      ).withValues(alpha: 0.20 + (progress * 0.32)),
-                    ],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: _arming
-                    ? const Padding(
-                        padding: EdgeInsets.all(9),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Transform.translate(
-                        offset: Offset(0, -5 * progress),
-                        child: Icon(
-                          Icons.keyboard_arrow_up_rounded,
-                          color: widget.active
-                              ? Colors.white
-                              : InboxLightPremiumTokens.ink,
-                          size: 24,
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      progress >= 1
-                          ? widget.active
-                                ? 'Release to leave disappearing mode'
-                                : 'Release to enter disappearing mode'
-                          : widget.active
-                          ? 'Swipe up to leave disappearing mode'
-                          : 'Swipe up for disappearing messages',
-                      style: TextStyle(
-                        color: widget.active
-                            ? Colors.white
-                            : InboxLightPremiumTokens.ink,
-                        fontSize: 12.4,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Stack(
-                      children: [
-                        Container(
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: widget.active
-                                ? Colors.white.withValues(alpha: 0.18)
-                                : InboxLightPremiumTokens.border,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        ),
-                        FractionallySizedBox(
-                          widthFactor: progress,
-                          child: Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  InboxLightPremiumTokens.violet,
-                                  InboxLightPremiumTokens.pink,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Icon(
-                widget.active
-                    ? Icons.timer_off_rounded
-                    : Icons.auto_awesome_rounded,
-                color: widget.active
-                    ? Colors.white
-                    : InboxLightPremiumTokens.violet,
-                size: 18,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _ChatMoreSheet extends StatelessWidget {
   const _ChatMoreSheet({
     required this.conversation,
-    required this.onDisappearingTap,
+    required this.onDriftTap,
     required this.onOriginalMoreTap,
   });
 
   final InboxConversation conversation;
-  final VoidCallback onDisappearingTap;
+  final VoidCallback onDriftTap;
   final VoidCallback onOriginalMoreTap;
 
   @override
@@ -2433,9 +2214,9 @@ class _ChatMoreSheet extends StatelessWidget {
                 ? Icons.timer_off_rounded
                 : Icons.timer_rounded,
             title: conversation.secretDriftEnabled
-                ? 'Turn off disappearing mode'
-                : 'Turn on disappearing mode',
-            onTap: onDisappearingTap,
+                ? 'Turn off Secret Drift'
+                : 'Turn on Secret Drift',
+            onTap: onDriftTap,
           ),
           _ActionTile(
             icon: Icons.more_horiz_rounded,
@@ -2452,6 +2233,8 @@ class _ChatInputBar extends StatelessWidget {
   const _ChatInputBar({
     required this.readOnly,
     required this.driftMode,
+    required this.showDriftHint,
+    required this.onDriftSwipe,
     required this.controller,
     required this.recordingVoice,
     required this.sendingVoice,
@@ -2465,6 +2248,8 @@ class _ChatInputBar extends StatelessWidget {
   });
   final bool readOnly;
   final bool driftMode;
+  final bool showDriftHint;
+  final Future<void> Function() onDriftSwipe;
   final TextEditingController controller;
   final bool recordingVoice;
   final bool sendingVoice;
@@ -2513,65 +2298,85 @@ class _ChatInputBar extends StatelessWidget {
             onTap: disabled ? null : onEmojiTap,
           ),
           Expanded(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              constraints: const BoxConstraints(minHeight: 46, maxHeight: 104),
-              padding: const EdgeInsets.symmetric(horizontal: 13),
-              decoration: BoxDecoration(
-                gradient: disabled ? null : composerGradient,
-                color: driftMode || disabled
-                    ? disabled
-                          ? const Color(0xFFF2EDF4)
-                          : null
-                    : InboxLightPremiumTokens.pearl,
-                borderRadius: BorderRadius.circular(23),
-                border: Border.all(
-                  color: driftMode
-                      ? InboxLightPremiumTokens.pink.withValues(alpha: 0.52)
-                      : hasText
-                      ? const Color(0xFFCDB7FF)
-                      : InboxLightPremiumTokens.border,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onVerticalDragEnd: disabled
+                  ? null
+                  : (details) {
+                      final velocity = details.primaryVelocity ?? 0;
+                      if (velocity < -260) unawaited(onDriftSwipe());
+                    },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOutCubic,
+                constraints: const BoxConstraints(
+                  minHeight: 46,
+                  maxHeight: 104,
                 ),
-              ),
-              child: TextField(
-                controller: controller,
-                enabled: !disabled,
-                minLines: 1,
-                maxLines: 4,
-                textCapitalization: TextCapitalization.sentences,
-                cursorColor: driftMode
-                    ? Colors.white
-                    : InboxLightPremiumTokens.violet,
-                style: TextStyle(
-                  color: driftMode ? Colors.white : InboxLightPremiumTokens.ink,
-                  fontWeight: FontWeight.w800,
-                ),
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  prefixIcon: driftMode
-                      ? const Icon(
-                          Icons.timer_rounded,
-                          color: Colors.white,
-                          size: 17,
-                        )
-                      : null,
-                  prefixIconConstraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
-                  ),
-                  hintText: disabled
-                      ? 'Replies disabled'
-                      : recordingVoice
-                      ? 'Recording voice...'
-                      : driftMode
-                      ? 'Disappearing message...'
-                      : 'Message...',
-                  hintStyle: TextStyle(
+                padding: const EdgeInsets.symmetric(horizontal: 13),
+                decoration: BoxDecoration(
+                  gradient: disabled ? null : composerGradient,
+                  color: driftMode || disabled
+                      ? disabled
+                            ? const Color(0xFFF2EDF4)
+                            : null
+                      : InboxLightPremiumTokens.pearl,
+                  borderRadius: BorderRadius.circular(23),
+                  border: Border.all(
                     color: driftMode
-                        ? Colors.white.withValues(alpha: 0.72)
-                        : const Color(0xFF8C8198),
-                    fontWeight: FontWeight.w700,
+                        ? InboxLightPremiumTokens.pink.withValues(alpha: 0.52)
+                        : showDriftHint
+                        ? InboxLightPremiumTokens.violet.withValues(alpha: 0.28)
+                        : hasText
+                        ? const Color(0xFFCDB7FF)
+                        : InboxLightPremiumTokens.border,
+                  ),
+                ),
+                child: TextField(
+                  controller: controller,
+                  enabled: !disabled,
+                  minLines: 1,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  cursorColor: driftMode
+                      ? Colors.white
+                      : InboxLightPremiumTokens.violet,
+                  style: TextStyle(
+                    color: driftMode
+                        ? Colors.white
+                        : InboxLightPremiumTokens.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    prefixIcon: driftMode || showDriftHint
+                        ? Icon(
+                            Icons.timer_rounded,
+                            color: driftMode
+                                ? Colors.white
+                                : InboxLightPremiumTokens.violet,
+                            size: 17,
+                          )
+                        : null,
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                    hintText: disabled
+                        ? 'Replies disabled'
+                        : recordingVoice
+                        ? 'Recording voice...'
+                        : driftMode
+                        ? 'Secret Drift...'
+                        : showDriftHint
+                        ? 'Swipe up for Secret Drift'
+                        : 'Message...',
+                    hintStyle: TextStyle(
+                      color: driftMode
+                          ? Colors.white.withValues(alpha: 0.72)
+                          : const Color(0xFF8C8198),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../media/data/media_upload_api_service.dart';
 import '../../data/inbox_stories_api_service.dart';
@@ -163,9 +164,9 @@ class _MyStoryBubble extends StatelessWidget {
                               ),
                               child: Center(
                                 child: Icon(
-                                  Icons.person_rounded,
+                                  Icons.add_a_photo_rounded,
                                   color: InboxLightPremiumTokens.violet,
-                                  size: 28,
+                                  size: 25,
                                 ),
                               ),
                             ),
@@ -212,7 +213,7 @@ class _MyStoryBubble extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              hasStory ? 'My story' : 'Your story',
+              'My story',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -1183,101 +1184,170 @@ class _StoryErrorPill extends StatelessWidget {
   }
 }
 
-class InboxStoryViewerSheet extends StatelessWidget {
+class InboxStoryViewerSheet extends StatefulWidget {
   const InboxStoryViewerSheet({super.key, required this.story});
 
   final InboxStoryItem story;
 
   @override
+  State<InboxStoryViewerSheet> createState() => _InboxStoryViewerSheetState();
+}
+
+class _InboxStoryViewerSheetState extends State<InboxStoryViewerSheet> {
+  VideoPlayerController? _videoController;
+  Future<void>? _videoFuture;
+
+  InboxStoryItem get story => widget.story;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_storyMediaIsImage(story.mediaType, story.mediaUrl)) {
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(story.mediaUrl),
+      );
+      _videoController = controller;
+      _videoFuture = controller.initialize().then((_) async {
+        await controller.setLooping(true);
+        await controller.play();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final caption = story.caption?.trim();
     final isImage = _storyMediaIsImage(story.mediaType, story.mediaUrl);
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height,
-        child: Container(
-          color: InboxLightPremiumTokens.ink,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment.topCenter,
-                      radius: 1.2,
-                      colors: [
-                        InboxLightPremiumTokens.violet.withValues(alpha: 0.30),
-                        InboxLightPremiumTokens.ink,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    12,
-                    10,
-                    12,
-                    12 + MediaQuery.paddingOf(context).bottom,
-                  ),
-                  child: Column(
-                    children: [
-                      _StoryProgressHeader(story: story),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(30),
-                          child: DecoratedBox(
-                            decoration: const BoxDecoration(
-                              color: Colors.black,
-                            ),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                if (isImage)
-                                  Image.network(
-                                    story.mediaUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            const _StoryMediaUnavailable(),
-                                  )
-                                else
-                                  const _StoryVideoUnavailable(),
-                                const _StoryViewerGradient(),
-                                Positioned(
-                                  left: 16,
-                                  right: 16,
-                                  bottom: 18,
-                                  child: _StoryCaptionArea(caption: caption),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _StoryViewerActions(story: story),
+    final padding = MediaQuery.paddingOf(context);
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height,
+      child: Container(
+        color: InboxLightPremiumTokens.ink,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.topCenter,
+                    radius: 1.2,
+                    colors: [
+                      InboxLightPremiumTokens.violet.withValues(alpha: 0.30),
+                      InboxLightPremiumTokens.ink,
                     ],
                   ),
                 ),
               ),
-              Positioned(
-                right: 10,
-                top: 8,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black.withValues(alpha: 0.26),
-                  ),
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+            ),
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  12,
+                  padding.top + 10,
+                  12,
+                  12 + padding.bottom,
+                ),
+                child: Column(
+                  children: [
+                    _StoryProgressHeader(story: story),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
+                        child: DecoratedBox(
+                          decoration: const BoxDecoration(color: Colors.black),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              if (isImage)
+                                Image.network(
+                                  story.mediaUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const _StoryMediaUnavailable(),
+                                )
+                              else
+                                _StoryVideoPlayer(
+                                  controller: _videoController,
+                                  videoFuture: _videoFuture,
+                                ),
+                              const _StoryViewerGradient(),
+                              Positioned(
+                                left: 16,
+                                right: 16,
+                                bottom: 18,
+                                child: _StoryCaptionArea(caption: caption),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _StoryViewerActions(story: story),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+            Positioned(
+              right: 10,
+              top: padding.top + 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: 0.26),
+                ),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _StoryVideoPlayer extends StatelessWidget {
+  const _StoryVideoPlayer({
+    required this.controller,
+    required this.videoFuture,
+  });
+
+  final VideoPlayerController? controller;
+  final Future<void>? videoFuture;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeController = controller;
+    final activeFuture = videoFuture;
+    if (activeController == null || activeFuture == null) {
+      return const _StoryMediaUnavailable();
+    }
+
+    return FutureBuilder<void>(
+      future: activeFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return const _StoryMediaUnavailable();
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          );
+        }
+        return FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: activeController.value.size.width,
+            height: activeController.value.size.height,
+            child: VideoPlayer(activeController),
+          ),
+        );
+      },
     );
   }
 }
@@ -1466,27 +1536,6 @@ class _StoryMediaUnavailable extends StatelessWidget {
         'Story media unavailable',
         textAlign: TextAlign.center,
         style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
-
-class _StoryVideoUnavailable extends StatelessWidget {
-  const _StoryVideoUnavailable();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 60),
-          SizedBox(height: 10),
-          Text(
-            'Video story',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-          ),
-        ],
       ),
     );
   }

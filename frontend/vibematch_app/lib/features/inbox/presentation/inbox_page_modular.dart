@@ -53,6 +53,7 @@ class _InboxPageState extends State<InboxPage> {
   int _lastHandledOpenConversationRequestNonce = 0;
   String? _activeConversationId;
   bool _showLockedChatsCoach = false;
+  String _selectedLandingSection = 'All';
 
   @override
   void initState() {
@@ -165,20 +166,28 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   List<InboxConversation> get _premiumVisibleConversations {
-    final base = _controller.visibleConversations
-        .where((item) => !item.isStranger)
+    final base = _controller.unlockedConversations
+        .where((item) => !item.isArchived && !item.isStranger)
         .toList();
-    if (_controller.selectedFilter == 'Strangers') {
-      final hub = _strangerHub;
-      return hub == null
-          ? const <InboxConversation>[]
-          : <InboxConversation>[hub];
+    switch (_selectedLandingSection) {
+      case 'Groups':
+        return base
+            .where((item) => item.type == InboxConversationType.group)
+            .toList();
+      case 'Calls':
+        return base
+            .where((item) => item.type == InboxConversationType.callLog)
+            .toList();
+      case 'Requests':
+        final hub = _strangerHub;
+        return hub == null
+            ? const <InboxConversation>[]
+            : <InboxConversation>[hub];
+      default:
+        final hub = _strangerHub;
+        if (hub != null) base.insert(0, hub);
+        return base;
     }
-    if (_controller.selectedFilter == 'All') {
-      final hub = _strangerHub;
-      if (hub != null) base.insert(0, hub);
-    }
-    return base;
   }
 
   void _closePanelOverlay() {
@@ -591,6 +600,8 @@ class _InboxPageState extends State<InboxPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useSafeArea: false,
+      enableDrag: false,
       builder: (_) => InboxStoryViewerSheet(story: story),
     );
   }
@@ -625,17 +636,13 @@ class _InboxPageState extends State<InboxPage> {
                 slivers: [
                   SliverToBoxAdapter(
                     child: _InstagramInboxHeader(
-                      unreadCount: _controller.unreadCount,
                       lockedCount: _controller.lockedCount,
-                      requestCount: _strangerRequests.length,
                       reportTaskCount: _controller.pendingReportTaskCount,
                       showLockedCoach: _showLockedChatsCoach,
                       onSearchTap: _openSearch,
                       onSettingsTap: _openSettings,
                       onLockedTap: _openLockedVault,
-                      onRequestsTap: _openStrangerRequests,
                       onReportsTap: _openCsReportTasks,
-                      onUnreadTap: () => _controller.selectFilter('Unread'),
                     ),
                   ),
                   SliverToBoxAdapter(
@@ -664,9 +671,9 @@ class _InboxPageState extends State<InboxPage> {
                   ),
                   SliverToBoxAdapter(
                     child: _PremiumFilterRail(
-                      filters: _controller.filters,
-                      selectedFilter: _controller.selectedFilter,
-                      onChanged: _controller.selectFilter,
+                      selectedFilter: _selectedLandingSection,
+                      onChanged: (section) =>
+                          setState(() => _selectedLandingSection = section),
                     ),
                   ),
                   if (_controller.isLoading && visibleConversations.isEmpty)
@@ -734,35 +741,25 @@ class _InboxPageState extends State<InboxPage> {
 
 class _InstagramInboxHeader extends StatelessWidget {
   const _InstagramInboxHeader({
-    required this.unreadCount,
     required this.lockedCount,
-    required this.requestCount,
     required this.reportTaskCount,
     required this.showLockedCoach,
     required this.onSearchTap,
     required this.onSettingsTap,
     required this.onLockedTap,
-    required this.onRequestsTap,
     required this.onReportsTap,
-    required this.onUnreadTap,
   });
 
-  final int unreadCount;
   final int lockedCount;
-  final int requestCount;
   final int reportTaskCount;
   final bool showLockedCoach;
   final VoidCallback onSearchTap;
   final VoidCallback onSettingsTap;
   final VoidCallback onLockedTap;
-  final VoidCallback onRequestsTap;
   final VoidCallback onReportsTap;
-  final VoidCallback onUnreadTap;
 
   @override
   Widget build(BuildContext context) {
-    final hasQuickActions =
-        unreadCount > 0 || requestCount > 0 || reportTaskCount > 0;
     final showVaultHint = showLockedCoach || lockedCount > 0;
     return Container(
       decoration: const BoxDecoration(
@@ -789,7 +786,7 @@ class _InstagramInboxHeader extends StatelessWidget {
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Chats, requests, calls and stories',
+                      'Stories and conversations',
                       style: TextStyle(
                         color: InboxLightPremiumTokens.muted,
                         fontSize: 11.8,
@@ -805,40 +802,15 @@ class _InstagramInboxHeader extends StatelessWidget {
                 onTap: onLockedTap,
                 badge: lockedCount,
               ),
+              if (reportTaskCount > 0)
+                _TopIcon(
+                  icon: Icons.support_agent_rounded,
+                  onTap: onReportsTap,
+                  badge: reportTaskCount,
+                ),
               _TopIcon(icon: Icons.settings_rounded, onTap: onSettingsTap),
             ],
           ),
-          if (hasQuickActions) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (unreadCount > 0) ...[
-                  _InboxPill(
-                    label: '$unreadCount unread',
-                    icon: Icons.mark_chat_unread_rounded,
-                    onTap: onUnreadTap,
-                    gradient: InboxLightPremiumTokens.primaryGradient,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (requestCount > 0) ...[
-                  _InboxPill(
-                    label: '$requestCount requests',
-                    icon: Icons.shield_rounded,
-                    onTap: onRequestsTap,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (reportTaskCount > 0)
-                  _InboxPill(
-                    label: '$reportTaskCount CS',
-                    icon: Icons.support_agent_rounded,
-                    onTap: onReportsTap,
-                    gradient: InboxLightPremiumTokens.aquaGradient,
-                  ),
-              ],
-            ),
-          ],
           if (showVaultHint) ...[
             const SizedBox(height: 9),
             _PullDownHint(
@@ -962,85 +934,26 @@ class _TopIcon extends StatelessWidget {
   );
 }
 
-class _InboxPill extends StatelessWidget {
-  const _InboxPill({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.gradient,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final Gradient? gradient;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = gradient != null;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          color: active ? null : Colors.white.withValues(alpha: 0.90),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: active
-                ? Colors.white.withValues(alpha: 0.5)
-                : InboxLightPremiumTokens.border,
-          ),
-          boxShadow: [
-            InboxLightPremiumTokens.softShadow(active ? 0.075 : 0.04),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: active ? Colors.white : InboxLightPremiumTokens.violet,
-              size: 15,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? Colors.white : InboxLightPremiumTokens.ink,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _PremiumFilterRail extends StatelessWidget {
   const _PremiumFilterRail({
-    required this.filters,
     required this.selectedFilter,
     required this.onChanged,
   });
 
-  final List<String> filters;
   final String selectedFilter;
   final ValueChanged<String> onChanged;
+  static const List<String> _sections = ['All', 'Groups', 'Calls', 'Requests'];
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 52,
+    height: 46,
     child: ListView.separated(
-      padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
       scrollDirection: Axis.horizontal,
-      itemCount: filters.length,
+      itemCount: _sections.length,
       separatorBuilder: (context, index) => const SizedBox(width: 8),
       itemBuilder: (context, index) {
-        final filter = filters[index];
+        final filter = _sections[index];
         final selected = filter == selectedFilter;
         return InkWell(
           onTap: () => onChanged(filter),
@@ -1048,21 +961,20 @@ class _PremiumFilterRail extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 170),
             curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              gradient: selected
-                  ? InboxLightPremiumTokens.primaryGradient
-                  : null,
-              color: selected ? null : Colors.white.withValues(alpha: 0.88),
+              color: selected
+                  ? InboxLightPremiumTokens.ink
+                  : Colors.white.withValues(alpha: 0.88),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
                 color: selected
-                    ? Colors.white.withValues(alpha: 0.45)
+                    ? InboxLightPremiumTokens.ink
                     : InboxLightPremiumTokens.border,
               ),
-              boxShadow: [
-                InboxLightPremiumTokens.softShadow(selected ? 0.08 : 0.035),
-              ],
+              boxShadow: selected
+                  ? [InboxLightPremiumTokens.softShadow(0.07)]
+                  : null,
             ),
             child: Text(
               filter,
