@@ -13,6 +13,11 @@ class SocialEmojiPackSheet extends StatefulWidget {
 }
 
 class _SocialEmojiPackSheetState extends State<SocialEmojiPackSheet> {
+  static const _ink = Color(0xFF111114);
+  static const _muted = Color(0xFF71717A);
+  static const _line = Color(0xFFEDEDEF);
+  static const _blue = Color(0xFF3797F0);
+
   int _selectedCategoryIndex = 0;
 
   static const List<_EmojiCategory> _categories = [
@@ -124,36 +129,38 @@ class _SocialEmojiPackSheetState extends State<SocialEmojiPackSheet> {
     return SafeArea(
       top: false,
       child: Container(
-        height: 330 + bottomPadding,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF7F4EF),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        height: 338 + bottomPadding,
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 28, offset: const Offset(0, 14))],
         ),
         child: Column(
           children: [
-            Container(
+            const SizedBox(height: 10),
+            Container(width: 38, height: 4, decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(999))),
+            const SizedBox(height: 10),
+            SizedBox(
               height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: Color(0xFFECE2D8))),
-              ),
-              child: Row(
-                children: [
-                  for (var index = 0; index < _categories.length; index++)
-                    Expanded(
-                      child: _EmojiCategoryButton(
-                        icon: _categories[index].icon,
-                        selected: index == _selectedCategoryIndex,
-                        onTap: () => setState(() => _selectedCategoryIndex = index),
-                      ),
-                    ),
-                ],
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                scrollDirection: Axis.horizontal,
+                itemCount: _categories.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  return _EmojiCategoryButton(
+                    icon: _categories[index].icon,
+                    selected: index == _selectedCategoryIndex,
+                    onTap: () => setState(() => _selectedCategoryIndex = index),
+                  );
+                },
               ),
             ),
+            const Divider(height: 1, color: _line),
             Expanded(
               child: GridView.builder(
-                padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 physics: const BouncingScrollPhysics(),
                 itemCount: selectedCategory.emojis.length,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -166,12 +173,7 @@ class _SocialEmojiPackSheetState extends State<SocialEmojiPackSheet> {
                   return InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () => widget.onEmojiSelected(emoji),
-                    child: Center(
-                      child: Text(
-                        emoji,
-                        style: const TextStyle(fontSize: 26),
-                      ),
-                    ),
+                    child: Center(child: Text(emoji, style: const TextStyle(fontSize: 25))),
                   );
                 },
               ),
@@ -205,20 +207,18 @@ class _EmojiCategoryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(999),
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+        duration: const Duration(milliseconds: 170),
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF251538) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: selected ? _SocialEmojiPackSheetState._ink : const Color(0xFFF4F4F5),
+          shape: BoxShape.circle,
+          border: Border.all(color: selected ? _SocialEmojiPackSheetState._ink : _SocialEmojiPackSheetState._line),
         ),
-        child: Icon(
-          icon,
-          color: selected ? Colors.white : const Color(0xFF7B6A86),
-          size: 20,
-        ),
+        child: Icon(icon, color: selected ? Colors.white : _SocialEmojiPackSheetState._muted, size: 20),
       ),
     );
   }
