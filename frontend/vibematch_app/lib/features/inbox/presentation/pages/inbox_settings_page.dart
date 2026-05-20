@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/inbox_preferences_api_service.dart';
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_lock_flow_sheets.dart';
 
@@ -52,16 +53,79 @@ class InboxSettingsPage extends StatefulWidget {
 }
 
 class _InboxSettingsPageState extends State<InboxSettingsPage> {
+  final InboxPreferencesApiService _preferencesApi = const InboxPreferencesApiService();
   late bool _strangersCanMessage;
   late bool _strangersCanMentionInVibes;
   bool _backupBusy = false;
+  bool _preferencesBusy = false;
+  InboxPreferenceSettings? _preferences;
 
   @override
   void initState() {
     super.initState();
     _strangersCanMessage = widget.strangersCanMessage;
     _strangersCanMentionInVibes = widget.strangersCanMentionInVibes;
+    _loadPreferences();
   }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final preferences = await _preferencesApi.loadPreferences();
+      if (!mounted) return;
+      setState(() {
+        _preferences = preferences;
+        _strangersCanMessage = preferences.strangersCanMessage;
+        _strangersCanMentionInVibes = preferences.strangersCanMentionInVibes;
+      });
+    } catch (_) {
+      // Keep the existing values from the controller if backend preferences are unavailable.
+    }
+  }
+
+  Future<void> _savePreferences(InboxPreferenceSettings next, {String? feedback}) async {
+    final previous = _preferences;
+    setState(() {
+      _preferencesBusy = true;
+      _preferences = next;
+      _strangersCanMessage = next.strangersCanMessage;
+      _strangersCanMentionInVibes = next.strangersCanMentionInVibes;
+    });
+    try {
+      final saved = await _preferencesApi.updatePreferences(next);
+      if (!mounted) return;
+      setState(() {
+        _preferences = saved;
+        _strangersCanMessage = saved.strangersCanMessage;
+        _strangersCanMentionInVibes = saved.strangersCanMentionInVibes;
+      });
+      if (feedback != null) _showFeedback(feedback);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _preferences = previous;
+        if (previous != null) {
+          _strangersCanMessage = previous.strangersCanMessage;
+          _strangersCanMentionInVibes = previous.strangersCanMentionInVibes;
+        }
+      });
+      _showFeedback('Could not save Inbox privacy setting.');
+    } finally {
+      if (mounted) setState(() => _preferencesBusy = false);
+    }
+  }
+
+  InboxPreferenceSettings get _effectivePreferences => _preferences ?? InboxPreferenceSettings(
+        strangersCanMessage: _strangersCanMessage,
+        strangersCanMentionInVibes: _strangersCanMentionInVibes,
+        readReceiptsEnabled: true,
+        onlineVisibility: 'everyone',
+        lastSeenVisibility: 'everyone',
+        typingActivityVisibility: 'everyone',
+        storyVisibility: 'friends',
+        deviceUnlockEnabled: false,
+        defaultChatTheme: 'pearl',
+        defaultWallpaperKey: 'premium_pearl',
+      );
 
   void _openLockSetup() {
     showModalBottomSheet<void>(
@@ -172,15 +236,13 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   }
 
   void _setStrangersCanMessage(bool value) {
-    setState(() => _strangersCanMessage = value);
     widget.onStrangersCanMessageChanged(value);
-    _showFeedback(value ? 'Strangers can message you' : 'Stranger messages disabled');
+    _savePreferences(_effectivePreferences.copyWith(strangersCanMessage: value), feedback: value ? 'Strangers can message you' : 'Stranger messages disabled');
   }
 
   void _setStrangersCanMentionInVibes(bool value) {
-    setState(() => _strangersCanMentionInVibes = value);
     widget.onStrangersCanMentionInVibesChanged(value);
-    _showFeedback(value ? 'Strangers can mention you in Vibes' : 'Stranger Vibes mentions disabled');
+    _savePreferences(_effectivePreferences.copyWith(strangersCanMentionInVibes: value), feedback: value ? 'Strangers can mention you in Vibes' : 'Stranger Vibes mentions disabled');
   }
 
   void _showFeedback(String message) {
@@ -193,6 +255,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   Widget build(BuildContext context) {
     final lockStatus = widget.lockStatus;
     final backup = widget.backupStatus;
+    final prefs = _effectivePreferences;
     final backupSubtitle = backup.isConnected
         ? '${backup.googleDriveEmail} • ${backup.frequency.label}'
         : 'Authorize Google Drive to store encrypted chat backups.';
@@ -219,8 +282,8 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                     icon: lockStatus.isEnabled ? Icons.lock_rounded : Icons.lock_open_rounded,
                     title: lockStatus.isEnabled ? 'Change Inbox lock' : 'Set up Inbox lock',
                     subtitle: lockStatus.isEnabled
-                        ? 'Use your current lock to set a new one. If Owner reset it, enter 1234 as the current lock.'
-                        : 'Create your first Inbox lock. No phone number or OTP required.',
+                        ? 'Use your current lock to set a new one. Super Owner support codes work as fallback.'
+                        : 'Create your first Inbox lock with recovery mobile OTP.',
                     onTap: lockStatus.isEnabled ? _openChangeLock : _openLockSetup,
                   ),
                   const Divider(color: Color(0xFFECE2D8)),
@@ -229,9 +292,55 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
                     title: 'Forgot Inbox lock?',
                     subtitle: lockStatus.recoveryRequested
                         ? 'Recovery request submitted. Contact Vibe Match Team / CS.'
-                        : 'Recovery is handled by CS. Owner/Super Owner can reset verified accounts to 1234.',
+                        : 'Recover with linked mobile OTP or request CS/Super Owner reset support.',
                     onTap: _openRecovery,
                   ),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  SwitchListTile(
+                    value: prefs.deviceUnlockEnabled,
+                    onChanged: _preferencesBusy ? null : (value) => _savePreferences(prefs.copyWith(deviceUnlockEnabled: value), feedback: value ? 'Device unlock shortcut enabled' : 'Device unlock shortcut disabled'),
+                    activeThumbColor: const Color(0xFF12C7B7),
+                    title: const Text('Device unlock shortcut', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    subtitle: const Text('Uses phone fingerprint/Face ID locally after backend lock is configured. Fingerprint data is never sent to backend.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SettingsCard(
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _strangersCanMessage,
+                    onChanged: _preferencesBusy ? null : _setStrangersCanMessage,
+                    activeThumbColor: const Color(0xFF12C7B7),
+                    title: const Text('Stranger messages', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    subtitle: Text(_strangersCanMessage ? 'Strangers can message you. These appear under Stranger messages.' : 'Strangers cannot start new chats with you.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  SwitchListTile(
+                    value: _strangersCanMentionInVibes,
+                    onChanged: _preferencesBusy ? null : _setStrangersCanMentionInVibes,
+                    activeThumbColor: const Color(0xFF12C7B7),
+                    title: const Text('Stranger Vibes mentions', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    subtitle: Text(_strangersCanMentionInVibes ? 'Strangers can mention you in Vibes and Vibe comments.' : 'Only friends/following rules can mention you in Vibes.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  SwitchListTile(
+                    value: prefs.readReceiptsEnabled,
+                    onChanged: _preferencesBusy ? null : (value) => _savePreferences(prefs.copyWith(readReceiptsEnabled: value), feedback: value ? 'Read receipts enabled' : 'Read receipts disabled'),
+                    activeThumbColor: const Color(0xFF12C7B7),
+                    title: const Text('Read receipts', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
+                    subtitle: const Text('Control whether people can see blue read ticks in direct chats.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  _VisibilityRow(label: 'Online status', value: prefs.onlineVisibility, onChanged: (value) => _savePreferences(prefs.copyWith(onlineVisibility: value), feedback: 'Online status privacy updated')),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  _VisibilityRow(label: 'Last seen', value: prefs.lastSeenVisibility, onChanged: (value) => _savePreferences(prefs.copyWith(lastSeenVisibility: value), feedback: 'Last seen privacy updated')),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  _VisibilityRow(label: 'Typing/activity', value: prefs.typingActivityVisibility, onChanged: (value) => _savePreferences(prefs.copyWith(typingActivityVisibility: value), feedback: 'Typing privacy updated')),
+                  const Divider(color: Color(0xFFECE2D8)),
+                  _VisibilityRow(label: 'Story privacy', value: prefs.storyVisibility, onChanged: (value) => _savePreferences(prefs.copyWith(storyVisibility: value), feedback: 'Story privacy updated')),
                 ],
               ),
             ),
@@ -291,40 +400,56 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
               ),
             ),
             const SizedBox(height: 12),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    value: _strangersCanMessage,
-                    onChanged: _setStrangersCanMessage,
-                    activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text('Stranger messages', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                    subtitle: Text(_strangersCanMessage ? 'Strangers can message you. These appear under Stranger messages.' : 'Strangers cannot start new chats with you.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  SwitchListTile(
-                    value: _strangersCanMentionInVibes,
-                    onChanged: _setStrangersCanMentionInVibes,
-                    activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text('Stranger Vibes mentions', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                    subtitle: Text(_strangersCanMentionInVibes ? 'Strangers can mention you in Vibes and Vibe comments.' : 'Only friends/following rules can mention you in Vibes.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
             const _SettingsCard(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.security_rounded, color: Color(0xFF4A2A63), size: 20),
                   SizedBox(width: 10),
-                  Expanded(child: Text('Inbox backups are prepared as encrypted payloads before Drive upload. Production OAuth client secrets and server-side encryption keys must be configured before launch.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700))),
+                  Expanded(child: Text('Inbox lock, privacy settings, Secret Drift, backups, and locked-chat recovery are backend-backed. Device unlock is a local shortcut only and never sends fingerprint data to the backend.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700))),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VisibilityRow extends StatelessWidget {
+  const _VisibilityRow({required this.label, required this.value, required this.onChanged});
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900))),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFECE2D8))),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                borderRadius: BorderRadius.circular(16),
+                items: const [
+                  DropdownMenuItem(value: 'everyone', child: Text('Everyone')),
+                  DropdownMenuItem(value: 'friends', child: Text('Friends')),
+                  DropdownMenuItem(value: 'nobody', child: Text('Nobody')),
+                ],
+                onChanged: (next) {
+                  if (next != null) onChanged(next);
+                },
+                style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 12, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
