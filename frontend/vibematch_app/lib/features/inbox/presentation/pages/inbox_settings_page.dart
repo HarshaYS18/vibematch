@@ -496,8 +496,8 @@ class _SettingRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: Opacity(
         opacity: onTap == null ? 0.45 : 1,
-        child: SizedBox(
-          minHeight: 58,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 58),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
             child: Row(
@@ -530,8 +530,8 @@ class _SwitchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      minHeight: 58,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 58),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
         child: Row(
@@ -582,8 +582,8 @@ class _ChoiceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      minHeight: 54,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 54),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
         child: Row(
@@ -620,8 +620,8 @@ class _FrequencyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      minHeight: 58,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 58),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(13, 8, 13, 8),
         child: Row(
