@@ -19,10 +19,10 @@ class InboxMessageMediaContent extends StatelessWidget {
       _ => Text(
           message.text,
           style: TextStyle(
-            color: mine ? Colors.white : const Color(0xFF251538),
+            color: mine ? Colors.white : const Color(0xFF111114),
             fontSize: 13.2,
             height: 1.32,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
     };
@@ -103,8 +103,8 @@ class _InboxFileMedia extends StatelessWidget {
       return _ExpiredMediaCard(message: message, mine: mine, icon: icon);
     }
     final subtitle = message.mediaExpired
-        ? (hasLocalCopy ? 'Saved on this device' : 'Server copy expired')
-        : (hasLocalCopy ? 'Local copy available' : 'Tap to open');
+        ? (hasLocalCopy ? 'Saved on this device' : 'Needs fresh access')
+        : (hasLocalCopy ? 'Saved on this device' : 'Tap to open');
     final canOpen = hasLocalCopy || hasRemoteCopy;
     return InkWell(
       onTap: canOpen ? () => _confirmAndOpenAttachment(context, message, title) : null,
@@ -113,9 +113,9 @@ class _InboxFileMedia extends StatelessWidget {
         width: 252,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF8F5FF),
+          color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF7F7F8),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFE9DDF5)),
+          border: Border.all(color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFEDEDEF)),
         ),
         child: Row(
           children: [
@@ -123,23 +123,23 @@ class _InboxFileMedia extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF3797F0).withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: mine ? Colors.white : const Color(0xFF7C3AED), size: 22),
+              child: Icon(icon, color: mine ? Colors.white : const Color(0xFF3797F0), size: 22),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white : const Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900)),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white : const Color(0xFF111114), fontSize: 12.5, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 3),
-                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF71717A), fontSize: 10.5, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
-            Icon(canOpen ? Icons.open_in_new_rounded : Icons.chevron_right_rounded, color: mine ? Colors.white70 : const Color(0xFF9B8CA5), size: 18),
+            Icon(canOpen ? Icons.open_in_new_rounded : Icons.chevron_right_rounded, color: mine ? Colors.white70 : const Color(0xFF71717A), size: 18),
           ],
         ),
       ),
@@ -202,7 +202,7 @@ class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
     final playing = active && state.isPlaying;
     final loading = active && state.isLoading;
     final subtitle = widget.message.mediaExpired
-        ? (widget.message.hasLocalAttachmentPath ? 'Saved on this device' : 'Server copy expired')
+        ? (widget.message.hasLocalAttachmentPath ? 'Saved on this device' : 'Needs fresh access')
         : (playing ? 'Playing voice message' : 'Tap to play');
     return InkWell(
       onTap: _toggle,
@@ -211,9 +211,9 @@ class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
         width: 252,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: widget.mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF8F5FF),
+          color: widget.mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF7F7F8),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: widget.mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFE9DDF5)),
+          border: Border.all(color: widget.mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFEDEDEF)),
         ),
         child: Row(
           children: [
@@ -221,32 +221,32 @@ class _InboxVoiceMediaState extends State<_InboxVoiceMedia> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: playing ? const Color(0xFF12C7B7) : (widget.mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF7C3AED).withValues(alpha: 0.12)),
+                color: playing ? const Color(0xFF22C55E) : (widget.mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFF3797F0).withValues(alpha: 0.10)),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: loading
                   ? Padding(
                       padding: const EdgeInsets.all(11),
-                      child: CircularProgressIndicator(strokeWidth: 2.3, color: widget.mine ? Colors.white : const Color(0xFF7C3AED)),
+                      child: CircularProgressIndicator(strokeWidth: 2.3, color: widget.mine ? Colors.white : const Color(0xFF3797F0)),
                     )
-                  : Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing || widget.mine ? Colors.white : const Color(0xFF7C3AED), size: 24),
+                  : Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing || widget.mine ? Colors.white : const Color(0xFF3797F0), size: 24),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: widget.mine ? Colors.white : const Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900)),
+                  Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: widget.mine ? Colors.white : const Color(0xFF111114), fontSize: 12.5, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       Expanded(child: _VoiceWaveform(active: playing, mine: widget.mine)),
                       const SizedBox(width: 8),
-                      Text(_durationFromTitle(widget.title), style: TextStyle(color: widget.mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w900)),
+                      Text(_durationFromTitle(widget.title), style: TextStyle(color: widget.mine ? Colors.white70 : const Color(0xFF71717A), fontSize: 10.5, fontWeight: FontWeight.w700)),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: widget.mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: widget.mine ? Colors.white70 : const Color(0xFF71717A), fontSize: 10.5, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -265,7 +265,7 @@ class _VoiceWaveform extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF12C7B7) : (mine ? Colors.white70 : const Color(0xFF9B8CA5));
+    final color = active ? const Color(0xFF22C55E) : (mine ? Colors.white70 : const Color(0xFFA1A1AA));
     const heights = [8.0, 13.0, 18.0, 11.0, 15.0, 9.0, 17.0, 12.0, 20.0, 10.0, 14.0, 8.0];
     return Row(
       children: heights
@@ -299,25 +299,25 @@ class _ExpiredMediaCard extends StatelessWidget {
       width: 252,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFFFF1F2),
+        color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF7F7F8),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFFECACA)),
+        border: Border.all(color: mine ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFEDEDEF)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: mine ? Colors.white : const Color(0xFFE84C72), size: 24),
+          Icon(icon, color: mine ? Colors.white : const Color(0xFF71717A), size: 24),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Media expired', style: TextStyle(color: mine ? Colors.white : const Color(0xFF7F1D1D), fontSize: 12.5, fontWeight: FontWeight.w900)),
+                Text('Media unavailable', style: TextStyle(color: mine ? Colors.white : const Color(0xFF111114), fontSize: 12.5, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 3),
                 Text(
-                  localAllowed ? 'Server copy was removed. It will show if saved on this device.' : 'This media is no longer available.',
+                  localAllowed ? 'It may still open if saved on this device.' : 'This media is no longer available.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF991B1B), fontSize: 10.5, fontWeight: FontWeight.w800, height: 1.2),
+                  style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF71717A), fontSize: 10.5, fontWeight: FontWeight.w600, height: 1.2),
                 ),
               ],
             ),
@@ -346,7 +346,7 @@ class _LocalFirstBadge extends StatelessWidget {
         children: [
           Icon(localAvailable ? Icons.phone_android_rounded : Icons.schedule_rounded, color: Colors.white, size: 12),
           const SizedBox(width: 4),
-          Text(localAvailable ? 'On device' : 'Server expired', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+          Text(localAvailable ? 'On device' : 'Needs access', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
         ],
       ),
     );
@@ -363,74 +363,79 @@ class _OpenAttachmentSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isZip = title.toLowerCase().endsWith('.zip') || target.toLowerCase().contains('.zip');
-    final isExpiredServerCopy = message.mediaExpired && !message.hasLocalAttachmentPath;
+    final isExpiredCopy = message.mediaExpired && !message.hasLocalAttachmentPath;
     final warning = isZip
-        ? 'ZIP files can contain risky files. Open only if you trust the sender.'
-        : isExpiredServerCopy
-            ? 'The server copy may already be expired. This will open only if your device or browser can still access it.'
+        ? 'ZIP files can include many file types. Open only if you trust the sender.'
+        : isExpiredCopy
+            ? 'This file may need fresh access before it opens.'
             : 'Open files only from people you trust.';
-    return Container(
-      margin: const EdgeInsets.all(14),
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(color: const Color(0xFF7C3AED).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)),
-                child: Icon(isZip ? Icons.folder_zip_rounded : Icons.description_rounded, color: const Color(0xFF7C3AED)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Open attachment?', style: TextStyle(color: Color(0xFF251538), fontSize: 16, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 3),
-                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w800)),
-                  ],
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.all(8),
+        padding: EdgeInsets.fromLTRB(16, 10, 16, 14 + MediaQuery.paddingOf(context).bottom),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 28, offset: const Offset(0, 14))]),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(999)))),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(color: const Color(0xFF3797F0).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(16)),
+                  child: Icon(isZip ? Icons.folder_zip_rounded : Icons.description_rounded, color: const Color(0xFF3797F0)),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isZip ? const Color(0xFFFFF7ED) : const Color(0xFFF8F5FF),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: isZip ? const Color(0xFFFED7AA) : const Color(0xFFE9DDF5)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Open attachment?', style: TextStyle(color: Color(0xFF111114), fontSize: 16, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 3),
+                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF71717A), fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            child: Text(warning, style: TextStyle(color: isZip ? const Color(0xFF9A3412) : const Color(0xFF251538), fontSize: 12, fontWeight: FontWeight.w800, height: 1.25)),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), side: const BorderSide(color: Color(0xFFE9DDF5))),
-                  child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w900)),
-                ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isZip ? const Color(0xFFFFF7ED) : const Color(0xFFF7F7F8),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isZip ? const Color(0xFFFED7AA) : const Color(0xFFEDEDEF)),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF251538), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 17),
-                  label: const Text('Open', style: TextStyle(fontWeight: FontWeight.w900)),
+              child: Text(warning, style: TextStyle(color: isZip ? const Color(0xFF9A3412) : const Color(0xFF111114), fontSize: 12, fontWeight: FontWeight.w600, height: 1.25)),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), side: const BorderSide(color: Color(0xFFEDEDEF))),
+                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF3797F0), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 17),
+                    label: const Text('Open', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -467,7 +472,7 @@ Future<void> _confirmAndOpenAttachment(BuildContext context, InboxMessage messag
 
   final uri = _attachmentUri(target);
   if (uri == null) {
-    _showOpenSnack(context, 'This attachment path cannot be opened yet.');
+    _showOpenSnack(context, 'This attachment cannot be opened yet.');
     return;
   }
 
@@ -516,8 +521,8 @@ void _showOpenSnack(BuildContext context, String message) {
     ..showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF251538),
-        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+        backgroundColor: const Color(0xFF111114),
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
     );
 }
