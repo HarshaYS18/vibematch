@@ -48,14 +48,19 @@ class InboxCallSession {
 
   bool get isVideo => type == InboxCallType.video;
   bool get isIncoming => direction == InboxCallDirection.incoming;
+  bool get isOutgoing => direction == InboxCallDirection.outgoing;
   bool get isRinging => status == InboxCallStatus.ringing;
+  bool get isConnected => status == InboxCallStatus.accepted;
   bool get isMissed => status == InboxCallStatus.missed;
+  bool get isTerminal => status == InboxCallStatus.declined || status == InboxCallStatus.missed || status == InboxCallStatus.ended || status == InboxCallStatus.failed;
 
   String get title {
     if (isIncoming && isRinging) return isVideo ? 'Incoming video call' : 'Incoming voice call';
-    if (!isIncoming && isRinging) return isVideo ? 'Calling video...' : 'Calling...';
+    if (isOutgoing && isRinging) return isVideo ? 'Calling video...' : 'Calling...';
     return isVideo ? 'Video call' : 'Voice call';
   }
+
+  String get iconLabel => isVideo ? 'Video' : 'Voice';
 
   String get statusLabel {
     return switch (status) {
@@ -121,6 +126,9 @@ class InboxCallSummaryMessage {
   final String label;
   final DateTime createdAt;
   final Duration? duration;
+
+  bool get isIncoming => direction == InboxCallDirection.incoming;
+  bool get isVideo => type == InboxCallType.video;
 
   Map<String, Object?> toMetadataJson() {
     return <String, Object?>{
