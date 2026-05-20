@@ -20,6 +20,12 @@ class InboxSearchPage extends StatefulWidget {
 }
 
 class _InboxSearchPageState extends State<InboxSearchPage> {
+  static const _bg = Color(0xFFFAFAFA);
+  static const _ink = Color(0xFF111114);
+  static const _muted = Color(0xFF71717A);
+  static const _line = Color(0xFFEDEDEF);
+  static const _blue = Color(0xFF3797F0);
+
   final TextEditingController _searchController = TextEditingController();
   List<InboxSearchResult> _results = const [];
 
@@ -46,7 +52,7 @@ class _InboxSearchPageState extends State<InboxSearchPage> {
     final messageResults = _results.where((item) => item.matchType == InboxSearchMatchType.message).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F1),
+      backgroundColor: _bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -57,33 +63,22 @@ class _InboxSearchPageState extends State<InboxSearchPage> {
               onClearTap: _clearSearch,
             ),
             Expanded(
-              child: query.isEmpty
-                  ? const _SearchEmptyHint()
-                  : _results.isEmpty
-                      ? _NoSearchResults(query: query)
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          children: [
-                            _ResultSection(
-                              title: 'Chats',
-                              results: chatResults,
-                              query: query,
-                              onOpenConversation: widget.onOpenConversation,
-                            ),
-                            _ResultSection(
-                              title: 'Friends',
-                              results: friendResults,
-                              query: query,
-                              onOpenConversation: widget.onOpenConversation,
-                            ),
-                            _ResultSection(
-                              title: 'Messages',
-                              results: messageResults,
-                              query: query,
-                              onOpenConversation: widget.onOpenConversation,
-                            ),
-                          ],
-                        ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: query.isEmpty
+                    ? const _SearchEmptyHint()
+                    : _results.isEmpty
+                        ? _NoSearchResults(query: query)
+                        : ListView(
+                            key: ValueKey(query),
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                            children: [
+                              _ResultSection(title: 'Chats', results: chatResults, query: query, onOpenConversation: widget.onOpenConversation),
+                              _ResultSection(title: 'Friends', results: friendResults, query: query, onOpenConversation: widget.onOpenConversation),
+                              _ResultSection(title: 'Messages', results: messageResults, query: query, onOpenConversation: widget.onOpenConversation),
+                            ],
+                          ),
+              ),
             ),
           ],
         ),
@@ -108,47 +103,32 @@ class _SearchHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 10, 14, 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFAF7F1),
-        border: Border(bottom: BorderSide(color: Color(0xFFECE2D8))),
-      ),
+      padding: const EdgeInsets.fromLTRB(8, 8, 14, 10),
+      decoration: const BoxDecoration(color: _InboxSearchPageState._bg, border: Border(bottom: BorderSide(color: _InboxSearchPageState._line))),
       child: Row(
         children: [
           IconButton(
+            visualDensity: VisualDensity.compact,
             onPressed: onBackTap,
-            icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF251538)),
+            icon: const Icon(Icons.arrow_back_rounded, color: _InboxSearchPageState._ink, size: 22),
           ),
           Expanded(
             child: TextField(
               controller: controller,
               autofocus: true,
               onChanged: onChanged,
-              style: const TextStyle(
-                color: Color(0xFF251538),
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
+              style: const TextStyle(color: _InboxSearchPageState._ink, fontSize: 15, fontWeight: FontWeight.w600),
               decoration: InputDecoration(
-                hintText: 'Search chats or messages',
-                hintStyle: const TextStyle(
-                  color: Color(0xFF9B8CA5),
-                  fontWeight: FontWeight.w700,
-                ),
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF7B6A86), size: 20),
+                hintText: 'Search',
+                hintStyle: const TextStyle(color: _InboxSearchPageState._muted, fontWeight: FontWeight.w500),
+                prefixIcon: const Icon(Icons.search_rounded, color: _InboxSearchPageState._muted, size: 20),
                 suffixIcon: controller.text.isEmpty
                     ? null
-                    : IconButton(
-                        onPressed: onClearTap,
-                        icon: const Icon(Icons.close_rounded, color: Color(0xFF7B6A86), size: 20),
-                      ),
+                    : IconButton(onPressed: onClearTap, icon: const Icon(Icons.close_rounded, color: _InboxSearchPageState._muted, size: 20)),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: const Color(0xFFF1F1F3),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
               ),
             ),
           ),
@@ -159,12 +139,7 @@ class _SearchHeader extends StatelessWidget {
 }
 
 class _ResultSection extends StatelessWidget {
-  const _ResultSection({
-    required this.title,
-    required this.results,
-    required this.query,
-    required this.onOpenConversation,
-  });
+  const _ResultSection({required this.title, required this.results, required this.query, required this.onOpenConversation});
 
   final String title;
   final List<InboxSearchResult> results;
@@ -182,20 +157,17 @@ class _ResultSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(2, 8, 2, 7),
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: Color(0xFF7B6A86),
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+            child: Text(title, style: const TextStyle(color: _InboxSearchPageState._muted, fontSize: 12, fontWeight: FontWeight.w700)),
           ),
-          ...results.map(
-            (result) => _SearchResultTile(
-              result: result,
-              query: query,
-              onTap: () => onOpenConversation(result.conversation),
+          DecoratedBox(
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _InboxSearchPageState._line)),
+            child: Column(
+              children: [
+                for (var index = 0; index < results.length; index++) ...[
+                  _SearchResultTile(result: results[index], query: query, onTap: () => onOpenConversation(results[index].conversation)),
+                  if (index != results.length - 1) const Divider(height: 1, color: _InboxSearchPageState._line, indent: 64),
+                ],
+              ],
             ),
           ),
         ],
@@ -205,11 +177,7 @@ class _ResultSection extends StatelessWidget {
 }
 
 class _SearchResultTile extends StatelessWidget {
-  const _SearchResultTile({
-    required this.result,
-    required this.query,
-    required this.onTap,
-  });
+  const _SearchResultTile({required this.result, required this.query, required this.onTap});
 
   final InboxSearchResult result;
   final String query;
@@ -218,27 +186,17 @@ class _SearchResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final conversation = result.conversation;
-
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: conversation.colors),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: Text(
-                  conversation.avatarText,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                ),
-              ),
+            CircleAvatar(
+              radius: 21,
+              backgroundColor: const Color(0xFFF1F1F3),
+              child: Text(conversation.avatarText, style: const TextStyle(color: _InboxSearchPageState._ink, fontSize: 12, fontWeight: FontWeight.w800)),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -247,42 +205,19 @@ class _SearchResultTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: Text(
-                          result.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF251538),
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        result.message?.time ?? conversation.time,
-                        style: const TextStyle(
-                          color: Color(0xFF9B8CA5),
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      Expanded(child: Text(result.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _InboxSearchPageState._ink, fontSize: 13.8, fontWeight: FontWeight.w700))),
+                      Text(result.message?.time ?? conversation.time, style: const TextStyle(color: _InboxSearchPageState._muted, fontSize: 10.5, fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   _HighlightedPreview(text: result.preview, query: query),
                   const SizedBox(height: 3),
-                  Text(
-                    result.matchType.label,
-                    style: const TextStyle(
-                      color: Color(0xFF8C8198),
-                      fontSize: 10.4,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  Text(result.matchType.label, style: const TextStyle(color: _InboxSearchPageState._muted, fontSize: 10.4, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded, color: _InboxSearchPageState._muted, size: 20),
           ],
         ),
       ),
@@ -303,16 +238,7 @@ class _HighlightedPreview extends StatelessWidget {
     final index = lowerText.indexOf(lowerQuery);
 
     if (index < 0 || query.isEmpty) {
-      return Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Color(0xFF7A6B86),
-          fontSize: 11.8,
-          fontWeight: FontWeight.w700,
-        ),
-      );
+      return Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _InboxSearchPageState._muted, fontSize: 12, fontWeight: FontWeight.w500));
     }
 
     final before = text.substring(0, index);
@@ -323,20 +249,10 @@ class _HighlightedPreview extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       text: TextSpan(
-        style: const TextStyle(
-          color: Color(0xFF7A6B86),
-          fontSize: 11.8,
-          fontWeight: FontWeight.w700,
-        ),
+        style: const TextStyle(color: _InboxSearchPageState._muted, fontSize: 12, fontWeight: FontWeight.w500),
         children: [
           TextSpan(text: before),
-          TextSpan(
-            text: match,
-            style: const TextStyle(
-              color: Color(0xFF251538),
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          TextSpan(text: match, style: const TextStyle(color: _InboxSearchPageState._blue, fontWeight: FontWeight.w800)),
           TextSpan(text: after),
         ],
       ),
@@ -349,15 +265,16 @@ class _SearchEmptyHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Search chats, friends, and message text',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: Color(0xFF7B6A86),
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-        ),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 72, height: 72, decoration: const BoxDecoration(color: Color(0xFFF1F1F3), shape: BoxShape.circle), child: const Icon(Icons.search_rounded, color: _InboxSearchPageState._muted, size: 30)),
+          const SizedBox(height: 14),
+          const Text('Search Inbox', style: TextStyle(color: _InboxSearchPageState._ink, fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          const Text('Find chats, friends, and messages.', textAlign: TextAlign.center, style: TextStyle(color: _InboxSearchPageState._muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }
@@ -371,14 +288,15 @@ class _NoSearchResults extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text(
-        'No results for “$query”',
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Color(0xFF7B6A86),
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 72, height: 72, decoration: const BoxDecoration(color: Color(0xFFF1F1F3), shape: BoxShape.circle), child: const Icon(Icons.search_off_rounded, color: _InboxSearchPageState._muted, size: 30)),
+          const SizedBox(height: 14),
+          Text('No results for “$query”', textAlign: TextAlign.center, style: const TextStyle(color: _InboxSearchPageState._ink, fontSize: 15, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          const Text('Try a name, message, or keyword.', textAlign: TextAlign.center, style: TextStyle(color: _InboxSearchPageState._muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }
