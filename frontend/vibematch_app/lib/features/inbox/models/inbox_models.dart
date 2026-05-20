@@ -210,6 +210,9 @@ class InboxConversation {
     this.chatStreakCount = 0,
     this.chatStreakActiveToday = false,
     this.secretDriftEnabled = false,
+    this.chatTheme,
+    this.wallpaperKey,
+    this.wallpaperUrl,
   });
 
   final String id;
@@ -238,6 +241,9 @@ class InboxConversation {
   final int chatStreakCount;
   final bool chatStreakActiveToday;
   final bool secretDriftEnabled;
+  final String? chatTheme;
+  final String? wallpaperKey;
+  final String? wallpaperUrl;
 
   bool get isOfficial => type == InboxConversationType.official;
   bool get isStranger => type == InboxConversationType.stranger;
@@ -339,6 +345,10 @@ class InboxConversation {
     int? chatStreakCount,
     bool? chatStreakActiveToday,
     bool? secretDriftEnabled,
+    String? chatTheme,
+    String? wallpaperKey,
+    String? wallpaperUrl,
+    bool clearWallpaperUrl = false,
   }) {
     return InboxConversation(
       id: id,
@@ -367,6 +377,9 @@ class InboxConversation {
       chatStreakCount: chatStreakCount ?? this.chatStreakCount,
       chatStreakActiveToday: chatStreakActiveToday ?? this.chatStreakActiveToday,
       secretDriftEnabled: secretDriftEnabled ?? this.secretDriftEnabled,
+      chatTheme: chatTheme ?? this.chatTheme,
+      wallpaperKey: wallpaperKey ?? this.wallpaperKey,
+      wallpaperUrl: clearWallpaperUrl ? null : wallpaperUrl ?? this.wallpaperUrl,
     );
   }
 }

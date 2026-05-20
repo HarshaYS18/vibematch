@@ -12,6 +12,7 @@ import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_message_media_content.dart';
 import '../widgets/inbox_message_action_sheet_v2.dart';
+import '../widgets/inbox_chat_theme_picker_sheet.dart';
 import '../widgets/social_emoji_pack_sheet.dart';
 import '../widgets/swipe_reply_message.dart';
 
@@ -581,10 +582,20 @@ class _InboxChatPageState extends State<InboxChatPage> {
     };
   }
 
+  InboxChatThemeChoice _resolvedChatTheme(InboxConversation conversation) {
+    final key = conversation.chatTheme ?? widget.controller.defaultChatTheme;
+    final wallpaperKey = conversation.wallpaperKey ?? widget.controller.defaultWallpaperKey;
+    return inboxChatThemeChoices.firstWhere(
+      (choice) => choice.key == key || choice.wallpaperKey == wallpaperKey,
+      orElse: () => inboxChatThemeChoices.first,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversation = _conversation;
     final messages = conversation.messages;
+    final chatTheme = _resolvedChatTheme(conversation);
     return Scaffold(
       backgroundColor: const Color(0xFF12091F),
       body: SafeArea(
@@ -602,11 +613,11 @@ class _InboxChatPageState extends State<InboxChatPage> {
               _SecretDriftBanner(label: conversation.secretDriftLabel),
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFFF8F5FF), Color(0xFFFFF7F2)],
+                    colors: chatTheme.colors,
                   ),
                 ),
                 child: ListView.separated(

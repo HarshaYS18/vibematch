@@ -389,6 +389,9 @@ class InboxApiService {
       chatStreakCount: _intValue(json['chat_streak_count']),
       chatStreakActiveToday: json['chat_streak_active_today'] == true,
       secretDriftEnabled: json['secret_drift_enabled'] == true,
+      chatTheme: _nullableString(json['chat_theme'] ?? json['default_chat_theme']),
+      wallpaperKey: _nullableString(json['wallpaper_key'] ?? json['default_wallpaper_key']),
+      wallpaperUrl: _nullableString(json['wallpaper_url']),
     );
   }
 

@@ -13,6 +13,7 @@ import 'pages/stranger_requests_page.dart';
 import 'widgets/inbox_conversation_card.dart';
 import 'widgets/inbox_lock_flow_sheets.dart';
 import 'widgets/inbox_passcode_sheet.dart';
+import 'widgets/inbox_chat_theme_picker_sheet.dart';
 import 'widgets/report_conversation_sheet.dart';
 
 class InboxPage extends StatefulWidget {
@@ -273,10 +274,34 @@ class _InboxPageState extends State<InboxPage> {
           conversation: conversation,
           onBackTap: _closePanelOverlay,
           onSearchTap: _openSearch,
-          onThemeTap: () => _toast('Chat themes are being connected to Store inventory next.'),
+          onThemeTap: () => _openThemePicker(conversation),
         ),
       );
     });
+  }
+
+  Future<void> _openThemePicker(InboxConversation conversation) async {
+    final latest = _controller.conversationById(conversation.id) ?? conversation;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => InboxChatThemePickerSheet(
+        currentThemeKey: latest.chatTheme ?? _controller.defaultChatTheme,
+        currentWallpaperKey: latest.wallpaperKey ?? _controller.defaultWallpaperKey,
+        onSelected: (choice) async {
+          Navigator.pop(context);
+          await _controller.updateConversationTheme(
+            conversation: latest,
+            chatTheme: choice.key,
+            wallpaperKey: choice.wallpaperKey,
+            wallpaperUrl: choice.wallpaperUrl,
+          );
+          if (!mounted) return;
+          _toast('Theme saved: ${choice.label}');
+        },
+      ),
+    );
   }
 
   void _clearActiveConversationForShell() {
