@@ -55,6 +55,12 @@ class CallSession(Base):
 
     conversation = relationship("InboxConversation")
     started_by = relationship("User", foreign_keys=[started_by_user_id])
+    participants = relationship(
+        "CallParticipant",
+        back_populates="call_session",
+        cascade="all, delete-orphan",
+        order_by="CallParticipant.id",
+    )
 
 
 class CallParticipant(Base):
@@ -70,5 +76,5 @@ class CallParticipant(Base):
     is_muted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_camera_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    call_session = relationship("CallSession")
+    call_session = relationship("CallSession", back_populates="participants")
     user = relationship("User", foreign_keys=[user_id])
