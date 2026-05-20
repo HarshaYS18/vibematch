@@ -20,6 +20,12 @@ class InboxCallActionSheet extends StatefulWidget {
 }
 
 class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
+  static const _ink = Color(0xFF111114);
+  static const _muted = Color(0xFF71717A);
+  static const _line = Color(0xFFEDEDEF);
+  static const _blue = Color(0xFF3797F0);
+  static const _red = Color(0xFFEF4444);
+
   bool _busy = false;
 
   Future<void> _startCall(InboxCallType type) async {
@@ -31,7 +37,7 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
 
     final existingCall = widget.callController.activeCall;
     if (existingCall != null && !existingCall.isTerminal) {
-      _toast('You already have an active call. End it before starting another one.');
+      _toast('End the current call before starting another one.');
       return;
     }
 
@@ -66,8 +72,8 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF251538),
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+          backgroundColor: _ink,
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       );
   }
@@ -79,113 +85,107 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
     final existingCall = widget.callController.activeCall;
     final callInProgress = existingCall != null && !existingCall.isTerminal;
     final disabled = callDisabled || callInProgress;
+    final avatarUrl = widget.conversation.avatarUrl?.trim();
+
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.all(14),
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottom),
+        margin: const EdgeInsets.all(10),
+        padding: EdgeInsets.fromLTRB(18, 10, 18, 16 + bottom),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.18),
-              blurRadius: 30,
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 28,
               offset: const Offset(0, 14),
             ),
           ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0D5CB),
-                  borderRadius: BorderRadius.circular(999),
-                ),
+            Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(99)),
+            ),
+            const SizedBox(height: 18),
+            CircleAvatar(
+              radius: 34,
+              backgroundColor: const Color(0xFFF1F1F3),
+              backgroundImage: avatarUrl == null || avatarUrl.isEmpty ? null : NetworkImage(avatarUrl),
+              child: avatarUrl == null || avatarUrl.isEmpty
+                  ? Text(
+                      widget.conversation.avatarText,
+                      style: const TextStyle(color: _ink, fontSize: 20, fontWeight: FontWeight.w800),
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              widget.conversation.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _ink, fontSize: 18.5, fontWeight: FontWeight.w800, letterSpacing: -0.2),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              callDisabled
+                  ? 'Calls are not available for official chats.'
+                  : callInProgress
+                      ? 'A call is already active.'
+                      : widget.conversation.isOnline
+                          ? 'online'
+                          : widget.conversation.safePresenceText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: disabled ? _red : _muted,
+                fontSize: 12.2,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 22),
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: widget.conversation.colors),
-                  ),
-                  child: Center(
-                    child: Text(
-                      widget.conversation.avatarText,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                    ),
-                  ),
+                _CallActionButton(
+                  icon: Icons.call_rounded,
+                  title: 'Voice',
+                  busy: _busy || disabled,
+                  color: _blue,
+                  onTap: () => _startCall(InboxCallType.audio),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.conversation.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        callDisabled
-                            ? 'Official team chats use support workflows, not direct calls.'
-                            : callInProgress
-                                ? 'A call is already active. End it before starting another one.'
-                                : 'Start a direct Inbox call. Media routing will attach to WebRTC/mediasoup gateway.',
-                        style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
+                const SizedBox(width: 34),
+                _CallActionButton(
+                  icon: Icons.videocam_rounded,
+                  title: 'Video',
+                  busy: _busy || disabled,
+                  color: _ink,
+                  onTap: () => _startCall(InboxCallType.video),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _CallActionButton(
-                    icon: Icons.call_rounded,
-                    title: 'Voice call',
-                    subtitle: callInProgress ? 'Busy' : callDisabled ? 'Unavailable' : 'Audio only',
-                    busy: _busy || disabled,
-                    color: const Color(0xFF12C7B7),
-                    onTap: () => _startCall(InboxCallType.audio),
-                  ),
+            if (disabled) ...[
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1F2),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFFFCDD2)),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _CallActionButton(
-                    icon: Icons.videocam_rounded,
-                    title: 'Video call',
-                    subtitle: callInProgress ? 'Busy' : callDisabled ? 'Unavailable' : 'Camera call',
-                    busy: _busy || disabled,
-                    color: const Color(0xFF8C5CF6),
-                    onTap: () => _startCall(InboxCallType.video),
-                  ),
+                child: Text(
+                  callDisabled ? 'Official team chats use support messages.' : 'End your active call first.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: _red, fontSize: 12, fontWeight: FontWeight.w700),
                 ),
-              ],
-            ),
-            if (callDisabled || callInProgress) ...[
-              const SizedBox(height: 12),
-              Text(
-                callDisabled
-                    ? 'Official team chats cannot be called.'
-                    : 'Active call in progress.',
-                style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11.5, fontWeight: FontWeight.w900),
               ),
             ],
+            const SizedBox(height: 2),
           ],
         ),
       ),
@@ -197,7 +197,6 @@ class _CallActionButton extends StatelessWidget {
   const _CallActionButton({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.busy,
     required this.color,
     required this.onTap,
@@ -205,7 +204,6 @@ class _CallActionButton extends StatelessWidget {
 
   final IconData icon;
   final String title;
-  final String subtitle;
   final bool busy;
   final Color color;
   final VoidCallback onTap;
@@ -214,31 +212,28 @@ class _CallActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: busy ? null : onTap,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(999),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 160),
-        opacity: busy ? 0.62 : 1,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: color.withValues(alpha: 0.28)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                child: Icon(icon, color: Colors.white, size: 22),
+        opacity: busy ? 0.45 : 1,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: color.withValues(alpha: 0.18), blurRadius: 20, offset: const Offset(0, 10)),
+                ],
               ),
-              const SizedBox(height: 10),
-              Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 3),
-              Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 10.8, fontWeight: FontWeight.w700)),
-            ],
-          ),
+              child: Icon(icon, color: Colors.white, size: 25),
+            ),
+            const SizedBox(height: 9),
+            Text(title, style: const TextStyle(color: _InboxCallActionSheetState._ink, fontSize: 12.5, fontWeight: FontWeight.w700)),
+          ],
         ),
       ),
     );
