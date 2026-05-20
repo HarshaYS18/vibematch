@@ -52,6 +52,12 @@ class SuperOwnerLevelAdjustmentRequest(SuperOwnerReasonRequest):
     ruby_total: int | None = Field(default=None, ge=0)
 
 
+class SuperOwnerInboxLockCodeRequest(SuperOwnerReasonRequest):
+    user_identifier: str = Field(..., min_length=1, max_length=64, description="internal user id, public_user_id, or display_custom_id")
+    lock_code: str = Field(..., min_length=4, max_length=12)
+    mode: str = Field(default="reset", pattern="^(setup|reset)$")
+
+
 class SuperOwnerPoolResponse(BaseModel):
     id: int
     owner_user_id: int | None
@@ -73,6 +79,18 @@ class SuperOwnerWalletResponse(BaseModel):
 class SuperOwnerActionResponse(BaseModel):
     message: str
     resource_id: str | None = None
+
+
+class SuperOwnerInboxLockCodeResponse(BaseModel):
+    message: str
+    user_id: int
+    public_user_id: int
+    display_custom_id: int | None = None
+    username: str | None = None
+    display_name: str | None = None
+    lock_enabled: bool
+    recovery_requested: bool
+    mode: str
 
 
 class SuperOwnerVipResponse(BaseModel):
