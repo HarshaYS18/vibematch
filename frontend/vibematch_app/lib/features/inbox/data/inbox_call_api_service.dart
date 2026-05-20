@@ -94,6 +94,17 @@ class InboxCallApiService {
     );
   }
 
+  Future<InboxCallSession> timeoutRingingCall({
+    required InboxCallSession session,
+  }) async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/calls/conversations/${session.conversationId}/${session.id}/missed')),
+      headers: await _headers(),
+    );
+    _throwIfFailed(response, 'timeout inbox call');
+    return session.copyWith(status: InboxCallStatus.missed, endedAt: DateTime.now());
+  }
+
   InboxCallSession callFromRealtimeJson(
     Map<String, dynamic> json, {
     required String peerName,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/inbox_call_api_service.dart';
@@ -9,8 +11,11 @@ class InboxCallController extends ChangeNotifier {
     : _apiService = apiService ?? const InboxCallApiService();
 
   final InboxCallApiService _apiService;
+  static const Duration incomingRingTimeout = Duration(seconds: 45);
+
   InboxCallSession? _activeCall;
   InboxCallSummaryMessage? _lastSummary;
+  Timer? _missedCallTimer;
   bool _busy = false;
   String? _errorMessage;
 
@@ -42,6 +47,7 @@ class InboxCallController extends ChangeNotifier {
       _activeCall = session;
       _lastSummary = null;
       _errorMessage = null;
+      _cancelMissedCallTimer();
       notifyListeners();
       return session;
     } catch (error) {
@@ -61,6 +67,7 @@ class InboxCallController extends ChangeNotifier {
       _activeCall = await _apiService.acceptCall(session: session);
       _lastSummary = null;
       _errorMessage = null;
+      _cancelMissedCallTimer();
       notifyListeners();
     } catch (error) {
       _errorMessage = error.toString();
@@ -82,6 +89,7 @@ class InboxCallController extends ChangeNotifier {
       _lastSummary = _summaryFromSession(ended);
       _activeCall = null;
       _errorMessage = null;
+      _cancelMissedCallTimer();
       notifyListeners();
     } catch (error) {
       _errorMessage = error.toString();
@@ -103,6 +111,7 @@ class InboxCallController extends ChangeNotifier {
       _lastSummary = _summaryFromSession(ended);
       _activeCall = null;
       _errorMessage = null;
+      _cancelMissedCallTimer();
       notifyListeners();
     } catch (error) {
       _errorMessage = error.toString();
@@ -115,6 +124,7 @@ class InboxCallController extends ChangeNotifier {
   void clearCall() {
     _activeCall = null;
     _errorMessage = null;
+    _cancelMissedCallTimer();
     notifyListeners();
   }
 
@@ -146,6 +156,7 @@ class InboxCallController extends ChangeNotifier {
         );
         _lastSummary = null;
         _errorMessage = null;
+        _scheduleMissedCallTimer(_activeCall);
         notifyListeners();
         break;
       case 'inbox_call_accepted':
@@ -157,6 +168,7 @@ class InboxCallController extends ChangeNotifier {
         );
         _lastSummary = null;
         _errorMessage = null;
+        _cancelMissedCallTimer();
         notifyListeners();
         break;
       case 'inbox_call_declined':
@@ -171,6 +183,7 @@ class InboxCallController extends ChangeNotifier {
         _lastSummary = _summaryFromSession(session);
         _activeCall = null;
         _errorMessage = null;
+        _cancelMissedCallTimer();
         notifyListeners();
         break;
       default:
@@ -204,6 +217,40 @@ class InboxCallController extends ChangeNotifier {
       createdAt: DateTime.now(),
       duration: session.duration,
     );
+  }
+
+  void _scheduleMissedCallTimer(InboxCallSession? session) {
+    _cancelMissedCallTimer();
+    if (session == null || !session.isIncoming || !session.isRinging) return;
+
+    _missedCallTimer = Timer(incomingRingTimeout, () async {
+      final current = _activeCall;
+      if (current == null || current.id != session.id || !current.isIncoming || !current.isRinging) {
+        return;
+      }
+      try {
+        final ended = await _apiService.timeoutRingingCall(session: current);
+        _lastSummary = _summaryFromSession(ended);
+      } catch (error) {
+        _errorMessage = error.toString();
+        _lastSummary = summaryFromActiveCall(status: InboxCallStatus.missed);
+      } finally {
+        _activeCall = null;
+        _cancelMissedCallTimer();
+        notifyListeners();
+      }
+    });
+  }
+
+  void _cancelMissedCallTimer() {
+    _missedCallTimer?.cancel();
+    _missedCallTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _cancelMissedCallTimer();
+    super.dispose();
   }
 
   void _setBusy(bool value) {
