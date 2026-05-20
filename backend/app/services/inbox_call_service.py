@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -10,9 +10,11 @@ from app.models.call_session import (
     CallSessionStatus,
     CallSessionType,
 )
-from app.models.inbox import InboxConversation, InboxMessage, InboxMessageStatus, InboxMessageType
+from app.models.inbox import InboxConversation, InboxConversationType, InboxMessage, InboxMessageStatus, InboxMessageType
 from app.models.user import User
 from app.services import inbox_service
+
+RING_TIMEOUT_SECONDS = 45
 
 
 def _public_id() -> str:
@@ -83,7 +85,54 @@ def call_to_dict(call: CallSession) -> dict:
     }
 
 
+def expire_stale_ringing_calls(db: Session, conversation: InboxConversation) -> list[InboxMessage]:
+    cutoff = _now() - timedelta(seconds=RING_TIMEOUT_SECONDS)
+    stale_calls = (
+        db.query(CallSession)
+        .filter(
+            CallSession.conversation_id == conversation.id,
+            CallSession.status == CallSessionStatus.RINGING,
+            CallSession.started_at <= cutoff,
+        )
+        .all()
+    )
+    summaries: list[InboxMessage] = []
+    for call in stale_calls:
+        ended = _now()
+        call.status = CallSessionStatus.MISSED
+        call.ended_at = ended
+        call.end_reason = "timeout"
+        for participant in db.query(CallParticipant).filter(CallParticipant.call_session_id == call.id).all():
+            if participant.status == CallParticipantStatus.RINGING:
+                participant.status = CallParticipantStatus.MISSED
+            elif participant.status == CallParticipantStatus.JOINED:
+                participant.status = CallParticipantStatus.LEFT
+            participant.left_at = participant.left_at or ended
+            db.add(participant)
+        db.add(call)
+        db.commit()
+        db.refresh(call)
+        actor = db.query(User).filter(User.id == call.started_by_user_id).first()
+        if actor is not None:
+            summaries.append(create_call_summary_message(db, call, actor, status="missed"))
+    return summaries
+
+
+def _validate_start_allowed(conversation: InboxConversation, caller: User) -> None:
+    if conversation.is_official:
+        raise ValueError("Calls are not available for official team chats.")
+    if conversation.is_blocked:
+        raise ValueError("Calls are not available for blocked chats.")
+    if conversation.conversation_type == InboxConversationType.STRANGER.value:
+        raise ValueError("Calls are available only after users become friends.")
+    if caller.is_banned or not caller.is_active:
+        raise ValueError("Your account cannot start calls right now.")
+
+
 def start_call(db: Session, conversation: InboxConversation, caller: User, call_type: str) -> CallSession:
+    _validate_start_allowed(conversation, caller)
+    expire_stale_ringing_calls(db, conversation)
+
     existing = (
         db.query(CallSession)
         .filter(
@@ -126,6 +175,7 @@ def start_call(db: Session, conversation: InboxConversation, caller: User, call_
 
 
 def get_call_for_conversation(db: Session, conversation: InboxConversation, call_public_id: str) -> CallSession | None:
+    expire_stale_ringing_calls(db, conversation)
     return db.query(CallSession).filter(CallSession.call_public_id == call_public_id, CallSession.conversation_id == conversation.id).first()
 
 
