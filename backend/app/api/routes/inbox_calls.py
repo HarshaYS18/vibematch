@@ -21,12 +21,17 @@ def _response(call) -> InboxCallResponse:
 
 
 async def _broadcast_call(conversation, call, event: str) -> None:
-    payload = {
-        "event": event,
-        "conversation_id": conversation.public_id,
-        "call": inbox_call_service.call_to_dict(call),
-    }
-    await inbox_ws_manager.broadcast_to_users(inbox_service.participant_user_ids(conversation), payload)
+    call_payload = inbox_call_service.call_to_dict(call)
+    for participant in conversation.participants:
+        await inbox_ws_manager.send_to_user(
+            participant.user_id,
+            {
+                "event": event,
+                "conversation_id": conversation.public_id,
+                "from_self": participant.user_id == call.started_by_user_id,
+                "call": call_payload,
+            },
+        )
 
 
 async def _broadcast_summary(conversation, message) -> None:
