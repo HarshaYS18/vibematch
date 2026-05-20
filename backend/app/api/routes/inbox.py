@@ -106,8 +106,6 @@ async def _broadcast_message_updates(conversation: InboxConversation, messages) 
         await _broadcast_message(conversation, message, event="inbox_message_updated")
 
 
-
-
 async def _broadcast_report_task(report: InboxReport) -> None:
     payload = inbox_service.report_to_dict(report)
     await inbox_ws_manager.broadcast_all_staff({"event": "inbox_report_task_updated", "task": payload})
@@ -173,16 +171,17 @@ def get_lock_status(db: Session = Depends(get_db), current_user: User = Depends(
 
 @router.post("/lock/setup/start", response_model=InboxLockDebugOtpResponse)
 def start_lock_setup(request: InboxLockStartSetupRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if request.lock_code:
-        inbox_lock_service.setup_lock(db, current_user, request.lock_code)
-        return InboxLockDebugOtpResponse(status="lock_enabled", expires_in_minutes=0, debug_otp=None)
-    return InboxLockDebugOtpResponse(status="ready_to_set_lock", expires_in_minutes=0, debug_otp=None)
+    try:
+        otp = inbox_lock_service.start_setup(db, current_user, request.mobile_number)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return InboxLockDebugOtpResponse(status="otp_sent", expires_in_minutes=inbox_lock_service.OTP_EXPIRE_MINUTES, debug_otp=otp)
 
 
 @router.post("/lock/setup/verify", response_model=InboxLockStatusResponse)
 def verify_lock_setup(request: InboxLockVerifySetupRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        inbox_lock_service.setup_lock(db, current_user, request.lock_code)
+        inbox_lock_service.verify_setup(db, current_user, request.mobile_number, request.otp, request.lock_code)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return InboxLockStatusResponse(**inbox_lock_service.get_status(db, current_user))
@@ -206,19 +205,26 @@ def change_lock(request: InboxLockChangeRequest, db: Session = Depends(get_db), 
 
 @router.post("/lock/recovery/start", response_model=InboxLockDebugOtpResponse)
 def start_lock_recovery(request: InboxLockRecoveryStartRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    inbox_lock_service.request_cs_recovery(db, current_user)
-    return InboxLockDebugOtpResponse(status="contact_cs", expires_in_minutes=0, debug_otp=None)
+    try:
+        otp = inbox_lock_service.start_recovery(db, current_user, request.mobile_number)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return InboxLockDebugOtpResponse(status="recovery_otp_sent", expires_in_minutes=inbox_lock_service.OTP_EXPIRE_MINUTES, debug_otp=otp)
 
 
 @router.post("/lock/recovery/verify", response_model=InboxLockStatusResponse)
 def verify_lock_recovery(request: InboxLockRecoveryVerifyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    raise HTTPException(status_code=400, detail="Inbox lock recovery is handled by CS. Please contact Vibe Match Team / CS.")
+    try:
+        inbox_lock_service.recover_lock(db, current_user, request.mobile_number, request.otp, request.new_lock_code)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return InboxLockStatusResponse(**inbox_lock_service.get_status(db, current_user))
 
 
 @router.post("/lock/recovery/request-cs", response_model=InboxLockRecoveryRequestResponse)
 def request_cs_recovery(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     inbox_lock_service.request_cs_recovery(db, current_user)
-    return InboxLockRecoveryRequestResponse(status="submitted", message="For Inbox lock recovery, please contact Vibe Match Team / CS. CS can verify identity and escalate reset if needed.")
+    return InboxLockRecoveryRequestResponse(status="submitted", message="Recovery request submitted. Vibe Match Team / CS can verify identity and escalate owner reset if OTP recovery is unavailable.")
 
 
 @router.post("/lock/owner-reset/{target_user_id}", response_model=InboxLockStatusResponse)
@@ -242,64 +248,27 @@ def owner_reset_lock_by_visible_id(request: InboxLockOwnerResetByIdentifierReque
 
 
 @router.get("/conversations", response_model=InboxConversationListResponse)
-async def list_my_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    conversations = inbox_service.list_conversations(db, current_user)
-    delivered_by_conversation: dict[int, list] = {}
-    for conversation in conversations:
-        delivered = inbox_service.mark_messages_delivered_for_user(db, conversation, current_user)
-        if delivered:
-            delivered_by_conversation[conversation.id] = delivered
-    for conversation in conversations:
-        await _broadcast_message_updates(conversation, delivered_by_conversation.get(conversation.id, []))
-    return InboxConversationListResponse(conversations=[InboxConversationResponse(**_conversation_payload(item, current_user)) for item in conversations])
-
-
-@router.post("/conversations/direct", response_model=InboxConversationResponse)
-async def create_direct_conversation(request: InboxDirectConversationRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if request.target_user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot create a direct chat with yourself.")
-    target_user = db.query(User).filter(User.id == request.target_user_id).first()
-    if not target_user or not target_user.is_active:
-        raise HTTPException(status_code=404, detail="Target user not found")
-    conversation = inbox_service.create_direct_conversation(db, current_user, target_user)
-    await _broadcast_conversation(conversation)
-    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
-
-
-@router.post("/conversations/direct/public/{public_user_id}", response_model=InboxConversationResponse)
-async def create_direct_conversation_by_public_id(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if public_user_id == current_user.public_user_id:
-        raise HTTPException(status_code=400, detail="Cannot create a direct chat with yourself.")
-    target_user = db.query(User).filter(User.public_user_id == public_user_id).first()
-    if not target_user or not target_user.is_active:
-        raise HTTPException(status_code=404, detail="Target user not found")
-    conversation = inbox_service.create_direct_conversation(db, current_user, target_user)
-    await _broadcast_conversation(conversation)
-    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
-
-
-@router.post("/conversations/direct/public/{public_user_id}/room-invite", response_model=InboxMessageResponse)
-async def send_room_invite_by_public_id(public_user_id: int, request: InboxRoomInviteRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if public_user_id == current_user.public_user_id:
-        raise HTTPException(status_code=400, detail="Cannot invite yourself to a room.")
-    target_user = db.query(User).filter(User.public_user_id == public_user_id, User.is_active.is_(True)).first()
-    if not target_user:
-        raise HTTPException(status_code=404, detail="Target user not found")
-    conversation, message = inbox_service.send_room_invite_message(db=db, sender=current_user, target_user=target_user, room_name=request.room_name, room_public_id=request.room_public_id, room_language=request.room_language, mode_title=request.mode_title)
-    sender_payload = inbox_service.message_to_dict(message, current_user)
-    await _broadcast_message(conversation, message)
-    await _broadcast_conversation(conversation)
-    return InboxMessageResponse(**sender_payload)
+def list_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    conversations = inbox_service.list_conversations_for_user(db, current_user)
+    return InboxConversationListResponse(conversations=[InboxConversationResponse(**_conversation_payload(conversation, current_user)) for conversation in conversations])
 
 
 @router.get("/conversations/{conversation_id}", response_model=InboxConversationResponse)
-async def get_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     conversation = inbox_service.mark_secret_drift_open(db, conversation, current_user)
     read_updates = inbox_service.mark_messages_read_for_user(db, conversation, current_user)
-    await _broadcast_message_updates(conversation, read_updates)
+    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
+
+
+@router.post("/conversations/direct", response_model=InboxConversationResponse)
+def create_direct_conversation(request: InboxDirectConversationRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    target = db.query(User).filter(User.id == request.target_user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    conversation = inbox_service.create_direct_conversation(db, current_user, target)
     return InboxConversationResponse(**_conversation_payload(conversation, current_user))
 
 
@@ -308,15 +277,45 @@ async def send_message(conversation_id: str, request: InboxSendMessageRequest, d
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.is_blocked:
-        raise HTTPException(status_code=403, detail="Conversation is blocked")
-    if conversation.is_official:
-        raise HTTPException(status_code=403, detail="Official team chat is read-only")
-    message = inbox_service.send_message(db=db, conversation=conversation, sender=current_user, text=request.text, message_type=request.type, reply_to_text=request.reply_to_text, invite_room_name=request.invite_room_name, invite_room_id=request.invite_room_id, attachment_url=request.attachment_url)
-    payload = inbox_service.message_to_dict(message, current_user)
+    message = inbox_service.send_message(
+        db,
+        conversation,
+        current_user,
+        text=request.text,
+        message_type=request.type,
+        reply_to_text=request.reply_to_text,
+        invite_room_name=request.invite_room_name,
+        invite_room_id=request.invite_room_id,
+        attachment_url=request.attachment_url,
+    )
     await _broadcast_message(conversation, message)
     await _broadcast_conversation(conversation)
-    return InboxMessageResponse(**payload)
+    return InboxMessageResponse(**inbox_service.message_to_dict(message, current_user))
+
+
+@router.patch("/conversations/{conversation_id}/messages/{message_id}", response_model=InboxMessageResponse)
+async def update_message(conversation_id: str, message_id: str, request: InboxMessageActionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    message = inbox_service.update_message(db, conversation, message_id, reaction=request.reaction, is_starred=request.is_starred)
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    await _broadcast_message(conversation, message, event="inbox_message_updated")
+    return InboxMessageResponse(**inbox_service.message_to_dict(message, current_user))
+
+
+@router.delete("/conversations/{conversation_id}/messages/{message_id}")
+async def delete_message(conversation_id: str, message_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    deleted = inbox_service.delete_message(db, conversation, message_id, current_user)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Message not found")
+    await inbox_ws_manager.broadcast_to_users(inbox_service.participant_user_ids(conversation), {"event": "inbox_message_deleted", "conversation_id": conversation.public_id, "message_id": message_id})
+    await _broadcast_conversation(conversation)
+    return {"status": "deleted"}
 
 
 @router.patch("/conversations/{conversation_id}/secret-drift", response_model=InboxConversationResponse)
@@ -326,22 +325,10 @@ async def update_secret_drift(conversation_id: str, request: InboxSecretDriftReq
         raise HTTPException(status_code=404, detail="Conversation not found")
     if conversation.is_official:
         raise HTTPException(status_code=403, detail="Secret Drift is not available for official chats.")
-
-    conversation = inbox_service.set_secret_drift_mode(
-        db=db,
-        conversation=conversation,
-        enabled=request.enabled,
-        started_by_user_id=current_user.id,
-    )
+    conversation = inbox_service.set_secret_drift_mode(db=db, conversation=conversation, enabled=request.enabled, started_by_user_id=current_user.id)
     await _broadcast_conversation(conversation)
     if not request.enabled:
-        await inbox_ws_manager.broadcast_to_users(
-            inbox_service.participant_user_ids(conversation),
-            {
-                "event": "inbox_secret_drift_cleared",
-                "conversation_id": conversation.public_id,
-            },
-        )
+        await inbox_ws_manager.broadcast_to_users(inbox_service.participant_user_ids(conversation), {"event": "inbox_secret_drift_cleared", "conversation_id": conversation.public_id})
     return InboxConversationResponse(**_conversation_payload(conversation, current_user))
 
 
@@ -350,85 +337,24 @@ async def close_secret_drift_session(conversation_id: str, db: Session = Depends
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-
     cleared = inbox_service.mark_secret_drift_closed_and_clear(db, conversation, current_user)
     await _broadcast_conversation(conversation)
     if cleared:
-        await inbox_ws_manager.broadcast_to_users(
-            inbox_service.participant_user_ids(conversation),
-            {
-                "event": "inbox_secret_drift_cleared",
-                "conversation_id": conversation.public_id,
-            },
-        )
+        await inbox_ws_manager.broadcast_to_users(inbox_service.participant_user_ids(conversation), {"event": "inbox_secret_drift_cleared", "conversation_id": conversation.public_id})
     return {"status": "closed", "cleared": cleared}
 
 
-
 @router.patch("/conversations/{conversation_id}/state", response_model=InboxConversationResponse)
-async def update_conversation_state(conversation_id: str, request: InboxConversationStateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_conversation_state(conversation_id: str, request: InboxConversationStateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    conversation = inbox_service.update_conversation_state(db=db, conversation=conversation, is_muted=request.is_muted, is_pinned=request.is_pinned, is_locked=request.is_locked, is_blocked=request.is_blocked)
-    await _broadcast_conversation(conversation)
+    conversation = inbox_service.update_conversation_state(db, conversation, is_muted=request.is_muted, is_pinned=request.is_pinned, is_locked=request.is_locked, is_blocked=request.is_blocked)
     return InboxConversationResponse(**_conversation_payload(conversation, current_user))
 
 
-@router.patch("/conversations/{conversation_id}/messages/{message_id}", response_model=InboxMessageResponse)
-async def update_message(conversation_id: str, message_id: str, request: InboxMessageActionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    message = inbox_service.update_message(db=db, conversation=conversation, message_public_id=message_id, reaction=request.reaction, is_starred=request.is_starred)
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-    payload = inbox_service.message_to_dict(message, current_user)
-    await _broadcast_message(conversation, message, event="inbox_message_updated")
-    return InboxMessageResponse(**payload)
-
-
-@router.delete("/conversations/{conversation_id}/messages/{message_id}")
-async def delete_message(conversation_id: str, message_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    message = next((item for item in conversation.messages if item.public_id == message_id), None)
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    if message.sender_user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You can only unsend your own messages.")
-
-    if message.sender_user_id is None or message.message_type == "system" or conversation.is_official:
-        raise HTTPException(status_code=403, detail="This message cannot be unsent.")
-
-    if message.created_at is None:
-        raise HTTPException(status_code=403, detail="This message can no longer be unsent.")
-
-    unsend_deadline = message.created_at + timedelta(hours=1)
-    if datetime.utcnow() > unsend_deadline:
-        raise HTTPException(status_code=403, detail="Messages can only be unsent within 1 hour.")
-
-    deleted = inbox_service.delete_message(db, conversation, message_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    await inbox_ws_manager.broadcast_to_users(
-        inbox_service.participant_user_ids(conversation),
-        {
-            "event": "inbox_message_deleted",
-            "conversation_id": conversation.public_id,
-            "message_id": message_id,
-        },
-    )
-    await _broadcast_conversation(conversation)
-    return {"status": "unsent"}
-
-
 @router.post("/conversations/{conversation_id}/reports", response_model=InboxReportTaskResponse)
-async def report_conversation(conversation_id: str, request: InboxReportCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def create_report(conversation_id: str, request: InboxReportCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -440,36 +366,35 @@ async def report_conversation(conversation_id: str, request: InboxReportCreateRe
 @router.get("/reports/tasks", response_model=InboxReportTaskListResponse)
 def list_report_tasks(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_cs_or_above(current_user)
-    tasks = inbox_service.list_report_tasks(db)
-    return InboxReportTaskListResponse(tasks=[InboxReportTaskResponse(**inbox_service.report_to_dict(task)) for task in tasks])
-
-
-def _get_report(db: Session, report_id: str) -> InboxReport:
-    report = db.query(InboxReport).filter(InboxReport.public_id == report_id).first()
-    if not report:
-        raise HTTPException(status_code=404, detail="Report task not found")
-    return report
+    reports = inbox_service.list_report_tasks(db)
+    return InboxReportTaskListResponse(tasks=[InboxReportTaskResponse(**inbox_service.report_to_dict(report)) for report in reports])
 
 
 @router.post("/reports/tasks/{report_id}/reject", response_model=InboxReportTaskResponse)
-async def reject_report_task(report_id: str, request: InboxReportDecisionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def reject_report(report_id: str, request: InboxReportDecisionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_cs_or_above(current_user)
-    report = inbox_service.decide_report(db, _get_report(db, report_id), accepted=False, cs_note=request.cs_note)
+    report = inbox_service.decide_report(db, report_id, "rejected_by_cs", cs_note=request.cs_note)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
     await _broadcast_report_task(report)
     return InboxReportTaskResponse(**inbox_service.report_to_dict(report))
 
 
 @router.post("/reports/tasks/{report_id}/accept", response_model=InboxReportTaskResponse)
-async def accept_report_task(report_id: str, request: InboxReportDecisionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def accept_report(report_id: str, request: InboxReportDecisionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_cs_or_above(current_user)
-    report = inbox_service.decide_report(db, _get_report(db, report_id), accepted=True, cs_note=request.cs_note)
+    report = inbox_service.decide_report(db, report_id, "accepted_escalated", cs_note=request.cs_note)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
     await _broadcast_report_task(report)
     return InboxReportTaskResponse(**inbox_service.report_to_dict(report))
 
 
 @router.post("/reports/tasks/{report_id}/monitor-action", response_model=InboxReportTaskResponse)
-async def apply_monitor_action(report_id: str, request: InboxMonitorActionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def monitor_action(report_id: str, request: InboxMonitorActionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_monitor_or_above(current_user)
-    report = inbox_service.apply_monitor_action(db, _get_report(db, report_id), request.action_label)
+    report = inbox_service.apply_monitor_action(db, report_id, request.action_label)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
     await _broadcast_report_task(report)
     return InboxReportTaskResponse(**inbox_service.report_to_dict(report))
