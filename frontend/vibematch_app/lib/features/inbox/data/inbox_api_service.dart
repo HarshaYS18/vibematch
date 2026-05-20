@@ -470,6 +470,10 @@ class InboxApiService {
         return InboxMessageType.relationshipRequest;
       case 'system':
         return InboxMessageType.system;
+      case 'story_reply':
+        return InboxMessageType.storyReply;
+      case 'call_log':
+        return InboxMessageType.callLog;
       default:
         return InboxMessageType.text;
     }

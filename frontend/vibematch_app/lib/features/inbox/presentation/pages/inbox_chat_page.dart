@@ -869,6 +869,8 @@ class _MessageBubble extends StatelessWidget {
                     _InviteCard(message: message, onTap: onJoinInviteTap)
                   else if (message.isSystem)
                     _SystemMessageCard(text: message.text)
+                  else if (message.type == InboxMessageType.callLog)
+                    _CallLogMessageCard(message: message)
                   else if (_hasMediaContent)
                     InboxMessageMediaContent(message: message, mine: mine)
                   else
@@ -985,6 +987,79 @@ class _SystemMessageCard extends StatelessWidget {
         decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF99F6E4))),
         child: Row(children: [const Icon(Icons.verified_rounded, color: Color(0xFF0F766E), size: 18), const SizedBox(width: 8), Expanded(child: Text(text, style: const TextStyle(color: Color(0xFF134E4A), fontSize: 12, fontWeight: FontWeight.w800, height: 1.25)))]),
       );
+}
+
+class _CallLogMessageCard extends StatelessWidget {
+  const _CallLogMessageCard({required this.message});
+
+  final InboxMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final lower = message.text.toLowerCase();
+    final missed = lower.contains('missed');
+    final video = lower.contains('video');
+    final incoming = lower.contains('incoming') || lower.contains('missed');
+    final color = missed ? const Color(0xFFE84C72) : const Color(0xFF12C7B7);
+    final directionIcon = incoming ? Icons.call_received_rounded : Icons.call_made_rounded;
+
+    return Container(
+      width: 252,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F5FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE9DDF5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(video ? Icons.videocam_rounded : Icons.call_rounded, color: color, size: 18),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.text.trim().isEmpty ? 'Call' : message.text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF251538),
+                    fontSize: 12.4,
+                    fontWeight: FontWeight.w900,
+                    height: 1.22,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Icon(directionIcon, color: const Color(0xFF7B6A86), size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      message.time,
+                      style: const TextStyle(
+                        color: Color(0xFF7B6A86),
+                        fontSize: 10.8,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _LoveBondRequestCard extends StatelessWidget {
