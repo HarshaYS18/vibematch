@@ -46,6 +46,7 @@ from app.api.routes import (
     notifications,
     presence,
     profile_display,
+    push,
     rankings,
     relationship_exp,
     role_badges,
@@ -102,6 +103,7 @@ from app.models import (
     MvpFeatureState,
     ProfileVisit,
     ProfileDisplayAudit,
+    PushDeviceToken,
     Room,
     RoomChatMessage,
     RoomExperienceStatus,
@@ -192,6 +194,10 @@ def _ensure_runtime_schema() -> None:
         "ALTER TABLE store_items ADD COLUMN IF NOT EXISTS admin_notes TEXT",
         "ALTER TABLE user_store_inventory ADD COLUMN IF NOT EXISTS ownership_type VARCHAR(40) DEFAULT 'purchase' NOT NULL",
         "ALTER TABLE user_store_inventory ADD COLUMN IF NOT EXISTS granted_by_user_id INTEGER",
+        "CREATE TABLE IF NOT EXISTS push_device_tokens (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), device_id VARCHAR(180) NOT NULL, platform VARCHAR(40) NOT NULL, fcm_token VARCHAR(700) UNIQUE NOT NULL, app_package VARCHAR(180), is_active BOOLEAN DEFAULT true NOT NULL, last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+        "CREATE INDEX IF NOT EXISTS ix_push_device_tokens_user_id ON push_device_tokens(user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_push_device_tokens_device_id ON push_device_tokens(device_id)",
+        "CREATE INDEX IF NOT EXISTS ix_push_device_tokens_fcm_token ON push_device_tokens(fcm_token)",
     ]
     with engine.begin() as connection:
         if connection.dialect.name == "postgresql":
@@ -276,6 +282,7 @@ app.include_router(experience_room_public.router)
 app.include_router(social.router)
 app.include_router(vibes.router)
 app.include_router(notifications.router)
+app.include_router(push.router)
 app.include_router(presence.router)
 app.include_router(profile_display.router)
 app.include_router(media.router)

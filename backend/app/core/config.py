@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     GOOGLE_DRIVE_SCOPES: str = "https://www.googleapis.com/auth/drive.file"
     INBOX_BACKUP_ENCRYPTION_KEY: str = "change-this-32-byte-key-before-production"
 
+    # Firebase Cloud Messaging HTTP v1
+    FCM_PROJECT_ID: str = ""
+    FIREBASE_SERVICE_ACCOUNT_PATH: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

@@ -93,3 +93,7 @@ redis_data/
 
 # Node if later used
 node_modules/
+
+# Firebase backend secrets
+backend/secrets/
+

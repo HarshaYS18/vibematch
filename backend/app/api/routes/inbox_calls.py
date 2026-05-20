@@ -11,7 +11,7 @@ from app.schemas.inbox_calls import (
     InboxCallStartRequest,
     InboxCallSummaryMessageResponse,
 )
-from app.services import inbox_call_contract_service, inbox_call_service, inbox_service
+from app.services import inbox_call_contract_service, inbox_call_service, inbox_service, push_notification_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/calls", tags=["Inbox Calls"])
@@ -52,6 +52,27 @@ async def _broadcast_call(conversation, call, event: str) -> None:
         )
 
 
+def _send_call_pushes(db: Session, conversation, call, event: str) -> None:
+    if event != "inbox_call_started":
+        return
+    for participant in conversation.participants:
+        if participant.user_id == call.started_by_user_id:
+            continue
+        payload = inbox_call_contract_service.push_payload_for_call(
+            conversation,
+            call,
+            event=event,
+            receiver_user_id=participant.user_id,
+        )
+        push_notification_service.send_to_user(
+            db,
+            user_id=participant.user_id,
+            title=payload.get("title", "Incoming call"),
+            body=payload.get("body", "Incoming FunKey call"),
+            data=payload,
+        )
+
+
 async def _broadcast_summary(conversation, message) -> None:
     for participant in conversation.participants:
         if participant.user is None:
@@ -85,6 +106,7 @@ async def start_call(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     await _broadcast_call(conversation, call, "inbox_call_started")
+    _send_call_pushes(db, conversation, call, "inbox_call_started")
     return _response(call, current_user=current_user, conversation=conversation)
 
 

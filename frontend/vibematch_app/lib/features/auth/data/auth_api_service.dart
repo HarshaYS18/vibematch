@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/vm_api_config.dart';
+import '../../../core/notifications/vm_push_notification_service.dart';
 import '../../../core/session/vm_session_cleanup_service.dart';
 import '../models/current_user.dart';
 import '../models/current_user_master_state_mapper.dart';
@@ -239,6 +240,7 @@ class AuthApiService {
   }
 
   Future<void> logout() async {
+    await VmPushNotificationService.instance.deleteCurrentTokenOnLogout();
     await VmSessionCleanupService.clearUserScopedState(reason: 'logout');
     _cachedAccessToken = null;
     _cachedUser = null;
