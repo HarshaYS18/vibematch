@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import '../data/inbox_api_service.dart';
 import '../data/inbox_backup_api_service.dart';
+import '../data/inbox_message_tools_api_service.dart';
+import '../data/inbox_preferences_api_service.dart';
 import '../../profile/data/love_bond_realtime_service.dart';
 import '../data/inbox_socket_service.dart';
 import '../models/inbox_models.dart';
@@ -10,13 +12,19 @@ class InboxController extends ChangeNotifier {
   InboxController({
     InboxApiService? apiService,
     InboxBackupApiService? backupApiService,
+    InboxPreferencesApiService? preferencesApiService,
+    InboxMessageToolsApiService? messageToolsApiService,
     InboxSocketService? socketService,
   }) : _apiService = apiService ?? InboxApiService(),
        _backupApiService = backupApiService ?? const InboxBackupApiService(),
+       _preferencesApiService = preferencesApiService ?? const InboxPreferencesApiService(),
+       _messageToolsApiService = messageToolsApiService ?? const InboxMessageToolsApiService(),
        _socketService = socketService ?? InboxSocketService();
 
   final InboxApiService _apiService;
   final InboxBackupApiService _backupApiService;
+  final InboxPreferencesApiService _preferencesApiService;
+  final InboxMessageToolsApiService _messageToolsApiService;
   final InboxSocketService _socketService;
   String selectedFilter = 'All';
   bool lockedVaultUnlocked = false;
@@ -35,8 +43,29 @@ class InboxController extends ChangeNotifier {
   InboxBackupJob? lastRestoreJob;
   String? lastGoogleDriveAuthorizationUrl;
   String? lastDebugOtp;
+  InboxPreferenceSettings preferenceSettings = const InboxPreferenceSettings(
+    strangersCanMessage: true,
+    strangersCanMentionInVibes: true,
+    readReceiptsEnabled: true,
+    onlineVisibility: 'everyone',
+    lastSeenVisibility: 'everyone',
+    typingActivityVisibility: 'everyone',
+    storyVisibility: 'friends',
+    deviceUnlockEnabled: false,
+    defaultChatTheme: 'pearl',
+    defaultWallpaperKey: 'premium_pearl',
+  );
   bool strangersCanMessage = true;
   bool strangersCanMentionInVibes = true;
+  bool get readReceiptsEnabled => preferenceSettings.readReceiptsEnabled;
+  bool get deviceUnlockEnabled => preferenceSettings.deviceUnlockEnabled;
+  String get onlineVisibility => preferenceSettings.onlineVisibility;
+  String get lastSeenVisibility => preferenceSettings.lastSeenVisibility;
+  String get typingActivityVisibility => preferenceSettings.typingActivityVisibility;
+  String get storyVisibility => preferenceSettings.storyVisibility;
+  String get defaultChatTheme => preferenceSettings.defaultChatTheme;
+  String get defaultWallpaperKey => preferenceSettings.defaultWallpaperKey;
+  String? get defaultWallpaperUrl => preferenceSettings.defaultWallpaperUrl;
   String? _activeConversationId;
   final Map<String, String> _remoteActivityByConversationId = <String, String>{};
 
@@ -124,6 +153,8 @@ class InboxController extends ChangeNotifier {
     try {
       lockStatus = await _apiService.loadLockStatus();
       backupStatus = await _backupApiService.loadStatus();
+      preferenceSettings = await _preferencesApiService.loadPreferences();
+      _syncLegacyPreferenceFlags();
       _conversations = await _apiService.loadConversations();
       _reportTasks
         ..clear()
@@ -134,6 +165,28 @@ class InboxController extends ChangeNotifier {
       _conversations = <InboxConversation>[];
     } finally {
       isLoading = false;
+      _safeNotify();
+    }
+  }
+
+  void _syncLegacyPreferenceFlags() {
+    strangersCanMessage = preferenceSettings.strangersCanMessage;
+    strangersCanMentionInVibes = preferenceSettings.strangersCanMentionInVibes;
+  }
+
+  Future<void> _savePreferences(InboxPreferenceSettings settings) async {
+    final previous = preferenceSettings;
+    preferenceSettings = settings;
+    _syncLegacyPreferenceFlags();
+    _safeNotify();
+    try {
+      preferenceSettings = await _preferencesApiService.updatePreferences(settings);
+      _syncLegacyPreferenceFlags();
+      _safeNotify();
+    } catch (error) {
+      preferenceSettings = previous;
+      _syncLegacyPreferenceFlags();
+      errorMessage = error.toString();
       _safeNotify();
     }
   }
@@ -288,8 +341,9 @@ class InboxController extends ChangeNotifier {
       case 'inbox_message_deleted':
         final conversationId = event['conversation_id']?.toString();
         final messageId = event['message_id']?.toString();
-        if (conversationId != null && messageId != null)
+        if (conversationId != null && messageId != null) {
           _removeMessageById(conversationId, messageId);
+        }
         break;
       case 'inbox_conversation_updated':
         loadFromBackend();
@@ -325,8 +379,9 @@ class InboxController extends ChangeNotifier {
       case 'inbox_report_task_updated':
       case 'inbox_report_status_updated':
         final rawTask = event['task'];
-        if (rawTask is Map<String, dynamic>)
+        if (rawTask is Map<String, dynamic>) {
           _upsertReportTask(_apiService.reportFromJson(rawTask));
+        }
         break;
       default:
         break;
@@ -490,13 +545,55 @@ class InboxController extends ChangeNotifier {
   }
 
   void setStrangersCanMessage(bool value) {
-    strangersCanMessage = value;
-    _safeNotify();
+    _savePreferences(preferenceSettings.copyWith(strangersCanMessage: value));
   }
 
   void setStrangersCanMentionInVibes(bool value) {
-    strangersCanMentionInVibes = value;
-    _safeNotify();
+    _savePreferences(preferenceSettings.copyWith(strangersCanMentionInVibes: value));
+  }
+
+  void setReadReceiptsEnabled(bool value) {
+    _savePreferences(preferenceSettings.copyWith(readReceiptsEnabled: value));
+  }
+
+  void setDeviceUnlockEnabled(bool value) {
+    _savePreferences(preferenceSettings.copyWith(deviceUnlockEnabled: value));
+  }
+
+  void setOnlineVisibility(String value) {
+    _savePreferences(preferenceSettings.copyWith(onlineVisibility: value));
+  }
+
+  void setLastSeenVisibility(String value) {
+    _savePreferences(preferenceSettings.copyWith(lastSeenVisibility: value));
+  }
+
+  void setTypingActivityVisibility(String value) {
+    _savePreferences(preferenceSettings.copyWith(typingActivityVisibility: value));
+  }
+
+  void setStoryVisibility(String value) {
+    _savePreferences(preferenceSettings.copyWith(storyVisibility: value));
+  }
+
+  Future<void> updateConversationTheme({
+    required InboxConversation conversation,
+    required String chatTheme,
+    required String wallpaperKey,
+    String? wallpaperUrl,
+  }) async {
+    try {
+      await _preferencesApiService.updateConversationTheme(
+        conversationId: conversation.id,
+        chatTheme: chatTheme,
+        wallpaperKey: wallpaperKey,
+        wallpaperUrl: wallpaperUrl,
+      );
+      await openConversationFromBackend(conversation.id);
+    } catch (error) {
+      errorMessage = error.toString();
+      _safeNotify();
+    }
   }
 
   Future<void> toggleBackendLock(InboxConversation conversation) =>
@@ -522,8 +619,9 @@ class InboxController extends ChangeNotifier {
     bool? isBlocked,
   }) async {
     if (conversation.isOfficial &&
-        (isLocked != null || isBlocked != null || isMuted != null))
+        (isLocked != null || isBlocked != null || isMuted != null)) {
       return;
+    }
     _replaceConversation(
       conversation.id,
       (chat) => chat.copyWith(
@@ -861,6 +959,58 @@ class InboxController extends ChangeNotifier {
     }
   }
 
+  Future<void> editTextMessage({
+    required String conversationId,
+    required InboxMessage message,
+    required String text,
+  }) async {
+    if (message.id == null || !message.isMine) return;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final previous = message;
+    _updateMessage(
+      conversationId: conversationId,
+      message: message,
+      mapper: (item) => item.copyWith(text: trimmed),
+    );
+    try {
+      final updated = await _messageToolsApiService.editTextMessage(
+        conversationId: conversationId,
+        messageId: message.id!,
+        text: trimmed,
+      );
+      _updateMessage(
+        conversationId: conversationId,
+        message: message,
+        mapper: (_) => updated,
+      );
+    } catch (error) {
+      errorMessage = error.toString();
+      _updateMessage(
+        conversationId: conversationId,
+        message: message.copyWith(text: trimmed),
+        mapper: (_) => previous,
+      );
+    }
+  }
+
+  Future<void> deleteMessageForMe({
+    required String conversationId,
+    required InboxMessage message,
+  }) async {
+    if (message.id == null) return;
+    _removeMessageById(conversationId, message.id!);
+    try {
+      await _messageToolsApiService.deleteForMe(
+        conversationId: conversationId,
+        messageId: message.id!,
+      );
+    } catch (error) {
+      errorMessage = error.toString();
+      _appendMessage(conversationId, message);
+    }
+  }
+
   Future<void> deleteMessage({
     required String conversationId,
     required InboxMessage message,
@@ -1072,8 +1222,9 @@ class InboxController extends ChangeNotifier {
 
   bool _isPendingLocalMatch(InboxMessage local, InboxMessage remote) {
     final localId = local.id ?? '';
-    if (!localId.startsWith('local_') && !localId.startsWith('doc_'))
+    if (!localId.startsWith('local_') && !localId.startsWith('doc_')) {
       return false;
+    }
     if (!local.isMine || !remote.isMine) return false;
     return local.text.trim() == remote.text.trim() &&
         local.type == remote.type &&
