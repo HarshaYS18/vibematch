@@ -9,8 +9,8 @@ class SwipeReplyMessage extends StatefulWidget {
     required this.isMine,
     required this.onReply,
     required this.child,
-    this.threshold = 58,
-    this.maxDrag = 86,
+    this.threshold = 54,
+    this.maxDrag = 78,
   });
 
   final bool isMine;
@@ -38,7 +38,7 @@ class _SwipeReplyMessageState extends State<SwipeReplyMessage>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 210),
+      duration: const Duration(milliseconds: 190),
     )..addListener(() {
         setState(() => _dragOffset = _animation.value);
       });
@@ -68,7 +68,7 @@ class _SwipeReplyMessageState extends State<SwipeReplyMessage>
     }
   }
 
-  void _handleDragEnd([DragEndDetails? _]) {
+  void _handleDragEnd([DragEndDetails? details]) {
     final shouldReply = _passedThreshold;
     if (shouldReply) widget.onReply();
     _animateBack();
@@ -111,12 +111,12 @@ class _SwipeReplyMessageState extends State<SwipeReplyMessage>
                       right: widget.isMine ? 10 : 0,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.14),
+                      color: const Color(0xFF3797F0).withValues(alpha: 0.13),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.reply_rounded,
-                      color: const Color(0xFF7C3AED),
+                      color: const Color(0xFF3797F0),
                       size: 19,
                       textDirection: widget.isMine ? TextDirection.rtl : TextDirection.ltr,
                     ),
