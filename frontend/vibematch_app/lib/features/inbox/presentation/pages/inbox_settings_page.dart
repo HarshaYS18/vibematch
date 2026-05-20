@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/inbox_preferences_api_service.dart';
 import '../../models/inbox_models.dart';
@@ -53,6 +54,13 @@ class InboxSettingsPage extends StatefulWidget {
 }
 
 class _InboxSettingsPageState extends State<InboxSettingsPage> {
+  static const _bg = Color(0xFFFAFAFA);
+  static const _surface = Colors.white;
+  static const _ink = Color(0xFF111114);
+  static const _muted = Color(0xFF71717A);
+  static const _line = Color(0xFFEDEDEF);
+  static const _blue = Color(0xFF3797F0);
+
   final InboxPreferencesApiService _preferencesApi = const InboxPreferencesApiService();
   late bool _strangersCanMessage;
   late bool _strangersCanMentionInVibes;
@@ -77,10 +85,23 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
         _strangersCanMessage = preferences.strangersCanMessage;
         _strangersCanMentionInVibes = preferences.strangersCanMentionInVibes;
       });
-    } catch (_) {
-      // Keep the existing values from the controller if backend preferences are unavailable.
-    }
+    } catch (_) {}
   }
+
+  InboxPreferenceSettings get _effectivePreferences =>
+      _preferences ??
+      InboxPreferenceSettings(
+        strangersCanMessage: _strangersCanMessage,
+        strangersCanMentionInVibes: _strangersCanMentionInVibes,
+        readReceiptsEnabled: true,
+        onlineVisibility: 'everyone',
+        lastSeenVisibility: 'everyone',
+        typingActivityVisibility: 'everyone',
+        storyVisibility: 'friends',
+        deviceUnlockEnabled: false,
+        defaultChatTheme: 'pearl',
+        defaultWallpaperKey: 'premium_pearl',
+      );
 
   Future<void> _savePreferences(InboxPreferenceSettings next, {String? feedback}) async {
     final previous = _preferences;
@@ -108,31 +129,33 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
           _strangersCanMentionInVibes = previous.strangersCanMentionInVibes;
         }
       });
-      _showFeedback('Could not save Inbox privacy setting.');
+      _showFeedback('Could not save setting.');
     } finally {
       if (mounted) setState(() => _preferencesBusy = false);
     }
   }
 
-  InboxPreferenceSettings get _effectivePreferences => _preferences ?? InboxPreferenceSettings(
-        strangersCanMessage: _strangersCanMessage,
-        strangersCanMentionInVibes: _strangersCanMentionInVibes,
-        readReceiptsEnabled: true,
-        onlineVisibility: 'everyone',
-        lastSeenVisibility: 'everyone',
-        typingActivityVisibility: 'everyone',
-        storyVisibility: 'friends',
-        deviceUnlockEnabled: false,
-        defaultChatTheme: 'pearl',
-        defaultWallpaperKey: 'premium_pearl',
+  void _showFeedback(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _ink,
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
       );
+  }
 
   void _openLockSetup() {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => InboxLockSetupSheet(onStartOtp: widget.onStartLockSetup, onVerifySetup: widget.onVerifyLockSetup),
+      builder: (_) => InboxLockSetupSheet(
+        onStartOtp: widget.onStartLockSetup,
+        onVerifySetup: widget.onVerifyLockSetup,
+      ),
     );
   }
 
@@ -164,8 +187,8 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _GoogleDriveSetupSheet(
-        currentEmail: widget.backupStatus.googleDriveEmail,
+      builder: (_) => _GoogleDriveSheet(
+        backupStatus: widget.backupStatus,
         onStart: widget.onStartGoogleDriveSetup,
         onConnect: widget.onConnectGoogleDrive,
       ),
@@ -174,16 +197,15 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
 
   Future<void> _setBackupEnabled(bool value) async {
     if (value && !widget.backupStatus.isAuthorized) {
-      _showFeedback('Connect Google Drive first.');
       _openGoogleDriveSetup();
       return;
     }
     setState(() => _backupBusy = true);
     try {
       await widget.onBackupEnabledChanged(value);
-      _showFeedback(value ? 'Chat backup enabled' : 'Chat backup disabled');
+      _showFeedback(value ? 'Chat backup enabled.' : 'Chat backup disabled.');
     } catch (_) {
-      _showFeedback('Could not update backup setting.');
+      _showFeedback('Could not update backup.');
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }
@@ -193,9 +215,9 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     setState(() => _backupBusy = true);
     try {
       await widget.onFrequencyChanged(frequency);
-      _showFeedback('Backup frequency set to ${frequency.label}');
+      _showFeedback('Backup set to ${frequency.label}.');
     } catch (_) {
-      _showFeedback('Could not update backup frequency.');
+      _showFeedback('Could not update frequency.');
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }
@@ -203,16 +225,15 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
 
   Future<void> _backupNow() async {
     if (!widget.backupStatus.isAuthorized) {
-      _showFeedback('Connect Google Drive first.');
       _openGoogleDriveSetup();
       return;
     }
     setState(() => _backupBusy = true);
     try {
       await widget.onBackupNow();
-      _showFeedback('Inbox backup completed.');
+      _showFeedback('Backup completed.');
     } catch (_) {
-      _showFeedback('Backup failed. Check Google Drive setup.');
+      _showFeedback('Backup failed.');
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }
@@ -220,16 +241,15 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
 
   Future<void> _restore() async {
     if (!widget.backupStatus.isAuthorized) {
-      _showFeedback('Connect Google Drive first.');
       _openGoogleDriveSetup();
       return;
     }
     setState(() => _backupBusy = true);
     try {
       await widget.onRestoreTap();
-      _showFeedback('Inbox restore completed.');
+      _showFeedback('Restore completed.');
     } catch (_) {
-      _showFeedback('Restore failed. No backup found or Drive setup failed.');
+      _showFeedback('No backup found.');
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }
@@ -237,18 +257,18 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
 
   void _setStrangersCanMessage(bool value) {
     widget.onStrangersCanMessageChanged(value);
-    _savePreferences(_effectivePreferences.copyWith(strangersCanMessage: value), feedback: value ? 'Strangers can message you' : 'Stranger messages disabled');
+    _savePreferences(
+      _effectivePreferences.copyWith(strangersCanMessage: value),
+      feedback: value ? 'Message requests enabled.' : 'Message requests disabled.',
+    );
   }
 
   void _setStrangersCanMentionInVibes(bool value) {
     widget.onStrangersCanMentionInVibesChanged(value);
-    _savePreferences(_effectivePreferences.copyWith(strangersCanMentionInVibes: value), feedback: value ? 'Strangers can mention you in Vibes' : 'Stranger Vibes mentions disabled');
-  }
-
-  void _showFeedback(String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
+    _savePreferences(
+      _effectivePreferences.copyWith(strangersCanMentionInVibes: value),
+      feedback: value ? 'Story mentions enabled.' : 'Story mentions limited.',
+    );
   }
 
   @override
@@ -256,159 +276,136 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     final lockStatus = widget.lockStatus;
     final backup = widget.backupStatus;
     final prefs = _effectivePreferences;
-    final backupSubtitle = backup.isConnected
-        ? '${backup.googleDriveEmail} • ${backup.frequency.label}'
-        : 'Authorize Google Drive to store encrypted chat backups.';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F1),
+      backgroundColor: _bg,
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 28),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           children: [
-            Row(
+            _Header(onBackTap: widget.onBackTap),
+            const SizedBox(height: 12),
+            _Section(
+              title: 'Security',
               children: [
-                IconButton(onPressed: widget.onBackTap, icon: const Icon(Icons.arrow_back_rounded)),
-                const SizedBox(width: 6),
-                const Expanded(child: Text('Inbox Settings', style: TextStyle(color: Color(0xFF251538), fontSize: 24, fontWeight: FontWeight.w900))),
-                const Icon(Icons.settings_rounded, color: Color(0xFF4A2A63)),
+                _SettingRow(
+                  icon: lockStatus.isEnabled ? Icons.lock_outline_rounded : Icons.lock_open_rounded,
+                  title: lockStatus.isEnabled ? 'Change lock' : 'Set up lock',
+                  subtitle: lockStatus.isEnabled ? 'Update your private Inbox lock.' : 'Protect private conversations.',
+                  onTap: lockStatus.isEnabled ? _openChangeLock : _openLockSetup,
+                ),
+                _SettingRow(
+                  icon: Icons.support_agent_outlined,
+                  title: 'Recover lock',
+                  subtitle: lockStatus.recoveryRequested ? 'Recovery request sent.' : 'Use mobile OTP or support recovery.',
+                  onTap: _openRecovery,
+                ),
+                _SwitchRow(
+                  icon: Icons.fingerprint_rounded,
+                  title: 'Device unlock',
+                  subtitle: 'Use this device to unlock faster.',
+                  value: prefs.deviceUnlockEnabled,
+                  enabled: !_preferencesBusy,
+                  onChanged: (value) => _savePreferences(
+                    prefs.copyWith(deviceUnlockEnabled: value),
+                    feedback: value ? 'Device unlock enabled.' : 'Device unlock disabled.',
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  _ActionRow(
-                    icon: lockStatus.isEnabled ? Icons.lock_rounded : Icons.lock_open_rounded,
-                    title: lockStatus.isEnabled ? 'Change Inbox lock' : 'Set up Inbox lock',
-                    subtitle: lockStatus.isEnabled
-                        ? 'Use your current lock to set a new one. Super Owner support codes work as fallback.'
-                        : 'Create your first Inbox lock with recovery mobile OTP.',
-                    onTap: lockStatus.isEnabled ? _openChangeLock : _openLockSetup,
+            _Section(
+              title: 'Privacy',
+              children: [
+                _SwitchRow(
+                  icon: Icons.mark_chat_unread_outlined,
+                  title: 'Message requests',
+                  subtitle: _strangersCanMessage ? 'Allow new requests.' : 'Block new requests.',
+                  value: _strangersCanMessage,
+                  enabled: !_preferencesBusy,
+                  onChanged: _setStrangersCanMessage,
+                ),
+                _SwitchRow(
+                  icon: Icons.alternate_email_rounded,
+                  title: 'Story mentions',
+                  subtitle: _strangersCanMentionInVibes ? 'Allow mentions from new people.' : 'Limit mentions to friends.',
+                  value: _strangersCanMentionInVibes,
+                  enabled: !_preferencesBusy,
+                  onChanged: _setStrangersCanMentionInVibes,
+                ),
+                _SwitchRow(
+                  icon: Icons.done_all_rounded,
+                  title: 'Read receipts',
+                  subtitle: 'Show when messages are read.',
+                  value: prefs.readReceiptsEnabled,
+                  enabled: !_preferencesBusy,
+                  onChanged: (value) => _savePreferences(
+                    prefs.copyWith(readReceiptsEnabled: value),
+                    feedback: value ? 'Read receipts enabled.' : 'Read receipts disabled.',
                   ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  _ActionRow(
-                    icon: Icons.support_agent_rounded,
-                    title: 'Forgot Inbox lock?',
-                    subtitle: lockStatus.recoveryRequested
-                        ? 'Recovery request submitted. Contact Vibe Match Team / CS.'
-                        : 'Recover with linked mobile OTP or request CS/Super Owner reset support.',
-                    onTap: _openRecovery,
-                  ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  SwitchListTile(
-                    value: prefs.deviceUnlockEnabled,
-                    onChanged: _preferencesBusy ? null : (value) => _savePreferences(prefs.copyWith(deviceUnlockEnabled: value), feedback: value ? 'Device unlock shortcut enabled' : 'Device unlock shortcut disabled'),
-                    activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text('Device unlock shortcut', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                    subtitle: const Text('Uses phone fingerprint/Face ID locally after backend lock is configured. Fingerprint data is never sent to backend.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ),
+                ),
+                _ChoiceRow(
+                  title: 'Online status',
+                  value: prefs.onlineVisibility,
+                  onChanged: (value) => _savePreferences(prefs.copyWith(onlineVisibility: value)),
+                ),
+                _ChoiceRow(
+                  title: 'Last seen',
+                  value: prefs.lastSeenVisibility,
+                  onChanged: (value) => _savePreferences(prefs.copyWith(lastSeenVisibility: value)),
+                ),
+                _ChoiceRow(
+                  title: 'Typing',
+                  value: prefs.typingActivityVisibility,
+                  onChanged: (value) => _savePreferences(prefs.copyWith(typingActivityVisibility: value)),
+                ),
+                _ChoiceRow(
+                  title: 'Story privacy',
+                  value: prefs.storyVisibility,
+                  onChanged: (value) => _savePreferences(prefs.copyWith(storyVisibility: value)),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    value: _strangersCanMessage,
-                    onChanged: _preferencesBusy ? null : _setStrangersCanMessage,
-                    activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text('Stranger messages', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                    subtitle: Text(_strangersCanMessage ? 'Strangers can message you. These appear under Stranger messages.' : 'Strangers cannot start new chats with you.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  SwitchListTile(
-                    value: _strangersCanMentionInVibes,
-                    onChanged: _preferencesBusy ? null : _setStrangersCanMentionInVibes,
-                    activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text('Stranger Vibes mentions', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                    subtitle: Text(_strangersCanMentionInVibes ? 'Strangers can mention you in Vibes and Vibe comments.' : 'Only friends/following rules can mention you in Vibes.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  SwitchListTile(
-                    value: prefs.readReceiptsEnabled,
-                    onChanged: _preferencesBusy ? null : (value) => _savePreferences(prefs.copyWith(readReceiptsEnabled: value), feedback: value ? 'Read receipts enabled' : 'Read receipts disabled'),
-                    activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text('Read receipts', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                    subtitle: const Text('Control whether people can see blue read ticks in direct chats.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  _VisibilityRow(label: 'Online status', value: prefs.onlineVisibility, onChanged: (value) => _savePreferences(prefs.copyWith(onlineVisibility: value), feedback: 'Online status privacy updated')),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  _VisibilityRow(label: 'Last seen', value: prefs.lastSeenVisibility, onChanged: (value) => _savePreferences(prefs.copyWith(lastSeenVisibility: value), feedback: 'Last seen privacy updated')),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  _VisibilityRow(label: 'Typing/activity', value: prefs.typingActivityVisibility, onChanged: (value) => _savePreferences(prefs.copyWith(typingActivityVisibility: value), feedback: 'Typing privacy updated')),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  _VisibilityRow(label: 'Story privacy', value: prefs.storyVisibility, onChanged: (value) => _savePreferences(prefs.copyWith(storyVisibility: value), feedback: 'Story privacy updated')),
-                ],
-              ),
+            _Section(
+              title: 'Backup',
+              children: [
+                _SettingRow(
+                  icon: Icons.add_to_drive_outlined,
+                  title: 'Chat backup',
+                  subtitle: backup.isConnected ? backup.googleDriveEmail ?? 'Google Drive connected' : 'Google Drive not connected',
+                  trailingText: backup.isEnabled ? 'On' : 'Off',
+                  onTap: _openGoogleDriveSetup,
+                ),
+                _SwitchRow(
+                  icon: Icons.cloud_sync_outlined,
+                  title: 'Auto backup',
+                  subtitle: backup.isConnected ? backup.frequency.label : 'Connect Drive first.',
+                  value: backup.isEnabled,
+                  enabled: !_backupBusy,
+                  onChanged: _setBackupEnabled,
+                ),
+                _FrequencyRow(
+                  value: backup.frequency,
+                  enabled: backup.isEnabled && !_backupBusy,
+                  onChanged: _setFrequency,
+                ),
+                _SettingRow(
+                  icon: Icons.cloud_upload_outlined,
+                  title: 'Back up now',
+                  subtitle: backup.lastBackupAt == null ? 'Last backup: Never' : 'Last backup: ${backup.lastBackupAt}',
+                  onTap: _backupBusy ? null : _backupNow,
+                ),
+                _SettingRow(
+                  icon: Icons.restore_rounded,
+                  title: 'Restore backup',
+                  subtitle: backup.lastRestoreAt == null ? 'Restore latest backup.' : 'Last restore: ${backup.lastRestoreAt}',
+                  onTap: _backupBusy ? null : _restore,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  _ActionRow(
-                    icon: Icons.add_to_drive_rounded,
-                    title: backup.isConnected ? 'Google Drive connected' : 'Connect Google Drive',
-                    subtitle: backupSubtitle,
-                    onTap: _openGoogleDriveSetup,
-                  ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  SwitchListTile(
-                    value: backup.isEnabled,
-                    onChanged: _backupBusy ? null : _setBackupEnabled,
-                    activeThumbColor: const Color(0xFF12C7B7),
-                    title: const Text('Chat backup', style: TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)),
-                    subtitle: Text(backup.isEnabled ? 'Backup is on. ${backup.frequency.label} backup is selected.' : 'Backup is off. Connect Drive before enabling automatic backups.', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  const Align(alignment: Alignment.centerLeft, child: Text('Backup frequency', style: TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900))),
-                  const SizedBox(height: 9),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: ChatBackupFrequency.values.map((item) {
-                      final selected = item == backup.frequency;
-                      return InkWell(
-                        onTap: backup.isEnabled && !_backupBusy ? () => _setFrequency(item) : null,
-                        borderRadius: BorderRadius.circular(999),
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 160),
-                          opacity: backup.isEnabled ? 1 : 0.46,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                            decoration: BoxDecoration(color: selected ? const Color(0xFF251538) : const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(999), border: Border.all(color: selected ? const Color(0xFF251538) : const Color(0xFFECE2D8))),
-                            child: Text(item.label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF4A2A63), fontSize: 11.5, fontWeight: FontWeight.w900)),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  _ActionRow(icon: Icons.cloud_upload_rounded, title: 'Back up now', subtitle: backup.lastBackupAt == null ? 'Create your first encrypted Drive backup.' : 'Last backup: ${backup.lastBackupAt}', onTap: _backupBusy ? () {} : _backupNow),
-                  const Divider(color: Color(0xFFECE2D8)),
-                  _ActionRow(icon: Icons.restore_rounded, title: 'Restore from backup', subtitle: backup.lastRestoreAt == null ? 'Restore latest available Drive backup.' : 'Last restore: ${backup.lastRestoreAt}', onTap: _backupBusy ? () {} : _restore),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            const _SettingsCard(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.security_rounded, color: Color(0xFF4A2A63), size: 20),
-                  SizedBox(width: 10),
-                  Expanded(child: Text('Inbox lock, privacy settings, Secret Drift, backups, and locked-chat recovery are backend-backed. Device unlock is a local shortcut only and never sends fingerprint data to the backend.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.35, fontWeight: FontWeight.w700))),
-                ],
-              ),
+            const SizedBox(height: 6),
+            const Text(
+              'FunKey keeps privacy controls short and clear. Advanced recovery and backup details stay inside their action screens.',
+              style: TextStyle(color: _muted, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -417,23 +414,182 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   }
 }
 
-class _VisibilityRow extends StatelessWidget {
-  const _VisibilityRow({required this.label, required this.value, required this.onChanged});
-  final String label;
+class _Header extends StatelessWidget {
+  const _Header({required this.onBackTap});
+  final VoidCallback onBackTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          onPressed: onBackTap,
+          icon: const Icon(Icons.arrow_back_rounded, color: _InboxSettingsPageState._ink, size: 22),
+        ),
+        const SizedBox(width: 4),
+        const Expanded(
+          child: Text(
+            'Inbox Settings',
+            style: TextStyle(color: _InboxSettingsPageState._ink, fontSize: 23, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 7),
+            child: Text(
+              title,
+              style: const TextStyle(color: _InboxSettingsPageState._muted, fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: _InboxSettingsPageState._surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _InboxSettingsPageState._line),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  children[i],
+                  if (i != children.length - 1) const Divider(height: 1, color: _InboxSettingsPageState._line, indent: 56),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({required this.icon, required this.title, required this.subtitle, this.trailingText, this.onTap});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? trailingText;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Opacity(
+        opacity: onTap == null ? 0.45 : 1,
+        child: SizedBox(
+          minHeight: 58,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+            child: Row(
+              children: [
+                Icon(icon, color: _InboxSettingsPageState._ink, size: 20),
+                const SizedBox(width: 13),
+                Expanded(child: _RowText(title: title, subtitle: subtitle)),
+                if (trailingText != null)
+                  Text(trailingText!, style: const TextStyle(color: _InboxSettingsPageState._muted, fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right_rounded, color: _InboxSettingsPageState._muted, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({required this.icon, required this.title, required this.subtitle, required this.value, required this.enabled, required this.onChanged});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      minHeight: 58,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, color: _InboxSettingsPageState._ink, size: 20),
+            const SizedBox(width: 13),
+            Expanded(child: _RowText(title: title, subtitle: subtitle)),
+            Switch.adaptive(
+              value: value,
+              activeThumbColor: _InboxSettingsPageState._blue,
+              onChanged: enabled ? onChanged : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RowText extends StatelessWidget {
+  const _RowText({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _InboxSettingsPageState._ink, fontSize: 14.3, fontWeight: FontWeight.w700)),
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _InboxSettingsPageState._muted, fontSize: 11.8, fontWeight: FontWeight.w500)),
+        ],
+      ],
+    );
+  }
+}
+
+class _ChoiceRow extends StatelessWidget {
+  const _ChoiceRow({required this.title, required this.value, required this.onChanged});
+
+  final String title;
   final String value;
   final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900))),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFECE2D8))),
-            child: DropdownButtonHideUnderline(
+    return SizedBox(
+      minHeight: 54,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+        child: Row(
+          children: [
+            Expanded(child: Text(title, style: const TextStyle(color: _InboxSettingsPageState._ink, fontSize: 14.2, fontWeight: FontWeight.w700))),
+            DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: value,
                 borderRadius: BorderRadius.circular(16),
@@ -445,37 +601,75 @@ class _VisibilityRow extends StatelessWidget {
                 onChanged: (next) {
                   if (next != null) onChanged(next);
                 },
-                style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 12, fontWeight: FontWeight.w900),
+                style: const TextStyle(color: _InboxSettingsPageState._muted, fontSize: 12.5, fontWeight: FontWeight.w700),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _GoogleDriveSetupSheet extends StatefulWidget {
-  const _GoogleDriveSetupSheet({required this.currentEmail, required this.onStart, required this.onConnect});
+class _FrequencyRow extends StatelessWidget {
+  const _FrequencyRow({required this.value, required this.enabled, required this.onChanged});
 
-  final String? currentEmail;
+  final ChatBackupFrequency value;
+  final bool enabled;
+  final ValueChanged<ChatBackupFrequency> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      minHeight: 58,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(13, 8, 13, 8),
+        child: Row(
+          children: [
+            const Icon(Icons.schedule_rounded, color: _InboxSettingsPageState._ink, size: 20),
+            const SizedBox(width: 13),
+            const Expanded(child: _RowText(title: 'Frequency', subtitle: 'Choose backup rhythm.')),
+            DropdownButtonHideUnderline(
+              child: DropdownButton<ChatBackupFrequency>(
+                value: value,
+                borderRadius: BorderRadius.circular(16),
+                items: ChatBackupFrequency.values.map((item) => DropdownMenuItem(value: item, child: Text(item.label))).toList(),
+                onChanged: enabled
+                    ? (next) {
+                        if (next != null) onChanged(next);
+                      }
+                    : null,
+                style: const TextStyle(color: _InboxSettingsPageState._muted, fontSize: 12.5, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleDriveSheet extends StatefulWidget {
+  const _GoogleDriveSheet({required this.backupStatus, required this.onStart, required this.onConnect});
+
+  final InboxBackupStatus backupStatus;
   final Future<String> Function() onStart;
   final Future<void> Function(String? email, String? setupCode) onConnect;
 
   @override
-  State<_GoogleDriveSetupSheet> createState() => _GoogleDriveSetupSheetState();
+  State<_GoogleDriveSheet> createState() => _GoogleDriveSheetState();
 }
 
-class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
-  final _email = TextEditingController();
-  final _code = TextEditingController();
+class _GoogleDriveSheetState extends State<_GoogleDriveSheet> {
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _code = TextEditingController();
   bool _busy = false;
-  String? _authUrl;
+  bool _manualCode = false;
 
   @override
   void initState() {
     super.initState();
-    _email.text = widget.currentEmail ?? '';
+    _email.text = widget.backupStatus.googleDriveEmail ?? '';
   }
 
   @override
@@ -485,32 +679,49 @@ class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
     super.dispose();
   }
 
-  Future<void> _start() async {
-    setState(() => _busy = true);
-    try {
-      final url = await widget.onStart();
-      if (url.contains('dev_mock_drive_code')) {
-        _code.text = 'dev_mock_drive_code';
-      }
-      setState(() => _authUrl = url);
-      _toast(url.contains('dev_mock_drive_code') ? 'Dev backup setup ready. Tap Connect to enable chat backup.' : 'Google Drive authorization started. Paste auth code after approval.');
-    } catch (_) {
-      _toast('Could not start Google Drive setup.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: _InboxSettingsPageState._ink, content: Text(message, style: const TextStyle(fontWeight: FontWeight.w700))));
   }
 
   Future<void> _connect() async {
     setState(() => _busy = true);
     try {
-      final trimmedCode = _code.text.trim();
-      await widget.onConnect(
-        _email.text.trim().isEmpty ? null : _email.text.trim(),
-        trimmedCode.isEmpty ? 'dev_mock_drive_code' : trimmedCode,
-      );
+      final url = await widget.onStart();
+      if (url.contains('dev_mock_drive_code')) {
+        await widget.onConnect(_email.text.trim().isEmpty ? null : _email.text.trim(), 'dev_mock_drive_code');
+        if (mounted) Navigator.pop(context);
+        _toast('Google Drive connected.');
+        return;
+      }
+      final uri = Uri.tryParse(url);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        setState(() => _manualCode = true);
+        _toast('Complete Google sign-in, then enter the code here.');
+      } else {
+        setState(() => _manualCode = true);
+        _toast('Enter the Google authorization code to finish.');
+      }
+    } catch (_) {
+      _toast('Could not start Google Drive connection.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _finishWithCode() async {
+    final code = _code.text.trim();
+    if (code.isEmpty) {
+      _toast('Enter the authorization code.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.onConnect(_email.text.trim().isEmpty ? null : _email.text.trim(), code);
       if (mounted) Navigator.pop(context);
-      _toast('Google Drive connected for Inbox backup.');
+      _toast('Google Drive connected.');
     } catch (_) {
       _toast('Could not connect Google Drive.');
     } finally {
@@ -518,130 +729,71 @@ class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
     }
   }
 
-  void _toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538), content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800))));
-  }
-
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.all(14),
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))]),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final connected = widget.backupStatus.isConnected;
+    return DraggableScrollableSheet(
+      initialChildSize: _manualCode ? 0.72 : 0.54,
+      minChildSize: 0.42,
+      maxChildSize: 0.86,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+          child: ListView(
+            controller: scrollController,
+            padding: EdgeInsets.fromLTRB(18, 10, 18, 18 + MediaQuery.paddingOf(context).bottom),
             children: [
-              Center(child: Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999)))),
-              const SizedBox(height: 12),
-              const Text('Google Drive Backup', style: TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 5),
-              const Text('Authorize Google Drive so Vibe Match can store encrypted Inbox backups and restore them later.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12.2, height: 1.35, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 14),
+              Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(99)))),
+              const SizedBox(height: 18),
+              const Icon(Icons.add_to_drive_rounded, color: _InboxSettingsPageState._blue, size: 36),
+              const SizedBox(height: 10),
+              Text(
+                connected ? 'Google Drive connected' : 'Chat backup',
+                style: const TextStyle(color: _InboxSettingsPageState._ink, fontSize: 22, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                connected ? widget.backupStatus.googleDriveEmail ?? 'Connected' : 'Save your chats to Google Drive.',
+                style: const TextStyle(color: _InboxSettingsPageState._muted, fontSize: 13, height: 1.35, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 18),
               TextField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
-                decoration: _inputDecoration('Google account email', Icons.alternate_email_rounded),
+                decoration: _fieldDecoration('Google account email'),
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _code,
-                decoration: _inputDecoration('Authorization code', Icons.key_rounded),
-              ),
-              if (_authUrl != null) ...[
+              if (_manualCode) ...[
                 const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECE2D8))),
-                  child: Text(_authUrl!, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 10.5, fontWeight: FontWeight.w800)),
-                ),
+                TextField(controller: _code, decoration: _fieldDecoration('Authorization code')),
               ],
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: _SheetButton(label: 'Start auth', icon: Icons.open_in_new_rounded, busy: _busy, onTap: _start, dark: false)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _SheetButton(label: 'Connect', icon: Icons.add_to_drive_rounded, busy: _busy, onTap: _connect, dark: true)),
-                ],
+              const SizedBox(height: 16),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _InboxSettingsPageState._blue,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: _busy ? null : (_manualCode ? _finishWithCode : _connect),
+                child: Text(_manualCode ? 'Finish connection' : connected ? 'Reconnect Google Drive' : 'Connect Google Drive'),
+              ),
+              TextButton(
+                onPressed: _busy ? null : () => setState(() => _manualCode = !_manualCode),
+                child: Text(_manualCode ? 'Hide manual code' : 'Enter code manually'),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon) {
+  InputDecoration _fieldDecoration(String label) {
     return InputDecoration(
-      prefixIcon: Icon(icon, color: const Color(0xFF4A2A63), size: 20),
       labelText: label,
-      labelStyle: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800),
       filled: true,
-      fillColor: const Color(0xFFFAF7F1),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF12C7B7), width: 1.4)),
-    );
-  }
-}
-
-class _SheetButton extends StatelessWidget {
-  const _SheetButton({required this.label, required this.icon, required this.busy, required this.onTap, required this.dark});
-  final String label;
-  final IconData icon;
-  final bool busy;
-  final VoidCallback onTap;
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: busy ? null : onTap,
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(color: dark ? const Color(0xFF251538) : const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18), border: Border.all(color: dark ? const Color(0xFF251538) : const Color(0xFFECE2D8))),
-        child: Center(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: dark ? Colors.white : const Color(0xFF4A2A63), size: 18), const SizedBox(width: 6), Text(label, style: TextStyle(color: dark ? Colors.white : const Color(0xFF251538), fontWeight: FontWeight.w900))])),
-      ),
-    );
-  }
-}
-
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.child});
-  final Widget child;
-  @override
-  Widget build(BuildContext context) {
-    return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFECE2D8))), child: child);
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.icon, required this.title, required this.subtitle, required this.onTap});
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: const Color(0xFF8C5CF6).withValues(alpha: 0.11), borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: const Color(0xFF8C5CF6), size: 21)),
-          const SizedBox(width: 11),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.5, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700))])),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5)),
-        ]),
-      ),
+      fillColor: const Color(0xFFF7F7F8),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: _InboxSettingsPageState._blue)),
     );
   }
 }
