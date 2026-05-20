@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/inbox_call_controller.dart';
 import '../../models/inbox_call_models.dart';
 import '../../models/inbox_models.dart';
-import 'inbox_call_overlay_sheet.dart';
+import '../pages/inbox_active_call_page.dart';
 
 class InboxCallActionSheet extends StatefulWidget {
   const InboxCallActionSheet({
@@ -39,25 +39,16 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
       _toast(widget.callController.errorMessage ?? 'Could not start call.');
       return;
     }
-    Navigator.pop(context);
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => AnimatedBuilder(
-        animation: widget.callController,
-        builder: (context, _) {
-          final active = widget.callController.activeCall ?? session;
-          return InboxCallOverlaySheet(
-            session: active,
-            onAccept: widget.callController.acceptActiveCall,
-            onDecline: () => widget.callController.declineActiveCall(reason: 'declined'),
-            onEnd: () async {
-              await widget.callController.endActiveCall(reason: 'ended');
-              if (context.mounted) Navigator.pop(context);
-            },
-          );
-        },
+
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await navigator.push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => InboxActiveCallPage(
+          callController: widget.callController,
+          initialSession: session,
+        ),
       ),
     );
   }
