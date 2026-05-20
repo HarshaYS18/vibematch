@@ -45,6 +45,12 @@ class InboxMessageActionSheetV2 extends StatefulWidget {
 }
 
 class _InboxMessageActionSheetV2State extends State<InboxMessageActionSheetV2> {
+  static const _ink = Color(0xFF111114);
+  static const _muted = Color(0xFF71717A);
+  static const _line = Color(0xFFEDEDEF);
+  static const _blue = Color(0xFF3797F0);
+  static const _red = Color(0xFFEF4444);
+
   late final TextEditingController _editController;
   bool _editing = false;
 
@@ -75,12 +81,12 @@ class _InboxMessageActionSheetV2State extends State<InboxMessageActionSheetV2> {
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.all(14),
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottom),
+        margin: const EdgeInsets.all(10),
+        padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + bottom),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))],
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 28, offset: const Offset(0, 14))],
         ),
         child: AnimatedSize(duration: const Duration(milliseconds: 180), curve: Curves.easeOutCubic, child: _editing ? _editBody() : _actionBody()),
       ),
@@ -92,24 +98,33 @@ class _InboxMessageActionSheetV2State extends State<InboxMessageActionSheetV2> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Center(child: Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999)))),
+        Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(999)))),
         const SizedBox(height: 12),
-        const Text('Message options', style: TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900)),
+        const Text('Message options', style: TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.2)),
         const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: ['❤️', '😂', '😮', '🙏', '🔥', '✨'].map((reaction) {
-            return InkWell(borderRadius: BorderRadius.circular(999), onTap: () => Navigator.pop(context, InboxMessageActionResult.react(reaction)), child: Padding(padding: const EdgeInsets.all(8), child: Text(reaction, style: const TextStyle(fontSize: 23))));
-          }).toList(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(color: const Color(0xFFF7F7F8), borderRadius: BorderRadius.circular(18)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: ['❤️', '😂', '😮', '🙏', '🔥', '✨'].map((reaction) {
+              return InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () => Navigator.pop(context, InboxMessageActionResult.react(reaction)),
+                child: Padding(padding: const EdgeInsets.all(8), child: Text(reaction, style: const TextStyle(fontSize: 23))),
+              );
+            }).toList(),
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         _ActionTile(icon: Icons.reply_rounded, title: 'Reply', onTap: () => Navigator.pop(context, InboxMessageActionResult.reply)),
         _ActionTile(icon: Icons.copy_rounded, title: 'Copy', onTap: () => Navigator.pop(context, InboxMessageActionResult.copy)),
-        _ActionTile(icon: widget.message.isStarred ? Icons.star_rounded : Icons.star_border_rounded, title: widget.message.isStarred ? 'Unstar message' : 'Star message', onTap: () => Navigator.pop(context, InboxMessageActionResult.star)),
+        _ActionTile(icon: widget.message.isStarred ? Icons.star_rounded : Icons.star_border_rounded, title: widget.message.isStarred ? 'Unstar' : 'Star', onTap: () => Navigator.pop(context, InboxMessageActionResult.star)),
         _ActionTile(icon: Icons.shortcut_rounded, title: 'Forward', onTap: () => Navigator.pop(context, InboxMessageActionResult.forward)),
-        if (_canEdit) _ActionTile(icon: Icons.edit_rounded, title: 'Edit message', subtitle: 'Allowed only for your text messages within server limit.', onTap: () => setState(() => _editing = true)),
-        _ActionTile(icon: Icons.remove_circle_outline_rounded, title: 'Remove for me', subtitle: 'Removes this message only from your Inbox view.', danger: true, onTap: () => Navigator.pop(context, InboxMessageActionResult.removeForMe)),
-        if (_canUnsend) _ActionTile(icon: Icons.undo_rounded, title: 'Unsend for everyone', subtitle: 'Uses the server recall window.', danger: true, onTap: () => Navigator.pop(context, InboxMessageActionResult.unsend)),
+        if (_canEdit) _ActionTile(icon: Icons.edit_rounded, title: 'Edit', onTap: () => setState(() => _editing = true)),
+        const Divider(height: 16, color: _line),
+        _ActionTile(icon: Icons.remove_circle_outline_rounded, title: 'Remove for me', danger: true, onTap: () => Navigator.pop(context, InboxMessageActionResult.removeForMe)),
+        if (_canUnsend) _ActionTile(icon: Icons.undo_rounded, title: 'Unsend for everyone', danger: true, onTap: () => Navigator.pop(context, InboxMessageActionResult.unsend)),
       ],
     );
   }
@@ -120,9 +135,9 @@ class _InboxMessageActionSheetV2State extends State<InboxMessageActionSheetV2> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          IconButton(onPressed: () => setState(() => _editing = false), icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF251538))),
-          const Expanded(child: Text('Edit message', style: TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900))),
-          TextButton(onPressed: _submitEdit, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w900))),
+          IconButton(onPressed: () => setState(() => _editing = false), icon: const Icon(Icons.arrow_back_rounded, color: _ink)),
+          const Expanded(child: Text('Edit message', style: TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w800))),
+          TextButton(onPressed: _submitEdit, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800))),
         ]),
         const SizedBox(height: 8),
         TextField(
@@ -133,46 +148,41 @@ class _InboxMessageActionSheetV2State extends State<InboxMessageActionSheetV2> {
           decoration: InputDecoration(
             hintText: 'Edit message',
             filled: true,
-            fillColor: const Color(0xFFFAF7F1),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 1.4)),
+            fillColor: const Color(0xFFF7F7F8),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: _blue, width: 1.3)),
           ),
         ),
         const SizedBox(height: 10),
-        const Text('Edits are backend-enforced and may fail if the edit window has expired.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+        const Text('Edited messages may show as edited in chat.', style: TextStyle(color: _muted, fontSize: 11.5, fontWeight: FontWeight.w500)),
       ],
     );
   }
 }
 
 class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.icon, required this.title, required this.onTap, this.subtitle, this.danger = false});
+  const _ActionTile({required this.icon, required this.title, required this.onTap, this.danger = false});
 
   final IconData icon;
   final String title;
-  final String? subtitle;
   final VoidCallback onTap;
   final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? const Color(0xFFE84C72) : const Color(0xFF251538);
+    final color = danger ? _InboxMessageActionSheetV2State._red : _InboxMessageActionSheetV2State._ink;
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        margin: const EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(color: danger ? const Color(0xFFFFF1F4) : const Color(0xFFF8F5FF), borderRadius: BorderRadius.circular(18)),
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        margin: const EdgeInsets.only(bottom: 2),
         child: Row(children: [
-          Icon(icon, color: color, size: 21),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: TextStyle(color: color, fontSize: 13.5, fontWeight: FontWeight.w900)),
-            if (subtitle != null) ...[const SizedBox(height: 2), Text(subtitle!, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 10.8, fontWeight: FontWeight.w700))],
-          ])),
-          Icon(Icons.chevron_right_rounded, color: danger ? color.withValues(alpha: 0.75) : const Color(0xFF9B8CA5)),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 13),
+          Expanded(child: Text(title, style: TextStyle(color: color, fontSize: 14.2, fontWeight: FontWeight.w700))),
+          Icon(Icons.chevron_right_rounded, color: danger ? color.withValues(alpha: 0.72) : _InboxMessageActionSheetV2State._muted, size: 20),
         ]),
       ),
     );
