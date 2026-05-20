@@ -24,6 +24,10 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
 
   Future<void> _startCall(InboxCallType type) async {
     if (_busy) return;
+    if (widget.conversation.isOfficial) {
+      _toast('Official team chats cannot be called.');
+      return;
+    }
     setState(() => _busy = true);
     final session = await widget.callController.startCall(
       conversation: widget.conversation,
@@ -73,6 +77,7 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final callDisabled = widget.conversation.isOfficial;
     return SafeArea(
       top: false,
       child: Container(
@@ -132,9 +137,11 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
                         style: const TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900),
                       ),
                       const SizedBox(height: 3),
-                      const Text(
-                        'Start a direct Inbox call. Media routing will attach to WebRTC/mediasoup gateway.',
-                        style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w700),
+                      Text(
+                        callDisabled
+                            ? 'Official team chats use support workflows, not direct calls.'
+                            : 'Start a direct Inbox call. Media routing will attach to WebRTC/mediasoup gateway.',
+                        style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -148,8 +155,8 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
                   child: _CallActionButton(
                     icon: Icons.call_rounded,
                     title: 'Voice call',
-                    subtitle: 'Audio only',
-                    busy: _busy,
+                    subtitle: callDisabled ? 'Unavailable' : 'Audio only',
+                    busy: _busy || callDisabled,
                     color: const Color(0xFF12C7B7),
                     onTap: () => _startCall(InboxCallType.audio),
                   ),
@@ -159,15 +166,15 @@ class _InboxCallActionSheetState extends State<InboxCallActionSheet> {
                   child: _CallActionButton(
                     icon: Icons.videocam_rounded,
                     title: 'Video call',
-                    subtitle: 'Camera call',
-                    busy: _busy,
+                    subtitle: callDisabled ? 'Unavailable' : 'Camera call',
+                    busy: _busy || callDisabled,
                     color: const Color(0xFF8C5CF6),
                     onTap: () => _startCall(InboxCallType.video),
                   ),
                 ),
               ],
             ),
-            if (widget.conversation.isOfficial) ...[
+            if (callDisabled) ...[
               const SizedBox(height: 12),
               const Text(
                 'Official team chats cannot be called.',
