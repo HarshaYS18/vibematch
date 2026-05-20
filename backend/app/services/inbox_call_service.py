@@ -194,7 +194,7 @@ def create_call_summary_message(db: Session, call: CallSession, actor: User, sta
         conversation_id=conversation.id,
         sender_user_id=actor.id,
         sender_name=actor_name,
-        message_type=InboxMessageType.SYSTEM.value,
+        message_type=InboxMessageType.CALL_LOG.value,
         text=text,
         status=InboxMessageStatus.SENT.value,
         metadata_json={
