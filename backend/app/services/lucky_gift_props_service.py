@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from random import choices
+import secrets
 from typing import Any
 
 from sqlalchemy import func
@@ -12,28 +12,33 @@ from app.models.game import GameDefinition
 from app.models.user import User
 
 LUCKY_GIFT_KEY = "lucky_gifts"
+_SECURE_RANDOM = secrets.SystemRandom()
 
 DEFAULT_MULTIPLIERS: list[dict[str, Any]] = [
-    {"multiplier": 1, "weight": 7200, "difficulty": "easy"},
-    {"multiplier": 2, "weight": 1500, "difficulty": "easy"},
-    {"multiplier": 5, "weight": 760, "difficulty": "normal"},
-    {"multiplier": 10, "weight": 330, "difficulty": "normal"},
-    {"multiplier": 20, "weight": 130, "difficulty": "medium"},
-    {"multiplier": 50, "weight": 55, "difficulty": "medium"},
-    {"multiplier": 100, "weight": 18, "difficulty": "medium_hard"},
-    {"multiplier": 500, "weight": 5, "difficulty": "hard"},
-    {"multiplier": 1000, "weight": 2, "difficulty": "very_hard"},
+    {"multiplier": 0, "weight": 2450, "difficulty": "miss", "tier": "miss"},
+    {"multiplier": 1, "weight": 6100, "difficulty": "easy", "tier": "small"},
+    {"multiplier": 2, "weight": 1050, "difficulty": "easy", "tier": "small"},
+    {"multiplier": 5, "weight": 300, "difficulty": "normal", "tier": "normal"},
+    {"multiplier": 10, "weight": 75, "difficulty": "normal", "tier": "good"},
+    {"multiplier": 20, "weight": 18, "difficulty": "medium", "tier": "big"},
+    {"multiplier": 50, "weight": 5, "difficulty": "medium", "tier": "big"},
+    {"multiplier": 100, "weight": 1, "difficulty": "hard", "tier": "mega"},
+    {"multiplier": 500, "weight": 0, "difficulty": "very_hard", "tier": "legendary"},
+    {"multiplier": 1000, "weight": 0, "difficulty": "mythic", "tier": "mythic"},
 ]
 
 DEFAULT_RULES: dict[str, Any] = {
-    "min_multiplier": 1,
+    "min_multiplier": 0,
     "max_multiplier": 1000,
     "broadcast_min_reward": 10000,
     "big_win_min_multiplier": 100,
     "payout_pool_safe_ratio_basis_points": 6500,
+    "target_rtp_basis_points": 7200,
+    "near_miss_enabled": True,
+    "near_miss_min_spend": 99,
     "whale_medium_multiplier_weight_basis_points": 1000,
-    "whale_high_multiplier_weight_basis_points": 250,
-    "whale_block_multiplier_weight_basis_points": 50,
+    "whale_high_multiplier_weight_basis_points": 220,
+    "whale_block_multiplier_weight_basis_points": 30,
     "multipliers": DEFAULT_MULTIPLIERS,
 }
 
@@ -91,16 +96,36 @@ def _as_bool(payload: dict[str, Any], key: str, fallback: bool) -> bool:
 
 def _difficulty_for_multiplier(multiplier: int) -> str:
     if multiplier >= 1000:
-        return "very_hard"
+        return "mythic"
     if multiplier >= 500:
-        return "hard"
+        return "very_hard"
     if multiplier >= 100:
-        return "medium_hard"
+        return "hard"
     if multiplier >= 20:
         return "medium"
     if multiplier >= 5:
         return "normal"
-    return "easy"
+    if multiplier >= 1:
+        return "easy"
+    return "miss"
+
+
+def _tier_for_multiplier(multiplier: int) -> str:
+    if multiplier >= 1000:
+        return "mythic"
+    if multiplier >= 500:
+        return "legendary"
+    if multiplier >= 100:
+        return "mega"
+    if multiplier >= 20:
+        return "big"
+    if multiplier >= 10:
+        return "good"
+    if multiplier >= 5:
+        return "normal"
+    if multiplier >= 1:
+        return "small"
+    return "miss"
 
 
 def _normalized_multiplier_rows(raw: Any) -> list[dict[str, Any]]:
@@ -114,13 +139,14 @@ def _normalized_multiplier_rows(raw: Any) -> list[dict[str, Any]]:
             weight = max(int(item.get("weight", 0)), 0)
         except Exception:
             continue
-        if multiplier < 1 or multiplier > 1000:
+        if multiplier < 0 or multiplier > 1000:
             continue
         rows.append(
             {
                 "multiplier": multiplier,
                 "weight": weight,
                 "difficulty": str(item.get("difficulty") or _difficulty_for_multiplier(multiplier)),
+                "tier": str(item.get("tier") or _tier_for_multiplier(multiplier)),
             }
         )
     if not rows or sum(int(item["weight"]) for item in rows) <= 0:
@@ -131,9 +157,9 @@ def _normalized_multiplier_rows(raw: Any) -> list[dict[str, Any]]:
 def _whale_weight_scale_basis_points(rules: dict[str, Any], risk_score: int) -> tuple[int, str]:
     safe_score = max(int(risk_score or 0), 0)
     if safe_score >= 95:
-        return max(int(rules.get("whale_block_multiplier_weight_basis_points", 50)), 0), "VERY_LOW_WHALE"
+        return max(int(rules.get("whale_block_multiplier_weight_basis_points", 30)), 0), "VERY_LOW_WHALE"
     if safe_score >= 70:
-        return max(int(rules.get("whale_high_multiplier_weight_basis_points", 250)), 0), "LOW_WHALE"
+        return max(int(rules.get("whale_high_multiplier_weight_basis_points", 220)), 0), "LOW_WHALE"
     if safe_score >= 35:
         return max(int(rules.get("whale_medium_multiplier_weight_basis_points", 1000)), 0), "MEDIUM_WHALE"
     return 10_000, "NORMAL"
@@ -143,40 +169,56 @@ def _apply_whale_probability_reduction(rows: list[dict[str, Any]], rules: dict[s
     scale_bp, mode = _whale_weight_scale_basis_points(rules, risk_score)
     if mode == "NORMAL":
         return rows, mode, scale_bp
-
     adjusted: list[dict[str, Any]] = []
     for item in rows:
         multiplier = int(item["multiplier"])
         weight = int(item["weight"])
         if multiplier >= 10:
-            weight = max(1, weight * scale_bp // 10_000)
-        elif multiplier >= 5 and scale_bp <= 250:
-            weight = max(1, weight * 1000 // 10_000)
+            weight = max(0, weight * scale_bp // 10_000)
+        elif multiplier >= 5 and scale_bp <= 220:
+            weight = max(1, weight * 800 // 10_000)
+        elif multiplier == 0:
+            weight = max(weight, 3000)
         adjusted.append({**item, "weight": weight})
     return adjusted, mode, scale_bp
+
+
+def _apply_payout_cap(rows: list[dict[str, Any]], *, spent: int, max_reward_coin_amount: int | None) -> tuple[list[dict[str, Any]], str | None]:
+    if max_reward_coin_amount is None or max_reward_coin_amount <= 0:
+        return rows, None
+    capped: list[dict[str, Any]] = []
+    for item in rows:
+        multiplier = int(item["multiplier"])
+        reward = spent * multiplier
+        if reward > max_reward_coin_amount:
+            capped.append({**item, "weight": 0})
+        else:
+            capped.append(item)
+    if sum(int(item["weight"]) for item in capped) <= 0:
+        return [{**item, "weight": 10000 if int(item["multiplier"]) == 0 else 0} for item in rows], "POOL_CAP_FORCED_MISS"
+    return capped, "POOL_CAP_APPLIED"
+
+
+def _secure_choice(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    total = sum(int(item["weight"]) for item in rows)
+    if total <= 0:
+        return {"multiplier": 0, "weight": 1, "difficulty": "miss", "tier": "miss"}
+    pick = _SECURE_RANDOM.randrange(total)
+    running = 0
+    for item in rows:
+        running += int(item["weight"])
+        if pick < running:
+            return item
+    return rows[-1]
 
 
 def get_or_create_definition(db: Session, actor: User | None = None) -> GameDefinition:
     definition = db.query(GameDefinition).filter(GameDefinition.game_key == LUCKY_GIFT_KEY).first()
     if definition is None:
-        definition = GameDefinition(
-            game_key=LUCKY_GIFT_KEY,
-            display_name="Lucky Gifts",
-            category="lucky_gift",
-            is_enabled=True,
-            is_coin_game=True,
-            min_app_version="1.0.0",
-            config_version=1,
-            ui_config_json="{}",
-            rules_json=_dumps(DEFAULT_RULES),
-            risk_config_json=_dumps(DEFAULT_RISK),
-            created_by_user_id=actor.id if actor else None,
-            updated_by_user_id=actor.id if actor else None,
-        )
+        definition = GameDefinition(game_key=LUCKY_GIFT_KEY, display_name="Lucky Gifts", category="lucky_gift", is_enabled=True, is_coin_game=True, min_app_version="1.0.0", config_version=1, ui_config_json="{}", rules_json=_dumps(DEFAULT_RULES), risk_config_json=_dumps(DEFAULT_RISK), created_by_user_id=actor.id if actor else None, updated_by_user_id=actor.id if actor else None)
         db.add(definition)
         db.flush()
         return definition
-
     rules = _merged(DEFAULT_RULES, definition.rules_json)
     risk = _merged(DEFAULT_RISK, definition.risk_config_json)
     rules["multipliers"] = _normalized_multiplier_rows(rules.get("multipliers"))
@@ -211,11 +253,14 @@ def get_props(db: Session) -> dict[str, Any]:
     return {
         "game_key": LUCKY_GIFT_KEY,
         "testing_mode_enabled": risk.get("testing_mode_enabled") is True,
-        "min_multiplier": int(rules.get("min_multiplier", 1)),
+        "min_multiplier": int(rules.get("min_multiplier", 0)),
         "max_multiplier": int(rules.get("max_multiplier", 1000)),
         "broadcast_min_reward": int(rules.get("broadcast_min_reward", 10000)),
         "big_win_min_multiplier": int(rules.get("big_win_min_multiplier", 100)),
         "payout_pool_safe_ratio_basis_points": int(rules.get("payout_pool_safe_ratio_basis_points", 6500)),
+        "target_rtp_basis_points": int(rules.get("target_rtp_basis_points", 7200)),
+        "near_miss_enabled": bool(rules.get("near_miss_enabled", True)),
+        "near_miss_min_spend": int(rules.get("near_miss_min_spend", 99)),
         "max_daily_spend": int(risk.get("max_daily_spend", DEFAULT_RISK["max_daily_spend"])),
         "max_daily_loss": int(risk.get("max_daily_loss", DEFAULT_RISK["max_daily_loss"])),
         "whale_daily_spend": int(risk.get("whale_daily_spend", DEFAULT_RISK["whale_daily_spend"])),
@@ -233,31 +278,20 @@ def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str,
     current = get_props(db)
     rules = _merged(DEFAULT_RULES, definition.rules_json)
     risk = _merged(DEFAULT_RISK, definition.risk_config_json)
-
-    for key in ["broadcast_min_reward", "big_win_min_multiplier", "payout_pool_safe_ratio_basis_points"]:
-        rules[key] = _as_int(payload, key, int(current[key]))
+    for key in ["broadcast_min_reward", "big_win_min_multiplier", "payout_pool_safe_ratio_basis_points", "target_rtp_basis_points", "near_miss_min_spend"]:
+        rules[key] = _as_int(payload, key, int(current.get(key, DEFAULT_RULES.get(key, 0))))
+    rules["near_miss_enabled"] = _as_bool(payload, "near_miss_enabled", bool(current.get("near_miss_enabled", True)))
     for key in ["whale_medium_multiplier_weight_basis_points", "whale_high_multiplier_weight_basis_points", "whale_block_multiplier_weight_basis_points"]:
         rules[key] = _as_int(payload, key, int(rules.get(key, DEFAULT_RULES[key])))
-    rules["min_multiplier"] = 1
+    rules["min_multiplier"] = 0
     rules["max_multiplier"] = 1000
     rules["multipliers"] = _normalized_multiplier_rows(payload.get("multipliers", current["multipliers"]))
-
     risk["testing_mode_enabled"] = _as_bool(payload, "testing_mode_enabled", bool(current["testing_mode_enabled"]))
     risk["whale_probability_mode_enabled"] = _as_bool(payload, "whale_probability_mode_enabled", bool(risk.get("whale_probability_mode_enabled", True)))
     if "reason" in payload:
         risk["testing_mode_reason"] = str(payload.get("reason") or "Super Owner lucky gift props update")
-    for key in [
-        "max_daily_spend",
-        "max_daily_loss",
-        "whale_daily_spend",
-        "whale_single_spend",
-        "whale_recent_count",
-        "whale_recent_window_minutes",
-        "manual_review_score",
-        "block_score",
-    ]:
+    for key in ["max_daily_spend", "max_daily_loss", "whale_daily_spend", "whale_single_spend", "whale_recent_count", "whale_recent_window_minutes", "manual_review_score", "block_score"]:
         risk[key] = _as_int(payload, key, int(current[key]))
-
     definition.rules_json = _dumps(rules)
     definition.risk_config_json = _dumps(risk)
     definition.updated_by_user_id = actor.id
@@ -266,32 +300,36 @@ def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str,
     return get_props(db)
 
 
-def roll_lucky_gift(
-    db: Session,
-    *,
-    gift_id: str,
-    gift_name: str,
-    base_coin_value: int,
-    quantity: int,
-    house_risk_score: int = 0,
-) -> dict[str, Any]:
+def roll_lucky_gift(db: Session, *, gift_id: str, gift_name: str, base_coin_value: int, quantity: int, house_risk_score: int = 0, max_reward_coin_amount: int | None = None) -> dict[str, Any]:
     rules = load_rules(db)
+    spent = max(int(base_coin_value or 0), 0) * max(int(quantity or 1), 1)
     rows = _normalized_multiplier_rows(rules.get("multipliers"))
     rows, probability_mode, whale_weight_scale_basis_points = _apply_whale_probability_reduction(rows, rules, house_risk_score)
-    multiplier = int(choices([item["multiplier"] for item in rows], weights=[item["weight"] for item in rows], k=1)[0])
-    selected = next((item for item in rows if int(item["multiplier"]) == multiplier), {"difficulty": _difficulty_for_multiplier(multiplier)})
-    spent = max(int(base_coin_value or 0), 0) * max(int(quantity or 1), 1)
+    rows, cap_mode = _apply_payout_cap(rows, spent=spent, max_reward_coin_amount=max_reward_coin_amount)
+    selected = _secure_choice(rows)
+    multiplier = int(selected.get("multiplier") or 0)
     reward = spent * multiplier
+    tier = str(selected.get("tier") or _tier_for_multiplier(multiplier))
+    near_miss = bool(rules.get("near_miss_enabled", True)) and multiplier == 0 and spent >= int(rules.get("near_miss_min_spend", 99))
     return {
         "gift_id": gift_id,
         "gift_name": gift_name,
         "multiplier": multiplier,
         "difficulty": str(selected.get("difficulty") or _difficulty_for_multiplier(multiplier)),
+        "tier": tier,
+        "display_tier": "near_miss" if near_miss else tier,
+        "is_big_win": multiplier >= int(rules.get("big_win_min_multiplier", 100)),
+        "is_broadcast_win": reward >= int(rules.get("broadcast_min_reward", 10000)),
+        "near_miss": near_miss,
         "reward_coin_amount": reward,
         "spent_coin_amount": spent,
+        "net_coin_amount": reward - spent,
         "house_risk_score": house_risk_score,
         "probability_mode": probability_mode,
+        "pool_cap_mode": cap_mode,
         "whale_weight_scale_basis_points": whale_weight_scale_basis_points,
+        "rng": "server_secure_rng",
+        "rule": "Server-side secure lucky gift roll with whale probability reduction, pool exposure cap, payout tiers, and no client-side outcome control.",
     }
 
 
@@ -299,9 +337,7 @@ def evaluate_whale_risk(db: Session, *, user_id: int, spend_amount: int) -> dict
     risk = load_risk(db)
     if risk.get("testing_mode_enabled") is True:
         return {"level": "LOW", "score": 0, "action": "ALLOW", "probability_mode": "NORMAL", "reasons": ["testing_mode_enabled"]}
-
     from datetime import datetime, timedelta
-
     since_day = datetime.utcnow() - timedelta(hours=24)
     since_recent = datetime.utcnow() - timedelta(minutes=max(int(risk.get("whale_recent_window_minutes", 5)), 1))
     daily_spent = int(db.query(func.coalesce(func.sum(LuckyGiftTransaction.spent_coins), 0)).filter(LuckyGiftTransaction.sender_user_id == user_id, LuckyGiftTransaction.created_at >= since_day).scalar() or 0)
@@ -309,25 +345,23 @@ def evaluate_whale_risk(db: Session, *, user_id: int, spend_amount: int) -> dict
     recent_count = int(db.query(func.count(LuckyGiftTransaction.id)).filter(LuckyGiftTransaction.sender_user_id == user_id, LuckyGiftTransaction.created_at >= since_recent).scalar() or 0)
     projected_spend = daily_spent + max(int(spend_amount or 0), 0)
     projected_loss = max(projected_spend - daily_reward, 0)
-
     score = 0
     reasons: list[str] = []
     if spend_amount >= int(risk.get("whale_single_spend", DEFAULT_RISK["whale_single_spend"])):
         score += 35
-        reasons.append("whale_single_spend")
+        reasons.append("single_spend")
     if projected_spend > int(risk.get("whale_daily_spend", DEFAULT_RISK["whale_daily_spend"])):
         score += 35
-        reasons.append("whale_daily_spend")
+        reasons.append("daily_spend")
     if projected_spend > int(risk.get("max_daily_spend", DEFAULT_RISK["max_daily_spend"])):
         score += 55
         reasons.append("max_daily_spend")
     if projected_loss > int(risk.get("max_daily_loss", DEFAULT_RISK["max_daily_loss"])):
         score += 45
-        reasons.append("max_daily_loss")
+        reasons.append("daily_loss")
     if recent_count >= int(risk.get("whale_recent_count", DEFAULT_RISK["whale_recent_count"])):
         score += 35
-        reasons.append("recent_velocity")
-
+        reasons.append("velocity")
     block_score = int(risk.get("block_score", DEFAULT_RISK["block_score"]))
     manual_score = int(risk.get("manual_review_score", DEFAULT_RISK["manual_review_score"]))
     if score >= block_score:
@@ -342,17 +376,4 @@ def evaluate_whale_risk(db: Session, *, user_id: int, spend_amount: int) -> dict
     else:
         level = "LOW"
         probability_mode = "NORMAL"
-
-    return {
-        "level": level,
-        "score": score,
-        "action": "ALLOW",
-        "probability_mode": probability_mode,
-        "reasons": reasons,
-        "daily_spent": daily_spent,
-        "daily_reward": daily_reward,
-        "projected_spend": projected_spend,
-        "projected_loss": projected_loss,
-        "recent_count": recent_count,
-        "rule": "Whale behavior accepts coins but reduces high-multiplier probability instead of blocking the send.",
-    }
+    return {"level": level, "score": score, "action": "ALLOW", "probability_mode": probability_mode, "reasons": reasons, "daily_spent": daily_spent, "daily_reward": daily_reward, "projected_spend": projected_spend, "projected_loss": projected_loss, "recent_count": recent_count, "rule": "Lucky gift accepts valid spend but reduces high-multiplier probability when risk rises."}
