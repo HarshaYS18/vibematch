@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +14,10 @@ import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_call_models.dart';
 import '../../models/inbox_models.dart';
 import 'inbox_active_call_page.dart';
+import '../widgets/funkey_attachment_picker_sheet.dart';
+import '../widgets/funkey_reply_preview.dart';
+import '../widgets/funkey_chat_input_bar.dart';
+import '../widgets/funkey_chat_header.dart';
 import '../widgets/inbox_message_media_content.dart';
 import '../widgets/inbox_message_action_sheet_v2.dart';
 import '../widgets/inbox_call_realtime_presenter.dart';
@@ -493,7 +497,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AttachmentSheet(
+      builder: (_) => FunKeyAttachmentPickerSheet(
         onPick: (type) async {
           Navigator.pop(context);
           if (type == InboxMessageType.document) {
@@ -715,7 +719,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
         body: SafeArea(
           child: Column(
             children: [
-              _ChatHeader(
+              FunKeyChatHeader(
                 conversation: conversation,
                 statusText: _chatStatusText(conversation),
                 onBackTap: () => unawaited(_handleBackFromChat()),
@@ -811,11 +815,11 @@ class _InboxChatPageState extends State<InboxChatPage> {
                 ),
               ),
               if (_replyToText != null)
-                _ReplyPreview(
-                  text: _replyToText!,
-                  onClose: () => setState(() => _replyToText = null),
-                ),
-              _ChatInputBar(
+                FunKeyReplyPreview(
+              text: _replyToText!,
+              onClose: () => setState(() => _replyToText = null),
+            ),
+              FunKeyChatInputBar(
                 readOnly: _readOnly,
                 driftMode: conversation.secretDriftEnabled,
                 showDriftHint: _showDriftCoach,
@@ -1197,198 +1201,11 @@ class _EmptyChatState extends StatelessWidget {
   }
 }
 
-class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({
-    required this.conversation,
-    required this.statusText,
-    required this.onBackTap,
-    required this.onMoreTap,
-    required this.callsEnabled,
-    required this.startingCallType,
-    required this.onVoiceCallTap,
-    required this.onVideoCallTap,
-  });
 
-  final InboxConversation conversation;
-  final String statusText;
-  final VoidCallback onBackTap;
-  final VoidCallback onMoreTap;
-  final bool callsEnabled;
-  final InboxCallType? startingCallType;
-  final VoidCallback onVoiceCallTap;
-  final VoidCallback onVideoCallTap;
 
-  @override
-  Widget build(BuildContext context) {
-    final avatarUrl = conversation.avatarUrl?.trim();
-    return Container(
-      padding: const EdgeInsets.fromLTRB(6, 8, 8, 10),
-      decoration: BoxDecoration(
-        color: InboxLightPremiumTokens.ink,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: onBackTap,
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          ),
-          Container(
-            width: 42,
-            height: 42,
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(colors: conversation.colors),
-            ),
-            child: ClipOval(
-              child: avatarUrl == null || avatarUrl.isEmpty
-                  ? _HeaderAvatarText(conversation: conversation)
-                  : Image.network(
-                      avatarUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _HeaderAvatarText(conversation: conversation),
-                    ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        conversation.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    if (conversation.isOfficial)
-                      const Icon(
-                        Icons.verified_rounded,
-                        color: InboxLightPremiumTokens.aqua,
-                        size: 15,
-                      ),
-                  ],
-                ),
-                Text(
-                  statusText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFCDBCE7),
-                    fontSize: 11.2,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (conversation.hasChatStreak) ...[
-            _HeaderChatStreakPill(conversation: conversation),
-            const SizedBox(width: 4),
-          ],
-          if (callsEnabled) ...[
-            _HeaderCallButton(
-              icon: Icons.call_rounded,
-              busy: startingCallType == InboxCallType.audio,
-              onTap: onVoiceCallTap,
-            ),
-            _HeaderCallButton(
-              icon: Icons.videocam_rounded,
-              busy: startingCallType == InboxCallType.video,
-              onTap: onVideoCallTap,
-            ),
-          ],
-          IconButton(
-            onPressed: onMoreTap,
-            icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class _HeaderCallButton extends StatelessWidget {
-  const _HeaderCallButton({
-    required this.icon,
-    required this.busy,
-    required this.onTap,
-  });
 
-  final IconData icon;
-  final bool busy;
-  final VoidCallback onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: busy ? null : onTap,
-      icon: busy
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : Icon(icon, color: Colors.white, size: 21),
-    );
-  }
-}
-
-class _HeaderChatStreakPill extends StatelessWidget {
-  const _HeaderChatStreakPill({required this.conversation});
-
-  final InboxConversation conversation;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = conversation.chatStreakActiveToday
-        ? const Color(0xFFFFA000)
-        : Color(0xFFEFE7FF);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.local_fire_department_rounded, color: color, size: 12),
-          const SizedBox(width: 3),
-          Text(
-            '${conversation.chatStreakCount}',
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _HeaderAvatarText extends StatelessWidget {
   const _HeaderAvatarText({required this.conversation});
@@ -2072,45 +1889,7 @@ class _RetryChip extends StatelessWidget {
   }
 }
 
-class _ReplyPreview extends StatelessWidget {
-  const _ReplyPreview({required this.text, required this.onClose});
-  final String text;
-  final VoidCallback onClose;
-  @override
-  Widget build(BuildContext context) => Container(
-    color: Colors.white,
-    padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: InboxLightPremiumTokens.pearl,
-        borderRadius: BorderRadius.circular(16),
-        border: const Border(
-          left: BorderSide(color: InboxLightPremiumTokens.pink, width: 4),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: InboxLightPremiumTokens.ink,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          IconButton(
-            onPressed: onClose,
-            icon: const Icon(Icons.close_rounded, size: 18),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+
 
 class _ChatMoreSheet extends StatelessWidget {
   const _ChatMoreSheet({
@@ -2229,467 +2008,9 @@ class _ChatMoreSheet extends StatelessWidget {
   }
 }
 
-class _ChatInputBar extends StatelessWidget {
-  const _ChatInputBar({
-    required this.readOnly,
-    required this.driftMode,
-    required this.showDriftHint,
-    required this.onDriftSwipe,
-    required this.controller,
-    required this.recordingVoice,
-    required this.sendingVoice,
-    required this.onAttachTap,
-    required this.onEmojiTap,
-    required this.onVoiceTap,
-    required this.onVoiceLongPressStart,
-    required this.onVoiceLongPressEnd,
-    required this.onVoiceLongPressCancel,
-    required this.onSendTap,
-  });
-  final bool readOnly;
-  final bool driftMode;
-  final bool showDriftHint;
-  final Future<void> Function() onDriftSwipe;
-  final TextEditingController controller;
-  final bool recordingVoice;
-  final bool sendingVoice;
-  final VoidCallback onAttachTap;
-  final VoidCallback onEmojiTap;
-  final VoidCallback onVoiceTap;
-  final VoidCallback onVoiceLongPressStart;
-  final VoidCallback onVoiceLongPressEnd;
-  final VoidCallback onVoiceLongPressCancel;
-  final VoidCallback onSendTap;
 
-  @override
-  Widget build(BuildContext context) {
-    final hasText = controller.text.trim().isNotEmpty;
-    final disabled = readOnly;
-    final composerGradient = driftMode
-        ? const LinearGradient(
-            colors: [Color(0xFF211133), Color(0xFF3D1B5F)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : null;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        10,
-        8,
-        10,
-        8 + MediaQuery.paddingOf(context).bottom,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          _ComposerIconButton(
-            tooltip: 'Emoji',
-            icon: Icons.emoji_emotions_outlined,
-            onTap: disabled ? null : onEmojiTap,
-          ),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onVerticalDragEnd: disabled
-                  ? null
-                  : (details) {
-                      final velocity = details.primaryVelocity ?? 0;
-                      if (velocity < -260) unawaited(onDriftSwipe());
-                    },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOutCubic,
-                constraints: const BoxConstraints(
-                  minHeight: 46,
-                  maxHeight: 104,
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 13),
-                decoration: BoxDecoration(
-                  gradient: disabled ? null : composerGradient,
-                  color: driftMode || disabled
-                      ? disabled
-                            ? const Color(0xFFF2EDF4)
-                            : null
-                      : InboxLightPremiumTokens.pearl,
-                  borderRadius: BorderRadius.circular(23),
-                  border: Border.all(
-                    color: driftMode
-                        ? InboxLightPremiumTokens.pink.withValues(alpha: 0.52)
-                        : showDriftHint
-                        ? InboxLightPremiumTokens.violet.withValues(alpha: 0.28)
-                        : hasText
-                        ? const Color(0xFFCDB7FF)
-                        : InboxLightPremiumTokens.border,
-                  ),
-                ),
-                child: TextField(
-                  controller: controller,
-                  enabled: !disabled,
-                  minLines: 1,
-                  maxLines: 4,
-                  textCapitalization: TextCapitalization.sentences,
-                  cursorColor: driftMode
-                      ? Colors.white
-                      : InboxLightPremiumTokens.violet,
-                  style: TextStyle(
-                    color: driftMode
-                        ? Colors.white
-                        : InboxLightPremiumTokens.ink,
-                    fontWeight: FontWeight.w800,
-                  ),
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    prefixIcon: driftMode || showDriftHint
-                        ? Icon(
-                            Icons.timer_rounded,
-                            color: driftMode
-                                ? Colors.white
-                                : InboxLightPremiumTokens.violet,
-                            size: 17,
-                          )
-                        : null,
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 28,
-                      minHeight: 28,
-                    ),
-                    hintText: disabled
-                        ? 'Replies disabled'
-                        : recordingVoice
-                        ? 'Recording voice...'
-                        : driftMode
-                        ? 'Secret Drift...'
-                        : showDriftHint
-                        ? 'Swipe up for Secret Drift'
-                        : 'Message...',
-                    hintStyle: TextStyle(
-                      color: driftMode
-                          ? Colors.white.withValues(alpha: 0.72)
-                          : const Color(0xFF8C8198),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          _ComposerIconButton(
-            tooltip: 'Attach',
-            icon: Icons.add_rounded,
-            onTap: disabled ? null : onAttachTap,
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: disabled ? null : onVoiceTap,
-            onLongPressStart: disabled || sendingVoice
-                ? null
-                : (_) => onVoiceLongPressStart(),
-            onLongPressEnd: disabled || sendingVoice
-                ? null
-                : (_) => onVoiceLongPressEnd(),
-            onLongPressCancel: disabled || sendingVoice
-                ? null
-                : onVoiceLongPressCancel,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: recordingVoice
-                    ? InboxLightPremiumTokens.danger
-                    : InboxLightPremiumTokens.violet.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: recordingVoice
-                      ? Colors.white.withValues(alpha: 0.20)
-                      : InboxLightPremiumTokens.violet.withValues(alpha: 0.14),
-                ),
-              ),
-              child: Icon(
-                sendingVoice
-                    ? Icons.hourglass_top_rounded
-                    : recordingVoice
-                    ? Icons.stop_rounded
-                    : Icons.mic_rounded,
-                color: recordingVoice
-                    ? Colors.white
-                    : InboxLightPremiumTokens.violet,
-                size: 21,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          InkWell(
-            borderRadius: BorderRadius.circular(999),
-            onTap: disabled || !hasText ? null : onSendTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                gradient: disabled || !hasText
-                    ? null
-                    : const LinearGradient(
-                        colors: [
-                          InboxLightPremiumTokens.violet,
-                          InboxLightPremiumTokens.pink,
-                        ],
-                      ),
-                color: disabled || !hasText ? const Color(0xFFE1D8E8) : null,
-                shape: BoxShape.circle,
-                boxShadow: disabled || !hasText
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: const Color(
-                            0xFF7C3AED,
-                          ).withValues(alpha: 0.26),
-                          blurRadius: 12,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-              ),
-              child: Icon(
-                Icons.send_rounded,
-                color: disabled || !hasText
-                    ? InboxLightPremiumTokens.softMuted
-                    : Colors.white,
-                size: 18,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class _ComposerIconButton extends StatelessWidget {
-  const _ComposerIconButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onTap,
-  });
 
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: enabled
-                ? InboxLightPremiumTokens.violet.withValues(alpha: 0.09)
-                : const Color(0xFFE9E0EE),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: enabled
-                ? InboxLightPremiumTokens.violet
-                : InboxLightPremiumTokens.softMuted,
-            size: 21,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AttachmentSheet extends StatelessWidget {
-  const _AttachmentSheet({required this.onPick});
-  final ValueChanged<InboxMessageType> onPick;
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      _AttachmentItem(
-        type: InboxMessageType.image,
-        icon: Icons.image_rounded,
-        label: 'Gallery',
-        subtitle: 'Photos from device',
-        colors: const [
-          InboxLightPremiumTokens.pink,
-          InboxLightPremiumTokens.violet,
-        ],
-      ),
-      _AttachmentItem(
-        type: InboxMessageType.document,
-        icon: Icons.description_rounded,
-        label: 'Document',
-        subtitle: 'PDF, Office, ZIP',
-        colors: const [InboxLightPremiumTokens.aqua, Color(0xFF0F766E)],
-      ),
-    ];
-    return Container(
-      margin: const EdgeInsets.all(14),
-      padding: EdgeInsets.fromLTRB(
-        14,
-        12,
-        14,
-        16 + MediaQuery.paddingOf(context).bottom,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 42,
-            height: 5,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0D5CB),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-          const SizedBox(height: 14),
-          const Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Send something',
-                  style: TextStyle(
-                    color: InboxLightPremiumTokens.ink,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.88,
-            ),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return _AttachmentActionTile(
-                item: item,
-                onTap: () => onPick(item.type),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AttachmentItem {
-  _AttachmentItem({
-    required this.type,
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.colors,
-  });
-  final InboxMessageType type;
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final List<Color> colors;
-}
-
-class _AttachmentActionTile extends StatelessWidget {
-  const _AttachmentActionTile({required this.item, required this.onTap});
-
-  final _AttachmentItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: InboxLightPremiumTokens.pearl,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: InboxLightPremiumTokens.border),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: item.colors),
-                borderRadius: BorderRadius.circular(17),
-                boxShadow: [
-                  BoxShadow(
-                    color: item.colors.last.withValues(alpha: 0.18),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Icon(item.icon, color: Colors.white, size: 23),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: InboxLightPremiumTokens.ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              item.subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF8C8198),
-                fontSize: 9.8,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _ActionTile extends StatelessWidget {
   const _ActionTile({
@@ -2730,3 +2051,17 @@ class _ActionTile extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

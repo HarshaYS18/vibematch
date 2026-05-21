@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../models/inbox_models.dart';
 
@@ -17,7 +17,13 @@ class ReportConversationSheet extends StatefulWidget {
 }
 
 class _ReportConversationSheetState extends State<ReportConversationSheet> {
-  final TextEditingController _reasonController = TextEditingController();
+  static const _ink = Color(0xFF111114);
+  static const _muted = Color(0xFF71717A);
+  static const _line = Color(0xFFEDEDEF);
+  static const _accent = Color(0xFFEF4444);
+
+  final TextEditingController _detailsController = TextEditingController();
+
   String _selectedReason = 'Harassment or abuse';
 
   static const List<String> _reasons = [
@@ -31,36 +37,35 @@ class _ReportConversationSheetState extends State<ReportConversationSheet> {
 
   @override
   void dispose() {
-    _reasonController.dispose();
+    _detailsController.dispose();
     super.dispose();
   }
 
   void _submit() {
-    final note = _reasonController.text.trim();
-    final reason = note.isEmpty ? _selectedReason : '$_selectedReason • $note';
+    final details = _detailsController.text.trim();
+    final reason = details.isEmpty ? _selectedReason : '$_selectedReason • $details';
     widget.onSubmit(reason);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.paddingOf(context).bottom;
-    final snapshot = widget.conversation.messages.length <= 5
-        ? widget.conversation.messages
-        : widget.conversation.messages.sublist(widget.conversation.messages.length - 5);
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    final messages = widget.conversation.messages;
+    final snapshot = messages.length <= 5 ? messages : messages.sublist(messages.length - 5);
 
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.all(14),
+        margin: const EdgeInsets.all(8),
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.84),
-        padding: EdgeInsets.fromLTRB(16, 10, 16, 14 + bottomPadding),
+        padding: EdgeInsets.fromLTRB(16, 10, 16, 14 + bottom),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.16),
-              blurRadius: 30,
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 28,
               offset: const Offset(0, 14),
             ),
           ],
@@ -73,25 +78,63 @@ class _ReportConversationSheetState extends State<ReportConversationSheet> {
             children: [
               Center(
                 child: Container(
-                  width: 42,
-                  height: 5,
+                  width: 38,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE0D5CB),
+                    color: const Color(0xFFD4D4D8),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
               const SizedBox(height: 14),
-              Text(
-                'Report ${widget.conversation.title}',
-                style: const TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900),
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _accent.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.flag_rounded, color: _accent, size: 21),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Report ${widget.conversation.title}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'Choose a reason and add optional details.',
+                          style: TextStyle(
+                            color: _muted,
+                            fontSize: 12.2,
+                            height: 1.3,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 16),
               const Text(
-                'A snapshot of this conversation will be sent to CS for review. If accepted, CS will escalate it to Monitor team for action.',
-                style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700, height: 1.35),
+                'Reason',
+                style: TextStyle(color: _ink, fontSize: 13.5, fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -100,19 +143,20 @@ class _ReportConversationSheetState extends State<ReportConversationSheet> {
                   return InkWell(
                     borderRadius: BorderRadius.circular(999),
                     onTap: () => setState(() => _selectedReason = reason),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 170),
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
                       decoration: BoxDecoration(
-                        color: selected ? const Color(0xFFE84C72) : const Color(0xFFFAF7F1),
+                        color: selected ? _accent : const Color(0xFFF4F4F5),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: selected ? const Color(0xFFE84C72) : const Color(0xFFECE2D8)),
+                        border: Border.all(color: selected ? _accent : _line),
                       ),
                       child: Text(
                         reason,
                         style: TextStyle(
-                          color: selected ? Colors.white : const Color(0xFF251538),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w900,
+                          color: selected ? Colors.white : _ink,
+                          fontSize: 11.7,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -121,72 +165,97 @@ class _ReportConversationSheetState extends State<ReportConversationSheet> {
               ),
               const SizedBox(height: 14),
               TextField(
-                controller: _reasonController,
+                controller: _detailsController,
                 minLines: 2,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'Add note for CS review optional',
-                  hintStyle: const TextStyle(color: Color(0xFF9B8CA5), fontWeight: FontWeight.w700),
+                  hintText: 'Add details optional',
+                  hintStyle: const TextStyle(color: _muted, fontWeight: FontWeight.w500),
                   filled: true,
-                  fillColor: const Color(0xFFFAF7F1),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFECE2D8))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE84C72))),
+                  fillColor: const Color(0xFFF7F7F8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: _accent, width: 1.2),
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
               const Text(
-                'Snapshot preview',
-                style: TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900),
+                'Recent messages',
+                style: TextStyle(color: _ink, fontSize: 13.5, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFAF7F1),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFECE2D8)),
+                  color: const Color(0xFFF7F7F8),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _line),
                 ),
-                child: Column(
-                  children: snapshot.map((message) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 7),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            message.sender,
-                            style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w900),
-                          ),
-                          const SizedBox(width: 7),
-                          Expanded(
-                            child: Text(
-                              message.text,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, fontWeight: FontWeight.w700),
+                child: snapshot.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Text(
+                          'No messages to preview.',
+                          style: TextStyle(color: _muted, fontSize: 12, fontWeight: FontWeight.w500),
+                        ),
+                      )
+                    : Column(
+                        children: snapshot.map((message) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 7),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 64,
+                                  child: Text(
+                                    message.sender,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: _ink,
+                                      fontSize: 10.8,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 7),
+                                Expanded(
+                                  child: Text(
+                                    message.text,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: _muted,
+                                      fontSize: 10.8,
+                                      height: 1.25,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }).toList(),
-                ),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 height: 48,
-                child: ElevatedButton.icon(
+                child: FilledButton.icon(
                   onPressed: _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE84C72),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _accent,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  icon: const Icon(Icons.report_rounded),
-                  label: const Text('Send report to CS', style: TextStyle(fontWeight: FontWeight.w900)),
+                  icon: const Icon(Icons.flag_rounded, size: 18),
+                  label: const Text('Send report', style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
             ],

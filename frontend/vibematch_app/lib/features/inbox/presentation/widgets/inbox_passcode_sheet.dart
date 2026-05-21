@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../data/inbox_preferences_api_service.dart';
-import 'inbox_light_premium_tokens.dart';
 
 class InboxPasscodeSheet extends StatefulWidget {
   const InboxPasscodeSheet({
@@ -27,20 +26,26 @@ class InboxPasscodeSheet extends StatefulWidget {
 }
 
 class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
+  static const _ink = Color(0xFF111114);
+  static const _muted = Color(0xFF71717A);
+  static const _line = Color(0xFFEDEDEF);
+  static const _blue = Color(0xFF3797F0);
+
   final TextEditingController _controller = TextEditingController();
   final LocalAuthentication _localAuth = LocalAuthentication();
   final InboxPreferencesApiService _preferencesApi = const InboxPreferencesApiService();
+
   bool _obscure = true;
   bool _busy = false;
-  bool _biometricBusy = false;
+  bool _deviceBusy = false;
   bool _deviceUnlockAllowed = false;
-  bool _canUseBiometrics = false;
+  bool _canUseDeviceUnlock = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _bootstrapDeviceUnlock();
+    _loadDeviceUnlockState();
   }
 
   @override
@@ -49,71 +54,87 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
     super.dispose();
   }
 
-  Future<void> _bootstrapDeviceUnlock() async {
+  Future<void> _loadDeviceUnlockState() async {
     var allowed = widget.deviceUnlockEnabled;
+
     try {
       final preferences = await _preferencesApi.loadPreferences();
       allowed = allowed || preferences.deviceUnlockEnabled;
     } catch (_) {
-      // Keep constructor-provided value if settings cannot be loaded yet.
+      // Keep the sheet usable even if preferences are unavailable.
     }
-    if (!mounted) return;
-    setState(() => _deviceUnlockAllowed = allowed);
-    await _checkBiometricAvailability();
-  }
 
-  Future<void> _checkBiometricAvailability() async {
-    if (!_deviceUnlockAllowed) return;
+    if (!mounted) return;
+
+    setState(() => _deviceUnlockAllowed = allowed);
+
+    if (!allowed) return;
+
     try {
       final supported = await _localAuth.isDeviceSupported();
       final canCheck = await _localAuth.canCheckBiometrics;
+
       if (!mounted) return;
-      setState(() => _canUseBiometrics = supported || canCheck);
+
+      setState(() => _canUseDeviceUnlock = supported || canCheck);
     } catch (_) {
-      if (mounted) setState(() => _canUseBiometrics = false);
+      if (mounted) setState(() => _canUseDeviceUnlock = false);
     }
   }
 
-  Future<void> _unlockWithBiometrics() async {
-    if (!_deviceUnlockAllowed || !_canUseBiometrics || _biometricBusy) return;
+  Future<void> _unlockWithDevice() async {
+    if (!_deviceUnlockAllowed || !_canUseDeviceUnlock || _deviceBusy) return;
+
     setState(() {
-      _biometricBusy = true;
+      _deviceBusy = true;
       _error = null;
     });
+
     try {
       final ok = await _localAuth.authenticate(
-        localizedReason: 'Unlock your locked Vibe Match chats',
+        localizedReason: 'Unlock your locked FunKey chats',
         options: const AuthenticationOptions(
           biometricOnly: false,
           stickyAuth: true,
           useErrorDialogs: true,
         ),
       );
+
       if (!mounted) return;
+
       if (ok) {
         widget.onUnlocked();
       } else {
         setState(() => _error = 'Device unlock cancelled.');
       }
     } catch (_) {
-      if (mounted) setState(() => _error = 'Device unlock is not available on this device.');
+      if (mounted) {
+        setState(() => _error = 'Device unlock is not available on this device.');
+      }
     } finally {
-      if (mounted) setState(() => _biometricBusy = false);
+      if (mounted) setState(() => _deviceBusy = false);
     }
   }
 
   Future<void> _submit() async {
-    if (_controller.text.trim().isEmpty) {
+    final value = _controller.text.trim();
+
+    if (value.isEmpty) {
       setState(() => _error = 'Enter your Inbox lock.');
       return;
     }
+
     setState(() {
       _busy = true;
       _error = null;
     });
-    final valid = await widget.onValidate(_controller.text.trim());
+
+    final valid = await widget.onValidate(value);
+
     if (!mounted) return;
+
     setState(() => _busy = false);
+
     if (valid) {
       widget.onUnlocked();
       return;
@@ -134,37 +155,96 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
       padding: EdgeInsets.only(bottom: keyboardInset),
       child: SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.all(8),
         child: Container(
-          padding: EdgeInsets.fromLTRB(18, 10, 18, 18 + safeBottom),
+          padding: EdgeInsets.fromLTRB(18, 10, 18, 16 + safeBottom),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))],
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.14),
+                blurRadius: 28,
+                offset: const Offset(0, 14),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999))),
+              Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4D4D8),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
               const SizedBox(height: 16),
-              Container(width: 62, height: 62, decoration: BoxDecoration(color: InboxLightPremiumTokens.ink, borderRadius: BorderRadius.circular(22)), child: const Icon(Icons.lock_rounded, color: Colors.white, size: 30)),
+              Container(
+                width: 60,
+                height: 60,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F1F3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.lock_outline_rounded, color: _ink, size: 28),
+              ),
               const SizedBox(height: 13),
-              Text(widget.title, textAlign: TextAlign.center, style: const TextStyle(color: InboxLightPremiumTokens.ink, fontSize: 21, fontWeight: FontWeight.w900)),
+              Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
               const SizedBox(height: 6),
-              Text(widget.subtitle, textAlign: TextAlign.center, style: const TextStyle(color: InboxLightPremiumTokens.muted, fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700)),
+              Text(
+                widget.subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 12.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               const SizedBox(height: 16),
-              if (_deviceUnlockAllowed && _canUseBiometrics) ...[
+              if (_deviceUnlockAllowed && _canUseDeviceUnlock) ...[
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: _biometricBusy ? null : _unlockWithBiometrics,
-                    style: OutlinedButton.styleFrom(foregroundColor: InboxLightPremiumTokens.ink, padding: const EdgeInsets.symmetric(vertical: 13), side: const BorderSide(color: InboxLightPremiumTokens.warmBorder), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
-                    icon: _biometricBusy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: InboxLightPremiumTokens.ink)) : const Icon(Icons.fingerprint_rounded, size: 22),
-                    label: const Text('Unlock with device', style: TextStyle(fontWeight: FontWeight.w900)),
+                    onPressed: _deviceBusy ? null : _unlockWithDevice,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _ink,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      side: const BorderSide(color: _line),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    icon: _deviceBusy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: _ink),
+                          )
+                        : const Icon(Icons.fingerprint_rounded, size: 22),
+                    label: const Text('Unlock with device', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Row(children: [Expanded(child: Divider(color: InboxLightPremiumTokens.warmBorder)), Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('or', style: TextStyle(color: InboxLightPremiumTokens.softMuted, fontWeight: FontWeight.w800))), Expanded(child: Divider(color: InboxLightPremiumTokens.warmBorder))]),
+                const Row(
+                  children: [
+                    Expanded(child: Divider(color: _line)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('or', style: TextStyle(color: _muted, fontWeight: FontWeight.w700)),
+                    ),
+                    Expanded(child: Divider(color: _line)),
+                  ],
+                ),
                 const SizedBox(height: 12),
               ],
               TextField(
@@ -173,17 +253,26 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _submit(),
-                style: const TextStyle(color: InboxLightPremiumTokens.ink, fontWeight: FontWeight.w900),
+                style: const TextStyle(color: _ink, fontWeight: FontWeight.w700),
                 decoration: InputDecoration(
                   hintText: 'Enter Inbox lock',
                   errorText: _error,
-                  prefixIcon: const Icon(Icons.password_rounded, color: InboxLightPremiumTokens.violet),
-                  suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded)),
+                  prefixIcon: const Icon(Icons.password_rounded, color: _muted),
+                  suffixIcon: IconButton(
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                    icon: Icon(
+                      _obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                      color: _muted,
+                    ),
+                  ),
                   filled: true,
-                  fillColor: InboxLightPremiumTokens.page,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: InboxLightPremiumTokens.warmBorder)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: InboxLightPremiumTokens.warmBorder)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: InboxLightPremiumTokens.violet, width: 1.4)),
+                  fillColor: const Color(0xFFF7F7F8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: _blue, width: 1.3),
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -191,14 +280,28 @@ class _InboxPasscodeSheetState extends State<InboxPasscodeSheet> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: _busy ? null : _submit,
-                  style: FilledButton.styleFrom(backgroundColor: InboxLightPremiumTokens.ink, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
-                  icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.lock_open_rounded, size: 18),
-                  label: const Text('Unlock', style: TextStyle(fontWeight: FontWeight.w900)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.lock_open_rounded, size: 18),
+                  label: const Text('Unlock', style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
               if (widget.onRecoverTap != null) ...[
                 const SizedBox(height: 8),
-                TextButton(onPressed: _busy ? null : widget.onRecoverTap, child: const Text('Recover lock', style: TextStyle(fontWeight: FontWeight.w900))),
+                TextButton(
+                  onPressed: _busy ? null : widget.onRecoverTap,
+                  child: const Text('Recover lock', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
               ],
             ],
           ),
