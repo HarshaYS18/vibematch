@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -15,6 +14,7 @@ from app.models.cdn_media import (
 )
 from app.models.inbox import InboxMessage
 from app.models.user import User
+from app.services import media_storage_service
 from app.services.audit_log_service import create_admin_log
 
 
@@ -109,13 +109,7 @@ def register_uploaded_media(
     )
 
 
-def mark_profile_picture_replaced(
-    db: Session,
-    *,
-    user: User,
-    new_asset: CdnMediaAsset,
-    actor_user_id: int | None = None,
-) -> None:
+def mark_profile_picture_replaced(db: Session, *, user: User, new_asset: CdnMediaAsset, actor_user_id: int | None = None) -> None:
     old_url = user.avatar_url
     if old_url:
         old_asset = find_active_asset_by_url(db, old_url)
@@ -131,20 +125,13 @@ def mark_profile_picture_replaced(
     db.commit()
 
 
-def add_cover_photo_reference(
-    db: Session,
-    *,
-    user: User,
-    new_asset: CdnMediaAsset,
-    actor_user_id: int | None = None,
-) -> None:
+def add_cover_photo_reference(db: Session, *, user: User, new_asset: CdnMediaAsset, actor_user_id: int | None = None) -> None:
     old_urls = list(user.cover_photo_urls or [])
-    for old_url in old_urls:
-        old_asset = find_active_asset_by_url(db, old_url)
-        if old_asset and old_asset.id != new_asset.id:
-            old_asset.replaced_by_media_id = new_asset.id
-            mark_media_deleted(db, asset=old_asset, actor_user_id=actor_user_id, reason="cover_photo_replaced")
-    user.cover_photo_urls = [new_asset.public_url]
+    if new_asset.public_url not in old_urls:
+        next_urls = [new_asset.public_url, *old_urls]
+    else:
+        next_urls = old_urls
+    user.cover_photo_urls = next_urls[:6]
     new_asset.upload_status = CdnMediaUploadStatus.APPROVED.value
     new_asset.moderation_status = CdnMediaModerationStatus.AI_APPROVED.value if new_asset.moderation_status == CdnMediaModerationStatus.PENDING.value else new_asset.moderation_status
     new_asset.is_active_reference = True
@@ -163,13 +150,18 @@ def find_active_asset_by_url(db: Session, public_url: str) -> CdnMediaAsset | No
     )
 
 
-def link_media_to_entity(
-    db: Session,
-    *,
-    public_url: str | None,
-    linked_entity_type: CdnMediaLinkedEntityType,
-    linked_entity_id: str,
-) -> CdnMediaAsset | None:
+def assert_user_owns_active_media_url(db: Session, *, user: User, public_url: str, media_type: CdnMediaType) -> CdnMediaAsset:
+    asset = find_active_asset_by_url(db, public_url)
+    if not asset:
+        raise ValueError("Media asset not found or deleted")
+    if asset.owner_user_id != user.id or asset.media_type != media_type.value:
+        raise ValueError("Media asset does not belong to this user")
+    if asset.upload_status not in {CdnMediaUploadStatus.APPROVED.value, CdnMediaUploadStatus.MODERATION_PENDING.value}:
+        raise ValueError("Media asset is not usable")
+    return asset
+
+
+def link_media_to_entity(db: Session, *, public_url: str | None, linked_entity_type: CdnMediaLinkedEntityType, linked_entity_id: str) -> CdnMediaAsset | None:
     if not public_url:
         return None
     asset = db.query(CdnMediaAsset).filter(CdnMediaAsset.public_url == public_url).order_by(CdnMediaAsset.id.desc()).first()
@@ -183,18 +175,16 @@ def link_media_to_entity(
     return asset
 
 
-def mark_media_deleted(
-    db: Session,
-    *,
-    asset: CdnMediaAsset,
-    actor_user_id: int | None = None,
-    reason: str = "media_deleted",
-) -> CdnMediaAsset:
+def mark_media_deleted(db: Session, *, asset: CdnMediaAsset, actor_user_id: int | None = None, reason: str = "media_deleted") -> CdnMediaAsset:
     asset.upload_status = CdnMediaUploadStatus.DELETED.value
     asset.deletion_status = CdnMediaDeletionStatus.DELETED.value
     asset.is_active_reference = False
     asset.deleted_at = datetime.utcnow()
-    try_delete_local_object(asset.object_key)
+    try:
+        media_storage_service.delete_media_object(asset.object_key)
+    except Exception as exc:
+        asset.deletion_status = CdnMediaDeletionStatus.FAILED.value
+        asset.deletion_error = str(exc)
     db.add(asset)
     db.commit()
     db.refresh(asset)
@@ -206,7 +196,7 @@ def mark_media_deleted(
         resource_type="cdn_media",
         resource_id=asset.public_id,
         reason=reason,
-        metadata_json={"media_type": asset.media_type, "object_key": asset.object_key},
+        metadata_json={"media_type": asset.media_type, "object_key": asset.object_key, "deletion_status": asset.deletion_status},
     )
     return asset
 
@@ -249,35 +239,17 @@ def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int 
             asset.is_active_reference = False
             asset.deleted_at = now
             placeholders += _expire_inbox_message_references(db, asset, now)
-            try_delete_local_object(asset.object_key)
+            media_storage_service.delete_media_object(asset.object_key)
             db.add(asset)
             deleted += 1
-        except Exception as exc:  # pragma: no cover - defensive cleanup guard
+        except Exception as exc:
             asset.deletion_status = CdnMediaDeletionStatus.FAILED.value
             asset.deletion_error = str(exc)
             db.add(asset)
             failed += 1
     db.commit()
-    create_admin_log(
-        db=db,
-        actor_user_id=actor_user_id,
-        action="INBOX_MEDIA_EXPIRY_CLEANUP_RUN",
-        resource_type="cdn_media_cleanup",
-        reason="manual_or_scheduled_cleanup",
-        metadata_json={"checked": len(assets), "deleted": deleted, "failed": failed, "placeholders": placeholders},
-    )
+    create_admin_log(db=db, actor_user_id=actor_user_id, action="INBOX_MEDIA_EXPIRY_CLEANUP_RUN", resource_type="cdn_media_cleanup", reason="manual_or_scheduled_cleanup", metadata_json={"checked": len(assets), "deleted": deleted, "failed": failed, "placeholders": placeholders})
     return {"checked": len(assets), "deleted": deleted, "failed": failed}
-
-
-def try_delete_local_object(object_key: str | None) -> None:
-    if not object_key:
-        return
-    normalized = object_key.replace("\\", "/").lstrip("/")
-    if ".." in Path(normalized).parts:
-        return
-    path = Path("static/uploads") / normalized
-    if path.exists() and path.is_file():
-        path.unlink()
 
 
 def get_inbox_retention_days(db: Session) -> int:
@@ -291,14 +263,7 @@ def get_inbox_retention_days(db: Session) -> int:
     return max(1, min(days, 90))
 
 
-def upsert_media_safety_setting(
-    db: Session,
-    *,
-    key: str,
-    value_json: dict,
-    description: str | None,
-    actor_user_id: int,
-) -> MediaSafetySetting:
+def upsert_media_safety_setting(db: Session, *, key: str, value_json: dict, description: str | None, actor_user_id: int) -> MediaSafetySetting:
     setting = db.query(MediaSafetySetting).filter(MediaSafetySetting.key == key).first()
     old_value = setting.value_json if setting else None
     if setting is None:
@@ -310,32 +275,13 @@ def upsert_media_safety_setting(
     db.add(setting)
     db.commit()
     db.refresh(setting)
-    create_admin_log(
-        db=db,
-        actor_user_id=actor_user_id,
-        action="MEDIA_SAFETY_SETTING_UPDATED",
-        resource_type="media_safety_setting",
-        resource_id=key,
-        metadata_json={"old_value": old_value, "new_value": value_json},
-    )
+    create_admin_log(db=db, actor_user_id=actor_user_id, action="MEDIA_SAFETY_SETTING_UPDATED", resource_type="media_safety_setting", resource_id=key, metadata_json={"old_value": old_value, "new_value": value_json})
     return setting
 
 
 def default_media_safety_settings() -> list[dict]:
     return [
-        {
-            "key": "inbox_media_retention",
-            "description": "Inbox media CDN retention policy.",
-            "value_json": {"days": DEFAULT_INBOX_RETENTION_DAYS, "placeholder_enabled": True, "cleanup_enabled": True, "batch_size": 100},
-        },
-        {
-            "key": "openai_image_moderation",
-            "description": "OpenAI image auditing surfaces and fallback behavior.",
-            "value_json": {"enabled": False, "profile_picture": True, "cover_photo": True, "vibes_media": True, "inbox_media": False, "uncertain_to_review": True},
-        },
-        {
-            "key": "openai_text_moderation",
-            "description": "OpenAI text moderation mode by surface.",
-            "value_json": {"enabled": False, "default_mode": "flag_only", "inbox_messages": "flag_only", "profile_text": "block_high_risk", "vibes_caption": "block_high_risk"},
-        },
+        {"key": "inbox_media_retention", "description": "Inbox media CDN retention policy.", "value_json": {"days": DEFAULT_INBOX_RETENTION_DAYS, "placeholder_enabled": True, "cleanup_enabled": True, "batch_size": 100}},
+        {"key": "openai_image_moderation", "description": "OpenAI image auditing surfaces and fallback behavior.", "value_json": {"enabled": False, "profile_picture": True, "cover_photo": True, "vibes_media": True, "inbox_media": False, "uncertain_to_review": True}},
+        {"key": "openai_text_moderation", "description": "OpenAI text moderation mode by surface.", "value_json": {"enabled": False, "default_mode": "flag_only", "inbox_messages": "flag_only", "profile_text": "block_high_risk", "vibes_caption": "block_high_risk"}},
     ]
