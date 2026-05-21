@@ -23,55 +23,49 @@ class MediaUploadService {
 
   ImagePicker get imagePicker => _imagePicker ?? ImagePicker();
 
-  Future<XFile?> pickImage({
-    ImageSource source = ImageSource.gallery,
-    int imageQuality = 88,
-    double? maxWidth = 1600,
-    double? maxHeight = 1600,
-  }) {
-    return imagePicker.pickImage(
-      source: source,
-      imageQuality: imageQuality,
-      maxWidth: maxWidth,
-      maxHeight: maxHeight,
-    );
+  Future<XFile?> pickImage({ImageSource source = ImageSource.gallery, int imageQuality = 88, double? maxWidth = 1600, double? maxHeight = 1600}) {
+    return imagePicker.pickImage(source: source, imageQuality: imageQuality, maxWidth: maxWidth, maxHeight: maxHeight);
   }
 
   Future<MediaUploadResult> pickCropAndUploadAvatar(BuildContext context) async {
-    final file = await pickImage(maxWidth: 1800, maxHeight: 1800, imageQuality: 95);
+    final file = await pickImage(maxWidth: 2400, maxHeight: 2400, imageQuality: 96);
     if (file == null) throw const MediaUploadCancelledException();
     final bytes = await file.readAsBytes();
-    final confirmed = await Navigator.of(context).push<bool>(
+    final crop = await Navigator.of(context).push<ManualImageCropResult>(
       MaterialPageRoute(
         builder: (_) => ProfileImageCropPage(
           imageBytes: bytes,
-          title: 'Crop Avatar',
+          title: 'Adjust Avatar',
           aspectRatio: 1,
-          helpText: 'Avatar uses a square 1:1 crop with a 3×3 grid. The final image is saved as 512×512 for profile, mini-card and chatroom seats.',
+          outputWidth: 512,
+          outputHeight: 512,
+          helpText: 'Drag and pinch to frame your face like Bigo. Final avatar is saved as 512×512 for profile, mini-card and live room seats.',
         ),
       ),
     );
-    if (confirmed != true) throw const MediaUploadCancelledException();
-    final cropped = _centerCropJpeg(bytes: bytes, aspectRatio: 1, outputWidth: 512, outputHeight: 512);
+    if (crop == null) throw const MediaUploadCancelledException();
+    final cropped = _manualCropJpeg(bytes: bytes, crop: crop);
     return _uploadBytes(bytes: cropped, filename: 'vibematch_avatar.jpg', endpointPath: '/media/avatar', failedMessage: 'Failed to upload avatar');
   }
 
   Future<MediaUploadResult> pickCropAndUploadProfileCover(BuildContext context) async {
-    final file = await pickImage(maxWidth: 2400, maxHeight: 1600, imageQuality: 95);
+    final file = await pickImage(maxWidth: 3200, maxHeight: 2200, imageQuality: 96);
     if (file == null) throw const MediaUploadCancelledException();
     final bytes = await file.readAsBytes();
-    final confirmed = await Navigator.of(context).push<bool>(
+    final crop = await Navigator.of(context).push<ManualImageCropResult>(
       MaterialPageRoute(
         builder: (_) => ProfileImageCropPage(
           imageBytes: bytes,
-          title: 'Crop Cover',
+          title: 'Adjust Cover',
           aspectRatio: 16 / 9,
-          helpText: 'Cover photo uses a wide 16:9 crop with a 3×3 grid. The final image is saved as 1600×900 for profile headers.',
+          outputWidth: 1600,
+          outputHeight: 900,
+          helpText: 'Drag and pinch to place the cover exactly. Final cover is saved as 1600×900 for profile headers and CDN delivery.',
         ),
       ),
     );
-    if (confirmed != true) throw const MediaUploadCancelledException();
-    final cropped = _centerCropJpeg(bytes: bytes, aspectRatio: 16 / 9, outputWidth: 1600, outputHeight: 900);
+    if (crop == null) throw const MediaUploadCancelledException();
+    final cropped = _manualCropJpeg(bytes: bytes, crop: crop);
     return _uploadBytes(bytes: cropped, filename: 'vibematch_cover.jpg', endpointPath: '/media/profile-cover', failedMessage: 'Failed to upload cover');
   }
 
@@ -96,26 +90,13 @@ class MediaUploadService {
     return _uploadBytes(bytes: cropped, filename: 'vibematch_room_cover.jpg', endpointPath: '/media/room-avatar', failedMessage: 'Failed to upload room cover');
   }
 
-  Future<MediaUploadResult> pickCropAndUploadHomeBanner(
-    BuildContext context, {
-    required String title,
-    required double aspectRatio,
-    required int outputWidth,
-    required int outputHeight,
-  }) async {
+  Future<MediaUploadResult> pickCropAndUploadHomeBanner(BuildContext context, {required String title, required double aspectRatio, required int outputWidth, required int outputHeight}) async {
     final file = await pickImage(maxWidth: 2600, maxHeight: 1800, imageQuality: 96);
     if (file == null) throw const MediaUploadCancelledException();
     final bytes = await file.readAsBytes();
     final crop = await Navigator.of(context).push<ManualImageCropResult>(
       MaterialPageRoute(
-        builder: (_) => ManualImageCropPage(
-          imageBytes: bytes,
-          title: title,
-          aspectRatio: aspectRatio,
-          outputWidth: outputWidth,
-          outputHeight: outputHeight,
-          helpText: 'Move and pinch zoom the image inside the grid. The final crop is saved as $outputWidth×$outputHeight for crisp CDN-ready home banners.',
-        ),
+        builder: (_) => ManualImageCropPage(imageBytes: bytes, title: title, aspectRatio: aspectRatio, outputWidth: outputWidth, outputHeight: outputHeight, helpText: 'Move and pinch zoom the image inside the grid. The final crop is saved as $outputWidth×$outputHeight for crisp CDN-ready home banners.'),
       ),
     );
     if (crop == null) throw const MediaUploadCancelledException();
@@ -156,26 +137,6 @@ class MediaUploadService {
   Future<MediaUploadResult> uploadRoomMusicBytes({required List<int> bytes, required String filename}) async {
     if (bytes.isEmpty) throw Exception('Selected audio is empty.');
     return _uploadBytes(bytes: bytes, filename: _safeAudioFilename(filename), endpointPath: '/media/room-music', failedMessage: 'Failed to upload room music');
-  }
-
-  Uint8List _centerCropJpeg({required Uint8List bytes, required double aspectRatio, required int outputWidth, required int outputHeight}) {
-    final source = img.decodeImage(bytes);
-    if (source == null) throw Exception('Selected image could not be decoded.');
-    final sourceRatio = source.width / source.height;
-    late final int cropWidth;
-    late final int cropHeight;
-    if (sourceRatio > aspectRatio) {
-      cropHeight = source.height;
-      cropWidth = max(1, (source.height * aspectRatio).round());
-    } else {
-      cropWidth = source.width;
-      cropHeight = max(1, (source.width / aspectRatio).round());
-    }
-    final x = max(0, ((source.width - cropWidth) / 2).round());
-    final y = max(0, ((source.height - cropHeight) / 2).round());
-    final cropped = img.copyCrop(source, x: x, y: y, width: cropWidth, height: cropHeight);
-    final resized = img.copyResize(cropped, width: outputWidth, height: outputHeight, interpolation: img.Interpolation.cubic);
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
   }
 
   Uint8List _manualCropJpeg({required Uint8List bytes, required ManualImageCropResult crop}) {
