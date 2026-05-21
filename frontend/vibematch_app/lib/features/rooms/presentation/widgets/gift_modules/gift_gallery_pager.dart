@@ -26,58 +26,41 @@ class GiftGalleryPager extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PageView.builder(
-      controller: controller,
-      physics: const BouncingScrollPhysics(),
-      itemCount: categories.length,
-      onPageChanged: (index) {
-        final category = categories[index];
-        if (category.key != selectedCategoryKey)
-          onCategoryChanged(category.key);
-      },
-      itemBuilder: (context, index) {
-        final category = categories[index];
-        final filtered = _orderedGiftsForCategory(category.key);
+    final filtered = _orderedGiftsForCategory(selectedCategoryKey);
 
-        if (filtered.isEmpty) {
-          return const Center(
-            child: Text(
-              'No active gifts in this category',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          );
-        }
+    if (filtered.isEmpty) {
+      return Center(
+        child: Text(
+          'No gifts yet',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.62),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
 
-        final pages = _giftPages(filtered);
-        return PageView.builder(
-          physics: const BouncingScrollPhysics(),
-          itemCount: pages.length,
-          itemBuilder: (context, pageIndex) {
-            final pageItems = pages[pageIndex];
-            return GridView.builder(
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: pageItems.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 9,
-                crossAxisSpacing: 9,
-                childAspectRatio: 1.02,
-              ),
-              itemBuilder: (context, giftIndex) {
-                final gift = pageItems[giftIndex];
-                return CompactGiftCard(
-                  gift: gift,
-                  selected: selectedGift?.id == gift.id,
-                  onTap: () => onGiftSelected(gift),
-                );
-              },
-            );
-          },
+    return GridView.builder(
+      key: PageStorageKey<String>('gift-grid-$selectedCategoryKey'),
+      padding: const EdgeInsets.fromLTRB(2, 1, 2, 12),
+      primary: false,
+      shrinkWrap: false,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      itemCount: filtered.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 4,
+        childAspectRatio: 0.78,
+      ),
+      itemBuilder: (context, giftIndex) {
+        final gift = filtered[giftIndex];
+        return CompactGiftCard(
+          gift: gift,
+          selected: selectedGift?.id == gift.id,
+          onTap: () => onGiftSelected(gift),
         );
       },
     );
@@ -99,14 +82,5 @@ class GiftGalleryPager extends StatelessWidget {
       return 0;
     });
     return filtered;
-  }
-
-  List<List<GiftItem>> _giftPages(List<GiftItem> source) {
-    final pages = <List<GiftItem>>[];
-    for (var index = 0; index < source.length; index += 6) {
-      final end = index + 6 > source.length ? source.length : index + 6;
-      pages.add(source.sublist(index, end));
-    }
-    return pages.isEmpty ? const <List<GiftItem>>[] : pages;
   }
 }
