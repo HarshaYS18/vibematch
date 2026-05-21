@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +10,9 @@ import '../../data/inbox_api_service.dart';
 import '../../data/inbox_voice_recorder_service.dart';
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
+import '../widgets/funkey_attachment_picker_sheet.dart';
+import '../widgets/funkey_chat_input_bar.dart';
+import '../widgets/funkey_reply_preview.dart';
 import '../widgets/inbox_message_media_content.dart';
 import '../widgets/inbox_message_action_sheet_v2.dart';
 import '../widgets/inbox_call_action_sheet.dart';
@@ -238,7 +241,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
       final sizeLabel = _formatAttachmentBytes(bytes.length);
       await _inboxApi.sendMessage(
         conversationId: _conversation.id,
-        text: '📄 ${file.name} • $sizeLabel',
+        text: 'ðŸ“„ ${file.name} â€¢ $sizeLabel',
         type: 'document',
         attachmentUrl: uploaded.url,
       );
@@ -299,7 +302,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
       await _inboxApi.sendMessage(
         conversationId: _conversation.id,
-        text: '📷 Photo attached',
+        text: 'ðŸ“· Photo attached',
         type: 'image',
         attachmentUrl: uploaded.url,
       );
@@ -379,7 +382,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
       final durationLabel = _formatVoiceDuration(recorded.duration);
       await _inboxApi.sendMessage(
         conversationId: _conversation.id,
-        text: '🎙 Voice message • $durationLabel',
+        text: 'ðŸŽ™ Voice message â€¢ $durationLabel',
         type: 'voice',
         attachmentUrl: uploaded.url,
       );
@@ -424,7 +427,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AttachmentSheet(
+      builder: (_) => FunKeyAttachmentPickerSheet(
         onPick: (type) async {
           Navigator.pop(context);
           if (type == InboxMessageType.document) {
@@ -660,8 +663,8 @@ class _InboxChatPageState extends State<InboxChatPage> {
               ),
             ),
             if (_replyToText != null)
-              _ReplyPreview(text: _replyToText!, onClose: () => setState(() => _replyToText = null)),
-            _ChatInputBar(
+              FunKeyReplyPreview(text: _replyToText!, onClose: () => setState(() => _replyToText = null)),
+            FunKeyChatInputBar(
               readOnly: _readOnly,
               controller: _textController,
               onAttachTap: _openAttachmentSheet,
@@ -908,7 +911,7 @@ class _MessageBubble extends StatelessWidget {
                       ],
                       if (showTime) ...[
                         Text(
-                          '${mine ? 'You' : message.sender} • ${message.time}',
+                          '${mine ? 'You' : message.sender} â€¢ ${message.time}',
                           style: TextStyle(
                             color: mine ? Colors.white70 : const Color(0xFF9B8CA5),
                             fontSize: 10.3,
@@ -1215,21 +1218,7 @@ class _RetryChip extends StatelessWidget {
   }
 }
 
-class _ReplyPreview extends StatelessWidget {
-  const _ReplyPreview({required this.text, required this.onClose});
-  final String text;
-  final VoidCallback onClose;
-  @override
-  Widget build(BuildContext context) => Container(
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(color: const Color(0xFFF8F5FF), borderRadius: BorderRadius.circular(16), border: const Border(left: BorderSide(color: Color(0xFFFF4F9A), width: 4))),
-          child: Row(children: [Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w800))), IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded, size: 18))]),
-        ),
-      );
-}
+
 
 class _SecretDriftBanner extends StatelessWidget {
   const _SecretDriftBanner({required this.label});
@@ -1303,97 +1292,11 @@ class _ChatMoreSheet extends StatelessWidget {
   }
 }
 
-class _ChatInputBar extends StatelessWidget {
-  const _ChatInputBar({
-    required this.readOnly,
-    required this.controller,
-    required this.recordingVoice,
-    required this.sendingVoice,
-    required this.onAttachTap,
-    required this.onEmojiTap,
-    required this.onVoiceTap,
-    required this.onVoiceLongPressStart,
-    required this.onVoiceLongPressEnd,
-    required this.onVoiceLongPressCancel,
-    required this.onSendTap,
-  });
-  final bool readOnly;
-  final TextEditingController controller;
-  final bool recordingVoice;
-  final bool sendingVoice;
-  final VoidCallback onAttachTap;
-  final VoidCallback onEmojiTap;
-  final VoidCallback onVoiceTap;
-  final VoidCallback onVoiceLongPressStart;
-  final VoidCallback onVoiceLongPressEnd;
-  final VoidCallback onVoiceLongPressCancel;
-  final VoidCallback onSendTap;
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.fromLTRB(10, 8, 10, 8 + MediaQuery.paddingOf(context).bottom),
-        color: Colors.white,
-        child: Row(children: [
-          IconButton(onPressed: readOnly ? null : onEmojiTap, icon: const Icon(Icons.emoji_emotions_outlined, color: Color(0xFF7C3AED))),
-          Expanded(
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 44, maxHeight: 96),
-              padding: const EdgeInsets.symmetric(horizontal: 13),
-              decoration: BoxDecoration(color: const Color(0xFFF8F5FF), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE9DDF5))),
-              child: TextField(controller: controller, enabled: !readOnly, minLines: 1, maxLines: 4, decoration: InputDecoration(border: InputBorder.none, hintText: readOnly ? 'Replies disabled for this chat' : 'Message...', hintStyle: const TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w700))),
-            ),
-          ),
-          IconButton(onPressed: readOnly ? null : onAttachTap, icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF7C3AED))),
-          GestureDetector(
-            onTap: readOnly ? null : onVoiceTap,
-            onLongPressStart: readOnly || sendingVoice ? null : (_) => onVoiceLongPressStart(),
-            onLongPressEnd: readOnly || sendingVoice ? null : (_) => onVoiceLongPressEnd(),
-            onLongPressCancel: readOnly || sendingVoice ? null : onVoiceLongPressCancel,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: 42,
-              height: 42,
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              decoration: BoxDecoration(
-                color: recordingVoice ? const Color(0xFFE84C72) : const Color(0xFF7C3AED).withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                sendingVoice
-                    ? Icons.hourglass_top_rounded
-                    : recordingVoice
-                        ? Icons.stop_rounded
-                        : Icons.mic_rounded,
-                color: recordingVoice ? Colors.white : const Color(0xFF7C3AED),
-                size: 21,
-              ),
-            ),
-          ),
-          InkWell(borderRadius: BorderRadius.circular(999), onTap: readOnly ? null : onSendTap, child: Container(width: 42, height: 42, decoration: BoxDecoration(gradient: readOnly ? null : const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFFF4F9A)]), color: readOnly ? const Color(0xFFB8A8BD) : null, shape: BoxShape.circle), child: const Icon(Icons.send_rounded, color: Colors.white, size: 18))),
-        ]),
-      );
-}
 
-class _AttachmentSheet extends StatelessWidget {
-  const _AttachmentSheet({required this.onPick});
-  final ValueChanged<InboxMessageType> onPick;
-  @override
-  Widget build(BuildContext context) {
-    final items = [_AttachmentItem(type: InboxMessageType.image, icon: Icons.image_rounded, label: 'Gallery'), _AttachmentItem(type: InboxMessageType.document, icon: Icons.description_rounded, label: 'Document'), _AttachmentItem(type: InboxMessageType.location, icon: Icons.location_on_rounded, label: 'Location')];
-    return Container(
-      margin: const EdgeInsets.all(14),
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
-      child: GridView.count(crossAxisCount: 3, shrinkWrap: true, children: items.map((item) => InkWell(borderRadius: BorderRadius.circular(20), onTap: () => onPick(item.type), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: const Color(0xFF7C3AED).withValues(alpha: 0.12), shape: BoxShape.circle), child: Icon(item.icon, color: const Color(0xFF7C3AED))), const SizedBox(height: 7), Text(item.label, style: const TextStyle(color: Color(0xFF251538), fontSize: 11, fontWeight: FontWeight.w800))]))).toList()),
-    );
-  }
-}
 
-class _AttachmentItem {
-  _AttachmentItem({required this.type, required this.icon, required this.label});
-  final InboxMessageType type;
-  final IconData icon;
-  final String label;
-}
+
+
+
 
 class _ActionTile extends StatelessWidget {
   const _ActionTile({required this.icon, required this.title, required this.onTap, this.danger = false});
@@ -1407,4 +1310,7 @@ class _ActionTile extends StatelessWidget {
     return InkWell(borderRadius: BorderRadius.circular(16), onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11), child: Row(children: [Icon(icon, color: color, size: 21), const SizedBox(width: 12), Text(title, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w900))])));
   }
 }
+
+
+
 
