@@ -34,44 +34,18 @@ class AppRouteFactory {
       case VmRoutes.liveRoom:
         final args = settings.arguments;
         if (args is LiveRoomRouteArgs) {
-          return LiveRoomRoutes.liveRoom(
-            LiveRoomRouteViewArgs(
-              roomName: args.roomName,
-              roomId: args.roomId,
-              language: args.language,
-              modeTitle: args.modeTitle,
-              onlineCount: args.onlineCount,
-              currentUser: args.currentUser,
-              lockPassword: args.lockPassword,
-            ),
-          );
+          return LiveRoomRoutes.liveRoom(LiveRoomRouteViewArgs(roomName: args.roomName, roomId: args.roomId, language: args.language, modeTitle: args.modeTitle, onlineCount: args.onlineCount, currentUser: args.currentUser, lockPassword: args.lockPassword));
         }
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Room Access Required', subtitle: 'Open rooms from Home so backend join checks can run before the live room starts.', icon: Icons.lock_rounded));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Room Locked', subtitle: 'Open rooms from Home after access check.', icon: Icons.lock_rounded));
 
       case VmRoutes.roomLevel:
         return _buildRoute(settings, const RoomLevelPage());
-
       case VmRoutes.experienceDetail:
         final args = settings.arguments;
-        if (args is ExperienceDetailRouteArgs) {
-          return _buildRoute(settings, ExperienceDetailPage(args: args));
-        }
-        return _buildRoute(settings, const ExperienceDetailPage(args: ExperienceDetailRouteArgs(kind: ExperienceDetailKind.sent)));
-
+        return _buildRoute(settings, args is ExperienceDetailRouteArgs ? ExperienceDetailPage(args: args) : const ExperienceDetailPage(args: ExperienceDetailRouteArgs(kind: ExperienceDetailKind.sent)));
       case VmRoutes.profile:
         final args = settings.arguments;
-        if (args is PublicProfileRouteArgs) {
-          return _buildRoute(
-            settings,
-            PublicProfilePage(
-              userId: args.userId,
-              displayName: args.displayName,
-              username: args.username,
-            ),
-          );
-        }
-        return _buildRoute(settings, const PublicProfilePage());
-
+        return _buildRoute(settings, args is PublicProfileRouteArgs ? PublicProfilePage(userId: args.userId, displayName: args.displayName, username: args.username) : const PublicProfilePage());
       case VmRoutes.events:
         return _buildRoute(settings, const EventsPage());
       case VmRoutes.rankings:
@@ -103,65 +77,74 @@ class AppRouteFactory {
         return _buildRoute(settings, const ControlCenterPage());
       case VmRoutes.bannerManager:
         return _buildRoute(settings, const BannerManagerPage());
-
       case VmRoutes.agency:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Agency', subtitle: 'Agency Owner, Agency Admin, Hosts, BD hierarchy, commission, leave requests, and agency performance.', icon: Icons.groups_2_rounded, highlights: ['Agency Owner can invite, approve, remove hosts, and appoint up to 2 admins.', 'Agency Admin can invite and approve hosts but cannot remove hosts or manage admins.', 'Future backend: agency membership, host rewards, commissions, and audit logs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Agency', subtitle: 'Manage hosts, admins and agency rewards.', icon: Icons.groups_2_rounded));
       case VmRoutes.gifts:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Gifts', subtitle: 'Gift catalog, normal gifts, lucky gifts, relationship gifts, premium animations, combo history, and received gifts.', icon: Icons.card_giftcard_rounded, highlights: ['Gift catalog must come from backend before production testing.', 'Gift sending must be wallet-ledger and WebSocket controlled.', 'Future backend: gift catalog, send gift, combo, received gift, and lucky gift APIs.']));
-
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Gifts', subtitle: 'Gift catalog, combos and received gifts.', icon: Icons.card_giftcard_rounded));
       case VmRoutes.admin:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Admin', subtitle: 'Admin routes for users, roles, bans, device bans, audit logs, login history, reports, and reviews.', icon: Icons.shield_rounded, highlights: ['Admin tools must be backend role/permission enforced.', 'Every sensitive action must be audit logged.', 'Future: split into users, roles, audit logs, bans, device bans, reports, and review pages.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Admin', subtitle: 'Manage users, roles, reports and safety.', icon: Icons.shield_rounded));
       case VmRoutes.reports:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Reports', subtitle: 'User, room, message, profile, gift, and safety reports review queue.', icon: Icons.report_rounded, highlights: ['Reports should route to CS/Monitor/Admin queues based on severity.', 'Actions must respect protected role hierarchy.', 'Future backend: report queue, status, reviewer notes, and moderation action APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Reports', subtitle: 'Review reports and safety actions.', icon: Icons.report_rounded));
       case VmRoutes.privacy:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Privacy', subtitle: 'Profile privacy, stranger messages, room presence, Secret Vibe visibility, and blocked access rules.', icon: Icons.privacy_tip_rounded, highlights: ['Secret Vibe room presence must never leak to unauthorized users.', 'Stranger messages and online/last-seen settings live here.', 'Future backend: privacy preferences and enforcement APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Privacy', subtitle: 'Profile, messages and presence settings.', icon: Icons.privacy_tip_rounded));
       case VmRoutes.blockList:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Block List', subtitle: 'Blocked users, unblock actions, chat restrictions, and safety preferences.', icon: Icons.block_rounded, highlights: ['Blocked users should not message or interact where restricted.', 'Block/unblock must sync across Inbox and profile modules.', 'Future backend: block relationships and privacy enforcement APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Block List', subtitle: 'Blocked users and safety controls.', icon: Icons.block_rounded));
       case VmRoutes.security:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Security', subtitle: 'Login devices, device ID, sessions, bans, account safety, and security history.', icon: Icons.security_rounded, highlights: ['Device bans are enforced at login.', 'Login history should be visible to authorized users/admins.', 'Future backend: sessions, device trust, and account security APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Security', subtitle: 'Devices, sessions and login safety.', icon: Icons.security_rounded));
       case VmRoutes.language:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Language', subtitle: 'App language, room language preferences, content language filters, and regional discovery.', icon: Icons.language_rounded, highlights: ['Home already supports room language filtering.', 'This page will hold user-level language preferences.', 'Future backend: language preferences and region-aware discovery APIs.']));
-
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Language', subtitle: 'App, room and discovery language.', icon: Icons.language_rounded));
       case VmRoutes.games:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Games', subtitle: 'Free-to-play games and coin games for live rooms, including Ludo, Carrom, Chess, Bingo, Sheep Fight, and Crystal Hunt.', icon: Icons.sports_esports_rounded, highlights: ['Games should lazy-load only when opened.', 'Coin games must be backend-authoritative with RTP/liability controls.', 'Future backend: game sessions, bets, results, anti-whale, and audit APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Games', subtitle: 'Free and coin games for rooms.', icon: Icons.sports_esports_rounded));
       case VmRoutes.watchParty:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Watch Party', subtitle: 'YouTube-first synced watch mode with 10-seat layout, video area, host controls, and viewer sync.', icon: Icons.ondemand_video_rounded, highlights: ['Watch Party should be a room mode, not a separate room.', 'Host controls play, pause, seek, and load video through WebSocket.', 'Future backend: watch session state and server-time sync APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Watch Party', subtitle: 'Synced YouTube watch mode.', icon: Icons.ondemand_video_rounded));
       case VmRoutes.cricketMode:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Cricket Mode', subtitle: 'Room mode for cricket scoring, teams, innings, overs, balls, score events, and permissions.', icon: Icons.sports_cricket_rounded, highlights: ['Cricket Mode reuses the same room seats and members.', 'Owner/admins control rules and score updates.', 'Future backend: cricket mode state, rules, score, and WebSocket sync APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Cricket Mode', subtitle: 'Live cricket scoring room mode.', icon: Icons.sports_cricket_rounded));
       case VmRoutes.vibeSync:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'VibeSync', subtitle: 'Pulse Match and Mic Chemistry room interaction engine with realtime matching and chemistry overlays.', icon: Icons.favorite_border_rounded, highlights: ['Pulse Match records server timestamps and sync windows.', 'Mic Chemistry calculates engagement and chemistry scores.', 'Future backend: VibeSync sessions, pulse events, matches, and chemistry APIs.']));
-
+        return _buildRoute(settings, const VmSkeletonPage(title: 'VibeSync', subtitle: 'Pulse Match and Mic Chemistry.', icon: Icons.favorite_border_rounded));
       case VmRoutes.vibeDetail:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Vibe Detail', subtitle: 'Detailed view for a single vibe post with media, caption, mentions, likes, comments, and reactions.', icon: Icons.auto_awesome_rounded, highlights: ['Reusable post detail route for feed and profile.', 'Comments and reactions should notify Inbox/Reactions.', 'Future backend: vibe detail, comments, likes, and reaction APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Vibe Detail', subtitle: 'Post, comments and reactions.', icon: Icons.auto_awesome_rounded));
       case VmRoutes.vibeComposer:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Create Vibe', subtitle: 'Create text, photo, or video vibes with captions, mentions, @all fans, and upload limits.', icon: Icons.add_photo_alternate_rounded, highlights: ['Media upload limits: avatars/dynamic avatars under 10MB; vibe media under 20MB.', 'Mention rules should use fixed user ID/public ID logic.', 'Future backend: upload, create vibe, mention notification, and moderation APIs.']));
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Create Vibe', subtitle: 'Post photos, videos and captions.', icon: Icons.add_photo_alternate_rounded));
       case VmRoutes.vibeComments:
-        return _buildRoute(settings, const VmSkeletonPage(title: 'Vibe Comments', subtitle: 'Comments, replies, reactions, mentions, and moderation actions for vibe posts.', icon: Icons.mode_comment_rounded, highlights: ['Comments should support mentions and report actions.', 'Reactions should appear in Inbox reactions.', 'Future backend: comment thread, reactions, report, and notification APIs.']));
-
+        return _buildRoute(settings, const VmSkeletonPage(title: 'Comments', subtitle: 'Replies, reactions and mentions.', icon: Icons.mode_comment_rounded));
       default:
         return _buildRoute(settings, UnknownRoutePage(routeName: settings.name ?? 'unknown'));
     }
   }
 
-  static MaterialPageRoute<dynamic> _buildRoute(RouteSettings settings, Widget page) {
-    return MaterialPageRoute<dynamic>(settings: settings, builder: (_) => page);
+  static PageRouteBuilder<dynamic> _buildRoute(RouteSettings settings, Widget page) {
+    return PageRouteBuilder<dynamic>(
+      settings: settings,
+      transitionDuration: const Duration(milliseconds: 260),
+      reverseTransitionDuration: const Duration(milliseconds: 210),
+      pageBuilder: (_, __, ___) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0.045, 0.012), end: Offset.zero).animate(curved),
+            child: ScaleTransition(scale: Tween<double>(begin: 0.988, end: 1).animate(curved), child: child),
+          ),
+        );
+      },
+    );
   }
 }
 
 class UnknownRoutePage extends StatelessWidget {
   const UnknownRoutePage({super.key, required this.routeName});
-
   final String routeName;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
-      appBar: AppBar(title: const Text('Route not found'), backgroundColor: const Color(0xFFFAF7F1), foregroundColor: const Color(0xFF251538), elevation: 0),
+      appBar: AppBar(title: const Text('Not found'), backgroundColor: const Color(0xFFFAF7F1), foregroundColor: const Color(0xFF251538), elevation: 0),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('No route is registered for $routeName', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900)),
+          child: Text('This page is not available yet.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: const Color(0xFF251538))),
         ),
       ),
     );
