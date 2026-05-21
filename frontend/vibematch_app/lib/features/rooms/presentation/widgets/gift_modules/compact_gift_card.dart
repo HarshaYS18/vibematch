@@ -23,78 +23,101 @@ class CompactGiftCard extends StatelessWidget {
     final isLuckyPacket = gift.id == 'lucky_packet';
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: AnimatedContainer(
+      child: AnimatedScale(
         duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFFFFC857).withValues(alpha: 0.18)
-              : Colors.white.withValues(alpha: 0.075),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected ? const Color(0xFFFFD166) : Colors.white12,
-            width: selected ? 1.8 : 1,
+        curve: Curves.easeOutCubic,
+        scale: selected ? 1.04 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: selected ? Colors.white.withValues(alpha: 0.055) : Colors.transparent,
           ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: gift.colors.first.withValues(alpha: 0.20),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  if (selected)
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: RoomColors.gold.withValues(alpha: 0.22),
+                              blurRadius: 18,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  GiftVisual(
+                    icon: gift.icon,
+                    colors: gift.colors,
+                    assetPath: gift.assetPath,
+                    assetUrl: gift.assetUrl,
+                    size: 60,
+                    padding: 2,
+                    square: true,
+                    plain: true,
                   ),
-                ]
-              : null,
-        ),
-        child: Column(
-          children: [
-            GiftVisual(
-              icon: gift.icon,
-              colors: gift.colors,
-              assetPath: gift.assetPath,
-              assetUrl: gift.assetUrl,
-              size: 58,
-              padding: 6,
-              square: true,
-            ),
-            const SizedBox(height: 5),
-            Text(
-              gift.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
+                  if (selected)
+                    Positioned(
+                      right: 4,
+                      top: 2,
+                      child: Container(
+                        width: 13,
+                        height: 13,
+                        decoration: const BoxDecoration(
+                          color: RoomColors.gold,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_rounded, color: Color(0xFF251538), size: 9),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (!isLuckyPacket)
-                  isOwned
-                      ? const Icon(
-                          Icons.inventory_2_rounded,
-                          color: RoomColors.aqua,
-                          size: 10,
-                        )
-                      : const GoldCoinIcon(size: 10),
-                if (!isLuckyPacket) const SizedBox(width: 2),
-                Text(
-                  isLuckyPacket
-                      ? 'Custom'
-                      : (isOwned ? 'Owned' : '${gift.coins}'),
-                  style: TextStyle(
-                    color: isOwned ? RoomColors.aqua : RoomColors.gold,
-                    fontSize: isLuckyPacket ? 9.1 : 9.4,
-                    fontWeight: FontWeight.w900,
-                  ),
+              const SizedBox(height: 2),
+              Text(
+                gift.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: selected ? 0.98 : 0.82),
+                  fontSize: 10.2,
+                  height: 1,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 3),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!isLuckyPacket)
+                    isOwned
+                        ? const Icon(Icons.inventory_2_rounded, color: RoomColors.aqua, size: 9.5)
+                        : const GoldCoinIcon(size: 9.5),
+                  if (!isLuckyPacket) const SizedBox(width: 2),
+                  Text(
+                    isLuckyPacket ? 'Custom' : (isOwned ? 'Owned' : '${gift.coins}'),
+                    style: TextStyle(
+                      color: isOwned ? RoomColors.aqua : RoomColors.gold,
+                      fontSize: 8.8,
+                      height: 1,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
