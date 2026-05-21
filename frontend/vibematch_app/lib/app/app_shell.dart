@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/icons/vm_icons.dart';
 import '../core/permissions/vm_android_permission_service.dart';
 import '../core/session/vm_session_cleanup_service.dart';
+import '../core/ui/vm_toast.dart';
 import '../features/auth/data/auth_api_service.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/home/presentation/home_page_modular.dart';
@@ -57,7 +58,6 @@ class _AppShellState extends State<AppShell> {
   bool _sessionLogoutInFlight = false;
 
   CurrentUser get _activeUser => _syncedUser;
-
   bool get _showOwnerControls => _activeUser.canSeeOwnerControls;
 
   @override
@@ -241,8 +241,7 @@ class _AppShellState extends State<AppShell> {
     _backPressResetTimer?.cancel();
     _backPressResetTimer = Timer(const Duration(seconds: 2), () => _backPressCount = 0);
     final remaining = (3 - _backPressCount).clamp(1, 3);
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Press back $remaining more time${remaining == 1 ? '' : 's'} to exit'), duration: const Duration(milliseconds: 1200), behavior: SnackBarBehavior.floating));
+    VmToast.show(context, 'Press back $remaining more time${remaining == 1 ? '' : 's'} to exit', icon: Icons.touch_app_rounded, duration: const Duration(milliseconds: 1300));
   }
 
   @override
@@ -363,11 +362,7 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.10) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          AnimatedScale(
-            scale: active ? 1.05 : 1.0,
-            duration: const Duration(milliseconds: 160),
-            child: Icon(icon, size: active ? 18 : 17, color: active ? deepPlum : muted),
-          ),
+          AnimatedScale(scale: active ? 1.05 : 1.0, duration: const Duration(milliseconds: 160), child: Icon(icon, size: active ? 18 : 17, color: active ? deepPlum : muted)),
           const SizedBox(height: 1),
           Text(label, style: TextStyle(fontSize: 8.4, height: 0.98, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? deepPlum : muted)),
         ]),
