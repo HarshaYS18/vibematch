@@ -102,22 +102,7 @@ def _ledger(
 ) -> None:
     before = int(pool.balance or 0)
     after = before + amount if direction == EconomyDirection.CREDIT.value else before - amount
-    db.add(
-        GamePoolLedger(
-            pool_id=pool.id,
-            direction=direction,
-            amount=amount,
-            before_balance=before,
-            after_balance=after,
-            source_type=source_type,
-            source_id=source_id,
-            game_key=pool.game_key,
-            user_id=user_id,
-            created_by_user_id=actor.id if actor else None,
-            reason=reason,
-            metadata_json=json.dumps(metadata or {}, separators=(",", ":")),
-        )
-    )
+    db.add(GamePoolLedger(pool_id=pool.id, direction=direction, amount=amount, before_balance=before, after_balance=after, source_type=source_type, source_id=source_id, game_key=pool.game_key, user_id=user_id, created_by_user_id=actor.id if actor else None, reason=reason, metadata_json=json.dumps(metadata or {}, separators=(",", ":"))))
 
 
 def _assert_active(pool: GamePool, label: str) -> None:
@@ -127,48 +112,39 @@ def _assert_active(pool: GamePool, label: str) -> None:
 
 def _today_amount(db: Session, pool_id: int, source_types: list[str], direction: str) -> int:
     since = datetime.utcnow() - timedelta(hours=24)
-    return int(
-        db.query(func.coalesce(func.sum(GamePoolLedger.amount), 0))
-        .filter(
-            GamePoolLedger.pool_id == pool_id,
-            GamePoolLedger.direction == direction,
-            GamePoolLedger.source_type.in_(source_types),
-            GamePoolLedger.created_at >= since,
-        )
-        .scalar()
-        or 0
-    )
+    return int(db.query(func.coalesce(func.sum(GamePoolLedger.amount), 0)).filter(GamePoolLedger.pool_id == pool_id, GamePoolLedger.direction == direction, GamePoolLedger.source_type.in_(source_types), GamePoolLedger.created_at >= since).scalar() or 0)
+
+
+def safe_payout_capacity(db: Session) -> dict:
+    main_pool, lucky_pool = ensure_house_pools(db)
+    props = lucky_gift_props_service.get_props(db)
+    safe_ratio = int(props.get("payout_pool_safe_ratio_basis_points", 6500))
+    lucky_payout_today = _today_amount(db, lucky_pool.id, ["LUCKY_GIFT_PAYOUT"], EconomyDirection.DEBIT.value)
+    main_payout_today = _today_amount(db, main_pool.id, ["LUCKY_GIFT_BACKSTOP_PAYOUT"], EconomyDirection.DEBIT.value)
+    lucky_cap_left = max(int(lucky_pool.daily_payout_cap or 0) - lucky_payout_today, 0) if lucky_pool.daily_payout_cap else available_balance(lucky_pool)
+    main_cap_left = max(int(main_pool.daily_payout_cap or 0) - main_payout_today, 0) if main_pool.daily_payout_cap else available_balance(main_pool)
+    lucky_safe = min(available_balance(lucky_pool) * safe_ratio // 10_000, lucky_cap_left, int(lucky_pool.max_single_payout or 10**18))
+    main_safe = min(available_balance(main_pool) * safe_ratio // 10_000, main_cap_left, int(main_pool.max_single_payout or 10**18))
+    return {
+        "max_safe_payout": max(lucky_safe + main_safe, 0),
+        "lucky_safe_payout": max(lucky_safe, 0),
+        "main_safe_payout": max(main_safe, 0),
+        "main_pool": pool_response(main_pool),
+        "lucky_pool": pool_response(lucky_pool),
+    }
 
 
 def validate_payout_exposure(db: Session, *, payout_amount: int) -> dict:
     main_pool, lucky_pool = ensure_house_pools(db)
     safe_payout = max(int(payout_amount or 0), 0)
     if safe_payout <= 0:
-        return {"allowed": True, "reason": "NO_PAYOUT", "main_pool": pool_response(main_pool), "lucky_pool": pool_response(lucky_pool)}
-
+        return {"allowed": True, "reason": "NO_PAYOUT", "max_safe_payout": safe_payout_capacity(db)["max_safe_payout"], "main_pool": pool_response(main_pool), "lucky_pool": pool_response(lucky_pool)}
     _assert_active(main_pool, "Main")
     _assert_active(lucky_pool, "Lucky")
-    props = lucky_gift_props_service.get_props(db)
-    safe_ratio = int(props.get("payout_pool_safe_ratio_basis_points", 6500))
-
-    if lucky_pool.max_single_payout and safe_payout > lucky_pool.max_single_payout:
-        raise HTTPException(status_code=409, detail="Lucky gift payout exceeds max single payout")
-    if main_pool.max_single_payout and safe_payout > main_pool.max_single_payout:
-        raise HTTPException(status_code=409, detail="Lucky gift payout exceeds main pool max single payout")
-
-    lucky_allowed = available_balance(lucky_pool) * safe_ratio // 10_000
-    main_allowed = available_balance(main_pool) * safe_ratio // 10_000
-    if safe_payout > max(lucky_allowed + main_allowed, available_balance(lucky_pool)):
+    capacity = safe_payout_capacity(db)
+    if safe_payout > int(capacity["max_safe_payout"]):
         raise HTTPException(status_code=409, detail="Lucky gift house pool exposure is too high")
-
-    lucky_payout_today = _today_amount(db, lucky_pool.id, ["LUCKY_GIFT_PAYOUT"], EconomyDirection.DEBIT.value)
-    main_payout_today = _today_amount(db, main_pool.id, ["LUCKY_GIFT_BACKSTOP_PAYOUT"], EconomyDirection.DEBIT.value)
-    if lucky_pool.daily_payout_cap and lucky_payout_today + safe_payout > lucky_pool.daily_payout_cap:
-        raise HTTPException(status_code=409, detail="Lucky gift daily payout cap reached")
-    if main_pool.daily_payout_cap and main_payout_today + safe_payout > main_pool.daily_payout_cap:
-        raise HTTPException(status_code=409, detail="Main lucky gift backstop daily payout cap reached")
-
-    return {"allowed": True, "reason": "ALLOW", "main_pool": pool_response(main_pool), "lucky_pool": pool_response(lucky_pool)}
+    return {"allowed": True, "reason": "ALLOW", **capacity}
 
 
 def record_spend_income(db: Session, *, amount: int, actor: User, source_id: str, user_id: int, metadata: dict | None = None) -> None:
@@ -187,7 +163,6 @@ def record_payout(db: Session, *, amount: int, actor: User, source_id: str, user
     _assert_active(main_pool, "Main")
     _assert_active(lucky_pool, "Lucky")
     remaining = int(amount)
-
     lucky_part = min(available_balance(lucky_pool), remaining)
     if lucky_part > 0:
         _ledger(db, lucky_pool, EconomyDirection.DEBIT.value, lucky_part, "LUCKY_GIFT_PAYOUT", actor, "Lucky gift payout", user_id=user_id, source_id=source_id, metadata=metadata)
@@ -251,19 +226,7 @@ def withdraw_lucky_to_main(db: Session, *, actor: User, amount: int, reason: str
     return {"main_pool": pool_response(main_pool), "lucky_pool": pool_response(lucky_pool)}
 
 
-def update_pool_settings(
-    db: Session,
-    *,
-    actor: User,
-    game_key: str,
-    pool_type: str,
-    status: str | None,
-    daily_payout_cap: int | None,
-    daily_loss_limit: int | None,
-    max_single_payout: int | None,
-    rtp_target_basis_points: int | None,
-    reason: str,
-) -> GamePool:
+def update_pool_settings(db: Session, *, actor: User, game_key: str, pool_type: str, status: str | None, daily_payout_cap: int | None, daily_loss_limit: int | None, max_single_payout: int | None, rtp_target_basis_points: int | None, reason: str) -> GamePool:
     pool = get_or_create_pool(db, game_key, pool_type)
     if status is not None:
         if status not in {item.value for item in EconomyPoolStatus}:
