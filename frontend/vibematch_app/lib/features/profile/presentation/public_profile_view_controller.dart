@@ -10,6 +10,18 @@ DateTime _publicProfileToIst(DateTime value) =>
 extension _PublicProfileViewController on _PublicProfileViewPageState {
   int _targetPublicUserId() => widget.publicUserId ?? widget.user.publicUserId;
 
+  Future<void> _loadCanonicalDisplay() async {
+    final publicUserId = _targetPublicUserId();
+    if (publicUserId <= 0) return;
+    try {
+      final display = await _profileDisplayRepository.getPublicUser(
+        publicUserId,
+      );
+      if (!mounted) return;
+      _setProfileState(() => _canonicalDisplay = display);
+    } catch (_) {}
+  }
+
   Future<void> _loadEconomyPublicCard() async {
     final publicUserId = _targetPublicUserId();
     if (publicUserId <= 0) return;
@@ -77,6 +89,7 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
         _backendProfile = profile;
         _relationship = profile.relationship;
       });
+      unawaited(_loadCanonicalDisplay());
       unawaited(_loadEconomyPublicCard());
     } catch (error) {
       if (!mounted) return;
@@ -148,7 +161,10 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
   }
 
   List<PublicCoverPhoto> _visibleCoverPhotos() {
-    final urls = _backendProfile?.coverPhotoUrls ?? widget.user.coverPhotoUrls;
+    final canonicalCover = _canonicalDisplay?.coverPhotoUrl?.trim();
+    final urls = canonicalCover != null && canonicalCover.isNotEmpty
+        ? <String>[canonicalCover]
+        : _backendProfile?.coverPhotoUrls ?? widget.user.coverPhotoUrls;
     final covers = publicCoverPhotosFromUrls(urls);
     return covers.isEmpty ? publicProfileCoverPhotos : covers;
   }
@@ -215,8 +231,13 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     avatarColors: const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
     avatarUrl: _avatarUrl(),
     nameGradientColors:
+        _canonicalDisplay?.nameGradientColors ??
         _backendProfile?.vip.nameGradientColors ??
         widget.user.vip.nameGradientColors,
+    equippedAvatarFrameAssetPath: _canonicalDisplay?.avatarFrame?.assetPath,
+    equippedAvatarFrameImageUrl: _canonicalDisplay?.avatarFrame?.preferredImage,
+    equippedChatBubbleAssetPath: _canonicalDisplay?.textBubble?.assetPath,
+    equippedChatBubbleImageUrl: _canonicalDisplay?.textBubble?.preferredImage,
     isCurrentUser: _isSelfProfile,
   );
 
@@ -331,48 +352,83 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
   }
 
   String _displayName() =>
+      _canonicalDisplay?.displayName ??
       _backendProfile?.visibleName ??
       _economyCard?.displayName ??
       widget.user.displayName ??
       widget.user.username ??
-      'Vibe User';
-  String _username() => _backendProfile?.username ?? widget.user.username ?? '';
+      'FunKey User';
+  String _username() =>
+      _canonicalDisplay?.username ??
+      _backendProfile?.username ??
+      widget.user.username ??
+      '';
   String _publicId() =>
+      _canonicalDisplay?.displayCustomId?.toString() ??
+      _canonicalDisplay?.publicUserId.toString() ??
       _backendProfile?.visibleId ??
       widget.user.displayCustomId?.toString() ??
       widget.user.publicUserId.toString();
   String? _avatarUrl() =>
+      _canonicalDisplay?.avatarUrl ??
       _backendProfile?.avatarUrl ??
       _economyCard?.avatarUrl ??
       widget.user.avatarUrl;
   bool _showOfficialTick() =>
+      _canonicalDisplay?.verifiedOfficial == true ||
       _backendProfile?.primaryRoleBadge?.showVerifiedTick == true ||
       widget.user.shouldShowOfficialYellowTick;
-  String? _roleTag() =>
-      _backendProfile?.primaryRoleBadge?.badgeLabel ??
-      widget.user.primaryRoleBadge?.badgeLabel ??
-      MeProfileConstants.roleTagFor(widget.user.primaryRole);
+
+  RoleBadge? _roleBadge() {
+    if (_canonicalDisplay != null &&
+        _canonicalDisplay!.primaryRole.toLowerCase().trim() !=
+            widget.user.primaryRole.toLowerCase().trim()) {
+      return null;
+    }
+    return _backendProfile?.primaryRoleBadge ?? widget.user.primaryRoleBadge;
+  }
+
+  String? _roleTag() {
+    final canonicalRoleLabel = _canonicalDisplay?.roomRoleLabel.trim();
+    if (canonicalRoleLabel != null && canonicalRoleLabel.isNotEmpty) {
+      return canonicalRoleLabel;
+    }
+    final canonicalRole = _canonicalDisplay?.primaryRole;
+    if (canonicalRole != null && canonicalRole.trim().isNotEmpty) {
+      return MeProfileConstants.roleTagFor(canonicalRole);
+    }
+    return _backendProfile?.primaryRoleBadge?.badgeLabel ??
+        widget.user.primaryRoleBadge?.badgeLabel ??
+        MeProfileConstants.roleTagFor(widget.user.primaryRole);
+  }
+
   int _vipLevel() =>
+      _canonicalDisplay?.vipLevel ??
       _economyCard?.vipLevel ??
       _backendProfile?.vip.vipLevel ??
       widget.vipLevel;
   int _svipLevel() =>
+      _canonicalDisplay?.svipLevel ??
       _economyCard?.svipLevel ??
       _backendProfile?.vip.svipLevel ??
       widget.svipLevel;
   int _sentLevel() =>
+      _canonicalDisplay?.sentLevel ??
       _economyCard?.sendLevel ??
       _backendProfile?.wallet.sendLevel ??
       widget.user.wallet.sendLevel;
   int _receiveLevel() =>
+      _canonicalDisplay?.receivedLevel ??
       _economyCard?.receiveLevel ??
       _backendProfile?.wallet.receiveLevel ??
       widget.user.wallet.receiveLevel;
   int _monthlyGiftCoinsSent() =>
+      _canonicalDisplay?.monthlySentCoins ??
       _economyCard?.monthlySentCoins ??
       _backendProfile?.wallet.monthlyGiftCoinsSent ??
       widget.user.wallet.monthlyGiftCoinsSent;
   int _monthlyGiftCoinsReceived() =>
+      _canonicalDisplay?.monthlyReceivedCoins ??
       _economyCard?.monthlyReceivedCoins ??
       _backendProfile?.wallet.monthlyGiftCoinsReceived ??
       widget.user.wallet.monthlyGiftCoinsReceived;

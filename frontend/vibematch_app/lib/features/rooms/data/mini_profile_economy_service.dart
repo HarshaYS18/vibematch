@@ -35,12 +35,30 @@ class MiniProfileEconomySummary {
     return MiniProfileEconomySummary(
       vipLevel: _firstPositive([json['vip_level'], vip['level']]),
       svipLevel: _firstPositive([json['svip_level'], svip['level']]),
-      monthlyGiftCoinsSent: _int(json['monthly_gift_coins_sent']),
-      monthlyGiftCoinsReceived: _int(json['monthly_gift_coins_received']),
-      lifetimeSendExp: _int(json['lifetime_send_exp']) == 0 ? _int(sent['total_exp']) : _int(json['lifetime_send_exp']),
-      lifetimeReceiveExp: _int(json['lifetime_receive_exp']) == 0 ? _int(received['total_exp']) : _int(json['lifetime_receive_exp']),
-      sentLevel: _int(json['sent_level']) == 0 ? _int(sent['level']) : _int(json['sent_level']),
-      receiveLevel: _int(json['receive_level']) == 0 ? _int(received['level']) : _int(json['receive_level']),
+      monthlyGiftCoinsSent: _firstPositive([
+        json['monthly_gift_coins_sent'],
+        json['monthly_sent_coins'],
+      ]),
+      monthlyGiftCoinsReceived: _firstPositive([
+        json['monthly_gift_coins_received'],
+        json['monthly_received_coins'],
+      ]),
+      lifetimeSendExp: _firstPositive([
+        json['lifetime_send_exp'],
+        json['total_sent_coins'],
+        sent['total_exp'],
+      ]),
+      lifetimeReceiveExp: _firstPositive([
+        json['lifetime_receive_exp'],
+        json['total_received_coins'],
+        received['total_exp'],
+      ]),
+      sentLevel: _firstPositive([json['sent_level'], sent['level']]),
+      receiveLevel: _firstPositive([
+        json['receive_level'],
+        json['received_level'],
+        received['level'],
+      ]),
     );
   }
 
@@ -61,7 +79,8 @@ class MiniProfileEconomySummary {
 class MiniProfileEconomyService {
   MiniProfileEconomyService._();
 
-  static final MiniProfileEconomyService instance = MiniProfileEconomyService._();
+  static final MiniProfileEconomyService instance =
+      MiniProfileEconomyService._();
   final AuthLocalStorage _storage = AuthLocalStorage();
 
   Future<MiniProfileEconomySummary> summaryForSeatUser(SeatUser user) async {
@@ -73,7 +92,7 @@ class MiniProfileEconomyService {
 
     final ids = _lookupCandidates(user.id);
     for (final candidate in ids) {
-      final summary = await _tryFetch(candidate.path, headers, user);
+      final summary = await _tryFetch(candidate.path, headers);
       if (summary != null) return summary;
     }
 
@@ -84,7 +103,10 @@ class MiniProfileEconomyService {
     // Kept for callers, but mini profile must always fetch fresh backend values.
   }
 
-  Future<MiniProfileEconomySummary?> _tryFetch(String path, Map<String, String> headers, SeatUser fallbackUser) async {
+  Future<MiniProfileEconomySummary?> _tryFetch(
+    String path,
+    Map<String, String> headers,
+  ) async {
     try {
       final response = await http.get(
         Uri.parse(VmApiConfig.endpoint(path)),
@@ -105,18 +127,34 @@ class MiniProfileEconomyService {
     final direct = int.tryParse(value);
     if (direct != null && direct > 0) {
       if (value.length >= 7) {
-        candidates.add(_MiniProfileLookupCandidate('/economy/users/public/$direct/summary'));
+        candidates.add(
+          _MiniProfileLookupCandidate('/profile-display/users/$direct'),
+        );
+        candidates.add(
+          _MiniProfileLookupCandidate('/economy/users/public/$direct/summary'),
+        );
       }
-      candidates.add(_MiniProfileLookupCandidate('/economy/users/$direct/summary'));
+      candidates.add(
+        _MiniProfileLookupCandidate('/economy/users/$direct/summary'),
+      );
     }
 
     final match = RegExp(r'(\d{1,12})').firstMatch(value);
     final extracted = int.tryParse(match?.group(1) ?? '');
     if (extracted != null && extracted > 0 && extracted != direct) {
       if ('$extracted'.length >= 7) {
-        candidates.add(_MiniProfileLookupCandidate('/economy/users/public/$extracted/summary'));
+        candidates.add(
+          _MiniProfileLookupCandidate('/profile-display/users/$extracted'),
+        );
+        candidates.add(
+          _MiniProfileLookupCandidate(
+            '/economy/users/public/$extracted/summary',
+          ),
+        );
       }
-      candidates.add(_MiniProfileLookupCandidate('/economy/users/$extracted/summary'));
+      candidates.add(
+        _MiniProfileLookupCandidate('/economy/users/$extracted/summary'),
+      );
     }
 
     return candidates;

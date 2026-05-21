@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
+import '../../auth/models/role_badge.dart';
 import '../../economy/data/economy_master_api_service.dart';
 import '../../family/models/family_ui_models.dart';
 import '../../family/presentation/family_modular_page.dart';
 import '../../presence/data/presence_api_service.dart';
+import '../../profile_display/data/profile_display_repository.dart';
+import '../../profile_display/models/canonical_user_display_model.dart';
 import '../../rooms/presentation/live_room_models.dart';
 import '../../rooms/presentation/widgets/followers_followed_page.dart';
 import '../../vip/presentation/vip_program_page.dart';
@@ -58,6 +61,8 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   final AuthApiService _authApi = const AuthApiService();
   final PresenceApiService _presenceApi = const PresenceApiService();
   final EconomyMasterApiService _economyApi = const EconomyMasterApiService();
+  final ProfileDisplayRepository _profileDisplayRepository =
+      ProfileDisplayRepository();
   Timer? _coverTimer;
   Timer? _presenceTimer;
   StreamSubscription<ProfileRelationshipRealtimeEvent>?
@@ -67,6 +72,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   bool _followBusy = false;
   String? _profileError;
   CurrentUser? _viewer;
+  CanonicalUserDisplayModel? _canonicalDisplay;
   PublicUserProfile? _backendProfile;
   EconomyPublicCardSnapshot? _economyCard;
   UserRelationship? _relationship;
@@ -94,6 +100,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
         .instance
         .events
         .listen(_onRelationshipRealtimeEvent);
+    unawaited(_loadCanonicalDisplay());
     unawaited(_loadBackendProfile());
     unawaited(_syncPublicLoveBonds());
     unawaited(_loadRealFamily());
@@ -106,6 +113,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
     _presenceTimer?.cancel();
     _relationshipRealtimeSub?.cancel();
     _coverController.dispose();
+    _profileDisplayRepository.close();
     super.dispose();
   }
 
@@ -146,9 +154,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 username: username,
                 publicId: publicId,
                 roleTag: _roleTag(),
-                roleBadge:
-                    _backendProfile?.primaryRoleBadge ??
-                    widget.user.primaryRoleBadge,
+                roleBadge: _roleBadge(),
                 showOfficialTick: _showOfficialTick(),
                 vipLevel: _vipLevel(),
                 svipLevel: _svipLevel(),
@@ -163,6 +169,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 coverPhotos: coverPhotos,
                 avatarUrl: _avatarUrl(),
                 nameGradientColors:
+                    _canonicalDisplay?.nameGradientColors ??
                     _backendProfile?.vip.nameGradientColors ??
                     widget.user.vip.nameGradientColors,
                 coverController: _coverController,

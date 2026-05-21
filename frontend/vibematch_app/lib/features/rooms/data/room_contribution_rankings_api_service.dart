@@ -16,7 +16,9 @@ class RoomContributionRankingsApiService {
     required RoomRankingPeriod period,
   }) async {
     final cleanRoomId = roomPublicId.trim();
-    if (cleanRoomId.isEmpty || cleanRoomId == 'unknown_room') return const <RoomRankingEntry>[];
+    if (cleanRoomId.isEmpty || cleanRoomId == 'unknown_room') {
+      return const <RoomRankingEntry>[];
+    }
 
     final token = await AuthLocalStorage().getAccessToken();
     final headers = <String, String>{'Accept': 'application/json'};
@@ -34,7 +36,9 @@ class RoomContributionRankingsApiService {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Failed to load room contributions (${response.statusCode})');
+      throw Exception(
+        'Failed to load room contributions (${response.statusCode})',
+      );
     }
 
     final decoded = jsonDecode(response.body);
@@ -50,30 +54,77 @@ class RoomContributionRankingsApiService {
 
   RoomRankingEntry _entryFromJson(Map<String, dynamic> json) {
     final userJson = _map(json['user']);
+    final gradientJson = _map(userJson['name_gradient']);
+    final equippedJson = _map(userJson['equipped_items']);
+    final avatarFrameJson = _map(equippedJson['avatar_frame']);
+    final textBubbleJson = _map(
+      equippedJson['text_bubble'] ?? equippedJson['chat_bubble'],
+    );
     final user = SeatUser(
       id: '${_int(userJson['public_user_id']) == 0 ? _int(userJson['id']) : _int(userJson['public_user_id'])}',
-      name: _string(userJson['display_name'], fallback: _string(userJson['username'], fallback: 'Vibe User')),
-      roleLabel: 'member',
+      name: _string(
+        userJson['display_name'],
+        fallback: _string(userJson['username'], fallback: 'FunKey User'),
+      ),
+      roleLabel: _string(
+        userJson['room_role_label'],
+        fallback: _string(userJson['primary_role'], fallback: 'member'),
+      ),
       familyName: '',
       relationshipText: '',
       vipLevel: _int(userJson['vip_level']),
       svipLevel: _int(userJson['svip_level']),
-      sendingLevel: _int(userJson['sending_level']),
-      receivingLevel: _int(userJson['receiving_level']),
-      sentExp: _int(userJson['monthly_sent']),
-      receivedExp: _int(userJson['monthly_received']),
+      sendingLevel: _firstPositive([
+        userJson['sent_level'],
+        userJson['sending_level'],
+      ]),
+      receivingLevel: _firstPositive([
+        userJson['received_level'],
+        userJson['receiving_level'],
+      ]),
+      sentExp: _firstPositive([
+        userJson['monthly_sent_coins'],
+        userJson['monthly_sent'],
+      ]),
+      receivedExp: _firstPositive([
+        userJson['monthly_received_coins'],
+        userJson['monthly_received'],
+      ]),
       medals: const <String>[],
       avatarColors: _avatarColors(_int(userJson['id'])),
       avatarUrl: _nullableString(userJson['avatar_url']),
+      nameGradientColors: _stringList(gradientJson['colors']),
+      equippedAvatarFrameAssetPath: _nullableString(
+        avatarFrameJson['asset_path'],
+      ),
+      equippedAvatarFrameImageUrl: _firstText([
+        avatarFrameJson['image_url'],
+        avatarFrameJson['cdn_asset_url'],
+        avatarFrameJson['thumbnail_url'],
+      ]),
+      equippedChatBubbleAssetPath: _nullableString(
+        textBubbleJson['asset_path'],
+      ),
+      equippedChatBubbleImageUrl: _firstText([
+        textBubbleJson['image_url'],
+        textBubbleJson['cdn_asset_url'],
+        textBubbleJson['thumbnail_url'],
+      ]),
     );
 
     return RoomRankingEntry(
       rank: _int(json['rank']),
       user: user,
       score: _int(json['score']),
-      scoreText: _string(json['score_text'], fallback: compactNumber(_int(json['score']))),
+      scoreText: _string(
+        json['score_text'],
+        fallback: compactNumber(_int(json['score'])),
+      ),
       scoreLabel: _string(json['score_label'], fallback: 'coin'),
-      subtitle: _string(json['subtitle'], fallback: 'Sent Lv ${user.sendingLevel}'),
+      subtitle: _string(
+        json['subtitle'],
+        fallback: 'Sent Lv ${user.sendingLevel}',
+      ),
     );
   }
 }
@@ -82,6 +133,30 @@ Map<String, dynamic> _map(dynamic value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) return value.cast<String, dynamic>();
   return const <String, dynamic>{};
+}
+
+List<String> _stringList(dynamic value) {
+  if (value is! List) return const <String>[];
+  return value
+      .map((item) => item.toString().trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
+int _firstPositive(List<dynamic> values) {
+  for (final value in values) {
+    final parsed = _int(value);
+    if (parsed > 0) return parsed;
+  }
+  return 0;
+}
+
+String? _firstText(List<dynamic> values) {
+  for (final value in values) {
+    final text = _nullableString(value);
+    if (text != null) return text;
+  }
+  return null;
 }
 
 int _int(dynamic value) {

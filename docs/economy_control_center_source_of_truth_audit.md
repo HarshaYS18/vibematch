@@ -1,8 +1,8 @@
 # Economy Control Center Source Of Truth Audit
 
-Branch: `economy-control-center-source-of-truth-v1`
+Branch: `inbox-v3-local-update` tracking `origin/inbox-v3-clean-ui-rebuild`
 
-This pass is intentionally a foundation pass. Stable live-room entry, privacy, settings, seats, gifts, chat, and profile navigation are preserved. Risky live-room realtime/profile rewiring is deferred.
+This audit started as the `economy-control-center-source-of-truth-v1` foundation pass. The continuation pass was applied on the Inbox changes branch after Inbox was completed, preserving stable live-room entry, privacy, settings, seats, gifts, chat, and profile navigation.
 
 ## Current Backend Sources
 
@@ -32,6 +32,11 @@ This pass is intentionally a foundation pass. Stable live-room entry, privacy, s
 - Profile display data was spread across profile, economy, room snapshot, and store inventory payloads. This pass adds `/profile-display/*` and `CanonicalUserDisplayModel` as the shared payload.
 - Stealth state used room participant flags and an older marker in `User.interests`. This pass adds `user_stealth_states`; room visibility flags remain the runtime source for each active room session.
 - Several mock/demo Flutter sources remain outside the safest live-room path, including VIP program mock repository, event/social/demo data, and some gift fallback data.
+- Me page hero display still read VIP/SVIP/name/avatar/cover/role fields from profile and wallet payloads before the continuation pass.
+- Public Profile header, mini-profile seat target, and follower/following entry payloads still mixed public profile, economy public card, and widget seed values before the continuation pass.
+- Live-room mini profile economy lookup used economy summary endpoints before canonical profile display.
+- Room contribution ranking rows parsed legacy economy/ranking user fields only, so canonical profile-display decorations could be dropped even when the backend supplied them.
+- Control Center economy/store write routes had service-level audit behavior but did not all repeat the same explicit owner access check used by read routes.
 
 ## Canonical Sources After This Pass
 
@@ -42,9 +47,28 @@ This pass is intentionally a foundation pass. Stable live-room entry, privacy, s
 - Ranking source: gift/ledger/stat tables and existing ranking endpoints; materialized `ranking_snapshots` remains available for later scheduled snapshots.
 - Store catalog: `store_categories`, `store_items`, and `store_asset_manifests`.
 - Inventory/equipment: `user_store_inventory`.
-- Shared display payload: `/profile-display/me` and `/profile-display/users/{public_user_id}`. Embedding this payload into room realtime snapshots was deferred because the stable live-room sync path must remain untouched until a dedicated verification pass.
+- Shared display payload: `/profile-display/me` and `/profile-display/users/{public_user_id}`. Me, Public Profile, mini profile economy lookup, and backend ranking-row parsing now prefer this payload where it is safely available. Embedding this payload into room realtime snapshots is still deferred because the stable live-room sync path must remain untouched until a dedicated verification pass.
 - Roles/permissions: `user_roles`, `special_permissions`, and centralized role/room permission services.
 - Stealth eligibility/state: `special_permissions.USE_STEALTH` and `user_stealth_states`; per-room public visibility still comes from room participant visibility flags.
+
+## Inbox Branch Continuation Migration
+
+- Me page: `MePageContent` now loads `ProfileDisplayRepository.getMe()` and uses canonical display name, public/display ID, role label, VIP/SVIP levels, avatar URL, and cover photo URL before legacy profile/wallet fallbacks.
+- Public Profile page: `PublicProfileViewPage` now loads `ProfileDisplayRepository.getPublicUser(public_user_id)` and uses canonical display name, username, public/display ID, verified flag, role label, VIP/SVIP, sent/received levels, monthly sent/received coins, avatar, cover photo, equipped avatar frame/chat bubble, and name gradient before legacy profile/economy/widget fallbacks.
+- Live-room mini profile: `MiniProfileEconomyService` now tries `/profile-display/users/{public_user_id}` before economy summary endpoints, keeping the old economy and seat-user fallbacks inside the service layer.
+- Ranking rows: `RoomContributionRankingsApiService` now accepts canonical `sent_level`, `received_level`, `monthly_sent_coins`, `monthly_received_coins`, `name_gradient`, and `equipped_items` fields when backend ranking payloads include them.
+- Control Center: owner-only access is now explicitly checked for economy rule writes, store category writes, store item writes, and store manifest imports, matching the existing owner-only read/preview route behavior.
+
+## Files Changed In Continuation Pass
+
+- `backend/app/api/routes/control_center.py`
+- `frontend/vibematch_app/lib/features/profile/presentation/widgets/me_page_content.dart`
+- `frontend/vibematch_app/lib/features/profile/presentation/public_profile_view_page.dart`
+- `frontend/vibematch_app/lib/features/profile/presentation/public_profile_view_controller.dart`
+- `frontend/vibematch_app/lib/features/profile_display/models/canonical_user_display_model.dart`
+- `frontend/vibematch_app/lib/features/rooms/data/mini_profile_economy_service.dart`
+- `frontend/vibematch_app/lib/features/rooms/data/room_contribution_rankings_api_service.dart`
+- `docs/economy_control_center_source_of_truth_audit.md`
 
 ## Safe Migration Order
 
@@ -59,8 +83,17 @@ This pass is intentionally a foundation pass. Stable live-room entry, privacy, s
 ## Deferred Work
 
 - Full migration of gift panel fallback items is deferred because gift sending is stable and has a separate catalog editor.
-- Public Profile and Me page deep rewiring is deferred beyond the shared payload endpoint; their current payload already uses backend profile/economy services.
-- Live-room seats, chat, mini profile, and realtime peer snapshots are intentionally left on the stable pre-foundation data path. Canonical display wiring there needs a dedicated two-window realtime verification pass before it is reintroduced.
+- VIP program reward/config defaults remain in `VipProgramMockRepository` until a public economy rules/config endpoint is exposed for that screen.
+- Local room ranking preview builders remain as offline/error fallbacks. Backend ranking endpoints and canonical ranking payload parsing are preferred when available.
+- Public profile cover placeholder and empty public Vibes list remain display-only fallbacks for missing backend media/feed data.
+- Live-room seats, chat sender snapshots, and realtime peer snapshots are intentionally left on the stable pre-foundation data path. Canonical display wiring there needs a dedicated two-window realtime verification pass before it is introduced.
 - Scheduled ranking materialization for hourly/daily/weekly/monthly periods is deferred; current ranking endpoints calculate from ledger/gift tables.
 - Asset manifest rollback UI is deferred. The backend stores manifest imports and validation results, but rollback needs a product decision around version pinning.
 - Fine-grained permission-grant UI for every new special permission is deferred; backend enum/service support is in place and existing Control Center role/permission tools remain active.
+
+## Verification Results
+
+- Passed on the Inbox changes branch: `cd frontend/vibematch_app && flutter analyze` (`No issues found!`).
+- Passed on the Inbox changes branch: `cd frontend/vibematch_app && flutter test test/widget_test.dart`.
+- Passed because backend route code changed: `cd backend && python -m compileall app`.
+- Passed: `git diff --check` exited successfully. Git printed existing CRLF normalization warnings for tracked files.

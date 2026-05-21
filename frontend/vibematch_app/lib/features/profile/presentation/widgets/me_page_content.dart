@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 
 import '../../../auth/data/auth_api_service.dart';
 import '../../../auth/models/current_user.dart';
+import '../../../auth/models/role_badge.dart';
 import '../../../control_center/presentation/control_center_hub_page.dart';
 import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
 import '../../../games/presentation/game_test_page.dart';
 import '../../../presence/data/presence_api_service.dart';
+import '../../../profile_display/data/profile_display_repository.dart';
+import '../../../profile_display/models/canonical_user_display_model.dart';
 import '../../../store/presentation/store_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/data/wallet_api_service.dart';
@@ -50,8 +53,11 @@ class _MePageContentState extends State<MePageContent> {
   final WalletApiService _walletApi = const WalletApiService();
   final PresenceApiService _presenceApi = const PresenceApiService();
   final ProfileApiService _profileApi = const ProfileApiService();
+  final ProfileDisplayRepository _profileDisplayRepository =
+      ProfileDisplayRepository();
 
   CurrentUser? _freshUser;
+  CanonicalUserDisplayModel? _profileDisplay;
   VmWallet? _wallet;
   PresenceDto? _presence;
   FamilySummaryDto? _family;
@@ -88,6 +94,10 @@ class _MePageContentState extends State<MePageContent> {
   }
 
   String get _displayName {
+    final canonicalName = _profileDisplay?.displayName.trim();
+    if (canonicalName != null && canonicalName.isNotEmpty) {
+      return canonicalName;
+    }
     final displayName = user.displayName?.trim();
     if (displayName != null && displayName.isNotEmpty) return displayName;
     final username = user.username?.trim();
@@ -95,8 +105,32 @@ class _MePageContentState extends State<MePageContent> {
     return 'User ${user.publicUserId}';
   }
 
-  int get _vipLevel => _wallet?.vipLevel ?? user.vip.vipLevel;
-  int get _svipLevel => _wallet?.svipLevel ?? user.vip.svipLevel;
+  String get _visiblePublicId =>
+      _profileDisplay?.displayCustomId?.toString() ??
+      _profileDisplay?.publicUserId.toString() ??
+      user.visibleId;
+  String get _primaryRole => _profileDisplay?.primaryRole ?? user.primaryRole;
+  String? get _roleTag {
+    final canonicalRoleLabel = _profileDisplay?.roomRoleLabel.trim();
+    if (canonicalRoleLabel != null && canonicalRoleLabel.isNotEmpty) {
+      return canonicalRoleLabel;
+    }
+    return MeProfileConstants.roleTagFor(_primaryRole);
+  }
+
+  RoleBadge? get _roleBadge {
+    if (_profileDisplay != null &&
+        _profileDisplay!.primaryRole.toLowerCase().trim() !=
+            user.primaryRole.toLowerCase().trim()) {
+      return null;
+    }
+    return user.primaryRoleBadge;
+  }
+
+  int get _vipLevel =>
+      _profileDisplay?.vipLevel ?? _wallet?.vipLevel ?? user.vip.vipLevel;
+  int get _svipLevel =>
+      _profileDisplay?.svipLevel ?? _wallet?.svipLevel ?? user.vip.svipLevel;
   int get _coinBalance => _wallet?.coinBalance ?? user.wallet.coinBalance;
   int get _rubyBalance => _wallet?.rubyBalance ?? user.wallet.rubyBalance;
   int get _lifetimeRechargeCoins =>
@@ -127,6 +161,14 @@ class _MePageContentState extends State<MePageContent> {
   String get _coverPhotoStatus => user.coverPhotoUrls.isEmpty
       ? 'No cover photo'
       : '${user.coverPhotoUrls.length} active';
+  String? get _avatarUrl => _profileDisplay?.avatarUrl ?? user.avatarUrl;
+  List<String> get _coverPhotoUrls {
+    final canonicalCover = _profileDisplay?.coverPhotoUrl?.trim();
+    if (canonicalCover != null && canonicalCover.isNotEmpty) {
+      return <String>[canonicalCover];
+    }
+    return user.coverPhotoUrls;
+  }
 
   @override
   void initState() {
@@ -140,6 +182,7 @@ class _MePageContentState extends State<MePageContent> {
   @override
   void dispose() {
     _userRealtimeSub?.cancel();
+    _profileDisplayRepository.close();
     super.dispose();
   }
 
@@ -148,6 +191,7 @@ class _MePageContentState extends State<MePageContent> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.user.publicUserId != widget.user.publicUserId) {
       _freshUser = null;
+      _profileDisplay = null;
       unawaited(_loadRealData());
     }
   }
@@ -189,6 +233,7 @@ class _MePageContentState extends State<MePageContent> {
         _walletApi.getWallet(),
         _presenceApi.getPublicPresence(freshUser.publicUserId),
         _profileApi.getMyFamily(),
+        _loadCanonicalProfileDisplay(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -196,6 +241,7 @@ class _MePageContentState extends State<MePageContent> {
         _wallet = results[0] as VmWallet;
         _presence = results[1] as PresenceDto;
         _family = results[2] as FamilySummaryDto;
+        _profileDisplay = results[3] as CanonicalUserDisplayModel?;
         _loadingRealData = false;
       });
     } catch (error) {
@@ -204,6 +250,14 @@ class _MePageContentState extends State<MePageContent> {
         _loadError = error.toString().replaceFirst('Exception: ', '');
         _loadingRealData = false;
       });
+    }
+  }
+
+  Future<CanonicalUserDisplayModel?> _loadCanonicalProfileDisplay() async {
+    try {
+      return await _profileDisplayRepository.getMe();
+    } catch (_) {
+      return null;
     }
   }
 
@@ -338,9 +392,7 @@ class _MePageContentState extends State<MePageContent> {
       Navigator.of(context)
           .push(
             MaterialPageRoute(
-              builder: (_) => const FamilyModularPage(
-                openCurrentFamily: false,
-              ),
+              builder: (_) => const FamilyModularPage(openCurrentFamily: false),
             ),
           )
           .then((_) => _loadRealData());
@@ -467,10 +519,10 @@ class _MePageContentState extends State<MePageContent> {
             _RealDataErrorBanner(message: _loadError!, onRetry: _loadRealData),
           MePremiumProfileHero(
             displayName: _displayName,
-            publicId: user.visibleId,
-            role: user.primaryRole,
-            roleTag: MeProfileConstants.roleTagFor(user.primaryRole),
-            roleBadge: user.primaryRoleBadge,
+            publicId: _visiblePublicId,
+            role: _primaryRole,
+            roleTag: _roleTag,
+            roleBadge: _roleBadge,
             vipLevel: _vipLevel,
             svipLevel: _svipLevel,
             vipFrozen: !user.vip.vipIsActive,
@@ -483,8 +535,8 @@ class _MePageContentState extends State<MePageContent> {
             currentRoomName: _currentRoomName,
             familyName: _family?.shouldShow == true ? _family!.safeName : '',
             familyLevel: _family?.level ?? 0,
-            avatarUrl: user.avatarUrl,
-            coverPhotoUrls: user.coverPhotoUrls,
+            avatarUrl: _avatarUrl,
+            coverPhotoUrls: _coverPhotoUrls,
             onFamilyTap: () => _openFamily(context),
             onAvatarTap: () => _openProfile(context),
             onQrTap: () => _openProfileQrActions(context),

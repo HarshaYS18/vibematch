@@ -42,6 +42,7 @@ def update_economy_rule_set(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _owner_control(current_user)
     return economy_rules_service.replace_rule_set(
         db,
         actor=current_user,
@@ -64,6 +65,7 @@ def upsert_store_category(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _owner_control(current_user)
     return store_control_center_service.upsert_category(db, actor=current_user, data=payload.model_dump())
 
 
@@ -83,6 +85,7 @@ def upsert_store_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _owner_control(current_user)
     return store_control_center_service.upsert_item(db, actor=current_user, data=payload.model_dump())
 
 
@@ -98,6 +101,7 @@ def import_store_manifest(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _owner_control(current_user)
     return store_control_center_service.import_manifest(db, actor=current_user, payload=payload.manifest, reason=payload.reason)
 
 

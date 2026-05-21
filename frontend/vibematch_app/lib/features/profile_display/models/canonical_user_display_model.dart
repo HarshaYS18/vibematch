@@ -74,7 +74,7 @@ class CanonicalUserDisplayModel {
           ? null
           : _int(json['display_custom_id']),
       username: _text(json['username']),
-      displayName: _text(json['display_name']) ?? 'Vibe User',
+      displayName: _text(json['display_name']) ?? 'FunKey User',
       avatarUrl: _text(json['avatar_url']),
       coverPhotoUrl: _text(json['cover_photo_url']),
       primaryRole: _text(json['primary_role']) ?? 'user',
