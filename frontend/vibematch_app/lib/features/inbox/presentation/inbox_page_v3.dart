@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/inbox_controller.dart';
+import '../data/inbox_ai_api_service.dart';
 import '../data/inbox_stories_api_service.dart';
 import '../models/inbox_models.dart';
 import 'pages/cs_report_tasks_page.dart';
@@ -12,6 +13,7 @@ import 'pages/locked_chats_page.dart';
 import 'pages/stranger_requests_page.dart';
 import 'widgets/inbox_chat_theme_picker_sheet.dart';
 import 'widgets/inbox_conversation_card.dart';
+import 'widgets/inbox_ai_helper_sheet.dart';
 import 'widgets/inbox_lock_flow_sheets.dart';
 import 'widgets/inbox_passcode_sheet.dart';
 import 'widgets/inbox_v3_locked_pull_reveal.dart';
@@ -45,6 +47,7 @@ class _InboxPageState extends State<InboxPage> {
 
   late final InboxController _controller;
   late final bool _ownsController;
+  final InboxAiApiService _inboxAiApi = const InboxAiApiService();
   final InboxStoriesApiService _storiesApi = const InboxStoriesApiService();
   final ScrollController _scrollController = ScrollController();
   Widget? _panelOverlay;
@@ -200,6 +203,37 @@ class _InboxPageState extends State<InboxPage> {
       onBackTap: _closePanelOverlay,
     ),
   );
+
+  Future<void> _openInboxAiHelper() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => InboxAiHelperSheet(
+        onSearch: _searchInboxAi,
+        onOpenResult: _openInboxAiResult,
+      ),
+    );
+  }
+
+  Future<InboxAiSearchResponse> _searchInboxAi(String query) async {
+    return _inboxAiApi.search(query);
+  }
+
+  void _openInboxAiResult(InboxAiSearchResult result) {
+    Navigator.pop(context);
+    if (result.isLocked) {
+      _toast('Unlock Inbox to open locked AI results.');
+      _openLockedVault();
+      return;
+    }
+    final conversation = _controller.conversationById(result.conversationId);
+    if (conversation == null) {
+      _toast('Matched ${result.title}; open id ${result.conversationId}.');
+      return;
+    }
+    _openConversation(conversation);
+  }
 
   void _openSettings() => _openInboxSubPage(
     InboxSettingsPage(
@@ -601,6 +635,9 @@ class _InboxPageState extends State<InboxPage> {
                     ),
                   ),
                   SliverToBoxAdapter(
+                    child: _InboxAiPromptV3(onTap: _openInboxAiHelper),
+                  ),
+                  SliverToBoxAdapter(
                     child: FutureBuilder<List<InboxStoryItem>>(
                       future: _storiesFuture,
                       builder: (context, snapshot) {
@@ -825,6 +862,59 @@ class _UnreadDot extends StatelessWidget {
           color: _InboxPageState._blue,
           fontSize: 11,
           fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _InboxAiPromptV3 extends StatelessWidget {
+  const _InboxAiPromptV3({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFEDEDEF)),
+          ),
+          child: Row(
+            children: const [
+              Icon(
+                Icons.auto_awesome_rounded,
+                color: _InboxPageState._blue,
+                size: 18,
+              ),
+              SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'Find anything in chats...',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _InboxPageState._muted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.keyboard_arrow_up_rounded,
+                color: Color(0xFFB8B8C0),
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1153,7 +1243,7 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
           behavior: SnackBarBehavior.floating,
           backgroundColor: Color(0xFF111114),
           content: Text(
-            'Story reply mapped locally.',
+            'Story reply service is not available yet.',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
@@ -1168,7 +1258,7 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
           behavior: SnackBarBehavior.floating,
           backgroundColor: const Color(0xFF111114),
           content: Text(
-            '$label reaction mapped locally.',
+            '$label reaction service is not available yet.',
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),

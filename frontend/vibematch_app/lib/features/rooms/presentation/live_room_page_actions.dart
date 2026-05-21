@@ -246,9 +246,23 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     );
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+    late final ChatModerationResult moderation;
+    try {
+      moderation = await _chatModerationApi.checkText(
+        text: text,
+        roomId: _roomId,
+      );
+    } catch (error) {
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+      return;
+    }
+    if (!moderation.allowed) {
+      RoomToast.show(context, moderation.userMessage);
+      return;
+    }
     _roomMessageController.sendMessage(text);
     _messageController.clear();
   }

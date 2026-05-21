@@ -111,3 +111,13 @@ from app.models.profile_visit import ProfileVisit
 
 from app.models.presence import UserRoomPresence
 from app.models.push_device_token import PushDeviceToken
+from app.models.support_ticket import SupportTicket
+from app.models.support_message import SupportMessage
+from app.models.support_attachment import SupportAttachment
+from app.models.help_article import HelpArticle
+from app.models.ai_helpdesk_log import AiHelpdeskLog
+from app.models.moderation_event import ModerationEvent
+from app.models.moderation_case import ModerationCase
+from app.models.moderation_evidence import ModerationEvidence
+from app.models.user_violation_score import UserViolationScore
+from app.models.user_app_setting import UserAppSetting
