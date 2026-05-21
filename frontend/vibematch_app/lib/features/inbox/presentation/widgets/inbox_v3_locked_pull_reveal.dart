@@ -26,13 +26,14 @@ class InboxV3LockedPullReveal extends StatelessWidget {
         child: Opacity(
           opacity: progress,
           child: Transform.scale(
-            scale: 0.96 + (progress * 0.04),
+            scale: 0.94 + (progress * 0.08),
             child: Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
-                color: const Color(0xFF111114),
-                borderRadius: BorderRadius.circular(18),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: const Color(0xFFEDEDEF)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.12 * progress),
@@ -45,26 +46,30 @@ class InboxV3LockedPullReveal extends StatelessWidget {
                 children: [
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 140),
-                    width: 32,
-                    height: 32,
+                    width: 34 + (progress * 4),
+                    height: 34 + (progress * 4),
                     decoration: BoxDecoration(
-                      color: ready ? const Color(0xFF22C55E) : Colors.white,
+                      color: ready
+                          ? const Color(0xFF22C55E)
+                          : const Color(0xFFF4F4F5),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       ready ? Icons.lock_open_rounded : Icons.lock_rounded,
                       color: ready ? Colors.white : const Color(0xFF111114),
-                      size: 17,
+                      size: 18,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      ready ? 'Release to open locked chats' : 'Keep pulling for locked chats',
+                      ready
+                          ? 'Release to unlock locked chats'
+                          : 'Pull to unlock locked chats',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF111114),
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.1,
@@ -75,7 +80,7 @@ class InboxV3LockedPullReveal extends StatelessWidget {
                     Text(
                       '$lockedCount',
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: Color(0xFF71717A),
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),

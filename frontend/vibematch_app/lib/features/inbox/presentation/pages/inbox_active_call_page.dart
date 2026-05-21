@@ -49,7 +49,9 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
   void _handleCallChanged() {
     if (!mounted || _closingFromRemote) return;
     final active = widget.callController.activeCall;
-    if (active != null && active.id == widget.initialSession.id && !active.isTerminal) {
+    if (active != null &&
+        active.id == widget.initialSession.id &&
+        !active.isTerminal) {
       if (active.isConnected) _maybeJoinMedia();
       return;
     }
@@ -63,10 +65,11 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
 
   Future<void> _maybeJoinMedia() async {
     final session = widget.callController.activeCall ?? widget.initialSession;
-    if (!mounted || _mediaJoining || _mediaReady || !session.isConnected) return;
+    if (!mounted || _mediaJoining || _mediaReady || !session.isConnected)
+      return;
     final roomId = session.roomId;
     if (roomId == null || roomId.trim().isEmpty) {
-      setState(() => _mediaError = 'Couldn’t connect call. Try again.');
+      setState(() => _mediaError = 'Could not connect call. Try again.');
       return;
     }
 
@@ -87,7 +90,7 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
       setState(() {
         _mediaReady = false;
         _mediaJoining = false;
-        _mediaError = 'Couldn’t connect call. Try again.';
+        _mediaError = 'Could not connect call. Try again.';
       });
     }
   }
@@ -120,7 +123,8 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
     return AnimatedBuilder(
       animation: widget.callController,
       builder: (context, _) {
-        final session = widget.callController.activeCall ?? widget.initialSession;
+        final session =
+            widget.callController.activeCall ?? widget.initialSession;
         return Scaffold(
           backgroundColor: _bg,
           body: SafeArea(
@@ -146,7 +150,11 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
                               onRetry: _maybeJoinMedia,
                             ),
                     ),
-                    _CallControls(session: session, onMuteChanged: _setMuted, onEnd: _endCall),
+                    _CallControls(
+                      session: session,
+                      onMuteChanged: _setMuted,
+                      onEnd: _endCall,
+                    ),
                   ],
                 ),
               ],
@@ -167,12 +175,12 @@ class _CallBackdrop extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+        gradient: RadialGradient(
+          center: Alignment.topCenter,
+          radius: 1.18,
           colors: session.isVideo
-              ? const [Color(0xFF15151A), Color(0xFF07070A)]
-              : const [Color(0xFF111827), Color(0xFF07070A)],
+              ? const [Color(0xFF26262C), Color(0xFF111114), Color(0xFF07070A)]
+              : const [Color(0xFF172033), Color(0xFF101014), Color(0xFF07070A)],
         ),
       ),
       child: const SizedBox.expand(),
@@ -193,13 +201,21 @@ class _CallTopBar extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 28),
+            icon: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
           ),
           Expanded(
             child: Text(
               session.isVideo ? 'Video call' : 'Voice call',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           const SizedBox(width: 48),
@@ -210,7 +226,13 @@ class _CallTopBar extends StatelessWidget {
 }
 
 class _VoiceCallBody extends StatelessWidget {
-  const _VoiceCallBody({required this.session, required this.stateLabel, required this.mediaError, required this.mediaJoining, required this.onRetry});
+  const _VoiceCallBody({
+    required this.session,
+    required this.stateLabel,
+    required this.mediaError,
+    required this.mediaJoining,
+    required this.onRetry,
+  });
 
   final InboxCallSession session;
   final String stateLabel;
@@ -226,17 +248,29 @@ class _VoiceCallBody extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _RingingAvatar(session: session, active: !session.isConnected || mediaJoining),
+            _RingingAvatar(
+              session: session,
+              active: !session.isConnected || mediaJoining,
+            ),
             const SizedBox(height: 26),
             Text(
               session.peerName,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: _InboxActiveCallPageState._ink, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+              style: const TextStyle(
+                color: _InboxActiveCallPageState._ink,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
             ),
             const SizedBox(height: 8),
-            _StateText(label: stateLabel, error: mediaError != null, onRetry: mediaError == null ? null : onRetry),
+            _StateText(
+              label: stateLabel,
+              error: mediaError != null,
+              onRetry: mediaError == null ? null : onRetry,
+            ),
           ],
         ),
       ),
@@ -254,13 +288,17 @@ class _RingingAvatar extends StatefulWidget {
   State<_RingingAvatar> createState() => _RingingAvatarState();
 }
 
-class _RingingAvatarState extends State<_RingingAvatar> with SingleTickerProviderStateMixin {
+class _RingingAvatarState extends State<_RingingAvatar>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    );
     if (widget.active) _controller.repeat(reverse: true);
   }
 
@@ -291,7 +329,18 @@ class _RingingAvatarState extends State<_RingingAvatar> with SingleTickerProvide
           height: 148 + (value * 18),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.04 + value * 0.04),
+            color: const Color(
+              0xFF3797F0,
+            ).withValues(alpha: 0.06 + value * 0.05),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(
+                  0xFF3797F0,
+                ).withValues(alpha: 0.18 + value * 0.12),
+                blurRadius: 36 + value * 18,
+                spreadRadius: 4 + value * 7,
+              ),
+            ],
           ),
           child: Center(child: child),
         );
@@ -301,7 +350,11 @@ class _RingingAvatarState extends State<_RingingAvatar> with SingleTickerProvide
         backgroundColor: Colors.white.withValues(alpha: 0.12),
         child: Text(
           widget.session.peerAvatarText,
-          style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w800),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 42,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
@@ -309,7 +362,12 @@ class _RingingAvatarState extends State<_RingingAvatar> with SingleTickerProvide
 }
 
 class _VideoCallBody extends StatelessWidget {
-  const _VideoCallBody({required this.session, required this.stateLabel, required this.mediaError, required this.onRetry});
+  const _VideoCallBody({
+    required this.session,
+    required this.stateLabel,
+    required this.mediaError,
+    required this.onRetry,
+  });
 
   final InboxCallSession session;
   final String stateLabel;
@@ -334,12 +392,30 @@ class _VideoCallBody extends StatelessWidget {
                 CircleAvatar(
                   radius: 48,
                   backgroundColor: Colors.white.withValues(alpha: 0.12),
-                  child: Text(session.peerAvatarText, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)),
+                  child: Text(
+                    session.peerAvatarText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
-                Text(session.peerName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                Text(
+                  session.peerName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                _StateText(label: stateLabel, error: mediaError != null, onRetry: mediaError == null ? null : onRetry),
+                _StateText(
+                  label: stateLabel,
+                  error: mediaError != null,
+                  onRetry: mediaError == null ? null : onRetry,
+                ),
               ],
             ),
           ),
@@ -354,10 +430,20 @@ class _VideoCallBody extends StatelessWidget {
               color: Colors.black,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 10))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
             child: const Center(
-              child: Icon(Icons.person_rounded, color: Colors.white70, size: 34),
+              child: Icon(
+                Icons.person_rounded,
+                color: Colors.white70,
+                size: 34,
+              ),
             ),
           ),
         ),
@@ -367,7 +453,11 @@ class _VideoCallBody extends StatelessWidget {
 }
 
 class _StateText extends StatelessWidget {
-  const _StateText({required this.label, required this.error, required this.onRetry});
+  const _StateText({
+    required this.label,
+    required this.error,
+    required this.onRetry,
+  });
 
   final String label;
   final bool error;
@@ -383,7 +473,11 @@ class _StateText extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: error ? _InboxActiveCallPageState._red.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(
+            color: error
+                ? _InboxActiveCallPageState._red.withValues(alpha: 0.55)
+                : Colors.white.withValues(alpha: 0.08),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -392,10 +486,17 @@ class _StateText extends StatelessWidget {
               Container(
                 width: 7,
                 height: 7,
-                decoration: const BoxDecoration(color: _InboxActiveCallPageState._green, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: _InboxActiveCallPageState._green,
+                  shape: BoxShape.circle,
+                ),
               )
             else
-              const Icon(Icons.error_outline_rounded, color: _InboxActiveCallPageState._red, size: 15),
+              const Icon(
+                Icons.error_outline_rounded,
+                color: _InboxActiveCallPageState._red,
+                size: 15,
+              ),
             const SizedBox(width: 7),
             Flexible(
               child: Text(
@@ -403,7 +504,9 @@ class _StateText extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: error ? _InboxActiveCallPageState._red : _InboxActiveCallPageState._muted,
+                  color: error
+                      ? _InboxActiveCallPageState._red
+                      : _InboxActiveCallPageState._muted,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                 ),
@@ -417,7 +520,11 @@ class _StateText extends StatelessWidget {
 }
 
 class _CallControls extends StatefulWidget {
-  const _CallControls({required this.session, required this.onMuteChanged, required this.onEnd});
+  const _CallControls({
+    required this.session,
+    required this.onMuteChanged,
+    required this.onEnd,
+  });
 
   final InboxCallSession session;
   final Future<void> Function(bool muted) onMuteChanged;
@@ -449,26 +556,64 @@ class _CallControlsState extends State<_CallControls> {
   @override
   Widget build(BuildContext context) {
     final controls = <Widget>[
-      _ControlButton(icon: _muted ? Icons.mic_off_rounded : Icons.mic_rounded, label: _muted ? 'Muted' : 'Mute', active: _muted, onTap: _toggleMute),
-      _ControlButton(icon: _speaker ? Icons.volume_up_rounded : Icons.volume_off_rounded, label: 'Speaker', active: _speaker, onTap: () => setState(() => _speaker = !_speaker)),
+      _ControlButton(
+        icon: _muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+        label: _muted ? 'Muted' : 'Mute',
+        active: _muted,
+        onTap: _toggleMute,
+      ),
+      _ControlButton(
+        icon: _speaker ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+        label: 'Speaker',
+        active: _speaker,
+        onTap: () => setState(() => _speaker = !_speaker),
+      ),
       if (widget.session.isVideo)
-        _ControlButton(icon: _camera ? Icons.videocam_rounded : Icons.videocam_off_rounded, label: 'Camera', active: !_camera, onTap: () => setState(() => _camera = !_camera)),
-      _ControlButton(icon: _ending ? Icons.hourglass_top_rounded : Icons.call_end_rounded, label: 'End', danger: true, onTap: _end),
+        _ControlButton(
+          icon: _camera ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+          label: 'Camera',
+          active: !_camera,
+          onTap: () => setState(() => _camera = !_camera),
+        ),
+      _ControlButton(
+        icon: _ending ? Icons.hourglass_top_rounded : Icons.call_end_rounded,
+        label: 'End',
+        danger: true,
+        onTap: _end,
+      ),
     ];
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(18, 10, 18, 20 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+        18,
+        10,
+        18,
+        20 + MediaQuery.paddingOf(context).bottom,
+      ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(28)),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: controls),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: controls,
+        ),
       ),
     );
   }
 }
 
 class _ControlButton extends StatelessWidget {
-  const _ControlButton({required this.icon, required this.label, required this.onTap, this.active = false, this.danger = false});
+  const _ControlButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+    this.danger = false,
+  });
 
   final IconData icon;
   final String label;
@@ -481,8 +626,8 @@ class _ControlButton extends StatelessWidget {
     final background = danger
         ? _InboxActiveCallPageState._red
         : active
-            ? _InboxActiveCallPageState._blue
-            : Colors.white.withValues(alpha: 0.12);
+        ? _InboxActiveCallPageState._blue
+        : Colors.white.withValues(alpha: 0.12);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
@@ -492,11 +637,21 @@ class _ControlButton extends StatelessWidget {
           Container(
             width: danger ? 62 : 56,
             height: danger ? 62 : 56,
-            decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: background,
+              shape: BoxShape.circle,
+            ),
             child: Icon(icon, color: Colors.white, size: danger ? 25 : 22),
           ),
           const SizedBox(height: 7),
-          Text(label, style: const TextStyle(color: _InboxActiveCallPageState._muted, fontSize: 11, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: _InboxActiveCallPageState._muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );

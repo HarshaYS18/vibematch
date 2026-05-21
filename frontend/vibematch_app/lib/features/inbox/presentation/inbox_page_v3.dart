@@ -89,8 +89,11 @@ class _InboxPageState extends State<InboxPage> {
   void _handleRequestedConversationOpen() {
     final conversationId = widget.openConversationId;
     if (conversationId == null || conversationId.isEmpty) return;
-    if (widget.openConversationRequestNonce == _lastHandledOpenConversationRequestNonce) return;
-    _lastHandledOpenConversationRequestNonce = widget.openConversationRequestNonce;
+    if (widget.openConversationRequestNonce ==
+        _lastHandledOpenConversationRequestNonce)
+      return;
+    _lastHandledOpenConversationRequestNonce =
+        widget.openConversationRequestNonce;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final conversation = _controller.conversationById(conversationId);
@@ -105,13 +108,17 @@ class _InboxPageState extends State<InboxPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: _ink,
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w700)),
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
       );
   }
 
-  List<InboxConversation> get _strangerRequests =>
-      _controller.conversations.where((item) => item.isStranger && !item.isArchived).toList();
+  List<InboxConversation> get _strangerRequests => _controller.conversations
+      .where((item) => item.isStranger && !item.isArchived)
+      .toList();
 
   InboxConversation? get _strangerHub {
     final requests = _strangerRequests;
@@ -135,10 +142,14 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   List<InboxConversation> get _visibleConversations {
-    final base = _controller.visibleConversations.where((item) => !item.isStranger).toList();
+    final base = _controller.visibleConversations
+        .where((item) => !item.isStranger)
+        .toList();
     if (_controller.selectedFilter == 'Strangers') {
       final hub = _strangerHub;
-      return hub == null ? const <InboxConversation>[] : <InboxConversation>[hub];
+      return hub == null
+          ? const <InboxConversation>[]
+          : <InboxConversation>[hub];
     }
     if (_controller.selectedFilter == 'All') {
       final hub = _strangerHub;
@@ -147,7 +158,8 @@ class _InboxPageState extends State<InboxPage> {
     return base;
   }
 
-  void _refreshStories() => setState(() => _storiesFuture = _storiesApi.loadStories());
+  void _refreshStories() =>
+      setState(() => _storiesFuture = _storiesApi.loadStories());
 
   void _clearActiveConversationForShell() {
     if (_activeConversationId == null) return;
@@ -182,40 +194,52 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _openSearch() => _openInboxSubPage(
-        InboxSearchPage(
-          controller: _controller,
-          onOpenConversation: _openConversation,
-          onBackTap: _closePanelOverlay,
-        ),
-      );
+    InboxSearchPage(
+      controller: _controller,
+      onOpenConversation: _openConversation,
+      onBackTap: _closePanelOverlay,
+    ),
+  );
 
   void _openSettings() => _openInboxSubPage(
-        InboxSettingsPage(
-          lockStatus: _controller.lockStatus,
-          backupStatus: _controller.backupStatus,
-          strangersCanMessage: _controller.strangersCanMessage,
-          strangersCanMentionInVibes: _controller.strangersCanMentionInVibes,
-          onStartLockSetup: _controller.startLockSetup,
-          onVerifyLockSetup: (mobile, otp, lock) =>
-              _controller.verifyLockSetup(mobileNumber: mobile, otp: otp, lockCode: lock),
-          onChangeLock: (currentLock, newLock) =>
-              _controller.changeLock(currentLockCode: currentLock, newLockCode: newLock),
-          onStartLockRecovery: _controller.startLockRecovery,
-          onVerifyLockRecovery: (mobile, otp, newLock) =>
-              _controller.verifyLockRecovery(mobileNumber: mobile, otp: otp, newLockCode: newLock),
-          onRequestCsLockRecovery: _controller.requestCsLockRecovery,
-          onStartGoogleDriveSetup: _controller.startGoogleDriveAuthorization,
-          onConnectGoogleDrive: (email, code) =>
-              _controller.connectGoogleDrive(googleDriveEmail: email, setupCode: code),
-          onBackupEnabledChanged: _controller.setBackupEnabled,
-          onFrequencyChanged: _controller.setBackupFrequency,
-          onStrangersCanMessageChanged: _controller.setStrangersCanMessage,
-          onStrangersCanMentionInVibesChanged: _controller.setStrangersCanMentionInVibes,
-          onBackupNow: _controller.runBackupNow,
-          onRestoreTap: _controller.restoreLatestBackup,
-          onBackTap: _closePanelOverlay,
-        ),
-      );
+    InboxSettingsPage(
+      lockStatus: _controller.lockStatus,
+      backupStatus: _controller.backupStatus,
+      strangersCanMessage: _controller.strangersCanMessage,
+      strangersCanMentionInVibes: _controller.strangersCanMentionInVibes,
+      onStartLockSetup: _controller.startLockSetup,
+      onVerifyLockSetup: (mobile, otp, lock) => _controller.verifyLockSetup(
+        mobileNumber: mobile,
+        otp: otp,
+        lockCode: lock,
+      ),
+      onChangeLock: (currentLock, newLock) => _controller.changeLock(
+        currentLockCode: currentLock,
+        newLockCode: newLock,
+      ),
+      onStartLockRecovery: _controller.startLockRecovery,
+      onVerifyLockRecovery: (mobile, otp, newLock) =>
+          _controller.verifyLockRecovery(
+            mobileNumber: mobile,
+            otp: otp,
+            newLockCode: newLock,
+          ),
+      onRequestCsLockRecovery: _controller.requestCsLockRecovery,
+      onStartGoogleDriveSetup: _controller.startGoogleDriveAuthorization,
+      onConnectGoogleDrive: (email, code) => _controller.connectGoogleDrive(
+        googleDriveEmail: email,
+        setupCode: code,
+      ),
+      onBackupEnabledChanged: _controller.setBackupEnabled,
+      onFrequencyChanged: _controller.setBackupFrequency,
+      onStrangersCanMessageChanged: _controller.setStrangersCanMessage,
+      onStrangersCanMentionInVibesChanged:
+          _controller.setStrangersCanMentionInVibes,
+      onBackupNow: _controller.runBackupNow,
+      onRestoreTap: _controller.restoreLatestBackup,
+      onBackTap: _closePanelOverlay,
+    ),
+  );
 
   void _openLockSetupSheet() {
     showModalBottomSheet<void>(
@@ -224,8 +248,11 @@ class _InboxPageState extends State<InboxPage> {
       isScrollControlled: true,
       builder: (_) => InboxLockSetupSheet(
         onStartOtp: _controller.startLockSetup,
-        onVerifySetup: (mobile, otp, lock) =>
-            _controller.verifyLockSetup(mobileNumber: mobile, otp: otp, lockCode: lock),
+        onVerifySetup: (mobile, otp, lock) => _controller.verifyLockSetup(
+          mobileNumber: mobile,
+          otp: otp,
+          lockCode: lock,
+        ),
       ),
     );
   }
@@ -239,7 +266,11 @@ class _InboxPageState extends State<InboxPage> {
         registeredMobile: _controller.lockStatus.mobileNumber,
         onStartRecovery: _controller.startLockRecovery,
         onVerifyRecovery: (mobile, otp, newLock) =>
-            _controller.verifyLockRecovery(mobileNumber: mobile, otp: otp, newLockCode: newLock),
+            _controller.verifyLockRecovery(
+              mobileNumber: mobile,
+              otp: otp,
+              newLockCode: newLock,
+            ),
         onRequestCs: _controller.requestCsLockRecovery,
       ),
     );
@@ -290,26 +321,26 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _openLockedVaultPage() => _openInboxSubPage(
-        LockedChatsPage(
-          conversations: _controller.lockedConversations,
-          onOpenConversation: _openConversation,
-          onShowOptions: _showChatOptions,
-          onBackTap: _closePanelOverlay,
-        ),
-      );
+    LockedChatsPage(
+      conversations: _controller.lockedConversations,
+      onOpenConversation: _openConversation,
+      onShowOptions: _showChatOptions,
+      onBackTap: _closePanelOverlay,
+    ),
+  );
 
   void _openStrangerRequests() => _openInboxSubPage(
-        StrangerRequestsPage(
-          requests: _strangerRequests,
-          onOpenConversation: _openConversation,
-          onShowOptions: _showChatOptions,
-          onBackTap: _closePanelOverlay,
-        ),
-      );
+    StrangerRequestsPage(
+      requests: _strangerRequests,
+      onOpenConversation: _openConversation,
+      onShowOptions: _showChatOptions,
+      onBackTap: _closePanelOverlay,
+    ),
+  );
 
   void _openCsReportTasks() => _openInboxSubPage(
-        CsReportTasksPage(controller: _controller, onBackTap: _closePanelOverlay),
-      );
+    CsReportTasksPage(controller: _controller, onBackTap: _closePanelOverlay),
+  );
 
   void _openConversation(InboxConversation conversation) {
     if (conversation.isStrangerHub) {
@@ -337,7 +368,10 @@ class _InboxPageState extends State<InboxPage> {
       onBackTap: _closePanelOverlay,
     );
     if (!widget.openPagesInOverlay) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) => _clearActiveConversationForShell());
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => page),
+      ).then((_) => _clearActiveConversationForShell());
       return;
     }
     _openInboxSubPage(page);
@@ -359,14 +393,16 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   Future<void> _openThemePicker(InboxConversation conversation) async {
-    final latest = _controller.conversationById(conversation.id) ?? conversation;
+    final latest =
+        _controller.conversationById(conversation.id) ?? conversation;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxChatThemePickerSheet(
         currentThemeKey: latest.chatTheme ?? _controller.defaultChatTheme,
-        currentWallpaperKey: latest.wallpaperKey ?? _controller.defaultWallpaperKey,
+        currentWallpaperKey:
+            latest.wallpaperKey ?? _controller.defaultWallpaperKey,
         onSelected: (choice) async {
           Navigator.pop(context);
           await _controller.updateConversationTheme(
@@ -401,7 +437,10 @@ class _InboxPageState extends State<InboxPage> {
           conversation: conversation,
           onSubmit: (reason) {
             Navigator.pop(context);
-            _controller.submitConversationReport(conversation: conversation, reason: reason);
+            _controller.submitConversationReport(
+              conversation: conversation,
+              reason: reason,
+            );
             _toast('Report sent.');
           },
         ),
@@ -426,7 +465,8 @@ class _InboxPageState extends State<InboxPage> {
         _closeChatOptions();
       },
       onToggleLock: () {
-        if (!_controller.lockStatus.isEnabled && !conversation.isLockedByBackend) {
+        if (!_controller.lockStatus.isEnabled &&
+            !conversation.isLockedByBackend) {
           _closeChatOptions();
           _openLockSetupSheet();
           return;
@@ -441,7 +481,12 @@ class _InboxPageState extends State<InboxPage> {
       onReport: () => _openReportSheet(conversation),
     );
     if (widget.openPagesInOverlay) {
-      setState(() => _panelOverlay = Align(alignment: Alignment.bottomCenter, child: sheet));
+      setState(
+        () => _panelOverlay = Align(
+          alignment: Alignment.bottomCenter,
+          child: sheet,
+        ),
+      );
       return;
     }
     showModalBottomSheet<void>(
@@ -500,7 +545,11 @@ class _InboxPageState extends State<InboxPage> {
     if (notification.metrics.pixels > 0) return false;
     if (notification is OverscrollNotification && notification.overscroll < 0) {
       setState(() {
-        _lockedPullExtent = (_lockedPullExtent + (-notification.overscroll * 0.65)).clamp(0, 92);
+        _lockedPullExtent =
+            (_lockedPullExtent + (-notification.overscroll * 0.65)).clamp(
+              0,
+              92,
+            );
       });
       return false;
     }
@@ -530,7 +579,9 @@ class _InboxPageState extends State<InboxPage> {
               onNotification: _onScrollNotification,
               child: CustomScrollView(
                 controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 slivers: [
                   SliverToBoxAdapter(
                     child: InboxV3LockedPullReveal(
@@ -553,7 +604,8 @@ class _InboxPageState extends State<InboxPage> {
                     child: FutureBuilder<List<InboxStoryItem>>(
                       future: _storiesFuture,
                       builder: (context, snapshot) {
-                        final stories = snapshot.data ?? const <InboxStoryItem>[];
+                        final stories =
+                            snapshot.data ?? const <InboxStoryItem>[];
                         return _StoryRailV3(
                           stories: stories,
                           onCreateStory: _createStory,
@@ -567,15 +619,20 @@ class _InboxPageState extends State<InboxPage> {
                       filters: _controller.filters,
                       selectedFilter: _controller.selectedFilter,
                       onChanged: _controller.selectFilter,
+                      lockedCount: _controller.lockedCount,
+                      onLockedTap: _openLockedVault,
                     ),
                   ),
                   if (_controller.isLoading && visibleConversations.isEmpty)
                     const SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: _blue)),
+                      child: _InboxLoadingSkeletonV3(),
                     )
                   else if (visibleConversations.isEmpty)
-                    const SliverFillRemaining(hasScrollBody: false, child: _EmptyInboxStateV3())
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyInboxStateV3(onSearchTap: _openSearch),
+                    )
                   else
                     SliverList.builder(
                       itemCount: visibleConversations.length,
@@ -647,43 +704,44 @@ class _InboxV3Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 12, 6),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Inbox',
-                  style: TextStyle(color: _InboxPageState._ink, fontSize: 25, fontWeight: FontWeight.w800, letterSpacing: -0.7),
-                ),
-              ),
-              _HeaderIcon(icon: Icons.search_rounded, onTap: onSearchTap),
-              _HeaderIcon(icon: Icons.lock_outline_rounded, onTap: onLockedTap, badge: lockedCount),
-              if (reportTaskCount > 0)
-                _HeaderIcon(icon: Icons.support_agent_rounded, onTap: onReportsTap, badge: reportTaskCount),
-              _HeaderIcon(icon: Icons.settings_outlined, onTap: onSettingsTap),
-            ],
-          ),
-          const SizedBox(height: 10),
-          InkWell(
-            onTap: onSearchTap,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 13),
-              decoration: BoxDecoration(color: const Color(0xFFF1F1F3), borderRadius: BorderRadius.circular(14)),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, color: _InboxPageState._muted, size: 19),
-                  const SizedBox(width: 8),
-                  Text(
-                    unreadCount > 0 ? 'Search messages • $unreadCount unread' : 'Search messages',
-                    style: const TextStyle(color: _InboxPageState._muted, fontSize: 13.5, fontWeight: FontWeight.w500),
-                  ),
-                ],
+          const Expanded(
+            child: Text(
+              'FunKey Inbox',
+              style: TextStyle(
+                color: _InboxPageState._ink,
+                fontSize: 25,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.4,
               ),
             ),
+          ),
+          if (unreadCount > 0) _UnreadDot(count: unreadCount),
+          _HeaderIcon(
+            icon: Icons.search_rounded,
+            onTap: onSearchTap,
+            tooltip: 'Search',
+          ),
+          _HeaderIcon(
+            icon: Icons.lock_outline_rounded,
+            onTap: onLockedTap,
+            badge: lockedCount,
+            tooltip: 'Locked chats',
+          ),
+          if (reportTaskCount > 0)
+            _HeaderIcon(
+              icon: Icons.support_agent_rounded,
+              onTap: onReportsTap,
+              badge: reportTaskCount,
+              tooltip: 'Report tasks',
+            ),
+          _HeaderIcon(
+            icon: Icons.settings_outlined,
+            onTap: onSettingsTap,
+            tooltip: 'Settings',
           ),
         ],
       ),
@@ -692,10 +750,16 @@ class _InboxV3Header extends StatelessWidget {
 }
 
 class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon({required this.icon, required this.onTap, this.badge = 0});
+  const _HeaderIcon({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+    this.badge = 0,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
+  final String tooltip;
   final int badge;
 
   @override
@@ -703,23 +767,35 @@ class _HeaderIcon extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          onPressed: onTap,
-          icon: Icon(icon, color: _InboxPageState._ink, size: 21),
+        Tooltip(
+          message: tooltip,
+          child: IconButton(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+            onPressed: onTap,
+            icon: Icon(icon, color: _InboxPageState._ink, size: 21),
+          ),
         ),
         if (badge > 0)
           Positioned(
-            right: 6,
-            top: 5,
+            right: 2,
+            top: 2,
             child: Container(
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: const BoxDecoration(color: _InboxPageState._blue, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: _InboxPageState._blue,
+                borderRadius: BorderRadius.circular(999),
+              ),
               child: Center(
                 child: Text(
                   badge > 99 ? '99+' : '$badge',
-                  style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ),
@@ -729,8 +805,38 @@ class _HeaderIcon extends StatelessWidget {
   }
 }
 
+class _UnreadDot extends StatelessWidget {
+  const _UnreadDot({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: _InboxPageState._blue.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        style: const TextStyle(
+          color: _InboxPageState._blue,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 class _StoryRailV3 extends StatelessWidget {
-  const _StoryRailV3({required this.stories, required this.onCreateStory, required this.onStoryTap});
+  const _StoryRailV3({
+    required this.stories,
+    required this.onCreateStory,
+    required this.onStoryTap,
+  });
 
   final List<InboxStoryItem> stories;
   final VoidCallback onCreateStory;
@@ -750,7 +856,10 @@ class _StoryRailV3 extends StatelessWidget {
             return _StoryBubbleV3.create(onTap: onCreateStory);
           }
           final story = stories[index - 1];
-          return _StoryBubbleV3.story(story: story, onTap: () => onStoryTap(index - 1));
+          return _StoryBubbleV3.story(
+            story: story,
+            onTap: () => onStoryTap(index - 1),
+          );
         },
       ),
     );
@@ -789,26 +898,43 @@ class _StoryBubbleV3 extends StatelessWidget {
                 gradient: isCreate || viewed
                     ? null
                     : const LinearGradient(
-                        colors: [Color(0xFFFEDA75), Color(0xFFFA7E1E), Color(0xFFD62976), Color(0xFF962FBF)],
+                        colors: [
+                          Color(0xFFFEDA75),
+                          Color(0xFFFA7E1E),
+                          Color(0xFFD62976),
+                          Color(0xFF962FBF),
+                        ],
                       ),
-                border: isCreate || viewed ? Border.all(color: const Color(0xFFD4D4D8), width: 1.4) : null,
+                border: isCreate || viewed
+                    ? Border.all(color: const Color(0xFFD4D4D8), width: 1.4)
+                    : null,
               ),
               child: Container(
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
                 padding: const EdgeInsets.all(2),
                 child: ClipOval(
                   child: isCreate
                       ? const ColoredBox(
                           color: Color(0xFFF1F1F3),
-                          child: Center(child: Icon(Icons.add_rounded, color: _InboxPageState._ink, size: 24)),
+                          child: Center(
+                            child: Icon(
+                              Icons.add_rounded,
+                              color: _InboxPageState._ink,
+                              size: 24,
+                            ),
+                          ),
                         )
                       : (avatarUrl != null && avatarUrl.trim().isNotEmpty)
-                          ? Image.network(
-                              avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => _StoryInitial(initial: initial),
-                            )
-                          : _StoryInitial(initial: initial),
+                      ? Image.network(
+                          avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _StoryInitial(initial: initial),
+                        )
+                      : _StoryInitial(initial: initial),
                 ),
               ),
             ),
@@ -817,7 +943,11 @@ class _StoryBubbleV3 extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: _InboxPageState._ink, fontSize: 10.5, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                color: _InboxPageState._ink,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -844,7 +974,11 @@ class _StoryInitial extends StatelessWidget {
       child: Center(
         child: Text(
           initial,
-          style: const TextStyle(color: _InboxPageState._ink, fontSize: 16, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            color: _InboxPageState._ink,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -852,51 +986,43 @@ class _StoryInitial extends StatelessWidget {
 }
 
 class _FilterTabsV3 extends StatelessWidget {
-  const _FilterTabsV3({required this.filters, required this.selectedFilter, required this.onChanged});
+  const _FilterTabsV3({
+    required this.filters,
+    required this.selectedFilter,
+    required this.onChanged,
+    required this.lockedCount,
+    required this.onLockedTap,
+  });
 
   final List<String> filters;
   final String selectedFilter;
   final ValueChanged<String> onChanged;
+  final int lockedCount;
+  final VoidCallback onLockedTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 42,
+      height: 44,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(16, 3, 16, 5),
         scrollDirection: Axis.horizontal,
-        itemCount: filters.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 22),
+        itemCount: filters.length + 1,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
+          if (index == filters.length) {
+            return _FilterChipV3(
+              label: lockedCount > 0 ? 'Locked $lockedCount' : 'Locked',
+              selected: false,
+              onTap: onLockedTap,
+            );
+          }
           final filter = filters[index];
           final selected = filter == selectedFilter;
-          return InkWell(
+          return _FilterChipV3(
+            label: _label(filter),
+            selected: selected,
             onTap: () => onChanged(filter),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 170),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _label(filter),
-                    style: TextStyle(
-                      color: selected ? _InboxPageState._ink : _InboxPageState._muted,
-                      fontSize: 13.2,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 170),
-                    width: selected ? 18 : 0,
-                    height: 2,
-                    decoration: BoxDecoration(color: _InboxPageState._ink, borderRadius: BorderRadius.circular(99)),
-                  ),
-                ],
-              ),
-            ),
           );
         },
       ),
@@ -906,12 +1032,65 @@ class _FilterTabsV3 extends StatelessWidget {
   String _label(String value) {
     if (value == 'Room Invites') return 'Invites';
     if (value == 'Strangers') return 'Requests';
+    if (value == 'Official') return 'FunKey';
     return value;
   }
 }
 
+class _FilterChipV3 extends StatelessWidget {
+  const _FilterChipV3({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? _InboxPageState._blue.withValues(alpha: 0.10)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? _InboxPageState._blue.withValues(alpha: 0.22)
+                : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: selected ? _InboxPageState._blue : _InboxPageState._muted,
+            fontSize: 12.7,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _StoryViewerPage extends StatefulWidget {
-  const _StoryViewerPage({required this.stories, required this.initialIndex, required this.onViewed});
+  const _StoryViewerPage({
+    required this.stories,
+    required this.initialIndex,
+    required this.onViewed,
+  });
 
   final List<InboxStoryItem> stories;
   final int initialIndex;
@@ -923,12 +1102,19 @@ class _StoryViewerPage extends StatefulWidget {
 
 class _StoryViewerPageState extends State<_StoryViewerPage> {
   late int _index;
+  final TextEditingController _replyController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _index = widget.initialIndex;
     _markViewed();
+  }
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
   }
 
   Future<void> _markViewed() async {
@@ -956,6 +1142,39 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
     }
   }
 
+  void _sendReply() {
+    final text = _replyController.text.trim();
+    if (text.isEmpty) return;
+    _replyController.clear();
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFF111114),
+          content: Text(
+            'Story reply mapped locally.',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      );
+  }
+
+  void _sendQuickReaction(String label) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF111114),
+          content: Text(
+            '$label reaction mapped locally.',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final story = widget.stories[_index];
@@ -972,18 +1191,33 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
                 child: story.mediaType == 'image'
                     ? Image.network(
                         story.mediaUrl,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.broken_image_outlined, color: Colors.white70, size: 42),
-                        ),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.white70,
+                                size: 42,
+                              ),
+                            ),
                       )
                     : Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: const [
-                            Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 62),
+                            Icon(
+                              Icons.play_circle_fill_rounded,
+                              color: Colors.white,
+                              size: 62,
+                            ),
                             SizedBox(height: 10),
-                            Text('Video story', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                            Text(
+                              'Video story',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -991,8 +1225,18 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
               Positioned.fill(
                 child: Row(
                   children: [
-                    Expanded(child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: _previous)),
-                    Expanded(child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: _next)),
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: _previous,
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: _next,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1009,7 +1253,9 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
                             height: 2.2,
                             margin: const EdgeInsets.symmetric(horizontal: 2),
                             decoration: BoxDecoration(
-                              color: i <= _index ? Colors.white : Colors.white.withValues(alpha: 0.28),
+                              color: i <= _index
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.28),
                               borderRadius: BorderRadius.circular(99),
                             ),
                           ),
@@ -1019,19 +1265,47 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        CircleAvatar(radius: 17, backgroundColor: Colors.white24, backgroundImage: _avatar(story)),
+                        CircleAvatar(
+                          radius: 17,
+                          backgroundColor: Colors.white24,
+                          backgroundImage: _avatar(story),
+                        ),
                         const SizedBox(width: 9),
                         Expanded(
-                          child: Text(
-                            story.ownerName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w800),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                story.ownerName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                _storyAge(story.createdAt),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10.8,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
                         ),
                       ],
                     ),
@@ -1042,12 +1316,69 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
                 Positioned(
                   left: 16,
                   right: 16,
-                  bottom: 32,
+                  bottom: 92,
                   child: Text(
                     story.caption?.trim() ?? '',
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600, height: 1.3),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
                   ),
                 ),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.28),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.30),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _replyController,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'Reply to story...',
+                            hintStyle: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            border: InputBorder.none,
+                          ),
+                          onSubmitted: (_) => _sendReply(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _StoryReactionButton(
+                      icon: Icons.favorite_rounded,
+                      label: 'Love',
+                      onTap: () => _sendQuickReaction('Love'),
+                    ),
+                    const SizedBox(width: 6),
+                    _StoryReactionButton(
+                      icon: Icons.send_rounded,
+                      label: 'Send',
+                      onTap: _sendReply,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -1060,10 +1391,57 @@ class _StoryViewerPageState extends State<_StoryViewerPage> {
     if (url == null || url.trim().isEmpty) return null;
     return NetworkImage(url);
   }
+
+  String _storyAge(DateTime? createdAt) {
+    if (createdAt == null) return 'now';
+    final delta = DateTime.now().difference(createdAt);
+    if (delta.inMinutes < 1) return 'now';
+    if (delta.inHours < 1) return '${delta.inMinutes}m';
+    if (delta.inDays < 1) return '${delta.inHours}h';
+    return '${delta.inDays}d';
+  }
+}
+
+class _StoryReactionButton extends StatelessWidget {
+  const _StoryReactionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.28),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
 }
 
 class _StoryDraft {
-  const _StoryDraft({required this.mediaUrl, required this.mediaType, required this.visibility, this.caption});
+  const _StoryDraft({
+    required this.mediaUrl,
+    required this.mediaType,
+    required this.visibility,
+    this.caption,
+  });
   final String mediaUrl;
   final String mediaType;
   final String visibility;
@@ -1104,34 +1482,67 @@ class _CreateStorySheetV3State extends State<_CreateStorySheetV3> {
           ),
           child: ListView(
             controller: scrollController,
-            padding: EdgeInsets.fromLTRB(16, 10, 16, 18 + MediaQuery.paddingOf(context).bottom),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              10,
+              16,
+              18 + MediaQuery.paddingOf(context).bottom,
+            ),
             children: [
               Center(
                 child: Container(
                   width: 38,
                   height: 4,
-                  decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(99)),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4D4D8),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Create story', style: TextStyle(color: _InboxPageState._ink, fontSize: 22, fontWeight: FontWeight.w800)),
+              const Text(
+                'New story',
+                style: TextStyle(
+                  color: _InboxPageState._ink,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Preview, caption, then share.',
+                style: TextStyle(
+                  color: _InboxPageState._muted,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               const SizedBox(height: 14),
               Container(
                 height: 260,
-                decoration: BoxDecoration(color: const Color(0xFFF4F4F5), borderRadius: BorderRadius.circular(24)),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.add_photo_alternate_outlined, size: 42, color: _InboxPageState._muted),
-                    SizedBox(height: 10),
-                    Text('Add image or video', style: TextStyle(color: _InboxPageState._ink, fontSize: 15, fontWeight: FontWeight.w700)),
-                  ],
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F4F5),
+                  borderRadius: BorderRadius.circular(24),
                 ),
+                child: _mediaUrl.text.trim().isNotEmpty && _mediaType == 'image'
+                    ? Image.network(
+                        _mediaUrl.text.trim(),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const _StoryUploadEmptyPreview(),
+                      )
+                    : const _StoryUploadEmptyPreview(),
               ),
               const SizedBox(height: 14),
               TextField(
                 controller: _mediaUrl,
-                decoration: _inputDecoration('Media link', 'Paste image/video link'),
+                onChanged: (_) => setState(() {}),
+                decoration: _inputDecoration(
+                  'Media link',
+                  'Paste image/video link',
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -1142,9 +1553,17 @@ class _CreateStorySheetV3State extends State<_CreateStorySheetV3> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  _SelectChip(label: 'Image', selected: _mediaType == 'image', onTap: () => setState(() => _mediaType = 'image')),
+                  _SelectChip(
+                    label: 'Image',
+                    selected: _mediaType == 'image',
+                    onTap: () => setState(() => _mediaType = 'image'),
+                  ),
                   const SizedBox(width: 8),
-                  _SelectChip(label: 'Video', selected: _mediaType == 'video', onTap: () => setState(() => _mediaType = 'video')),
+                  _SelectChip(
+                    label: 'Video',
+                    selected: _mediaType == 'video',
+                    onTap: () => setState(() => _mediaType = 'video'),
+                  ),
                   const Spacer(),
                   PopupMenuButton<String>(
                     onSelected: (value) => setState(() => _visibility = value),
@@ -1153,7 +1572,14 @@ class _CreateStorySheetV3State extends State<_CreateStorySheetV3> {
                       PopupMenuItem(value: 'everyone', child: Text('Everyone')),
                       PopupMenuItem(value: 'nobody', child: Text('Only me')),
                     ],
-                    child: _SelectChip(label: _visibility == 'friends' ? 'Friends' : _visibility == 'everyone' ? 'Everyone' : 'Only me', selected: true),
+                    child: _SelectChip(
+                      label: _visibility == 'friends'
+                          ? 'Friends'
+                          : _visibility == 'everyone'
+                          ? 'Everyone'
+                          : 'Only me',
+                      selected: true,
+                    ),
                   ),
                 ],
               ),
@@ -1161,8 +1587,10 @@ class _CreateStorySheetV3State extends State<_CreateStorySheetV3> {
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: _InboxPageState._blue,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
                 onPressed: () {
                   final mediaUrl = _mediaUrl.text.trim();
@@ -1173,11 +1601,16 @@ class _CreateStorySheetV3State extends State<_CreateStorySheetV3> {
                       mediaUrl: mediaUrl,
                       mediaType: _mediaType,
                       visibility: _visibility,
-                      caption: _caption.text.trim().isEmpty ? null : _caption.text.trim(),
+                      caption: _caption.text.trim().isEmpty
+                          ? null
+                          : _caption.text.trim(),
                     ),
                   );
                 },
-                child: const Text('Share story', style: TextStyle(fontWeight: FontWeight.w800)),
+                child: const Text(
+                  'Post story',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
               ),
             ],
           ),
@@ -1192,8 +1625,14 @@ class _CreateStorySheetV3State extends State<_CreateStorySheetV3> {
       hintText: hint,
       filled: true,
       fillColor: const Color(0xFFF7F7F8),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: _InboxPageState._blue)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: _InboxPageState._blue),
+      ),
     );
   }
 }
@@ -1218,7 +1657,11 @@ class _SelectChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(color: selected ? Colors.white : _InboxPageState._ink, fontSize: 12.5, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            color: selected ? Colors.white : _InboxPageState._ink,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -1250,19 +1693,61 @@ class _InboxV3OptionsSheet extends StatelessWidget {
       top: false,
       child: Container(
         margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        padding: EdgeInsets.fromLTRB(10, 8, 10, 10 + MediaQuery.paddingOf(context).bottom),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
+        padding: EdgeInsets.fromLTRB(
+          10,
+          8,
+          10,
+          10 + MediaQuery.paddingOf(context).bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 38, height: 4, decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(99))),
+            Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4D4D8),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
             const SizedBox(height: 10),
-            _SheetRow(icon: Icons.info_outline_rounded, label: 'Chat info', onTap: onInfo),
-            _SheetRow(icon: Icons.push_pin_outlined, label: conversation.isPinned ? 'Unpin' : 'Pin', onTap: onTogglePin),
-            _SheetRow(icon: Icons.volume_off_outlined, label: conversation.isMuted ? 'Unmute' : 'Mute', onTap: conversation.isOfficial ? null : onToggleMute),
-            _SheetRow(icon: Icons.lock_outline_rounded, label: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat', onTap: conversation.isOfficial ? null : onToggleLock),
-            _SheetRow(icon: Icons.block_rounded, label: conversation.isBlocked ? 'Unblock' : 'Block', onTap: conversation.isOfficial ? null : onToggleBlock),
-            _SheetRow(icon: Icons.report_outlined, label: 'Report', onTap: conversation.isOfficial ? null : onReport, destructive: true),
+            _SheetRow(
+              icon: Icons.info_outline_rounded,
+              label: 'Chat info',
+              onTap: onInfo,
+            ),
+            _SheetRow(
+              icon: Icons.push_pin_outlined,
+              label: conversation.isPinned ? 'Unpin' : 'Pin',
+              onTap: onTogglePin,
+            ),
+            _SheetRow(
+              icon: Icons.volume_off_outlined,
+              label: conversation.isMuted ? 'Unmute' : 'Mute',
+              onTap: conversation.isOfficial ? null : onToggleMute,
+            ),
+            _SheetRow(
+              icon: Icons.lock_outline_rounded,
+              label: conversation.isLockedByBackend
+                  ? 'Unlock chat'
+                  : 'Lock chat',
+              onTap: conversation.isOfficial ? null : onToggleLock,
+            ),
+            _SheetRow(
+              icon: Icons.block_rounded,
+              label: conversation.isBlocked ? 'Unblock' : 'Block',
+              onTap: conversation.isOfficial ? null : onToggleBlock,
+            ),
+            _SheetRow(
+              icon: Icons.report_outlined,
+              label: 'Report',
+              onTap: conversation.isOfficial ? null : onReport,
+              destructive: true,
+            ),
           ],
         ),
       ),
@@ -1271,7 +1756,12 @@ class _InboxV3OptionsSheet extends StatelessWidget {
 }
 
 class _SheetRow extends StatelessWidget {
-  const _SheetRow({required this.icon, required this.label, this.onTap, this.destructive = false});
+  const _SheetRow({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.destructive = false,
+  });
 
   final IconData icon;
   final String label;
@@ -1293,7 +1783,16 @@ class _SheetRow extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 20),
               const SizedBox(width: 13),
-              Expanded(child: Text(label, style: TextStyle(color: color, fontSize: 14.5, fontWeight: FontWeight.w600))),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -1303,14 +1802,218 @@ class _SheetRow extends StatelessWidget {
 }
 
 class _EmptyInboxStateV3 extends StatelessWidget {
-  const _EmptyInboxStateV3();
+  const _EmptyInboxStateV3({required this.onSearchTap});
+
+  final VoidCallback onSearchTap;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'No chats yet',
-        style: TextStyle(color: _InboxPageState._muted, fontSize: 14, fontWeight: FontWeight.w600),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 34),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F4F5),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: const Color(0xFFEDEDEF)),
+              ),
+              child: const Icon(
+                Icons.forum_outlined,
+                color: _InboxPageState._ink,
+                size: 25,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'No chats yet',
+              style: TextStyle(
+                color: _InboxPageState._ink,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Search for friends or check message requests to start a conversation.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _InboxPageState._muted,
+                fontSize: 12.5,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextButton.icon(
+              onPressed: onSearchTap,
+              style: TextButton.styleFrom(
+                foregroundColor: _InboxPageState._blue,
+                textStyle: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              icon: const Icon(Icons.search_rounded, size: 18),
+              label: const Text('Search messages'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StoryUploadEmptyPreview extends StatelessWidget {
+  const _StoryUploadEmptyPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F4F5),
+              border: Border.all(color: const Color(0xFFEDEDEF)),
+            ),
+          ),
+        ),
+        const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add_photo_alternate_outlined,
+                size: 38,
+                color: _InboxPageState._muted,
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Add image or video',
+                style: TextStyle(
+                  color: _InboxPageState._ink,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 3),
+              Text(
+                'Paste a media link below',
+                style: TextStyle(
+                  color: _InboxPageState._muted,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InboxLoadingSkeletonV3 extends StatefulWidget {
+  const _InboxLoadingSkeletonV3();
+
+  @override
+  State<_InboxLoadingSkeletonV3> createState() =>
+      _InboxLoadingSkeletonV3State();
+}
+
+class _InboxLoadingSkeletonV3State extends State<_InboxLoadingSkeletonV3>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1150),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final alpha = 0.42 + (_controller.value * 0.22);
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 7,
+          itemBuilder: (context, index) {
+            return Opacity(
+              opacity: alpha,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    const _SkeletonBox(width: 50, height: 50, radius: 25),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SkeletonBox(
+                            width: 132 + (index % 3) * 20,
+                            height: 12,
+                            radius: 8,
+                          ),
+                          const SizedBox(height: 9),
+                          _SkeletonBox(
+                            width: 210 - (index % 3) * 24,
+                            height: 10,
+                            radius: 8,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const _SkeletonBox(width: 32, height: 10, radius: 8),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SkeletonBox extends StatelessWidget {
+  const _SkeletonBox({
+    required this.width,
+    required this.height,
+    required this.radius,
+  });
+
+  final double width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDEDEF),
+        borderRadius: BorderRadius.circular(radius),
       ),
     );
   }

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class FunKeyChatInputBar extends StatelessWidget {
   const FunKeyChatInputBar({
@@ -39,42 +39,75 @@ class FunKeyChatInputBar extends StatelessWidget {
     final hasText = controller.text.trim().isNotEmpty;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(8, 7, 8, 7 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+        8,
+        7,
+        8,
+        7 + MediaQuery.paddingOf(context).bottom,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: _line)),
       ),
       child: Row(
         children: [
-          _InputIcon(icon: Icons.emoji_emotions_outlined, onTap: readOnly ? null : onEmojiTap),
+          _InputIcon(
+            icon: Icons.emoji_emotions_outlined,
+            onTap: readOnly ? null : onEmojiTap,
+          ),
           Expanded(
             child: Container(
               constraints: const BoxConstraints(minHeight: 42, maxHeight: 96),
               padding: const EdgeInsets.symmetric(horizontal: 13),
               decoration: BoxDecoration(
-                color: const Color(0xFFF4F4F5),
+                color: recordingVoice
+                    ? const Color(0xFFFFF1F2)
+                    : const Color(0xFFF4F4F5),
                 borderRadius: BorderRadius.circular(21),
+                border: recordingVoice
+                    ? Border.all(color: _rose.withValues(alpha: 0.20))
+                    : null,
               ),
               child: TextField(
                 controller: controller,
-                enabled: !readOnly,
+                enabled: !readOnly && !recordingVoice,
                 minLines: 1,
                 maxLines: 4,
-                style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
                 decoration: InputDecoration(
                   border: InputBorder.none,
-                  hintText: readOnly ? 'Replies disabled' : 'Message...',
-                  hintStyle: const TextStyle(color: _muted, fontWeight: FontWeight.w500),
+                  hintText: recordingVoice
+                      ? 'Recording... release to send'
+                      : readOnly
+                      ? 'Replies disabled'
+                      : 'Message...',
+                  hintStyle: TextStyle(
+                    color: recordingVoice ? _rose : _muted,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
           ),
-          _InputIcon(icon: Icons.add_circle_outline_rounded, onTap: readOnly ? null : onAttachTap),
+          _InputIcon(
+            icon: Icons.add_circle_outline_rounded,
+            onTap: readOnly ? null : onAttachTap,
+          ),
           GestureDetector(
             onTap: readOnly ? null : onVoiceTap,
-            onLongPressStart: readOnly || sendingVoice ? null : (_) => onVoiceLongPressStart(),
-            onLongPressEnd: readOnly || sendingVoice ? null : (_) => onVoiceLongPressEnd(),
-            onLongPressCancel: readOnly || sendingVoice ? null : onVoiceLongPressCancel,
+            onLongPressStart: readOnly || sendingVoice
+                ? null
+                : (_) => onVoiceLongPressStart(),
+            onLongPressEnd: readOnly || sendingVoice
+                ? null
+                : (_) => onVoiceLongPressEnd(),
+            onLongPressCancel: readOnly || sendingVoice
+                ? null
+                : onVoiceLongPressCancel,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               width: 40,
@@ -88,8 +121,8 @@ class FunKeyChatInputBar extends StatelessWidget {
                 sendingVoice
                     ? Icons.hourglass_top_rounded
                     : recordingVoice
-                        ? Icons.stop_rounded
-                        : Icons.mic_rounded,
+                    ? Icons.stop_rounded
+                    : Icons.mic_rounded,
                 color: recordingVoice ? Colors.white : _ink,
                 size: 20,
               ),
@@ -106,7 +139,11 @@ class FunKeyChatInputBar extends StatelessWidget {
                 color: readOnly || !hasText ? const Color(0xFFE4E4E7) : _blue,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.send_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
           ),
         ],
@@ -126,7 +163,13 @@ class _InputIcon extends StatelessWidget {
     return IconButton(
       visualDensity: VisualDensity.compact,
       onPressed: onTap,
-      icon: Icon(icon, color: onTap == null ? const Color(0xFFD4D4D8) : FunKeyChatInputBar._ink, size: 22),
+      icon: Icon(
+        icon,
+        color: onTap == null
+            ? const Color(0xFFD4D4D8)
+            : FunKeyChatInputBar._ink,
+        size: 22,
+      ),
     );
   }
 }

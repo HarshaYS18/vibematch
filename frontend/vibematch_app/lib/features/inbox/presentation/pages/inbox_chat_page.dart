@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,11 +55,15 @@ class _InboxChatPageState extends State<InboxChatPage> {
   double _timeRevealDrag = 0;
   String? _lastSentActivity;
 
-  InboxConversation get _conversation => widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
+  InboxConversation get _conversation =>
+      widget.controller.conversationById(widget.conversation.id) ??
+      widget.conversation;
 
   bool get _readOnly {
     final conversation = _conversation;
-    return conversation.isOfficial || conversation.isStranger || conversation.isBlocked;
+    return conversation.isOfficial ||
+        conversation.isStranger ||
+        conversation.isBlocked;
   }
 
   @override
@@ -69,13 +73,18 @@ class _InboxChatPageState extends State<InboxChatPage> {
     widget.controller.addListener(_handleChanged);
     _textController.addListener(_handleTextInputChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(widget.controller.openConversationFromBackend(widget.conversation.id));
+      if (mounted)
+        unawaited(
+          widget.controller.openConversationFromBackend(widget.conversation.id),
+        );
     });
   }
 
   @override
   void dispose() {
-    unawaited(widget.controller.closeSecretDriftSession(conversation: _conversation));
+    unawaited(
+      widget.controller.closeSecretDriftSession(conversation: _conversation),
+    );
     widget.controller.clearActiveConversation(widget.conversation.id);
     widget.controller.removeListener(_handleChanged);
     _textController.removeListener(_handleTextInputChanged);
@@ -101,8 +110,9 @@ class _InboxChatPageState extends State<InboxChatPage> {
   }
 
   void _handleTimeRevealPointerMove(PointerMoveEvent event) {
-    if (event.delta.dx <= 0 || event.delta.dx.abs() < event.delta.dy.abs()) return;
-    _timeRevealDrag += event.delta.dx;
+    if (event.delta.dx >= 0 || event.delta.dx.abs() < event.delta.dy.abs())
+      return;
+    _timeRevealDrag += -event.delta.dx;
     if (_timeRevealDrag > 18 && !_showMessageTimes && mounted) {
       setState(() => _showMessageTimes = true);
     }
@@ -162,15 +172,20 @@ class _InboxChatPageState extends State<InboxChatPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: const Color(0xFF251538),
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
       );
   }
 
   void _openInvitedRoom(InboxMessage message) {
     final conversation = _conversation;
-    final roomName = message.inviteRoomName ?? conversation.currentRoomName ?? 'Live Room';
-    final roomId = message.inviteRoomId ?? conversation.currentRoomId ?? roomName;
+    final roomName =
+        message.inviteRoomName ?? conversation.currentRoomName ?? 'Live Room';
+    final roomId =
+        message.inviteRoomId ?? conversation.currentRoomId ?? roomName;
     Navigator.pushNamed(
       context,
       VmRoutes.liveRoom,
@@ -191,7 +206,10 @@ class _InboxChatPageState extends State<InboxChatPage> {
     final end = selection.end >= 0 ? selection.end : oldText.length;
     final newText = oldText.replaceRange(start, end, emoji);
     final newOffset = start + emoji.length;
-    _textController.value = TextEditingValue(text: newText, selection: TextSelection.collapsed(offset: newOffset));
+    _textController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newOffset),
+    );
   }
 
   void _openEmojiPack() {
@@ -210,7 +228,18 @@ class _InboxChatPageState extends State<InboxChatPage> {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: false,
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip'],
+        allowedExtensions: [
+          'pdf',
+          'txt',
+          'csv',
+          'doc',
+          'docx',
+          'xls',
+          'xlsx',
+          'ppt',
+          'pptx',
+          'zip',
+        ],
         withData: true,
         withReadStream: false,
       );
@@ -241,7 +270,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
       final sizeLabel = _formatAttachmentBytes(bytes.length);
       await _inboxApi.sendMessage(
         conversationId: _conversation.id,
-        text: 'ðŸ“„ ${file.name} â€¢ $sizeLabel',
+        text: '${file.name} - $sizeLabel',
         type: 'document',
         attachmentUrl: uploaded.url,
       );
@@ -265,13 +294,17 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
   String _friendlyDocumentError(Object error) {
     final raw = error.toString().replaceFirst('Exception: ', '').trim();
-    if (raw.contains('413')) return 'Document is too large. Choose a file under 20 MB.';
-    if (raw.contains('401') || raw.toLowerCase().contains('login')) return 'Session expired. Login again before sending document.';
-    if (raw.contains('400') && raw.toLowerCase().contains('unsupported')) return 'Unsupported document type. Use PDF, TXT, CSV, Word, Excel, PowerPoint, or ZIP.';
-    if (raw.toLowerCase().contains('failed to fetch') || raw.toLowerCase().contains('xmlhttprequest')) return 'Upload failed. Check FastAPI is running and try again.';
+    if (raw.contains('413'))
+      return 'Document is too large. Choose a file under 20 MB.';
+    if (raw.contains('401') || raw.toLowerCase().contains('login'))
+      return 'Session expired. Login again before sending document.';
+    if (raw.contains('400') && raw.toLowerCase().contains('unsupported'))
+      return 'Unsupported document type. Use PDF, TXT, CSV, Word, Excel, PowerPoint, or ZIP.';
+    if (raw.toLowerCase().contains('failed to fetch') ||
+        raw.toLowerCase().contains('xmlhttprequest'))
+      return 'Upload failed. Check FastAPI is running and try again.';
     return raw.isEmpty ? 'Document send failed. Please try again.' : raw;
   }
-
 
   Future<void> _pickAndSendImageAttachment() async {
     if (_readOnly || _sendingImage) return;
@@ -302,7 +335,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
       await _inboxApi.sendMessage(
         conversationId: _conversation.id,
-        text: 'ðŸ“· Photo attached',
+        text: 'Photo attached',
         type: 'image',
         attachmentUrl: uploaded.url,
       );
@@ -318,10 +351,15 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
   String _friendlyImageError(Object error) {
     final raw = error.toString().replaceFirst('Exception: ', '').trim();
-    if (raw.contains('413')) return 'Image is too large. Choose an image under 10 MB.';
-    if (raw.contains('401') || raw.toLowerCase().contains('login')) return 'Session expired. Login again before sending image.';
-    if (raw.contains('400') && raw.toLowerCase().contains('unsupported')) return 'Unsupported image type. Choose JPG, PNG, WEBP, or GIF.';
-    if (raw.toLowerCase().contains('failed to fetch') || raw.toLowerCase().contains('xmlhttprequest')) return 'Upload failed. Check FastAPI is running and try again.';
+    if (raw.contains('413'))
+      return 'Image is too large. Choose an image under 10 MB.';
+    if (raw.contains('401') || raw.toLowerCase().contains('login'))
+      return 'Session expired. Login again before sending image.';
+    if (raw.contains('400') && raw.toLowerCase().contains('unsupported'))
+      return 'Unsupported image type. Choose JPG, PNG, WEBP, or GIF.';
+    if (raw.toLowerCase().contains('failed to fetch') ||
+        raw.toLowerCase().contains('xmlhttprequest'))
+      return 'Upload failed. Check FastAPI is running and try again.';
     return raw.isEmpty ? 'Image send failed. Please try again.' : raw;
   }
 
@@ -382,7 +420,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
       final durationLabel = _formatVoiceDuration(recorded.duration);
       await _inboxApi.sendMessage(
         conversationId: _conversation.id,
-        text: 'ðŸŽ™ Voice message â€¢ $durationLabel',
+        text: 'Voice message - $durationLabel',
         type: 'voice',
         attachmentUrl: uploaded.url,
       );
@@ -415,10 +453,15 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
   String _friendlyVoiceError(Object error) {
     final raw = error.toString().replaceFirst('Exception: ', '').trim();
-    if (raw.contains('413')) return 'Voice file is too large. Keep it under 10 MB.';
-    if (raw.contains('401') || raw.toLowerCase().contains('login')) return 'Session expired. Login again before sending voice.';
-    if (raw.toLowerCase().contains('permission')) return 'Microphone permission is needed to record voice.';
-    if (raw.toLowerCase().contains('failed to fetch') || raw.toLowerCase().contains('xmlhttprequest')) return 'Upload failed. Check FastAPI is running and try again.';
+    if (raw.contains('413'))
+      return 'Voice file is too large. Keep it under 10 MB.';
+    if (raw.contains('401') || raw.toLowerCase().contains('login'))
+      return 'Session expired. Login again before sending voice.';
+    if (raw.toLowerCase().contains('permission'))
+      return 'Microphone permission is needed to record voice.';
+    if (raw.toLowerCase().contains('failed to fetch') ||
+        raw.toLowerCase().contains('xmlhttprequest'))
+      return 'Upload failed. Check FastAPI is running and try again.';
     return raw.isEmpty ? 'Voice send failed. Please try again.' : raw;
   }
 
@@ -438,19 +481,28 @@ class _InboxChatPageState extends State<InboxChatPage> {
             await _pickAndSendImageAttachment();
             return;
           }
-          widget.controller.addMockAttachment(conversationId: _conversation.id, type: type);
+          widget.controller.addMockAttachment(
+            conversationId: _conversation.id,
+            type: type,
+          );
         },
       ),
     );
   }
 
   Future<void> _acceptLoveBondRequest(InboxMessage message) async {
-    await widget.controller.acceptLoveBondRequest(conversationId: _conversation.id, message: message);
+    await widget.controller.acceptLoveBondRequest(
+      conversationId: _conversation.id,
+      message: message,
+    );
     if (mounted) _showToast('Relationship request accepted.');
   }
 
   Future<void> _rejectLoveBondRequest(InboxMessage message) async {
-    await widget.controller.rejectLoveBondRequest(conversationId: _conversation.id, message: message);
+    await widget.controller.rejectLoveBondRequest(
+      conversationId: _conversation.id,
+      message: message,
+    );
     if (mounted) _showToast('Relationship request rejected.');
   }
 
@@ -520,7 +572,6 @@ class _InboxChatPageState extends State<InboxChatPage> {
     }
   }
 
-
   void _openChatMoreSheet() {
     showModalBottomSheet<void>(
       context: context,
@@ -539,7 +590,9 @@ class _InboxChatPageState extends State<InboxChatPage> {
   Future<void> _handleBackFromChat() async {
     final conversation = _conversation;
     if (conversation.secretDriftEnabled) {
-      await widget.controller.closeSecretDriftSession(conversation: conversation);
+      await widget.controller.closeSecretDriftSession(
+        conversation: conversation,
+      );
     }
     if (!mounted) return;
     final customBack = widget.onBackTap;
@@ -570,7 +623,9 @@ class _InboxChatPageState extends State<InboxChatPage> {
   }
 
   String _chatStatusText(InboxConversation conversation) {
-    final remoteActivity = widget.controller.remoteActivityForConversation(conversation.id);
+    final remoteActivity = widget.controller.remoteActivityForConversation(
+      conversation.id,
+    );
     if (remoteActivity != null) return _activityLabel(remoteActivity);
 
     if (conversation.isOnline) return 'online';
@@ -592,11 +647,17 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
   InboxChatThemeChoice _resolvedChatTheme(InboxConversation conversation) {
     final key = conversation.chatTheme ?? widget.controller.defaultChatTheme;
-    final wallpaperKey = conversation.wallpaperKey ?? widget.controller.defaultWallpaperKey;
+    final wallpaperKey =
+        conversation.wallpaperKey ?? widget.controller.defaultWallpaperKey;
     return inboxChatThemeChoices.firstWhere(
       (choice) => choice.key == key || choice.wallpaperKey == wallpaperKey,
       orElse: () => inboxChatThemeChoices.first,
     );
+  }
+
+  Color _chatSurfaceColor(InboxChatThemeChoice choice) {
+    if (choice.key == 'royal_dark') return const Color(0xFF101014);
+    return const Color(0xFFFAFAFA);
   }
 
   @override
@@ -607,86 +668,110 @@ class _InboxChatPageState extends State<InboxChatPage> {
     return InboxCallRealtimePresenter(
       callController: widget.controller.callController,
       child: Scaffold(
-        backgroundColor: const Color(0xFF12091F),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _ChatHeader(
-              conversation: conversation,
-              statusText: _chatStatusText(conversation),
-              onBackTap: () => unawaited(_handleBackFromChat()),
-              onMoreTap: _openChatMoreSheet,
-              onVoiceCallTap: _openCallSheet,
-              onVideoCallTap: _openCallSheet,
-            ),
-            if (conversation.secretDriftEnabled)
-              _SecretDriftBanner(label: conversation.secretDriftLabel),
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: chatTheme.colors,
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _ChatHeader(
+                conversation: conversation,
+                statusText: _chatStatusText(conversation),
+                onBackTap: () => unawaited(_handleBackFromChat()),
+                onMoreTap: _openChatMoreSheet,
+                onVoiceCallTap: _openCallSheet,
+                onVideoCallTap: _openCallSheet,
+              ),
+              if (conversation.secretDriftEnabled)
+                _SecretDriftBanner(label: conversation.secretDriftLabel),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _chatSurfaceColor(chatTheme),
+                  ),
+                  child: ListView.separated(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(12, 14, 12, 18),
+                    itemCount: messages.length,
+                    separatorBuilder: (context, index) {
+                      final current = messages[index];
+                      final next = messages[index + 1];
+                      return SizedBox(
+                        height: current.isMine == next.isMine ? 4 : 10,
+                      );
+                    },
+                    itemBuilder: (context, index) {
+                      final message = messages[index];
+                      return Listener(
+                        onPointerMove: _handleTimeRevealPointerMove,
+                        onPointerUp: (_) => _clearTimeReveal(),
+                        onPointerCancel: (_) => _clearTimeReveal(),
+                        child: SwipeReplyMessage(
+                          isMine: message.isMine,
+                          onReply: () =>
+                              setState(() => _replyToText = message.text),
+                          child: _MessageBubble(
+                            showTime: _showMessageTimes,
+                            message: message,
+                            conversation: conversation,
+                            onLongPress: () => _openMessageActions(message),
+                            onJoinInviteTap: message.isInvite
+                                ? () => _openInvitedRoom(message)
+                                : null,
+                            onAcceptLoveBondTap: message.isLoveBondRequest
+                                ? () => _acceptLoveBondRequest(message)
+                                : null,
+                            onRejectLoveBondTap: message.isLoveBondRequest
+                                ? () => _rejectLoveBondRequest(message)
+                                : null,
+                            onRetryFailedTap:
+                                message.isMine &&
+                                    message.status == InboxMessageStatus.failed
+                                ? () => widget.controller.retryFailedMessage(
+                                    conversationId: _conversation.id,
+                                    message: message,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-                child: ListView.separated(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(12, 16, 12, 18),
-                  itemCount: messages.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final message = messages[index];
-                    return Listener(
-                      onPointerMove: _handleTimeRevealPointerMove,
-                      onPointerUp: (_) => _clearTimeReveal(),
-                      onPointerCancel: (_) => _clearTimeReveal(),
-                      child: SwipeReplyMessage(
-                        isMine: message.isMine,
-                      onReply: () => setState(() => _replyToText = message.text),
-                        child: _MessageBubble(
-                          showTime: _showMessageTimes,
-                          message: message,
-                        conversation: conversation,
-                        onLongPress: () => _openMessageActions(message),
-                        onJoinInviteTap: message.isInvite ? () => _openInvitedRoom(message) : null,
-                        onAcceptLoveBondTap: message.isLoveBondRequest ? () => _acceptLoveBondRequest(message) : null,
-                          onRejectLoveBondTap: message.isLoveBondRequest ? () => _rejectLoveBondRequest(message) : null,
-                          onRetryFailedTap: message.isMine && message.status == InboxMessageStatus.failed
-                              ? () => widget.controller.retryFailedMessage(conversationId: _conversation.id, message: message)
-                              : null,
-                        ),
-                      ),
-                    );
-                  },
-                ),
               ),
-            ),
-            if (_replyToText != null)
-              FunKeyReplyPreview(text: _replyToText!, onClose: () => setState(() => _replyToText = null)),
-            FunKeyChatInputBar(
-              readOnly: _readOnly,
-              controller: _textController,
-              onAttachTap: _openAttachmentSheet,
-              onEmojiTap: _openEmojiPack,
-              recordingVoice: _recordingVoice,
-              sendingVoice: _sendingVoice,
-              onVoiceTap: _showHoldToRecordHint,
-              onVoiceLongPressStart: _startVoiceRecording,
-              onVoiceLongPressEnd: _stopAndSendVoiceRecording,
-              onVoiceLongPressCancel: _cancelVoiceRecording,
-              onSendTap: _sendText,
-            ),
-          ],
+              if (_replyToText != null)
+                FunKeyReplyPreview(
+                  text: _replyToText!,
+                  onClose: () => setState(() => _replyToText = null),
+                ),
+              FunKeyChatInputBar(
+                readOnly: _readOnly,
+                controller: _textController,
+                onAttachTap: _openAttachmentSheet,
+                onEmojiTap: _openEmojiPack,
+                recordingVoice: _recordingVoice,
+                sendingVoice: _sendingVoice,
+                onVoiceTap: _showHoldToRecordHint,
+                onVoiceLongPressStart: _startVoiceRecording,
+                onVoiceLongPressEnd: _stopAndSendVoiceRecording,
+                onVoiceLongPressCancel: _cancelVoiceRecording,
+                onSendTap: _sendText,
+              ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }
 
 class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({required this.conversation, required this.statusText, required this.onBackTap, required this.onMoreTap, required this.onVoiceCallTap, required this.onVideoCallTap});
+  const _ChatHeader({
+    required this.conversation,
+    required this.statusText,
+    required this.onBackTap,
+    required this.onMoreTap,
+    required this.onVoiceCallTap,
+    required this.onVideoCallTap,
+  });
 
   final InboxConversation conversation;
   final String statusText;
@@ -699,23 +784,42 @@ class _ChatHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final avatarUrl = conversation.avatarUrl?.trim();
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 8, 8, 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF12091F),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 20, offset: const Offset(0, 10))],
+      padding: const EdgeInsets.fromLTRB(4, 6, 6, 7),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFEDEDEF), width: 0.8),
+        ),
       ),
       child: Row(
         children: [
-          IconButton(onPressed: onBackTap, icon: const Icon(Icons.arrow_back_rounded, color: Colors.white)),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: onBackTap,
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFF111114),
+              size: 22,
+            ),
+          ),
           Container(
-            width: 42,
-            height: 42,
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: conversation.colors)),
+            width: 40,
+            height: 40,
+            padding: const EdgeInsets.all(1),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFF4F4F5),
+              border: Border.all(color: const Color(0xFFEDEDEF)),
+            ),
             child: ClipOval(
               child: avatarUrl == null || avatarUrl.isEmpty
                   ? _HeaderAvatarText(conversation: conversation)
-                  : Image.network(avatarUrl, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => _HeaderAvatarText(conversation: conversation)),
+                  : Image.network(
+                      avatarUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _HeaderAvatarText(conversation: conversation),
+                    ),
             ),
           ),
           const SizedBox(width: 10),
@@ -730,18 +834,30 @@ class _ChatHeader extends StatelessWidget {
                         conversation.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 15.5, fontWeight: FontWeight.w900),
+                        style: const TextStyle(
+                          color: Color(0xFF111114),
+                          fontSize: 14.8,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     if (conversation.isOfficial)
-                      const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 15),
+                      const Icon(
+                        Icons.verified_rounded,
+                        color: Color(0xFF3797F0),
+                        size: 15,
+                      ),
                   ],
                 ),
                 Text(
                   statusText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFFCDBCE7), fontSize: 11.2, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Color(0xFF71717A),
+                    fontSize: 11.2,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -750,15 +866,38 @@ class _ChatHeader extends StatelessWidget {
             _HeaderChatStreakPill(conversation: conversation),
             const SizedBox(width: 4),
           ],
-          IconButton(onPressed: onVoiceCallTap, icon: const Icon(Icons.call_rounded, color: Colors.white, size: 20)),
-          IconButton(onPressed: onVideoCallTap, icon: const Icon(Icons.videocam_rounded, color: Colors.white, size: 21)),
-          IconButton(onPressed: onMoreTap, icon: const Icon(Icons.more_vert_rounded, color: Colors.white)),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: onVoiceCallTap,
+            icon: const Icon(
+              Icons.call_rounded,
+              color: Color(0xFF111114),
+              size: 20,
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: onVideoCallTap,
+            icon: const Icon(
+              Icons.videocam_rounded,
+              color: Color(0xFF111114),
+              size: 21,
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: onMoreTap,
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              color: Color(0xFF111114),
+              size: 21,
+            ),
+          ),
         ],
       ),
     );
   }
 }
-
 
 class _HeaderChatStreakPill extends StatelessWidget {
   const _HeaderChatStreakPill({required this.conversation});
@@ -769,7 +908,7 @@ class _HeaderChatStreakPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = conversation.chatStreakActiveToday
         ? const Color(0xFFFFA000)
-        : const Color(0xFFCDBCE7);
+        : const Color(0xFFA1A1AA);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -802,9 +941,17 @@ class _HeaderAvatarText extends StatelessWidget {
   final InboxConversation conversation;
   @override
   Widget build(BuildContext context) => DecoratedBox(
-        decoration: BoxDecoration(gradient: LinearGradient(colors: conversation.colors)),
-        child: Center(child: Text(conversation.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
-      );
+    decoration: BoxDecoration(color: conversation.colors.first),
+    child: Center(
+      child: Text(
+        conversation.avatarText,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    ),
+  );
 }
 
 class _MessageBubble extends StatelessWidget {
@@ -828,16 +975,21 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onRejectLoveBondTap;
   final VoidCallback? onRetryFailedTap;
 
-  bool get _hasMediaContent => message.type == InboxMessageType.image || message.type == InboxMessageType.document || message.type == InboxMessageType.voice;
+  bool get _hasMediaContent =>
+      message.type == InboxMessageType.image ||
+      message.type == InboxMessageType.document ||
+      message.type == InboxMessageType.voice;
 
   @override
   Widget build(BuildContext context) {
     final mine = message.isMine;
-    final showInlineReceipt = mine &&
+    final showInlineReceipt =
+        mine &&
         !_hasMediaContent &&
         !message.isLoveBondRequest &&
         !message.isInvite &&
         !message.isSystem;
+    final maxBubbleWidth = MediaQuery.sizeOf(context).width * 0.76;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -846,28 +998,56 @@ class _MessageBubble extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            if (showTime)
+              Positioned(
+                top: 10,
+                left: mine ? -58 : null,
+                right: mine ? null : -58,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 120),
+                  opacity: showTime ? 1 : 0,
+                  child: Text(
+                    message.time,
+                    style: const TextStyle(
+                      color: Color(0xFF71717A),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
             Container(
-              constraints: const BoxConstraints(maxWidth: 304),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                gradient: mine ? const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFFF4F9A)]) : null,
-                color: mine ? null : Colors.white,
+                color: mine ? const Color(0xFF3797F0) : const Color(0xFFF1F1F3),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(mine ? 20 : 6),
-                  bottomRight: Radius.circular(mine ? 6 : 20),
+                  bottomLeft: Radius.circular(mine ? 20 : 7),
+                  bottomRight: Radius.circular(mine ? 7 : 20),
                 ),
-                border: mine ? null : Border.all(color: const Color(0xFFE9DDF5)),
-                boxShadow: [BoxShadow(color: const Color(0xFF1E1230).withValues(alpha: 0.07), blurRadius: 14, offset: const Offset(0, 8))],
+                border: mine
+                    ? null
+                    : Border.all(color: const Color(0xFFEDEDEF)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (message.isForwarded) _BubbleMeta(label: 'Forwarded', mine: mine, icon: Icons.shortcut_rounded),
-                  if (message.replyToText != null) _ReplySnippet(text: message.replyToText!, mine: mine),
+                  if (message.isForwarded)
+                    _BubbleMeta(
+                      label: 'Forwarded',
+                      mine: mine,
+                      icon: Icons.shortcut_rounded,
+                    ),
+                  if (message.replyToText != null)
+                    _ReplySnippet(text: message.replyToText!, mine: mine),
                   if (message.isLoveBondRequest)
-                    _LoveBondRequestCard(message: message, onAccept: onAcceptLoveBondTap, onReject: onRejectLoveBondTap)
+                    _LoveBondRequestCard(
+                      message: message,
+                      onAccept: onAcceptLoveBondTap,
+                      onReject: onRejectLoveBondTap,
+                    )
                   else if (message.isInvite)
                     _InviteCard(message: message, onTap: onJoinInviteTap)
                   else if (message.isSystem)
@@ -885,10 +1065,12 @@ class _MessageBubble extends StatelessWidget {
                           child: Text(
                             message.text,
                             style: TextStyle(
-                              color: mine ? Colors.white : const Color(0xFF251538),
-                              fontSize: 13.2,
+                              color: mine
+                                  ? Colors.white
+                                  : const Color(0xFF111114),
+                              fontSize: 14.5,
                               height: 1.32,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
@@ -896,7 +1078,10 @@ class _MessageBubble extends StatelessWidget {
                           const SizedBox(width: 5),
                           Padding(
                             padding: const EdgeInsets.only(bottom: 1),
-                            child: _ReadReceipt(status: message.status, mine: mine),
+                            child: _ReadReceipt(
+                              status: message.status,
+                              mine: mine,
+                            ),
                           ),
                         ],
                       ],
@@ -906,23 +1091,35 @@ class _MessageBubble extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (message.isStarred) ...[
-                        Icon(Icons.star_rounded, color: mine ? Colors.white70 : const Color(0xFFC99A3B), size: 12),
+                        Icon(
+                          Icons.star_rounded,
+                          color: mine
+                              ? Colors.white70
+                              : const Color(0xFFC99A3B),
+                          size: 12,
+                        ),
                         const SizedBox(width: 4),
                       ],
-                      if (showTime) ...[
+                      if (showTime &&
+                          message.id == '__inline_time_disabled__') ...[
                         Text(
                           '${mine ? 'You' : message.sender} â€¢ ${message.time}',
                           style: TextStyle(
-                            color: mine ? Colors.white70 : const Color(0xFF9B8CA5),
+                            color: mine
+                                ? Colors.white70
+                                : const Color(0xFF71717A),
                             fontSize: 10.3,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
                       if (mine) ...[
-                        if (showTime && !showInlineReceipt) const SizedBox(width: 5),
-                        if (!showInlineReceipt) _ReadReceipt(status: message.status, mine: mine),
-                        if (message.status == InboxMessageStatus.failed && onRetryFailedTap != null) ...[
+                        if (showTime && !showInlineReceipt)
+                          const SizedBox(width: 5),
+                        if (!showInlineReceipt)
+                          _ReadReceipt(status: message.status, mine: mine),
+                        if (message.status == InboxMessageStatus.failed &&
+                            onRetryFailedTap != null) ...[
                           const SizedBox(width: 6),
                           _RetryChip(onTap: onRetryFailedTap!),
                         ],
@@ -938,9 +1135,19 @@ class _MessageBubble extends StatelessWidget {
                 left: mine ? null : 8,
                 bottom: -14,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFE9DDF5))),
-                  child: Text(message.reaction!, style: const TextStyle(fontSize: 13)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFE9DDF5)),
+                  ),
+                  child: Text(
+                    message.reaction!,
+                    style: const TextStyle(fontSize: 13),
+                  ),
                 ),
               ),
           ],
@@ -951,15 +1158,37 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _BubbleMeta extends StatelessWidget {
-  const _BubbleMeta({required this.label, required this.mine, required this.icon});
+  const _BubbleMeta({
+    required this.label,
+    required this.mine,
+    required this.icon,
+  });
   final String label;
   final bool mine;
   final IconData icon;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: mine ? Colors.white70 : const Color(0xFF7B6A86), size: 12), const SizedBox(width: 4), Text(label, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w800))]),
-      );
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: mine ? Colors.white70 : const Color(0xFF71717A),
+          size: 12,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: mine ? Colors.white70 : const Color(0xFF71717A),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ReplySnippet extends StatelessWidget {
@@ -968,16 +1197,30 @@ class _ReplySnippet extends StatelessWidget {
   final bool mine;
   @override
   Widget build(BuildContext context) => Container(
-        width: 252,
-        margin: const EdgeInsets.only(bottom: 7),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-        decoration: BoxDecoration(
-          color: mine ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFF8F5FF),
-          borderRadius: BorderRadius.circular(13),
-          border: Border(left: BorderSide(color: mine ? const Color(0xFF2DD4BF) : const Color(0xFFFF4F9A), width: 3)),
+    width: 252,
+    margin: const EdgeInsets.only(bottom: 7),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+    decoration: BoxDecoration(
+      color: mine ? Colors.white.withValues(alpha: 0.14) : Colors.white,
+      borderRadius: BorderRadius.circular(13),
+      border: Border(
+        left: BorderSide(
+          color: mine ? Colors.white70 : const Color(0xFF3797F0),
+          width: 3,
         ),
-        child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF7B6A86), fontSize: 11.2, fontWeight: FontWeight.w800)),
-      );
+      ),
+    ),
+    child: Text(
+      text,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: mine ? Colors.white70 : const Color(0xFF71717A),
+        fontSize: 11.2,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }
 
 class _SystemMessageCard extends StatelessWidget {
@@ -985,11 +1228,31 @@ class _SystemMessageCard extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Container(
-        width: 252,
-        padding: const EdgeInsets.all(11),
-        decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF99F6E4))),
-        child: Row(children: [const Icon(Icons.verified_rounded, color: Color(0xFF0F766E), size: 18), const SizedBox(width: 8), Expanded(child: Text(text, style: const TextStyle(color: Color(0xFF134E4A), fontSize: 12, fontWeight: FontWeight.w800, height: 1.25)))]),
-      );
+    width: 252,
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFEDEDEF)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.verified_rounded, color: Color(0xFF22C55E), size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _CallLogMessageCard extends StatelessWidget {
@@ -1004,15 +1267,17 @@ class _CallLogMessageCard extends StatelessWidget {
     final video = lower.contains('video');
     final incoming = lower.contains('incoming') || lower.contains('missed');
     final color = missed ? const Color(0xFFE84C72) : const Color(0xFF12C7B7);
-    final directionIcon = incoming ? Icons.call_received_rounded : Icons.call_made_rounded;
+    final directionIcon = incoming
+        ? Icons.call_received_rounded
+        : Icons.call_made_rounded;
 
     return Container(
       width: 252,
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F5FF),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE9DDF5)),
+        border: Border.all(color: const Color(0xFFEDEDEF)),
       ),
       child: Row(
         children: [
@@ -1023,7 +1288,11 @@ class _CallLogMessageCard extends StatelessWidget {
               color: color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: Icon(video ? Icons.videocam_rounded : Icons.call_rounded, color: color, size: 18),
+            child: Icon(
+              video ? Icons.videocam_rounded : Icons.call_rounded,
+              color: color,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 9),
           Expanded(
@@ -1035,7 +1304,7 @@ class _CallLogMessageCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF251538),
+                    color: Color(0xFF111114),
                     fontSize: 12.4,
                     fontWeight: FontWeight.w900,
                     height: 1.22,
@@ -1044,12 +1313,16 @@ class _CallLogMessageCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    Icon(directionIcon, color: const Color(0xFF7B6A86), size: 12),
+                    Icon(
+                      directionIcon,
+                      color: const Color(0xFF71717A),
+                      size: 12,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       message.time,
                       style: const TextStyle(
-                        color: Color(0xFF7B6A86),
+                        color: Color(0xFF71717A),
                         fontSize: 10.8,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1066,30 +1339,93 @@ class _CallLogMessageCard extends StatelessWidget {
 }
 
 class _LoveBondRequestCard extends StatelessWidget {
-  const _LoveBondRequestCard({required this.message, required this.onAccept, required this.onReject});
+  const _LoveBondRequestCard({
+    required this.message,
+    required this.onAccept,
+    required this.onReject,
+  });
   final InboxMessage message;
   final VoidCallback? onAccept;
   final VoidCallback? onReject;
-  bool get _pending => (message.loveBondStatus ?? 'pending').toLowerCase() == 'pending';
+  bool get _pending =>
+      (message.loveBondStatus ?? 'pending').toLowerCase() == 'pending';
   @override
   Widget build(BuildContext context) {
-    final cardName = message.loveBondCardName?.trim().isNotEmpty == true ? message.loveBondCardName!.trim() : 'Relationship';
+    final cardName = message.loveBondCardName?.trim().isNotEmpty == true
+        ? message.loveBondCardName!.trim()
+        : 'Relationship';
     return Container(
       width: 252,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFFF5AAA), Color(0xFF6D5DF6)]), borderRadius: BorderRadius.circular(18)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.favorite_rounded, color: Colors.white, size: 23),
-        const SizedBox(height: 7),
-        Text(cardName, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 4),
-        Text(message.text, style: const TextStyle(color: Colors.white70, fontSize: 11.2, fontWeight: FontWeight.w800, height: 1.25)),
-        const SizedBox(height: 10),
-        if (_pending && !message.isMine)
-          Row(children: [Expanded(child: _PillAction(label: 'Reject', icon: Icons.close_rounded, onTap: onReject, filled: false)), const SizedBox(width: 8), Expanded(child: _PillAction(label: 'Accept', icon: Icons.check_rounded, onTap: onAccept, filled: true))])
-        else
-          _StatusPill(label: (message.loveBondStatus ?? 'pending').toUpperCase()),
-      ]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEDEDEF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEF4444).withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.favorite_rounded,
+              color: Color(0xFFEF4444),
+              size: 18,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            cardName,
+            style: const TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message.text,
+            style: const TextStyle(
+              color: Color(0xFF71717A),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (_pending && !message.isMine)
+            Row(
+              children: [
+                Expanded(
+                  child: _PillAction(
+                    label: 'Reject',
+                    icon: Icons.close_rounded,
+                    onTap: onReject,
+                    filled: false,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _PillAction(
+                    label: 'Accept',
+                    icon: Icons.check_rounded,
+                    onTap: onAccept,
+                    filled: true,
+                  ),
+                ),
+              ],
+            )
+          else
+            _StatusPill(
+              label: (message.loveBondStatus ?? 'pending').toUpperCase(),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1104,43 +1440,125 @@ class _InviteCard extends StatelessWidget {
     return Container(
       width: 252,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)]), borderRadius: BorderRadius.circular(18)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.meeting_room_rounded, color: Colors.white, size: 22),
-        const SizedBox(height: 7),
-        Text(roomName, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 4),
-        const Text('Room invite - access checked before entry', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 9),
-        _PillAction(label: 'Join room', icon: Icons.login_rounded, onTap: onTap, filled: true),
-      ]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEDEDEF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFF3797F0).withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.meeting_room_rounded,
+              color: Color(0xFF3797F0),
+              size: 18,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            roomName,
+            style: const TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Access is checked before entry',
+            style: TextStyle(
+              color: Color(0xFF71717A),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 9),
+          _PillAction(
+            label: 'Join room',
+            icon: Icons.login_rounded,
+            onTap: onTap,
+            filled: true,
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _PillAction extends StatelessWidget {
-  const _PillAction({required this.label, required this.icon, required this.onTap, required this.filled});
+  const _PillAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    required this.filled,
+  });
   final String label;
   final IconData icon;
   final VoidCallback? onTap;
   final bool filled;
   @override
   Widget build(BuildContext context) => InkWell(
+    borderRadius: BorderRadius.circular(999),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: filled ? const Color(0xFF3797F0) : const Color(0xFFF7F7F8),
         borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(color: filled ? Colors.white : Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white.withValues(alpha: 0.38))),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: filled ? const Color(0xFF251538) : Colors.white, size: 14), const SizedBox(width: 4), Text(label, style: TextStyle(color: filled ? const Color(0xFF251538) : Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900))]),
+        border: Border.all(
+          color: filled ? const Color(0xFF3797F0) : const Color(0xFFEDEDEF),
         ),
-      );
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: filled ? Colors.white : const Color(0xFF111114),
+            size: 14,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: filled ? Colors.white : const Color(0xFF111114),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.label});
   final String label;
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.20), borderRadius: BorderRadius.circular(999)), child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)));
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF7F7F8),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: Color(0xFF111114),
+        fontSize: 10.5,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
 }
 
 class _ReadReceipt extends StatelessWidget {
@@ -1168,9 +1586,9 @@ class _ReadReceipt extends StatelessWidget {
     };
 
     final color = switch (status) {
-      InboxMessageStatus.read => const Color(0xFF34D5FF),
-      InboxMessageStatus.failed => const Color(0xFFFFD1DC),
-      _ => mine ? Colors.white70 : const Color(0xFF9B8CA5),
+      InboxMessageStatus.read => mine ? Colors.white : const Color(0xFF3797F0),
+      InboxMessageStatus.failed => const Color(0xFFEF4444),
+      _ => mine ? Colors.white70 : const Color(0xFF71717A),
     };
 
     return Tooltip(
@@ -1179,7 +1597,6 @@ class _ReadReceipt extends StatelessWidget {
     );
   }
 }
-
 
 class _RetryChip extends StatelessWidget {
   const _RetryChip({required this.onTap});
@@ -1217,8 +1634,6 @@ class _RetryChip extends StatelessWidget {
     );
   }
 }
-
-
 
 class _SecretDriftBanner extends StatelessWidget {
   const _SecretDriftBanner({required this.label});
@@ -1271,14 +1686,26 @@ class _ChatMoreSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(14),
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        16 + MediaQuery.paddingOf(context).bottom,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           _ActionTile(
-            icon: conversation.secretDriftEnabled ? Icons.timer_off_rounded : Icons.timer_rounded,
-            title: conversation.secretDriftEnabled ? 'Turn off Secret Drift' : 'Turn on Secret Drift',
+            icon: conversation.secretDriftEnabled
+                ? Icons.timer_off_rounded
+                : Icons.timer_rounded,
+            title: conversation.secretDriftEnabled
+                ? 'Turn off Secret Drift'
+                : 'Turn on Secret Drift',
             onTap: onDisappearingTap,
           ),
           _ActionTile(
@@ -1292,25 +1719,40 @@ class _ChatMoreSheet extends StatelessWidget {
   }
 }
 
-
-
-
-
-
-
 class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.icon, required this.title, required this.onTap, this.danger = false});
+  const _ActionTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.danger = false,
+  });
   final IconData icon;
   final String title;
   final VoidCallback onTap;
   final bool danger;
   @override
   Widget build(BuildContext context) {
-    final color = danger ? const Color(0xFFE84C72) : const Color(0xFF251538);
-    return InkWell(borderRadius: BorderRadius.circular(16), onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11), child: Row(children: [Icon(icon, color: color, size: 21), const SizedBox(width: 12), Text(title, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w900))])));
+    final color = danger ? const Color(0xFFEF4444) : const Color(0xFF111114);
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 21),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
-
-
-
-

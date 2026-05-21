@@ -30,18 +30,19 @@ class _SwipeReplyMessageState extends State<SwipeReplyMessage>
   double _dragOffset = 0;
   bool _thresholdBuzzed = false;
 
-  double get _direction => widget.isMine ? -1 : 1;
+  double get _direction => 1;
   bool get _passedThreshold => _dragOffset.abs() >= widget.threshold;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 190),
-    )..addListener(() {
-        setState(() => _dragOffset = _animation.value);
-      });
+    _controller =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 190),
+        )..addListener(() {
+          setState(() => _dragOffset = _animation.value);
+        });
     _animation = const AlwaysStoppedAnimation<double>(0);
   }
 
@@ -75,9 +76,10 @@ class _SwipeReplyMessageState extends State<SwipeReplyMessage>
   }
 
   void _animateBack() {
-    _animation = Tween<double>(begin: _dragOffset, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+    _animation = Tween<double>(
+      begin: _dragOffset,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller
       ..reset()
       ..forward();
@@ -87,7 +89,7 @@ class _SwipeReplyMessageState extends State<SwipeReplyMessage>
   @override
   Widget build(BuildContext context) {
     final progress = (_dragOffset.abs() / widget.threshold).clamp(0.0, 1.0);
-    final iconAlignment = widget.isMine ? Alignment.centerRight : Alignment.centerLeft;
+    const iconAlignment = Alignment.centerLeft;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onHorizontalDragUpdate: _handleDragUpdate,
@@ -106,10 +108,7 @@ class _SwipeReplyMessageState extends State<SwipeReplyMessage>
                   child: Container(
                     width: 34,
                     height: 34,
-                    margin: EdgeInsets.only(
-                      left: widget.isMine ? 0 : 10,
-                      right: widget.isMine ? 10 : 0,
-                    ),
+                    margin: EdgeInsets.only(left: 10, right: 0),
                     decoration: BoxDecoration(
                       color: const Color(0xFF3797F0).withValues(alpha: 0.13),
                       shape: BoxShape.circle,
@@ -118,7 +117,9 @@ class _SwipeReplyMessageState extends State<SwipeReplyMessage>
                       Icons.reply_rounded,
                       color: const Color(0xFF3797F0),
                       size: 19,
-                      textDirection: widget.isMine ? TextDirection.rtl : TextDirection.ltr,
+                      textDirection: widget.isMine
+                          ? TextDirection.rtl
+                          : TextDirection.ltr,
                     ),
                   ),
                 ),

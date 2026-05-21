@@ -1,33 +1,45 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../models/inbox_models.dart';
 
 class FunKeyAttachmentPickerSheet extends StatelessWidget {
-  const FunKeyAttachmentPickerSheet({
-    super.key,
-    required this.onPick,
-  });
+  const FunKeyAttachmentPickerSheet({super.key, required this.onPick});
 
   final ValueChanged<InboxMessageType> onPick;
 
   static const _ink = Color(0xFF111114);
-  static const _muted = Color(0xFF71717A);
-  static const _line = Color(0xFFEDEDEF);
   static const _blue = Color(0xFF3797F0);
 
   @override
   Widget build(BuildContext context) {
     final items = <_AttachmentOption>[
-      _AttachmentOption(type: InboxMessageType.image, icon: Icons.image_rounded, label: 'Gallery'),
-      _AttachmentOption(type: InboxMessageType.document, icon: Icons.description_rounded, label: 'Document'),
-      _AttachmentOption(type: InboxMessageType.location, icon: Icons.location_on_rounded, label: 'Location'),
+      _AttachmentOption(
+        type: InboxMessageType.image,
+        icon: Icons.image_rounded,
+        label: 'Gallery',
+      ),
+      _AttachmentOption(
+        type: InboxMessageType.document,
+        icon: Icons.description_rounded,
+        label: 'Document',
+      ),
+      _AttachmentOption(
+        type: InboxMessageType.location,
+        icon: Icons.location_on_rounded,
+        label: 'Location',
+      ),
     ];
 
     return SafeArea(
       top: false,
       child: Container(
         margin: const EdgeInsets.all(8),
-        padding: EdgeInsets.fromLTRB(16, 10, 16, 14 + MediaQuery.paddingOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          10,
+          16,
+          14 + MediaQuery.paddingOf(context).bottom,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(28),
@@ -55,58 +67,70 @@ class FunKeyAttachmentPickerSheet extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             const Text(
-              'Add to chat',
+              'Add',
               style: TextStyle(
                 color: _ink,
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.2,
               ),
             ),
-            const SizedBox(height: 4),
-            const Text(
-              'Choose what you want to send.',
-              style: TextStyle(color: _muted, fontSize: 12.2, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 14),
-            GridView.count(
-              crossAxisCount: 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: items.map((item) {
-                return InkWell(
-                  borderRadius: BorderRadius.circular(20),
+                return _AttachmentButton(
+                  item: item,
                   onTap: () => onPick(item.type),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFAFAFA),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _line),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: _blue.withValues(alpha: 0.10),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(item.icon, color: _blue),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          item.label,
-                          style: const TextStyle(color: _ink, fontSize: 11.5, fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                  ),
                 );
               }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentButton extends StatelessWidget {
+  const _AttachmentButton({required this.item, required this.onTap});
+
+  final _AttachmentOption item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: FunKeyAttachmentPickerSheet._blue.withValues(
+                  alpha: 0.10,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                item.icon,
+                color: FunKeyAttachmentPickerSheet._blue,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              item.label,
+              style: const TextStyle(
+                color: FunKeyAttachmentPickerSheet._ink,
+                fontSize: 11.8,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
