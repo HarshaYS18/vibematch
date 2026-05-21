@@ -215,12 +215,7 @@ class _AppShellState extends State<AppShell> {
       case VmMainTab.vibes:
         return const VibesPage();
       case VmMainTab.inbox:
-        return InboxPage(
-          controller: _inboxController,
-          openConversationId: _pendingInboxOpenConversationId,
-          openConversationRequestNonce: _pendingInboxOpenRequestNonce,
-          onActiveConversationChanged: (conversationId) => _activeInboxConversationId = conversationId,
-        );
+        return InboxPage(controller: _inboxController, openConversationId: _pendingInboxOpenConversationId, openConversationRequestNonce: _pendingInboxOpenRequestNonce, onActiveConversationChanged: (conversationId) => _activeInboxConversationId = conversationId);
       case VmMainTab.me:
         return MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser);
     }
@@ -257,19 +252,12 @@ class _AppShellState extends State<AppShell> {
       onPopInvokedWithResult: _handleAppBack,
       child: Scaffold(
         backgroundColor: const Color(0xFFFAF7F1),
-        body: Stack(
-          children: [
-            _AnimatedTabStage(selectedTab: _selectedTab, previousTab: _previousTab, child: _pageFor(_selectedTab)),
-            const _LiveRoomMiniBubbleLayer(),
-            if (_globalForegroundConversation != null && _globalForegroundMessage != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: InboxForegroundNotificationBanner(conversation: _globalForegroundConversation!, message: _globalForegroundMessage!, onTap: _openGlobalForegroundNotification, onClose: _dismissGlobalForegroundNotification),
-              ),
-          ],
-        ),
+        body: Stack(children: [
+          _AnimatedTabStage(selectedTab: _selectedTab, previousTab: _previousTab, child: _pageFor(_selectedTab)),
+          const _LiveRoomMiniBubbleLayer(),
+          if (_globalForegroundConversation != null && _globalForegroundMessage != null)
+            Positioned(left: 0, right: 0, top: 0, child: InboxForegroundNotificationBanner(conversation: _globalForegroundConversation!, message: _globalForegroundMessage!, onTap: _openGlobalForegroundNotification, onClose: _dismissGlobalForegroundNotification)),
+        ]),
         bottomNavigationBar: _VibeBottomNav(selectedTab: _selectedTab, showOwnerControls: _showOwnerControls, onTabSelected: _selectTab),
       ),
     );
@@ -286,17 +274,14 @@ class _AnimatedTabStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final direction = selectedTab.tabIndex >= previousTab.tabIndex ? 1.0 : -1.0;
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 320),
+      duration: const Duration(milliseconds: 260),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, animation) {
         final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
         return FadeTransition(
           opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(begin: Offset(0.035 * direction, 0.012), end: Offset.zero).animate(curved),
-            child: ScaleTransition(scale: Tween<double>(begin: 0.985, end: 1).animate(curved), child: child),
-          ),
+          child: SlideTransition(position: Tween<Offset>(begin: Offset(0.025 * direction, 0.006), end: Offset.zero).animate(curved), child: child),
         );
       },
       child: KeyedSubtree(key: ValueKey(selectedTab), child: child),
@@ -306,30 +291,17 @@ class _AnimatedTabStage extends StatelessWidget {
 
 class _LiveRoomMiniBubbleLayer extends StatefulWidget {
   const _LiveRoomMiniBubbleLayer();
-
   @override
   State<_LiveRoomMiniBubbleLayer> createState() => _LiveRoomMiniBubbleLayerState();
 }
 
 class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
   final LiveRoomMinimizedOverlayService _service = LiveRoomMinimizedOverlayService.instance;
-
   @override
-  void initState() {
-    super.initState();
-    _service.addListener(_onServiceChanged);
-  }
-
+  void initState() { super.initState(); _service.addListener(_onServiceChanged); }
   @override
-  void dispose() {
-    _service.removeListener(_onServiceChanged);
-    super.dispose();
-  }
-
-  void _onServiceChanged() {
-    if (mounted) setState(() {});
-  }
-
+  void dispose() { _service.removeListener(_onServiceChanged); super.dispose(); }
+  void _onServiceChanged() { if (mounted) setState(() {}); }
   @override
   Widget build(BuildContext context) {
     if (!_service.isShowing) return const SizedBox.shrink();
@@ -337,24 +309,18 @@ class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
     final bottomSafeArea = MediaQuery.paddingOf(context).bottom;
     final maxX = size.width - 78;
     final maxY = size.height - bottomSafeArea - 88;
-    return LiveRoomMinimizedBubble(
-      offset: _service.offset,
-      onRestore: _service.restore,
-      onDrag: (details) {
-        final nextOffset = Offset((_service.offset.dx + details.delta.dx).clamp(8.0, maxX), (_service.offset.dy + details.delta.dy).clamp(40.0, maxY));
-        _service.updateOffset(nextOffset);
-      },
-    );
+    return LiveRoomMinimizedBubble(offset: _service.offset, onRestore: _service.restore, onDrag: (details) {
+      final nextOffset = Offset((_service.offset.dx + details.delta.dx).clamp(8.0, maxX), (_service.offset.dy + details.delta.dy).clamp(40.0, maxY));
+      _service.updateOffset(nextOffset);
+    });
   }
 }
 
 class _VibeBottomNav extends StatelessWidget {
   const _VibeBottomNav({required this.selectedTab, required this.showOwnerControls, required this.onTabSelected});
-
   final VmMainTab selectedTab;
   final bool showOwnerControls;
   final ValueChanged<VmMainTab> onTabSelected;
-
   static const Color deepPlum = Color(0xFF251538);
   static const Color softBorder = Color(0xFFECE2D8);
 
@@ -363,18 +329,15 @@ class _VibeBottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 3, 12, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.98), borderRadius: BorderRadius.circular(24), border: Border.all(color: softBorder), boxShadow: [BoxShadow(color: deepPlum.withValues(alpha: 0.10), blurRadius: 22, offset: const Offset(0, 9))]),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(icon: VMIcons.home, label: VmMainTab.home.label, active: selectedTab == VmMainTab.home, onTap: () => onTabSelected(VmMainTab.home)),
-            _NavItem(icon: VMIcons.vibes, label: VmMainTab.vibes.label, active: selectedTab == VmMainTab.vibes, onTap: () => onTabSelected(VmMainTab.vibes)),
-            _NavItem(icon: VMIcons.inbox, label: VmMainTab.inbox.label, active: selectedTab == VmMainTab.inbox, onTap: () => onTabSelected(VmMainTab.inbox)),
-            _NavItem(icon: showOwnerControls ? VMIcons.admin : VMIcons.profile, label: VmMainTab.me.label, active: selectedTab == VmMainTab.me, onTap: () => onTabSelected(VmMainTab.me)),
-          ],
-        ),
+        margin: const EdgeInsets.fromLTRB(12, 2, 12, 7),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.98), borderRadius: BorderRadius.circular(22), border: Border.all(color: softBorder), boxShadow: [BoxShadow(color: deepPlum.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 7))]),
+        child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+          _NavItem(icon: VMIcons.home, label: VmMainTab.home.label, active: selectedTab == VmMainTab.home, onTap: () => onTabSelected(VmMainTab.home)),
+          _NavItem(icon: VMIcons.vibes, label: VmMainTab.vibes.label, active: selectedTab == VmMainTab.vibes, onTap: () => onTabSelected(VmMainTab.vibes)),
+          _NavItem(icon: VMIcons.inbox, label: VmMainTab.inbox.label, active: selectedTab == VmMainTab.inbox, onTap: () => onTabSelected(VmMainTab.inbox)),
+          _NavItem(icon: showOwnerControls ? VMIcons.admin : VMIcons.profile, label: VmMainTab.me.label, active: selectedTab == VmMainTab.me, onTap: () => onTabSelected(VmMainTab.me)),
+        ]),
       ),
     );
   }
@@ -382,12 +345,10 @@ class _VibeBottomNav extends StatelessWidget {
 
 class _NavItem extends StatelessWidget {
   const _NavItem({required this.icon, required this.label, required this.active, required this.onTap});
-
   final IconData icon;
   final String label;
   final bool active;
   final VoidCallback onTap;
-
   static const Color deepPlum = Color(0xFF251538);
   static const Color muted = Color(0xFF8C8198);
   static const Color aqua = Color(0xFF12C7B7);
@@ -395,29 +356,21 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(15),
       onTap: onTap,
-      child: AnimatedScale(
-        scale: active ? 1.04 : 1.0,
+      child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutBack,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: active ? aqua.withValues(alpha: 0.12) : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: active ? [BoxShadow(color: aqua.withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 5))] : null,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.10) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          AnimatedScale(
+            scale: active ? 1.05 : 1.0,
+            duration: const Duration(milliseconds: 160),
+            child: Icon(icon, size: active ? 18 : 17, color: active ? deepPlum : muted),
           ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: Icon(icon, key: ValueKey(active), size: active ? 20 : 18, color: active ? deepPlum : muted),
-            ),
-            const SizedBox(height: 1),
-            Text(label, style: TextStyle(fontSize: 9, height: 1.0, fontWeight: active ? FontWeight.w900 : FontWeight.w600, color: active ? deepPlum : muted)),
-          ]),
-        ),
+          const SizedBox(height: 1),
+          Text(label, style: TextStyle(fontSize: 8.4, height: 0.98, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? deepPlum : muted)),
+        ]),
       ),
     );
   }
