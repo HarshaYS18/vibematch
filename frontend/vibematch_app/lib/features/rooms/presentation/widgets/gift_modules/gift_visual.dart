@@ -10,6 +10,7 @@ class GiftVisual extends StatelessWidget {
     this.size = 36,
     this.padding = 5,
     this.square = false,
+    this.plain = false,
   });
 
   final IconData icon;
@@ -19,6 +20,7 @@ class GiftVisual extends StatelessWidget {
   final double size;
   final double padding;
   final bool square;
+  final bool plain;
 
   @override
   Widget build(BuildContext context) {
@@ -34,10 +36,13 @@ class GiftVisual extends StatelessWidget {
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
             gaplessPlayback: true,
-            errorBuilder: (context, error, stackTrace) =>
-                _localOrIcon(cleanPath, visualSize),
+            errorBuilder: (context, error, stackTrace) => _localOrIcon(cleanPath, visualSize),
           )
         : _localOrIcon(cleanPath, visualSize);
+
+    if (plain) {
+      return SizedBox(width: size, height: size, child: Center(child: visual));
+    }
 
     return Container(
       width: size,
@@ -47,21 +52,10 @@ class GiftVisual extends StatelessWidget {
         shape: square ? BoxShape.rectangle : BoxShape.circle,
         borderRadius: square ? BorderRadius.circular(14) : null,
         gradient: LinearGradient(colors: colors),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.34),
-          width: 0.9,
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.34), width: 0.9),
         boxShadow: [
-          BoxShadow(
-            color: colors.first.withValues(alpha: 0.35),
-            blurRadius: size * 0.38,
-            offset: Offset(0, size * 0.12),
-          ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.16),
-            blurRadius: size * 0.22,
-            spreadRadius: 0.5,
-          ),
+          BoxShadow(color: colors.first.withValues(alpha: 0.35), blurRadius: size * 0.38, offset: Offset(0, size * 0.12)),
+          BoxShadow(color: Colors.white.withValues(alpha: 0.16), blurRadius: size * 0.22, spreadRadius: 0.5),
         ],
       ),
       child: ClipRRect(
