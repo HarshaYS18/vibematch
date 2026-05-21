@@ -21,6 +21,18 @@ class Settings(BaseSettings):
     # fallback paths for closed-beta testing.
     GIFT_CDN_BASE_URL: str = ""
 
+    # Production media storage.
+    # local = dev/testing only. s3 = Oracle Object Storage S3-compatible API,
+    # AWS S3, Cloudflare R2, MinIO, or any S3-compatible bucket.
+    MEDIA_STORAGE_DRIVER: str = "local"
+    MEDIA_CDN_BASE_URL: str = ""
+    MEDIA_S3_BUCKET: str = ""
+    MEDIA_S3_REGION: str = ""
+    MEDIA_S3_ENDPOINT_URL: str = ""
+    MEDIA_S3_ACCESS_KEY_ID: str = ""
+    MEDIA_S3_SECRET_ACCESS_KEY: str = ""
+    MEDIA_S3_PUBLIC_READ: bool = True
+
     # Google Sign-In OAuth client IDs. Comma-separated for web/android/ios clients.
     GOOGLE_AUTH_CLIENT_IDS: str = ""
     ENABLE_DEV_LOGIN: bool = False
