@@ -23,6 +23,7 @@ class VibeMatchApp extends StatelessWidget {
   static const Color _aqua = Color(0xFF12C7B7);
   static const Color _deepPlum = Color(0xFF251538);
   static const Color _surface = Color(0xFFFAF7F1);
+  static const Color _bodyText = Color(0xFF18131F);
 
   ThemeData _theme() {
     final base = ThemeData(
@@ -34,23 +35,23 @@ class VibeMatchApp extends StatelessWidget {
       scaffoldBackgroundColor: _surface,
     );
 
-    final compactText = base.textTheme.apply(fontSizeFactor: 0.88, bodyColor: const Color(0xFF18131F), displayColor: _deepPlum).copyWith(
-          displayLarge: const TextStyle(fontSize: 24, height: 1.05, fontWeight: FontWeight.w700, letterSpacing: -0.6),
-          displayMedium: const TextStyle(fontSize: 22, height: 1.05, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-          displaySmall: const TextStyle(fontSize: 20, height: 1.05, fontWeight: FontWeight.w700, letterSpacing: -0.35),
-          headlineLarge: const TextStyle(fontSize: 19, height: 1.08, fontWeight: FontWeight.w700, letterSpacing: -0.3),
-          headlineMedium: const TextStyle(fontSize: 18, height: 1.08, fontWeight: FontWeight.w700, letterSpacing: -0.25),
-          headlineSmall: const TextStyle(fontSize: 17, height: 1.08, fontWeight: FontWeight.w700, letterSpacing: -0.2),
-          titleLarge: const TextStyle(fontSize: 16, height: 1.08, fontWeight: FontWeight.w700, letterSpacing: -0.1),
-          titleMedium: const TextStyle(fontSize: 14, height: 1.10, fontWeight: FontWeight.w600),
-          titleSmall: const TextStyle(fontSize: 12, height: 1.10, fontWeight: FontWeight.w600),
-          bodyLarge: const TextStyle(fontSize: 13, height: 1.16, fontWeight: FontWeight.w400),
-          bodyMedium: const TextStyle(fontSize: 12, height: 1.15, fontWeight: FontWeight.w400),
-          bodySmall: const TextStyle(fontSize: 10.5, height: 1.12, fontWeight: FontWeight.w400),
-          labelLarge: const TextStyle(fontSize: 12, height: 1.05, fontWeight: FontWeight.w600),
-          labelMedium: const TextStyle(fontSize: 10.5, height: 1.05, fontWeight: FontWeight.w600),
-          labelSmall: const TextStyle(fontSize: 9, height: 1.0, fontWeight: FontWeight.w600),
-        );
+    const compactText = TextTheme(
+      displayLarge: TextStyle(color: _deepPlum, fontSize: 24, height: 1.05, fontWeight: FontWeight.w700, letterSpacing: -0.6),
+      displayMedium: TextStyle(color: _deepPlum, fontSize: 22, height: 1.05, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+      displaySmall: TextStyle(color: _deepPlum, fontSize: 20, height: 1.05, fontWeight: FontWeight.w700, letterSpacing: -0.35),
+      headlineLarge: TextStyle(color: _deepPlum, fontSize: 19, height: 1.08, fontWeight: FontWeight.w700, letterSpacing: -0.3),
+      headlineMedium: TextStyle(color: _deepPlum, fontSize: 18, height: 1.08, fontWeight: FontWeight.w700, letterSpacing: -0.25),
+      headlineSmall: TextStyle(color: _deepPlum, fontSize: 17, height: 1.08, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+      titleLarge: TextStyle(color: _deepPlum, fontSize: 16, height: 1.08, fontWeight: FontWeight.w700, letterSpacing: -0.1),
+      titleMedium: TextStyle(color: _bodyText, fontSize: 14, height: 1.10, fontWeight: FontWeight.w600),
+      titleSmall: TextStyle(color: _bodyText, fontSize: 12, height: 1.10, fontWeight: FontWeight.w600),
+      bodyLarge: TextStyle(color: _bodyText, fontSize: 13, height: 1.16, fontWeight: FontWeight.w400),
+      bodyMedium: TextStyle(color: _bodyText, fontSize: 12, height: 1.15, fontWeight: FontWeight.w400),
+      bodySmall: TextStyle(color: _bodyText, fontSize: 10.5, height: 1.12, fontWeight: FontWeight.w400),
+      labelLarge: TextStyle(color: _bodyText, fontSize: 12, height: 1.05, fontWeight: FontWeight.w600),
+      labelMedium: TextStyle(color: _bodyText, fontSize: 10.5, height: 1.05, fontWeight: FontWeight.w600),
+      labelSmall: TextStyle(color: _bodyText, fontSize: 9, height: 1.0, fontWeight: FontWeight.w600),
+    );
 
     return base.copyWith(
       textTheme: compactText,
