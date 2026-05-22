@@ -51,7 +51,6 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   String? _presenceError;
 
   int get _onlineCount => _snapshot?.onlineCount ?? widget.initialOnlineCount;
-
   bool get _restoringMinimizedRoom => widget.restoreState != null;
 
   @override
@@ -85,6 +84,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   }
 
   void _restorePresenceWithoutFreshJoin() {
+    _seedIdentityFromRestoreState();
     final cachedParticipants = LiveRoomPresenceRepository.currentParticipantsForRoom(widget.roomId);
     _snapshot = LiveRoomPresenceSnapshot(
       roomId: widget.roomId,
@@ -95,6 +95,74 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     _identitySeeded = true;
     _presenceError = null;
     _startHeartbeat();
+    _restoreSavedSeatIfNeeded();
+  }
+
+  void _seedIdentityFromRestoreState() {
+    final restoreState = widget.restoreState;
+    if (restoreState == null) return;
+    final restoredSelf = _restoredCurrentSeatUser(restoreState);
+    if (restoredSelf == null) return;
+    LiveRoomMediaSignalingService.instance.seedActiveRoomSeatUser(restoredSelf);
+  }
+
+  SeatUser? _restoredCurrentSeatUser(LiveRoomRestoreState restoreState) {
+    final currentPublicId = widget.currentUser?.publicUserId.toString();
+    for (final seat in restoreState.seatState.seats) {
+      final user = seat.user;
+      if (user == null) continue;
+      if (user.isCurrentUser) return user;
+      if (currentPublicId != null && _sameRoomUserId(user.id, 'user_$currentPublicId')) return user.copyWith(isCurrentUser: true);
+    }
+    return null;
+  }
+
+  int? _restoredCurrentSeatIndex() {
+    final restoreState = widget.restoreState;
+    if (restoreState == null) return null;
+    final currentPublicId = widget.currentUser?.publicUserId.toString();
+    for (final seat in restoreState.seatState.seats) {
+      final user = seat.user;
+      if (user == null) continue;
+      if (user.isCurrentUser) return seat.index;
+      if (currentPublicId != null && _sameRoomUserId(user.id, 'user_$currentPublicId')) return seat.index;
+    }
+    return null;
+  }
+
+  void _restoreSavedSeatIfNeeded() {
+    final seatIndex = _restoredCurrentSeatIndex();
+    if (seatIndex == null || seatIndex < 0) return;
+    _autoSeatAttempted = true;
+    final media = LiveRoomMediaSignalingService.instance;
+    for (final delay in const <Duration>[
+      Duration(milliseconds: 120),
+      Duration(milliseconds: 650),
+      Duration(milliseconds: 1500),
+    ]) {
+      unawaited(Future<void>.delayed(delay, () {
+        if (!mounted) return;
+        media.takeSeat(seatIndex);
+      }));
+    }
+  }
+
+  bool _sameRoomUserId(String a, String b) {
+    final left = _identityAliases(a);
+    final right = _identityAliases(b);
+    if (left.isEmpty || right.isEmpty) return false;
+    return left.intersection(right).isNotEmpty;
+  }
+
+  Set<String> _identityAliases(String rawId) {
+    final value = rawId.trim();
+    if (value.isEmpty) return <String>{};
+    final aliases = <String>{value, value.toLowerCase()};
+    final userPrefix = RegExp(r'^user_(\d+)$').firstMatch(value);
+    if (userPrefix != null) aliases.add(userPrefix.group(1)!);
+    final direct = int.tryParse(value);
+    if (direct != null) aliases.add('user_$direct');
+    return aliases;
   }
 
   Future<void> _joinPresence() async {
@@ -254,9 +322,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     return Stack(
       children: [
         LiveRoomPage(
-          key: ValueKey(
-            'live-room-${widget.roomId}-${LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id ?? 'user'}',
-          ),
+          key: ValueKey('live-room-${widget.roomId}-${LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id ?? 'user'}'),
           roomName: widget.roomName,
           roomId: widget.roomId,
           language: widget.language,
