@@ -32,6 +32,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
     required this.onClearChatTap,
     required this.onCricketModeTap,
     required this.canCloseRoom,
+    this.cricketModeActive = false,
   });
 
   final String roomId;
@@ -58,6 +59,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   final VoidCallback onClearChatTap;
   final VoidCallback onCricketModeTap;
   final bool canCloseRoom;
+  final bool cricketModeActive;
 
   void _openBlockedList(BuildContext context) {
     showModalBottomSheet<void>(
@@ -115,6 +117,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onClearChatTap: onClearChatTap,
       onCloseRoom: onCloseRoom,
       canCloseRoom: canCloseRoom,
+      showSeatLayoutOption: !cricketModeActive,
     );
   }
 }
