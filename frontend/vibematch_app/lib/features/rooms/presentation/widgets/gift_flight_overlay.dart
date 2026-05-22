@@ -14,7 +14,7 @@ class GiftFlightEvent {
     required this.combo,
     this.multiplier,
     this.rewardCoinAmount,
-    this.startAlignment = const Alignment(-0.78, 0.56),
+    this.startAlignment = Alignment.center,
     this.endAlignment = const Alignment(0.68, -0.16),
   });
 
@@ -69,12 +69,12 @@ class _GiftFlightActorState extends State<_GiftFlightActor> with SingleTickerPro
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1380));
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1180));
     _curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
     _controller
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) {
-          Future<void>.delayed(const Duration(milliseconds: 220), () {
+          Future<void>.delayed(const Duration(milliseconds: 180), () {
             if (mounted) widget.onCompleted();
           });
         }
@@ -107,44 +107,44 @@ class _GiftFlightActorState extends State<_GiftFlightActor> with SingleTickerPro
         final size = Size(constraints.maxWidth, constraints.maxHeight);
         final start = _alignmentToOffset(size, widget.event.startAlignment);
         final end = _alignmentToOffset(size, widget.event.endAlignment);
-        final control = Offset((start.dx + end.dx) / 2, math.min(start.dy, end.dy) - size.height * 0.24);
+        final control = Offset(
+          (start.dx + end.dx) / 2,
+          math.min(start.dy, end.dy) - size.height * 0.18,
+        );
 
         return AnimatedBuilder(
           animation: _curve,
           builder: (context, child) {
             final t = _curve.value;
             final position = _bezier(start, control, end, t);
-            final scale = t < 0.72 ? 0.62 + (t * 0.58) : 1.2 - ((t - 0.72) * 0.42);
-            final opacity = t < 0.88 ? 1.0 : (1 - ((t - 0.88) / 0.12)).clamp(0.0, 1.0);
-            final rotation = math.sin(t * math.pi * 2) * 0.14;
+            final scale = t < 0.72 ? 0.48 + (t * 0.54) : 1.02 - ((t - 0.72) * 0.22);
+            final opacity = t < 0.90 ? 1.0 : (1 - ((t - 0.90) / 0.10)).clamp(0.0, 1.0);
+            final rotation = math.sin(t * math.pi * 2) * 0.10;
             final pop = t > 0.72 ? ((t - 0.72) / 0.28).clamp(0.0, 1.0) : 0.0;
 
             return Stack(
               children: [
                 Positioned(
-                  left: position.dx - 46,
-                  top: position.dy - 46,
+                  left: position.dx - 34,
+                  top: position.dy - 34,
                   child: Opacity(
                     opacity: opacity,
                     child: Transform.rotate(
                       angle: rotation,
-                      child: Transform.scale(
-                        scale: scale,
-                        child: _FlyingGiftVisual(event: widget.event),
-                      ),
+                      child: Transform.scale(scale: scale, child: _FlyingGiftVisual(event: widget.event)),
                     ),
                   ),
                 ),
                 if (pop > 0)
                   Positioned(
-                    left: end.dx - 74,
-                    top: end.dy - 74,
+                    left: end.dx - 58,
+                    top: end.dy - 58,
                     child: Opacity(opacity: (1 - pop).clamp(0.0, 1.0), child: _GiftLandingBurst(event: widget.event, progress: pop)),
                   ),
                 if (widget.event.multiplier != null && t > 0.62)
                   Positioned(
                     left: end.dx - 52,
-                    top: end.dy - 112,
+                    top: end.dy - 108,
                     child: Opacity(
                       opacity: ((t - 0.62) / 0.18).clamp(0.0, 1.0),
                       child: Transform.scale(
@@ -171,16 +171,23 @@ class _FlyingGiftVisual extends StatelessWidget {
   Widget build(BuildContext context) {
     final glow = GiftWinStyle.fromMultiplier(event.multiplier).colors;
     return Container(
-      width: 92,
-      height: 92,
+      width: 68,
+      height: 68,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(color: glow.first.withValues(alpha: 0.48), blurRadius: 34, spreadRadius: 4),
-          BoxShadow(color: glow.last.withValues(alpha: 0.34), blurRadius: 48, spreadRadius: 2),
+          BoxShadow(color: glow.first.withValues(alpha: 0.42), blurRadius: 26, spreadRadius: 2),
+          BoxShadow(color: glow.last.withValues(alpha: 0.25), blurRadius: 34, spreadRadius: 1),
         ],
       ),
-      child: GiftVisual(icon: event.gift.icon, colors: event.gift.colors, assetPath: event.gift.assetPath, size: 92, padding: 0),
+      child: GiftVisual(
+        icon: event.gift.icon,
+        colors: event.gift.colors,
+        assetPath: event.gift.assetPath,
+        assetUrl: event.gift.assetUrl,
+        size: 68,
+        padding: 0,
+      ),
     );
   }
 }
@@ -195,24 +202,24 @@ class _GiftLandingBurst extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = GiftWinStyle.fromMultiplier(event.multiplier).colors;
     return SizedBox(
-      width: 148,
-      height: 148,
+      width: 116,
+      height: 116,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Container(
-            width: 36 + progress * 104,
-            height: 36 + progress * 104,
+            width: 28 + progress * 80,
+            height: 28 + progress * 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: colors.first.withValues(alpha: 0.74), width: 2.4),
-              boxShadow: [BoxShadow(color: colors.first.withValues(alpha: 0.34), blurRadius: 28, spreadRadius: 10)],
+              border: Border.all(color: colors.first.withValues(alpha: 0.70), width: 2.0),
+              boxShadow: [BoxShadow(color: colors.first.withValues(alpha: 0.28), blurRadius: 22, spreadRadius: 6)],
             ),
           ),
-          for (var i = 0; i < 10; i++)
+          for (var i = 0; i < 8; i++)
             Transform.translate(
-              offset: Offset(math.cos(i * math.pi / 5) * progress * 58, math.sin(i * math.pi / 5) * progress * 58),
-              child: Icon(Icons.auto_awesome_rounded, color: i.isEven ? colors.first : colors.last, size: 10 + (i % 3) * 3),
+              offset: Offset(math.cos(i * math.pi / 4) * progress * 42, math.sin(i * math.pi / 4) * progress * 42),
+              child: Icon(Icons.auto_awesome_rounded, color: i.isEven ? colors.first : colors.last, size: 9 + (i % 3) * 3),
             ),
         ],
       ),
@@ -228,18 +235,10 @@ class GiftWinStyle {
 
   static GiftWinStyle fromMultiplier(int? multiplier) {
     final value = multiplier ?? 0;
-    if (value >= 1000) {
-      return const GiftWinStyle(label: 'LEGEND', colors: [Color(0xFF8B5CF6), Color(0xFF22D3EE)]);
-    }
-    if (value >= 500) {
-      return const GiftWinStyle(label: 'MEGA', colors: [Color(0xFFFF2D95), Color(0xFF00E5FF)]);
-    }
-    if (value >= 100) {
-      return const GiftWinStyle(label: 'SUPER', colors: [Color(0xFFFFD166), Color(0xFFFF8A00)]);
-    }
-    if (value > 1) {
-      return const GiftWinStyle(label: 'WIN', colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)]);
-    }
+    if (value >= 1000) return const GiftWinStyle(label: 'LEGEND', colors: [Color(0xFF8B5CF6), Color(0xFF22D3EE)]);
+    if (value >= 500) return const GiftWinStyle(label: 'MEGA', colors: [Color(0xFFFF2D95), Color(0xFF00E5FF)]);
+    if (value >= 100) return const GiftWinStyle(label: 'SUPER', colors: [Color(0xFFFFD166), Color(0xFFFF8A00)]);
+    if (value > 1) return const GiftWinStyle(label: 'WIN', colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)]);
     return const GiftWinStyle(label: 'GIFT', colors: [Color(0xFFFFD166), Color(0xFFE84C72)]);
   }
 }
