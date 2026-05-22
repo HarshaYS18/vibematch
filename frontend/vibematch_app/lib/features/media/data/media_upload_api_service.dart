@@ -24,6 +24,19 @@ class MediaUploadApiService {
     return _upload(endpoint: '/media/vibes', file: file);
   }
 
+  Future<MediaUploadResult> uploadStoryMediaXFile(XFile file) async {
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) throw Exception('Selected story media is empty.');
+    return _uploadBytes(
+      endpoint: '/media/story',
+      bytes: bytes,
+      filename: _safeFilename(
+        file.name,
+        fallbackExtension: _extensionForMime(file.mimeType),
+      ),
+    );
+  }
+
   Future<MediaUploadResult> uploadChatImage(File file) {
     return _upload(endpoint: '/media/chat-image', file: file);
   }
@@ -42,7 +55,10 @@ class MediaUploadApiService {
     return _uploadBytes(
       endpoint: '/media/vibes',
       bytes: bytes,
-      filename: _safeFilename(file.name),
+      filename: _safeFilename(
+        file.name,
+        fallbackExtension: _extensionForMime(file.mimeType),
+      ),
     );
   }
 
@@ -52,11 +68,17 @@ class MediaUploadApiService {
     return _uploadBytes(
       endpoint: '/media/chat-image',
       bytes: bytes,
-      filename: _safeFilename(file.name),
+      filename: _safeFilename(
+        file.name,
+        fallbackExtension: _extensionForMime(file.mimeType),
+      ),
     );
   }
 
-  Future<MediaUploadResult> uploadChatDocumentBytes({required List<int> bytes, required String filename}) async {
+  Future<MediaUploadResult> uploadChatDocumentBytes({
+    required List<int> bytes,
+    required String filename,
+  }) async {
     if (bytes.isEmpty) throw Exception('Selected document is empty.');
     return _uploadBytes(
       endpoint: '/media/chat-document',
@@ -65,7 +87,10 @@ class MediaUploadApiService {
     );
   }
 
-  Future<MediaUploadResult> uploadChatVoiceBytes({required List<int> bytes, required String filename}) async {
+  Future<MediaUploadResult> uploadChatVoiceBytes({
+    required List<int> bytes,
+    required String filename,
+  }) async {
     if (bytes.isEmpty) throw Exception('Selected voice file is empty.');
     return _uploadBytes(
       endpoint: '/media/chat-voice',
@@ -74,53 +99,101 @@ class MediaUploadApiService {
     );
   }
 
-  Future<MediaUploadResult> _upload({required String endpoint, required File file}) async {
+  Future<MediaUploadResult> _upload({
+    required String endpoint,
+    required File file,
+  }) async {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
       throw Exception('Please login again before uploading media.');
     }
 
-    final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpoint)))
-      ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+    final request =
+        http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpoint)))
+          ..headers['Authorization'] = 'Bearer $token'
+          ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Media upload failed (${response.statusCode}): ${response.body}');
+      throw Exception(
+        'Media upload failed (${response.statusCode}): ${response.body}',
+      );
     }
 
-    return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return MediaUploadResult.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
-  Future<MediaUploadResult> _uploadBytes({required String endpoint, required List<int> bytes, required String filename}) async {
+  Future<MediaUploadResult> _uploadBytes({
+    required String endpoint,
+    required List<int> bytes,
+    required String filename,
+  }) async {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
       throw Exception('Please login again before uploading media.');
     }
 
-    final request = http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpoint)))
-      ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final request =
+        http.MultipartRequest('POST', Uri.parse(VmApiConfig.endpoint(endpoint)))
+          ..headers['Authorization'] = 'Bearer $token'
+          ..files.add(
+            http.MultipartFile.fromBytes('file', bytes, filename: filename),
+          );
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Media upload failed (${response.statusCode}): ${response.body}');
+      throw Exception(
+        'Media upload failed (${response.statusCode}): ${response.body}',
+      );
     }
 
-    return MediaUploadResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return MediaUploadResult.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
-  String _safeFilename(String raw) {
+  String _safeFilename(String raw, {String fallbackExtension = '.jpg'}) {
     final cleaned = raw.trim().replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-    if (cleaned.isEmpty) return 'funkey_vibe_media.jpg';
-    return cleaned.contains('.') ? cleaned : '$cleaned.jpg';
+    final extension = fallbackExtension.trim().isEmpty
+        ? '.jpg'
+        : fallbackExtension.trim();
+    if (cleaned.isEmpty) return 'funkey_media$extension';
+    return cleaned.contains('.') ? cleaned : '$cleaned$extension';
+  }
+
+  String _extensionForMime(String? mimeType) {
+    switch ((mimeType ?? '').toLowerCase().trim()) {
+      case 'image/jpeg':
+        return '.jpg';
+      case 'image/png':
+        return '.png';
+      case 'image/webp':
+        return '.webp';
+      case 'image/gif':
+        return '.gif';
+      case 'video/mp4':
+        return '.mp4';
+      case 'video/webm':
+        return '.webm';
+      case 'video/quicktime':
+        return '.mov';
+      default:
+        return '.jpg';
+    }
   }
 }
 
 class MediaUploadResult {
-  const MediaUploadResult({required this.url, required this.mediaType, required this.contentType, required this.sizeBytes});
+  const MediaUploadResult({
+    required this.url,
+    required this.mediaType,
+    required this.contentType,
+    required this.sizeBytes,
+  });
 
   final String url;
   final String mediaType;

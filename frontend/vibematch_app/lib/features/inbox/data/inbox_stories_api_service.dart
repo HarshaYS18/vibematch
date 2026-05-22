@@ -42,7 +42,7 @@ class InboxStoryItem {
       ownerUserId: (json['owner_user_id'] as num?)?.toInt() ?? 0,
       ownerName: json['owner_name']?.toString() ?? 'Story',
       ownerAvatarUrl: _nullable(json['owner_avatar_url']),
-      mediaUrl: json['media_url']?.toString() ?? '',
+      mediaUrl: VmApiConfig.mediaUrl(json['media_url']?.toString() ?? ''),
       mediaType: json['media_type']?.toString() ?? 'image',
       caption: _nullable(json['caption']),
       visibility: json['visibility']?.toString() ?? 'friends',
@@ -68,27 +68,46 @@ class InboxStoryItem {
 }
 
 class InboxStoriesApiService {
-  const InboxStoriesApiService({AuthApiService authApiService = const AuthApiService()}) : _authApiService = authApiService;
+  const InboxStoriesApiService({
+    AuthApiService authApiService = const AuthApiService(),
+  }) : _authApiService = authApiService;
 
   final AuthApiService _authApiService;
 
   Future<Map<String, String>> _headers() async {
     final token = _authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
-      throw Exception('No auth token available for Inbox stories. Login first.');
+      throw Exception(
+        'No auth token available for Inbox stories. Login first.',
+      );
     }
-    return <String, String>{'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
+    return <String, String>{
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
   }
 
   Future<List<InboxStoryItem>> loadStories() async {
-    final response = await http.get(Uri.parse(VmApiConfig.endpoint('/inbox/stories')), headers: await _headers());
+    final response = await http.get(
+      Uri.parse(VmApiConfig.endpoint('/inbox/stories')),
+      headers: await _headers(),
+    );
     _throwIfFailed(response, 'load stories');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final items = decoded['stories'] as List<dynamic>? ?? const [];
-    return items.whereType<Map<String, dynamic>>().map(InboxStoryItem.fromJson).where((item) => item.id.isNotEmpty && item.mediaUrl.isNotEmpty).toList();
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(InboxStoryItem.fromJson)
+        .where((item) => item.id.isNotEmpty && item.mediaUrl.isNotEmpty)
+        .toList();
   }
 
-  Future<InboxStoryItem> createStory({required String mediaUrl, required String mediaType, String? caption, String visibility = 'friends'}) async {
+  Future<InboxStoryItem> createStory({
+    required String mediaUrl,
+    required String mediaType,
+    String? caption,
+    String visibility = 'friends',
+  }) async {
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/inbox/stories')),
       headers: await _headers(),
@@ -100,22 +119,34 @@ class InboxStoriesApiService {
       }),
     );
     _throwIfFailed(response, 'create story');
-    return InboxStoryItem.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return InboxStoryItem.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<InboxStoryItem> markViewed(String storyId) async {
-    final response = await http.post(Uri.parse(VmApiConfig.endpoint('/inbox/stories/$storyId/view')), headers: await _headers());
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/stories/$storyId/view')),
+      headers: await _headers(),
+    );
     _throwIfFailed(response, 'mark story viewed');
-    return InboxStoryItem.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return InboxStoryItem.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<void> deleteStory(String storyId) async {
-    final response = await http.delete(Uri.parse(VmApiConfig.endpoint('/inbox/stories/$storyId')), headers: await _headers());
+    final response = await http.delete(
+      Uri.parse(VmApiConfig.endpoint('/inbox/stories/$storyId')),
+      headers: await _headers(),
+    );
     _throwIfFailed(response, 'delete story');
   }
 
   void _throwIfFailed(http.Response response, String action) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
-    throw Exception('Inbox stories failed to $action (${response.statusCode}): ${response.body}');
+    throw Exception(
+      'Inbox stories failed to $action (${response.statusCode}): ${response.body}',
+    );
   }
 }

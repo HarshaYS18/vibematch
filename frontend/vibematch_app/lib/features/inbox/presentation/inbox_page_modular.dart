@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../media/data/media_upload_api_service.dart';
 import '../controllers/inbox_controller.dart';
 import '../data/inbox_ai_api_service.dart';
 import '../data/inbox_stories_api_service.dart';
@@ -42,6 +46,7 @@ class _InboxPageState extends State<InboxPage> {
   late final InboxController _controller;
   late final bool _ownsController;
   final InboxAiApiService _inboxAiApi = const InboxAiApiService();
+  final MediaUploadApiService _mediaUploadApi = const MediaUploadApiService();
   final InboxStoriesApiService _storiesApi = const InboxStoriesApiService();
   Widget? _panelOverlay;
   Future<List<InboxStoryItem>>? _storiesFuture;
@@ -78,8 +83,11 @@ class _InboxPageState extends State<InboxPage> {
   void _handleRequestedConversationOpen() {
     final conversationId = widget.openConversationId;
     if (conversationId == null || conversationId.isEmpty) return;
-    if (widget.openConversationRequestNonce == _lastHandledOpenConversationRequestNonce) return;
-    _lastHandledOpenConversationRequestNonce = widget.openConversationRequestNonce;
+    if (widget.openConversationRequestNonce ==
+        _lastHandledOpenConversationRequestNonce)
+      return;
+    _lastHandledOpenConversationRequestNonce =
+        widget.openConversationRequestNonce;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final conversation = _controller.conversationById(conversationId);
@@ -99,7 +107,10 @@ class _InboxPageState extends State<InboxPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: const Color(0xFF251538),
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
       );
   }
@@ -108,7 +119,9 @@ class _InboxPageState extends State<InboxPage> {
     setState(() => _storiesFuture = _storiesApi.loadStories());
   }
 
-  List<InboxConversation> get _strangerRequests => _controller.conversations.where((item) => item.isStranger && !item.isArchived).toList();
+  List<InboxConversation> get _strangerRequests => _controller.conversations
+      .where((item) => item.isStranger && !item.isArchived)
+      .toList();
 
   InboxConversation? get _strangerHub {
     final requests = _strangerRequests;
@@ -117,7 +130,8 @@ class _InboxPageState extends State<InboxPage> {
     return InboxConversation(
       id: '__stranger_hub__',
       title: 'Stranger Messages',
-      subtitle: '${requests.length} request${requests.length == 1 ? '' : 's'} waiting',
+      subtitle:
+          '${requests.length} request${requests.length == 1 ? '' : 's'} waiting',
       time: requests.first.time,
       avatarText: 'SM',
       type: InboxConversationType.stranger,
@@ -132,10 +146,14 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   List<InboxConversation> get _premiumVisibleConversations {
-    final base = _controller.visibleConversations.where((item) => !item.isStranger).toList();
+    final base = _controller.visibleConversations
+        .where((item) => !item.isStranger)
+        .toList();
     if (_controller.selectedFilter == 'Strangers') {
       final hub = _strangerHub;
-      return hub == null ? const <InboxConversation>[] : <InboxConversation>[hub];
+      return hub == null
+          ? const <InboxConversation>[]
+          : <InboxConversation>[hub];
     }
     if (_controller.selectedFilter == 'All') {
       final hub = _strangerHub;
@@ -177,7 +195,11 @@ class _InboxPageState extends State<InboxPage> {
       isScrollControlled: true,
       builder: (_) => InboxLockSetupSheet(
         onStartOtp: _controller.startLockSetup,
-        onVerifySetup: (mobile, otp, lock) => _controller.verifyLockSetup(mobileNumber: mobile, otp: otp, lockCode: lock),
+        onVerifySetup: (mobile, otp, lock) => _controller.verifyLockSetup(
+          mobileNumber: mobile,
+          otp: otp,
+          lockCode: lock,
+        ),
       ),
     );
   }
@@ -190,13 +212,22 @@ class _InboxPageState extends State<InboxPage> {
       builder: (_) => InboxLockRecoverySheet(
         registeredMobile: _controller.lockStatus.mobileNumber,
         onStartRecovery: _controller.startLockRecovery,
-        onVerifyRecovery: (mobile, otp, newLock) => _controller.verifyLockRecovery(mobileNumber: mobile, otp: otp, newLockCode: newLock),
+        onVerifyRecovery: (mobile, otp, newLock) =>
+            _controller.verifyLockRecovery(
+              mobileNumber: mobile,
+              otp: otp,
+              newLockCode: newLock,
+            ),
         onRequestCs: _controller.requestCsLockRecovery,
       ),
     );
   }
 
-  Future<void> _showPasscodeGate({required String title, required String subtitle, required VoidCallback onUnlocked}) async {
+  Future<void> _showPasscodeGate({
+    required String title,
+    required String subtitle,
+    required VoidCallback onUnlocked,
+  }) async {
     if (!_controller.lockStatus.isEnabled) {
       _toast('Set up Inbox lock first.');
       _openLockSetupSheet();
@@ -244,7 +275,8 @@ class _InboxPageState extends State<InboxPage> {
     if (conversation.isLockedByBackend && !_controller.lockedVaultUnlocked) {
       _showPasscodeGate(
         title: 'Unlock chat',
-        subtitle: 'This chat is locked for your account. Enter your Inbox lock to open it.',
+        subtitle:
+            'This chat is locked for your account. Enter your Inbox lock to open it.',
         onUnlocked: () => _openChat(conversation),
       );
       return;
@@ -262,7 +294,10 @@ class _InboxPageState extends State<InboxPage> {
       onBackTap: _closePanelOverlay,
     );
     if (!widget.openPagesInOverlay) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) => _clearActiveConversationForShell());
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => page),
+      ).then((_) => _clearActiveConversationForShell());
       return;
     }
     _openInboxSubPage(page);
@@ -284,14 +319,16 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   Future<void> _openThemePicker(InboxConversation conversation) async {
-    final latest = _controller.conversationById(conversation.id) ?? conversation;
+    final latest =
+        _controller.conversationById(conversation.id) ?? conversation;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxChatThemePickerSheet(
         currentThemeKey: latest.chatTheme ?? _controller.defaultChatTheme,
-        currentWallpaperKey: latest.wallpaperKey ?? _controller.defaultWallpaperKey,
+        currentWallpaperKey:
+            latest.wallpaperKey ?? _controller.defaultWallpaperKey,
         onSelected: (choice) async {
           Navigator.pop(context);
           await _controller.updateConversationTheme(
@@ -313,7 +350,13 @@ class _InboxPageState extends State<InboxPage> {
     widget.onActiveConversationChanged?.call(null);
   }
 
-  void _openSearch() => _openInboxSubPage(InboxSearchPage(controller: _controller, onOpenConversation: _openConversation, onBackTap: _closePanelOverlay));
+  void _openSearch() => _openInboxSubPage(
+    InboxSearchPage(
+      controller: _controller,
+      onOpenConversation: _openConversation,
+      onBackTap: _closePanelOverlay,
+    ),
+  );
 
   Future<void> _openInboxAiHelper() async {
     await showModalBottomSheet<void>(
@@ -350,17 +393,33 @@ class _InboxPageState extends State<InboxPage> {
         strangersCanMessage: _controller.strangersCanMessage,
         strangersCanMentionInVibes: _controller.strangersCanMentionInVibes,
         onStartLockSetup: _controller.startLockSetup,
-        onVerifyLockSetup: (mobile, otp, lock) => _controller.verifyLockSetup(mobileNumber: mobile, otp: otp, lockCode: lock),
-        onChangeLock: (currentLock, newLock) => _controller.changeLock(currentLockCode: currentLock, newLockCode: newLock),
+        onVerifyLockSetup: (mobile, otp, lock) => _controller.verifyLockSetup(
+          mobileNumber: mobile,
+          otp: otp,
+          lockCode: lock,
+        ),
+        onChangeLock: (currentLock, newLock) => _controller.changeLock(
+          currentLockCode: currentLock,
+          newLockCode: newLock,
+        ),
         onStartLockRecovery: _controller.startLockRecovery,
-        onVerifyLockRecovery: (mobile, otp, newLock) => _controller.verifyLockRecovery(mobileNumber: mobile, otp: otp, newLockCode: newLock),
+        onVerifyLockRecovery: (mobile, otp, newLock) =>
+            _controller.verifyLockRecovery(
+              mobileNumber: mobile,
+              otp: otp,
+              newLockCode: newLock,
+            ),
         onRequestCsLockRecovery: _controller.requestCsLockRecovery,
         onStartGoogleDriveSetup: _controller.startGoogleDriveAuthorization,
-        onConnectGoogleDrive: (email, code) => _controller.connectGoogleDrive(googleDriveEmail: email, setupCode: code),
+        onConnectGoogleDrive: (email, code) => _controller.connectGoogleDrive(
+          googleDriveEmail: email,
+          setupCode: code,
+        ),
         onBackupEnabledChanged: _controller.setBackupEnabled,
         onFrequencyChanged: _controller.setBackupFrequency,
         onStrangersCanMessageChanged: _controller.setStrangersCanMessage,
-        onStrangersCanMentionInVibesChanged: _controller.setStrangersCanMentionInVibes,
+        onStrangersCanMentionInVibesChanged:
+            _controller.setStrangersCanMentionInVibes,
         onBackupNow: _controller.runBackupNow,
         onRestoreTap: _controller.restoreLatestBackup,
         onBackTap: _closePanelOverlay,
@@ -378,7 +437,11 @@ class _InboxPageState extends State<InboxPage> {
       _openLockedVaultPage();
       return;
     }
-    _showPasscodeGate(title: 'Locked chats', subtitle: 'Enter your Inbox lock before viewing locked conversations.', onUnlocked: _openLockedVaultPage);
+    _showPasscodeGate(
+      title: 'Locked chats',
+      subtitle: 'Enter your Inbox lock before viewing locked conversations.',
+      onUnlocked: _openLockedVaultPage,
+    );
   }
 
   Future<void> _handleInboxPullDown() async {
@@ -388,15 +451,31 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _openLockedVaultPage() {
-    _openInboxSubPage(LockedChatsPage(conversations: _controller.lockedConversations, onOpenConversation: _openConversation, onShowOptions: _showChatOptions, onBackTap: _closePanelOverlay));
+    _openInboxSubPage(
+      LockedChatsPage(
+        conversations: _controller.lockedConversations,
+        onOpenConversation: _openConversation,
+        onShowOptions: _showChatOptions,
+        onBackTap: _closePanelOverlay,
+      ),
+    );
   }
 
   void _openStrangerRequests() {
-    _openInboxSubPage(StrangerRequestsPage(requests: _strangerRequests, onOpenConversation: _openConversation, onShowOptions: _showChatOptions, onBackTap: _closePanelOverlay));
+    _openInboxSubPage(
+      StrangerRequestsPage(
+        requests: _strangerRequests,
+        onOpenConversation: _openConversation,
+        onShowOptions: _showChatOptions,
+        onBackTap: _closePanelOverlay,
+      ),
+    );
   }
 
   void _openCsReportTasks() {
-    _openInboxSubPage(CsReportTasksPage(controller: _controller, onBackTap: _closePanelOverlay));
+    _openInboxSubPage(
+      CsReportTasksPage(controller: _controller, onBackTap: _closePanelOverlay),
+    );
   }
 
   void _closeChatOptions() {
@@ -419,7 +498,10 @@ class _InboxPageState extends State<InboxPage> {
           conversation: conversation,
           onSubmit: (reason) {
             Navigator.pop(context);
-            _controller.submitConversationReport(conversation: conversation, reason: reason);
+            _controller.submitConversationReport(
+              conversation: conversation,
+              reason: reason,
+            );
             _toast('Report sent to CS task list with conversation snapshot.');
           },
         ),
@@ -436,7 +518,8 @@ class _InboxPageState extends State<InboxPage> {
       conversation: conversation,
       onInfo: () => _openChatInfo(conversation),
       onToggleLock: () {
-        if (!_controller.lockStatus.isEnabled && !conversation.isLockedByBackend) {
+        if (!_controller.lockStatus.isEnabled &&
+            !conversation.isLockedByBackend) {
           _closeChatOptions();
           _toast('Set up Inbox lock before locking chats.');
           _openLockSetupSheet();
@@ -444,12 +527,16 @@ class _InboxPageState extends State<InboxPage> {
         }
         _controller.toggleBackendLock(conversation);
         _closeChatOptions();
-        _toast(conversation.isLockedByBackend ? 'Chat unlocked.' : 'Chat locked.');
+        _toast(
+          conversation.isLockedByBackend ? 'Chat unlocked.' : 'Chat locked.',
+        );
       },
       onToggleBlock: () {
         _controller.toggleBlock(conversation);
         _closeChatOptions();
-        _toast(conversation.isBlocked ? 'Profile unblocked.' : 'Profile blocked.');
+        _toast(
+          conversation.isBlocked ? 'Profile unblocked.' : 'Profile blocked.',
+        );
       },
       onToggleMute: () {
         _controller.toggleMute(conversation);
@@ -464,10 +551,22 @@ class _InboxPageState extends State<InboxPage> {
       onReport: () => _openReportSheet(conversation),
     );
     if (widget.openPagesInOverlay) {
-      setState(() => _panelOverlay = Align(alignment: Alignment.bottomCenter, child: sheet));
+      setState(
+        () => _panelOverlay = Align(
+          alignment: Alignment.bottomCenter,
+          child: sheet,
+        ),
+      );
       return;
     }
-    showModalBottomSheet<void>(context: context, isDismissible: true, enableDrag: true, backgroundColor: Colors.transparent, isScrollControlled: true, builder: (_) => sheet);
+    showModalBottomSheet<void>(
+      context: context,
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => sheet,
+    );
   }
 
   Future<void> _createStory() async {
@@ -475,11 +574,17 @@ class _InboxPageState extends State<InboxPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => const _CreateStorySheet(),
+      builder: (_) =>
+          _CreateStorySheet(onUpload: _mediaUploadApi.uploadStoryMediaXFile),
     );
     if (result == null) return;
     try {
-      await _storiesApi.createStory(mediaUrl: result.mediaUrl, mediaType: result.mediaType, caption: result.caption, visibility: result.visibility);
+      await _storiesApi.createStory(
+        mediaUrl: result.mediaUrl,
+        mediaType: result.mediaType,
+        caption: result.caption,
+        visibility: result.visibility,
+      );
       _toast('Story posted.');
       _refreshStories();
     } catch (error) {
@@ -509,7 +614,9 @@ class _InboxPageState extends State<InboxPage> {
               strokeWidth: 2.7,
               onRefresh: _handleInboxPullDown,
               child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 slivers: [
                   SliverToBoxAdapter(
                     child: _InstagramInboxHeader(
@@ -523,7 +630,9 @@ class _InboxPageState extends State<InboxPage> {
                       onReportsTap: _openCsReportTasks,
                     ),
                   ),
-                  SliverToBoxAdapter(child: _InboxAiPrompt(onTap: _openInboxAiHelper)),
+                  SliverToBoxAdapter(
+                    child: _InboxAiPrompt(onTap: _openInboxAiHelper),
+                  ),
                   SliverToBoxAdapter(
                     child: FutureBuilder<List<InboxStoryItem>>(
                       future: _storiesFuture,
@@ -533,23 +642,45 @@ class _InboxPageState extends State<InboxPage> {
                         onStoryTap: (story) async {
                           await _storiesApi.markViewed(story.id);
                           if (!mounted) return;
-                          _toast('${story.ownerName}: ${story.caption ?? 'Story opened'}');
+                          _toast(
+                            '${story.ownerName}: ${story.caption ?? 'Story opened'}',
+                          );
                           _refreshStories();
                         },
                       ),
                     ),
                   ),
-                  SliverToBoxAdapter(child: _PremiumFilterRail(filters: _controller.filters, selectedFilter: _controller.selectedFilter, onChanged: _controller.selectFilter)),
+                  SliverToBoxAdapter(
+                    child: _PremiumFilterRail(
+                      filters: _controller.filters,
+                      selectedFilter: _controller.selectedFilter,
+                      onChanged: _controller.selectFilter,
+                    ),
+                  ),
                   if (_controller.isLoading && visibleConversations.isEmpty)
-                    const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))))
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF7C3AED),
+                        ),
+                      ),
+                    )
                   else if (visibleConversations.isEmpty)
-                    const SliverFillRemaining(hasScrollBody: false, child: _EmptyInboxState())
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyInboxState(),
+                    )
                   else
                     SliverList.builder(
                       itemCount: visibleConversations.length,
                       itemBuilder: (context, index) {
                         final conversation = visibleConversations[index];
-                        return InboxConversationCard(conversation: conversation, onTap: () => _openConversation(conversation), onLongPress: () => _showChatOptions(conversation));
+                        return InboxConversationCard(
+                          conversation: conversation,
+                          onTap: () => _openConversation(conversation),
+                          onLongPress: () => _showChatOptions(conversation),
+                        );
                       },
                     ),
                   const SliverToBoxAdapter(child: SizedBox(height: 104)),
@@ -564,7 +695,12 @@ class _InboxPageState extends State<InboxPage> {
               color: const Color(0x88000000),
               child: Stack(
                 children: [
-                  Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => setState(() => _panelOverlay = null))),
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _panelOverlay = null),
+                    ),
+                  ),
                   Positioned.fill(child: _panelOverlay!),
                 ],
               ),
@@ -573,12 +709,28 @@ class _InboxPageState extends State<InboxPage> {
       ],
     );
     if (!widget.openPagesInOverlay) return page;
-    return PopScope<void>(canPop: _panelOverlay == null, onPopInvokedWithResult: (didPop, result) { if (didPop) return; _handleBackInsideOverlay(); }, child: page);
+    return PopScope<void>(
+      canPop: _panelOverlay == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackInsideOverlay();
+      },
+      child: page,
+    );
   }
 }
 
 class _InstagramInboxHeader extends StatelessWidget {
-  const _InstagramInboxHeader({required this.unreadCount, required this.lockedCount, required this.requestCount, required this.reportTaskCount, required this.onSearchTap, required this.onSettingsTap, required this.onLockedTap, required this.onReportsTap});
+  const _InstagramInboxHeader({
+    required this.unreadCount,
+    required this.lockedCount,
+    required this.requestCount,
+    required this.reportTaskCount,
+    required this.onSearchTap,
+    required this.onSettingsTap,
+    required this.onLockedTap,
+    required this.onReportsTap,
+  });
   final int unreadCount;
   final int lockedCount;
   final int requestCount;
@@ -597,20 +749,49 @@ class _InstagramInboxHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(child: Text('Inbox', style: TextStyle(color: Color(0xFF111111), fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.8))),
+              const Expanded(
+                child: Text(
+                  'Inbox',
+                  style: TextStyle(
+                    color: Color(0xFF111111),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+              ),
               _TopIcon(icon: Icons.search_rounded, onTap: onSearchTap),
-              _TopIcon(icon: Icons.lock_rounded, onTap: onLockedTap, badge: lockedCount),
+              _TopIcon(
+                icon: Icons.lock_rounded,
+                onTap: onLockedTap,
+                badge: lockedCount,
+              ),
               _TopIcon(icon: Icons.settings_rounded, onTap: onSettingsTap),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              _InboxPill(label: unreadCount == 0 ? 'No unread' : '$unreadCount unread', icon: Icons.mark_chat_unread_rounded, onTap: onSearchTap),
+              _InboxPill(
+                label: unreadCount == 0 ? 'No unread' : '$unreadCount unread',
+                icon: Icons.mark_chat_unread_rounded,
+                onTap: onSearchTap,
+              ),
               const SizedBox(width: 8),
-              _InboxPill(label: requestCount == 0 ? 'Requests' : '$requestCount requests', icon: Icons.shield_rounded, onTap: onSearchTap),
+              _InboxPill(
+                label: requestCount == 0
+                    ? 'Requests'
+                    : '$requestCount requests',
+                icon: Icons.shield_rounded,
+                onTap: onSearchTap,
+              ),
               const SizedBox(width: 8),
-              if (reportTaskCount > 0) _InboxPill(label: '$reportTaskCount CS', icon: Icons.support_agent_rounded, onTap: onReportsTap),
+              if (reportTaskCount > 0)
+                _InboxPill(
+                  label: '$reportTaskCount CS',
+                  icon: Icons.support_agent_rounded,
+                  onTap: onReportsTap,
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -633,13 +814,30 @@ class _PullDownHint extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(color: const Color(0xFFF4EFE8), borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFE6D8CA))),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4EFE8),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFE6D8CA)),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.keyboard_double_arrow_down_rounded, color: Color(0xFF251538), size: 16),
+            const Icon(
+              Icons.keyboard_double_arrow_down_rounded,
+              color: Color(0xFF251538),
+              size: 16,
+            ),
             const SizedBox(width: 5),
-            Text(lockedCount == 0 ? 'Pull down to open locked chats' : 'Pull down for $lockedCount locked chat${lockedCount == 1 ? '' : 's'}', style: const TextStyle(color: Color(0xFF5E4B6F), fontSize: 11, fontWeight: FontWeight.w900)),
+            Text(
+              lockedCount == 0
+                  ? 'Pull down to open locked chats'
+                  : 'Pull down for $lockedCount locked chat${lockedCount == 1 ? '' : 's'}',
+              style: const TextStyle(
+                color: Color(0xFF5E4B6F),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ],
         ),
       ),
@@ -662,13 +860,36 @@ class _InboxAiPrompt extends StatelessWidget {
         child: Container(
           height: 42,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFEDEDEF))),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFEDEDEF)),
+          ),
           child: const Row(
             children: [
-              Icon(Icons.auto_awesome_rounded, color: Color(0xFF3797F0), size: 18),
+              Icon(
+                Icons.auto_awesome_rounded,
+                color: Color(0xFF3797F0),
+                size: 18,
+              ),
               SizedBox(width: 9),
-              Expanded(child: Text('Find anything in chats...', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xFF71717A), fontSize: 13, fontWeight: FontWeight.w700))),
-              Icon(Icons.keyboard_arrow_up_rounded, color: Color(0xFFB8B8C0), size: 20),
+              Expanded(
+                child: Text(
+                  'Find anything in chats...',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFF71717A),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.keyboard_arrow_up_rounded,
+                color: Color(0xFFB8B8C0),
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -684,34 +905,81 @@ class _TopIcon extends StatelessWidget {
   final int badge;
   @override
   Widget build(BuildContext context) => Stack(
-        clipBehavior: Clip.none,
-        children: [
-          IconButton(onPressed: onTap, icon: Icon(icon, color: const Color(0xFF111111), size: 25)),
-          if (badge > 0)
-            Positioned(right: 6, top: 5, child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2), decoration: BoxDecoration(color: const Color(0xFFFF2D55), borderRadius: BorderRadius.circular(99)), child: Text('$badge', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)))),
-        ],
-      );
+    clipBehavior: Clip.none,
+    children: [
+      IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, color: const Color(0xFF111111), size: 25),
+      ),
+      if (badge > 0)
+        Positioned(
+          right: 6,
+          top: 5,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF2D55),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Text(
+              '$badge',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 class _InboxPill extends StatelessWidget {
-  const _InboxPill({required this.label, required this.icon, required this.onTap});
+  const _InboxPill({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
   final String label;
   final IconData icon;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(999),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFE8DFD5))),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: const Color(0xFF7C3AED), size: 15), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Color(0xFF251538), fontSize: 11.5, fontWeight: FontWeight.w900))]),
-        ),
-      );
+        border: Border.all(color: const Color(0xFFE8DFD5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFF7C3AED), size: 15),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF251538),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _PremiumStoryRail extends StatelessWidget {
-  const _PremiumStoryRail({required this.stories, required this.onCreateStory, required this.onStoryTap});
+  const _PremiumStoryRail({
+    required this.stories,
+    required this.onCreateStory,
+    required this.onStoryTap,
+  });
   final List<InboxStoryItem> stories;
   final VoidCallback onCreateStory;
   final ValueChanged<InboxStoryItem> onStoryTap;
@@ -725,9 +993,28 @@ class _PremiumStoryRail extends StatelessWidget {
         itemCount: stories.length + 1,
         separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          if (index == 0) return _StoryBubble(label: 'Your story', avatarText: '+', colors: const [Color(0xFF12C7B7), Color(0xFF7C3AED)], onTap: onCreateStory);
+          if (index == 0)
+            return _StoryBubble(
+              label: 'Your story',
+              avatarText: '+',
+              colors: const [Color(0xFF12C7B7), Color(0xFF7C3AED)],
+              onTap: onCreateStory,
+            );
           final story = stories[index - 1];
-          return _StoryBubble(label: story.ownerName, avatarText: story.ownerName.isEmpty ? 'S' : story.ownerName.characters.first.toUpperCase(), colors: story.isViewed ? const [Color(0xFFB8B1C1), Color(0xFFD8D2DD)] : const [Color(0xFFFF2D55), Color(0xFFFFB020), Color(0xFF7C3AED)], onTap: () => onStoryTap(story));
+          return _StoryBubble(
+            label: story.ownerName,
+            avatarText: story.ownerName.isEmpty
+                ? 'S'
+                : story.ownerName.characters.first.toUpperCase(),
+            colors: story.isViewed
+                ? const [Color(0xFFB8B1C1), Color(0xFFD8D2DD)]
+                : const [
+                    Color(0xFFFF2D55),
+                    Color(0xFFFFB020),
+                    Color(0xFF7C3AED),
+                  ],
+            onTap: () => onStoryTap(story),
+          );
         },
       ),
     );
@@ -735,30 +1022,115 @@ class _PremiumStoryRail extends StatelessWidget {
 }
 
 class _StoryBubble extends StatelessWidget {
-  const _StoryBubble({required this.label, required this.avatarText, required this.colors, required this.onTap});
+  const _StoryBubble({
+    required this.label,
+    required this.avatarText,
+    required this.colors,
+    required this.onTap,
+  });
   final String label;
   final String avatarText;
   final List<Color> colors;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: SizedBox(width: 66, child: Column(children: [Container(width: 58, height: 58, padding: const EdgeInsets.all(2.5), decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: colors)), child: Container(decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: Center(child: Text(avatarText, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900))))), const SizedBox(height: 6), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF5E4B6F), fontSize: 10.5, fontWeight: FontWeight.w800))])),
-      );
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(18),
+    child: SizedBox(
+      width: 66,
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            padding: const EdgeInsets.all(2.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: colors),
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  avatarText,
+                  style: const TextStyle(
+                    color: Color(0xFF251538),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF5E4B6F),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _PremiumFilterRail extends StatelessWidget {
-  const _PremiumFilterRail({required this.filters, required this.selectedFilter, required this.onChanged});
+  const _PremiumFilterRail({
+    required this.filters,
+    required this.selectedFilter,
+    required this.onChanged,
+  });
   final List<String> filters;
   final String selectedFilter;
   final ValueChanged<String> onChanged;
   @override
-  Widget build(BuildContext context) => SizedBox(height: 48, child: ListView.separated(padding: const EdgeInsets.symmetric(horizontal: 14), scrollDirection: Axis.horizontal, itemCount: filters.length, separatorBuilder: (context, index) => const SizedBox(width: 8), itemBuilder: (context, index) { final filter = filters[index]; final selected = filter == selectedFilter; return ChoiceChip(label: Text(filter), selected: selected, onSelected: (selected) => onChanged(filter), selectedColor: const Color(0xFF251538), backgroundColor: Colors.white, labelStyle: TextStyle(color: selected ? Colors.white : const Color(0xFF5E4B6F), fontWeight: FontWeight.w900, fontSize: 12), side: BorderSide(color: selected ? const Color(0xFF251538) : const Color(0xFFE5DDF1))); }));
+  Widget build(BuildContext context) => SizedBox(
+    height: 48,
+    child: ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      scrollDirection: Axis.horizontal,
+      itemCount: filters.length,
+      separatorBuilder: (context, index) => const SizedBox(width: 8),
+      itemBuilder: (context, index) {
+        final filter = filters[index];
+        final selected = filter == selectedFilter;
+        return ChoiceChip(
+          label: Text(filter),
+          selected: selected,
+          onSelected: (selected) => onChanged(filter),
+          selectedColor: const Color(0xFF251538),
+          backgroundColor: Colors.white,
+          labelStyle: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF5E4B6F),
+            fontWeight: FontWeight.w900,
+            fontSize: 12,
+          ),
+          side: BorderSide(
+            color: selected ? const Color(0xFF251538) : const Color(0xFFE5DDF1),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class _InboxChatOptionsSheet extends StatelessWidget {
-  const _InboxChatOptionsSheet({required this.conversation, required this.onInfo, required this.onToggleLock, required this.onToggleBlock, required this.onToggleMute, required this.onTogglePin, required this.onReport});
+  const _InboxChatOptionsSheet({
+    required this.conversation,
+    required this.onInfo,
+    required this.onToggleLock,
+    required this.onToggleBlock,
+    required this.onToggleMute,
+    required this.onTogglePin,
+    required this.onReport,
+  });
   final InboxConversation conversation;
   final VoidCallback onInfo;
   final VoidCallback onToggleLock;
@@ -774,23 +1146,88 @@ class _InboxChatOptionsSheet extends StatelessWidget {
       top: false,
       child: Container(
         margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.72),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+        ),
         padding: EdgeInsets.fromLTRB(14, 8, 14, 10 + bottomPadding),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, 14))]),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 30,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFD1D7DB), borderRadius: BorderRadius.circular(999))),
-            const SizedBox(height: 10),
-            Text(conversation.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 10),
-            _OptionTile(icon: Icons.info_rounded, title: 'Chat info', onTap: onInfo),
-            _OptionTile(icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, title: conversation.isPinned ? 'Unpin chat' : 'Pin chat', onTap: onTogglePin),
-            _OptionTile(icon: conversation.isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded, title: conversation.isMuted ? 'Unmute chat' : 'Mute chat', onTap: conversation.isOfficial ? null : onToggleMute),
-            _OptionTile(icon: conversation.isLockedByBackend ? Icons.lock_open_rounded : Icons.lock_rounded, title: conversation.isLockedByBackend ? 'Unlock chat' : 'Lock chat', onTap: conversation.isOfficial ? null : onToggleLock),
-            _OptionTile(icon: conversation.isBlocked ? Icons.undo_rounded : Icons.block_rounded, title: conversation.isBlocked ? 'Unblock profile' : 'Block profile', onTap: conversation.isOfficial ? null : onToggleBlock),
-            _OptionTile(icon: Icons.report_rounded, title: 'Report profile', onTap: conversation.isOfficial ? null : onReport),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD1D7DB),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                conversation.title,
+                style: const TextStyle(
+                  color: Color(0xFF251538),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _OptionTile(
+                icon: Icons.info_rounded,
+                title: 'Chat info',
+                onTap: onInfo,
+              ),
+              _OptionTile(
+                icon: conversation.isPinned
+                    ? Icons.push_pin_outlined
+                    : Icons.push_pin_rounded,
+                title: conversation.isPinned ? 'Unpin chat' : 'Pin chat',
+                onTap: onTogglePin,
+              ),
+              _OptionTile(
+                icon: conversation.isMuted
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_off_rounded,
+                title: conversation.isMuted ? 'Unmute chat' : 'Mute chat',
+                onTap: conversation.isOfficial ? null : onToggleMute,
+              ),
+              _OptionTile(
+                icon: conversation.isLockedByBackend
+                    ? Icons.lock_open_rounded
+                    : Icons.lock_rounded,
+                title: conversation.isLockedByBackend
+                    ? 'Unlock chat'
+                    : 'Lock chat',
+                onTap: conversation.isOfficial ? null : onToggleLock,
+              ),
+              _OptionTile(
+                icon: conversation.isBlocked
+                    ? Icons.undo_rounded
+                    : Icons.block_rounded,
+                title: conversation.isBlocked
+                    ? 'Unblock profile'
+                    : 'Block profile',
+                onTap: conversation.isOfficial ? null : onToggleBlock,
+              ),
+              _OptionTile(
+                icon: Icons.report_rounded,
+                title: 'Report profile',
+                onTap: conversation.isOfficial ? null : onReport,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -798,19 +1235,59 @@ class _InboxChatOptionsSheet extends StatelessWidget {
 }
 
 class _OptionTile extends StatelessWidget {
-  const _OptionTile({required this.icon, required this.title, required this.onTap});
+  const _OptionTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
   final IconData icon;
   final String title;
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
     final disabled = onTap == null;
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(16), child: Opacity(opacity: disabled ? 0.45 : 1, child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12), margin: const EdgeInsets.only(bottom: 6), decoration: BoxDecoration(color: const Color(0xFFF8F5FF), borderRadius: BorderRadius.circular(16)), child: Row(children: [Icon(icon, color: const Color(0xFF7C3AED), size: 20), const SizedBox(width: 12), Expanded(child: Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w800))), const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5))]))));
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Opacity(
+        opacity: disabled ? 0.45 : 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          margin: const EdgeInsets.only(bottom: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F5FF),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: const Color(0xFF7C3AED), size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF251538),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B8CA5)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class _StoryDraft {
-  const _StoryDraft({required this.mediaUrl, required this.mediaType, required this.visibility, this.caption});
+  const _StoryDraft({
+    required this.mediaUrl,
+    required this.mediaType,
+    required this.visibility,
+    this.caption,
+  });
   final String mediaUrl;
   final String mediaType;
   final String visibility;
@@ -818,42 +1295,416 @@ class _StoryDraft {
 }
 
 class _CreateStorySheet extends StatefulWidget {
-  const _CreateStorySheet();
+  const _CreateStorySheet({required this.onUpload});
+
+  final Future<MediaUploadResult> Function(XFile file) onUpload;
+
   @override
   State<_CreateStorySheet> createState() => _CreateStorySheetState();
 }
 
 class _CreateStorySheetState extends State<_CreateStorySheet> {
-  final TextEditingController _url = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
   final TextEditingController _caption = TextEditingController();
-  String _mediaType = 'image';
   String _visibility = 'friends';
+  XFile? _file;
+  Uint8List? _previewBytes;
+  String _mediaType = 'image';
+  bool _busy = false;
+  String? _error;
 
   @override
-  void dispose() { _url.dispose(); _caption.dispose(); super.dispose(); }
+  void dispose() {
+    _caption.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pick(ImageSource source, {required bool video}) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final picked = video
+          ? await _picker.pickVideo(source: source)
+          : await _picker.pickImage(source: source, imageQuality: 92);
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (bytes.isEmpty) {
+        setState(() => _error = 'Selected media is empty.');
+        return;
+      }
+      if (bytes.length > 20 * 1024 * 1024) {
+        setState(() => _error = 'Story media must be 20 MB or smaller.');
+        return;
+      }
+      setState(() {
+        _file = picked;
+        _previewBytes = video ? null : bytes;
+        _mediaType = video ? 'video' : 'image';
+      });
+    } catch (error) {
+      setState(() => _error = _friendlyUploadError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _post() async {
+    final file = _file;
+    if (file == null || _busy) {
+      setState(() => _error = 'Choose a photo or video first.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final uploaded = await widget.onUpload(file);
+      final mediaUrl = uploaded.url.trim();
+      if (mediaUrl.isEmpty)
+        throw Exception('Upload completed without a media URL.');
+      if (!mounted) return;
+      Navigator.pop(
+        context,
+        _StoryDraft(
+          mediaUrl: mediaUrl,
+          mediaType: uploaded.mediaType == 'video' ? 'video' : _mediaType,
+          visibility: _visibility,
+          caption: _caption.text.trim().isEmpty ? null : _caption.text.trim(),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = _friendlyUploadError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final file = _file;
     return SafeArea(
       top: false,
       child: Container(
         margin: const EdgeInsets.all(12),
-        padding: EdgeInsets.fromLTRB(16, 14, 16, 16 + MediaQuery.paddingOf(context).bottom),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Create story', style: TextStyle(color: Color(0xFF251538), fontSize: 20, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 12),
-          TextField(controller: _url, decoration: const InputDecoration(labelText: 'Media URL', border: OutlineInputBorder())),
-          const SizedBox(height: 10),
-          TextField(controller: _caption, maxLength: 500, decoration: const InputDecoration(labelText: 'Caption', border: OutlineInputBorder())),
-          Row(children: [
-            Expanded(child: DropdownButtonFormField<String>(initialValue: _mediaType, items: const [DropdownMenuItem(value: 'image', child: Text('Image')), DropdownMenuItem(value: 'video', child: Text('Video'))], onChanged: (value) => setState(() => _mediaType = value ?? 'image'), decoration: const InputDecoration(labelText: 'Type'))),
-            const SizedBox(width: 10),
-            Expanded(child: DropdownButtonFormField<String>(initialValue: _visibility, items: const [DropdownMenuItem(value: 'friends', child: Text('Friends')), DropdownMenuItem(value: 'everyone', child: Text('Everyone')), DropdownMenuItem(value: 'nobody', child: Text('Only me'))], onChanged: (value) => setState(() => _visibility = value ?? 'friends'), decoration: const InputDecoration(labelText: 'Privacy'))),
-          ]),
-          const SizedBox(height: 14),
-          SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final mediaUrl = _url.text.trim(); if (mediaUrl.isEmpty) return; Navigator.pop(context, _StoryDraft(mediaUrl: mediaUrl, mediaType: _mediaType, visibility: _visibility, caption: _caption.text.trim().isEmpty ? null : _caption.text.trim())); }, child: const Text('Post story'))),
-        ]),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          14,
+          16,
+          16 + MediaQuery.paddingOf(context).bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Create story',
+                    style: TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _busy ? null : () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF5E4B6F),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            AspectRatio(
+              aspectRatio: 9 / 12,
+              child: InkWell(
+                onTap: _busy
+                    ? null
+                    : () => _pick(ImageSource.gallery, video: false),
+                borderRadius: BorderRadius.circular(22),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(color: Color(0xFFF7F7F8)),
+                    child: file == null
+                        ? const _StoryMediaEmpty()
+                        : Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              if (_mediaType == 'image' &&
+                                  _previewBytes != null)
+                                Image.memory(_previewBytes!, fit: BoxFit.cover)
+                              else
+                                _StoryVideoPreview(name: file.name),
+                              Positioned(
+                                left: 12,
+                                bottom: 12,
+                                child: _StoryMediaBadge(type: _mediaType),
+                              ),
+                              Positioned(
+                                right: 12,
+                                top: 12,
+                                child: InkWell(
+                                  onTap: _busy
+                                      ? null
+                                      : () => setState(() {
+                                          _file = null;
+                                          _previewBytes = null;
+                                          _mediaType = 'image';
+                                        }),
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.48,
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _StoryPickButton(
+                    icon: Icons.photo_rounded,
+                    label: 'Photo',
+                    onTap: _busy
+                        ? null
+                        : () => _pick(ImageSource.gallery, video: false),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _StoryPickButton(
+                    icon: Icons.play_circle_fill_rounded,
+                    label: 'Video',
+                    onTap: _busy
+                        ? null
+                        : () => _pick(ImageSource.gallery, video: true),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _caption,
+              maxLength: 500,
+              decoration: const InputDecoration(
+                labelText: 'Caption',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            DropdownButtonFormField<String>(
+              initialValue: _visibility,
+              items: const [
+                DropdownMenuItem(value: 'friends', child: Text('Friends')),
+                DropdownMenuItem(value: 'everyone', child: Text('Everyone')),
+                DropdownMenuItem(value: 'nobody', child: Text('Only me')),
+              ],
+              onChanged: _busy
+                  ? null
+                  : (value) => setState(() => _visibility = value ?? 'friends'),
+              decoration: const InputDecoration(labelText: 'Privacy'),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _busy ? null : _post,
+                child: Text(_busy ? 'Uploading...' : 'Post story'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _friendlyUploadError(Object error) {
+    final raw = error.toString().replaceFirst('Exception: ', '').trim();
+    if (raw.contains('413'))
+      return 'This file is too large. Choose media under 20 MB.';
+    if (raw.contains('401') || raw.toLowerCase().contains('login'))
+      return 'Session expired. Login again before posting.';
+    if (raw.toLowerCase().contains('unsupported'))
+      return 'Unsupported media type. Choose JPG, PNG, WEBP, GIF, MP4, WEBM, or MOV.';
+    if (raw.toLowerCase().contains('failed to fetch') ||
+        raw.toLowerCase().contains('xmlhttprequest'))
+      return 'Upload failed. Check the backend connection and try again.';
+    return raw.isEmpty ? 'Could not upload story. Please try again.' : raw;
+  }
+}
+
+class _StoryMediaEmpty extends StatelessWidget {
+  const _StoryMediaEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.add_photo_alternate_rounded,
+            color: Color(0xFF3797F0),
+            size: 42,
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Choose photo or video',
+            style: TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoryVideoPreview extends StatelessWidget {
+  const _StoryVideoPreview({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF111114), Color(0xFF25252A)],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.play_circle_fill_rounded,
+              color: Colors.white,
+              size: 56,
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: Text(
+                name.trim().isEmpty ? 'Selected video' : name.trim(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StoryMediaBadge extends StatelessWidget {
+  const _StoryMediaBadge({required this.type});
+
+  final String type;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.54),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            type == 'video'
+                ? Icons.play_circle_fill_rounded
+                : Icons.photo_rounded,
+            color: Colors.white,
+            size: 15,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            type == 'video' ? 'Video' : 'Photo',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoryPickButton extends StatelessWidget {
+  const _StoryPickButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF111114),
+        side: const BorderSide(color: Color(0xFFEDEDEF)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -862,5 +1713,22 @@ class _CreateStorySheetState extends State<_CreateStorySheet> {
 class _EmptyInboxState extends StatelessWidget {
   const _EmptyInboxState();
   @override
-  Widget build(BuildContext context) => Center(child: Container(margin: const EdgeInsets.all(24), padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)), child: const Text('No chats here', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 14, fontWeight: FontWeight.w800))));
+  Widget build(BuildContext context) => Center(
+    child: Container(
+      margin: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: const Text(
+        'No chats here',
+        style: TextStyle(
+          color: Color(0xFF7B6A86),
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    ),
+  );
 }

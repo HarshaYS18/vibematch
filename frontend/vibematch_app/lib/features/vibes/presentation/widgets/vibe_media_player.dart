@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../../core/network/vm_api_config.dart';
 import '../../models/vibe_models.dart';
 import 'vibe_media_playback_gate.dart';
 
@@ -20,15 +21,19 @@ class VibeMediaPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mediaUrl = vibe.mediaUrl?.trim();
+    final mediaUrl = _resolvedMediaUrl(vibe.mediaUrl);
     if (vibe.mediaType == VibeMediaType.text) return const SizedBox.shrink();
-    if (mediaUrl == null || mediaUrl.isEmpty) {
+    if (mediaUrl == null) {
       return GestureDetector(
         onDoubleTap: onDoubleTap,
         child: Container(
-          decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors)),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: vibe.colors),
+          ),
           child: Icon(
-            vibe.mediaType == VibeMediaType.video ? Icons.play_circle_fill_rounded : Icons.photo_rounded,
+            vibe.mediaType == VibeMediaType.video
+                ? Icons.play_circle_fill_rounded
+                : Icons.photo_rounded,
             color: Colors.white,
             size: 72,
           ),
@@ -36,7 +41,9 @@ class VibeMediaPlayer extends StatelessWidget {
       );
     }
     if (vibe.mediaType == VibeMediaType.video) {
-      final resolvedVideoKey = vibe.id.trim().isNotEmpty ? vibe.id.trim() : mediaUrl.hashCode.toString();
+      final resolvedVideoKey = vibe.id.trim().isNotEmpty
+          ? vibe.id.trim()
+          : mediaUrl.hashCode.toString();
       return GestureDetector(
         onDoubleTap: onDoubleTap,
         child: _NetworkVideoPlayer(
@@ -55,7 +62,10 @@ class VibeMediaPlayer extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) => loadingProgress == null ? child : _MediaLoading(colors: vibe.colors),
+        loadingBuilder: (context, child, loadingProgress) =>
+            loadingProgress == null
+            ? child
+            : _MediaLoading(colors: vibe.colors),
         errorBuilder: (_, _, _) => _MediaFallback(vibe: vibe),
       ),
     );
@@ -63,7 +73,13 @@ class VibeMediaPlayer extends StatelessWidget {
 }
 
 class _NetworkVideoPlayer extends StatefulWidget {
-  const _NetworkVideoPlayer({required this.videoKey, required this.url, required this.respectFeedPause, required this.autoplay, super.key});
+  const _NetworkVideoPlayer({
+    required this.videoKey,
+    required this.url,
+    required this.respectFeedPause,
+    required this.autoplay,
+    super.key,
+  });
 
   final String videoKey;
   final String url;
@@ -85,12 +101,18 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   void initState() {
     super.initState();
     if (widget.respectFeedPause) {
-      VibeMediaPlaybackGate.feedPlaybackPaused.addListener(_handlePlaybackGateChanged);
+      VibeMediaPlaybackGate.feedPlaybackPaused.addListener(
+        _handlePlaybackGateChanged,
+      );
       VibeMediaPlaybackGate.feedScrollTick.addListener(_handleScrollTick);
-      VibeMediaPlaybackGate.activeFeedVideoKey.addListener(_handleActiveVideoChanged);
+      VibeMediaPlaybackGate.activeFeedVideoKey.addListener(
+        _handleActiveVideoChanged,
+      );
     }
     _initializeController();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncAutoplayWithVisibility());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _syncAutoplayWithVisibility(),
+    );
   }
 
   @override
@@ -112,9 +134,13 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   void dispose() {
     VibeMediaPlaybackGate.releaseActiveFeedVideo(widget.videoKey);
     if (widget.respectFeedPause) {
-      VibeMediaPlaybackGate.feedPlaybackPaused.removeListener(_handlePlaybackGateChanged);
+      VibeMediaPlaybackGate.feedPlaybackPaused.removeListener(
+        _handlePlaybackGateChanged,
+      );
       VibeMediaPlaybackGate.feedScrollTick.removeListener(_handleScrollTick);
-      VibeMediaPlaybackGate.activeFeedVideoKey.removeListener(_handleActiveVideoChanged);
+      VibeMediaPlaybackGate.activeFeedVideoKey.removeListener(
+        _handleActiveVideoChanged,
+      );
     }
     _controller?.dispose();
     super.dispose();
@@ -123,13 +149,15 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   void _initializeController() {
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..setLooping(true)
-      ..initialize().then((_) {
-        if (!mounted) return;
-        setState(() => _isReady = true);
-        _syncAutoplayWithVisibility();
-      }).catchError((_) {
-        if (mounted) setState(() => _hasError = true);
-      });
+      ..initialize()
+          .then((_) {
+            if (!mounted) return;
+            setState(() => _isReady = true);
+            _syncAutoplayWithVisibility();
+          })
+          .catchError((_) {
+            if (mounted) setState(() => _hasError = true);
+          });
   }
 
   void _handlePlaybackGateChanged() {
@@ -162,9 +190,13 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
     final mediaQuery = MediaQuery.maybeOf(context);
     if (mediaQuery == null) return false;
     final viewportTop = mediaQuery.padding.top;
-    final viewportBottom = mediaQuery.size.height - mediaQuery.padding.bottom - 92;
+    final viewportBottom =
+        mediaQuery.size.height - mediaQuery.padding.bottom - 92;
     final visibleTop = topLeft.dy.clamp(viewportTop, viewportBottom);
-    final visibleBottom = (topLeft.dy + height).clamp(viewportTop, viewportBottom);
+    final visibleBottom = (topLeft.dy + height).clamp(
+      viewportTop,
+      viewportBottom,
+    );
     final visibleHeight = visibleBottom - visibleTop;
     if (visibleHeight <= 0) return false;
     final visibleRatio = visibleHeight / height;
@@ -214,8 +246,24 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
-    if (_hasError) return const Center(child: Icon(Icons.broken_image_rounded, size: 44, color: Color(0xFF8C8198)));
-    if (controller == null || !_isReady) return const Center(child: CircularProgressIndicator(color: Color(0xFF111015), strokeWidth: 2.6));
+    if (_hasError)
+      return const Center(
+        child: Icon(
+          Icons.broken_image_rounded,
+          size: 44,
+          color: Color(0xFF8C8198),
+        ),
+      );
+    if (controller == null || !_isReady)
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF111015),
+          strokeWidth: 2.6,
+        ),
+      );
+    final videoSize = controller.value.size;
+    final videoWidth = videoSize.width <= 0 ? 9.0 : videoSize.width;
+    final videoHeight = videoSize.height <= 0 ? 16.0 : videoSize.height;
     return Stack(
       fit: StackFit.expand,
       clipBehavior: Clip.hardEdge,
@@ -225,8 +273,8 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
           fit: BoxFit.cover,
           clipBehavior: Clip.hardEdge,
           child: SizedBox(
-            width: controller.value.size.width,
-            height: controller.value.size.height,
+            width: videoWidth,
+            height: videoHeight,
             child: VideoPlayer(controller),
           ),
         ),
@@ -245,7 +293,11 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
                     color: Colors.black.withValues(alpha: 0.34),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 44,
+                  ),
                 ),
               ),
             ),
@@ -265,7 +317,9 @@ class _MediaLoading extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
-      child: const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.6)),
+      child: const Center(
+        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.6),
+      ),
     );
   }
 }
@@ -281,11 +335,19 @@ class _MediaFallback extends StatelessWidget {
       decoration: BoxDecoration(gradient: LinearGradient(colors: vibe.colors)),
       child: Center(
         child: Icon(
-          vibe.mediaType == VibeMediaType.video ? Icons.play_circle_fill_rounded : Icons.photo_rounded,
+          vibe.mediaType == VibeMediaType.video
+              ? Icons.play_circle_fill_rounded
+              : Icons.photo_rounded,
           color: Colors.white,
           size: 72,
         ),
       ),
     );
   }
+}
+
+String? _resolvedMediaUrl(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+  return VmApiConfig.mediaUrl(trimmed);
 }

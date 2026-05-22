@@ -45,6 +45,33 @@ abstract final class VmApiConfig {
     return '$baseUrl$normalizedPath';
   }
 
+  static String mediaUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('/')) return endpoint(trimmed);
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) return trimmed;
+
+    final baseUri = Uri.tryParse(baseUrl);
+    final host = uri.host.toLowerCase();
+    final shouldRewriteToConfiguredBackend =
+        baseUri != null &&
+        (host == 'localhost' ||
+            host == '127.0.0.1' ||
+            host == '0.0.0.0' ||
+            host == '10.0.2.2');
+    if (!shouldRewriteToConfiguredBackend) return trimmed;
+
+    return baseUri
+        .replace(
+          path: uri.path,
+          query: uri.hasQuery ? uri.query : null,
+          fragment: uri.hasFragment ? uri.fragment : null,
+        )
+        .toString();
+  }
+
   static String _withoutTrailingSlash(String value) {
     var next = value;
     while (next.endsWith('/')) {

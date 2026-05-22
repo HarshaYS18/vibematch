@@ -3,10 +3,11 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from app.models.cdn_media import CdnMediaLinkedEntityType, CdnMediaType
 from app.models.follow import UserFollow
 from app.models.inbox_story import InboxStory, InboxStoryView
 from app.models.user import User
-from app.services import inbox_preference_service
+from app.services import cdn_media_service, inbox_preference_service
 
 VALID_VISIBILITY = {"everyone", "friends", "nobody"}
 VALID_MEDIA_TYPES = {"image", "video"}
@@ -74,12 +75,22 @@ def list_visible_stories(db: Session, viewer: User) -> list[InboxStory]:
 def create_story(db: Session, owner: User, media_url: str, media_type: str, caption: str | None, visibility: str | None) -> InboxStory:
     clean_type = (media_type or "image").strip().lower()
     clean_visibility = (visibility or inbox_preference_service.get_or_create_preferences(db, owner).story_visibility).strip().lower()
+    clean_url = media_url.strip()
     if clean_type not in VALID_MEDIA_TYPES:
         raise ValueError("Story media type must be image or video")
     if clean_visibility not in VALID_VISIBILITY:
         raise ValueError("Invalid story visibility")
-    story = InboxStory(public_id=_public_id(), owner_user_id=owner.id, media_url=media_url.strip(), media_type=clean_type, caption=(caption or '').strip() or None, visibility=clean_visibility)
+    try:
+        asset = cdn_media_service.assert_user_owns_active_media_url(db, user=owner, public_url=clean_url, media_type=CdnMediaType.STORY_MEDIA)
+    except ValueError as exc:
+        raise ValueError("Upload story media before posting") from exc
+    story = InboxStory(public_id=_public_id(), owner_user_id=owner.id, media_url=clean_url, media_type=clean_type, caption=(caption or '').strip() or None, visibility=clean_visibility)
     db.add(story)
+    db.commit()
+    db.refresh(story)
+    asset.linked_entity_type = CdnMediaLinkedEntityType.STORY.value
+    asset.linked_entity_id = str(story.id)
+    db.add(asset)
     db.commit()
     db.refresh(story)
     return story
