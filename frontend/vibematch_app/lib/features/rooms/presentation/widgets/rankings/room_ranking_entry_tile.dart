@@ -21,13 +21,7 @@ class RoomRankingEntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isTopThree = entry.rank <= 3;
-    final rankColor = switch (entry.rank) {
-      1 => const Color(0xFFFFD166),
-      2 => const Color(0xFFB7C2FF),
-      3 => const Color(0xFFFF8FA3),
-      _ => Colors.white.withValues(alpha: 0.58),
-    };
+    final rankColor = Colors.white.withValues(alpha: 0.62);
 
     return Material(
       color: Colors.transparent,
@@ -38,9 +32,9 @@ class RoomRankingEntryTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: isTopThree ? 0.13 : 0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: isTopThree ? rankColor.withValues(alpha: 0.38) : Colors.white.withValues(alpha: 0.10)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
           ),
           child: Row(
             children: [
@@ -50,42 +44,38 @@ class RoomRankingEntryTile extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isTopThree ? rankColor.withValues(alpha: 0.20) : Colors.white.withValues(alpha: 0.08),
-                  border: Border.all(color: rankColor.withValues(alpha: isTopThree ? 0.60 : 0.20)),
+                  color: Colors.white.withValues(alpha: 0.08),
+                  border: Border.all(color: rankColor.withValues(alpha: 0.20)),
                 ),
                 child: Text(
                   entry.displayRank,
-                  style: TextStyle(color: rankColor, fontSize: entry.rank > 99 ? 10 : 12, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                    color: rankColor,
+                    fontSize: entry.rank > 99 ? 10 : 12,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               _RankingAvatar(user: entry.user),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            entry.user.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
-                          ),
+                    Flexible(
+                      child: Text(
+                        entry.user.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
                         ),
-                        const SizedBox(width: 5),
-                        ChatVipBadge(level: entry.user.vipLevel, showWhenZero: true),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      entry.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 10.5, fontWeight: FontWeight.w800),
-                    ),
+                    const SizedBox(width: 5),
+                    ChatVipBadge(level: entry.user.vipLevel, showWhenZero: true),
                   ],
                 ),
               ),
@@ -93,7 +83,10 @@ class RoomRankingEntryTile extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(entry.scoreText, style: TextStyle(color: accentColor, fontSize: 14, fontWeight: FontWeight.w900)),
+                  Text(
+                    entry.scoreText,
+                    style: TextStyle(color: accentColor, fontSize: 14, fontWeight: FontWeight.w900),
+                  ),
                   const SizedBox(height: 2),
                   SizedBox(
                     width: 82,
@@ -106,7 +99,11 @@ class RoomRankingEntryTile extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.end,
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.50), fontSize: 9.5, fontWeight: FontWeight.w800),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.50),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                     ),
                   ),
@@ -131,7 +128,10 @@ class _RankingAvatar extends StatelessWidget {
     final fallback = Container(
       alignment: Alignment.center,
       decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
-      child: Text(avatarLetter(user.name), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+      child: Text(
+        avatarLetter(user.name),
+        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+      ),
     );
     return Container(
       width: 40,
@@ -139,12 +139,24 @@ class _RankingAvatar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: user.avatarColors.first.withValues(alpha: 0.22), blurRadius: 12, offset: const Offset(0, 6))],
+        boxShadow: [
+          BoxShadow(
+            color: user.avatarColors.first.withValues(alpha: 0.22),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: ClipOval(
         child: avatarUrl == null || avatarUrl.isEmpty
             ? fallback
-            : Image.network(avatarUrl, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => fallback),
+            : Image.network(
+                avatarUrl,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => fallback,
+              ),
       ),
     );
   }
