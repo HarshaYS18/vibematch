@@ -472,7 +472,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onDismiss: _clearVibeSyncOverlay,
             ),
             const LiveRoomRemoteAudioRenderers(),
-            const RoomMusicOverlay(),
+            const RoomMusicOverlayHost(),
             LiveRoomGiftOverlay(
               slides: _giftController.giftSlides,
               activeComboSlide: _giftController.activeComboSlide,
