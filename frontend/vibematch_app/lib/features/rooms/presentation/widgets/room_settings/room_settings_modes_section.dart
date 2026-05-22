@@ -24,15 +24,15 @@ class RoomSettingsModesSection extends StatelessWidget {
       children: [
         RoomSettingsCard(
           icon: Icons.favorite_rounded,
-          title: 'VibeSync',
+          title: cricketModeActive ? 'VibeSync locked' : 'VibeSync',
           iconColor: cricketModeActive ? Colors.grey : RoomColors.coral,
-          onTap: cricketModeActive ? null : onVibeSyncTap,
+          onTap: cricketModeActive ? () {} : onVibeSyncTap,
         ),
         RoomSettingsCard(
           icon: Icons.smart_display_rounded,
-          title: 'Watch Party',
+          title: cricketModeActive ? 'Watch Party locked' : 'Watch Party',
           iconColor: cricketModeActive ? Colors.grey : RoomColors.aqua,
-          onTap: cricketModeActive ? null : onWatchPartyTap,
+          onTap: cricketModeActive ? () {} : onWatchPartyTap,
         ),
         if (!cricketModeActive)
           RoomSettingsCard(
