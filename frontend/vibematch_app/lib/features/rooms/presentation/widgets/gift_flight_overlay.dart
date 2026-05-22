@@ -141,7 +141,7 @@ class _GiftFlightActorState extends State<_GiftFlightActor> with SingleTickerPro
                     top: end.dy - 58,
                     child: Opacity(opacity: (1 - pop).clamp(0.0, 1.0), child: _GiftLandingBurst(event: widget.event, progress: pop)),
                   ),
-                if (widget.event.multiplier != null && t > 0.62)
+                if ((widget.event.multiplier ?? 0) > 0 && t > 0.62)
                   Positioned(
                     left: end.dx - 52,
                     top: end.dy - 108,
