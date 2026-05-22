@@ -6,32 +6,24 @@ import '../models/home_room.dart';
 
 class HomeController extends ChangeNotifier {
   HomeController({HomeRepository? repository})
-    : _repository = repository ?? HomeRepository();
+      : _repository = repository ?? HomeRepository();
 
   final HomeRepository _repository;
 
   int selectedBannerIndex = 0;
   int selectedPolicyBannerIndex = 0;
-  int visibleRoomCount = 6;
   String selectedCategory = 'Trending';
   String selectedLanguage = 'All';
-  bool isLoadingRooms = false;
   bool isLoadingHomeChrome = false;
-  String? loadErrorMessage;
   String? bannerErrorMessage;
   HomeRoom? myCreatedRoom;
 
-  List<HomeRoom> _backendRooms = const [];
   List<HomeBanner> _eventBanners = const [];
   List<HomeBanner> _policyBanners = const [];
 
   final List<String> categories = const [
     'Trending',
     'Following',
-    'Music',
-    'Gaming',
-    'Chat',
-    'PK',
   ];
 
   final List<String> languages = const [
@@ -58,53 +50,19 @@ class HomeController extends ChangeNotifier {
 
   List<HomeBanner> get policyBanners => _policyBanners;
 
-  List<HomeRoom> get rooms => _backendRooms;
+  List<HomeRoom> get rooms => const [];
 
-  bool get hasNetworkError => loadErrorMessage != null;
+  List<HomeRoom> get filteredRooms => const [];
 
-  bool get usingBackendRooms => _backendRooms.isNotEmpty && !hasNetworkError;
+  List<HomeRoom> get visibleRooms => const [];
 
-  bool _isOpenActiveRoom(HomeRoom room) {
-    final hasActiveUsers = room.onlineCount > 0;
-    return room.isPublicOpen && hasActiveUsers;
-  }
+  bool get hasNetworkError => false;
 
-  List<HomeRoom> get filteredRooms {
-    if (hasNetworkError) return const [];
+  bool get usingBackendRooms => false;
 
-    final filtered = rooms.where((room) {
-      final languageMatch =
-          selectedLanguage == 'All' || room.language == selectedLanguage;
-      if (!languageMatch) return false;
+  bool get isLoadingRooms => false;
 
-      // Product rule: Trending/Home room list should show only public discovery
-      // rooms that currently have at least one active participant.
-      if (selectedCategory == 'Trending' ||
-          _isRoomTypeCategory(selectedCategory)) {
-        final selectedRoomType = selectedCategory.trim().toLowerCase();
-        final roomType = room.type.trim().toLowerCase();
-        if (_isRoomTypeCategory(selectedCategory) &&
-            roomType != selectedRoomType) {
-          return false;
-        }
-        return _isOpenActiveRoom(room);
-      }
-      return true;
-    }).toList();
-
-    filtered.sort((a, b) {
-      final onlineCompare = b.onlineCount.compareTo(a.onlineCount);
-      if (onlineCompare != 0) return onlineCompare;
-      return b.trendingScore.compareTo(a.trendingScore);
-    });
-    return filtered;
-  }
-
-  List<HomeRoom> get visibleRooms {
-    final rooms = filteredRooms;
-    final count = _clampCount(visibleRoomCount, rooms.length);
-    return rooms.take(count).toList();
-  }
+  String? get loadErrorMessage => null;
 
   Future<void> loadHomeChrome() async {
     if (isLoadingHomeChrome) return;
@@ -122,21 +80,14 @@ class HomeController extends ChangeNotifier {
       myCreatedRoom = results[0] as HomeRoom?;
       _eventBanners = (results[1] as List<HomeBanner>?) ?? const [];
       _policyBanners = (results[2] as List<HomeBanner>?) ?? const [];
-      selectedBannerIndex = _clampIndex(
-        selectedBannerIndex,
-        _eventBanners.length,
-      );
-      selectedPolicyBannerIndex = _clampIndex(
-        selectedPolicyBannerIndex,
-        _policyBanners.length,
-      );
+      selectedBannerIndex = _clampIndex(selectedBannerIndex, _eventBanners.length);
+      selectedPolicyBannerIndex = _clampIndex(selectedPolicyBannerIndex, _policyBanners.length);
       bannerErrorMessage = null;
     } catch (_) {
       myCreatedRoom = null;
       _eventBanners = const [];
       _policyBanners = const [];
-      bannerErrorMessage =
-          'Could not load home banners or created room. Pull to refresh.';
+      bannerErrorMessage = 'Could not load home banners. Pull to refresh.';
     } finally {
       isLoadingHomeChrome = false;
       notifyListeners();
@@ -145,70 +96,17 @@ class HomeController extends ChangeNotifier {
 
   Future<void> refreshAfterRoomCreation() async {
     await loadHomeChrome();
-    await loadRooms();
   }
 
-  Future<void> loadTrendingRooms({bool silent = false}) =>
-      loadRooms(silent: silent);
+  Future<void> loadTrendingRooms({bool silent = false}) async {}
 
-  Future<void> loadRooms({bool silent = false}) async {
-    if (isLoadingRooms) return;
-
-    isLoadingRooms = true;
-    if (!silent) loadErrorMessage = null;
-    notifyListeners();
-
-    try {
-      final languageForBackend = selectedLanguage == 'All'
-          ? null
-          : selectedLanguage;
-      final categoryForBackend = _isRoomTypeCategory(selectedCategory)
-          ? selectedCategory
-          : null;
-
-      final fetchedRooms = selectedCategory == 'Following'
-          ? await _repository.fetchFollowingRooms(
-              language: languageForBackend,
-              category: categoryForBackend,
-              limit: 50,
-            )
-          : await _repository.fetchTrendingRooms(
-              language: languageForBackend,
-              category: categoryForBackend,
-              limit: 50,
-            );
-
-      _backendRooms = fetchedRooms;
-      loadErrorMessage = null;
-    } catch (_) {
-      _backendRooms = const [];
-      loadErrorMessage = selectedCategory == 'Following'
-          ? 'Network error. Could not load following rooms. Login again or try later.'
-          : 'Network error. Please check your connection and try again.';
-    } finally {
-      isLoadingRooms = false;
-      visibleRoomCount = 6;
-      notifyListeners();
-    }
-  }
+  Future<void> loadRooms({bool silent = false}) async {}
 
   Future<void> refreshAll() async {
-    await Future.wait([loadHomeChrome(), loadRooms()]);
+    await loadHomeChrome();
   }
 
-  void onScrollNearBottom(ScrollController scrollController) {
-    if (!scrollController.hasClients || hasNetworkError) return;
-    final nearBottom =
-        scrollController.position.pixels >
-        scrollController.position.maxScrollExtent - 420;
-    if (nearBottom && visibleRoomCount < filteredRooms.length) {
-      final nextCount = visibleRoomCount + 4;
-      visibleRoomCount = nextCount > filteredRooms.length
-          ? filteredRooms.length
-          : nextCount;
-      notifyListeners();
-    }
-  }
+  void onScrollNearBottom(ScrollController scrollController) {}
 
   void selectBanner(int index) {
     selectedBannerIndex = _clampIndex(index, _eventBanners.length);
@@ -221,42 +119,25 @@ class HomeController extends ChangeNotifier {
   }
 
   void selectCategory(String category) {
+    if (!categories.contains(category)) return;
     selectedCategory = category;
-    visibleRoomCount = 6;
     notifyListeners();
-    loadRooms(silent: true);
   }
 
   void selectLanguage(String language) {
     selectedLanguage = language;
-    visibleRoomCount = 6;
-    notifyListeners();
-    loadRooms(silent: true);
-  }
-
-  void seeAllRooms() {
-    visibleRoomCount = filteredRooms.length;
     notifyListeners();
   }
 
-  Future<void> retryLoadingRooms() {
-    return loadRooms();
-  }
+  void seeAllRooms() {}
+
+  Future<void> retryLoadingRooms() async {}
 
   int _clampIndex(int value, int length) {
     if (length <= 0) return 0;
     if (value < 0) return 0;
     if (value >= length) return length - 1;
     return value;
-  }
-
-  int _clampCount(int value, int max) {
-    if (max <= 0 || value <= 0) return 0;
-    return value > max ? max : value;
-  }
-
-  bool _isRoomTypeCategory(String category) {
-    return category != 'Trending' && category != 'Following';
   }
 
   @override
