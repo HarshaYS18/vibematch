@@ -64,21 +64,15 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
   @override
   Widget build(BuildContext context) {
     final accentColor = _category.accentColor;
-    final syncedUsers = widget.users
-        .map(_syncCurrentProfile)
-        .toList(growable: false);
+    final syncedUsers = widget.users.map(_syncCurrentProfile).toList(growable: false);
     final allEntries = _controller.buildMockEntries(
       users: syncedUsers,
       category: _category,
       period: _period,
     );
-    final topEntries = allEntries.take(100).toList(growable: false);
+    final podiumEntries = allEntries.take(3).toList(growable: false);
+    final listEntries = allEntries.skip(3).take(97).toList(growable: false);
     final currentEntry = _currentEntry(allEntries);
-    final backendPath = _controller.backendPath(
-      roomPublicId: widget.roomPublicId,
-      category: _category,
-      period: _period,
-    );
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.78,
@@ -99,7 +93,6 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
                 const SizedBox(height: 12),
                 _RankingsHeader(
                   title: _category.title,
-                  subtitle: '${_period.label} global ranking',
                   icon: _category.icon,
                   accentColor: accentColor,
                   onClose: () => Navigator.pop(context),
@@ -119,50 +112,31 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
                 Expanded(
                   child: ListView.separated(
                     physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.only(
-                      bottom: currentEntry == null ? 8 : 86,
-                    ),
-                    itemCount: topEntries.length + 2,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 8),
+                    padding: EdgeInsets.only(bottom: currentEntry == null ? 8 : 86),
+                    itemCount: listEntries.length + 1,
+                    separatorBuilder: (context, index) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       if (index == 0) {
                         return RoomRankingsPodiumPreview(
-                          entries: allEntries,
+                          entries: podiumEntries,
                           accentColor: accentColor,
                         );
                       }
-                      if (index == topEntries.length + 1) {
-                        return Text(
-                          'Backend later: GET $backendPath',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.42),
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        );
-                      }
-                      final entry = topEntries[index - 1];
+                      final entry = listEntries[index - 1];
                       return RoomRankingEntryTile(
                         entry: entry,
                         accentColor: accentColor,
-                        onTap: widget.onUserTap == null
-                            ? null
-                            : () => widget.onUserTap!(entry.user),
+                        onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(entry.user),
                       );
                     },
                   ),
                 ),
-                if (currentEntry != null) ...[
+                if (currentEntry != null && currentEntry.rank > 3) ...[
                   const SizedBox(height: 8),
                   RoomRankingEntryTile(
                     entry: currentEntry,
                     accentColor: accentColor,
-                    onTap: widget.onUserTap == null
-                        ? null
-                        : () => widget.onUserTap!(currentEntry.user),
+                    onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(currentEntry.user),
                   ),
                 ],
               ],
@@ -204,14 +178,12 @@ class _RoomRankingsSheetState extends State<RoomRankingsSheet> {
 class _RankingsHeader extends StatelessWidget {
   const _RankingsHeader({
     required this.title,
-    required this.subtitle,
     required this.icon,
     required this.accentColor,
     required this.onClose,
   });
 
   final String title;
-  final String subtitle;
   final IconData icon;
   final Color accentColor;
   final VoidCallback onClose;
@@ -239,32 +211,16 @@ class _RankingsHeader extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.35,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.58),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.35,
+            ),
           ),
         ),
         Material(
