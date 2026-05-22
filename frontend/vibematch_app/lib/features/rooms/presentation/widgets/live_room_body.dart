@@ -277,6 +277,16 @@ class LiveRoomBody extends StatelessWidget {
                     );
                   },
                 ),
+              if (cricketModeActive && canManageCricket)
+                AnimatedBuilder(
+                  animation: cricketController,
+                  builder: (context, child) {
+                    return CricketRoomModeModule.scorerOverlay(
+                      controller: cricketController,
+                      visibleToCurrentUser: true,
+                    );
+                  },
+                ),
             ],
           ),
         );
