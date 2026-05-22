@@ -45,7 +45,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
 
 class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   static const int _premiumGiftMinCoins = 1000;
-  static const int _legacyControllerComboExtraSeconds = 5;
+  static const int _legacyControllerComboExtraSeconds = 10;
 
   final List<RibbonMessage> _ribbonMessages = <RibbonMessage>[];
   final List<GiftSlide> _backendGiftSlides = <GiftSlide>[];
@@ -118,9 +118,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     for (final gift in _fullGiftCatalog) {
       final giftId = _normalize(gift.id);
       final giftName = _normalize(gift.name);
-      if (giftId == cleanGiftId || giftName == cleanGiftName) {
-        return gift;
-      }
+      if (giftId == cleanGiftId || giftName == cleanGiftName) return gift;
     }
 
     final looksPremium = event.showPremiumBroadcast ||
@@ -182,6 +180,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       case 'premium_magic_2':
         return 'assets/videos/gifts/premium_magic_2.mp4';
       case 'magic_3':
+        return 'assets/videos/gifts/premium_magic_3.mp4';
       case 'premium_magic_3':
         return 'assets/videos/gifts/premium_magic_3.mp4';
     }
@@ -211,15 +210,9 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   List<Color> _colorsForBackendEvent(LiveRoomSystemEvent event, GiftItem gift) {
     if (!event.isLuckyGift) return gift.colors;
-    if (event.luckyMultiplier >= 1000) {
-      return const <Color>[Color(0xFF8B5CF6), Color(0xFF22D3EE)];
-    }
-    if (event.luckyMultiplier >= 500) {
-      return const <Color>[Color(0xFFFF2D95), Color(0xFF00E5FF)];
-    }
-    if (event.luckyMultiplier >= 100) {
-      return const <Color>[Color(0xFFFFC857), Color(0xFFFF5F7E)];
-    }
+    if (event.luckyMultiplier >= 1000) return const <Color>[Color(0xFF8B5CF6), Color(0xFF22D3EE)];
+    if (event.luckyMultiplier >= 500) return const <Color>[Color(0xFFFF2D95), Color(0xFF00E5FF)];
+    if (event.luckyMultiplier >= 100) return const <Color>[Color(0xFFFFC857), Color(0xFFFF5F7E)];
     return gift.colors;
   }
 
@@ -247,9 +240,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       }
       if (!mounted) return;
       setState(() {
-        _backendGiftSlides[index] = active.copyWith(
-          remainingSeconds: active.remainingSeconds - 1,
-        );
+        _backendGiftSlides[index] = active.copyWith(remainingSeconds: active.remainingSeconds - 1);
       });
     });
   }
@@ -296,9 +287,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   Widget build(BuildContext context) {
     final combinedSlides = <GiftSlide>[
       ...widget.slides,
-      ..._backendGiftSlides.where(
-        (backendSlide) => !widget.slides.any((localSlide) => localSlide.id == backendSlide.id),
-      ),
+      ..._backendGiftSlides.where((backendSlide) => !widget.slides.any((localSlide) => localSlide.id == backendSlide.id)),
     ];
     final normalSlides = combinedSlides.where((slide) => !slide.isVideoGift).toList(growable: false);
     final videoSlides = combinedSlides.where((slide) => slide.isVideoGift).toList(growable: false);
@@ -311,21 +300,12 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         clipBehavior: Clip.none,
         children: [
           const PremiumGiftBroadcastOverlay(),
-          GiftSlideOverlay(
-            slides: normalSlides,
-            onComboTap: widget.onComboTap,
-          ),
-          CleanVideoGiftOverlay(
-            slides: videoSlides,
-            onVideoFinished: _finishVideoGift,
-          ),
+          GiftSlideOverlay(slides: normalSlides, onComboTap: widget.onComboTap),
+          CleanVideoGiftOverlay(slides: videoSlides, onVideoFinished: _finishVideoGift),
           ValueListenableBuilder<GiftFlightEvent?>(
             valueListenable: GiftFlightBus.latest,
             builder: (context, event, _) {
-              return GiftFlightOverlay(
-                event: event,
-                onCompleted: GiftFlightBus.clear,
-              );
+              return GiftFlightOverlay(event: event, onCompleted: GiftFlightBus.clear);
             },
           ),
           RibbonMessageOverlay(messages: _ribbonMessages),
@@ -333,10 +313,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             Positioned(
               right: 18,
               bottom: 178 + widget.bottomPadding,
-              child: ComboBuzzer(
-                slide: comboSlide,
-                onTap: () => widget.onComboTap(rawComboSlide!),
-              ),
+              child: ComboBuzzer(slide: comboSlide, onTap: () => widget.onComboTap(rawComboSlide!)),
             ),
           LuckyPacketRoomOverlay(
             packet: widget.activeLuckyPacket,
@@ -350,7 +327,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   GiftSlide? _comboDisplaySlide(GiftSlide? slide) {
     if (slide == null) return null;
-    final displaySeconds = (slide.remainingSeconds - _legacyControllerComboExtraSeconds).clamp(0, 10).toInt();
+    final displaySeconds = (slide.remainingSeconds - _legacyControllerComboExtraSeconds).clamp(0, 5).toInt();
     if (displaySeconds <= 0) return null;
     return slide.copyWith(remainingSeconds: displaySeconds);
   }
@@ -368,9 +345,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
 extension _FirstOrNull<T> on Iterable<T> {
   T? get firstOrNull {
-    for (final item in this) {
-      return item;
-    }
+    for (final item in this) return item;
     return null;
   }
 }
