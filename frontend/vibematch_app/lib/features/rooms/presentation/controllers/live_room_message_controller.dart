@@ -13,8 +13,7 @@ class LiveRoomMessageController {
     required SeatUser currentUser,
     required this.onChanged,
     LiveRoomMessageRestoreState? restoreState,
-  }) : currentUser = LiveRoomMediaSignalingService.instance
-           .effectiveCurrentUser(currentUser) {
+  }) : currentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser) {
     messages = List<ChatEntry>.from(restoreState?.messages ?? mockChatEntries);
     joinRequestUsers.addAll(restoreState?.joinRequestUsers ?? const []);
     _activeController?._detachSystemEventListener();
@@ -28,34 +27,22 @@ class LiveRoomMessageController {
     _activeController?.clearChatForEveryone();
   }
 
-  static void sendActiveRoomImageMessage({
-    required String imageUrl,
-    required String contentType,
-  }) {
-    _activeController?.sendImageMessage(
-      imageUrl: imageUrl,
-      contentType: contentType,
-    );
+  static void sendActiveRoomImageMessage({required String imageUrl, required String contentType}) {
+    _activeController?.sendImageMessage(imageUrl: imageUrl, contentType: contentType);
   }
 
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
 
   late List<ChatEntry> messages;
-
   final List<SeatUser> joinRequestUsers = <SeatUser>[];
   final Set<String> _handledSystemEventIds = <String>{};
   VoidCallbackLike? _systemEventListener;
   VoidCallbackLike? _seatApplicationListener;
 
-  bool get _currentUserCanBypassGuestMessageBlock {
-    return currentUser.isHost || currentUser.isRoomAdmin;
-  }
+  bool get _currentUserCanBypassGuestMessageBlock => currentUser.isHost || currentUser.isRoomAdmin;
 
-  bool get _guestMessageAllowed {
-    return LiveRoomRestrictionsService.guestMessagesEnabled ||
-        _currentUserCanBypassGuestMessageBlock;
-  }
+  bool get _guestMessageAllowed => LiveRoomRestrictionsService.guestMessagesEnabled || _currentUserCanBypassGuestMessageBlock;
 
   LiveRoomMessageRestoreState snapshotForRestore() {
     return LiveRoomMessageRestoreState(
@@ -71,33 +58,23 @@ class LiveRoomMessageController {
     LiveRoomMediaSignalingService.instance.sendRoomChat(trimmed);
   }
 
-  void sendImageMessage({
-    required String imageUrl,
-    required String contentType,
-  }) {
+  void sendImageMessage({required String imageUrl, required String contentType}) {
     final safeUrl = imageUrl.trim();
     if (safeUrl.isEmpty) return;
     if (!LiveRoomRestrictionsService.roomImagesEnabled) return;
     if (!_guestMessageAllowed) return;
   }
 
-  void insertSystemMessage(String message) =>
-      insertPersistentSystemMessage(message);
+  void insertSystemMessage(String message) => insertPersistentSystemMessage(message);
 
   void insertPersistentSystemMessage(String message) {
     final trimmed = message.trim();
     if (trimmed.isEmpty) return;
-    messages.insert(
-      0,
-      ChatEntry(senderName: 'System', senderId: 'system', message: trimmed),
-    );
+    messages.insert(0, ChatEntry(senderName: 'System', senderId: 'system', message: trimmed));
     onChanged();
   }
 
-  void insertTransientSystemMessage(
-    String message, {
-    Duration duration = const Duration(seconds: 10),
-  }) {
+  void insertTransientSystemMessage(String message, {Duration duration = const Duration(seconds: 10)}) {
     final trimmed = message.trim();
     if (trimmed.isEmpty) return;
     final entry = ChatEntry(
@@ -111,27 +88,21 @@ class LiveRoomMessageController {
     _scheduleAutoDismiss(entry);
   }
 
-  void insertUserEnteredSystemEvent(SeatUser user) =>
-      _insertUserEnteredByName(user.name, avatarUrl: user.avatarUrl);
+  void insertUserEnteredSystemEvent(SeatUser user) => _insertUserEnteredByName(user.name, avatarUrl: user.avatarUrl);
 
-  void insertUserRemovedSystemEvent({
-    required String actorName,
-    required String targetName,
-  }) {
+  void insertUserRemovedSystemEvent({required String actorName, required String targetName}) {
     final actor = actorName.trim().isEmpty ? 'Room admin' : actorName.trim();
     final member = targetName.trim().isEmpty ? 'user' : targetName.trim();
-    messages.insert(
-      0,
-      ChatEntry(
-        senderName: 'System',
-        senderId: 'system',
-        message: '$actor has removed $member from the group',
-        systemEventType: RoomSystemEventType.userRemoved,
-        autoDismissAt: DateTime.now().add(const Duration(seconds: 10)),
-      ),
+    final entry = ChatEntry(
+      senderName: 'System',
+      senderId: 'system',
+      message: '$actor has removed $member from the group',
+      systemEventType: RoomSystemEventType.userRemoved,
+      autoDismissAt: DateTime.now().add(const Duration(seconds: 10)),
     );
+    messages.insert(0, entry);
     onChanged();
-    _scheduleAutoDismiss(messages.first);
+    _scheduleAutoDismiss(entry);
   }
 
   void insertEntry(ChatEntry entry) {
@@ -140,34 +111,23 @@ class LiveRoomMessageController {
       return;
     }
     messages.insert(0, entry);
-    if (entry.shouldAutoDismiss) {
-      _scheduleAutoDismiss(entry);
-    }
+    if (entry.shouldAutoDismiss) _scheduleAutoDismiss(entry);
     onChanged();
   }
 
   void clearChatForEveryone() {
     messages.clear();
-    insertPersistentSystemMessage(
-      'Chat cleared for everyone by ${currentUser.name}',
-    );
+    insertPersistentSystemMessage('Chat cleared for everyone by ${currentUser.name}');
   }
 
   void requestJoin() {
-    final alreadyRequested = joinRequestUsers.any(
-      (user) => user.id == currentUser.id,
-    );
-    if (!alreadyRequested) {
-      joinRequestUsers.add(currentUser);
-      onChanged();
-    }
+    final alreadyRequested = joinRequestUsers.any((user) => user.id == currentUser.id);
+    if (alreadyRequested) return;
+    joinRequestUsers.add(currentUser);
+    onChanged();
   }
 
-  void resolveJoinRequest({
-    required SeatUser user,
-    required bool approved,
-    required String roomName,
-  }) {
+  void resolveJoinRequest({required SeatUser user, required bool approved, required String roomName}) {
     joinRequestUsers.removeWhere((item) => item.id == user.id);
     messages.insert(
       0,
@@ -175,9 +135,7 @@ class LiveRoomMessageController {
         senderName: currentUser.name,
         senderId: currentUser.id,
         senderAvatarUrl: currentUser.avatarUrl,
-        message: approved
-            ? 'approved ${user.name} to join $roomName'
-            : 'rejected ${user.name}\'s join request',
+        message: approved ? 'approved ${user.name} to join $roomName' : 'rejected ${user.name}\'s join request',
         vipLevel: currentUser.vipLevel,
         sendingLevel: currentUser.sendingLevel,
         receivingLevel: currentUser.receivingLevel,
@@ -190,30 +148,22 @@ class LiveRoomMessageController {
     _systemEventListener = _handleLatestMediaSystemEvent;
     LiveRoomSystemEventBus.latestEvent.addListener(_systemEventListener!);
     _seatApplicationListener = _handleLatestSeatApplicationEvent;
-    LiveRoomSeatApplicationEventBus.latestEvent.addListener(
-      _seatApplicationListener!,
-    );
+    LiveRoomSeatApplicationEventBus.latestEvent.addListener(_seatApplicationListener!);
   }
 
   void _detachSystemEventListener() {
     final listener = _systemEventListener;
-    if (listener == null) return;
-    LiveRoomSystemEventBus.latestEvent.removeListener(listener);
+    if (listener != null) LiveRoomSystemEventBus.latestEvent.removeListener(listener);
     _systemEventListener = null;
     final seatApplicationListener = _seatApplicationListener;
-    if (seatApplicationListener != null) {
-      LiveRoomSeatApplicationEventBus.latestEvent.removeListener(
-        seatApplicationListener,
-      );
-      _seatApplicationListener = null;
-    }
+    if (seatApplicationListener != null) LiveRoomSeatApplicationEventBus.latestEvent.removeListener(seatApplicationListener);
+    _seatApplicationListener = null;
   }
 
   void _handleLatestSeatApplicationEvent() {
     final event = LiveRoomSeatApplicationEventBus.latestEvent.value;
     if (event == null || _handledSystemEventIds.contains(event.id)) return;
     if (event.seatIndex < 0) return;
-
     _handledSystemEventIds.add(event.id);
     _insertSeatApplicationRequest(
       applicantUserId: event.applicantUserId,
@@ -234,19 +184,15 @@ class LiveRoomMessageController {
     required DateTime expiresAt,
   }) {
     final existingPending = messages.any(
-      (message) =>
-          message.isSeatApplication &&
+      (message) => message.isSeatApplication &&
           !message.applicationResolved &&
           _sameRoomUserId(message.senderId, applicantUserId) &&
           message.seatIndex == seatIndex,
     );
-
     if (existingPending) return;
-
     final applicant = _sameRoomUserId(applicantUserId, currentUser.id)
         ? currentUser
         : LiveRoomPresenceRepository.userByRoomUserId(applicantUserId);
-
     messages.insert(
       0,
       ChatEntry(
@@ -263,7 +209,6 @@ class LiveRoomMessageController {
         applicationExpiresAt: expiresAt,
       ),
     );
-
     onChanged();
   }
 
@@ -276,9 +221,7 @@ class LiveRoomMessageController {
       messages.insert(
         0,
         ChatEntry(
-          senderName: event.actorName.trim().isEmpty
-              ? 'Vibe User'
-              : event.actorName.trim(),
+          senderName: event.actorName.trim().isEmpty ? 'Vibe User' : event.actorName.trim(),
           senderId: event.actorUserId,
           senderAvatarUrl: event.actorAvatarUrl,
           message: event.message,
@@ -292,52 +235,23 @@ class LiveRoomMessageController {
     }
 
     if (event.isRoomGiftSent) {
-      if (_sameRoomUserId(event.actorUserId, currentUser.id) ||
-          _sameDisplayName(event.actorName, currentUser.name)) {
-        return;
-      }
-      _insertOrUpdateGiftEntry(
-        ChatEntry(
-          senderName: event.actorName.trim().isEmpty
-              ? 'Vibe User'
-              : event.actorName.trim(),
-          senderId: event.actorUserId,
-          senderAvatarUrl: event.actorAvatarUrl,
-          message: event.message.trim().isEmpty
-              ? 'sent ${event.giftName} x${event.giftQuantity}'
-              : event.message.trim(),
-          vipLevel: event.actorVipLevel,
-          sendingLevel: event.actorSendingLevel,
-          receivingLevel: event.actorReceivingLevel,
-          isGift: true,
-        ),
-      );
       return;
     }
 
     if (event.isUserEntered) {
-      if (event.targetUserId == currentUser.id ||
-          event.actorUserId == currentUser.id) {
-        return;
-      }
-      final name = event.targetName.trim().isNotEmpty
-          ? event.targetName
-          : event.actorName;
+      if (event.targetUserId == currentUser.id || event.actorUserId == currentUser.id) return;
+      final name = event.targetName.trim().isNotEmpty ? event.targetName : event.actorName;
       _insertUserEnteredByName(name, avatarUrl: event.actorAvatarUrl);
       return;
     }
 
     if (event.type == 'seat_application_requested') {
       final seatIndex = event.seatIndex;
-      final applicantId = event.actorUserId.trim().isNotEmpty
-          ? event.actorUserId
-          : event.targetUserId;
+      final applicantId = event.actorUserId.trim().isNotEmpty ? event.actorUserId : event.targetUserId;
       if (seatIndex != null && applicantId.trim().isNotEmpty) {
         _insertSeatApplicationRequest(
           applicantUserId: applicantId,
-          applicantName: event.actorName.trim().isEmpty
-              ? event.targetName
-              : event.actorName,
+          applicantName: event.actorName.trim().isEmpty ? event.targetName : event.actorName,
           applicantAvatarUrl: event.actorAvatarUrl,
           seatIndex: seatIndex,
           createdAt: event.createdAt,
@@ -349,19 +263,12 @@ class LiveRoomMessageController {
 
     if (event.isChatCleared) {
       messages.clear();
-      insertTransientSystemMessage(
-        event.message.trim().isEmpty
-            ? 'Chat cleared for everyone'
-            : event.message.trim(),
-      );
+      insertTransientSystemMessage(event.message.trim().isEmpty ? 'Chat cleared for everyone' : event.message.trim());
       return;
     }
 
     if (event.isSeatApplicationAgreed || event.isSeatApplicationRejected) {
-      _resolveSeatApplicationFromSystemEvent(
-        event,
-        approved: event.isSeatApplicationAgreed,
-      );
+      _resolveSeatApplicationFromSystemEvent(event, approved: event.isSeatApplicationAgreed);
       insertTransientSystemMessage(event.message);
       return;
     }
@@ -381,19 +288,16 @@ class LiveRoomMessageController {
       return;
     }
 
-    if (event.message.trim().isNotEmpty) {
-      insertTransientSystemMessage(event.message);
-    }
+    if (event.message.trim().isNotEmpty) insertTransientSystemMessage(event.message);
   }
 
   void _insertOrUpdateGiftEntry(ChatEntry entry) {
-    final cleanMessage = _cleanGiftMessage(entry.message);
     final cleanEntry = ChatEntry(
       senderName: entry.senderName,
       senderId: entry.senderId,
       senderAvatarUrl: entry.senderAvatarUrl,
       senderNameGradientColors: entry.senderNameGradientColors,
-      message: cleanMessage,
+      message: _cleanGiftMessage(entry.message),
       vipLevel: entry.vipLevel,
       sendingLevel: entry.sendingLevel,
       receivingLevel: entry.receivingLevel,
@@ -404,10 +308,7 @@ class LiveRoomMessageController {
     final oldIndex = messages.indexWhere((item) => item.isGift && _giftMessageKey(item) == key);
     if (oldIndex >= 0) {
       messages[oldIndex] = cleanEntry;
-      if (oldIndex != 0) {
-        final updated = messages.removeAt(oldIndex);
-        messages.insert(0, updated);
-      }
+      if (oldIndex != 0) messages.insert(0, messages.removeAt(oldIndex));
     } else {
       messages.insert(0, cleanEntry);
     }
@@ -415,11 +316,12 @@ class LiveRoomMessageController {
   }
 
   String _cleanGiftMessage(String message) {
-    var clean = message.trim();
-    clean = clean.replaceAll(RegExp(r'\s+x0(?=\s+x\d+|$)', caseSensitive: false), '');
-    clean = clean.replaceAll(RegExp(r'\s+0x(?=\s+x\d+|$)', caseSensitive: false), '');
-    clean = clean.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return clean;
+    return message
+        .trim()
+        .replaceAll(RegExp(r'\s+x0(?=\s+x\d+|$)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+0x(?=\s+x\d+|$)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   String _giftMessageKey(ChatEntry entry) {
@@ -432,12 +334,6 @@ class LiveRoomMessageController {
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     return '$sender|$baseMessage';
-  }
-
-  bool _sameDisplayName(String a, String b) {
-    final left = a.trim().toLowerCase();
-    final right = b.trim().toLowerCase();
-    return left.isNotEmpty && left == right;
   }
 
   void _insertUserEnteredByName(String rawName, {String? avatarUrl}) {
@@ -455,30 +351,18 @@ class LiveRoomMessageController {
     _scheduleAutoDismiss(entry);
   }
 
-  void _resolveSeatApplicationFromSystemEvent(
-    LiveRoomSystemEvent event, {
-    required bool approved,
-  }) {
+  void _resolveSeatApplicationFromSystemEvent(LiveRoomSystemEvent event, {required bool approved}) {
     var changed = false;
     final entriesToDismiss = <ChatEntry>[];
     for (var i = 0; i < messages.length; i++) {
       final entry = messages[i];
-      if (!entry.isSeatApplication ||
-          entry.applicationApproved ||
-          entry.applicationRejected) {
-        continue;
-      }
+      if (!entry.isSeatApplication || entry.applicationApproved || entry.applicationRejected) continue;
       if (!_sameRoomUserId(entry.senderId, event.targetUserId)) continue;
       final eventSeatIndex = event.seatIndex;
       if (eventSeatIndex != null && entry.seatIndex != eventSeatIndex) continue;
-
-      final seatLabel = entry.seatIndex == null
-          ? ''
-          : ' ${entry.seatIndex! + 1}';
+      final seatLabel = entry.seatIndex == null ? '' : ' ${entry.seatIndex! + 1}';
       final updatedEntry = entry.copyWith(
-        message: approved
-            ? '${entry.senderName} seat$seatLabel request agreed'
-            : '${entry.senderName} seat$seatLabel request rejected',
+        message: approved ? '${entry.senderName} seat$seatLabel request agreed' : '${entry.senderName} seat$seatLabel request rejected',
         applicationApproved: approved,
         applicationRejected: !approved,
         autoDismissAt: DateTime.now().add(const Duration(seconds: 10)),
@@ -487,11 +371,10 @@ class LiveRoomMessageController {
       entriesToDismiss.add(updatedEntry);
       changed = true;
     }
-    if (changed) {
-      onChanged();
-      for (final entry in entriesToDismiss) {
-        _scheduleAutoDismiss(entry);
-      }
+    if (!changed) return;
+    onChanged();
+    for (final entry in entriesToDismiss) {
+      _scheduleAutoDismiss(entry);
     }
   }
 
