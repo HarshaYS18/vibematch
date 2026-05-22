@@ -26,14 +26,34 @@ class PremiumGiftBroadcastEvent {
 class PremiumGiftBroadcastBus {
   const PremiumGiftBroadcastBus._();
 
-  static final ValueNotifier<PremiumGiftBroadcastEvent?> latest = ValueNotifier<PremiumGiftBroadcastEvent?>(null);
+  static final ValueNotifier<int> queueVersion = ValueNotifier<int>(0);
+  static final List<PremiumGiftBroadcastEvent> _queue = <PremiumGiftBroadcastEvent>[];
+  static PremiumGiftBroadcastEvent? _active;
+
+  static PremiumGiftBroadcastEvent? get active => _active;
 
   static void publish(PremiumGiftBroadcastEvent event) {
-    latest.value = event;
+    if (_active == null) {
+      _active = event;
+    } else {
+      _queue.add(event);
+    }
+    queueVersion.value++;
   }
 
-  static void clear() {
-    latest.value = null;
+  static void completeActive() {
+    if (_queue.isEmpty) {
+      _active = null;
+    } else {
+      _active = _queue.removeAt(0);
+    }
+    queueVersion.value++;
+  }
+
+  static void clearAll() {
+    _active = null;
+    _queue.clear();
+    queueVersion.value++;
   }
 }
 
@@ -42,9 +62,10 @@ class PremiumGiftBroadcastOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<PremiumGiftBroadcastEvent?>(
-      valueListenable: PremiumGiftBroadcastBus.latest,
-      builder: (context, event, _) {
+    return ValueListenableBuilder<int>(
+      valueListenable: PremiumGiftBroadcastBus.queueVersion,
+      builder: (context, _, child) {
+        final event = PremiumGiftBroadcastBus.active;
         if (event == null) return const SizedBox.shrink();
         return Positioned(
           top: MediaQuery.paddingOf(context).top + 8,
@@ -54,7 +75,7 @@ class PremiumGiftBroadcastOverlay extends StatelessWidget {
             child: _PremiumGiftBroadcastCard(
               key: ValueKey(event.id),
               event: event,
-              onCompleted: PremiumGiftBroadcastBus.clear,
+              onCompleted: PremiumGiftBroadcastBus.completeActive,
             ),
           ),
         );
