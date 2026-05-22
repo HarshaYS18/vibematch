@@ -68,9 +68,6 @@ class LiveRoomMessageController {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     if (!_guestMessageAllowed) return;
-
-    // Room chat is backend-owned. Sender and receivers render only the same
-    // backend broadcast after the DB write succeeds.
     LiveRoomMediaSignalingService.instance.sendRoomChat(trimmed);
   }
 
@@ -82,9 +79,6 @@ class LiveRoomMessageController {
     if (safeUrl.isEmpty) return;
     if (!LiveRoomRestrictionsService.roomImagesEnabled) return;
     if (!_guestMessageAllowed) return;
-
-    // TODO: move image upload/message to backend room event. Until then do not
-    // fake-send through local state under the single-source-of-truth rule.
   }
 
   void insertSystemMessage(String message) =>
@@ -141,8 +135,10 @@ class LiveRoomMessageController {
   }
 
   void insertEntry(ChatEntry entry) {
-    // Legacy local insert path. Keep for temporary local-only UI modules, but
-    // committed live-room events must go through backend websocket events.
+    if (entry.isGift) {
+      _insertOrUpdateGiftEntry(entry);
+      return;
+    }
     messages.insert(0, entry);
     if (entry.shouldAutoDismiss) {
       _scheduleAutoDismiss(entry);
@@ -296,8 +292,11 @@ class LiveRoomMessageController {
     }
 
     if (event.isRoomGiftSent) {
-      messages.insert(
-        0,
+      if (_sameRoomUserId(event.actorUserId, currentUser.id) ||
+          _sameDisplayName(event.actorName, currentUser.name)) {
+        return;
+      }
+      _insertOrUpdateGiftEntry(
         ChatEntry(
           senderName: event.actorName.trim().isEmpty
               ? 'Vibe User'
@@ -313,7 +312,6 @@ class LiveRoomMessageController {
           isGift: true,
         ),
       );
-      onChanged();
       return;
     }
 
@@ -386,6 +384,60 @@ class LiveRoomMessageController {
     if (event.message.trim().isNotEmpty) {
       insertTransientSystemMessage(event.message);
     }
+  }
+
+  void _insertOrUpdateGiftEntry(ChatEntry entry) {
+    final cleanMessage = _cleanGiftMessage(entry.message);
+    final cleanEntry = ChatEntry(
+      senderName: entry.senderName,
+      senderId: entry.senderId,
+      senderAvatarUrl: entry.senderAvatarUrl,
+      senderNameGradientColors: entry.senderNameGradientColors,
+      message: cleanMessage,
+      vipLevel: entry.vipLevel,
+      sendingLevel: entry.sendingLevel,
+      receivingLevel: entry.receivingLevel,
+      isGift: true,
+      giftAssetPath: entry.giftAssetPath,
+    );
+    final key = _giftMessageKey(cleanEntry);
+    final oldIndex = messages.indexWhere((item) => item.isGift && _giftMessageKey(item) == key);
+    if (oldIndex >= 0) {
+      messages[oldIndex] = cleanEntry;
+      if (oldIndex != 0) {
+        final updated = messages.removeAt(oldIndex);
+        messages.insert(0, updated);
+      }
+    } else {
+      messages.insert(0, cleanEntry);
+    }
+    onChanged();
+  }
+
+  String _cleanGiftMessage(String message) {
+    var clean = message.trim();
+    clean = clean.replaceAll(RegExp(r'\s+x0(?=\s+x\d+|$)', caseSensitive: false), '');
+    clean = clean.replaceAll(RegExp(r'\s+0x(?=\s+x\d+|$)', caseSensitive: false), '');
+    clean = clean.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return clean;
+  }
+
+  String _giftMessageKey(ChatEntry entry) {
+    final sender = (entry.senderId?.trim().isNotEmpty ?? false)
+        ? entry.senderId!.trim().toLowerCase()
+        : entry.senderName.trim().toLowerCase();
+    final baseMessage = _cleanGiftMessage(entry.message)
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+x\d+\b'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return '$sender|$baseMessage';
+  }
+
+  bool _sameDisplayName(String a, String b) {
+    final left = a.trim().toLowerCase();
+    final right = b.trim().toLowerCase();
+    return left.isNotEmpty && left == right;
   }
 
   void _insertUserEnteredByName(String rawName, {String? avatarUrl}) {
