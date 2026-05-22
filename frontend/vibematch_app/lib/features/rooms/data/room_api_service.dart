@@ -439,7 +439,20 @@ class RoomSettingsDto {
 }
 
 class RoomThemeDto {
-  const RoomThemeDto({required this.themeId, required this.name, required this.ownershipType, required this.priceCoins, required this.isOwned, required this.isDefault, this.imageUrl, this.assetPath});
+  const RoomThemeDto({
+    required this.themeId,
+    required this.name,
+    required this.ownershipType,
+    required this.priceCoins,
+    required this.isOwned,
+    required this.isDefault,
+    this.mode = 'chat',
+    this.imageUrl,
+    this.thumbnailUrl,
+    this.assetPath,
+    this.isActive = true,
+    this.overlayOpacity = 0.42,
+  });
 
   final String themeId;
   final String name;
@@ -447,12 +460,19 @@ class RoomThemeDto {
   final int priceCoins;
   final bool isOwned;
   final bool isDefault;
+  final String mode;
   final String? imageUrl;
+  final String? thumbnailUrl;
   final String? assetPath;
+  final bool isActive;
+  final double overlayOpacity;
 
   bool get isFree => ownershipType == 'free' || priceCoins <= 0;
 
   factory RoomThemeDto.fromJson(Map<String, dynamic> json) {
+    final opacityValue = json['overlay_opacity'] ?? json['overlayOpacity'];
+    final parsedOpacity = double.tryParse(opacityValue?.toString() ?? '');
+
     return RoomThemeDto(
       themeId: json['theme_id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Room Background',
@@ -460,8 +480,12 @@ class RoomThemeDto {
       priceCoins: int.tryParse(json['price_coins']?.toString() ?? '') ?? 0,
       isOwned: json['is_owned'] == true,
       isDefault: json['is_default'] == true,
+      mode: json['mode']?.toString() ?? json['category']?.toString() ?? 'chat',
       imageUrl: _nullableString(json['image_url']),
+      thumbnailUrl: _nullableString(json['thumbnail_url'] ?? json['thumbnailUrl']),
       assetPath: _nullableString(json['asset_path']),
+      isActive: json['is_active'] != false,
+      overlayOpacity: (parsedOpacity?.clamp(0.0, 1.0) ?? 0.42).toDouble(),
     );
   }
 }
