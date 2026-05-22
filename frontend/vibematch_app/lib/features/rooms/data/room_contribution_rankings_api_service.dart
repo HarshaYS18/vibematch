@@ -50,20 +50,61 @@ class RoomContributionRankingsApiService {
 
   RoomRankingEntry _entryFromJson(Map<String, dynamic> json) {
     final userJson = _map(json['user']);
+    final vipJson = _map(userJson['vip']);
+    final vipSummaryJson = _map(userJson['vip_summary']);
+    final publicUserId = _firstInt([
+      userJson['public_user_id'],
+      userJson['publicUserId'],
+      userJson['id'],
+      json['public_user_id'],
+    ]);
+    final internalUserId = _firstInt([userJson['id'], userJson['user_id'], publicUserId]);
+    final vipLevel = _firstInt([
+      userJson['vip_level'],
+      userJson['vipLevel'],
+      userJson['vip'],
+      vipJson['vip_level'],
+      vipJson['level'],
+      vipSummaryJson['vip_level'],
+      vipSummaryJson['level'],
+      json['vip_level'],
+    ]);
+    final svipLevel = _firstInt([
+      userJson['svip_level'],
+      userJson['svipLevel'],
+      vipJson['svip_level'],
+      vipSummaryJson['svip_level'],
+      json['svip_level'],
+    ]);
+    final sendingLevel = _firstInt([
+      userJson['sending_level'],
+      userJson['send_level'],
+      userJson['sendLevel'],
+      json['sending_level'],
+      json['send_level'],
+    ]);
+    final receivingLevel = _firstInt([
+      userJson['receiving_level'],
+      userJson['receive_level'],
+      userJson['receiveLevel'],
+      json['receiving_level'],
+      json['receive_level'],
+    ]);
+
     final user = SeatUser(
-      id: '${_int(userJson['public_user_id']) == 0 ? _int(userJson['id']) : _int(userJson['public_user_id'])}',
+      id: 'user_$publicUserId',
       name: _string(userJson['display_name'], fallback: _string(userJson['username'], fallback: 'Vibe User')),
       roleLabel: 'member',
       familyName: '',
       relationshipText: '',
-      vipLevel: _int(userJson['vip_level']),
-      svipLevel: _int(userJson['svip_level']),
-      sendingLevel: _int(userJson['sending_level']),
-      receivingLevel: _int(userJson['receiving_level']),
-      sentExp: _int(userJson['monthly_sent']),
-      receivedExp: _int(userJson['monthly_received']),
+      vipLevel: vipLevel,
+      svipLevel: svipLevel,
+      sendingLevel: sendingLevel,
+      receivingLevel: receivingLevel,
+      sentExp: _firstInt([userJson['monthly_sent'], userJson['sent_exp'], json['score']]),
+      receivedExp: _firstInt([userJson['monthly_received'], userJson['received_exp']]),
       medals: const <String>[],
-      avatarColors: _avatarColors(_int(userJson['id'])),
+      avatarColors: _avatarColors(internalUserId),
       avatarUrl: _nullableString(userJson['avatar_url']),
     );
 
@@ -71,9 +112,9 @@ class RoomContributionRankingsApiService {
       rank: _int(json['rank']),
       user: user,
       score: _int(json['score']),
-      scoreText: _string(json['score_text'], fallback: compactNumber(_int(json['score']))),
+      scoreText: _string(json['score_text'] ?? json['score_display'], fallback: compactNumber(_int(json['score']))),
       scoreLabel: _string(json['score_label'], fallback: 'coin'),
-      subtitle: _string(json['subtitle'], fallback: 'Sent Lv ${user.sendingLevel}'),
+      subtitle: '',
     );
   }
 }
@@ -88,6 +129,14 @@ int _int(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+int _firstInt(List<dynamic> values) {
+  for (final value in values) {
+    final parsed = _int(value);
+    if (parsed != 0) return parsed;
+  }
   return 0;
 }
 
