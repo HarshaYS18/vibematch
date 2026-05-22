@@ -192,9 +192,9 @@ class GlobalRankingResponse {
       periodStartAt: _date(json['period_start_at']),
       entries: entries is List
           ? entries
-                .whereType<Map>()
-                .map((entry) => GlobalRankingEntry.fromJson(entry.cast<String, dynamic>()))
-                .toList(growable: false)
+              .whereType<Map>()
+              .map((entry) => GlobalRankingEntry.fromJson(entry.cast<String, dynamic>()))
+              .toList(growable: false)
           : const <GlobalRankingEntry>[],
     );
   }
@@ -248,15 +248,32 @@ class GlobalRankingUser {
   final String? avatarUrl;
 
   factory GlobalRankingUser.fromJson(Map<String, dynamic> json) {
+    final vipJson = _map(json['vip']);
+    final vipSummaryJson = _map(json['vip_summary']);
     return GlobalRankingUser(
-      id: _int(json['id']),
-      publicUserId: _int(json['public_user_id']),
+      id: _firstInt([json['id'], json['user_id'], json['internal_user_id']]),
+      publicUserId: _firstInt([json['public_user_id'], json['publicUserId'], json['id']]),
       displayName: _string(json['display_name'], fallback: _string(json['username'], fallback: 'Vibe User')),
       username: _string(json['username'], fallback: ''),
-      vipLevel: _int(json['vip_level']),
-      svipLevel: _int(json['svip_level']),
-      sendLevel: _int(json['send_level']),
-      receiveLevel: _int(json['receive_level']),
+      vipLevel: _firstInt([
+        json['vip_level'],
+        json['vipLevel'],
+        json['vip'],
+        vipJson['vip_level'],
+        vipJson['level'],
+        vipSummaryJson['vip_level'],
+        vipSummaryJson['level'],
+      ]),
+      svipLevel: _firstInt([
+        json['svip_level'],
+        json['svipLevel'],
+        vipJson['svip_level'],
+        vipJson['svipLevel'],
+        vipSummaryJson['svip_level'],
+        vipSummaryJson['svipLevel'],
+      ]),
+      sendLevel: _firstInt([json['send_level'], json['sending_level'], json['sendLevel']]),
+      receiveLevel: _firstInt([json['receive_level'], json['receiving_level'], json['receiveLevel']]),
       avatarUrl: _nullableString(json['avatar_url']),
     );
   }
@@ -288,6 +305,14 @@ int _int(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+int _firstInt(List<Object?> values) {
+  for (final value in values) {
+    final parsed = _int(value);
+    if (parsed != 0) return parsed;
+  }
   return 0;
 }
 
