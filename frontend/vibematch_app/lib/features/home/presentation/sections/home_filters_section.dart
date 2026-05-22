@@ -19,94 +19,94 @@ class HomeFiltersSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 12),
       child: Row(
         children: [
           Expanded(
             child: SizedBox(
-              height: 42,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 9),
-                itemBuilder: (context, index) {
-                  final category = categories[index];
+              height: 34,
+              child: Row(
+                children: categories.map((category) {
                   final selected = category == selectedCategory;
-
-                  return GestureDetector(
-                    onTap: () => onCategorySelected(category),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      decoration: BoxDecoration(
-                        color: selected ? const Color(0xFF251538) : Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: selected ? const Color(0xFF251538) : const Color(0xFFEDE3D7),
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 26),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onCategorySelected(category),
+                      child: AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 170),
+                        curve: Curves.easeOutCubic,
+                        style: TextStyle(
+                          color: selected ? const Color(0xFF251538) : const Color(0xFF7B6A86),
+                          fontSize: selected ? 15 : 14,
+                          height: 1,
+                          fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                          letterSpacing: -0.15,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF251538).withValues(alpha: selected ? 0.13 : 0.04),
-                            blurRadius: 14,
-                            offset: const Offset(0, 7),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          category,
-                          style: TextStyle(
-                            color: selected ? Colors.white : const Color(0xFF4A2A63),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w900,
-                          ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(category),
+                            const SizedBox(height: 6),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOutCubic,
+                              width: selected ? 28 : 0,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF12C7B7),
+                                borderRadius: BorderRadius.circular(999),
+                                boxShadow: selected
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(0xFF12C7B7).withValues(alpha: 0.34),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   );
-                },
+                }).toList(growable: false),
               ),
             ),
           ),
-          const SizedBox(width: 10),
           GestureDetector(
             onTap: onLanguageTap,
             child: Container(
-              height: 42,
-              constraints: const BoxConstraints(minWidth: 48, maxWidth: 118),
-              padding: const EdgeInsets.symmetric(horizontal: 11),
+              height: 30,
+              constraints: const BoxConstraints(minWidth: 42, maxWidth: 108),
+              padding: const EdgeInsets.symmetric(horizontal: 9),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.white.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: const Color(0xFFEDE3D7)),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF251538).withValues(alpha: 0.04),
-                    blurRadius: 14,
-                    offset: const Offset(0, 7),
-                  ),
-                ],
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.translate_rounded, color: Color(0xFF8C5CF6), size: 19),
+                  const Icon(Icons.translate_rounded, color: Color(0xFF8C5CF6), size: 16),
                   if (selectedLanguage != 'All') ...[
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Flexible(
                       child: Text(
                         selectedLanguage,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF251538),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                   ],
-                  const SizedBox(width: 2),
-                  const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF4A2A63), size: 18),
+                  const SizedBox(width: 1),
+                  const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF4A2A63), size: 16),
                 ],
               ),
             ),
