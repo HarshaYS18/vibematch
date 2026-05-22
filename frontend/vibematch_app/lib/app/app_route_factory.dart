@@ -30,14 +30,12 @@ class AppRouteFactory {
     switch (settings.name) {
       case VmRoutes.auth:
         return _buildRoute(settings, const AuthGate());
-
       case VmRoutes.liveRoom:
         final args = settings.arguments;
         if (args is LiveRoomRouteArgs) {
           return LiveRoomRoutes.liveRoom(LiveRoomRouteViewArgs(roomName: args.roomName, roomId: args.roomId, language: args.language, modeTitle: args.modeTitle, onlineCount: args.onlineCount, currentUser: args.currentUser, lockPassword: args.lockPassword));
         }
         return _buildRoute(settings, const VmSkeletonPage(title: 'Room Locked', subtitle: 'Open rooms from Home after access check.', icon: Icons.lock_rounded));
-
       case VmRoutes.roomLevel:
         return _buildRoute(settings, const RoomLevelPage());
       case VmRoutes.experienceDetail:
@@ -117,15 +115,12 @@ class AppRouteFactory {
       settings: settings,
       transitionDuration: const Duration(milliseconds: 260),
       reverseTransitionDuration: const Duration(milliseconds: 210),
-      pageBuilder: (_, __, ___) => page,
+      pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
         return FadeTransition(
           opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(begin: const Offset(0.045, 0.012), end: Offset.zero).animate(curved),
-            child: ScaleTransition(scale: Tween<double>(begin: 0.988, end: 1).animate(curved), child: child),
-          ),
+          child: SlideTransition(position: Tween<Offset>(begin: const Offset(0.045, 0.012), end: Offset.zero).animate(curved), child: ScaleTransition(scale: Tween<double>(begin: 0.988, end: 1).animate(curved), child: child)),
         );
       },
     );
@@ -141,12 +136,7 @@ class UnknownRoutePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       appBar: AppBar(title: const Text('Not found'), backgroundColor: const Color(0xFFFAF7F1), foregroundColor: const Color(0xFF251538), elevation: 0),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('This page is not available yet.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: const Color(0xFF251538))),
-        ),
-      ),
+      body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('This page is not available yet.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: const Color(0xFF251538))))),
     );
   }
 }
