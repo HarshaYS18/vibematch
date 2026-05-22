@@ -77,8 +77,7 @@ class _PremiumGiftBroadcastCard extends StatefulWidget {
   State<_PremiumGiftBroadcastCard> createState() => _PremiumGiftBroadcastCardState();
 }
 
-class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
-    with SingleTickerProviderStateMixin {
+class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _opacity;
   late final Animation<Offset> _offset;
@@ -201,9 +200,8 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w900,
                                     height: 1.0,
-                                    shadows: [
-                                      Shadow(color: Colors.black87, blurRadius: 6),
-                                    ],
+                                    decoration: TextDecoration.none,
+                                    shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
                                   ),
                                 ),
                                 const SizedBox(height: 3),
@@ -216,9 +214,8 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                                     fontSize: 10.8,
                                     fontWeight: FontWeight.w800,
                                     height: 1.0,
-                                    shadows: [
-                                      Shadow(color: Colors.black87, blurRadius: 6),
-                                    ],
+                                    decoration: TextDecoration.none,
+                                    shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
                                   ),
                                 ),
                               ],
@@ -334,6 +331,7 @@ class _BroadcastAvatar extends StatelessWidget {
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
+                    decoration: TextDecoration.none,
                   ),
                 ),
               )
@@ -349,6 +347,7 @@ class _BroadcastAvatar extends StatelessWidget {
                       color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ),
