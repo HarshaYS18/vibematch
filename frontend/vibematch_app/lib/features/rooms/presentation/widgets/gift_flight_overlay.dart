@@ -139,18 +139,9 @@ class _GiftFlightActorState extends State<_GiftFlightActor> with SingleTickerPro
                   Positioned(
                     left: end.dx - 58,
                     top: end.dy - 58,
-                    child: Opacity(opacity: (1 - pop).clamp(0.0, 1.0), child: _GiftLandingBurst(event: widget.event, progress: pop)),
-                  ),
-                if ((widget.event.multiplier ?? 0) > 0 && t > 0.62)
-                  Positioned(
-                    left: end.dx - 52,
-                    top: end.dy - 108,
                     child: Opacity(
-                      opacity: ((t - 0.62) / 0.18).clamp(0.0, 1.0),
-                      child: Transform.scale(
-                        scale: 0.7 + (((t - 0.62) / 0.20).clamp(0.0, 1.0) * 0.36),
-                        child: LuckyWinBadge(multiplier: widget.event.multiplier!, rewardCoinAmount: widget.event.rewardCoinAmount ?? 0),
-                      ),
+                      opacity: (1 - pop).clamp(0.0, 1.0),
+                      child: _GiftLandingBurst(event: widget.event, progress: pop),
                     ),
                   ),
               ],
@@ -240,50 +231,5 @@ class GiftWinStyle {
     if (value >= 100) return const GiftWinStyle(label: 'SUPER', colors: [Color(0xFFFFD166), Color(0xFFFF8A00)]);
     if (value > 1) return const GiftWinStyle(label: 'WIN', colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)]);
     return const GiftWinStyle(label: 'GIFT', colors: [Color(0xFFFFD166), Color(0xFFE84C72)]);
-  }
-}
-
-class LuckyWinBadge extends StatelessWidget {
-  const LuckyWinBadge({super.key, required this.multiplier, required this.rewardCoinAmount});
-
-  final int multiplier;
-  final int rewardCoinAmount;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = GiftWinStyle.fromMultiplier(multiplier);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: style.colors),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.70), width: 1.4),
-        boxShadow: [
-          BoxShadow(color: style.colors.first.withValues(alpha: 0.58), blurRadius: 24, spreadRadius: 2),
-          BoxShadow(color: Colors.white.withValues(alpha: 0.28), blurRadius: 18),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('${style.label} x$multiplier', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black45, blurRadius: 7)])),
-          const SizedBox(height: 3),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.toll_rounded, color: Colors.white, size: 13),
-              const SizedBox(width: 3),
-              Text('+${_compact(rewardCoinAmount)}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _compact(int value) {
-    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
-    return '$value';
   }
 }
