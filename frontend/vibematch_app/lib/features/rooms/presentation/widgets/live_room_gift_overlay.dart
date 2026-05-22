@@ -12,7 +12,6 @@ import '../live_room_models.dart';
 import 'gift_flight_bus.dart';
 import 'gift_flight_overlay.dart';
 import 'gift_modules/lucky_packet_room_overlay.dart';
-import 'live_room_event_carousel.dart';
 import 'premium_gift_broadcast_overlay.dart';
 import 'room_gifts.dart';
 
@@ -139,9 +138,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
               ? GiftCategory.premium
               : GiftCategory.classic,
       coins: event.giftCoinValue,
-      icon: looksPremium
-          ? Icons.workspace_premium_rounded
-          : Icons.card_giftcard_rounded,
+      icon: looksPremium ? Icons.workspace_premium_rounded : Icons.card_giftcard_rounded,
       chatSymbol: looksPremium ? '👑' : '🎁',
       colors: looksPremium
           ? const <Color>[Color(0xFFFFD166), Color(0xFF8C5CF6)]
@@ -256,11 +253,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     });
   }
 
-  void _publishBackendPremiumBroadcast(
-    LiveRoomSystemEvent event,
-    GiftItem gift,
-    GiftSlide slide,
-  ) {
+  void _publishBackendPremiumBroadcast(LiveRoomSystemEvent event, GiftItem gift, GiftSlide slide) {
     final shouldBroadcast = event.showPremiumBroadcast ||
         gift.category == GiftCategory.premium ||
         event.ribbonTier == 'premium' ||
@@ -280,15 +273,9 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     );
   }
 
-  void _publishBackendGiftFlight(
-    LiveRoomSystemEvent event,
-    GiftItem gift,
-    GiftSlide slide,
-  ) {
+  void _publishBackendGiftFlight(LiveRoomSystemEvent event, GiftItem gift, GiftSlide slide) {
     if (!event.showGiftFlight) return;
-    final totalCoins = event.giftTotalCoinValue > 0
-        ? event.giftTotalCoinValue
-        : gift.coins * slide.combo;
+    final totalCoins = event.giftTotalCoinValue > 0 ? event.giftTotalCoinValue : gift.coins * slide.combo;
     if (totalCoins >= LiveRoomGiftController.smallGiftFlightThreshold) return;
     GiftFlightBus.publish(
       GiftFlightEvent(
@@ -298,9 +285,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         receiverName: slide.receiverName,
         combo: slide.combo,
         multiplier: event.luckyMultiplier <= 0 ? null : event.luckyMultiplier,
-        rewardCoinAmount: event.luckyRewardCoinAmount <= 0
-            ? null
-            : event.luckyRewardCoinAmount,
+        rewardCoinAmount: event.luckyRewardCoinAmount <= 0 ? null : event.luckyRewardCoinAmount,
         endAlignment: Alignment.center,
       ),
     );
@@ -308,12 +293,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    final normalSlides = _backendGiftSlides
-        .where((slide) => !slide.isVideoGift)
-        .toList(growable: false);
-    final hasActiveVideoGift = _backendGiftSlides.any((slide) => slide.isVideoGift);
-    final hasLuckyPacketDialog = widget.activeLuckyPacket != null &&
-        widget.activeLuckyPacket!.phase != LuckyPacketPhase.countdown;
+    final normalSlides = _backendGiftSlides.where((slide) => !slide.isVideoGift).toList(growable: false);
 
     return SizedBox.expand(
       child: Stack(
@@ -339,12 +319,6 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             },
           ),
           RibbonMessageOverlay(messages: _ribbonMessages),
-          if (!hasActiveVideoGift && !hasLuckyPacketDialog)
-            Positioned(
-              right: 24,
-              bottom: 104 + widget.bottomPadding,
-              child: const LiveRoomEventCarousel(),
-            ),
           Positioned(
             right: 18,
             bottom: 178 + widget.bottomPadding,
