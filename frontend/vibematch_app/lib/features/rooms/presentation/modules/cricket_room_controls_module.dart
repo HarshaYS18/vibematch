@@ -16,24 +16,25 @@ class CricketRoomControlsModule extends StatefulWidget {
     required this.controller,
     required this.canManage,
     required this.onEndMode,
+    required this.onStartNewMatch,
   });
 
   final CricketRoomModeController controller;
   final bool canManage;
   final VoidCallback onEndMode;
+  final VoidCallback onStartNewMatch;
 
   @override
   State<CricketRoomControlsModule> createState() => _CricketRoomControlsModuleState();
 }
-
 
 class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
   bool _expanded = false;
   Offset _position = const Offset(14, 94);
 
   Offset _clampPosition(Offset next, Size size, {required bool expanded}) {
-    final width = expanded ? 178.0 : 54.0;
-    final height = expanded ? 154.0 : 54.0;
+    final width = expanded ? 188.0 : 54.0;
+    final height = expanded ? 196.0 : 54.0;
     final maxX = math.max(8.0, size.width - width - 8);
     final maxY = math.max(8.0, size.height - height - 76);
     return Offset(
@@ -44,11 +45,7 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
 
   void _move(DragUpdateDetails details, Size size) {
     setState(() {
-      _position = _clampPosition(
-        _position + details.delta,
-        size,
-        expanded: _expanded,
-      );
+      _position = _clampPosition(_position + details.delta, size, expanded: _expanded);
     });
   }
 
@@ -73,7 +70,7 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            width: _expanded ? 178 : 54,
+            width: _expanded ? 188 : 54,
             padding: EdgeInsets.all(_expanded ? 8 : 0),
             decoration: BoxDecoration(
               color: const Color(0xEE07160D),
@@ -121,11 +118,7 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
                 ),
                 child: const Text(
                   'CP',
-                  style: TextStyle(
-                    color: Color(0xFF251538),
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(color: Color(0xFF251538), fontSize: 8, fontWeight: FontWeight.w900),
                 ),
               ),
             ),
@@ -178,17 +171,17 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
           onTap: () => _openResult(context),
         ),
         _CricketControlButton(
+          icon: Icons.restart_alt_rounded,
+          label: 'Start New Match',
+          enabled: widget.canManage,
+          onTap: widget.onStartNewMatch,
+        ),
+        _CricketControlButton(
           icon: Icons.stop_circle_rounded,
           label: 'End Match',
           danger: true,
           enabled: widget.canManage,
-          onTap: () {
-            final roomId = widget.controller.match.roomId;
-            LiveRoomMediaSignalingService.instance.endCricketMode(roomId);
-            CricketRoomModeSignal.deactivate(roomId);
-            CricketRoomModeRegistry.deactivateRoom(roomId: roomId);
-            widget.onEndMode();
-          },
+          onTap: widget.onEndMode,
         ),
       ],
     );
@@ -239,9 +232,7 @@ class CricketMatchResultSheet extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: const LinearGradient(colors: [Color(0xFF061B0D), Color(0xFF0E5A31)]),
               borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 18, offset: const Offset(0, 8)),
-              ],
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 18, offset: const Offset(0, 8))],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,13 +307,7 @@ class _ResultMetricRow extends StatelessWidget {
 }
 
 class _CricketControlButton extends StatelessWidget {
-  const _CricketControlButton({
-    required this.icon,
-    required this.label,
-    required this.enabled,
-    required this.onTap,
-    this.danger = false,
-  });
+  const _CricketControlButton({required this.icon, required this.label, required this.enabled, required this.onTap, this.danger = false});
 
   final IconData icon;
   final String label;
