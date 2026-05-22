@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_api_config.dart';
 import '../../../../core/widgets/vm_gradient_name_text.dart';
 import '../live_room_models.dart';
 import 'chat_vip_badge.dart';
@@ -170,6 +171,7 @@ class _CompactChatLine extends StatelessWidget {
         canManageSeatApplications &&
         !message.applicationResolved;
     final showAgreedState = message.isSeatApplication && message.applicationApproved;
+    final giftVisual = message.isGift ? _GiftChatVisual.fromMessage(message) : null;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -221,13 +223,16 @@ class _CompactChatLine extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 3),
-                      RichText(
-                        maxLines: message.isImageMessage ? 1 : 3,
-                        overflow: TextOverflow.ellipsis,
-                        text: TextSpan(
-                          children: _messageSpans(message, onMentionTap),
+                      if (message.isGift && giftVisual != null)
+                        _GiftInlineMessage(message: message, visual: giftVisual)
+                      else
+                        RichText(
+                          maxLines: message.isImageMessage ? 1 : 3,
+                          overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            children: _messageSpans(message, onMentionTap),
+                          ),
                         ),
-                      ),
                       if (message.isImageMessage) ...[
                         const SizedBox(height: 6),
                         _ChatImagePreview(imageUrl: message.imageUrl!),
@@ -261,8 +266,6 @@ class _CompactChatLine extends StatelessWidget {
   }
 
   List<InlineSpan> _messageSpans(ChatEntry message, ValueChanged<String>? onMentionTap) {
-    // Do not use String.split(RegExp(r'(\s+)')) here: Dart discards delimiter
-    // matches, which removes spaces and renders "that was fire" as "thatwasfire".
     final tokenMatches = RegExp(r'\s+|\S+').allMatches(message.message);
     final tokens = tokenMatches.map((match) => match.group(0) ?? '').where((part) => part.isNotEmpty);
 
@@ -295,6 +298,133 @@ class _CompactChatLine extends StatelessWidget {
       );
     }).toList(growable: false);
   }
+}
+
+class _GiftInlineMessage extends StatelessWidget {
+  const _GiftInlineMessage({required this.message, required this.visual});
+
+  final ChatEntry message;
+  final _GiftChatVisual visual;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        Text(
+          _giftLeadText(message.message),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.94),
+            fontSize: 13.2,
+            fontWeight: FontWeight.w800,
+            height: 1.2,
+          ),
+        ),
+        _GiftImageChip(visual: visual),
+        if (_giftComboText(message.message).isNotEmpty)
+          Text(
+            _giftComboText(message.message),
+            style: const TextStyle(
+              color: RoomColors.aqua,
+              fontSize: 12.2,
+              fontWeight: FontWeight.w900,
+              height: 1.1,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _GiftImageChip extends StatelessWidget {
+  const _GiftImageChip({required this.visual});
+
+  final _GiftChatVisual visual;
+
+  @override
+  Widget build(BuildContext context) {
+    final assetPath = visual.assetPath?.trim();
+    final assetUrl = visual.assetUrl?.trim();
+    return Container(
+      width: 36,
+      height: 36,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: assetUrl != null && assetUrl.isNotEmpty
+            ? Image.network(
+                VmApiConfig.mediaUrl(assetUrl),
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => Icon(visual.icon, color: Colors.white, size: 22),
+              )
+            : assetPath != null && assetPath.isNotEmpty
+                ? Image.asset(
+                    assetPath,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => Icon(visual.icon, color: Colors.white, size: 22),
+                  )
+                : Icon(visual.icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
+}
+
+class _GiftChatVisual {
+  const _GiftChatVisual({this.assetPath, this.assetUrl, required this.icon});
+
+  final String? assetPath;
+  final String? assetUrl;
+  final IconData icon;
+
+  static _GiftChatVisual? fromMessage(ChatEntry message) {
+    final explicitPath = message.giftAssetPath?.trim();
+    if (explicitPath != null && explicitPath.isNotEmpty) {
+      return _GiftChatVisual(assetPath: explicitPath, icon: Icons.card_giftcard_rounded);
+    }
+    final rawMessage = message.message.toLowerCase();
+    for (final gift in mockGiftItems) {
+      if (rawMessage.contains(gift.name.toLowerCase()) || rawMessage.contains(gift.id.toLowerCase())) {
+        return _GiftChatVisual(assetPath: gift.assetPath, assetUrl: gift.assetUrl, icon: gift.icon);
+      }
+    }
+    return const _GiftChatVisual(icon: Icons.card_giftcard_rounded);
+  }
+}
+
+String _giftLeadText(String message) {
+  final clean = message.trim();
+  if (clean.isEmpty) return 'sent';
+  final lower = clean.toLowerCase();
+  final giftNames = mockGiftItems.map((gift) => gift.name).toList(growable: false);
+  for (final giftName in giftNames) {
+    final index = lower.indexOf(giftName.toLowerCase());
+    if (index > 0) {
+      final prefix = clean.substring(0, index).trim();
+      return prefix.isEmpty ? 'sent' : prefix;
+    }
+  }
+  final comboIndex = RegExp(r'\s+x\d+').firstMatch(clean)?.start;
+  if (comboIndex != null && comboIndex > 0) return 'sent';
+  return lower.startsWith('sent') ? 'sent' : clean;
+}
+
+String _giftComboText(String message) {
+  final match = RegExp(r'x\s*\d+', caseSensitive: false).firstMatch(message);
+  return match?.group(0)?.replaceAll(' ', '') ?? '';
 }
 
 class _EnteredRoomLine extends StatelessWidget {
