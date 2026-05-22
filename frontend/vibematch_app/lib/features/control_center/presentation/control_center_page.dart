@@ -9,19 +9,23 @@ class ControlCenterPage extends StatefulWidget {
   State<ControlCenterPage> createState() => _ControlCenterPageState();
 }
 
+enum _ControlSection { assets, users, economy, safety, reviews, logs }
+
 class _ControlCenterPageState extends State<ControlCenterPage> {
   final ControlCenterApiService _api = ControlCenterApiService();
 
   AdminControlSummary? _summary;
-  List<AdminUser> _users = const <AdminUser>[];
-  List<RoleOption> _roles = const <RoleOption>[];
-  List<UserBanItem> _userBans = const <UserBanItem>[];
-  List<DeviceBanItem> _deviceBans = const <DeviceBanItem>[];
-  List<SuperOwnerPoolItem> _coinPools = const <SuperOwnerPoolItem>[];
-  List<SpecialPermissionOption> _permissionOptions = const <SpecialPermissionOption>[];
-  List<SuperOwnerLogItem> _logs = const <SuperOwnerLogItem>[];
-  List<SuperOwnerReviewItem> _reviews = const <SuperOwnerReviewItem>[];
+  List<AdminUser> _users = const [];
+  List<UserBanItem> _userBans = const [];
+  List<DeviceBanItem> _deviceBans = const [];
+  List<SuperOwnerPoolItem> _coinPools = const [];
+  List<SuperOwnerLogItem> _logs = const [];
+  List<SuperOwnerReviewItem> _reviews = const [];
+  List<ControlCenterStoreCategory> _storeCategories = const [];
+  List<ControlCenterStoreItem> _storeItems = const [];
 
+  _ControlSection _section = _ControlSection.assets;
+  _AssetCategory _selectedAssetCategory = _assetCategories.first;
   bool _loading = true;
   bool _busy = false;
   String? _error;
@@ -48,56 +52,47 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
     try {
       final summary = await _api.loadSummary();
       final users = await _api.loadUsers();
-      final roles = await _api.loadRoleOptions();
       var userBans = const <UserBanItem>[];
       var deviceBans = const <DeviceBanItem>[];
-      var pools = const <SuperOwnerPoolItem>[];
-      var permissions = const <SpecialPermissionOption>[];
+      var coinPools = const <SuperOwnerPoolItem>[];
       var logs = const <SuperOwnerLogItem>[];
       var reviews = const <SuperOwnerReviewItem>[];
-      try {
-        userBans = await _api.loadUserBans();
-      } catch (_) {}
-      if (summary.isSuperOwnerPanel) {
-        try {
-          deviceBans = await _api.loadDeviceBans();
-        } catch (_) {}
-        try {
-          pools = await _api.loadCoinPools();
-        } catch (_) {}
-        try {
-          permissions = await _api.loadSpecialPermissionOptions();
-        } catch (_) {}
-        try {
-          logs = await _api.loadSuperOwnerLogs();
-        } catch (_) {}
-        try {
-          reviews = await _api.loadReviewItems();
-        } catch (_) {}
+      var categories = const <ControlCenterStoreCategory>[];
+      var items = const <ControlCenterStoreItem>[];
+
+      try { userBans = await _api.loadUserBans(); } catch (_) {}
+      if (summary.isSuperOwnerPanel || summary.isOwnerPanel || summary.isSuperAdminPanel) {
+        try { categories = await _api.loadStoreCategories(); } catch (_) {}
+        try { items = await _api.loadStoreItems(); } catch (_) {}
       }
+      if (summary.isSuperOwnerPanel) {
+        try { deviceBans = await _api.loadDeviceBans(); } catch (_) {}
+        try { coinPools = await _api.loadCoinPools(); } catch (_) {}
+        try { logs = await _api.loadSuperOwnerLogs(); } catch (_) {}
+        try { reviews = await _api.loadReviewItems(); } catch (_) {}
+      }
+
       if (!mounted) return;
       setState(() {
         _summary = summary;
         _users = users;
-        _roles = roles;
         _userBans = userBans;
         _deviceBans = deviceBans;
-        _coinPools = pools;
-        _permissionOptions = permissions;
+        _coinPools = coinPools;
         _logs = logs;
         _reviews = reviews;
+        _storeCategories = categories;
+        _storeItems = items;
         _loading = false;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
         _loading = false;
-        _error = _cleanError(error);
       });
     }
   }
-
-  String _cleanError(Object error) => error.toString().replaceFirst('Exception: ', '');
 
   void _toast(String message, {bool danger = false}) {
     ScaffoldMessenger.of(context)
@@ -106,7 +101,8 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: danger ? const Color(0xFFE84C72) : const Color(0xFF12C7B7),
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          content: Text(message, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
         ),
       );
   }
@@ -121,686 +117,622 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
       await _load();
     } catch (error) {
       if (!mounted) return;
-      _toast(_cleanError(error), danger: true);
+      _toast(error.toString().replaceFirst('Exception: ', ''), danger: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-
-  void _closeSheetAndRunAction(Future<void> Function() action, String success) {
-    Navigator.of(context).pop();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _runAction(action, success);
-    });
-  }
-  AdminUser? _findUserByPublicId(String text) {
-    final id = int.tryParse(text.trim());
-    if (id == null) return null;
-    for (final user in _users) {
-      if (user.publicUserId == id || user.id == id) return user;
-    }
-    return null;
+  List<ControlCenterStoreItem> get _selectedAssets {
+    return _storeItems.where((item) {
+      if (item.category == _selectedAssetCategory.storeCategory) return true;
+      if (_selectedAssetCategory.aliases.contains(item.category)) return true;
+      return false;
+    }).toList(growable: false)
+      ..sort((a, b) {
+        final order = a.sortOrder.compareTo(b.sortOrder);
+        if (order != 0) return order;
+        return a.name.compareTo(b.name);
+      });
   }
 
-  Future<void> _openAssignRoleSheet(AdminUser user) async {
-    final assignableRoles = _roles.where((role) => role.assignable).toList(growable: false);
-    if (_summary?.canAssignRoles != true || assignableRoles.isEmpty) {
-      _toast('Founder Owner access is required to assign official roles.', danger: true);
-      return;
-    }
-    RoleOption selected = assignableRoles.firstWhere((role) => role.value == user.primaryRole, orElse: () => assignableRoles.first);
-    final reason = TextEditingController(text: 'Super Owner role update');
-    await _showControlSheet(
-      title: 'Assign role',
-      subtitle: '${user.title} • ID ${user.publicUserId}',
-      childBuilder: (setSheetState) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<RoleOption>(
-            initialValue: selected,
-            decoration: _input('Role'),
-            items: assignableRoles.map((role) => DropdownMenuItem(value: role, child: Text('${role.label} • P${role.power}'))).toList(growable: false),
-            onChanged: (role) {
-              if (role != null) setSheetState(() => selected = role);
-            },
-          ),
-          const SizedBox(height: 12),
-          _ReasonField(controller: reason),
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            label: 'Assign role',
-            busyLabel: 'Assigning...',
-            icon: Icons.manage_accounts_rounded,
-            onPressed: () {
-              final safeReason = reason.text.trim();
-              if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              _closeSheetAndRunAction(() => _api.assignRole(targetUserId: user.id, role: selected.value, reason: safeReason), 'Role updated and audit logged.');
-            },
-          ),
-        ],
-      ),
-    );
-    reason.dispose();
-  }
+  Future<void> _openAddAssetSheet([ControlCenterStoreItem? existing]) async {
+    final category = existing == null
+        ? _selectedAssetCategory
+        : _assetCategories.firstWhere(
+            (item) => item.storeCategory == existing.category || item.aliases.contains(existing.category),
+            orElse: () => _selectedAssetCategory,
+          );
+    var selectedCategory = category;
+    final itemId = TextEditingController(text: existing?.itemId ?? '');
+    final name = TextEditingController(text: existing?.name ?? '');
+    final imageUrl = TextEditingController(text: existing?.imageUrl ?? existing?.assetUrl ?? '');
+    final thumbnailUrl = TextEditingController(text: existing?.thumbnailUrl ?? '');
+    final price = TextEditingController(text: '${existing?.priceCoins ?? 0}');
+    final sortOrder = TextEditingController(text: '${existing?.sortOrder ?? 0}');
+    final reason = TextEditingController(text: existing == null ? 'Super Owner asset catalog add' : 'Super Owner asset catalog update');
+    var isActive = existing?.active ?? true;
+    var isDefault = false;
 
-  Future<void> _openBanSheet(AdminUser user) async {
-    if (!user.isNormalUser) {
-      _toast('Protected/official users cannot be moderated from this normal-user action.', danger: true);
-      return;
-    }
-    final reason = TextEditingController(text: user.isBanned ? 'Super Owner unban review' : 'Super Owner moderation action');
-    final deviceId = TextEditingController();
-    await _showControlSheet(
-      title: user.isBanned ? 'Unban user' : 'Ban user',
-      subtitle: '${user.title} • ID ${user.publicUserId}',
-      childBuilder: (_) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _ReasonField(controller: reason),
-          if (!user.isBanned) ...[
-            const SizedBox(height: 12),
-            TextField(controller: deviceId, decoration: _input('Device ID snapshot optional')),
-          ],
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            danger: !user.isBanned,
-            label: user.isBanned ? 'Unban' : 'Ban',
-            busyLabel: 'Saving...',
-            icon: user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded,
-            onPressed: () {
-              final safeReason = reason.text.trim();
-              if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              _closeSheetAndRunAction(
-                () => user.isBanned
-                    ? _api.unbanUser(targetUserId: user.id, reason: safeReason)
-                    : _api.banUser(targetUserId: user.id, reason: safeReason, deviceId: deviceId.text),
-                user.isBanned ? 'User unbanned and audit logged.' : 'User banned and audit logged.',
-              );
-            },
-          ),
-        ],
-      ),
-    );
-    reason.dispose();
-    deviceId.dispose();
-  }
-
-  Future<void> _openDeviceUnbanSheet(DeviceBanItem ban) async {
-    final reason = TextEditingController(text: 'Founder Owner device unban review');
-    await _showControlSheet(
-      title: 'Unban device',
-      subtitle: ban.deviceId,
-      childBuilder: (_) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _ReasonField(controller: reason),
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            label: 'Unban device',
-            busyLabel: 'Unbanning...',
-            icon: Icons.phonelink_lock_rounded,
-            onPressed: () {
-              final safeReason = reason.text.trim();
-              if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              _closeSheetAndRunAction(() => _api.unbanDevice(deviceId: ban.deviceId, reason: safeReason), 'Device unbanned and audit logged.');
-            },
-          ),
-        ],
-      ),
-    );
-    reason.dispose();
-  }
-
-  Future<void> _openMintCoinsSheet() async {
-    final amount = TextEditingController();
-    final target = TextEditingController();
-    final reason = TextEditingController(text: 'Founder Owner supply mint');
-    const poolTypes = <String>[
-      'FOUNDER_MINT_POOL',
-      'OWNER_SUPPLY_POOL',
-      'MERCHANT_SUPPLY_POOL',
-      'SELLER_SUPPLY_POOL',
-      'FRIENDS_GAMING_POOL',
-      'EVENT_POOL',
-    ];
-    var selectedPool = poolTypes.first;
-    await _showControlSheet(
-      title: 'Mint supply coins',
-      subtitle: 'Stored in coin_supply_pools and coin_pool_ledger, not wallet balance.',
-      childBuilder: (setSheetState) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<String>(
-            initialValue: selectedPool,
-            decoration: _input('Target pool'),
-            items: poolTypes.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(growable: false),
-            onChanged: (value) {
-              if (value != null) setSheetState(() => selectedPool = value);
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(controller: target, keyboardType: TextInputType.number, decoration: _input('Target internal user ID optional')),
-          const SizedBox(height: 12),
-          TextField(controller: amount, keyboardType: TextInputType.number, decoration: _input('Coin amount')),
-          const SizedBox(height: 12),
-          _ReasonField(controller: reason),
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            label: 'Mint coins',
-            busyLabel: 'Minting...',
-            icon: Icons.add_circle_rounded,
-            onPressed: () {
-              final coinAmount = int.tryParse(amount.text.trim()) ?? 0;
-              final targetUserId = int.tryParse(target.text.trim());
-              final safeReason = reason.text.trim();
-              if (coinAmount <= 0 || safeReason.isEmpty) return _toast('Amount and reason are required.', danger: true);
-              _closeSheetAndRunAction(() => _api.mintCoins(poolType: selectedPool, amount: coinAmount, targetUserId: targetUserId, reason: safeReason), 'Coins minted to supply pool and audit logged.');
-            },
-          ),
-        ],
-      ),
-    );
-    amount.dispose();
-    target.dispose();
-    reason.dispose();
-  }
-
-  Future<void> _openSendAllSheet() async {
-    final amount = TextEditingController();
-    final reason = TextEditingController(text: 'Founder Owner coin grant to active users');
-    var activeOnly = true;
-    await _showControlSheet(
-      title: 'Send coins to all users',
-      subtitle: 'Credits user_wallets and writes wallet_ledger + admin_logs.',
-      childBuilder: (setSheetState) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SwitchListTile.adaptive(
-            value: activeOnly,
-            onChanged: (value) => setSheetState(() => activeOnly = value),
-            title: const Text('Active users only', style: TextStyle(fontWeight: FontWeight.w900)),
-          ),
-          TextField(controller: amount, keyboardType: TextInputType.number, decoration: _input('Coins per user')),
-          const SizedBox(height: 12),
-          _ReasonField(controller: reason),
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            label: 'Send coins',
-            busyLabel: 'Sending...',
-            icon: Icons.send_rounded,
-            onPressed: () {
-              final coins = int.tryParse(amount.text.trim()) ?? 0;
-              final safeReason = reason.text.trim();
-              if (coins <= 0 || safeReason.isEmpty) return _toast('Amount and reason are required.', danger: true);
-              _closeSheetAndRunAction(() => _api.sendCoinsToAll(coinAmount: coins, activeOnly: activeOnly, reason: safeReason), 'Coins sent to users and audit logged.');
-            },
-          ),
-        ],
-      ),
-    );
-    amount.dispose();
-    reason.dispose();
-  }
-
-  Future<void> _openCustomIdSheet(AdminUser user) async {
-    final customId = TextEditingController(text: user.displayCustomId?.toString() ?? '');
-    final reason = TextEditingController(text: 'Founder Owner custom ID update');
-    await _showControlSheet(
-      title: 'Assign custom ID',
-      subtitle: '${user.title} • ID ${user.publicUserId}',
-      childBuilder: (_) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(controller: customId, keyboardType: TextInputType.number, decoration: _input('Custom display ID, empty to clear')),
-          const SizedBox(height: 12),
-          _ReasonField(controller: reason),
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            label: 'Save custom ID',
-            busyLabel: 'Saving...',
-            icon: Icons.badge_rounded,
-            onPressed: () {
-              final text = customId.text.trim();
-              final parsed = text.isEmpty ? null : int.tryParse(text);
-              final safeReason = reason.text.trim();
-              if (text.isNotEmpty && parsed == null) return _toast('Custom ID must be numeric.', danger: true);
-              if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              _closeSheetAndRunAction(() => _api.assignCustomId(targetUserId: user.id, customId: parsed, reason: safeReason), 'Custom ID updated and audit logged.');
-            },
-          ),
-        ],
-      ),
-    );
-    customId.dispose();
-    reason.dispose();
-  }
-
-  Future<void> _openVipSheet(AdminUser user) async {
-    final vip = TextEditingController(text: '0');
-    final svip = TextEditingController(text: '0');
-    final reason = TextEditingController(text: 'Founder Owner VIP/SVIP adjustment');
-    var vipActive = true;
-    var svipActive = false;
-    await _showControlSheet(
-      title: 'Adjust VIP / SVIP',
-      subtitle: '${user.title} • ID ${user.publicUserId}',
-      childBuilder: (setSheetState) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(children: [
-            Expanded(child: TextField(controller: vip, keyboardType: TextInputType.number, decoration: _input('VIP level'))),
-            const SizedBox(width: 10),
-            Expanded(child: TextField(controller: svip, keyboardType: TextInputType.number, decoration: _input('SVIP level'))),
-          ]),
-          SwitchListTile.adaptive(value: vipActive, onChanged: (value) => setSheetState(() => vipActive = value), title: const Text('VIP active')),
-          SwitchListTile.adaptive(value: svipActive, onChanged: (value) => setSheetState(() => svipActive = value), title: const Text('SVIP active')),
-          _ReasonField(controller: reason),
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            label: 'Save VIP/SVIP',
-            busyLabel: 'Saving...',
-            icon: Icons.workspace_premium_rounded,
-            onPressed: () {
-              final vipLevel = int.tryParse(vip.text.trim()) ?? -1;
-              final svipLevel = int.tryParse(svip.text.trim()) ?? -1;
-              final safeReason = reason.text.trim();
-              if (vipLevel < 0 || svipLevel < 0 || safeReason.isEmpty) return _toast('Levels and reason are required.', danger: true);
-              _closeSheetAndRunAction(
-                () => _api.adjustVip(targetUserId: user.id, vipLevel: vipLevel, svipLevel: svipLevel, vipActive: vipActive, svipActive: svipActive, reason: safeReason),
-                'VIP/SVIP stored in DB and audit logged.',
-              );
-            },
-          ),
-        ],
-      ),
-    );
-    vip.dispose();
-    svip.dispose();
-    reason.dispose();
-  }
-
-  Future<void> _openGrantPermissionSheet(AdminUser user) async {
-    if (_permissionOptions.isEmpty) {
-      _toast('No special permissions returned by backend.', danger: true);
-      return;
-    }
-    var selected = _permissionOptions.first;
-    final reason = TextEditingController(text: 'Founder Owner special permission grant');
-    await _showControlSheet(
-      title: 'Grant special permission',
-      subtitle: '${user.title} • ID ${user.publicUserId}',
-      childBuilder: (setSheetState) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<SpecialPermissionOption>(
-            initialValue: selected,
-            decoration: _input('Permission'),
-            items: _permissionOptions.map((item) => DropdownMenuItem(value: item, child: Text(item.label))).toList(growable: false),
-            onChanged: (value) {
-              if (value != null) setSheetState(() => selected = value);
-            },
-          ),
-          const SizedBox(height: 12),
-          _ReasonField(controller: reason),
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            label: 'Grant permission',
-            busyLabel: 'Granting...',
-            icon: Icons.key_rounded,
-            onPressed: () {
-              final safeReason = reason.text.trim();
-              if (safeReason.isEmpty) return _toast('Reason is required.', danger: true);
-              _closeSheetAndRunAction(() => _api.grantSpecialPermission(targetUserId: user.id, permission: selected.value, reason: safeReason), 'Special permission stored and audit logged.');
-            },
-          ),
-        ],
-      ),
-    );
-    reason.dispose();
-  }
-
-  Future<void> _openStealthSheet() async {
-    final userId = TextEditingController();
-    final reason = TextEditingController(text: 'Founder Owner stealth visibility update');
-    var enabled = true;
-    await _showControlSheet(
-      title: 'Stealth mode',
-      subtitle: 'Use internal user ID or public user ID shown in users list.',
-      childBuilder: (setSheetState) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(controller: userId, keyboardType: TextInputType.number, decoration: _input('Target user ID / public ID')),
-          SwitchListTile.adaptive(value: enabled, onChanged: (value) => setSheetState(() => enabled = value), title: const Text('Enable stealth marker')),
-          _ReasonField(controller: reason),
-          const SizedBox(height: 14),
-          _PrimaryActionButton(
-            busy: _busy,
-            label: 'Save stealth',
-            busyLabel: 'Saving...',
-            icon: Icons.visibility_off_rounded,
-            onPressed: () {
-              final user = _findUserByPublicId(userId.text);
-              final safeReason = reason.text.trim();
-              if (user == null || safeReason.isEmpty) return _toast('Valid user ID and reason are required.', danger: true);
-              _closeSheetAndRunAction(() => _api.setStealth(targetUserId: user.id, enabled: enabled, reason: safeReason), 'Stealth setting stored and audit logged.');
-            },
-          ),
-        ],
-      ),
-    );
-    userId.dispose();
-    reason.dispose();
-  }
-
-  InputDecoration _input(String label) => InputDecoration(labelText: label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)));
-
-  Future<void> _showControlSheet({required String title, required String subtitle, required Widget Function(StateSetter setSheetState) childBuilder}) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => _ControlSheet(title: title, subtitle: subtitle, child: childBuilder(setSheetState)),
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+              child: Container(
+                constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.86),
+                padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 14),
+                decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+                child: ListView(
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999)))),
+                    const SizedBox(height: 14),
+                    Text(existing == null ? 'Add asset' : 'Edit asset', style: const TextStyle(color: Color(0xFF251538), fontSize: 19, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 4),
+                    const Text('CDN/object-storage URL based now. Binary upload will connect to media storage next.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<_AssetCategory>(
+                      initialValue: selectedCategory,
+                      decoration: _input('Category'),
+                      items: _assetCategories.map((item) => DropdownMenuItem(value: item, child: Text(item.title))).toList(growable: false),
+                      onChanged: existing == null ? (value) { if (value != null) setSheetState(() => selectedCategory = value); } : null,
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(controller: itemId, enabled: existing == null, decoration: _input('Asset ID key, e.g. cricket_night_01')),
+                    const SizedBox(height: 10),
+                    TextField(controller: name, decoration: _input('Display name')),
+                    const SizedBox(height: 10),
+                    TextField(controller: imageUrl, decoration: _input('Image/CDN/WebP/Lottie URL')),
+                    const SizedBox(height: 10),
+                    TextField(controller: thumbnailUrl, decoration: _input('Thumbnail URL optional')),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: TextField(controller: price, keyboardType: TextInputType.number, decoration: _input('Price coins'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TextField(controller: sortOrder, keyboardType: TextInputType.number, decoration: _input('Sort order'))),
+                    ]),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: isActive,
+                      onChanged: (value) => setSheetState(() => isActive = value),
+                      title: const Text('Enabled', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                      subtitle: const Text('Disabled assets stay in DB but app should not render them.', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600)),
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: isDefault,
+                      onChanged: (value) => setSheetState(() => isDefault = value),
+                      title: const Text('Set as default / featured', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                      subtitle: const Text('For backgrounds this becomes the default/featured candidate for this category.', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600)),
+                    ),
+                    TextField(controller: reason, maxLines: 2, decoration: _input('Reason / audit note')),
+                    const SizedBox(height: 14),
+                    _PrimaryButton(
+                      busy: _busy,
+                      label: existing == null ? 'Save asset' : 'Update asset',
+                      icon: Icons.cloud_upload_rounded,
+                      onPressed: () {
+                        final id = itemId.text.trim().toLowerCase().replaceAll(' ', '_');
+                        final displayName = name.text.trim();
+                        final assetUrl = imageUrl.text.trim();
+                        final safeReason = reason.text.trim();
+                        if (id.isEmpty || displayName.isEmpty || assetUrl.isEmpty || safeReason.isEmpty) {
+                          _toast('Asset ID, name, URL, and reason are required.', danger: true);
+                          return;
+                        }
+                        Navigator.of(context).pop();
+                        _runAction(
+                          () => _api.upsertStoreItem({
+                            'item_id': id,
+                            'name': displayName,
+                            'category': selectedCategory.storeCategory,
+                            'item_type': selectedCategory.storeItemType,
+                            'description': selectedCategory.description,
+                            'price_coins': int.tryParse(price.text.trim()) ?? 0,
+                            'currency_type': 'coin',
+                            'ownership_type': selectedCategory.freeByDefault ? 'free' : 'permanent',
+                            'cdn_asset_url': assetUrl,
+                            'image_url': assetUrl,
+                            'thumbnail_url': thumbnailUrl.text.trim().isEmpty ? assetUrl : thumbnailUrl.text.trim(),
+                            'is_active': isActive,
+                            'is_featured': isDefault,
+                            'sort_order': int.tryParse(sortOrder.text.trim()) ?? 0,
+                            'visibility': 'public',
+                            'reason': safeReason,
+                          }),
+                          existing == null ? 'Asset added to Control Center catalog.' : 'Asset updated in Control Center catalog.',
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    itemId.dispose();
+    name.dispose();
+    imageUrl.dispose();
+    thumbnailUrl.dispose();
+    price.dispose();
+    sortOrder.dispose();
+    reason.dispose();
+  }
+
+  Future<void> _toggleAsset(ControlCenterStoreItem item) {
+    return _runAction(
+      () => _api.upsertStoreItem({
+        'item_id': item.itemId,
+        'name': item.name,
+        'category': item.category,
+        'item_type': item.itemType,
+        'price_coins': item.priceCoins,
+        'cdn_asset_url': item.displayAssetUrl,
+        'image_url': item.imageUrl ?? item.displayAssetUrl,
+        'thumbnail_url': item.thumbnailUrl ?? item.displayAssetUrl,
+        'is_active': !item.active,
+        'sort_order': item.sortOrder,
+        'reason': item.active ? 'Super Owner disabled asset' : 'Super Owner enabled asset',
+      }),
+      item.active ? 'Asset disabled.' : 'Asset enabled.',
     );
   }
+
+  Future<void> _setAssetDefault(ControlCenterStoreItem item) {
+    return _runAction(
+      () => _api.upsertStoreItem({
+        'item_id': item.itemId,
+        'name': item.name,
+        'category': item.category,
+        'item_type': item.itemType,
+        'price_coins': item.priceCoins,
+        'cdn_asset_url': item.displayAssetUrl,
+        'image_url': item.imageUrl ?? item.displayAssetUrl,
+        'thumbnail_url': item.thumbnailUrl ?? item.displayAssetUrl,
+        'is_active': true,
+        'is_featured': true,
+        'sort_order': 0,
+        'reason': 'Super Owner set default/featured asset',
+      }),
+      'Asset marked as default/featured.',
+    );
+  }
+
+  InputDecoration _input(String label) => InputDecoration(
+        labelText: label,
+        isDense: true,
+        filled: true,
+        fillColor: const Color(0xFFFAF7F1),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      );
 
   @override
   Widget build(BuildContext context) {
     final summary = _summary;
-    final panelTitle = summary?.isSuperOwnerPanel == true
-        ? 'Super Owner Control Panel'
-        : summary?.isOwnerPanel == true
-            ? 'Owner Control Panel'
-            : 'Official Control Center';
-
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFAF7F1),
-        foregroundColor: const Color(0xFF251538),
-        elevation: 0,
-        title: Text(panelTitle, style: const TextStyle(fontWeight: FontWeight.w900)),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded))],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF12C7B7)))
-          : _error != null
-              ? _ErrorState(message: _error!, onRetry: _load)
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  color: const Color(0xFF12C7B7),
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
-                    children: [
-                      if (summary != null) _SummaryCard(summary: summary),
-                      const SizedBox(height: 14),
-                      if (_isSuperOwner) _SuperOwnerActionsCard(onMint: _openMintCoinsSheet, onSendAll: _openSendAllSheet, onStealth: _openStealthSheet),
-                      if (_isSuperOwner) const SizedBox(height: 14),
-                      if (_isSuperOwner) _PoolsCard(pools: _coinPools),
-                      if (_isSuperOwner) const SizedBox(height: 14),
-                      if (_deviceBans.isNotEmpty) ...[
-                        _SectionHeader(title: 'Device bans', subtitle: '${_deviceBans.length} records'),
-                        const SizedBox(height: 10),
-                        ..._deviceBans.map((ban) => _DeviceBanCard(ban: ban, onUnban: () => _openDeviceUnbanSheet(ban))),
-                        const SizedBox(height: 14),
-                      ],
-                      if (_userBans.isNotEmpty) ...[
-                        _SectionHeader(title: 'User bans', subtitle: '${_userBans.length} latest'),
-                        const SizedBox(height: 10),
-                        ..._userBans.take(5).map((ban) => _UserBanCard(ban: ban)),
-                        const SizedBox(height: 14),
-                      ],
-                      _SectionHeader(title: 'Users & controls', subtitle: '${_users.length} shown'),
-                      const SizedBox(height: 10),
-                      ..._users.map(
-                        (user) => _AdminUserCard(
-                          user: user,
-                          canAssign: summary?.canAssignRoles == true,
-                          canModerate: summary != null && (summary.isSuperOwnerPanel || summary.isOwnerPanel || summary.isSuperAdminPanel),
-                          isSuperOwner: _isSuperOwner,
-                          onAssignRole: () => _openAssignRoleSheet(user),
-                          onModerate: () => _openBanSheet(user),
-                          onCustomId: () => _openCustomIdSheet(user),
-                          onVip: () => _openVipSheet(user),
-                          onPermission: () => _openGrantPermissionSheet(user),
+      body: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF12C7B7)))
+            : _error != null
+                ? _ErrorState(message: _error!, onRetry: _load)
+                : RefreshIndicator(
+                    color: const Color(0xFF12C7B7),
+                    onRefresh: _load,
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      slivers: [
+                        SliverToBoxAdapter(child: _Header(summary: summary, onRefresh: _load)),
+                        SliverToBoxAdapter(child: _SectionTabs(selected: _section, onChanged: (section) => setState(() => _section = section))),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(14, 8, 14, 120),
+                          sliver: SliverToBoxAdapter(child: _buildSection()),
                         ),
-                      ),
-                      if (_isSuperOwner) ...[
-                        const SizedBox(height: 14),
-                        _LogsCard(logs: _logs),
-                        const SizedBox(height: 14),
-                        _ReviewsCard(reviews: _reviews),
                       ],
-                    ],
+                    ),
                   ),
-                ),
+      ),
     );
+  }
+
+  Widget _buildSection() {
+    switch (_section) {
+      case _ControlSection.assets:
+        return _AssetsSection(
+          selectedCategory: _selectedAssetCategory,
+          categories: _assetCategories,
+          backendCategories: _storeCategories,
+          items: _selectedAssets,
+          allItemsCount: _storeItems.length,
+          onCategoryChanged: (category) => setState(() => _selectedAssetCategory = category),
+          onAddAsset: () => _openAddAssetSheet(),
+          onEditAsset: _openAddAssetSheet,
+          onToggleAsset: _toggleAsset,
+          onSetDefault: _setAssetDefault,
+        );
+      case _ControlSection.users:
+        return _UsersSection(users: _users, isSuperOwner: _isSuperOwner);
+      case _ControlSection.economy:
+        return _EconomySection(pools: _coinPools);
+      case _ControlSection.safety:
+        return _SafetySection(userBans: _userBans, deviceBans: _deviceBans);
+      case _ControlSection.reviews:
+        return _ReviewsSection(reviews: _reviews);
+      case _ControlSection.logs:
+        return _LogsSection(logs: _logs);
+    }
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.summary});
-  final AdminControlSummary summary;
+class _AssetCategory {
+  const _AssetCategory({required this.title, required this.storeCategory, required this.storeItemType, required this.description, required this.icon, required this.color, this.aliases = const [], this.freeByDefault = false});
+
+  final String title;
+  final String storeCategory;
+  final String storeItemType;
+  final String description;
+  final IconData icon;
+  final Color color;
+  final List<String> aliases;
+  final bool freeByDefault;
+}
+
+const List<_AssetCategory> _assetCategories = [
+  _AssetCategory(title: 'Chatroom backgrounds', storeCategory: 'room_background_chat_room', storeItemType: 'room_background', description: 'Normal live room wallpapers and background themes', icon: Icons.wallpaper_rounded, color: Color(0xFF12C7B7), aliases: ['room_background', 'theme']),
+  _AssetCategory(title: 'Cricket backgrounds', storeCategory: 'room_background_cricket', storeItemType: 'room_background', description: 'Cricket Mode only backgrounds, stadiums and scorer themes', icon: Icons.sports_cricket_rounded, color: Color(0xFF65B741), freeByDefault: true),
+  _AssetCategory(title: 'Normal gifts', storeCategory: 'gift_normal', storeItemType: 'gift', description: 'Gift icons and standard gift catalog visuals', icon: Icons.card_giftcard_rounded, color: Color(0xFFFF7AA2), aliases: ['gift']),
+  _AssetCategory(title: 'Lucky gifts', storeCategory: 'gift_lucky', storeItemType: 'gift', description: 'Lucky gift icons, multipliers and animation assets', icon: Icons.casino_rounded, color: Color(0xFFFFC857)),
+  _AssetCategory(title: 'Gift animations', storeCategory: 'gift_animation', storeItemType: 'gift', description: 'WebP/Lottie/video overlays for gifts and global broadcasts', icon: Icons.auto_awesome_rounded, color: Color(0xFF8C5CF6)),
+  _AssetCategory(title: 'Avatar frames', storeCategory: 'avatar_frame', storeItemType: 'avatar_frame', description: 'Profile, seat and chat avatar frames', icon: Icons.filter_frames_rounded, color: Color(0xFF4E8CFF)),
+  _AssetCategory(title: 'VIP / SVIP badges', storeCategory: 'vip_badge', storeItemType: 'badge', description: 'VIP, SVIP, frozen VIP and official badge assets', icon: Icons.workspace_premium_rounded, color: Color(0xFFFFB84D), aliases: ['badge']),
+  _AssetCategory(title: 'Entrance effects', storeCategory: 'entrance_effect', storeItemType: 'entrance_effect', description: 'Room entry animation, sound and luxury effect assets', icon: Icons.rocket_launch_rounded, color: Color(0xFFE84C72)),
+  _AssetCategory(title: 'Chat bubbles', storeCategory: 'chat_bubble', storeItemType: 'chat_bubble', description: 'Inbox and chatroom bubble designs', icon: Icons.chat_bubble_rounded, color: Color(0xFF00A8CC)),
+  _AssetCategory(title: 'Animated emojis', storeCategory: 'animated_emoji', storeItemType: 'event_asset', description: 'Seat/avatar reaction animations and emoji assets', icon: Icons.emoji_emotions_rounded, color: Color(0xFFFF9F1C)),
+  _AssetCategory(title: 'Event banners', storeCategory: 'event_asset', storeItemType: 'event_asset', description: 'Home banners, events, campaign and rules graphics', icon: Icons.campaign_rounded, color: Color(0xFF7B61FF), aliases: ['event_asset']),
+];
+
+class _Header extends StatelessWidget {
+  const _Header({required this.summary, required this.onRefresh});
+  final AdminControlSummary? summary;
+  final VoidCallback onRefresh;
+
   @override
   Widget build(BuildContext context) {
-    final colors = summary.isSuperOwnerPanel ? const [Color(0xFF120D1F), Color(0xFF4A2A63), Color(0xFFFFC857)] : const [Color(0xFF251538), Color(0xFF4A2A63), Color(0xFF12C7B7)];
+    final role = summary?.currentPrimaryRole.replaceAll('_', ' ').toUpperCase() ?? 'CONTROL CENTER';
     return Container(
+      margin: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(gradient: LinearGradient(colors: colors), borderRadius: BorderRadius.circular(26), boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.14), blurRadius: 20, offset: const Offset(0, 10))]),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFF120D1F), Color(0xFF4A2A63), Color(0xFFFFC857)]),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.16), blurRadius: 24, offset: const Offset(0, 12))],
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Icon(summary.isSuperOwnerPanel ? Icons.workspace_premium_rounded : Icons.admin_panel_settings_rounded, color: const Color(0xFFFFC857), size: 26), const SizedBox(width: 9), Expanded(child: Text(summary.currentPrimaryRole.replaceAll('_', ' ').toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)))]),
+        Row(children: [
+          Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFFFC857))),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Super Owner Control Center', style: TextStyle(color: Colors.white, fontSize: 18, height: 1, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(role, style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w800)),
+          ])),
+          IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded, color: Colors.white)),
+        ]),
         const SizedBox(height: 14),
-        Wrap(spacing: 8, runSpacing: 8, children: [_MetricPill(label: 'Users', value: '${summary.usersCount}'), _MetricPill(label: 'Active', value: '${summary.activeUsersCount}'), _MetricPill(label: 'Banned', value: '${summary.bannedUsersCount}'), _MetricPill(label: 'Officials', value: '${summary.officialUsersCount}'), _MetricPill(label: 'Audit', value: '${summary.recentAuditCount}')]),
-        const SizedBox(height: 12),
-        Text(summary.isSuperOwnerPanel ? 'Founder-only controls are backed by DB tables and audit logs.' : 'Official panel is permission-scoped by backend role rules.', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          _Metric(label: 'Users', value: '${summary?.usersCount ?? 0}'),
+          _Metric(label: 'Active', value: '${summary?.activeUsersCount ?? 0}'),
+          _Metric(label: 'Banned', value: '${summary?.bannedUsersCount ?? 0}'),
+          _Metric(label: 'Officials', value: '${summary?.officialUsersCount ?? 0}'),
+        ]),
       ]),
     );
   }
 }
 
-class _SuperOwnerActionsCard extends StatelessWidget {
-  const _SuperOwnerActionsCard({required this.onMint, required this.onSendAll, required this.onStealth});
-  final VoidCallback onMint;
-  final VoidCallback onSendAll;
-  final VoidCallback onStealth;
-  @override
-  Widget build(BuildContext context) => _WhiteCard(children: [
-        const _SectionHeader(title: 'Super Owner actions', subtitle: 'DB + audit'),
-        const SizedBox(height: 10),
-        _ActionTile(icon: Icons.add_circle_rounded, title: 'Mint supply coins', subtitle: 'coin_supply_pools + coin_pool_ledger', onTap: onMint),
-        _ActionTile(icon: Icons.groups_rounded, title: 'Send coins to all', subtitle: 'user_wallets + wallet_ledger', onTap: onSendAll),
-        _ActionTile(icon: Icons.visibility_off_rounded, title: 'Stealth visibility', subtitle: 'Founder-controlled stealth marker', onTap: onStealth),
-      ]);
-}
+class _SectionTabs extends StatelessWidget {
+  const _SectionTabs({required this.selected, required this.onChanged});
+  final _ControlSection selected;
+  final ValueChanged<_ControlSection> onChanged;
 
-class _PoolsCard extends StatelessWidget {
-  const _PoolsCard({required this.pools});
-  final List<SuperOwnerPoolItem> pools;
-  @override
-  Widget build(BuildContext context) => _WhiteCard(children: [
-        _SectionHeader(title: 'Coin supply pools', subtitle: '${pools.length}'),
-        const SizedBox(height: 8),
-        if (pools.isEmpty)
-          const Text('No pools yet. Mint coins to create a pool.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700))
-        else
-          ...pools.map((pool) => _CompactRecordCard(icon: Icons.account_balance_wallet_rounded, title: pool.poolType, subtitle: 'Owner ${pool.ownerUserId ?? 'Platform'} • Reserved ${pool.reservedBalance}', status: _fmt(pool.balance))),
-      ]);
-}
-
-class _LogsCard extends StatelessWidget {
-  const _LogsCard({required this.logs});
-  final List<SuperOwnerLogItem> logs;
-  @override
-  Widget build(BuildContext context) => _WhiteCard(children: [
-        _SectionHeader(title: 'Audit logs', subtitle: '${logs.length}'),
-        const SizedBox(height: 8),
-        if (logs.isEmpty)
-          const Text('No logs loaded.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700))
-        else
-          ...logs.take(8).map((log) => _CompactRecordCard(icon: Icons.receipt_long_rounded, title: log.action, subtitle: log.reason.isEmpty ? 'Actor ${log.actorUserId ?? '-'} → Target ${log.targetUserId ?? '-'}' : log.reason, status: log.resourceType ?? 'audit')),
-      ]);
-}
-
-class _ReviewsCard extends StatelessWidget {
-  const _ReviewsCard({required this.reviews});
-  final List<SuperOwnerReviewItem> reviews;
-  @override
-  Widget build(BuildContext context) => _WhiteCard(children: [
-        _SectionHeader(title: 'Review queue', subtitle: '${reviews.length}'),
-        const SizedBox(height: 8),
-        if (reviews.isEmpty)
-          const Text('No review items loaded.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700))
-        else
-          ...reviews.take(8).map((item) => _CompactRecordCard(icon: Icons.fact_check_rounded, title: item.title, subtitle: item.reason, status: item.status)),
-      ]);
-}
-
-class _AdminUserCard extends StatelessWidget {
-  const _AdminUserCard({required this.user, required this.canAssign, required this.canModerate, required this.isSuperOwner, required this.onAssignRole, required this.onModerate, required this.onCustomId, required this.onVip, required this.onPermission});
-  final AdminUser user;
-  final bool canAssign;
-  final bool canModerate;
-  final bool isSuperOwner;
-  final VoidCallback onAssignRole;
-  final VoidCallback onModerate;
-  final VoidCallback onCustomId;
-  final VoidCallback onVip;
-  final VoidCallback onPermission;
   @override
   Widget build(BuildContext context) {
-    final danger = user.isBanned || !user.isActive;
-    final initial = user.title.trim().isEmpty ? 'U' : user.title.trim().substring(0, 1).toUpperCase();
+    final items = <({IconData icon, String label, _ControlSection section})>[
+      (icon: Icons.auto_awesome_rounded, label: 'Assets', section: _ControlSection.assets),
+      (icon: Icons.people_alt_rounded, label: 'Users', section: _ControlSection.users),
+      (icon: Icons.account_balance_wallet_rounded, label: 'Economy', section: _ControlSection.economy),
+      (icon: Icons.shield_rounded, label: 'Safety', section: _ControlSection.safety),
+      (icon: Icons.fact_check_rounded, label: 'Reviews', section: _ControlSection.reviews),
+      (icon: Icons.receipt_long_rounded, label: 'Logs', section: _ControlSection.logs),
+    ];
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final active = item.section == selected;
+          return GestureDetector(
+            onTap: () => onChanged(item.section),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: active ? const Color(0xFF251538) : Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFEDE3D7))),
+              child: Row(children: [Icon(item.icon, size: 16, color: active ? Colors.white : const Color(0xFF7B6A86)), const SizedBox(width: 6), Text(item.label, style: TextStyle(color: active ? Colors.white : const Color(0xFF251538), fontSize: 11.5, fontWeight: FontWeight.w900))]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AssetsSection extends StatelessWidget {
+  const _AssetsSection({required this.selectedCategory, required this.categories, required this.backendCategories, required this.items, required this.allItemsCount, required this.onCategoryChanged, required this.onAddAsset, required this.onEditAsset, required this.onToggleAsset, required this.onSetDefault});
+
+  final _AssetCategory selectedCategory;
+  final List<_AssetCategory> categories;
+  final List<ControlCenterStoreCategory> backendCategories;
+  final List<ControlCenterStoreItem> items;
+  final int allItemsCount;
+  final ValueChanged<_AssetCategory> onCategoryChanged;
+  final VoidCallback onAddAsset;
+  final ValueChanged<ControlCenterStoreItem> onEditAsset;
+  final ValueChanged<ControlCenterStoreItem> onToggleAsset;
+  final ValueChanged<ControlCenterStoreItem> onSetDefault;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _Panel(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Expanded(child: _PanelTitle(title: 'Asset Control Center', subtitle: 'One backend source for CDN assets, categories, enable/disable and defaults.')),
+            _SmallButton(label: 'Add', icon: Icons.add_rounded, onTap: onAddAsset),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: categories.map((category) {
+            final active = category.storeCategory == selectedCategory.storeCategory;
+            return GestureDetector(
+              onTap: () => onCategoryChanged(category),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(color: active ? category.color : const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(16), border: Border.all(color: active ? category.color : const Color(0xFFEDE3D7))),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(category.icon, color: active ? Colors.white : category.color, size: 16), const SizedBox(width: 6), Text(category.title, style: TextStyle(color: active ? Colors.white : const Color(0xFF251538), fontSize: 10.8, fontWeight: FontWeight.w900))]),
+              ),
+            );
+          }).toList(growable: false)),
+        ]),
+      ),
+      const SizedBox(height: 12),
+      _CategoryExplainer(category: selectedCategory, itemsCount: items.length, totalItems: allItemsCount),
+      const SizedBox(height: 12),
+      if (items.isEmpty)
+        _EmptyPanel(icon: selectedCategory.icon, title: 'No assets in ${selectedCategory.title}', subtitle: 'Tap Add and save CDN/Object Storage URLs into this category.')
+      else
+        ...items.map((item) => _AssetCard(item: item, onEdit: () => onEditAsset(item), onToggle: () => onToggleAsset(item), onDefault: () => onSetDefault(item))),
+    ]);
+  }
+}
+
+class _CategoryExplainer extends StatelessWidget {
+  const _CategoryExplainer({required this.category, required this.itemsCount, required this.totalItems});
+  final _AssetCategory category;
+  final int itemsCount;
+  final int totalItems;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      child: Row(children: [
+        Container(width: 48, height: 48, decoration: BoxDecoration(color: category.color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(18)), child: Icon(category.icon, color: category.color)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(category.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 14.5, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(category.description, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, height: 1.2, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 5),
+          Text('Category key: ${category.storeCategory} • Type: ${category.storeItemType}', style: const TextStyle(color: Color(0xFF9B8AA7), fontSize: 10, fontWeight: FontWeight.w800)),
+        ])),
+        _Metric(label: 'Assets', value: '$itemsCount'),
+      ]),
+    );
+  }
+}
+
+class _AssetCard extends StatelessWidget {
+  const _AssetCard({required this.item, required this.onEdit, required this.onToggle, required this.onDefault});
+  final ControlCenterStoreItem item;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+  final VoidCallback onDefault;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = item.displayAssetUrl;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFEDE3D7))),
-      child: Column(children: [
-        Row(children: [
-          CircleAvatar(backgroundColor: danger ? const Color(0xFFE84C72) : const Color(0xFF12C7B7), child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(user.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 14.5, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text('ID ${user.publicUserId} • ${user.roleLabel}', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))])),
-          IconButton(onPressed: canModerate && user.isNormalUser ? onModerate : null, icon: Icon(user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded)),
-          IconButton(onPressed: canAssign ? onAssignRole : null, icon: const Icon(Icons.manage_accounts_rounded)),
-        ]),
-        if (isSuperOwner) ...[
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            _MiniButton(label: 'Custom ID', icon: Icons.badge_rounded, onTap: onCustomId),
-            _MiniButton(label: 'VIP/SVIP', icon: Icons.workspace_premium_rounded, onTap: onVip),
-            _MiniButton(label: 'Permission', icon: Icons.key_rounded, onTap: onPermission),
+      child: Row(children: [
+        Container(
+          width: 58,
+          height: 58,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(color: const Color(0xFF251538), borderRadius: BorderRadius.circular(18)),
+          child: url.isEmpty ? const Icon(Icons.image_rounded, color: Colors.white) : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: Colors.white)),
+        ),
+        const SizedBox(width: 11),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 13.2, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 3),
+          Text('${item.itemType} • ${item.category}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 5),
+          Row(children: [
+            _StatusPill(text: item.active ? 'Enabled' : 'Disabled', color: item.active ? const Color(0xFF12C7B7) : const Color(0xFFE84C72)),
+            const SizedBox(width: 6),
+            _StatusPill(text: item.priceCoins == 0 ? 'Free' : '${item.priceCoins} coins', color: const Color(0xFFFFC857)),
           ]),
-        ],
+        ])),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF251538)),
+          onSelected: (value) {
+            if (value == 'edit') onEdit();
+            if (value == 'toggle') onToggle();
+            if (value == 'default') onDefault();
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: 'edit', child: Text('Edit asset')),
+            PopupMenuItem(value: 'toggle', child: Text(item.active ? 'Disable' : 'Enable')),
+            const PopupMenuItem(value: 'default', child: Text('Set default/featured')),
+          ],
+        ),
       ]),
     );
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
+class _UsersSection extends StatelessWidget {
+  const _UsersSection({required this.users, required this.isSuperOwner});
+  final List<AdminUser> users;
+  final bool isSuperOwner;
+  @override
+  Widget build(BuildContext context) => _Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    _PanelTitle(title: 'Users & roles', subtitle: '${users.length} users loaded • role hierarchy remains backend-controlled'),
+    const SizedBox(height: 12),
+    ...users.take(18).map((user) => _MiniRecord(icon: Icons.person_rounded, title: user.title, subtitle: 'ID ${user.publicUserId} • ${user.roleLabel}', trailing: user.isBanned ? 'Banned' : user.isActive ? 'Active' : 'Inactive')),
+  ]));
+}
+
+class _EconomySection extends StatelessWidget {
+  const _EconomySection({required this.pools});
+  final List<SuperOwnerPoolItem> pools;
+  @override
+  Widget build(BuildContext context) => _Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    _PanelTitle(title: 'Economy source of truth', subtitle: 'Coin pools, wallet ledgers, VIP/SVIP and store catalog controls'),
+    const SizedBox(height: 12),
+    if (pools.isEmpty) const Text('No coin pools loaded yet.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)) else ...pools.map((pool) => _MiniRecord(icon: Icons.account_balance_wallet_rounded, title: pool.poolType, subtitle: 'Owner ${pool.ownerUserId ?? 'Platform'} • Reserved ${pool.reservedBalance}', trailing: '${pool.balance}')),
+  ]));
+}
+
+class _SafetySection extends StatelessWidget {
+  const _SafetySection({required this.userBans, required this.deviceBans});
+  final List<UserBanItem> userBans;
+  final List<DeviceBanItem> deviceBans;
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    _Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _PanelTitle(title: 'Safety & moderation', subtitle: 'Active user/device bans and protected moderation state'),
+      const SizedBox(height: 12),
+      ...userBans.take(10).map((ban) => _MiniRecord(icon: Icons.block_rounded, title: 'User ${ban.userId}', subtitle: ban.reason, trailing: ban.isActive ? 'Active' : 'Expired')),
+      ...deviceBans.take(10).map((ban) => _MiniRecord(icon: Icons.phonelink_lock_rounded, title: ban.deviceId, subtitle: ban.reason, trailing: ban.isActive ? 'Active' : 'Lifted')),
+      if (userBans.isEmpty && deviceBans.isEmpty) const Text('No bans loaded.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)),
+    ])),
+  ]);
+}
+
+class _ReviewsSection extends StatelessWidget {
+  const _ReviewsSection({required this.reviews});
+  final List<SuperOwnerReviewItem> reviews;
+  @override
+  Widget build(BuildContext context) => _Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    _PanelTitle(title: 'Review queues', subtitle: 'Custom backgrounds, reports, media safety and pending approvals'),
+    const SizedBox(height: 12),
+    if (reviews.isEmpty) const Text('No review items loaded.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)) else ...reviews.map((item) => _MiniRecord(icon: Icons.fact_check_rounded, title: item.title, subtitle: item.reason, trailing: item.status)),
+  ]));
+}
+
+class _LogsSection extends StatelessWidget {
+  const _LogsSection({required this.logs});
+  final List<SuperOwnerLogItem> logs;
+  @override
+  Widget build(BuildContext context) => _Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    _PanelTitle(title: 'Audit logs', subtitle: 'Sensitive actions remain reason-required and audit logged'),
+    const SizedBox(height: 12),
+    if (logs.isEmpty) const Text('No audit logs loaded.', style: TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)) else ...logs.take(30).map((log) => _MiniRecord(icon: Icons.receipt_long_rounded, title: log.action, subtitle: log.reason.isEmpty ? 'Actor ${log.actorUserId ?? '-'} → Target ${log.targetUserId ?? '-'}' : log.reason, trailing: log.resourceType ?? 'audit')),
+  ]));
+}
+
+class _Panel extends StatelessWidget {
+  const _Panel({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFEDE3D7)), boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 8))]), child: child);
+}
+
+class _PanelTitle extends StatelessWidget {
+  const _PanelTitle({required this.title, required this.subtitle});
+  final String title;
+  final String subtitle;
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 15.5, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, height: 1.2, fontWeight: FontWeight.w700))]);
+}
+
+class _MiniRecord extends StatelessWidget {
+  const _MiniRecord({required this.icon, required this.title, required this.subtitle, required this.trailing});
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final String trailing;
   @override
-  Widget build(BuildContext context) => ListTile(leading: Icon(icon, color: const Color(0xFF12C7B7)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), subtitle: Text(subtitle), trailing: const Icon(Icons.chevron_right_rounded), onTap: onTap);
+  Widget build(BuildContext context) => Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFFAF7F1), borderRadius: BorderRadius.circular(18)), child: Row(children: [Icon(icon, color: const Color(0xFF8C5CF6), size: 18), const SizedBox(width: 9), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w700))])), const SizedBox(width: 6), _StatusPill(text: trailing, color: const Color(0xFF12C7B7))]));
 }
 
-class _MiniButton extends StatelessWidget {
-  const _MiniButton({required this.label, required this.icon, required this.onTap});
+class _SmallButton extends StatelessWidget {
+  const _SmallButton({required this.label, required this.icon, required this.onTap});
   final String label;
   final IconData icon;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => ActionChip(avatar: Icon(icon, size: 16), label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)), onPressed: onTap);
+  Widget build(BuildContext context) => GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8), decoration: BoxDecoration(color: const Color(0xFF251538), borderRadius: BorderRadius.circular(999)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: Colors.white, size: 15), const SizedBox(width: 5), Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900))])));
 }
 
-class _WhiteCard extends StatelessWidget {
-  const _WhiteCard({required this.children});
-  final List<Widget> children;
+class _PrimaryButton extends StatelessWidget {
+  const _PrimaryButton({required this.busy, required this.label, required this.icon, required this.onPressed});
+  final bool busy;
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
   @override
-  Widget build(BuildContext context) => Container(width: double.infinity, padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFEDE3D7))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children));
+  Widget build(BuildContext context) => SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: busy ? null : onPressed, icon: Icon(icon, size: 17), label: Text(busy ? 'Saving...' : label), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF251538), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)))));
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.subtitle});
-  final String title;
-  final String subtitle;
-  @override
-  Widget build(BuildContext context) => Row(children: [Expanded(child: Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900))), Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w800))]);
-}
-
-class _MetricPill extends StatelessWidget {
-  const _MetricPill({required this.label, required this.value});
+class _Metric extends StatelessWidget {
+  const _Metric({required this.label, required this.value});
   final String label;
   final String value;
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(999)), child: Text('$label $value', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)));
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white24)), child: Column(mainAxisSize: MainAxisSize.min, children: [Text(value, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)), Text(label, style: const TextStyle(color: Colors.white70, fontSize: 9.5, fontWeight: FontWeight.w700))]));
 }
 
-class _UserBanCard extends StatelessWidget {
-  const _UserBanCard({required this.ban});
-  final UserBanItem ban;
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.text, required this.color});
+  final String text;
+  final Color color;
   @override
-  Widget build(BuildContext context) => _CompactRecordCard(icon: Icons.block_rounded, title: 'User ${ban.userId}', subtitle: ban.reason, status: ban.isActive ? 'Active' : 'Lifted');
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4), decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)), child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w900)));
 }
 
-class _DeviceBanCard extends StatelessWidget {
-  const _DeviceBanCard({required this.ban, required this.onUnban});
-  final DeviceBanItem ban;
-  final VoidCallback onUnban;
-  @override
-  Widget build(BuildContext context) => _CompactRecordCard(icon: Icons.phonelink_lock_rounded, title: ban.deviceId, subtitle: ban.reason, status: ban.isActive ? 'Active' : 'Lifted', trailing: IconButton(onPressed: ban.isActive ? onUnban : null, icon: const Icon(Icons.lock_open_rounded)));
-}
-
-class _CompactRecordCard extends StatelessWidget {
-  const _CompactRecordCard({required this.icon, required this.title, required this.subtitle, required this.status, this.trailing});
+class _EmptyPanel extends StatelessWidget {
+  const _EmptyPanel({required this.icon, required this.title, required this.subtitle});
   final IconData icon;
   final String title;
   final String subtitle;
-  final String status;
-  final Widget? trailing;
   @override
-  Widget build(BuildContext context) => Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFEDE3D7))), child: Row(children: [Icon(icon, color: const Color(0xFFE84C72), size: 20), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w900)), Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11, fontWeight: FontWeight.w700))])), Text(status, style: const TextStyle(color: Color(0xFFE84C72), fontSize: 11, fontWeight: FontWeight.w900)), ?trailing]));
-}
-
-class _ControlSheet extends StatelessWidget {
-  const _ControlSheet({required this.title, required this.subtitle, required this.child});
-  final String title;
-  final String subtitle;
-  final Widget child;
-  @override
-  Widget build(BuildContext context) => Container(margin: const EdgeInsets.all(14), padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.paddingOf(context).bottom), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 26, offset: const Offset(0, 12))]), child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Center(child: Container(width: 42, height: 5, decoration: BoxDecoration(color: const Color(0xFFE0D5CB), borderRadius: BorderRadius.circular(999)))), const SizedBox(height: 14), Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 6), Text(subtitle, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w700)), const SizedBox(height: 14), child])));
-}
-
-class _ReasonField extends StatelessWidget {
-  const _ReasonField({required this.controller});
-  final TextEditingController controller;
-  @override
-  Widget build(BuildContext context) => TextField(controller: controller, minLines: 2, maxLines: 3, decoration: InputDecoration(labelText: 'Reason required', border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))));
-}
-
-class _PrimaryActionButton extends StatelessWidget {
-  const _PrimaryActionButton({required this.busy, required this.label, required this.busyLabel, required this.icon, required this.onPressed, this.danger = false});
-  final bool busy;
-  final String label;
-  final String busyLabel;
-  final IconData icon;
-  final VoidCallback onPressed;
-  final bool danger;
-  @override
-  Widget build(BuildContext context) => SizedBox(width: double.infinity, height: 48, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: danger ? const Color(0xFFE84C72) : const Color(0xFF12C7B7), foregroundColor: Colors.white), onPressed: busy ? null : onPressed, icon: Icon(icon), label: Text(busy ? busyLabel : label)));
+  Widget build(BuildContext context) => _Panel(child: Column(children: [Icon(icon, color: const Color(0xFF8C5CF6), size: 34), const SizedBox(height: 10), Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900)), const SizedBox(height: 5), Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700))]));
 }
 
 class _ErrorState extends StatelessWidget {
@@ -808,17 +740,5 @@ class _ErrorState extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
   @override
-  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.lock_rounded, color: Color(0xFFE84C72), size: 38), const SizedBox(height: 12), Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w800)), const SizedBox(height: 14), ElevatedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Retry'))])));
+  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(22), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 38), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w800)), const SizedBox(height: 14), _SmallButton(label: 'Retry', icon: Icons.refresh_rounded, onTap: onRetry)])));
 }
-
-String _fmt(int value) {
-  final raw = value.toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < raw.length; i++) {
-    final remaining = raw.length - i;
-    buffer.write(raw[i]);
-    if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
-  }
-  return buffer.toString();
-}
-
