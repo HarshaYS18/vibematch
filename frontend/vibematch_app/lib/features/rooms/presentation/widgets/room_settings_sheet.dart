@@ -37,6 +37,7 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.onClearChatTap,
     required this.canCloseRoom,
     this.showSeatLayoutOption = true,
+    this.cricketModeActive = false,
   });
 
   final RoomPrivacyMode privacyMode;
@@ -66,6 +67,7 @@ class RoomSettingsSheet extends StatelessWidget {
   final VoidCallback onClearChatTap;
   final bool canCloseRoom;
   final bool showSeatLayoutOption;
+  final bool cricketModeActive;
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +92,7 @@ class RoomSettingsSheet extends StatelessWidget {
                 physics: const BouncingScrollPhysics(),
                 children: [
                   RoomSettingsModesSection(
+                    cricketModeActive: cricketModeActive,
                     onVibeSyncTap: onVibeSyncTap,
                     onWatchPartyTap: onWatchPartyTap,
                     onCricketModeTap: onCricketModeTap,
