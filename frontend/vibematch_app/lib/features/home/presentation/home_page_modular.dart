@@ -6,6 +6,9 @@ import '../controllers/home_navigation_controller.dart';
 import 'sections/home_banner_section.dart';
 import 'sections/home_filters_section.dart';
 import 'sections/home_header_section.dart';
+import 'sections/home_room_list_section.dart';
+import 'sections/home_room_section_header.dart';
+import 'widgets/home_loading_strip.dart';
 import 'widgets/home_network_error_card.dart';
 import 'widgets/home_official_banner_manage_card.dart';
 
@@ -30,6 +33,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_handleScroll);
     _controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _controller.refreshAll();
@@ -38,10 +42,15 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_handleScroll);
     _controller.removeListener(_handleControllerChanged);
     _scrollController.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _handleScroll() {
+    _controller.onScrollNearBottom(_scrollController);
   }
 
   void _handleControllerChanged() {
@@ -54,6 +63,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleRooms = _controller.visibleRooms;
     final activeCurrentUser = HomeNavigationController.activeCurrentUser(widget.user, widget.currentUser);
 
     return Scaffold(
@@ -110,72 +120,41 @@ class _HomePageState extends State<HomePage> {
                   onLanguageTap: () => HomeNavigationController.openLanguageSheet(context: context, controller: _controller),
                 ),
               ),
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _PinnedRoomsComingSoonState(
-                  selectedTab: _controller.selectedCategory,
-                  canManageRooms: _canManageHomeBanners,
-                  onManageTap: () => VmNavigator.openControlCenter(context),
+              if (_controller.isLoadingRooms)
+                const SliverToBoxAdapter(child: HomeLoadingStrip())
+              else if (_controller.loadErrorMessage != null)
+                SliverToBoxAdapter(
+                  child: HomeNetworkErrorCard(
+                    message: _controller.loadErrorMessage!,
+                    onRetry: _controller.retryLoadingRooms,
+                  ),
                 ),
+              SliverToBoxAdapter(
+                child: HomeRoomSectionHeader(
+                  selectedCategory: _controller.selectedCategory,
+                  totalRooms: _controller.filteredRooms.length,
+                ),
+              ),
+              HomeRoomListSection(
+                visibleRooms: visibleRooms,
+                selectedCategory: _controller.selectedCategory,
+                hasLoadError: _controller.loadErrorMessage != null,
+                policyBanners: _controller.policyBanners,
+                selectedPolicyBannerIndex: _controller.selectedPolicyBannerIndex,
+                canManageBanners: _canManageHomeBanners,
+                onRoomTap: (room) => HomeNavigationController.openRoom(
+                  context: context,
+                  room: room,
+                  currentUser: activeCurrentUser,
+                ),
+                onPolicyBannerChanged: _controller.selectPolicyBanner,
+                onPolicyBannerTap: (banner) => HomeNavigationController.handlePolicyBannerTap(context, banner),
+                onManageBannersTap: () => VmNavigator.openBannerManager(context),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 110)),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PinnedRoomsComingSoonState extends StatelessWidget {
-  const _PinnedRoomsComingSoonState({required this.selectedTab, required this.canManageRooms, required this.onManageTap});
-
-  final String selectedTab;
-  final bool canManageRooms;
-  final VoidCallback onManageTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isFollowing = selectedTab == 'Following';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 120),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 74,
-            height: 74,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(colors: [Color(0xFF251538), Color(0xFF8C5CF6)]),
-              boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: 0.14), blurRadius: 22, offset: const Offset(0, 10))],
-            ),
-            child: Icon(isFollowing ? Icons.group_rounded : Icons.push_pin_rounded, color: Colors.white, size: 30),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            isFollowing ? 'Following rooms will appear here' : 'Pinned rooms will appear here',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.2),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            isFollowing ? 'Rooms from followed users stay separate from public trending.' : 'Owner Control Center can pin rooms for the Home page.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, height: 1.25, fontWeight: FontWeight.w600),
-          ),
-          if (canManageRooms) ...[
-            const SizedBox(height: 14),
-            GestureDetector(
-              onTap: onManageTap,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                decoration: BoxDecoration(color: const Color(0xFF12C7B7), borderRadius: BorderRadius.circular(999), boxShadow: [BoxShadow(color: const Color(0xFF12C7B7).withValues(alpha: 0.24), blurRadius: 12, offset: const Offset(0, 6))]),
-                child: const Text('Manage pinned rooms', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }
