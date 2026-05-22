@@ -106,8 +106,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onEffectsTap: () => LiveRoomProfileNavigator.openModulePage(
         context: context,
         title: 'Room effects',
-        subtitle:
-            'Room entrance effects, seat effects, and background effects will connect here.',
+        subtitle: 'Room entrance effects, seat effects, and background effects will connect here.',
         icon: Icons.auto_awesome_rounded,
       ),
       onMusicTap: () => _openMusicModule(context),
@@ -118,6 +117,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onCloseRoom: onCloseRoom,
       canCloseRoom: canCloseRoom,
       showSeatLayoutOption: !cricketModeActive,
+      cricketModeActive: cricketModeActive,
     );
   }
 }
