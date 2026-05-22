@@ -249,7 +249,7 @@ def owner_reset_lock_by_visible_id(request: InboxLockOwnerResetByIdentifierReque
 
 @router.get("/conversations", response_model=InboxConversationListResponse)
 def list_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    conversations = inbox_service.list_conversations_for_user(db, current_user)
+    conversations = inbox_service.list_conversations(db, current_user)
     return InboxConversationListResponse(conversations=[InboxConversationResponse(**_conversation_payload(conversation, current_user)) for conversation in conversations])
 
 
