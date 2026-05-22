@@ -117,24 +117,17 @@ class _ChatroomContributionRankingsSheetState
   Widget build(BuildContext context) {
     const category = RoomRankingCategory.sent;
     final accentColor = category.accentColor;
-    final syncedUsers = widget.users
-        .map(_syncCurrentProfile)
-        .toList(growable: false);
+    final syncedUsers = widget.users.map(_syncCurrentProfile).toList(growable: false);
     final fallbackEntries = _controller.buildMockEntries(
       users: syncedUsers,
       category: category,
       period: _period,
     );
-    final realEntries = _realEntries
-        ?.map(_syncCurrentEntry)
-        .toList(growable: false);
-    final entries = (realEntries != null && realEntries.isNotEmpty)
-        ? realEntries
-        : fallbackEntries;
-    final topEntries = entries.take(100).toList(growable: false);
+    final realEntries = _realEntries?.map(_syncCurrentEntry).toList(growable: false);
+    final entries = (realEntries != null && realEntries.isNotEmpty) ? realEntries : fallbackEntries;
+    final podiumEntries = entries.take(3).toList(growable: false);
+    final listEntries = entries.skip(3).take(97).toList(growable: false);
     final currentEntry = _currentEntry(entries);
-    final backendPath =
-        '/rooms/${widget.roomPublicId}/contributions?period=${_period.backendValue}&category=sent';
 
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.78,
@@ -154,8 +147,6 @@ class _ChatroomContributionRankingsSheetState
                 const SheetHandle(width: 44, color: Colors.white54),
                 const SizedBox(height: 12),
                 _ContributionHeader(
-                  roomName: widget.roomName,
-                  period: _period,
                   accentColor: accentColor,
                   onClose: () => Navigator.pop(context),
                 ),
@@ -166,54 +157,39 @@ class _ChatroomContributionRankingsSheetState
                   onChanged: _changePeriod,
                 ),
                 const SizedBox(height: 12),
-                _RoomScopePill(
-                  roomName: widget.roomName,
-                  usersCount: topEntries.length,
-                  backendPath: backendPath,
-                  loading: _loading,
-                  error: _error,
-                ),
-                const SizedBox(height: 12),
                 Expanded(
-                  child: topEntries.isEmpty && !_loading
+                  child: entries.isEmpty && !_loading
                       ? _EmptyContributionState(
                           error: _error,
                           onRetry: () => unawaited(_loadRealEntries()),
                         )
                       : ListView.separated(
                           physics: const BouncingScrollPhysics(),
-                          padding: EdgeInsets.only(
-                            bottom: currentEntry == null ? 8 : 86,
-                          ),
-                          itemCount: topEntries.length + 1,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 8),
+                          padding: EdgeInsets.only(bottom: currentEntry == null ? 8 : 86),
+                          itemCount: listEntries.length + 1,
+                          separatorBuilder: (context, index) => const SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             if (index == 0) {
                               return RoomRankingsPodiumPreview(
-                                entries: entries,
+                                entries: podiumEntries,
                                 accentColor: accentColor,
                               );
                             }
-                            final entry = topEntries[index - 1];
+                            final entry = listEntries[index - 1];
                             return RoomRankingEntryTile(
                               entry: entry,
                               accentColor: accentColor,
-                              onTap: widget.onUserTap == null
-                                  ? null
-                                  : () => widget.onUserTap!(entry.user),
+                              onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(entry.user),
                             );
                           },
                         ),
                 ),
-                if (currentEntry != null) ...[
+                if (currentEntry != null && currentEntry.rank > 3) ...[
                   const SizedBox(height: 8),
                   RoomRankingEntryTile(
                     entry: currentEntry,
                     accentColor: accentColor,
-                    onTap: widget.onUserTap == null
-                        ? null
-                        : () => widget.onUserTap!(currentEntry.user),
+                    onTap: widget.onUserTap == null ? null : () => widget.onUserTap!(currentEntry.user),
                   ),
                 ],
               ],
@@ -261,14 +237,10 @@ class _ChatroomContributionRankingsSheetState
 
 class _ContributionHeader extends StatelessWidget {
   const _ContributionHeader({
-    required this.roomName,
-    required this.period,
     required this.accentColor,
     required this.onClose,
   });
 
-  final String roomName;
-  final RoomRankingPeriod period;
   final Color accentColor;
   final VoidCallback onClose;
 
@@ -294,33 +266,17 @@ class _ContributionHeader extends StatelessWidget {
           child: Icon(Icons.emoji_events_rounded, color: accentColor, size: 20),
         ),
         const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Chatroom Contribution',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.35,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${period.label} real coin contributors in this room',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.58),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+        const Expanded(
+          child: Text(
+            'Chatroom Contribution',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.35,
+            ),
           ),
         ),
         Material(
@@ -337,93 +293,11 @@ class _ContributionHeader extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.10),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
-              child: const Icon(
-                Icons.close_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
+              child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _RoomScopePill extends StatelessWidget {
-  const _RoomScopePill({
-    required this.roomName,
-    required this.usersCount,
-    required this.backendPath,
-    required this.loading,
-    required this.error,
-  });
-
-  final String roomName;
-  final int usersCount;
-  final String backendPath;
-  final bool loading;
-  final String? error;
-
-  @override
-  Widget build(BuildContext context) {
-    final statusText = loading
-        ? 'syncing live...'
-        : (error == null ? 'live backend data' : 'fallback: $error');
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.meeting_room_rounded,
-                color: RoomColors.gold,
-                size: 15,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '$roomName only',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Text(
-                '$usersCount ranks',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.58),
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$statusText · GET $backendPath',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.34),
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -447,9 +321,7 @@ class _EmptyContributionState extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            error == null
-                ? 'No gifts sent in this room yet'
-                : 'Could not load real rankings',
+            error == null ? 'No gifts sent in this room yet' : 'Could not load real rankings',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 13,
@@ -492,21 +364,15 @@ class _ContributionPeriodTabs extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
-                  color: selected
-                      ? accentColor
-                      : Colors.white.withValues(alpha: 0.08),
+                  color: selected ? accentColor : Colors.white.withValues(alpha: 0.08),
                   border: Border.all(
-                    color: selected
-                        ? Colors.white.withValues(alpha: 0.18)
-                        : Colors.white.withValues(alpha: 0.10),
+                    color: selected ? Colors.white.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.10),
                   ),
                 ),
                 child: Text(
                   period.label,
                   style: TextStyle(
-                    color: selected
-                        ? RoomColors.deep
-                        : Colors.white.withValues(alpha: 0.78),
+                    color: selected ? RoomColors.deep : Colors.white.withValues(alpha: 0.78),
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                   ),
