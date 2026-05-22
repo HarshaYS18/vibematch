@@ -12,12 +12,16 @@ class HomeController extends ChangeNotifier {
 
   int selectedBannerIndex = 0;
   int selectedPolicyBannerIndex = 0;
+  int visibleRoomCount = 8;
   String selectedCategory = 'Trending';
   String selectedLanguage = 'All';
+  bool isLoadingRooms = false;
   bool isLoadingHomeChrome = false;
+  String? loadErrorMessage;
   String? bannerErrorMessage;
   HomeRoom? myCreatedRoom;
 
+  List<HomeRoom> _backendRooms = const [];
   List<HomeBanner> _eventBanners = const [];
   List<HomeBanner> _policyBanners = const [];
 
@@ -50,19 +54,38 @@ class HomeController extends ChangeNotifier {
 
   List<HomeBanner> get policyBanners => _policyBanners;
 
-  List<HomeRoom> get rooms => const [];
+  List<HomeRoom> get rooms => _backendRooms;
 
-  List<HomeRoom> get filteredRooms => const [];
+  bool get hasNetworkError => loadErrorMessage != null;
 
-  List<HomeRoom> get visibleRooms => const [];
+  bool get usingBackendRooms => _backendRooms.isNotEmpty && !hasNetworkError;
 
-  bool get hasNetworkError => false;
+  bool _isOpenActiveRoom(HomeRoom room) {
+    return room.isPublicOpen && room.onlineCount > 0;
+  }
 
-  bool get usingBackendRooms => false;
+  List<HomeRoom> get filteredRooms {
+    if (hasNetworkError) return const [];
+    final filtered = rooms.where((room) {
+      final languageMatch = selectedLanguage == 'All' || room.language == selectedLanguage;
+      if (!languageMatch) return false;
+      if (selectedCategory == 'Trending') return _isOpenActiveRoom(room);
+      return true;
+    }).toList();
 
-  bool get isLoadingRooms => false;
+    filtered.sort((a, b) {
+      final onlineCompare = b.onlineCount.compareTo(a.onlineCount);
+      if (onlineCompare != 0) return onlineCompare;
+      return b.trendingScore.compareTo(a.trendingScore);
+    });
+    return filtered;
+  }
 
-  String? get loadErrorMessage => null;
+  List<HomeRoom> get visibleRooms {
+    final rooms = filteredRooms;
+    final count = _clampCount(visibleRoomCount, rooms.length);
+    return rooms.take(count).toList();
+  }
 
   Future<void> loadHomeChrome() async {
     if (isLoadingHomeChrome) return;
@@ -96,17 +119,56 @@ class HomeController extends ChangeNotifier {
 
   Future<void> refreshAfterRoomCreation() async {
     await loadHomeChrome();
+    await loadRooms();
   }
 
-  Future<void> loadTrendingRooms({bool silent = false}) async {}
+  Future<void> loadTrendingRooms({bool silent = false}) => loadRooms(silent: silent);
 
-  Future<void> loadRooms({bool silent = false}) async {}
+  Future<void> loadRooms({bool silent = false}) async {
+    if (isLoadingRooms) return;
+    isLoadingRooms = true;
+    if (!silent) loadErrorMessage = null;
+    notifyListeners();
+
+    try {
+      final languageForBackend = selectedLanguage == 'All' ? null : selectedLanguage;
+      final fetchedRooms = selectedCategory == 'Following'
+          ? await _repository.fetchFollowingRooms(
+              language: languageForBackend,
+              category: null,
+              limit: 80,
+            )
+          : await _repository.fetchTrendingRooms(
+              language: languageForBackend,
+              category: null,
+              limit: 80,
+            );
+
+      _backendRooms = fetchedRooms;
+      loadErrorMessage = null;
+    } catch (_) {
+      _backendRooms = const [];
+      loadErrorMessage = 'Could not load rooms. Pull to refresh.';
+    } finally {
+      isLoadingRooms = false;
+      visibleRoomCount = 8;
+      notifyListeners();
+    }
+  }
 
   Future<void> refreshAll() async {
-    await loadHomeChrome();
+    await Future.wait([loadHomeChrome(), loadRooms()]);
   }
 
-  void onScrollNearBottom(ScrollController scrollController) {}
+  void onScrollNearBottom(ScrollController scrollController) {
+    if (!scrollController.hasClients || hasNetworkError) return;
+    final nearBottom = scrollController.position.pixels > scrollController.position.maxScrollExtent - 420;
+    if (nearBottom && visibleRoomCount < filteredRooms.length) {
+      final nextCount = visibleRoomCount + 5;
+      visibleRoomCount = nextCount > filteredRooms.length ? filteredRooms.length : nextCount;
+      notifyListeners();
+    }
+  }
 
   void selectBanner(int index) {
     selectedBannerIndex = _clampIndex(index, _eventBanners.length);
@@ -121,23 +183,37 @@ class HomeController extends ChangeNotifier {
   void selectCategory(String category) {
     if (!categories.contains(category)) return;
     selectedCategory = category;
+    visibleRoomCount = 8;
     notifyListeners();
+    loadRooms(silent: true);
   }
 
   void selectLanguage(String language) {
     selectedLanguage = language;
+    visibleRoomCount = 8;
+    notifyListeners();
+    loadRooms(silent: true);
+  }
+
+  void seeAllRooms() {
+    visibleRoomCount = filteredRooms.length;
     notifyListeners();
   }
 
-  void seeAllRooms() {}
-
-  Future<void> retryLoadingRooms() async {}
+  Future<void> retryLoadingRooms() {
+    return loadRooms();
+  }
 
   int _clampIndex(int value, int length) {
     if (length <= 0) return 0;
     if (value < 0) return 0;
     if (value >= length) return length - 1;
     return value;
+  }
+
+  int _clampCount(int value, int max) {
+    if (max <= 0 || value <= 0) return 0;
+    return value > max ? max : value;
   }
 
   @override
