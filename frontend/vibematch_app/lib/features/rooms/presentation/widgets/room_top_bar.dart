@@ -333,7 +333,7 @@ class _RoomNamePill extends StatelessWidget {
                     width: 28,
                     height: 28,
                     child: Center(
-                      child: Icon(Icons.add_rounded, color: RoomColors.aqua, size: 17),
+                      child: Icon(Icons.person_add_alt_1_rounded, color: RoomColors.aqua, size: 15),
                     ),
                   ),
                 ),
