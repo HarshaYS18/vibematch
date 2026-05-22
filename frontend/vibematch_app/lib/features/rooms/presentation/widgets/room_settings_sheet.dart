@@ -36,6 +36,7 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.onCricketModeTap,
     required this.onClearChatTap,
     required this.canCloseRoom,
+    this.showSeatLayoutOption = true,
   });
 
   final RoomPrivacyMode privacyMode;
@@ -64,6 +65,7 @@ class RoomSettingsSheet extends StatelessWidget {
   final VoidCallback onCricketModeTap;
   final VoidCallback onClearChatTap;
   final bool canCloseRoom;
+  final bool showSeatLayoutOption;
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +110,7 @@ class RoomSettingsSheet extends StatelessWidget {
                     onBlockedTap: onBlockedTap,
                     onReportsTap: onReportsTap,
                     onClearChatTap: onClearChatTap,
+                    showSeatLayoutOption: showSeatLayoutOption,
                   ),
                   const SizedBox(height: 11),
                   RoomSettingsPermissionsSection(
