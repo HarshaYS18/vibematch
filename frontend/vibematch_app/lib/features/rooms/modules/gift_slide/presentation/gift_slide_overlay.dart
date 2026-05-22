@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../presentation/live_room_models.dart';
+import '../../../presentation/widgets/gift_flight_bus.dart';
+import '../../../presentation/widgets/gift_flight_overlay.dart';
 import '../../../presentation/widgets/gift_modules/gift_visual.dart';
 
 class GiftSlideOverlay extends StatelessWidget {
@@ -27,15 +31,53 @@ class GiftSlideOverlay extends StatelessWidget {
   }
 }
 
-class GiftSlideStackModule extends StatelessWidget {
+class GiftSlideStackModule extends StatefulWidget {
   const GiftSlideStackModule({super.key, required this.slides, required this.onComboTap});
 
   final List<GiftSlide> slides;
   final ValueChanged<GiftSlide> onComboTap;
 
   @override
+  State<GiftSlideStackModule> createState() => _GiftSlideStackModuleState();
+}
+
+class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
+  final Map<String, int> _luckyComboTotals = <String, int>{};
+  final Map<String, int> _luckyRewardTotals = <String, int>{};
+  final Set<String> _handledFlightIds = <String>{};
+  VoidCallback? _flightListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _flightListener = _handleGiftFlight;
+    GiftFlightBus.latest.addListener(_flightListener!);
+  }
+
+  @override
+  void dispose() {
+    final listener = _flightListener;
+    if (listener != null) {
+      GiftFlightBus.latest.removeListener(listener);
+    }
+    super.dispose();
+  }
+
+  void _handleGiftFlight() {
+    final event = GiftFlightBus.latest.value;
+    if (event == null) return;
+    if (!_handledFlightIds.add(event.id)) return;
+    if (event.multiplier == null) return;
+
+    final key = _eventKey(event);
+    _luckyComboTotals[key] = (_luckyComboTotals[key] ?? 0) + math.max(1, event.combo);
+    _luckyRewardTotals[key] = (_luckyRewardTotals[key] ?? 0) + math.max(0, event.rewardCoinAmount ?? 0);
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final visibleSlides = slides.where((slide) {
+    final visibleSlides = widget.slides.where((slide) {
       final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15);
       return ageSeconds <= 5;
     }).take(1).toList(growable: false);
@@ -56,7 +98,9 @@ class GiftSlideStackModule extends StatelessWidget {
                   child: GiftSlideCardModule(
                     key: ValueKey(slide.id),
                     slide: slide,
-                    onComboTap: () => onComboTap(slide),
+                    displayCombo: math.max(slide.combo, _luckyComboTotals[_slideKey(slide)] ?? slide.combo),
+                    rewardCoins: _luckyRewardTotals[_slideKey(slide)] ?? _rewardCoinsFromSlide(slide),
+                    onComboTap: () => widget.onComboTap(slide),
                   ),
                 ),
             ],
@@ -68,10 +112,18 @@ class GiftSlideStackModule extends StatelessWidget {
 }
 
 class GiftSlideCardModule extends StatelessWidget {
-  const GiftSlideCardModule({super.key, required this.slide, required this.onComboTap});
+  const GiftSlideCardModule({
+    super.key,
+    required this.slide,
+    required this.onComboTap,
+    required this.displayCombo,
+    required this.rewardCoins,
+  });
 
   final GiftSlide slide;
   final VoidCallback onComboTap;
+  final int displayCombo;
+  final int rewardCoins;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +135,6 @@ class GiftSlideCardModule extends StatelessWidget {
         : ((ageSeconds - holdSeconds) / 1.10).clamp(0.0, 1.0).toDouble();
     final accent = _accentForSlide(slide);
     final isLucky = _isLuckySlide(slide);
-    final rewardCoins = _rewardCoins(slide);
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0 + exitProgress),
@@ -213,7 +264,7 @@ class GiftSlideCardModule extends StatelessWidget {
                       duration: const Duration(milliseconds: 170),
                       transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
                       child: Container(
-                        key: ValueKey('combo-${slide.id}-${slide.combo}'),
+                        key: ValueKey('combo-${slide.id}-$displayCombo'),
                         constraints: const BoxConstraints(minWidth: 44),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                         decoration: BoxDecoration(
@@ -222,7 +273,7 @@ class GiftSlideCardModule extends StatelessWidget {
                           border: Border.all(color: accent.withValues(alpha: 0.48), width: 0.8),
                         ),
                         child: Text(
-                          'x${slide.combo}',
+                          'x$displayCombo',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: accent,
@@ -256,11 +307,6 @@ class GiftSlideCardModule extends StatelessWidget {
         text.contains('packet') ||
         text.contains('spin') ||
         RegExp(r'x(0|1|2|5|10|20|50|100|500|1000)').hasMatch(text.toLowerCase());
-  }
-
-  int _rewardCoins(GiftSlide slide) {
-    final match = RegExp(r'\+(\d+)').firstMatch(slide.giftName.replaceAll(',', ''));
-    return int.tryParse(match?.group(1) ?? '') ?? 0;
   }
 
   Color _accentForSlide(GiftSlide slide) {
@@ -350,4 +396,26 @@ class _LuckyPulse extends StatelessWidget {
       ),
     );
   }
+}
+
+String _slideKey(GiftSlide slide) {
+  return '${slide.senderName.trim().toLowerCase()}|${slide.receiverName.trim().toLowerCase()}|${_baseGiftName(slide.giftName)}';
+}
+
+String _eventKey(GiftFlightEvent event) {
+  return '${event.senderName.trim().toLowerCase()}|${event.receiverName.trim().toLowerCase()}|${event.gift.name.trim().toLowerCase()}';
+}
+
+String _baseGiftName(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+x\d+'), '')
+      .replaceAll(RegExp(r'\s+\+\d+'), '')
+      .trim();
+}
+
+int _rewardCoinsFromSlide(GiftSlide slide) {
+  final match = RegExp(r'\+(\d+)').firstMatch(slide.giftName.replaceAll(',', ''));
+  return int.tryParse(match?.group(1) ?? '') ?? 0;
 }
