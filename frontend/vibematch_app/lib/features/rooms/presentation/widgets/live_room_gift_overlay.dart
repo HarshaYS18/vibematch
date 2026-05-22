@@ -293,7 +293,15 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    final normalSlides = _backendGiftSlides.where((slide) => !slide.isVideoGift).toList(growable: false);
+    final combinedSlides = <GiftSlide>[
+      ...widget.slides,
+      ..._backendGiftSlides.where(
+        (backendSlide) => !widget.slides.any((localSlide) => localSlide.id == backendSlide.id),
+      ),
+    ];
+    final normalSlides = combinedSlides.where((slide) => !slide.isVideoGift).toList(growable: false);
+    final videoSlides = combinedSlides.where((slide) => slide.isVideoGift).toList(growable: false);
+    final comboSlide = widget.activeComboSlide ?? normalSlides.where((slide) => slide.giftName != 'Lucky Packet').firstOrNull;
 
     return SizedBox.expand(
       child: Stack(
@@ -306,8 +314,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             onComboTap: widget.onComboTap,
           ),
           CleanVideoGiftOverlay(
-            slides: _backendGiftSlides,
-            onVideoFinished: _finishBackendVideoGift,
+            slides: videoSlides,
+            onVideoFinished: _finishVideoGift,
           ),
           ValueListenableBuilder<GiftFlightEvent?>(
             valueListenable: GiftFlightBus.latest,
@@ -319,14 +327,15 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             },
           ),
           RibbonMessageOverlay(messages: _ribbonMessages),
-          Positioned(
-            right: 18,
-            bottom: 178 + widget.bottomPadding,
-            child: ComboBuzzer(
-              slide: null,
-              onTap: widget.onComboButtonTap,
+          if (comboSlide != null)
+            Positioned(
+              right: 18,
+              bottom: 178 + widget.bottomPadding,
+              child: ComboBuzzer(
+                slide: comboSlide,
+                onTap: () => widget.onComboTap(comboSlide),
+              ),
             ),
-          ),
           LuckyPacketRoomOverlay(
             packet: widget.activeLuckyPacket,
             onGetTap: widget.onLuckyPacketGetTap ?? () {},
@@ -337,9 +346,22 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     );
   }
 
-  void _finishBackendVideoGift(GiftSlide slide) {
-    _backendGiftTimers.remove(slide.id)?.cancel();
-    if (!mounted) return;
-    setState(() => _backendGiftSlides.removeWhere((item) => item.id == slide.id));
+  void _finishVideoGift(GiftSlide slide) {
+    if (_backendGiftSlides.any((item) => item.id == slide.id)) {
+      _backendGiftTimers.remove(slide.id)?.cancel();
+      if (!mounted) return;
+      setState(() => _backendGiftSlides.removeWhere((item) => item.id == slide.id));
+      return;
+    }
+    widget.onVideoGiftFinished(slide);
+  }
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull {
+    for (final item in this) {
+      return item;
+    }
+    return null;
   }
 }
