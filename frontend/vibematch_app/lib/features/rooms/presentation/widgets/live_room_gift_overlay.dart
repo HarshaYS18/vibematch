@@ -45,6 +45,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
 
 class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   static const int _premiumGiftMinCoins = 1000;
+  static const int _legacyControllerComboExtraSeconds = 5;
 
   final List<RibbonMessage> _ribbonMessages = <RibbonMessage>[];
   final List<GiftSlide> _backendGiftSlides = <GiftSlide>[];
@@ -101,7 +102,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       colors: _colorsForBackendEvent(event, gift),
       combo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
       baseCombo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
-      remainingSeconds: (videoUrl == null && videoPath == null) ? 15 : 10,
+      remainingSeconds: 10,
     );
 
     if (event.showGiftSlide || slide.isVideoGift) {
@@ -301,7 +302,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     ];
     final normalSlides = combinedSlides.where((slide) => !slide.isVideoGift).toList(growable: false);
     final videoSlides = combinedSlides.where((slide) => slide.isVideoGift).toList(growable: false);
-    final comboSlide = widget.activeComboSlide ?? normalSlides.where((slide) => slide.giftName != 'Lucky Packet').firstOrNull;
+    final rawComboSlide = widget.activeComboSlide ?? normalSlides.where((slide) => slide.giftName != 'Lucky Packet').firstOrNull;
+    final comboSlide = _comboDisplaySlide(rawComboSlide);
 
     return SizedBox.expand(
       child: Stack(
@@ -333,7 +335,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
               bottom: 178 + widget.bottomPadding,
               child: ComboBuzzer(
                 slide: comboSlide,
-                onTap: () => widget.onComboTap(comboSlide),
+                onTap: () => widget.onComboTap(rawComboSlide!),
               ),
             ),
           LuckyPacketRoomOverlay(
@@ -344,6 +346,13 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         ],
       ),
     );
+  }
+
+  GiftSlide? _comboDisplaySlide(GiftSlide? slide) {
+    if (slide == null) return null;
+    final displaySeconds = (slide.remainingSeconds - _legacyControllerComboExtraSeconds).clamp(0, 10).toInt();
+    if (displaySeconds <= 0) return null;
+    return slide.copyWith(remainingSeconds: displaySeconds);
   }
 
   void _finishVideoGift(GiftSlide slide) {
