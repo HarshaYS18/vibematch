@@ -44,7 +44,7 @@ class GiftSlideStackModule extends StatefulWidget {
 
 class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
   static const int _maxVisibleSlides = 3;
-  static const Duration _slideStagger = Duration(milliseconds: 260);
+  static const Duration _slideStagger = Duration(milliseconds: 220);
 
   final Map<String, int> _luckyComboTotals = <String, int>{};
   final Map<String, int> _luckyRewardTotals = <String, int>{};
@@ -137,6 +137,7 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
         .take(_maxVisibleSlides)
         .toList(growable: false);
     if (visibleSlides.isEmpty) return const SizedBox.shrink();
+
     return IgnorePointer(
       ignoring: false,
       child: Align(
@@ -149,7 +150,7 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
             children: [
               for (var index = 0; index < visibleSlides.length; index++)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.only(bottom: 5),
                   child: GiftSlideCardModule(
                     key: ValueKey(visibleSlides[index].id),
                     slide: visibleSlides[index],
@@ -170,7 +171,7 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
   }
 }
 
-class GiftSlideCardModule extends StatelessWidget {
+class GiftSlideCardModule extends StatefulWidget {
   const GiftSlideCardModule({
     super.key,
     required this.slide,
@@ -187,45 +188,62 @@ class GiftSlideCardModule extends StatelessWidget {
   final int stackIndex;
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15).toDouble();
-    const holdSeconds = 3.6;
-    final exitProgress = ageSeconds <= holdSeconds
-        ? 0.0
-        : ((ageSeconds - holdSeconds) / 1.10).clamp(0.0, 1.0).toDouble();
-    final accent = _accentForSlide(slide);
-    final isLucky = _isLuckySlide(slide);
+  State<GiftSlideCardModule> createState() => _GiftSlideCardModuleState();
+}
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.0, end: 1.0 + exitProgress),
-      duration: Duration(milliseconds: 560 + (stackIndex * 80)),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        final enter = value.clamp(0.0, 1.0).toDouble();
-        final exit = (value - 1.0).clamp(0.0, 1.0).toDouble();
-        final enterCurve = Curves.easeOutCubic.transform(enter);
-        final exitCurve = Curves.easeInCubic.transform(exit);
-        final opacity = exit > 0 ? 1 - exitCurve : enterCurve;
-        final startDx = (size.width * 0.50) - 10;
-        final dx = exit > 0 ? -235 * exitCurve : startDx * (1 - enterCurve);
+class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTickerProviderStateMixin {
+  late final AnimationController _enterController;
+  late final Animation<double> _enterCurve;
+
+  @override
+  void initState() {
+    super.initState();
+    _enterController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 360 + (widget.stackIndex * 55)),
+    );
+    _enterCurve = CurvedAnimation(parent: _enterController, curve: Curves.easeOutCubic);
+    _enterController.forward();
+  }
+
+  @override
+  void dispose() {
+    _enterController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final accent = _accentForSlide(widget.slide);
+    final isLucky = _isLuckySlide(widget.slide);
+
+    return AnimatedBuilder(
+      animation: _enterCurve,
+      builder: (context, child) {
+        final t = _enterCurve.value;
+        final dx = (screenWidth * 0.46) * (1 - t);
         return Opacity(
-          opacity: opacity.clamp(0.0, 1.0),
+          opacity: t.clamp(0.0, 1.0),
           child: Transform.translate(
             offset: Offset(dx, 0),
-            child: Transform.scale(scale: 0.985 + (0.015 * enterCurve), child: child),
+            child: Transform.scale(
+              scale: 0.98 + (0.02 * t),
+              alignment: Alignment.centerLeft,
+              child: child,
+            ),
           ),
         );
       },
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTap: onComboTap,
+        onTap: widget.onComboTap,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 236,
-              height: 52,
+              width: 232,
+              height: 50,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -237,26 +255,26 @@ class GiftSlideCardModule extends StatelessWidget {
                         gradient: LinearGradient(
                           colors: [
                             Colors.black.withValues(alpha: 0.00),
-                            const Color(0xEE171020),
-                            const Color(0xF0221730),
+                            const Color(0xE6161020),
+                            const Color(0xF01F172D),
                             Colors.black.withValues(alpha: 0.00),
                           ],
                           stops: const [0, 0.14, 0.82, 1],
                         ),
                         border: Border.all(
-                          color: accent.withValues(alpha: isLucky ? 0.42 : 0.20),
+                          color: accent.withValues(alpha: isLucky ? 0.44 : 0.18),
                           width: 0.75,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.26),
-                            blurRadius: 16,
-                            offset: const Offset(0, 7),
+                            color: Colors.black.withValues(alpha: 0.22),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
                           ),
                           if (isLucky)
                             BoxShadow(
-                              color: accent.withValues(alpha: 0.20),
-                              blurRadius: 22,
+                              color: accent.withValues(alpha: 0.18),
+                              blurRadius: 18,
                               offset: const Offset(0, 3),
                             ),
                         ],
@@ -267,23 +285,23 @@ class GiftSlideCardModule extends StatelessWidget {
                     left: 0,
                     top: 2,
                     child: GiftVisual(
-                      icon: slide.giftIcon,
-                      colors: slide.colors,
-                      assetPath: slide.giftAssetPath,
-                      assetUrl: slide.giftAssetUrl,
-                      size: 48,
+                      icon: widget.slide.giftIcon,
+                      colors: widget.slide.colors,
+                      assetPath: widget.slide.giftAssetPath,
+                      assetUrl: widget.slide.giftAssetUrl,
+                      size: 46,
                       padding: 2,
                     ),
                   ),
                   Positioned(
-                    left: 55,
-                    right: 58,
+                    left: 54,
+                    right: 56,
                     top: 8,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          slide.senderName,
+                          widget.slide.senderName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -301,11 +319,11 @@ class GiftSlideCardModule extends StatelessWidget {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                slide.receiverName,
+                                widget.slide.receiverName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.74),
+                                  color: Colors.white.withValues(alpha: 0.72),
                                   fontSize: 10,
                                   height: 1,
                                   fontWeight: FontWeight.w800,
@@ -320,21 +338,21 @@ class GiftSlideCardModule extends StatelessWidget {
                   ),
                   Positioned(
                     right: 8,
-                    top: 9,
+                    top: 8,
                     child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 170),
+                      duration: const Duration(milliseconds: 150),
                       transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
                       child: Container(
-                        key: ValueKey('combo-${slide.id}-$displayCombo'),
-                        constraints: const BoxConstraints(minWidth: 44),
+                        key: ValueKey('combo-${widget.slide.id}-${widget.displayCombo}'),
+                        constraints: const BoxConstraints(minWidth: 43),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(999),
-                          color: accent.withValues(alpha: isLucky ? 0.22 : 0.15),
-                          border: Border.all(color: accent.withValues(alpha: 0.48), width: 0.8),
+                          color: accent.withValues(alpha: isLucky ? 0.22 : 0.14),
+                          border: Border.all(color: accent.withValues(alpha: 0.44), width: 0.8),
                         ),
                         child: Text(
-                          'x$displayCombo',
+                          'x${widget.displayCombo}',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: accent,
@@ -347,13 +365,13 @@ class GiftSlideCardModule extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (isLucky) Positioned(right: 49, top: -3, child: _LuckyPulse(color: accent)),
+                  if (isLucky) Positioned(right: 48, top: -3, child: _LuckyPulse(color: accent)),
                 ],
               ),
             ),
             if (isLucky)
               _LuckyRewardTicker(
-                rewardCoins: rewardCoins,
+                rewardCoins: widget.rewardCoins,
                 accent: accent,
               ),
           ],
@@ -392,7 +410,7 @@ class _LuckyRewardTicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 210),
+      duration: const Duration(milliseconds: 170),
       transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
       child: Container(
         key: ValueKey(rewardCoins),
@@ -402,7 +420,7 @@ class _LuckyRewardTicker extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           color: const Color(0xFF171020).withValues(alpha: 0.88),
           border: Border.all(color: accent.withValues(alpha: 0.42), width: 0.8),
-          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.20), blurRadius: 14)],
+          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.16), blurRadius: 12)],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -439,11 +457,11 @@ class _LuckyPulse extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.72, end: 1.0),
-      duration: const Duration(milliseconds: 620),
+      tween: Tween<double>(begin: 0.74, end: 1.0),
+      duration: const Duration(milliseconds: 720),
       curve: Curves.easeInOut,
       builder: (context, value, child) => Opacity(
-        opacity: 1 - ((value - 0.72) / 0.28).clamp(0.0, 1.0) * 0.45,
+        opacity: 1 - ((value - 0.74) / 0.26).clamp(0.0, 1.0) * 0.40,
         child: Transform.scale(scale: value, child: child),
       ),
       child: Container(
@@ -452,7 +470,7 @@ class _LuckyPulse extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(color: color.withValues(alpha: 0.55), width: 1.2),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 9)],
+          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 8)],
         ),
       ),
     );
