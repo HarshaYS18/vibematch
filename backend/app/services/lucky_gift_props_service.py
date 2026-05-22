@@ -15,16 +15,16 @@ LUCKY_GIFT_KEY = "lucky_gifts"
 _SECURE_RANDOM = secrets.SystemRandom()
 
 DEFAULT_MULTIPLIERS: list[dict[str, Any]] = [
-    {"multiplier": 0, "weight": 2450, "difficulty": "miss", "tier": "miss"},
-    {"multiplier": 1, "weight": 6100, "difficulty": "easy", "tier": "small"},
+    {"multiplier": 0, "weight": 3600, "difficulty": "miss", "tier": "miss"},
+    {"multiplier": 1, "weight": 4700, "difficulty": "easy", "tier": "small"},
     {"multiplier": 2, "weight": 1050, "difficulty": "easy", "tier": "small"},
-    {"multiplier": 5, "weight": 300, "difficulty": "normal", "tier": "normal"},
-    {"multiplier": 10, "weight": 75, "difficulty": "normal", "tier": "good"},
-    {"multiplier": 20, "weight": 18, "difficulty": "medium", "tier": "big"},
-    {"multiplier": 50, "weight": 5, "difficulty": "medium", "tier": "big"},
-    {"multiplier": 100, "weight": 1, "difficulty": "hard", "tier": "mega"},
-    {"multiplier": 500, "weight": 0, "difficulty": "very_hard", "tier": "legendary"},
-    {"multiplier": 1000, "weight": 0, "difficulty": "mythic", "tier": "mythic"},
+    {"multiplier": 5, "weight": 450, "difficulty": "normal", "tier": "normal"},
+    {"multiplier": 10, "weight": 150, "difficulty": "normal", "tier": "good"},
+    {"multiplier": 20, "weight": 40, "difficulty": "medium", "tier": "big"},
+    {"multiplier": 50, "weight": 8, "difficulty": "medium", "tier": "big"},
+    {"multiplier": 100, "weight": 2, "difficulty": "hard", "tier": "mega"},
+    {"multiplier": 500, "weight": 1, "difficulty": "very_hard", "tier": "legendary"},
+    {"multiplier": 1000, "weight": 1, "difficulty": "mythic", "tier": "mythic"},
 ]
 
 DEFAULT_RULES: dict[str, Any] = {
@@ -32,6 +32,7 @@ DEFAULT_RULES: dict[str, Any] = {
     "max_multiplier": 1000,
     "broadcast_min_reward": 10000,
     "big_win_min_multiplier": 100,
+    "special_scroll_multipliers": [100, 500, 1000],
     "payout_pool_safe_ratio_basis_points": 6500,
     "target_rtp_basis_points": 7200,
     "near_miss_enabled": True,
@@ -39,6 +40,7 @@ DEFAULT_RULES: dict[str, Any] = {
     "whale_medium_multiplier_weight_basis_points": 1000,
     "whale_high_multiplier_weight_basis_points": 220,
     "whale_block_multiplier_weight_basis_points": 30,
+    "combo_probability_boost_enabled": True,
     "multipliers": DEFAULT_MULTIPLIERS,
 }
 
@@ -128,8 +130,15 @@ def _tier_for_multiplier(multiplier: int) -> str:
     return "miss"
 
 
+def _default_weight_for_multiplier(multiplier: int) -> int:
+    for item in DEFAULT_MULTIPLIERS:
+        if int(item["multiplier"]) == int(multiplier):
+            return int(item["weight"])
+    return 0
+
+
 def _normalized_multiplier_rows(raw: Any) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+    rows_by_multiplier: dict[int, dict[str, Any]] = {}
     source = raw if isinstance(raw, list) else DEFAULT_MULTIPLIERS
     for item in source:
         if not isinstance(item, dict):
@@ -141,17 +150,58 @@ def _normalized_multiplier_rows(raw: Any) -> list[dict[str, Any]]:
             continue
         if multiplier < 0 or multiplier > 1000:
             continue
-        rows.append(
-            {
-                "multiplier": multiplier,
-                "weight": weight,
-                "difficulty": str(item.get("difficulty") or _difficulty_for_multiplier(multiplier)),
-                "tier": str(item.get("tier") or _tier_for_multiplier(multiplier)),
+        rows_by_multiplier[multiplier] = {
+            "multiplier": multiplier,
+            "weight": weight,
+            "difficulty": str(item.get("difficulty") or _difficulty_for_multiplier(multiplier)),
+            "tier": str(item.get("tier") or _tier_for_multiplier(multiplier)),
+        }
+    for default_item in DEFAULT_MULTIPLIERS:
+        multiplier = int(default_item["multiplier"])
+        existing = rows_by_multiplier.get(multiplier)
+        if existing is None:
+            rows_by_multiplier[multiplier] = dict(default_item)
+            continue
+        if multiplier in {100, 500, 1000} and int(existing.get("weight") or 0) <= 0:
+            rows_by_multiplier[multiplier] = {
+                **existing,
+                "weight": _default_weight_for_multiplier(multiplier),
             }
-        )
+    rows = sorted(rows_by_multiplier.values(), key=lambda item: int(item["multiplier"]))
     if not rows or sum(int(item["weight"]) for item in rows) <= 0:
         return [dict(item) for item in DEFAULT_MULTIPLIERS]
-    return sorted(rows, key=lambda item: int(item["multiplier"]))
+    return rows
+
+
+def _combo_profile(quantity: int) -> tuple[str, dict[int, int]]:
+    combo = max(int(quantity or 1), 1)
+    if combo >= 999:
+        return "MAX_COMBO_BOOST", {0: 7000, 1: 8500, 2: 8500, 5: 10500, 10: 11500, 20: 15000, 50: 17000, 100: 20000, 500: 10000, 1000: 5000}
+    if combo >= 99:
+        return "HIGH_COMBO_BOOST", {0: 8500, 1: 9500, 2: 9500, 5: 10500, 10: 11000, 20: 12500, 50: 13500, 100: 9000, 500: 2500, 1000: 1200}
+    if combo >= 69:
+        return "MID_COMBO_BOOST", {0: 9200, 1: 9800, 2: 9800, 5: 10200, 10: 10500, 20: 11200, 50: 12000, 100: 5000, 500: 1200, 1000: 600}
+    if combo >= 9:
+        return "SMALL_COMBO_HARD", {0: 10000, 1: 10000, 2: 10000, 5: 10000, 10: 10000, 20: 10000, 50: 10000, 100: 10000, 500: 10000, 1000: 10000}
+    return "TINY_COMBO_VERY_HARD", {0: 11200, 1: 10200, 2: 9500, 5: 8500, 10: 6000, 20: 3500, 50: 2000, 100: 1000, 500: 300, 1000: 100}
+
+
+def _apply_combo_probability_boost(rows: list[dict[str, Any]], rules: dict[str, Any], quantity: int) -> tuple[list[dict[str, Any]], str]:
+    if rules.get("combo_probability_boost_enabled") is False:
+        return rows, "DISABLED"
+    profile, scale_by_multiplier = _combo_profile(quantity)
+    adjusted: list[dict[str, Any]] = []
+    for item in rows:
+        multiplier = int(item["multiplier"])
+        weight = int(item["weight"])
+        scale_bp = int(scale_by_multiplier.get(multiplier, 10_000))
+        next_weight = max(0, weight * scale_bp // 10_000)
+        if multiplier in {100, 500, 1000} and weight > 0 and next_weight <= 0:
+            next_weight = 1
+        adjusted.append({**item, "weight": next_weight})
+    if sum(int(item["weight"]) for item in adjusted) <= 0:
+        return rows, "FALLBACK"
+    return adjusted, profile
 
 
 def _whale_weight_scale_basis_points(rules: dict[str, Any], risk_score: int) -> tuple[int, str]:
@@ -173,8 +223,10 @@ def _apply_whale_probability_reduction(rows: list[dict[str, Any]], rules: dict[s
     for item in rows:
         multiplier = int(item["multiplier"])
         weight = int(item["weight"])
-        if multiplier >= 10:
+        if multiplier >= 100:
             weight = max(0, weight * scale_bp // 10_000)
+        elif multiplier >= 10:
+            weight = max(0, weight * max(scale_bp, 1200) // 10_000)
         elif multiplier >= 5 and scale_bp <= 220:
             weight = max(1, weight * 800 // 10_000)
         elif multiplier == 0:
@@ -222,11 +274,15 @@ def get_or_create_definition(db: Session, actor: User | None = None) -> GameDefi
     rules = _merged(DEFAULT_RULES, definition.rules_json)
     risk = _merged(DEFAULT_RISK, definition.risk_config_json)
     rules["multipliers"] = _normalized_multiplier_rows(rules.get("multipliers"))
+    rules["min_multiplier"] = 0
+    rules["max_multiplier"] = 1000
+    rules["special_scroll_multipliers"] = [100, 500, 1000]
+    rules.setdefault("combo_probability_boost_enabled", True)
     definition.display_name = "Lucky Gifts"
     definition.category = "lucky_gift"
     definition.is_enabled = True
     definition.is_coin_game = True
-    definition.config_version = max(int(definition.config_version or 1), 1)
+    definition.config_version = max(int(definition.config_version or 1), 2)
     definition.rules_json = _dumps(rules)
     definition.risk_config_json = _dumps(risk)
     if actor is not None:
@@ -239,6 +295,7 @@ def load_rules(db: Session) -> dict[str, Any]:
     definition = get_or_create_definition(db)
     rules = _merged(DEFAULT_RULES, definition.rules_json)
     rules["multipliers"] = _normalized_multiplier_rows(rules.get("multipliers"))
+    rules["special_scroll_multipliers"] = [100, 500, 1000]
     return rules
 
 
@@ -257,6 +314,8 @@ def get_props(db: Session) -> dict[str, Any]:
         "max_multiplier": int(rules.get("max_multiplier", 1000)),
         "broadcast_min_reward": int(rules.get("broadcast_min_reward", 10000)),
         "big_win_min_multiplier": int(rules.get("big_win_min_multiplier", 100)),
+        "special_scroll_multipliers": [100, 500, 1000],
+        "combo_probability_boost_enabled": bool(rules.get("combo_probability_boost_enabled", True)),
         "payout_pool_safe_ratio_basis_points": int(rules.get("payout_pool_safe_ratio_basis_points", 6500)),
         "target_rtp_basis_points": int(rules.get("target_rtp_basis_points", 7200)),
         "near_miss_enabled": bool(rules.get("near_miss_enabled", True)),
@@ -281,10 +340,12 @@ def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str,
     for key in ["broadcast_min_reward", "big_win_min_multiplier", "payout_pool_safe_ratio_basis_points", "target_rtp_basis_points", "near_miss_min_spend"]:
         rules[key] = _as_int(payload, key, int(current.get(key, DEFAULT_RULES.get(key, 0))))
     rules["near_miss_enabled"] = _as_bool(payload, "near_miss_enabled", bool(current.get("near_miss_enabled", True)))
+    rules["combo_probability_boost_enabled"] = _as_bool(payload, "combo_probability_boost_enabled", bool(current.get("combo_probability_boost_enabled", True)))
     for key in ["whale_medium_multiplier_weight_basis_points", "whale_high_multiplier_weight_basis_points", "whale_block_multiplier_weight_basis_points"]:
         rules[key] = _as_int(payload, key, int(rules.get(key, DEFAULT_RULES[key])))
     rules["min_multiplier"] = 0
     rules["max_multiplier"] = 1000
+    rules["special_scroll_multipliers"] = [100, 500, 1000]
     rules["multipliers"] = _normalized_multiplier_rows(payload.get("multipliers", current["multipliers"]))
     risk["testing_mode_enabled"] = _as_bool(payload, "testing_mode_enabled", bool(current["testing_mode_enabled"]))
     risk["whale_probability_mode_enabled"] = _as_bool(payload, "whale_probability_mode_enabled", bool(risk.get("whale_probability_mode_enabled", True)))
@@ -302,14 +363,18 @@ def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str,
 
 def roll_lucky_gift(db: Session, *, gift_id: str, gift_name: str, base_coin_value: int, quantity: int, house_risk_score: int = 0, max_reward_coin_amount: int | None = None) -> dict[str, Any]:
     rules = load_rules(db)
-    spent = max(int(base_coin_value or 0), 0) * max(int(quantity or 1), 1)
+    safe_quantity = max(int(quantity or 1), 1)
+    spent = max(int(base_coin_value or 0), 0) * safe_quantity
     rows = _normalized_multiplier_rows(rules.get("multipliers"))
+    rows, combo_probability_mode = _apply_combo_probability_boost(rows, rules, safe_quantity)
     rows, probability_mode, whale_weight_scale_basis_points = _apply_whale_probability_reduction(rows, rules, house_risk_score)
     rows, cap_mode = _apply_payout_cap(rows, spent=spent, max_reward_coin_amount=max_reward_coin_amount)
     selected = _secure_choice(rows)
     multiplier = int(selected.get("multiplier") or 0)
     reward = spent * multiplier
     tier = str(selected.get("tier") or _tier_for_multiplier(multiplier))
+    special_scroll_multipliers = {100, 500, 1000}
+    is_special_scroll_win = multiplier in special_scroll_multipliers
     near_miss = bool(rules.get("near_miss_enabled", True)) and multiplier == 0 and spent >= int(rules.get("near_miss_min_spend", 99))
     return {
         "gift_id": gift_id,
@@ -319,17 +384,20 @@ def roll_lucky_gift(db: Session, *, gift_id: str, gift_name: str, base_coin_valu
         "tier": tier,
         "display_tier": "near_miss" if near_miss else tier,
         "is_big_win": multiplier >= int(rules.get("big_win_min_multiplier", 100)),
-        "is_broadcast_win": reward >= int(rules.get("broadcast_min_reward", 10000)),
+        "is_broadcast_win": is_special_scroll_win,
+        "is_special_scroll_win": is_special_scroll_win,
+        "special_scroll_multipliers": [100, 500, 1000],
         "near_miss": near_miss,
         "reward_coin_amount": reward,
         "spent_coin_amount": spent,
         "net_coin_amount": reward - spent,
         "house_risk_score": house_risk_score,
         "probability_mode": probability_mode,
+        "combo_probability_mode": combo_probability_mode,
         "pool_cap_mode": cap_mode,
         "whale_weight_scale_basis_points": whale_weight_scale_basis_points,
         "rng": "server_secure_rng",
-        "rule": "Server-side secure lucky gift roll with whale probability reduction, pool exposure cap, payout tiers, and no client-side outcome control.",
+        "rule": "Server-side secure lucky gift roll. Multipliers are 0x to 1000x. Combo size increases win probability, whale risk reduces high tiers, pool cap protects exposure, and special scrolls trigger only on 100x, 500x, and 1000x.",
     }
 
 
