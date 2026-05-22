@@ -156,14 +156,21 @@ class LiveRoomBody extends StatelessWidget {
           currentLayoutId: layoutId,
         );
         final cricketModeActive = cricketController.active;
+        final effectiveSeats = cricketModeActive ? _cricketSeats() : seats;
         final currentUser = media.activeLoggedInSeatUser;
         final canManageCricket = cricketModeActive &&
             currentUser != null &&
             CricketRoomModeModule.canScore(
-              seats: seats,
+              seats: effectiveSeats,
               currentUserId: currentUser.id,
             );
         final effectiveLayoutId = cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
+        final effectiveSelectedSeatIndex = cricketModeActive &&
+                selectedSeatIndex != null &&
+                selectedSeatIndex! >= CricketRoomRules.totalSeats
+            ? null
+            : selectedSeatIndex;
+
         return SafeArea(
           child: Stack(
             children: [
@@ -202,9 +209,9 @@ class LiveRoomBody extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: RoomSeatLayout(
-                      seats: seats,
+                      seats: effectiveSeats,
                       layoutId: effectiveLayoutId,
-                      selectedSeatIndex: selectedSeatIndex,
+                      selectedSeatIndex: effectiveSelectedSeatIndex,
                       canManageSeats: canManageSeats,
                       applyOnlyModeEnabled: applyOnlyModeEnabled,
                       onSeatTap: onSeatTap,
@@ -292,5 +299,13 @@ class LiveRoomBody extends StatelessWidget {
         );
       },
     );
+  }
+
+  List<RoomSeat> _cricketSeats() {
+    final visibleSeats = seats.take(CricketRoomRules.totalSeats).toList(growable: true);
+    for (var index = visibleSeats.length; index < CricketRoomRules.totalSeats; index++) {
+      visibleSeats.add(RoomSeat(index: index));
+    }
+    return visibleSeats;
   }
 }
