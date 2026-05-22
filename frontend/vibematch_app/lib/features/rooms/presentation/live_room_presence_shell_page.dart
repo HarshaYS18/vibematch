@@ -36,13 +36,11 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
   final LiveRoomRestoreState? restoreState;
 
   @override
-  State<LiveRoomPresenceShellPage> createState() =>
-      _LiveRoomPresenceShellPageState();
+  State<LiveRoomPresenceShellPage> createState() => _LiveRoomPresenceShellPageState();
 }
 
 class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
-  final LiveRoomPresenceRepository _presenceRepository =
-      LiveRoomPresenceRepository();
+  final LiveRoomPresenceRepository _presenceRepository = LiveRoomPresenceRepository();
   Timer? _heartbeatTimer;
   Timer? _enteredMessageTimer;
   LiveRoomPresenceSnapshot? _snapshot;
@@ -54,6 +52,8 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
 
   int get _onlineCount => _snapshot?.onlineCount ?? widget.initialOnlineCount;
 
+  bool get _restoringMinimizedRoom => widget.restoreState != null;
+
   @override
   void initState() {
     super.initState();
@@ -62,9 +62,15 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       roomName: widget.roomName,
     );
     final currentUser = widget.currentUser;
-    if (currentUser != null)
+    if (currentUser != null) {
       LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(currentUser);
-    unawaited(_joinPresence());
+    }
+
+    if (_restoringMinimizedRoom) {
+      _restorePresenceWithoutFreshJoin();
+    } else {
+      unawaited(_joinPresence());
+    }
   }
 
   @override
@@ -72,12 +78,23 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     _heartbeatTimer?.cancel();
     _enteredMessageTimer?.cancel();
     if (!LiveRoomMinimizedOverlayService.instance.isShowing) {
-      unawaited(
-        _presenceRepository.leaveRoom(widget.roomId).catchError((_) => 0),
-      );
+      unawaited(_presenceRepository.leaveRoom(widget.roomId).catchError((_) => 0));
     }
     _presenceRepository.close();
     super.dispose();
+  }
+
+  void _restorePresenceWithoutFreshJoin() {
+    final cachedParticipants = LiveRoomPresenceRepository.currentParticipantsForRoom(widget.roomId);
+    _snapshot = LiveRoomPresenceSnapshot(
+      roomId: widget.roomId,
+      onlineCount: widget.initialOnlineCount,
+      participants: cachedParticipants,
+    );
+    _joining = false;
+    _identitySeeded = true;
+    _presenceError = null;
+    _startHeartbeat();
   }
 
   Future<void> _joinPresence() async {
@@ -114,9 +131,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     final currentPublicId = widget.currentUser?.publicUserId.toString();
     SeatUser? self;
     if (currentPublicId != null) {
-      self = snapshot.participants
-          .where((user) => user.id == 'user_$currentPublicId')
-          .firstOrNull;
+      self = snapshot.participants.where((user) => user.id == 'user_$currentPublicId').firstOrNull;
     }
     self ??= snapshot.joinedUser;
     if (self == null) return;
@@ -127,8 +142,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     final joinedUser = snapshot.joinedUser;
     if (!snapshot.shouldShowEnteredMessage || joinedUser == null) return;
     final currentPublicId = widget.currentUser?.publicUserId.toString();
-    if (currentPublicId != null && joinedUser.id == 'user_$currentPublicId')
-      return;
+    if (currentPublicId != null && joinedUser.id == 'user_$currentPublicId') return;
     _enteredMessageTimer?.cancel();
     setState(() => _enteredUser = joinedUser);
     _enteredMessageTimer = Timer(const Duration(seconds: 5), () {
@@ -139,30 +153,25 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
 
   void _autoSeatIfAllowed(LiveRoomPresenceSnapshot snapshot) {
     if (_autoSeatAttempted) return;
+    if (_restoringMinimizedRoom) return;
     final currentUser = widget.currentUser;
     if (currentUser == null) return;
     final currentPublicId = currentUser.publicUserId.toString();
-    final self = snapshot.participants
-        .where((user) => user.id == 'user_$currentPublicId')
-        .firstOrNull;
+    final self = snapshot.participants.where((user) => user.id == 'user_$currentPublicId').firstOrNull;
     final isRoomHostOrAdmin = self?.isHost == true || self?.isRoomAdmin == true;
     final isOfficialOwner = currentUser.canSeeOwnerControls;
     if (!isRoomHostOrAdmin && !isOfficialOwner) return;
 
     _autoSeatAttempted = true;
     final media = LiveRoomMediaSignalingService.instance;
-    unawaited(
-      Future<void>.delayed(const Duration(milliseconds: 700), () {
-        if (!mounted) return;
-        media.takeSeatIfVacant(0);
-      }),
-    );
-    unawaited(
-      Future<void>.delayed(const Duration(milliseconds: 1700), () {
-        if (!mounted) return;
-        media.takeSeatIfVacant(0);
-      }),
-    );
+    unawaited(Future<void>.delayed(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      media.takeSeatIfVacant(0);
+    }));
+    unawaited(Future<void>.delayed(const Duration(milliseconds: 1700), () {
+      if (!mounted) return;
+      media.takeSeatIfVacant(0);
+    }));
   }
 
   void _startHeartbeat() {
@@ -185,9 +194,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       _autoSeatIfAllowed(snapshot);
     } catch (error) {
       if (!mounted) return;
-      setState(
-        () => _presenceError = error.toString().replaceFirst('Exception: ', ''),
-      );
+      setState(() => _presenceError = error.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -212,20 +219,12 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.lock_rounded,
-                    color: Color(0xFFE84C72),
-                    size: 42,
-                  ),
+                  const Icon(Icons.lock_rounded, color: Color(0xFFE84C72), size: 42),
                   const SizedBox(height: 14),
                   const Text(
-                    'Room access blocked',
+                    'Room access issue',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -310,17 +309,10 @@ class _RoomEnteredSystemToast extends StatelessWidget {
                 width: 28,
                 height: 28,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(colors: user.avatarColors),
-                ),
+                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
                 child: Text(
                   avatarLetter(user.name),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(width: 9),
@@ -329,11 +321,7 @@ class _RoomEnteredSystemToast extends StatelessWidget {
                   '${user.name} entered the room',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900),
                 ),
               ),
             ],
