@@ -21,6 +21,7 @@ class RoomSettingsMainSection extends StatelessWidget {
     required this.onEffectsTap,
     required this.onMusicTap,
     required this.onClearChatTap,
+    this.showSeatLayoutOption = true,
   });
 
   final RoomPrivacyMode privacyMode;
@@ -37,6 +38,7 @@ class RoomSettingsMainSection extends StatelessWidget {
   final VoidCallback onEffectsTap;
   final VoidCallback onMusicTap;
   final VoidCallback onClearChatTap;
+  final bool showSeatLayoutOption;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +49,7 @@ class RoomSettingsMainSection extends StatelessWidget {
         RoomSettingsCard(icon: Icons.photo_size_select_actual_rounded, title: 'Change Cover Photo', onTap: onCoverPhotoTap),
         RoomSettingsCard(icon: Icons.add_photo_alternate_rounded, title: 'Upload Custom Background', badge: 'Review', onTap: onCustomBackgroundTap),
         RoomSettingsCard(icon: privacyMode.icon, title: 'Privacy', badge: privacyMode.shortLabel, onTap: onPrivacyTap),
-        RoomSettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
+        if (showSeatLayoutOption) RoomSettingsCard(icon: Icons.grid_view_rounded, title: 'Seats', onTap: onSeatLayoutTap),
         RoomSettingsCard(icon: Icons.campaign_rounded, title: 'Notice', onTap: onAnnouncementTap),
         RoomSettingsCard(icon: Icons.how_to_reg_rounded, title: 'Requests', badge: joinRequestCount > 0 ? '$joinRequestCount' : null, onTap: onJoinRequestsTap),
         RoomSettingsCard(icon: Icons.auto_awesome_rounded, title: 'Effects', onTap: onEffectsTap),
