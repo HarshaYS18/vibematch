@@ -42,19 +42,26 @@ class GiftSlideStackModule extends StatelessWidget {
     if (visibleSlides.isEmpty) return const SizedBox.shrink();
     return IgnorePointer(
       ignoring: false,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final slide in visibleSlides)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: GiftSlideCardModule(
-                key: ValueKey(slide.id),
-                slide: slide,
-                onComboTap: () => onComboTap(slide),
-              ),
-            ),
-        ],
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final slide in visibleSlides)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: GiftSlideCardModule(
+                    key: ValueKey(slide.id),
+                    slide: slide,
+                    onComboTap: () => onComboTap(slide),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -68,18 +75,19 @@ class GiftSlideCardModule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
     final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15).toDouble();
-    const holdSeconds = 3.25;
+    const holdSeconds = 3.6;
     final exitProgress = ageSeconds <= holdSeconds
         ? 0.0
-        : ((ageSeconds - holdSeconds) / 1.15).clamp(0.0, 1.0).toDouble();
+        : ((ageSeconds - holdSeconds) / 1.10).clamp(0.0, 1.0).toDouble();
     final accent = _accentForSlide(slide);
     final isLucky = _isLuckySlide(slide);
-    final label = _comboLabel(slide);
+    final rewardCoins = _rewardCoins(slide);
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0 + exitProgress),
-      duration: const Duration(milliseconds: 520),
+      duration: const Duration(milliseconds: 560),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         final enter = value.clamp(0.0, 1.0).toDouble();
@@ -87,7 +95,8 @@ class GiftSlideCardModule extends StatelessWidget {
         final enterCurve = Curves.easeOutCubic.transform(enter);
         final exitCurve = Curves.easeInCubic.transform(exit);
         final opacity = exit > 0 ? 1 - exitCurve : enterCurve;
-        final dx = exit > 0 ? -260 * exitCurve : 320 * (1 - enterCurve);
+        final startDx = (size.width * 0.50) - 10;
+        final dx = exit > 0 ? -235 * exitCurve : startDx * (1 - enterCurve);
         return Opacity(
           opacity: opacity.clamp(0.0, 1.0),
           child: Transform.translate(
@@ -99,121 +108,143 @@ class GiftSlideCardModule extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: onComboTap,
-        child: SizedBox(
-          width: 298,
-          height: 47,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                left: 16,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.black.withValues(alpha: 0.02),
-                        const Color(0xDD18111F),
-                        const Color(0xE621182E),
-                        Colors.black.withValues(alpha: 0.04),
-                      ],
-                      stops: const [0, 0.16, 0.78, 1],
-                    ),
-                    border: Border.all(
-                      color: accent.withValues(alpha: isLucky ? 0.34 : 0.16),
-                      width: 0.7,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.24),
-                        blurRadius: 16,
-                        offset: const Offset(0, 7),
-                      ),
-                      if (isLucky)
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.18),
-                          blurRadius: 18,
-                          offset: const Offset(0, 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 236,
+              height: 52,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    left: 18,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withValues(alpha: 0.00),
+                            const Color(0xEE171020),
+                            const Color(0xF0221730),
+                            Colors.black.withValues(alpha: 0.00),
+                          ],
+                          stops: const [0, 0.14, 0.82, 1],
                         ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                top: 3,
-                child: GiftVisual(
-                  icon: slide.giftIcon,
-                  colors: slide.colors,
-                  assetPath: slide.giftAssetPath,
-                  assetUrl: slide.giftAssetUrl,
-                  size: 41,
-                  padding: 2,
-                ),
-              ),
-              Positioned(
-                left: 49,
-                right: 54,
-                top: 7,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      slide.senderName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10.8,
-                        height: 1,
-                        fontWeight: FontWeight.w700,
-                        decoration: TextDecoration.none,
+                        border: Border.all(
+                          color: accent.withValues(alpha: isLucky ? 0.42 : 0.20),
+                          width: 0.75,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.26),
+                            blurRadius: 16,
+                            offset: const Offset(0, 7),
+                          ),
+                          if (isLucky)
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.20),
+                              blurRadius: 22,
+                              offset: const Offset(0, 3),
+                            ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'sent ${slide.giftName} to ${slide.receiverName}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.76),
-                        fontSize: 9.7,
-                        height: 1,
-                        fontWeight: FontWeight.w500,
-                        decoration: TextDecoration.none,
+                  ),
+                  Positioned(
+                    left: 0,
+                    top: 2,
+                    child: GiftVisual(
+                      icon: slide.giftIcon,
+                      colors: slide.colors,
+                      assetPath: slide.giftAssetPath,
+                      assetUrl: slide.giftAssetUrl,
+                      size: 48,
+                      padding: 2,
+                    ),
+                  ),
+                  Positioned(
+                    left: 55,
+                    right: 58,
+                    top: 8,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          slide.senderName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Icon(Icons.arrow_forward_rounded, color: accent, size: 12),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                slide.receiverName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.74),
+                                  fontSize: 10,
+                                  height: 1,
+                                  fontWeight: FontWeight.w800,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    right: 8,
+                    top: 9,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 170),
+                      transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
+                      child: Container(
+                        key: ValueKey('combo-${slide.id}-${slide.combo}'),
+                        constraints: const BoxConstraints(minWidth: 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          color: accent.withValues(alpha: isLucky ? 0.22 : 0.15),
+                          border: Border.all(color: accent.withValues(alpha: 0.48), width: 0.8),
+                        ),
+                        child: Text(
+                          'x${slide.combo}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              Positioned(
-                right: 8,
-                top: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    color: accent.withValues(alpha: isLucky ? 0.18 : 0.12),
-                    border: Border.all(
-                      color: accent.withValues(alpha: isLucky ? 0.44 : 0.24),
-                      width: 0.7,
-                    ),
                   ),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: isLucky ? 11.2 : 10.6,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ),
+                  if (isLucky) Positioned(right: 49, top: -3, child: _LuckyPulse(color: accent)),
+                ],
               ),
-              if (isLucky) Positioned(right: 46, top: -3, child: _LuckyPulse(color: accent)),
-            ],
-          ),
+            ),
+            if (isLucky)
+              _LuckyRewardTicker(
+                rewardCoins: rewardCoins,
+                accent: accent,
+              ),
+          ],
         ),
       ),
     );
@@ -227,11 +258,9 @@ class GiftSlideCardModule extends StatelessWidget {
         RegExp(r'x(0|1|2|5|10|20|50|100|500|1000)').hasMatch(text.toLowerCase());
   }
 
-  String _comboLabel(GiftSlide slide) {
-    final lower = slide.giftName.toLowerCase();
-    final match = RegExp(r'x(1000|500|100|50|20|10|5|2|1|0)').firstMatch(lower);
-    if (match != null) return '${match.group(1)}x';
-    return 'x${slide.combo}';
+  int _rewardCoins(GiftSlide slide) {
+    final match = RegExp(r'\+(\d+)').firstMatch(slide.giftName.replaceAll(',', ''));
+    return int.tryParse(match?.group(1) ?? '') ?? 0;
   }
 
   Color _accentForSlide(GiftSlide slide) {
@@ -244,6 +273,55 @@ class GiftSlideCardModule extends StatelessWidget {
       return const Color(0xFFFFB545);
     }
     return Colors.white;
+  }
+}
+
+class _LuckyRewardTicker extends StatelessWidget {
+  const _LuckyRewardTicker({required this.rewardCoins, required this.accent});
+
+  final int rewardCoins;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 210),
+      transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
+      child: Container(
+        key: ValueKey(rewardCoins),
+        margin: const EdgeInsets.only(left: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          color: const Color(0xFF171020).withValues(alpha: 0.88),
+          border: Border.all(color: accent.withValues(alpha: 0.42), width: 0.8),
+          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.20), blurRadius: 14)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.toll_rounded, color: accent, size: 13),
+            const SizedBox(width: 4),
+            Text(
+              '+${_compact(rewardCoins)}',
+              style: TextStyle(
+                color: accent,
+                fontSize: 11,
+                height: 1,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _compact(int value) {
+    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
+    if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
+    return '$value';
   }
 }
 
