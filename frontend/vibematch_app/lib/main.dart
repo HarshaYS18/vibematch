@@ -64,7 +64,7 @@ class VibeMatchApp extends StatelessWidget {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        textStyle: compactText.bodySmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+        contentTextStyle: compactText.bodySmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
       ),
       chipTheme: base.chipTheme.copyWith(labelStyle: compactText.labelMedium, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), side: BorderSide.none),
       iconButtonTheme: IconButtonThemeData(
