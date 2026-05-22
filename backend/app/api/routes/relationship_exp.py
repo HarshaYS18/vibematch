@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -92,6 +94,28 @@ def _best_relationship_for_user(db: Session, user: User) -> tuple[RelationshipEc
     other_id = row.user_b_id if row.user_a_id == user.id else row.user_a_id
     other = db.query(User).filter(User.id == other_id).first() if other_id else None
     return row, other
+
+
+@router.post("/relationships/exp/events")
+def create_relationship_exp_event(
+    payload: dict[str, Any],
+    current_user: User = Depends(get_current_user),
+):
+    """Compatibility event sink for relationship EXP writes.
+
+    Some app flows already emit relationship EXP events when gifts/relationship
+    actions happen. The relationship EXP foundation is currently read-only from
+    relationship_economy_stats, so this endpoint accepts the event without
+    mutating totals yet. This prevents noisy 404s while keeping the future event
+    writer contract stable.
+    """
+    return {
+        "accepted": True,
+        "status": "queued_for_future_relationship_exp_writer",
+        "actor_public_user_id": current_user.public_user_id,
+        "event_type": payload.get("event_type") or payload.get("type"),
+        "source": "relationship_exp_compat_event_sink",
+    }
 
 
 @router.get("/relationships/{relationship_id}/score")
