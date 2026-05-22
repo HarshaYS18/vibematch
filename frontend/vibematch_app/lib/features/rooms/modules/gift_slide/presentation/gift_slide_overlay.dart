@@ -49,9 +49,9 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
   final Map<String, int> _luckyComboTotals = <String, int>{};
   final Map<String, int> _luckyRewardTotals = <String, int>{};
   final Set<String> _handledFlightIds = <String>{};
-  final List<String> _visibleSlideIds = <String>[];
-  final List<String> _pendingSlideIds = <String>[];
-  final Set<String> _knownSlideIds = <String>{};
+  final List<String> _visibleSlideKeys = <String>[];
+  final List<String> _pendingSlideKeys = <String>[];
+  final Set<String> _knownSlideKeys = <String>{};
   Timer? _dequeueTimer;
   VoidCallback? _flightListener;
 
@@ -80,22 +80,23 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
   }
 
   void _syncSlides() {
-    final currentIds = widget.slides.map((slide) => slide.id).toSet();
+    final currentKeys = widget.slides.map(_slideKey).toSet();
     var changed = false;
 
-    _knownSlideIds.removeWhere((id) => !currentIds.contains(id));
-    final visibleBefore = _visibleSlideIds.length;
-    final pendingBefore = _pendingSlideIds.length;
-    _visibleSlideIds.removeWhere((id) => !currentIds.contains(id));
-    _pendingSlideIds.removeWhere((id) => !currentIds.contains(id));
-    changed = visibleBefore != _visibleSlideIds.length || pendingBefore != _pendingSlideIds.length;
+    _knownSlideKeys.removeWhere((key) => !currentKeys.contains(key));
+    final visibleBefore = _visibleSlideKeys.length;
+    final pendingBefore = _pendingSlideKeys.length;
+    _visibleSlideKeys.removeWhere((key) => !currentKeys.contains(key));
+    _pendingSlideKeys.removeWhere((key) => !currentKeys.contains(key));
+    changed = visibleBefore != _visibleSlideKeys.length || pendingBefore != _pendingSlideKeys.length;
 
     for (final slide in widget.slides) {
-      if (_knownSlideIds.add(slide.id)) {
-        if (_visibleSlideIds.length < _maxVisibleSlides && _pendingSlideIds.isEmpty) {
-          _visibleSlideIds.add(slide.id);
-        } else if (!_pendingSlideIds.contains(slide.id)) {
-          _pendingSlideIds.add(slide.id);
+      final key = _slideKey(slide);
+      if (_knownSlideKeys.add(key)) {
+        if (_visibleSlideKeys.length < _maxVisibleSlides && _pendingSlideKeys.isEmpty) {
+          _visibleSlideKeys.add(key);
+        } else if (!_pendingSlideKeys.contains(key)) {
+          _pendingSlideKeys.add(key);
         }
         changed = true;
       }
@@ -107,11 +108,11 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
 
   void _scheduleDequeue() {
     if (_dequeueTimer?.isActive == true) return;
-    if (_pendingSlideIds.isEmpty || _visibleSlideIds.length >= _maxVisibleSlides) return;
+    if (_pendingSlideKeys.isEmpty || _visibleSlideKeys.length >= _maxVisibleSlides) return;
     _dequeueTimer = Timer(_slideStagger, () {
       if (!mounted) return;
-      if (_pendingSlideIds.isEmpty || _visibleSlideIds.length >= _maxVisibleSlides) return;
-      setState(() => _visibleSlideIds.add(_pendingSlideIds.removeAt(0)));
+      if (_pendingSlideKeys.isEmpty || _visibleSlideKeys.length >= _maxVisibleSlides) return;
+      setState(() => _visibleSlideKeys.add(_pendingSlideKeys.removeAt(0)));
       _scheduleDequeue();
     });
   }
@@ -130,9 +131,12 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
 
   @override
   Widget build(BuildContext context) {
-    final byId = {for (final slide in widget.slides) slide.id: slide};
-    final visibleSlides = _visibleSlideIds
-        .map((id) => byId[id])
+    final byKey = <String, GiftSlide>{};
+    for (final slide in widget.slides) {
+      byKey[_slideKey(slide)] = slide;
+    }
+    final visibleSlides = _visibleSlideKeys
+        .map((key) => byKey[key])
         .whereType<GiftSlide>()
         .take(_maxVisibleSlides)
         .toList(growable: false);
@@ -152,7 +156,7 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 5),
                   child: GiftSlideCardModule(
-                    key: ValueKey(visibleSlides[index].id),
+                    key: ValueKey(_slideKey(visibleSlides[index])),
                     slide: visibleSlides[index],
                     stackIndex: index,
                     displayCombo: math.max(
@@ -343,7 +347,7 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTi
                       duration: const Duration(milliseconds: 150),
                       transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
                       child: Container(
-                        key: ValueKey('combo-${widget.slide.id}-${widget.displayCombo}'),
+                        key: ValueKey('combo-${_slideKey(widget.slide)}-${widget.displayCombo}'),
                         constraints: const BoxConstraints(minWidth: 43),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                         decoration: BoxDecoration(
