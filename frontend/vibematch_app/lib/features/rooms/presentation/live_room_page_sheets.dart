@@ -149,15 +149,12 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       final themes = await api.listRoomThemes();
       if (!mounted) return;
       final storeThemes = themes.where((theme) => !theme.isDefault && theme.mode != 'cricket').toList(growable: false);
-      if (storeThemes.isEmpty) {
-        RoomToast.show(context, 'No store backgrounds available yet');
-        return;
-      }
       LiveRoomSheetController.showTransparentSheet<void>(
         context: context,
         isScrollControlled: true,
         builder: (context) => _RoomThemeStoreSheet(
           themes: storeThemes,
+          onCustomBackgroundTap: () => _submitCustomBackgroundFromSettings(context),
           onThemePressed: (theme) async {
             try {
               var selectedTheme = theme;
@@ -515,10 +512,11 @@ class _RoomNameEditSheetState extends State<_RoomNameEditSheet> {
 }
 
 class _RoomThemeStoreSheet extends StatelessWidget {
-  const _RoomThemeStoreSheet({required this.themes, required this.onThemePressed});
+  const _RoomThemeStoreSheet({required this.themes, required this.onThemePressed, required this.onCustomBackgroundTap});
 
   final List<RoomThemeDto> themes;
   final ValueChanged<RoomThemeDto> onThemePressed;
+  final VoidCallback onCustomBackgroundTap;
 
   @override
   Widget build(BuildContext context) {
@@ -537,9 +535,9 @@ class _RoomThemeStoreSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Store Backgrounds', style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900)),
+                    Text('Background Store', style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900)),
                     SizedBox(height: 4),
-                    Text('Purchased and premium backgrounds', style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    Text('Premium backgrounds and custom uploads', style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -547,51 +545,96 @@ class _RoomThemeStoreSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Expanded(
-            child: ListView.separated(
-              itemCount: themes.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final theme = themes[index];
-                final priceLabel = theme.isFree ? 'Free' : theme.isOwned ? 'Owned' : '${theme.priceCoins} coins';
-                return Material(
-                  color: RoomColors.pearl,
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () => onThemePressed(theme),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
+          Material(
+            color: const Color(0xFF251538),
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: onCustomBackgroundTap,
+              child: Padding(
+                padding: const EdgeInsets.all(13),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: RoomColors.aqua.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: RoomColors.aqua.withValues(alpha: 0.24)),
+                      ),
+                      child: const Icon(Icons.add_photo_alternate_rounded, color: RoomColors.aqua, size: 23),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 58,
-                            height: 58,
-                            decoration: BoxDecoration(color: RoomColors.deep, borderRadius: BorderRadius.circular(16), border: Border.all(color: RoomColors.softLine)),
-                            clipBehavior: Clip.antiAlias,
-                            child: theme.imageUrl != null
-                                ? Image.network(theme.imageUrl!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_rounded))
-                                : const Icon(Icons.wallpaper_rounded, color: Colors.white),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(theme.name, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
-                                const SizedBox(height: 4),
-                                Text(priceLabel, style: TextStyle(color: theme.isOwned || theme.isFree ? RoomColors.aqua : RoomColors.coral, fontSize: 12, fontWeight: FontWeight.w800)),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right_rounded, color: RoomColors.plum),
+                          Text('Upload Custom Background', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                          SizedBox(height: 4),
+                          Text('Submit your room background for monitor review.', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
                         ],
                       ),
                     ),
-                  ),
-                );
-              },
+                    const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                  ],
+                ),
+              ),
             ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: themes.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No store backgrounds available yet.',
+                      style: TextStyle(color: Color(0xFF82758E), fontSize: 12, fontWeight: FontWeight.w800),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: themes.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final theme = themes[index];
+                      final priceLabel = theme.isFree ? 'Free' : theme.isOwned ? 'Owned' : '${theme.priceCoins} coins';
+                      return Material(
+                        color: RoomColors.pearl,
+                        borderRadius: BorderRadius.circular(18),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => onThemePressed(theme),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 58,
+                                  height: 58,
+                                  decoration: BoxDecoration(color: RoomColors.deep, borderRadius: BorderRadius.circular(16), border: Border.all(color: RoomColors.softLine)),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: theme.imageUrl != null
+                                      ? Image.network(theme.imageUrl!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_rounded))
+                                      : const Icon(Icons.wallpaper_rounded, color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(theme.name, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
+                                      const SizedBox(height: 4),
+                                      Text(priceLabel, style: TextStyle(color: theme.isOwned || theme.isFree ? RoomColors.aqua : RoomColors.coral, fontSize: 12, fontWeight: FontWeight.w800)),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right_rounded, color: RoomColors.plum),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
