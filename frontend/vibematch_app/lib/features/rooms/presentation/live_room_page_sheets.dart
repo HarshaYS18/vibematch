@@ -16,8 +16,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         cricketModeActive: CricketRoomModeSignal.isActive(_roomId),
         onBackgroundTap: () => _openBackgroundPickerFromSettings(sheetContext),
         onCoverPhotoTap: () => _changeRoomCoverPhotoFromSettings(sheetContext),
-        onCustomBackgroundTap: () =>
-            _submitCustomBackgroundFromSettings(sheetContext),
+        onCustomBackgroundTap: () => _submitCustomBackgroundFromSettings(sheetContext),
         onPrivacyTap: _openPrivacySheet,
         onSeatLayoutTap: _openSeatLayoutSheet,
         onAnnouncementTap: _openAnnouncementSheet,
@@ -34,50 +33,36 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         onToggleRoomImages: (value) {
           _roomStateController.setRoomImagesEnabled(value);
           setSheetState(() {});
-          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
-            _settingsController.roomImagesSystemMessage(value),
-          );
+          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(_settingsController.roomImagesSystemMessage(value));
         },
         onToggleGuestMessages: (value) {
           _roomStateController.setGuestMessagesEnabled(value);
           setSheetState(() {});
-          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
-            _settingsController.guestMessagesSystemMessage(value),
-          );
+          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(_settingsController.guestMessagesSystemMessage(value));
         },
         onToggleApplyOnlyMode: (value) {
           _roomStateController.setApplyOnlyModeEnabled(value);
           setSheetState(() {});
-          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
-            _settingsController.applyOnlyModeSystemMessage(value),
-          );
+          LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(_settingsController.applyOnlyModeSystemMessage(value));
         },
         onCloseRoom: () => _leaveRoomFromSheet(sheetContext),
       ),
     );
   }
 
-  Future<void> _changeRoomCoverPhotoFromSettings(
-    BuildContext sheetContext,
-  ) async {
+  Future<void> _changeRoomCoverPhotoFromSettings(BuildContext sheetContext) async {
     if (!_viewerCanManageRoom) {
       RoomToast.show(context, 'Only the host/admin can change the cover photo');
       return;
     }
     Navigator.pop(sheetContext);
     try {
-      final file = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 88,
-      );
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 88);
       if (file == null || !mounted) return;
       RoomToast.show(context, 'Uploading room cover photo...');
       final api = const RoomApiService();
       final upload = await api.uploadRoomCover(file);
-      await api.updateRoomCoverPhoto(
-        roomId: _roomId,
-        coverPhotoUrl: upload.url,
-      );
+      await api.updateRoomCoverPhoto(roomId: _roomId, coverPhotoUrl: upload.url);
       if (!mounted) return;
       RoomToast.show(context, 'Room cover photo updated');
       _insertSystemMessage('Room cover photo updated by ${_currentUser.name}.');
@@ -87,63 +72,67 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     }
   }
 
-  Future<void> _submitCustomBackgroundFromSettings(
-    BuildContext sheetContext,
-  ) async {
+  Future<void> _submitCustomBackgroundFromSettings(BuildContext sheetContext) async {
     if (!_viewerCanManageRoom) {
-      RoomToast.show(
-        context,
-        'Only the host/admin can submit room backgrounds',
-      );
+      RoomToast.show(context, 'Only the host/admin can submit room backgrounds');
       return;
     }
     Navigator.pop(sheetContext);
     try {
-      final file = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 90,
-      );
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
       if (file == null || !mounted) return;
       RoomToast.show(context, 'Uploading custom background...');
       final api = const RoomApiService();
       final upload = await api.uploadRoomBackground(file);
-      final review = await api.submitCustomBackground(
-        roomId: _roomId,
-        imageUrl: upload.url,
-      );
+      final review = await api.submitCustomBackground(roomId: _roomId, imageUrl: upload.url);
       if (!mounted) return;
       RoomToast.show(context, 'Submitted for review: ${review.reviewPublicId}');
-      _insertSystemMessage(
-        'Custom room background submitted for review. Current background stays unchanged until approval.',
-      );
+      _insertSystemMessage('Custom room background submitted for review. Current background stays unchanged until approval.');
     } catch (error) {
       if (!mounted) return;
       RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
     }
   }
 
-  Future<void> _openBackgroundPickerFromSettings(
-    BuildContext sheetContext,
-  ) async {
+  Future<void> _openBackgroundPickerFromSettings(BuildContext sheetContext) async {
     if (!_viewerCanManageRoom) {
       RoomToast.show(context, 'Only the host/admin can change room background');
       return;
     }
     Navigator.pop(sheetContext);
+
+    if (CricketRoomModeSignal.isActive(_roomId)) {
+      final currentCricketTheme = isCricketRoomBackground(_selectedBackgroundTheme) ? _selectedBackgroundTheme : cricketFloodlightArenaBackgroundTheme;
+      LiveRoomSheetController.showTransparentSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => CricketRoomBackgroundPickerSheet(
+          currentTheme: currentCricketTheme,
+          onThemeSelected: (theme) {
+            _roomStateController.setSelectedBackgroundTheme(theme);
+            LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(theme.id);
+            RoomToast.show(context, '${theme.name} applied');
+            _insertSystemMessage('${theme.name} cricket background applied by ${_currentUser.name}.');
+          },
+        ),
+      );
+      return;
+    }
+
     LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (context) => RoomBackgroundPickerSheet(
-        currentTheme: _selectedBackgroundTheme,
+        currentTheme: isCricketRoomBackground(_selectedBackgroundTheme) ? defaultRoomBackgroundTheme : _selectedBackgroundTheme,
         onThemeSelected: (theme) {
+          if (isCricketRoomBackground(theme)) {
+            RoomToast.show(context, 'Cricket backgrounds are available only in Cricket Mode');
+            return;
+          }
           _roomStateController.setSelectedBackgroundTheme(theme);
-          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
-            theme.id,
-          );
+          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(theme.id);
           RoomToast.show(context, '${theme.name} applied');
-          _insertSystemMessage(
-            '${theme.name} background applied by ${_currentUser.name}.',
-          );
+          _insertSystemMessage('${theme.name} background applied by ${_currentUser.name}.');
         },
         onStoreTap: () {
           Navigator.pop(context);
@@ -159,9 +148,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       final api = const RoomApiService();
       final themes = await api.listRoomThemes();
       if (!mounted) return;
-      final storeThemes = themes
-          .where((theme) => !theme.isDefault)
-          .toList(growable: false);
+      final storeThemes = themes.where((theme) => !theme.isDefault && theme.mode != 'cricket').toList(growable: false);
       if (storeThemes.isEmpty) {
         RoomToast.show(context, 'No store backgrounds available yet');
         return;
@@ -176,29 +163,17 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
               var selectedTheme = theme;
               if (!selectedTheme.isOwned && !selectedTheme.isFree) {
                 RoomToast.show(context, 'Purchasing ${selectedTheme.name}...');
-                selectedTheme = await api.purchaseRoomTheme(
-                  selectedTheme.themeId,
-                );
+                selectedTheme = await api.purchaseRoomTheme(selectedTheme.themeId);
               }
-              await api.applyRoomTheme(
-                roomId: _roomId,
-                themeId: selectedTheme.themeId,
-              );
+              await api.applyRoomTheme(roomId: _roomId, themeId: selectedTheme.themeId);
               if (!mounted) return;
               Navigator.pop(context);
-              _roomStateController.setSelectedBackgroundTheme(
-                _themeFromDto(selectedTheme),
-              );
+              _roomStateController.setSelectedBackgroundTheme(_themeFromDto(selectedTheme));
               RoomToast.show(context, '${selectedTheme.name} applied');
-              _insertSystemMessage(
-                '${selectedTheme.name} background applied by ${_currentUser.name}.',
-              );
+              _insertSystemMessage('${selectedTheme.name} background applied by ${_currentUser.name}.');
             } catch (error) {
               if (!mounted) return;
-              RoomToast.show(
-                context,
-                error.toString().replaceFirst('Exception: ', ''),
-              );
+              RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
             }
           },
         ),
@@ -210,24 +185,21 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
   }
 
   RoomBackgroundTheme _themeFromDto(RoomThemeDto theme) {
+    final isCricket = theme.mode == 'cricket' || theme.themeId.startsWith('cricket_');
     return RoomBackgroundTheme(
       id: theme.themeId,
       name: theme.name,
       imageUrl: theme.imageUrl,
+      thumbnailUrl: theme.thumbnailUrl,
       assetPath: theme.assetPath,
-      accent: RoomColors.aqua,
-      sourceType: theme.isDefault
-          ? RoomBackgroundSourceType.chatRoom
-          : RoomBackgroundSourceType.store,
-      unlockType: theme.isFree
-          ? RoomBackgroundUnlockType.free
-          : RoomBackgroundUnlockType.storePurchase,
-      ownershipType: theme.isFree
-          ? RoomBackgroundOwnershipType.free
-          : RoomBackgroundOwnershipType.permanent,
+      accent: isCricket ? const Color(0xFF65FF8F) : RoomColors.aqua,
+      sourceType: isCricket ? RoomBackgroundSourceType.event : (theme.isDefault ? RoomBackgroundSourceType.chatRoom : RoomBackgroundSourceType.store),
+      unlockType: theme.isFree ? RoomBackgroundUnlockType.free : RoomBackgroundUnlockType.storePurchase,
+      ownershipType: theme.isFree ? RoomBackgroundOwnershipType.free : RoomBackgroundOwnershipType.permanent,
       isDefault: theme.isDefault,
-      overlayOpacity: 0.42,
-      fallbackColors: const [RoomColors.deep, RoomColors.plum],
+      isActive: theme.isActive,
+      overlayOpacity: theme.overlayOpacity,
+      fallbackColors: isCricket ? const [Color(0xFF04130A), Color(0xFF0B3E1F)] : const [RoomColors.deep, RoomColors.plum],
     );
   }
 
@@ -235,7 +207,6 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     Navigator.pop(sheetContext);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (!mounted) return;
-
       CricketStumpsFlowModule.open(
         context: context,
         roomId: _roomId,
@@ -252,10 +223,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     Navigator.pop(sheetContext);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (mounted) {
-        _openInfoSheet(
-          'Watch Party',
-          'Watch Party settings will open here. YouTube link, play/pause/seek sync, and 10-seat watch layout will connect next.',
-        );
+        _openInfoSheet('Watch Party', 'Watch Party settings will open here. YouTube link, play/pause/seek sync, and 10-seat watch layout will connect next.');
       }
     });
   }
@@ -277,20 +245,10 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         users: _roomUsers,
         canManage: _viewerCanManageRoom,
         onPickFirst: (user) {
-          _roomStateController.setVibeSyncState(
-            _vibeSyncController.pickFirstUser(
-              state: _vibeSyncState,
-              user: user,
-            ),
-          );
+          _roomStateController.setVibeSyncState(_vibeSyncController.pickFirstUser(state: _vibeSyncState, user: user));
         },
         onPickSecond: (user) {
-          _roomStateController.setVibeSyncState(
-            _vibeSyncController.pickSecondUser(
-              state: _vibeSyncState,
-              user: user,
-            ),
-          );
+          _roomStateController.setVibeSyncState(_vibeSyncController.pickSecondUser(state: _vibeSyncState, user: user));
         },
         onAnnounce: () {
           Navigator.pop(context);
@@ -330,10 +288,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
 
   void _resolveJoinRequest(SeatUser user, {required bool approved}) {
     if (!_viewerCanManageAdmins) {
-      RoomToast.show(
-        context,
-        'Only channel host can approve room member requests',
-      );
+      RoomToast.show(context, 'Only channel host can approve room member requests');
       return;
     }
     if (approved) {
@@ -343,12 +298,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       LiveRoomMemberRequestService.instance.rejectMembership(user);
       LiveRoomMembershipService.markGuest(roomId: _roomId, userId: user.id);
     }
-    RoomToast.show(
-      context,
-      approved
-          ? '${user.name} approved as room member'
-          : '${user.name} rejected',
-    );
+    RoomToast.show(context, approved ? '${user.name} approved as room member' : '${user.name} rejected');
   }
 
   void _openPrivacySheet() {
@@ -359,9 +309,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       builder: (context) => LiveRoomPrivacySheet(
         currentMode: _privacyMode,
         onModeChanged: (mode) {
-          _insertSystemMessage(
-            _settingsController.privacyModeSystemMessage(mode),
-          );
+          _insertSystemMessage(_settingsController.privacyModeSystemMessage(mode));
         },
       ),
     );
@@ -423,3 +371,230 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       await _roomStateController.setRoomName(cleanName);
       if (!mounted) return;
       RoomToast.show(context, 'Room name updated');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  void _openAnnouncementSheet() {
+    _clearRoomFocus();
+    if (!_viewerCanManageAdmins) {
+      RoomToast.show(context, 'Only channel host can update broad announcement');
+      return;
+    }
+    _announcementController.text = _roomStateController.announcementText;
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => LiveRoomAnnouncementSheet(
+        controller: _announcementController,
+        onSubmit: (message) {
+          Navigator.pop(sheetContext);
+          unawaited(_saveAnnouncement(message));
+        },
+      ),
+    );
+  }
+
+  Future<void> _saveAnnouncement(String message) async {
+    final cleanMessage = message.trim();
+    try {
+      await _roomStateController.setRoomAnnouncement(cleanMessage);
+      if (!mounted) return;
+      _announcementController.clear();
+      if (cleanMessage.isNotEmpty) {
+        LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(cleanMessage);
+      }
+      RoomToast.show(context, 'Announcement saved');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  void _openLeaveSheet() {
+    LiveRoomLeaveActionsModule.openLeaveSheet(
+      context: context,
+      navigationController: _navigationController,
+      roomStateController: _roomStateController,
+      roomName: _roomName,
+      roomId: _roomId,
+      language: widget.language,
+      modeTitle: widget.modeTitle,
+      onlineCount: _safeOnlineCount,
+      restoreState: _buildRestoreState(),
+      dismissSeatActionPill: dismissRoomSeatActionPill,
+      clearFocus: _clearRoomFocus,
+      mountedGetter: () => mounted,
+    );
+  }
+
+  void _leaveRoomFromSheet(BuildContext sheetContext) {
+    LiveRoomLeaveActionsModule.leaveRoomFromSheet(
+      context: context,
+      sheetContext: sheetContext,
+      navigationController: _navigationController,
+      roomStateController: _roomStateController,
+      mountedGetter: () => mounted,
+    );
+  }
+
+  void _openInfoSheet(String title, String body) {
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: context,
+      builder: (context) => LiveRoomInfoSheet(title: title, body: body),
+    );
+  }
+}
+
+class _RoomNameEditSheet extends StatefulWidget {
+  const _RoomNameEditSheet({required this.initialName, required this.onSubmit});
+
+  final String initialName;
+  final ValueChanged<String> onSubmit;
+
+  @override
+  State<_RoomNameEditSheet> createState() => _RoomNameEditSheetState();
+}
+
+class _RoomNameEditSheetState extends State<_RoomNameEditSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(18, 12, 18, MediaQuery.paddingOf(context).bottom + 16),
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(),
+            const SizedBox(height: 16),
+            const Text('Edit Room Name', style: TextStyle(color: RoomColors.plum, fontSize: 23, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              maxLength: 120,
+              decoration: InputDecoration(
+                hintText: 'Room name',
+                filled: true,
+                fillColor: RoomColors.pearl,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => widget.onSubmit(_controller.text.trim()),
+                style: ElevatedButton.styleFrom(backgroundColor: RoomColors.plum, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoomThemeStoreSheet extends StatelessWidget {
+  const _RoomThemeStoreSheet({required this.themes, required this.onThemePressed});
+
+  final List<RoomThemeDto> themes;
+  final ValueChanged<RoomThemeDto> onThemePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.70,
+      padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 14),
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SheetHandle(width: 44),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Store Backgrounds', style: TextStyle(color: RoomColors.plum, fontSize: 18, fontWeight: FontWeight.w900)),
+                    SizedBox(height: 4),
+                    Text('Purchased and premium backgrounds', style: TextStyle(color: Color(0xFF82758E), fontSize: 11.5, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: RoomColors.plum)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.separated(
+              itemCount: themes.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final theme = themes[index];
+                final priceLabel = theme.isFree ? 'Free' : theme.isOwned ? 'Owned' : '${theme.priceCoins} coins';
+                return Material(
+                  color: RoomColors.pearl,
+                  borderRadius: BorderRadius.circular(18),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () => onThemePressed(theme),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 58,
+                            height: 58,
+                            decoration: BoxDecoration(color: RoomColors.deep, borderRadius: BorderRadius.circular(16), border: Border.all(color: RoomColors.softLine)),
+                            clipBehavior: Clip.antiAlias,
+                            child: theme.imageUrl != null
+                                ? Image.network(theme.imageUrl!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_rounded))
+                                : const Icon(Icons.wallpaper_rounded, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(theme.name, style: const TextStyle(color: RoomColors.plum, fontSize: 14, fontWeight: FontWeight.w900)),
+                                const SizedBox(height: 4),
+                                Text(priceLabel, style: TextStyle(color: theme.isOwned || theme.isFree ? RoomColors.aqua : RoomColors.coral, fontSize: 12, fontWeight: FontWeight.w800)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: RoomColors.plum),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
