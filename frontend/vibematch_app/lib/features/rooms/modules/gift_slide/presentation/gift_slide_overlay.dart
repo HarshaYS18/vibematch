@@ -48,7 +48,11 @@ class GiftSlideStackModule extends StatelessWidget {
           for (final slide in visibleSlides)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: GiftSlideCardModule(key: ValueKey(slide.id), slide: slide, onComboTap: () => onComboTap(slide)),
+              child: GiftSlideCardModule(
+                key: ValueKey(slide.id),
+                slide: slide,
+                onComboTap: () => onComboTap(slide),
+              ),
             ),
         ],
       ),
@@ -66,7 +70,9 @@ class GiftSlideCardModule extends StatelessWidget {
   Widget build(BuildContext context) {
     final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15).toDouble();
     const holdSeconds = 3.25;
-    final exitProgress = ageSeconds <= holdSeconds ? 0.0 : ((ageSeconds - holdSeconds) / 1.15).clamp(0.0, 1.0).toDouble();
+    final exitProgress = ageSeconds <= holdSeconds
+        ? 0.0
+        : ((ageSeconds - holdSeconds) / 1.15).clamp(0.0, 1.0).toDouble();
     final accent = _accentForSlide(slide);
     final isLucky = _isLuckySlide(slide);
     final label = _comboLabel(slide);
@@ -113,10 +119,22 @@ class GiftSlideCardModule extends StatelessWidget {
                       ],
                       stops: const [0, 0.16, 0.78, 1],
                     ),
-                    border: Border.all(color: accent.withValues(alpha: isLucky ? 0.34 : 0.16), width: 0.7),
+                    border: Border.all(
+                      color: accent.withValues(alpha: isLucky ? 0.34 : 0.16),
+                      width: 0.7,
+                    ),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.24), blurRadius: 16, offset: const Offset(0, 7)),
-                      if (isLucky) BoxShadow(color: accent.withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 3)),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.24),
+                        blurRadius: 16,
+                        offset: const Offset(0, 7),
+                      ),
+                      if (isLucky)
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.18),
+                          blurRadius: 18,
+                          offset: const Offset(0, 3),
+                        ),
                     ],
                   ),
                 ),
@@ -144,14 +162,26 @@ class GiftSlideCardModule extends StatelessWidget {
                       slide.senderName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 10.8, height: 1, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.8,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       'sent ${slide.giftName} to ${slide.receiverName}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.76), fontSize: 9.7, height: 1, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.76),
+                        fontSize: 9.7,
+                        height: 1,
+                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
                   ],
                 ),
@@ -164,11 +194,20 @@ class GiftSlideCardModule extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
                     color: accent.withValues(alpha: isLucky ? 0.18 : 0.12),
-                    border: Border.all(color: accent.withValues(alpha: isLucky ? 0.44 : 0.24), width: 0.7),
+                    border: Border.all(
+                      color: accent.withValues(alpha: isLucky ? 0.44 : 0.24),
+                      width: 0.7,
+                    ),
                   ),
                   child: Text(
                     label,
-                    style: TextStyle(color: accent, fontSize: isLucky ? 11.2 : 10.6, fontWeight: FontWeight.w800, height: 1),
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: isLucky ? 11.2 : 10.6,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                      decoration: TextDecoration.none,
+                    ),
                   ),
                 ),
               ),
@@ -182,7 +221,10 @@ class GiftSlideCardModule extends StatelessWidget {
 
   bool _isLuckySlide(GiftSlide slide) {
     final text = '${slide.giftName} ${slide.giftName.toLowerCase()}';
-    return text.contains('lucky') || text.contains('packet') || text.contains('spin') || RegExp(r'x(0|1|2|5|10|20|50|100|500|1000)').hasMatch(text.toLowerCase());
+    return text.contains('lucky') ||
+        text.contains('packet') ||
+        text.contains('spin') ||
+        RegExp(r'x(0|1|2|5|10|20|50|100|500|1000)').hasMatch(text.toLowerCase());
   }
 
   String _comboLabel(GiftSlide slide) {
@@ -198,7 +240,9 @@ class GiftSlideCardModule extends StatelessWidget {
     if (name.contains('x500')) return const Color(0xFFFF2D95);
     if (name.contains('x100')) return const Color(0xFFFFD166);
     if (name.contains('x0') || name.contains('try again')) return const Color(0xFFB9ADC8);
-    if (name.contains('lucky') || name.contains('packet') || name.contains('spin')) return const Color(0xFFFFB545);
+    if (name.contains('lucky') || name.contains('packet') || name.contains('spin')) {
+      return const Color(0xFFFFB545);
+    }
     return Colors.white;
   }
 }
