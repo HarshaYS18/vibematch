@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../rooms/presentation/widgets/chat_vip_badge.dart';
 import '../data/global_rankings_api_service.dart';
 
 class GlobalRankingsSheet extends StatefulWidget {
@@ -142,15 +143,6 @@ class _GlobalRankingsSheetState extends State<GlobalRankingsSheet> {
                 const SizedBox(height: 10),
                 _PeriodTabs(selected: _period, onChanged: _changePeriod),
                 const SizedBox(height: 12),
-                _StatusPill(
-                  type: _type,
-                  period: _period,
-                  count: entries.length,
-                  loading: _loading,
-                  error: _error,
-                  onRefresh: () => unawaited(_load()),
-                ),
-                const SizedBox(height: 12),
                 Expanded(
                   child: _loading && entries.isEmpty
                       ? const Center(
@@ -204,32 +196,17 @@ class _Header extends StatelessWidget {
           child: Icon(_icon(type), color: _accent(type), size: 21),
         ),
         const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Global Rankings',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.4,
-                ),
-              ),
-              Text(
-                '${type.label} ranking across Vibe Match',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.58),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+        const Expanded(
+          child: Text(
+            'Global Rankings',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.4,
+            ),
           ),
         ),
         Material(
@@ -345,70 +322,6 @@ class _PeriodTabs extends StatelessWidget {
   }
 }
 
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.type,
-    required this.period,
-    required this.count,
-    required this.loading,
-    required this.error,
-    required this.onRefresh,
-  });
-
-  final GlobalRankingType type;
-  final GlobalRankingPeriod period;
-  final int count;
-  final bool loading;
-  final String? error;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = '/rankings/${type.backendValue}?period=${period.backendValue}';
-    final status = loading ? 'syncing live...' : error == null ? 'live backend data' : 'fallback: $error';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.public_rounded, color: _accent(type), size: 16),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              '$status · GET $path',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.54),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          Text(
-            '$count ranks',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.70),
-              fontSize: 10.5,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: onRefresh,
-            child: Icon(Icons.refresh_rounded, color: Colors.white.withValues(alpha: 0.75), size: 17),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _RankingTile extends StatelessWidget {
   const _RankingTile({required this.entry, required this.type});
 
@@ -449,26 +362,18 @@ class _RankingTile extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  entry.user.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'VIP ${entry.user.vipLevel} · SVIP ${entry.user.svipLevel} · Sent Lv ${entry.user.sendLevel} · Rec Lv ${entry.user.receiveLevel}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.52),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
+                Flexible(
+                  child: Text(
+                    entry.user.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
                   ),
                 ),
+                const SizedBox(width: 5),
+                ChatVipBadge(level: entry.user.vipLevel, showWhenZero: true),
               ],
             ),
           ),
