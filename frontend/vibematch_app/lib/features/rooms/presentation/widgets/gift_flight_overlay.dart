@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../live_room_models.dart';
-import 'room_gifts.dart';
+import 'gift_modules/gift_visual.dart';
 
 class GiftFlightEvent {
   const GiftFlightEvent({
