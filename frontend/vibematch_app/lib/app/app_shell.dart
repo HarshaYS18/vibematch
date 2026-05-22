@@ -98,8 +98,10 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _startGlobalInboxRealtime() async {
     await _inboxController.loadFromBackend();
+    if (!mounted) return;
     _lastGlobalInboxMessageKey = _latestIncomingInboxKey();
     _inboxRealtimeReady = true;
+    setState(() {});
   }
 
   String? _latestIncomingInboxKey() {
@@ -116,6 +118,7 @@ class _AppShellState extends State<AppShell> {
 
   void _handleGlobalInboxChanged() {
     if (!_inboxRealtimeReady || !mounted) return;
+    var shouldRefreshShell = false;
     for (final conversation in _inboxController.conversations) {
       if (conversation.messages.isEmpty) continue;
       if (conversation.isMuted || conversation.isLockedByBackend) continue;
@@ -123,7 +126,10 @@ class _AppShellState extends State<AppShell> {
       final message = conversation.messages.last;
       if (message.isMine) continue;
       final key = _globalInboxMessageKey(conversation, message);
-      if (key == _lastGlobalInboxMessageKey) return;
+      if (key == _lastGlobalInboxMessageKey) {
+        shouldRefreshShell = true;
+        continue;
+      }
       _lastGlobalInboxMessageKey = key;
       _globalForegroundConversation = conversation;
       _globalForegroundMessage = message;
@@ -138,6 +144,7 @@ class _AppShellState extends State<AppShell> {
       setState(() {});
       return;
     }
+    if (shouldRefreshShell) setState(() {});
   }
 
   void _dismissGlobalForegroundNotification() {
@@ -215,7 +222,10 @@ class _AppShellState extends State<AppShell> {
       case VmMainTab.vibes:
         return const VibesPage();
       case VmMainTab.inbox:
-        return InboxPage(controller: _inboxController, openConversationId: _pendingInboxOpenConversationId, openConversationRequestNonce: _pendingInboxOpenRequestNonce, onActiveConversationChanged: (conversationId) => _activeInboxConversationId = conversationId);
+        return InboxPage(controller: _inboxController, openConversationId: _pendingInboxOpenConversationId, openConversationRequestNonce: _pendingInboxOpenRequestNonce, onActiveConversationChanged: (conversationId) {
+          _activeInboxConversationId = conversationId;
+          if (mounted) setState(() {});
+        });
       case VmMainTab.me:
         return MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser);
     }
@@ -257,7 +267,12 @@ class _AppShellState extends State<AppShell> {
           if (_globalForegroundConversation != null && _globalForegroundMessage != null)
             Positioned(left: 0, right: 0, top: 0, child: InboxForegroundNotificationBanner(conversation: _globalForegroundConversation!, message: _globalForegroundMessage!, onTap: _openGlobalForegroundNotification, onClose: _dismissGlobalForegroundNotification)),
         ]),
-        bottomNavigationBar: _VibeBottomNav(selectedTab: _selectedTab, showOwnerControls: _showOwnerControls, onTabSelected: _selectTab),
+        bottomNavigationBar: _VibeBottomNav(
+          selectedTab: _selectedTab,
+          showOwnerControls: _showOwnerControls,
+          inboxUnreadCount: _inboxController.unreadCount,
+          onTabSelected: _selectTab,
+        ),
       ),
     );
   }
@@ -316,9 +331,10 @@ class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
 }
 
 class _VibeBottomNav extends StatelessWidget {
-  const _VibeBottomNav({required this.selectedTab, required this.showOwnerControls, required this.onTabSelected});
+  const _VibeBottomNav({required this.selectedTab, required this.showOwnerControls, required this.inboxUnreadCount, required this.onTabSelected});
   final VmMainTab selectedTab;
   final bool showOwnerControls;
+  final int inboxUnreadCount;
   final ValueChanged<VmMainTab> onTabSelected;
   static const Color deepPlum = Color(0xFF251538);
   static const Color softBorder = Color(0xFFECE2D8);
@@ -334,7 +350,7 @@ class _VibeBottomNav extends StatelessWidget {
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
           _NavItem(icon: VMIcons.home, label: VmMainTab.home.label, active: selectedTab == VmMainTab.home, onTap: () => onTabSelected(VmMainTab.home)),
           _NavItem(icon: VMIcons.vibes, label: VmMainTab.vibes.label, active: selectedTab == VmMainTab.vibes, onTap: () => onTabSelected(VmMainTab.vibes)),
-          _NavItem(icon: VMIcons.inbox, label: VmMainTab.inbox.label, active: selectedTab == VmMainTab.inbox, onTap: () => onTabSelected(VmMainTab.inbox)),
+          _NavItem(icon: VMIcons.inbox, label: VmMainTab.inbox.label, active: selectedTab == VmMainTab.inbox, badgeCount: inboxUnreadCount, onTap: () => onTabSelected(VmMainTab.inbox)),
           _NavItem(icon: showOwnerControls ? VMIcons.admin : VMIcons.profile, label: VmMainTab.me.label, active: selectedTab == VmMainTab.me, onTap: () => onTabSelected(VmMainTab.me)),
         ]),
       ),
@@ -343,17 +359,21 @@ class _VibeBottomNav extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap});
+  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap, this.badgeCount = 0});
   final IconData icon;
   final String label;
   final bool active;
   final VoidCallback onTap;
+  final int badgeCount;
   static const Color deepPlum = Color(0xFF251538);
   static const Color muted = Color(0xFF8C8198);
   static const Color aqua = Color(0xFF12C7B7);
+  static const Color coral = Color(0xFFE84C72);
 
   @override
   Widget build(BuildContext context) {
+    final showBadge = badgeCount > 0;
+    final badgeText = badgeCount > 99 ? '99+' : '$badgeCount';
     return InkWell(
       borderRadius: BorderRadius.circular(15),
       onTap: onTap,
@@ -362,7 +382,24 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.10) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          AnimatedScale(scale: active ? 1.05 : 1.0, duration: const Duration(milliseconds: 160), child: Icon(icon, size: active ? 18 : 17, color: active ? deepPlum : muted)),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              AnimatedScale(scale: active ? 1.05 : 1.0, duration: const Duration(milliseconds: 160), child: Icon(icon, size: active ? 18 : 17, color: active ? deepPlum : muted)),
+              if (showBadge)
+                Positioned(
+                  right: -9,
+                  top: -7,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(color: coral, borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white, width: 1.2), boxShadow: [BoxShadow(color: coral.withValues(alpha: 0.28), blurRadius: 8, offset: const Offset(0, 3))]),
+                    alignment: Alignment.center,
+                    child: Text(badgeText, style: const TextStyle(color: Colors.white, fontSize: 8, height: 1, fontWeight: FontWeight.w800)),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 1),
           Text(label, style: TextStyle(fontSize: 8.4, height: 0.98, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? deepPlum : muted)),
         ]),
