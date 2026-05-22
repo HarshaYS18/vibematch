@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -83,8 +84,11 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
     var changed = false;
 
     _knownSlideIds.removeWhere((id) => !currentIds.contains(id));
-    changed = _visibleSlideIds.removeWhere((id) => !currentIds.contains(id)) > 0 || changed;
-    changed = _pendingSlideIds.removeWhere((id) => !currentIds.contains(id)) > 0 || changed;
+    final visibleBefore = _visibleSlideIds.length;
+    final pendingBefore = _pendingSlideIds.length;
+    _visibleSlideIds.removeWhere((id) => !currentIds.contains(id));
+    _pendingSlideIds.removeWhere((id) => !currentIds.contains(id));
+    changed = visibleBefore != _visibleSlideIds.length || pendingBefore != _pendingSlideIds.length;
 
     for (final slide in widget.slides) {
       if (_knownSlideIds.add(slide.id)) {
