@@ -72,7 +72,8 @@ class _VibeCardModularState extends State<VibeCardModular> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width;
+    final width = MediaQuery.sizeOf(context).width;
+    final mediaHeight = (width * 1.04).clamp(330.0, 470.0).toDouble();
     final isTextVibe = widget.vibe.mediaType == VibeMediaType.text;
 
     return ValueListenableBuilder<String?>(
@@ -95,8 +96,8 @@ class _VibeCardModularState extends State<VibeCardModular> {
                     _AuthorRow(vibe: widget.vibe, onProfileTap: widget.onProfileTap, onMoreTap: _toggleActionPill),
                     if (!isTextVibe)
                       SizedBox(
-                        width: size,
-                        height: size,
+                        width: width,
+                        height: mediaHeight,
                         child: ClipRect(child: VibeMediaPlayer(vibe: widget.vibe, onDoubleTap: _handleDoubleTap)),
                       ),
                     _MetaPanel(
@@ -114,11 +115,7 @@ class _VibeCardModularState extends State<VibeCardModular> {
               ),
             ),
             if (showActionPill)
-              Positioned(
-                top: 46,
-                right: 28,
-                child: _InlineVibeActionPill(isSelfVibe: _isSelfVibe, onTap: _runAction),
-              ),
+              Positioned(top: 42, right: 22, child: _InlineVibeActionPill(isSelfVibe: _isSelfVibe, onTap: _runAction)),
           ],
         );
       },
@@ -138,13 +135,13 @@ class _AuthorRow extends StatelessWidget {
     return ColoredBox(
       color: Colors.white,
       child: SizedBox(
-        height: 58,
+        height: 48,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
           child: Row(
             children: [
-              InkWell(onTap: onProfileTap, customBorder: const CircleBorder(), child: VibeAvatar(vibe: vibe, size: 38)),
-              const SizedBox(width: 10),
+              InkWell(onTap: onProfileTap, customBorder: const CircleBorder(), child: VibeAvatar(vibe: vibe, size: 34)),
+              const SizedBox(width: 9),
               Expanded(
                 child: InkWell(
                   onTap: onProfileTap,
@@ -152,14 +149,14 @@ class _AuthorRow extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(vibe.authorName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF111015), fontSize: 14, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 2),
-                      Text(vibe.timeAgo, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      Text(vibe.authorName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF111015), fontSize: 12.8, fontWeight: FontWeight.w800, height: 1)),
+                      const SizedBox(height: 3),
+                      Text(vibe.timeAgo, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.2, fontWeight: FontWeight.w600, height: 1)),
                     ],
                   ),
                 ),
               ),
-              IconButton(onPressed: onMoreTap, icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF111015))),
+              IconButton(onPressed: onMoreTap, icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF111015), size: 20)),
             ],
           ),
         ),
@@ -183,21 +180,9 @@ class _InlineVibeActionPill extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFECE2D8)),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 20, offset: const Offset(0, 9))],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(isSelfVibe ? Icons.delete_outline_rounded : Icons.report_gmailerrorred_rounded, color: color, size: 19),
-              const SizedBox(width: 8),
-              Text(isSelfVibe ? 'Delete Vibe' : 'Report Vibe', style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w900)),
-            ],
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFECE2D8)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 16, offset: const Offset(0, 7))]),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(isSelfVibe ? Icons.delete_outline_rounded : Icons.report_gmailerrorred_rounded, color: color, size: 17), const SizedBox(width: 7), Text(isSelfVibe ? 'Delete' : 'Report', style: TextStyle(color: color, fontSize: 11.2, fontWeight: FontWeight.w800))]),
         ),
       ),
     );
@@ -220,20 +205,13 @@ class _MetaPanel extends StatelessWidget {
     return ColoredBox(
       color: Colors.white,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(0, isTextVibe ? 4 : 0, 0, 14),
+        padding: EdgeInsets.fromLTRB(0, isTextVibe ? 4 : 0, 0, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (caption.isNotEmpty)
-              Padding(
-                padding: EdgeInsets.fromLTRB(14, isTextVibe ? 4 : 2, 14, isTextVibe ? 10 : 2),
-                child: isTextVibe
-                    ? _PlainCaption(caption: caption, fontSize: 16, lineHeight: 1.35)
-                    : _CaptionWithAuthor(authorName: vibe.authorName, caption: caption, fontSize: 13.3, lineHeight: 1.32),
-              ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+              padding: const EdgeInsets.fromLTRB(6, 3, 6, 0),
               child: Row(
                 children: [
                   _IconAction(icon: vibe.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: vibe.likedByMe ? const Color(0xFFE84C72) : const Color(0xFF111015), onTap: onLikeTap),
@@ -244,22 +222,15 @@ class _MetaPanel extends StatelessWidget {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-              child: Text(_likesText(vibe.likes), style: const TextStyle(color: Color(0xFF111015), fontSize: 13, fontWeight: FontWeight.w900)),
-            ),
-            if (vibe.comments > 0)
-              InkWell(
-                onTap: onCommentTap,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 5, 14, 2),
-                  child: Text('View all ${_formatCount(vibe.comments)} comments', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 13, fontWeight: FontWeight.w700)),
-                ),
+            Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 3), child: Text(_likesText(vibe.likes), style: const TextStyle(color: Color(0xFF111015), fontSize: 11.5, fontWeight: FontWeight.w800, height: 1.05))),
+            if (caption.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(12, isTextVibe ? 5 : 2, 12, 2),
+                child: isTextVibe ? _PlainCaption(caption: caption, fontSize: 14, lineHeight: 1.25) : _CaptionWithAuthor(authorName: vibe.authorName, caption: caption, fontSize: 12.1, lineHeight: 1.25),
               ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 5, 14, 0),
-              child: Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
-            ),
+            if (vibe.comments > 0)
+              InkWell(onTap: onCommentTap, child: Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 1), child: Text('View all ${_formatCount(vibe.comments)} comments', style: const TextStyle(color: Color(0xFF8C8198), fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.05)))),
+            Padding(padding: const EdgeInsets.fromLTRB(12, 5, 12, 0), child: Text(vibe.timeAgo.toUpperCase(), style: const TextStyle(color: Color(0xFF8C8198), fontSize: 9.2, fontWeight: FontWeight.w700, letterSpacing: 0.2, height: 1))),
           ],
         ),
       ),
@@ -275,11 +246,11 @@ class _IconAction extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => IconButton(onPressed: onTap, icon: Icon(icon, color: color, size: 27));
+  Widget build(BuildContext context) => IconButton(onPressed: onTap, icon: Icon(icon, color: color, size: 22));
 }
 
 class _PlainCaption extends StatelessWidget {
-  const _PlainCaption({required this.caption, this.fontSize = 16, this.lineHeight = 1.35});
+  const _PlainCaption({required this.caption, this.fontSize = 14, this.lineHeight = 1.25});
 
   final String caption;
   final double fontSize;
@@ -293,16 +264,16 @@ class _PlainCaption extends StatelessWidget {
     var index = 0;
     for (final match in _mentionPattern.allMatches(caption)) {
       if (match.start > index) spans.add(TextSpan(text: caption.substring(index, match.start)));
-      spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w900)));
+      spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w800)));
       index = match.end;
     }
     if (index < caption.length) spans.add(TextSpan(text: caption.substring(index)));
-    return RichText(text: TextSpan(style: TextStyle(color: const Color(0xFF111015), fontSize: fontSize, height: lineHeight, fontWeight: FontWeight.w600), children: spans));
+    return RichText(text: TextSpan(style: TextStyle(color: const Color(0xFF111015), fontSize: fontSize, height: lineHeight, fontWeight: FontWeight.w500), children: spans));
   }
 }
 
 class _CaptionWithAuthor extends StatelessWidget {
-  const _CaptionWithAuthor({required this.authorName, required this.caption, this.fontSize = 13.3, this.lineHeight = 1.32});
+  const _CaptionWithAuthor({required this.authorName, required this.caption, this.fontSize = 12.1, this.lineHeight = 1.25});
 
   final String authorName;
   final String caption;
@@ -313,17 +284,15 @@ class _CaptionWithAuthor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spans = <TextSpan>[
-      TextSpan(text: '$authorName  ', style: const TextStyle(color: Color(0xFF8C5CF6), fontWeight: FontWeight.w900)),
-    ];
+    final spans = <TextSpan>[TextSpan(text: '$authorName  ', style: const TextStyle(color: Color(0xFF8C5CF6), fontWeight: FontWeight.w800))];
     var index = 0;
     for (final match in _mentionPattern.allMatches(caption)) {
       if (match.start > index) spans.add(TextSpan(text: caption.substring(index, match.start)));
-      spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w900)));
+      spans.add(TextSpan(text: caption.substring(match.start, match.end), style: const TextStyle(color: Color(0xFF3859D6), fontWeight: FontWeight.w800)));
       index = match.end;
     }
     if (index < caption.length) spans.add(TextSpan(text: caption.substring(index)));
-    return RichText(text: TextSpan(style: TextStyle(color: const Color(0xFF111015), fontSize: fontSize, height: lineHeight, fontWeight: FontWeight.w600), children: spans));
+    return RichText(text: TextSpan(style: TextStyle(color: const Color(0xFF111015), fontSize: fontSize, height: lineHeight, fontWeight: FontWeight.w500), children: spans));
   }
 }
 
