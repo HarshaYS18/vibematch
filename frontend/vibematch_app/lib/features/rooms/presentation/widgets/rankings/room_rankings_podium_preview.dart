@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../live_room_models.dart';
+import '../chat_vip_badge.dart';
 import 'room_rankings_models.dart';
 
 class RoomRankingsPodiumPreview extends StatelessWidget {
@@ -20,40 +21,43 @@ class RoomRankingsPodiumPreview extends StatelessWidget {
     final third = entries.length > 2 ? entries[2] : null;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      padding: const EdgeInsets.only(top: 2, bottom: 6),
       child: SizedBox(
-        height: 190,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
+        height: 184,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Positioned(
-              left: 8,
-              right: 8,
-              bottom: 0,
-              child: Container(
-                height: 30,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.white.withValues(alpha: 0.05),
-                      accentColor.withValues(alpha: 0.22),
-                      Colors.white.withValues(alpha: 0.05),
-                    ],
-                  ),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 48),
+                child: _PodiumUser(
+                  entry: second,
+                  height: 118,
+                  rank: 2,
+                  accentColor: accentColor,
                 ),
               ),
             ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(child: Padding(padding: const EdgeInsets.only(top: 52), child: _PodiumUser(entry: second, height: 120, rank: 2, accentColor: accentColor))),
-                const SizedBox(width: 9),
-                Expanded(child: _PodiumUser(entry: first, height: 162, rank: 1, accentColor: accentColor)),
-                const SizedBox(width: 9),
-                Expanded(child: Padding(padding: const EdgeInsets.only(top: 58), child: _PodiumUser(entry: third, height: 118, rank: 3, accentColor: accentColor))),
-              ],
+            const SizedBox(width: 9),
+            Expanded(
+              child: _PodiumUser(
+                entry: first,
+                height: 158,
+                rank: 1,
+                accentColor: accentColor,
+              ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 54),
+                child: _PodiumUser(
+                  entry: third,
+                  height: 116,
+                  rank: 3,
+                  accentColor: accentColor,
+                ),
+              ),
             ),
           ],
         ),
@@ -63,7 +67,12 @@ class RoomRankingsPodiumPreview extends StatelessWidget {
 }
 
 class _PodiumUser extends StatelessWidget {
-  const _PodiumUser({required this.entry, required this.height, required this.rank, required this.accentColor});
+  const _PodiumUser({
+    required this.entry,
+    required this.height,
+    required this.rank,
+    required this.accentColor,
+  });
 
   final RoomRankingEntry? entry;
   final double height;
@@ -80,28 +89,61 @@ class _PodiumUser extends StatelessWidget {
 
     return Container(
       height: height,
-      padding: const EdgeInsets.fromLTRB(8, 9, 8, 9),
+      padding: const EdgeInsets.fromLTRB(8, 9, 8, 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [rankColor.withValues(alpha: 0.22), accentColor.withValues(alpha: 0.12), Colors.black.withValues(alpha: 0.13)],
+          colors: [
+            rankColor.withValues(alpha: 0.23),
+            accentColor.withValues(alpha: 0.13),
+            Colors.white.withValues(alpha: 0.04),
+          ],
         ),
         border: Border.all(color: rankColor.withValues(alpha: 0.42)),
-        boxShadow: [BoxShadow(color: rankColor.withValues(alpha: 0.14), blurRadius: 18, offset: const Offset(0, 8))],
+        boxShadow: [
+          BoxShadow(
+            color: rankColor.withValues(alpha: 0.13),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _PodiumAvatar(entry: entry, rankColor: rankColor, size: rank == 1 ? 42 : 36),
+          _PodiumAvatar(
+            entry: entry,
+            rankColor: rankColor,
+            size: rank == 1 ? 42 : 36,
+          ),
           const SizedBox(height: 5),
-          Text('$rank', style: TextStyle(color: rankColor, fontSize: rank == 1 ? 23 : 19, fontWeight: FontWeight.w900, height: 1)),
+          Text(
+            '$rank',
+            style: TextStyle(
+              color: rankColor,
+              fontSize: rank == 1 ? 23 : 19,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(entry?.user.name ?? '—', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, height: 1)),
-          const SizedBox(height: 3),
-          Text(entry?.scoreText ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 8.5, fontWeight: FontWeight.w800, height: 1)),
+          Text(
+            entry?.user.name ?? '—',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          ChatVipBadge(level: entry?.user.vipLevel ?? 0, showWhenZero: true),
         ],
       ),
     );
@@ -119,13 +161,23 @@ class _PodiumAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = entry?.user;
     if (user == null) {
-      return _AvatarShell(size: size, rankColor: rankColor, child: Text('?', style: TextStyle(color: Colors.white, fontSize: size * 0.42, fontWeight: FontWeight.w900)));
+      return _AvatarShell(
+        size: size,
+        rankColor: rankColor,
+        child: Text(
+          '?',
+          style: TextStyle(color: Colors.white, fontSize: size * 0.42, fontWeight: FontWeight.w900),
+        ),
+      );
     }
     final avatarUrl = user.avatarUrl?.trim();
     final fallback = Container(
       alignment: Alignment.center,
       decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: user.avatarColors)),
-      child: Text(avatarLetter(user.name), style: TextStyle(color: Colors.white, fontSize: size * 0.42, fontWeight: FontWeight.w900)),
+      child: Text(
+        avatarLetter(user.name),
+        style: TextStyle(color: Colors.white, fontSize: size * 0.42, fontWeight: FontWeight.w900),
+      ),
     );
     return _AvatarShell(
       size: size,
@@ -133,7 +185,13 @@ class _PodiumAvatar extends StatelessWidget {
       child: ClipOval(
         child: avatarUrl == null || avatarUrl.isEmpty
             ? fallback
-            : Image.network(avatarUrl, width: size, height: size, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => fallback),
+            : Image.network(
+                avatarUrl,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => fallback,
+              ),
       ),
     );
   }
@@ -152,7 +210,11 @@ class _AvatarShell extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.08), border: Border.all(color: rankColor.withValues(alpha: 0.70), width: 1.4)),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.08),
+        border: Border.all(color: rankColor.withValues(alpha: 0.70), width: 1.4),
+      ),
       child: ClipOval(child: child),
     );
   }
