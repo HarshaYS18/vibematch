@@ -68,6 +68,8 @@ class LiveRoomBody extends StatelessWidget {
     required this.onMicTap,
     required this.onGamesTap,
     required this.onGiftTap,
+    required this.onCricketEndMatch,
+    required this.onCricketStartNewMatch,
   });
 
   final String roomName;
@@ -124,6 +126,8 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onMicTap;
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
+  final VoidCallback onCricketEndMatch;
+  final VoidCallback onCricketStartNewMatch;
 
   int get _effectiveOnlineCount {
     final ids = <String>{};
@@ -157,19 +161,9 @@ class LiveRoomBody extends StatelessWidget {
         );
         final cricketModeActive = cricketController.active;
         final effectiveSeats = cricketModeActive ? _cricketSeats() : seats;
-        final currentUser = media.activeLoggedInSeatUser;
-        final canManageCricket = cricketModeActive &&
-            currentUser != null &&
-            CricketRoomModeModule.canScore(
-              seats: effectiveSeats,
-              currentUserId: currentUser.id,
-            );
+        final canManageCricket = cricketModeActive && canManageSeats;
         final effectiveLayoutId = cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
-        final effectiveSelectedSeatIndex = cricketModeActive &&
-                selectedSeatIndex != null &&
-                selectedSeatIndex! >= CricketRoomRules.totalSeats
-            ? null
-            : selectedSeatIndex;
+        final effectiveSelectedSeatIndex = cricketModeActive && selectedSeatIndex != null && selectedSeatIndex! >= CricketRoomRules.totalSeats ? null : selectedSeatIndex;
 
         return SafeArea(
           child: Stack(
@@ -235,12 +229,10 @@ class LiveRoomBody extends StatelessWidget {
                             if (cricketModeActive)
                               AnimatedBuilder(
                                 animation: cricketController,
-                                builder: (context, child) {
-                                  return CricketRoomModeModule.fixedScoreboard(
-                                    state: cricketController.match,
-                                    margin: const EdgeInsets.only(bottom: 6),
-                                  );
-                                },
+                                builder: (context, child) => CricketRoomModeModule.fixedScoreboard(
+                                  state: cricketController.match,
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                ),
                               ),
                             Expanded(
                               child: RoomChatFeed(
@@ -280,7 +272,8 @@ class LiveRoomBody extends StatelessWidget {
                     return CricketRoomControlsModule(
                       controller: cricketController,
                       canManage: canManageCricket,
-                      onEndMode: () => CricketRoomModeSignal.deactivate(roomId),
+                      onEndMode: onCricketEndMatch,
+                      onStartNewMatch: onCricketStartNewMatch,
                     );
                   },
                 ),
