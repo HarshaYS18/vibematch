@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../../data/room_level_service.dart';
 import 'room_theme.dart';
 
@@ -27,10 +28,13 @@ class RoomLevelSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RoomLevelSheet(
-        roomName: roomName,
-        roomPublicId: roomPublicId,
-        fallbackLevel: fallbackLevel,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+      builder: (_) => VmFadeSlide(
+        child: RoomLevelSheet(
+          roomName: roomName,
+          roomPublicId: roomPublicId,
+          fallbackLevel: fallbackLevel,
+        ),
       ),
     );
   }
@@ -145,25 +149,31 @@ class _RoomLevelSheetState extends State<RoomLevelSheet> {
                 Expanded(
                   child: _loading && _history.isEmpty
                       ? const Center(
-                          child: CircularProgressIndicator(color: RoomColors.gold),
+                          child: CircularProgressIndicator(
+                            color: RoomColors.gold,
+                          ),
                         )
                       : _history.isEmpty
-                          ? _EmptyHistory(error: _error, onRetry: () => unawaited(_load()))
-                          : RefreshIndicator(
-                              onRefresh: _load,
-                              color: RoomColors.gold,
-                              child: ListView.separated(
-                                physics: const AlwaysScrollableScrollPhysics(
-                                  parent: BouncingScrollPhysics(),
-                                ),
-                                padding: const EdgeInsets.only(bottom: 10),
-                                itemCount: _history.length,
-                                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  return _HistoryTile(entry: _history[index]);
-                                },
-                              ),
+                      ? _EmptyHistory(
+                          error: _error,
+                          onRetry: () => unawaited(_load()),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          color: RoomColors.gold,
+                          child: ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
                             ),
+                            padding: const EdgeInsets.only(bottom: 10),
+                            itemCount: _history.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              return _HistoryTile(entry: _history[index]);
+                            },
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -261,7 +271,11 @@ class _Header extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.10),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
-              child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
           ),
         ),
@@ -354,7 +368,10 @@ class _StatsRow extends StatelessWidget {
         const SizedBox(width: 8),
         _StatPill(label: 'Period EXP', value: _compact(summary.periodExp)),
         const SizedBox(width: 8),
-        _StatPill(label: 'Rank', value: summary.rank == null ? '--' : '#${summary.rank}'),
+        _StatPill(
+          label: 'Rank',
+          value: summary.rank == null ? '--' : '#${summary.rank}',
+        ),
         const SizedBox(width: 8),
         _StatPill(label: 'Max Lv', value: '${summary.maxLevel}'),
       ],
@@ -426,8 +443,8 @@ class _StatusPill extends StatelessWidget {
     final status = loading
         ? 'syncing live...'
         : error == null
-            ? 'live backend data'
-            : 'fallback: $error';
+        ? 'live backend data'
+        : 'fallback: $error';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -438,7 +455,11 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.query_stats_rounded, color: RoomColors.gold, size: 16),
+          const Icon(
+            Icons.query_stats_rounded,
+            color: RoomColors.gold,
+            size: 16,
+          ),
           const SizedBox(width: 7),
           Expanded(
             child: Text(
@@ -488,9 +509,15 @@ class _HistoryTile extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: RoomColors.gold.withValues(alpha: 0.16),
-              border: Border.all(color: RoomColors.gold.withValues(alpha: 0.24)),
+              border: Border.all(
+                color: RoomColors.gold.withValues(alpha: 0.24),
+              ),
             ),
-            child: const Icon(Icons.bolt_rounded, color: RoomColors.gold, size: 19),
+            child: const Icon(
+              Icons.bolt_rounded,
+              color: RoomColors.gold,
+              size: 19,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -555,7 +582,9 @@ class _EmptyHistory extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            error == null ? 'No room EXP history yet' : 'Could not load history',
+            error == null
+                ? 'No room EXP history yet'
+                : 'Could not load history',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 13,

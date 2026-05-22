@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../../data/live_room_media_signaling_service.dart';
 
 import '../widgets/room_theme.dart';
@@ -25,7 +26,8 @@ class CricketRoomControlsModule extends StatefulWidget {
   final VoidCallback onStartNewMatch;
 
   @override
-  State<CricketRoomControlsModule> createState() => _CricketRoomControlsModuleState();
+  State<CricketRoomControlsModule> createState() =>
+      _CricketRoomControlsModuleState();
 }
 
 class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
@@ -45,7 +47,11 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
 
   void _move(DragUpdateDetails details, Size size) {
     setState(() {
-      _position = _clampPosition(_position + details.delta, size, expanded: _expanded);
+      _position = _clampPosition(
+        _position + details.delta,
+        size,
+        expanded: _expanded,
+      );
     });
   }
 
@@ -100,25 +106,40 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
         height: 54,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(colors: [Color(0xFF0E8F54), Color(0xFF86FF9D)]),
+          gradient: LinearGradient(
+            colors: [Color(0xFF0E8F54), Color(0xFF86FF9D)],
+          ),
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 24),
+            const Icon(
+              Icons.admin_panel_settings_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
             Positioned(
               right: 5,
               bottom: 5,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
-                  color: widget.canManage ? const Color(0xFFFFD36A) : Colors.white38,
+                  color: widget.canManage
+                      ? const Color(0xFFFFD36A)
+                      : Colors.white38,
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: const Color(0xEE07160D), width: 1.2),
+                  border: Border.all(
+                    color: const Color(0xEE07160D),
+                    width: 1.2,
+                  ),
                 ),
                 child: const Text(
                   'CP',
-                  style: TextStyle(color: Color(0xFF251538), fontSize: 8, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                    color: Color(0xFF251538),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ),
@@ -140,9 +161,15 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
               height: 28,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(colors: [Color(0xFF0E8F54), Color(0xFF86FF9D)]),
+                gradient: LinearGradient(
+                  colors: [Color(0xFF0E8F54), Color(0xFF86FF9D)],
+                ),
               ),
-              child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 16),
+              child: const Icon(
+                Icons.admin_panel_settings_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -150,7 +177,11 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
                 widget.canManage ? 'Cricket CP' : 'Cricket',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
             InkWell(
@@ -158,7 +189,11 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
               onTap: () => setState(() => _expanded = false),
               child: const Padding(
                 padding: EdgeInsets.all(4),
-                child: Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                child: Icon(
+                  Icons.close_rounded,
+                  color: Colors.white70,
+                  size: 16,
+                ),
               ),
             ),
           ],
@@ -192,6 +227,7 @@ class _CricketRoomControlsModuleState extends State<CricketRoomControlsModule> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => CricketMatchResultSheet(controller: widget.controller),
     );
   }
@@ -211,7 +247,12 @@ class CricketMatchResultSheet extends StatelessWidget {
 
     return Container(
       height: MediaQuery.sizeOf(context).height * 0.58,
-      padding: EdgeInsets.fromLTRB(14, 8, 14, MediaQuery.paddingOf(context).bottom + 12),
+      padding: EdgeInsets.fromLTRB(
+        14,
+        8,
+        14,
+        MediaQuery.paddingOf(context).bottom + 12,
+      ),
       decoration: const BoxDecoration(
         color: Color(0xFFF9F8F2),
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -223,42 +264,84 @@ class CricketMatchResultSheet extends StatelessWidget {
           const SizedBox(height: 12),
           const Text(
             'Match Result',
-            style: TextStyle(color: RoomColors.plum, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+            style: TextStyle(
+              color: RoomColors.plum,
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+            ),
           ),
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF061B0D), Color(0xFF0E5A31)]),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF061B0D), Color(0xFF0E5A31)],
+              ),
               borderRadius: BorderRadius.circular(24),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 18, offset: const Offset(0, 8))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.16),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '${match.battingTeam.shortName} ${snapshot.runs}/${snapshot.wickets} (${snapshot.oversText})',
-                  style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  target == null ? 'First innings in progress' : 'Target $target',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 12, fontWeight: FontWeight.w800),
+                  target == null
+                      ? 'First innings in progress'
+                      : 'Target $target',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.78),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   resultText,
-                  style: const TextStyle(color: Color(0xFFFFD36A), fontSize: 16, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    color: Color(0xFFFFD36A),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 14),
-          _ResultMetricRow(label: 'Current run rate', value: snapshot.currentRunRate.toStringAsFixed(2)),
-          _ResultMetricRow(label: 'Required run rate', value: snapshot.requiredRunRate?.toStringAsFixed(2) ?? '--'),
-          _ResultMetricRow(label: 'Legal balls', value: '${snapshot.legalBalls}'),
-          _ResultMetricRow(label: 'Recent balls', value: snapshot.recentBalls.isEmpty ? '--' : snapshot.recentBalls.join(' ')),
+          _ResultMetricRow(
+            label: 'Current run rate',
+            value: snapshot.currentRunRate.toStringAsFixed(2),
+          ),
+          _ResultMetricRow(
+            label: 'Required run rate',
+            value: snapshot.requiredRunRate?.toStringAsFixed(2) ?? '--',
+          ),
+          _ResultMetricRow(
+            label: 'Legal balls',
+            value: '${snapshot.legalBalls}',
+          ),
+          _ResultMetricRow(
+            label: 'Recent balls',
+            value: snapshot.recentBalls.isEmpty
+                ? '--'
+                : snapshot.recentBalls.join(' '),
+          ),
         ],
       ),
     );
@@ -293,12 +376,20 @@ class _ResultMetricRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(color: Color(0xFF81758C), fontSize: 12, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: Color(0xFF81758C),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(color: RoomColors.plum, fontSize: 12.5, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: RoomColors.plum,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ],
       ),
@@ -307,7 +398,13 @@ class _ResultMetricRow extends StatelessWidget {
 }
 
 class _CricketControlButton extends StatelessWidget {
-  const _CricketControlButton({required this.icon, required this.label, required this.enabled, required this.onTap, this.danger = false});
+  const _CricketControlButton({
+    required this.icon,
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+    this.danger = false,
+  });
 
   final IconData icon;
   final String label;
@@ -322,7 +419,9 @@ class _CricketControlButton extends StatelessWidget {
       child: Opacity(
         opacity: enabled ? 1 : 0.48,
         child: Material(
-          color: danger ? RoomColors.coral.withValues(alpha: 0.88) : Colors.white.withValues(alpha: 0.12),
+          color: danger
+              ? RoomColors.coral.withValues(alpha: 0.88)
+              : Colors.white.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
@@ -338,7 +437,11 @@ class _CricketControlButton extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ],

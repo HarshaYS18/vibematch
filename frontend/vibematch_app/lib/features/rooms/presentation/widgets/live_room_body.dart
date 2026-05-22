@@ -141,29 +141,37 @@ class LiveRoomBody extends StatelessWidget {
   }
 
   bool get _derivedShowMicButton {
-    final activeUser = LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser;
+    final activeUser =
+        LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser;
     if (activeUser == null) return false;
     return seats.any((seat) => seat.user?.id == activeUser.id);
   }
 
   @override
   Widget build(BuildContext context) {
-    final media = LiveRoomMediaSignalingService.instance;
     final shouldShowMicButton = showMicButton ?? _derivedShowMicButton;
 
     return ValueListenableBuilder<Set<String>>(
       valueListenable: CricketRoomModeSignal.activeRoomIds,
       builder: (context, activeRoomIds, child) {
-        final cricketController = CricketRoomModeRegistry.syncRoomModeFromSignal(
-          roomId: roomId,
-          roomName: roomName,
-          currentLayoutId: layoutId,
-        );
+        final cricketController =
+            CricketRoomModeRegistry.syncRoomModeFromSignal(
+              roomId: roomId,
+              roomName: roomName,
+              currentLayoutId: layoutId,
+            );
         final cricketModeActive = cricketController.active;
         final effectiveSeats = cricketModeActive ? _cricketSeats() : seats;
         final canManageCricket = cricketModeActive && canManageSeats;
-        final effectiveLayoutId = cricketModeActive ? CricketRoomRules.fixedLayoutId : layoutId;
-        final effectiveSelectedSeatIndex = cricketModeActive && selectedSeatIndex != null && selectedSeatIndex! >= CricketRoomRules.totalSeats ? null : selectedSeatIndex;
+        final effectiveLayoutId = cricketModeActive
+            ? CricketRoomRules.fixedLayoutId
+            : layoutId;
+        final effectiveSelectedSeatIndex =
+            cricketModeActive &&
+                selectedSeatIndex != null &&
+                selectedSeatIndex! >= CricketRoomRules.totalSeats
+            ? null
+            : selectedSeatIndex;
 
         return SafeArea(
           child: Stack(
@@ -229,17 +237,21 @@ class LiveRoomBody extends StatelessWidget {
                             if (cricketModeActive)
                               AnimatedBuilder(
                                 animation: cricketController,
-                                builder: (context, child) => CricketRoomModeModule.fixedScoreboard(
-                                  state: cricketController.match,
-                                  margin: const EdgeInsets.only(bottom: 6),
-                                ),
+                                builder: (context, child) =>
+                                    CricketRoomModeModule.fixedScoreboard(
+                                      state: cricketController.match,
+                                      margin: const EdgeInsets.only(bottom: 6),
+                                    ),
                               ),
                             Expanded(
                               child: RoomChatFeed(
                                 messages: messages,
-                                canManageSeatApplications: canManageSeatApplications,
-                                onApproveSeatApplication: onApproveSeatApplication,
-                                onRejectSeatApplication: onRejectSeatApplication,
+                                canManageSeatApplications:
+                                    canManageSeatApplications,
+                                onApproveSeatApplication:
+                                    onApproveSeatApplication,
+                                onRejectSeatApplication:
+                                    onRejectSeatApplication,
                                 onSenderTap: onSenderTap,
                                 onMentionTap: onMentionTap,
                               ),
@@ -295,8 +307,14 @@ class LiveRoomBody extends StatelessWidget {
   }
 
   List<RoomSeat> _cricketSeats() {
-    final visibleSeats = seats.take(CricketRoomRules.totalSeats).toList(growable: true);
-    for (var index = visibleSeats.length; index < CricketRoomRules.totalSeats; index++) {
+    final visibleSeats = seats
+        .take(CricketRoomRules.totalSeats)
+        .toList(growable: true);
+    for (
+      var index = visibleSeats.length;
+      index < CricketRoomRules.totalSeats;
+      index++
+    ) {
       visibleSeats.add(RoomSeat(index: index));
     }
     return visibleSeats;

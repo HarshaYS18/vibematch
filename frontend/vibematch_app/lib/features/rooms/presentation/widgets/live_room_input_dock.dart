@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../../../media/data/media_upload_service.dart';
 import '../controllers/live_room_message_controller.dart';
 import '../modules/live_room_games_module.dart';
@@ -77,13 +78,16 @@ class RoomInputDock extends StatelessWidget {
       isScrollControlled: true,
       useSafeArea: false,
       backgroundColor: Colors.transparent,
-      builder: (_) => LiveRoomMessageComposerModule(
-        controller: controller,
-        focusNode: focusNode,
-        imagesEnabled: imagesEnabled,
-        onSendText: onSendTap,
-        onImageTap: () => _pickAndSendImage(context),
-        onSendFloatingText: onSendTap,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+      builder: (_) => VmFadeSlide(
+        child: LiveRoomMessageComposerModule(
+          controller: controller,
+          focusNode: focusNode,
+          imagesEnabled: imagesEnabled,
+          onSendText: onSendTap,
+          onImageTap: () => _pickAndSendImage(context),
+          onSendFloatingText: onSendTap,
+        ),
       ),
     );
   }

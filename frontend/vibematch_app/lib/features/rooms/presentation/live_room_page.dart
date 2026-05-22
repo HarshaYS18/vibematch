@@ -98,11 +98,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   late final LiveRoomMessageController _roomMessageController;
   late final LiveRoomModerationController _moderationController;
 
-  final LiveRoomUsersController _usersController = const LiveRoomUsersController();
-  final LiveRoomSettingsController _settingsController = const LiveRoomSettingsController();
-  final LiveRoomVibeSyncController _vibeSyncController = const LiveRoomVibeSyncController();
-  final LiveRoomNavigationController _navigationController = const LiveRoomNavigationController();
-  final ChatModerationApiService _chatModerationApi = const ChatModerationApiService();
+  final LiveRoomUsersController _usersController =
+      const LiveRoomUsersController();
+  final LiveRoomSettingsController _settingsController =
+      const LiveRoomSettingsController();
+  final LiveRoomVibeSyncController _vibeSyncController =
+      const LiveRoomVibeSyncController();
+  final LiveRoomNavigationController _navigationController =
+      const LiveRoomNavigationController();
+  final ChatModerationApiService _chatModerationApi =
+      const ChatModerationApiService();
   late final LiveRoomPresenceController _presenceController;
 
   bool _giftControllerReady = false;
@@ -118,7 +123,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   VoidCallback? _roomMemberRequestListener;
 
   SeatUser get _currentUser {
-    return LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser ?? _roomIdentityFallback;
+    return LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser ??
+        _roomIdentityFallback;
   }
 
   String get _roomName => _roomStateController.roomName;
@@ -132,7 +138,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   int get _inboxUnreadCount => _roomStateController.inboxUnreadCount;
   VibeSyncRoomState get _vibeSyncState => _roomStateController.vibeSyncState;
   Offset get _bubbleOffset => _roomStateController.bubbleOffset;
-  RoomBackgroundTheme get _selectedBackgroundTheme => _roomStateController.selectedBackgroundTheme;
+  RoomBackgroundTheme get _selectedBackgroundTheme =>
+      _roomStateController.selectedBackgroundTheme;
 
   List<SeatUser> get _roomUsers => _seatController.roomUsers;
 
@@ -142,11 +149,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   bool get _currentUserIsMember {
     if (_viewerCanManageRoom) return true;
-    return LiveRoomMembershipService.isRoomMember(roomId: _roomId, userId: _currentUser.id);
+    return LiveRoomMembershipService.isRoomMember(
+      roomId: _roomId,
+      userId: _currentUser.id,
+    );
   }
 
   bool get _joinRequestPending {
-    return LiveRoomMembershipService.isPending(roomId: _roomId, userId: _currentUser.id);
+    return LiveRoomMembershipService.isPending(
+      roomId: _roomId,
+      userId: _currentUser.id,
+    );
   }
 
   List<SeatUser> get _allRoomUsers {
@@ -158,11 +171,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 
-  List<SeatUser> get _roomAdmins => _usersController.buildRoomAdmins(_allRoomUsers);
+  List<SeatUser> get _roomAdmins =>
+      _usersController.buildRoomAdmins(_allRoomUsers);
 
-  List<SeatUser> get _availableAdminUsers => _usersController.buildAvailableAdminUsers(_allRoomUsers);
+  List<SeatUser> get _availableAdminUsers =>
+      _usersController.buildAvailableAdminUsers(_allRoomUsers);
 
-  bool get _viewerCanManageRoom => _currentUser.isHost || _currentUser.isRoomAdmin;
+  bool get _viewerCanManageRoom =>
+      _currentUser.isHost || _currentUser.isRoomAdmin;
 
   bool get _viewerCanManageAdmins => _currentUser.isHost;
 
@@ -181,7 +197,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     final restoreState = widget.restoreState;
     final initialStateSnapshot = restoreState?.roomState;
-    final initialSeatLayout = initialStateSnapshot?.seatLayoutId ?? restoreState?.seatState.layoutId ?? '5x2';
+    final initialSeatLayout =
+        initialStateSnapshot?.seatLayoutId ??
+        restoreState?.seatState.layoutId ??
+        '5x2';
 
     _messageController = LiveRoomMentionTextController();
     if (restoreState != null && restoreState.messageDraft.trim().isNotEmpty) {
@@ -196,11 +215,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       initialModeTitle: widget.modeTitle,
       initialBackgroundTheme: widget.initialBackgroundTheme,
       initialStateSnapshot: initialStateSnapshot,
-      preserveInitialBackgroundOnFirstLoad: widget.initialBackgroundTheme != null,
+      preserveInitialBackgroundOnFirstLoad:
+          widget.initialBackgroundTheme != null,
       initialInboxUnreadCount: 0,
     )..addListener(_onRoomStateChanged);
 
-    _moderationController = LiveRoomModerationController(currentUser: _currentUser);
+    _moderationController = LiveRoomModerationController(
+      currentUser: _currentUser,
+    );
 
     _roomMessageController = LiveRoomMessageController(
       currentUser: _currentUser,
@@ -240,7 +262,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _presenceController = LiveRoomPresenceController();
 
     _seatInviteListener = _handleSeatInviteUpdate;
-    LiveRoomMediaSignalingService.instance.seatInvite.addListener(_seatInviteListener!);
+    LiveRoomMediaSignalingService.instance.seatInvite.addListener(
+      _seatInviteListener!,
+    );
 
     _roomMembershipListener = () {
       if (mounted) _setRoomState(() {});
@@ -250,15 +274,23 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _roomMemberRequestListener = () {
       if (mounted) _setRoomState(() {});
     };
-    LiveRoomMemberRequestService.instance.pendingRequests.addListener(_roomMemberRequestListener!);
+    LiveRoomMemberRequestService.instance.pendingRequests.addListener(
+      _roomMemberRequestListener!,
+    );
 
-    LiveRoomMemberRequestService.instance.startRoom(roomId: _roomId, currentUser: _currentUser);
+    LiveRoomMemberRequestService.instance.startRoom(
+      roomId: _roomId,
+      currentUser: _currentUser,
+    );
 
     _startRoomPresence();
     _syncPresenceRoomDetails();
 
     _giftController.ensureDefaultReceiver(_roomUsers);
-    LuckyPacketRoomBus.bind(controller: _giftController, roomUsers: _allRoomUsers);
+    LuckyPacketRoomBus.bind(
+      controller: _giftController,
+      roomUsers: _allRoomUsers,
+    );
 
     unawaited(_roomStateController.loadPersistedRoomSettings());
 
@@ -277,7 +309,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     final seatInviteListener = _seatInviteListener;
     if (seatInviteListener != null) {
-      LiveRoomMediaSignalingService.instance.seatInvite.removeListener(seatInviteListener);
+      LiveRoomMediaSignalingService.instance.seatInvite.removeListener(
+        seatInviteListener,
+      );
     }
 
     final membershipListener = _roomMembershipListener;
@@ -287,11 +321,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
     final memberRequestListener = _roomMemberRequestListener;
     if (memberRequestListener != null) {
-      LiveRoomMemberRequestService.instance.pendingRequests.removeListener(memberRequestListener);
+      LiveRoomMemberRequestService.instance.pendingRequests.removeListener(
+        memberRequestListener,
+      );
     }
 
     LiveRoomMemberRequestService.instance.stop();
-    if (_giftControllerReady) LuckyPacketRoomBus.clearController(_giftController);
+    if (_giftControllerReady)
+      LuckyPacketRoomBus.clearController(_giftController);
 
     _roomStateController.removeListener(_onRoomStateChanged);
     _messageController.dispose();
@@ -310,7 +347,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     if (!mounted) return;
     setState(callback);
     if (!_giftControllerReady) return;
-    LuckyPacketRoomBus.bind(controller: _giftController, roomUsers: _allRoomUsers);
+    LuckyPacketRoomBus.bind(
+      controller: _giftController,
+      roomUsers: _allRoomUsers,
+    );
   }
 
   void _capturePreCricketRoomState() {
@@ -321,17 +361,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _handleCricketStartNewMatch() {
     if (!CricketRoomModeSignal.isActive(_roomId)) return;
-    final controller = CricketRoomModeRegistry.controllerFor(roomId: _roomId, roomName: _roomName);
-    controller.scorer.resetDemo();
-    controller.scorer.startMatch();
-    controller.notifyListeners();
+    final controller = CricketRoomModeRegistry.controllerFor(
+      roomId: _roomId,
+      roomName: _roomName,
+    );
+    controller.startNewMatch();
     RoomToast.show(context, 'New cricket match started');
     _insertSystemMessage('New cricket match started by ${_currentUser.name}.');
   }
 
   void _handleCricketEndMatch() {
-    final restoreLayout = _preCricketLayoutId ?? _roomStateController.seatLayoutId;
-    final restoreBackground = _preCricketBackgroundTheme ?? defaultRoomBackgroundTheme;
+    final restoreLayout =
+        _preCricketLayoutId ?? _roomStateController.seatLayoutId;
+    final restoreBackground =
+        _preCricketBackgroundTheme ?? defaultRoomBackgroundTheme;
 
     LiveRoomMediaSignalingService.instance.endCricketMode(_roomId);
     CricketRoomModeSignal.deactivate(_roomId);
@@ -345,7 +388,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _preCricketBackgroundTheme = null;
 
     RoomToast.show(context, 'Cricket Mode ended');
-    _insertSystemMessage('Cricket Mode ended by ${_currentUser.name}. Chat room restored.');
+    _insertSystemMessage(
+      'Cricket Mode ended by ${_currentUser.name}. Chat room restored.',
+    );
   }
 
   @override
@@ -354,7 +399,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       return PopScope<void>(
         canPop: _allowRoomPop,
         onPopInvokedWithResult: (didPop, result) {
-          if (_navigationController.shouldBlockBackAction(allowRoomPop: _allowRoomPop, didPop: didPop)) {
+          if (_navigationController.shouldBlockBackAction(
+            allowRoomPop: _allowRoomPop,
+            didPop: didPop,
+          )) {
             dismissRoomSeatActionPill();
             _openLeaveSheet();
           }
@@ -363,7 +411,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           backgroundColor: Colors.transparent,
           body: Stack(
             children: [
-              Positioned.fill(child: RoomBackground(theme: _selectedBackgroundTheme)),
+              Positioned.fill(
+                child: RoomBackground(theme: _selectedBackgroundTheme),
+              ),
               LiveRoomMinimizedBubble(
                 offset: _bubbleOffset,
                 onRestore: () {
@@ -372,7 +422,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 },
                 onDrag: (details) {
                   dismissRoomSeatActionPill();
-                  _roomStateController.moveBubble(delta: details.delta, screenSize: MediaQuery.sizeOf(context));
+                  _roomStateController.moveBubble(
+                    delta: details.delta,
+                    screenSize: MediaQuery.sizeOf(context),
+                  );
                 },
               ),
             ],
@@ -384,7 +437,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     return PopScope<void>(
       canPop: _allowRoomPop,
       onPopInvokedWithResult: (didPop, result) {
-        if (_navigationController.shouldBlockBackAction(allowRoomPop: _allowRoomPop, didPop: didPop)) {
+        if (_navigationController.shouldBlockBackAction(
+          allowRoomPop: _allowRoomPop,
+          didPop: didPop,
+        )) {
           dismissRoomSeatActionPill();
           _openLeaveSheet();
         }
@@ -394,7 +450,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         backgroundColor: RoomColors.deep,
         body: Stack(
           children: [
-            Positioned.fill(child: RoomBackground(theme: _selectedBackgroundTheme)),
+            Positioned.fill(
+              child: RoomBackground(theme: _selectedBackgroundTheme),
+            ),
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
@@ -460,7 +518,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onCricketEndMatch: _handleCricketEndMatch,
               onCricketStartNewMatch: _handleCricketStartNewMatch,
             ),
-            VibeSyncRoomOverlay(state: _vibeSyncState, onDismiss: _clearVibeSyncOverlay),
+            VibeSyncRoomOverlay(
+              state: _vibeSyncState,
+              onDismiss: _clearVibeSyncOverlay,
+            ),
             const LiveRoomRemoteAudioRenderers(),
             const RoomMusicOverlayHost(),
             LiveRoomGiftOverlay(
@@ -490,6 +551,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _clearVibeSyncOverlay() {
-    _roomStateController.setVibeSyncState(_vibeSyncController.clearOverlay(_vibeSyncState));
+    _roomStateController.setVibeSyncState(
+      _vibeSyncController.clearOverlay(_vibeSyncState),
+    );
   }
 }

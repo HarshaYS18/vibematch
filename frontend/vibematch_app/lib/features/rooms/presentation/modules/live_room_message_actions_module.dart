@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../controllers/live_room_mention_text_controller.dart';
 import 'live_room_message_composer_module.dart';
 
@@ -22,13 +23,16 @@ class LiveRoomMessageActionsModule {
       isScrollControlled: true,
       useSafeArea: false,
       backgroundColor: Colors.transparent,
-      builder: (_) => LiveRoomMessageComposerModule(
-        controller: controller,
-        focusNode: focusNode,
-        imagesEnabled: imagesEnabled,
-        onSendText: onSendText,
-        onImageTap: onImageTap,
-        onSendFloatingText: onSendFloatingText,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+      builder: (_) => VmFadeSlide(
+        child: LiveRoomMessageComposerModule(
+          controller: controller,
+          focusNode: focusNode,
+          imagesEnabled: imagesEnabled,
+          onSendText: onSendText,
+          onImageTap: onImageTap,
+          onSendFloatingText: onSendFloatingText,
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
+import '../../../core/ui/vm_motion.dart';
 import '../../auth/models/current_user.dart';
 import '../../create/presentation/create_page.dart';
 import '../../rooms/data/room_api_service.dart';
@@ -86,7 +87,10 @@ class HomeNavigationController {
 
     await Navigator.push<void>(
       context,
-      MaterialPageRoute(builder: (_) => CreatePage(currentUser: currentUser)),
+      VmMotion.pageRoute<void>(
+        settings: const RouteSettings(name: 'create-room'),
+        page: CreatePage(currentUser: currentUser),
+      ),
     );
     if (!context.mounted) return;
     await controller.refreshAfterRoomCreation();

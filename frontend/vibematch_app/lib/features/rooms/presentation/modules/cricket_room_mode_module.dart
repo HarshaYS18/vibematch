@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../live_room_models.dart';
 import '../widgets/room_theme.dart';
 import 'cricket_mode_module.dart';
@@ -28,10 +29,7 @@ class CricketRoomRules {
     required List<RoomSeat> seats,
     required String currentUserId,
   }) {
-    return currentUserSeatIndex(
-          seats: seats,
-          currentUserId: currentUserId,
-        ) ==
+    return currentUserSeatIndex(seats: seats, currentUserId: currentUserId) ==
         scorerSeatIndex;
   }
 }
@@ -155,7 +153,12 @@ class CricketTournamentConfig {
   factory CricketTournamentConfig.demo() {
     return CricketTournamentConfig(
       name: 'Vibe Premier Cup',
-      teams: const ['Vibe Strikers', 'Royal Hitters', 'Neon Kings', 'Aqua Titans'],
+      teams: const [
+        'Vibe Strikers',
+        'Royal Hitters',
+        'Neon Kings',
+        'Aqua Titans',
+      ],
       rules: CricketTournamentRules.t10League(),
     );
   }
@@ -195,11 +198,11 @@ class CricketPointsRow {
   final String form;
 
   double get netRunRate => CricketMath.netRunRate(
-        runsFor: runsFor,
-        ballsFaced: ballsFaced,
-        runsAgainst: runsAgainst,
-        ballsBowled: ballsBowled,
-      );
+    runsFor: runsFor,
+    ballsFaced: ballsFaced,
+    runsAgainst: runsAgainst,
+    ballsBowled: ballsBowled,
+  );
 }
 
 class CricketMath {
@@ -254,10 +257,8 @@ class CricketMath {
 }
 
 class CricketRoomModeController extends ChangeNotifier {
-  CricketRoomModeController({
-    required String roomId,
-    required String roomName,
-  }) : scorer = CricketModeController(roomId: roomId, roomName: roomName);
+  CricketRoomModeController({required String roomId, required String roomName})
+    : scorer = CricketModeController(roomId: roomId, roomName: roomName);
 
   final CricketModeController scorer;
   CricketTournamentConfig tournament = CricketTournamentConfig.demo();
@@ -287,6 +288,12 @@ class CricketRoomModeController extends ChangeNotifier {
       scorer.resetDemo();
       scorer.startMatch();
     }
+    notifyListeners();
+  }
+
+  void startNewMatch() {
+    scorer.resetDemo();
+    scorer.startMatch();
     notifyListeners();
   }
 
@@ -356,7 +363,6 @@ class CricketRoomModeController extends ChangeNotifier {
     notifyListeners();
   }
 
-
   @override
   void dispose() {
     scorer.dispose();
@@ -400,6 +406,7 @@ class CricketRoomModeModule {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => CricketTournamentCreatorSheet(
         initialConfig: initialConfig ?? CricketTournamentConfig.demo(),
       ),
@@ -414,11 +421,11 @@ class CricketRoomModeModule {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => CricketPointsTableSheet(rows: rows),
     );
   }
 }
-
 
 class _CricketBatterStats {
   const _CricketBatterStats({
@@ -452,7 +459,9 @@ class _CricketBowlerStats {
 }
 
 _CricketBatterStats _batterStats(CricketMatchState state, String playerId) {
-  final events = state.inningsEvents.where((event) => event.strikerId == playerId);
+  final events = state.inningsEvents.where(
+    (event) => event.strikerId == playerId,
+  );
   var runs = 0;
   var balls = 0;
   var fours = 0;
@@ -474,7 +483,9 @@ _CricketBatterStats _batterStats(CricketMatchState state, String playerId) {
 }
 
 _CricketBowlerStats _bowlerStats(CricketMatchState state, String bowlerId) {
-  final events = state.inningsEvents.where((event) => event.bowlerId == bowlerId);
+  final events = state.inningsEvents.where(
+    (event) => event.bowlerId == bowlerId,
+  );
   var legalBalls = 0;
   var runs = 0;
   var wickets = 0;
@@ -484,7 +495,8 @@ _CricketBowlerStats _bowlerStats(CricketMatchState state, String bowlerId) {
     if (event.extraType != CricketExtraType.penalty) {
       runs += event.totalRuns;
     }
-    if (event.wicketType != null && event.wicketType != CricketWicketType.runOut) {
+    if (event.wicketType != null &&
+        event.wicketType != CricketWicketType.runOut) {
       wickets += 1;
     }
   }
@@ -511,9 +523,6 @@ String _matchResultText(CricketMatchState state) {
   final runsShort = math.max(0, target - snapshot.runs - 1);
   return '${state.bowlingTeam.name} won by $runsShort runs';
 }
-
-
-
 
 class _CompletedBatterRow {
   const _CompletedBatterRow({
@@ -561,9 +570,16 @@ List<_CompletedBatterRow> _completedBatters(CricketMatchState state) {
   final rows = <_CompletedBatterRow>[];
 
   for (final player in state.battingTeam.players) {
-    final playerEvents = events.where((event) => event.strikerId == player.id).toList();
-    final dismissed = events.any((event) => event.dismissedPlayerId == player.id);
-    if (playerEvents.isEmpty && !dismissed && player.id != state.strikerId && player.id != state.nonStrikerId) {
+    final playerEvents = events
+        .where((event) => event.strikerId == player.id)
+        .toList();
+    final dismissed = events.any(
+      (event) => event.dismissedPlayerId == player.id,
+    );
+    if (playerEvents.isEmpty &&
+        !dismissed &&
+        player.id != state.strikerId &&
+        player.id != state.nonStrikerId) {
       continue;
     }
 
@@ -599,7 +615,9 @@ List<_CompletedBowlerRow> _completedBowlers(CricketMatchState state) {
   final rows = <_CompletedBowlerRow>[];
 
   for (final player in state.bowlingTeam.players) {
-    final playerEvents = events.where((event) => event.bowlerId == player.id).toList();
+    final playerEvents = events
+        .where((event) => event.bowlerId == player.id)
+        .toList();
     if (playerEvents.isEmpty) continue;
 
     var legalBalls = 0;
@@ -609,7 +627,9 @@ List<_CompletedBowlerRow> _completedBowlers(CricketMatchState state) {
     for (final event in playerEvents) {
       if (event.isLegalBall) legalBalls += 1;
       if (event.extraType != CricketExtraType.penalty) runs += event.totalRuns;
-      if (event.wicketType != null && event.wicketType != CricketWicketType.runOut) wickets += 1;
+      if (event.wicketType != null &&
+          event.wicketType != CricketWicketType.runOut)
+        wickets += 1;
     }
 
     rows.add(
@@ -781,105 +801,102 @@ class CricketFixedScoreboard extends StatelessWidget {
                 snapshot: snapshot,
               )
             else ...[
-            Row(
-              children: [
-                const Icon(
-                  Icons.sports_cricket_rounded,
-                  color: Color(0xFF86FF9D),
-                  size: 16,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    resultText.isNotEmpty
-                        ? resultText
-                        : '${state.battingTeam.shortName} ${snapshot.runs}/${snapshot.wickets} (${snapshot.oversText})',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: resultText.isNotEmpty
-                          ? const Color(0xFFFFD36A)
-                          : Colors.white,
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.25,
-                    ),
-                  ),
-                ),
-                Text(
-                  resultText.isNotEmpty
-                      ? 'Final'
-                      : 'CRR ${snapshot.currentRunRate.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: Color(0xFFFFD36A),
-                    fontSize: 10.2,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            Text(
-              target == null
-                  ? '${state.battingTeam.name} batting'
-                  : 'Target $target • Need ${math.max(0, target - snapshot.runs)} from $ballsRemaining balls${requiredRate == null ? '' : ' • RRR ${requiredRate.toStringAsFixed(2)}'}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.80),
-                fontSize: 10.2,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            _CricbuzzBatterLine(
-              name: '${striker.name}*',
-              stats: strikerStats,
-            ),
-            const SizedBox(height: 4),
-            _CricbuzzBatterLine(
-              name: nonStriker.name,
-              stats: nonStrikerStats,
-            ),
-            const SizedBox(height: 4),
-            _CricbuzzBowlerLine(
-              name: bowler.name,
-              stats: bowlerStats,
-            ),
-            if (snapshot.recentBalls.isNotEmpty) ...[
-              const SizedBox(height: 7),
               Row(
                 children: [
-                  Text(
-                    'Last 6',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  const Icon(
+                    Icons.sports_cricket_rounded,
+                    color: Color(0xFF86FF9D),
+                    size: 16,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const NeverScrollableScrollPhysics(),
-                      child: Row(
-                        children: snapshot.recentBalls
-                            .map(
-                              (ball) => Padding(
-                                padding: const EdgeInsets.only(right: 5),
-                                child: _CricketMiniBallChip(label: ball),
-                              ),
-                            )
-                            .toList(),
+                    child: Text(
+                      resultText.isNotEmpty
+                          ? resultText
+                          : '${state.battingTeam.shortName} ${snapshot.runs}/${snapshot.wickets} (${snapshot.oversText})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: resultText.isNotEmpty
+                            ? const Color(0xFFFFD36A)
+                            : Colors.white,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.25,
                       ),
+                    ),
+                  ),
+                  Text(
+                    resultText.isNotEmpty
+                        ? 'Final'
+                        : 'CRR ${snapshot.currentRunRate.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: Color(0xFFFFD36A),
+                      fontSize: 10.2,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 5),
+              Text(
+                target == null
+                    ? '${state.battingTeam.name} batting'
+                    : 'Target $target • Need ${math.max(0, target - snapshot.runs)} from $ballsRemaining balls${requiredRate == null ? '' : ' • RRR ${requiredRate.toStringAsFixed(2)}'}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.80),
+                  fontSize: 10.2,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _CricbuzzBatterLine(
+                name: '${striker.name}*',
+                stats: strikerStats,
+              ),
+              const SizedBox(height: 4),
+              _CricbuzzBatterLine(
+                name: nonStriker.name,
+                stats: nonStrikerStats,
+              ),
+              const SizedBox(height: 4),
+              _CricbuzzBowlerLine(name: bowler.name, stats: bowlerStats),
+              if (snapshot.recentBalls.isNotEmpty) ...[
+                const SizedBox(height: 7),
+                Row(
+                  children: [
+                    Text(
+                      'Last 6',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: Row(
+                          children: snapshot.recentBalls
+                              .map(
+                                (ball) => Padding(
+                                  padding: const EdgeInsets.only(right: 5),
+                                  child: _CricketMiniBallChip(label: ball),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ],
-            ],
         ),
       ),
     );
@@ -887,10 +904,7 @@ class CricketFixedScoreboard extends StatelessWidget {
 }
 
 class _CricbuzzBatterLine extends StatelessWidget {
-  const _CricbuzzBatterLine({
-    required this.name,
-    required this.stats,
-  });
+  const _CricbuzzBatterLine({required this.name, required this.stats});
 
   final String name;
   final _CricketBatterStats stats;
@@ -913,10 +927,7 @@ class _CricbuzzBatterLine extends StatelessWidget {
 }
 
 class _CricbuzzBowlerLine extends StatelessWidget {
-  const _CricbuzzBowlerLine({
-    required this.name,
-    required this.stats,
-  });
+  const _CricbuzzBowlerLine({required this.name, required this.stats});
 
   final String name;
   final _CricketBowlerStats stats;
@@ -934,7 +945,6 @@ class _CricbuzzBowlerLine extends StatelessWidget {
     );
   }
 }
-
 
 class _TinyScoreText extends StatelessWidget {
   const _TinyScoreText(this.text, {this.strong = false});
@@ -970,6 +980,7 @@ Future<void> _showCricketPlayerPicker({
     isDismissible: false,
     enableDrag: false,
     backgroundColor: Colors.transparent,
+    sheetAnimationStyle: VmMotion.sheetAnimationStyle,
     builder: (_) {
       return Container(
         padding: EdgeInsets.fromLTRB(
@@ -1035,11 +1046,11 @@ List<CricketPlayer> _availableNextBatters(CricketMatchState state) {
   return state.battingTeam.players
       .where(
         (player) =>
-            !dismissed.contains(player.id) &&
-            player.id != state.nonStrikerId,
+            !dismissed.contains(player.id) && player.id != state.nonStrikerId,
       )
       .toList();
 }
+
 List<CricketPlayer> _availableOpeningBatters(CricketMatchState state) {
   return state.battingTeam.players.toList();
 }
@@ -1066,10 +1077,7 @@ bool _lastBallWasLegalOverEnd(CricketMatchState state) {
 }
 
 class CricketScorerHalfOverlay extends StatefulWidget {
-  const CricketScorerHalfOverlay({
-    super.key,
-    required this.controller,
-  });
+  const CricketScorerHalfOverlay({super.key, required this.controller});
 
   final CricketRoomModeController controller;
 
@@ -1086,7 +1094,11 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
 
   CricketRoomModeController get controller => widget.controller;
 
-  Offset _clampScorerPosition(Offset next, Size size, {required bool minimized}) {
+  Offset _clampScorerPosition(
+    Offset next,
+    Size size, {
+    required bool minimized,
+  }) {
     final width = minimized ? 58.0 : math.min(size.width - 20, 392.0);
     final height = minimized ? 58.0 : 236.0;
     final maxX = math.max(8.0, size.width - width - 8);
@@ -1212,7 +1224,9 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
                 decoration: BoxDecoration(
                   color: const Color(0xF8F9F8F2),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.75)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.30),
@@ -1245,7 +1259,9 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: _ScorerOverlayHeader(state: controller.match),
+                            child: _ScorerOverlayHeader(
+                              state: controller.match,
+                            ),
                           ),
                           IconButton(
                             tooltip: 'Minimize scorer',
@@ -1275,11 +1291,8 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
                             ),
                           _PremiumScoreButton(
                             label: 'Wd',
-                            onTap: () => _scoreExtra(
-                              context,
-                              CricketExtraType.wide,
-                              1,
-                            ),
+                            onTap: () =>
+                                _scoreExtra(context, CricketExtraType.wide, 1),
                           ),
                           _PremiumScoreButton(
                             label: 'Nb',
@@ -1504,10 +1517,11 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
     }
 
     await showModalBottomSheet<void>(
-    context: context,
-    isDismissible: false,
-    enableDrag: false,
-    backgroundColor: Colors.transparent,
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) {
         return Container(
           padding: EdgeInsets.fromLTRB(
@@ -1559,10 +1573,7 @@ class _CricketScorerHalfOverlayState extends State<CricketScorerHalfOverlay> {
 }
 
 class CricketTournamentCreatorSheet extends StatefulWidget {
-  const CricketTournamentCreatorSheet({
-    super.key,
-    required this.initialConfig,
-  });
+  const CricketTournamentCreatorSheet({super.key, required this.initialConfig});
 
   final CricketTournamentConfig initialConfig;
 
@@ -1669,9 +1680,8 @@ class _CricketTournamentCreatorSheetState
                 const SizedBox(height: 12),
                 _TournamentTypePicker(
                   value: _rules.type,
-                  onChanged: (type) => setState(
-                    () => _rules = _rules.copyWith(type: type),
-                  ),
+                  onChanged: (type) =>
+                      setState(() => _rules = _rules.copyWith(type: type)),
                 ),
                 const SizedBox(height: 12),
                 _RuleGrid(
@@ -1773,7 +1783,9 @@ class _ScorerOverlayHeader extends StatelessWidget {
           height: 38,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            gradient: LinearGradient(colors: [Color(0xFF0E5A31), Color(0xFF65FF8F)]),
+            gradient: LinearGradient(
+              colors: [Color(0xFF0E5A31), Color(0xFF65FF8F)],
+            ),
           ),
           child: const Icon(Icons.sports_cricket_rounded, color: Colors.white),
         ),
@@ -1825,8 +1837,8 @@ class _CricketMiniBallChip extends StatelessWidget {
         color: isWicket
             ? RoomColors.coral
             : isBoundary
-                ? const Color(0xFFFFD36A)
-                : Colors.white,
+            ? const Color(0xFFFFD36A)
+            : Colors.white,
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
       ),
@@ -1967,17 +1979,20 @@ class _RuleGrid extends StatelessWidget {
         _NumberRuleTile(
           label: 'Players/team',
           value: rules.playersPerTeam,
-          onChanged: (value) => onChanged(rules.copyWith(playersPerTeam: value)),
+          onChanged: (value) =>
+              onChanged(rules.copyWith(playersPerTeam: value)),
         ),
         _NumberRuleTile(
           label: 'Overs',
           value: rules.oversPerInnings,
-          onChanged: (value) => onChanged(rules.copyWith(oversPerInnings: value)),
+          onChanged: (value) =>
+              onChanged(rules.copyWith(oversPerInnings: value)),
         ),
         _NumberRuleTile(
           label: 'Wickets',
           value: rules.wicketsPerInnings,
-          onChanged: (value) => onChanged(rules.copyWith(wicketsPerInnings: value)),
+          onChanged: (value) =>
+              onChanged(rules.copyWith(wicketsPerInnings: value)),
         ),
         _NumberRuleTile(
           label: 'Balls/over',
@@ -1987,7 +2002,8 @@ class _RuleGrid extends StatelessWidget {
         _NumberRuleTile(
           label: 'Matches/team',
           value: rules.matchesPerTeam,
-          onChanged: (value) => onChanged(rules.copyWith(matchesPerTeam: value)),
+          onChanged: (value) =>
+              onChanged(rules.copyWith(matchesPerTeam: value)),
         ),
         _NumberRuleTile(
           label: 'Vs each team',
@@ -2003,7 +2019,8 @@ class _RuleGrid extends StatelessWidget {
         _NumberRuleTile(
           label: 'Qualifiers',
           value: rules.qualifierCount,
-          onChanged: (value) => onChanged(rules.copyWith(qualifierCount: value)),
+          onChanged: (value) =>
+              onChanged(rules.copyWith(qualifierCount: value)),
         ),
       ],
     );
@@ -2036,7 +2053,10 @@ class _NumberRuleTile extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           IconButton(
@@ -2069,17 +2089,20 @@ class _RuleSwitches extends StatelessWidget {
         _SwitchTile(
           label: 'Net run rate',
           value: rules.enableNetRunRate,
-          onChanged: (value) => onChanged(rules.copyWith(enableNetRunRate: value)),
+          onChanged: (value) =>
+              onChanged(rules.copyWith(enableNetRunRate: value)),
         ),
         _SwitchTile(
           label: 'Bonus point',
           value: rules.enableBonusPoint,
-          onChanged: (value) => onChanged(rules.copyWith(enableBonusPoint: value)),
+          onChanged: (value) =>
+              onChanged(rules.copyWith(enableBonusPoint: value)),
         ),
         _SwitchTile(
           label: 'Super over',
           value: rules.enableSuperOver,
-          onChanged: (value) => onChanged(rules.copyWith(enableSuperOver: value)),
+          onChanged: (value) =>
+              onChanged(rules.copyWith(enableSuperOver: value)),
         ),
         _SwitchTile(
           label: 'Last man stands',
@@ -2142,7 +2165,10 @@ class _PointsRowCard extends StatelessWidget {
             backgroundColor: rank <= 4 ? RoomColors.gold : RoomColors.plum,
             child: Text(
               '$rank',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           const SizedBox(width: 10),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../../data/live_room_membership_service.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
@@ -51,22 +52,19 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
   late List<SeatUser> _localAvailableAdminUsers;
   _RoomInfoTab _selectedTab = _RoomInfoTab.roomInfo;
 
-  List<SeatUser> get _allKnownUsers => _dedupeUsers(<SeatUser>[
-        ..._localAdmins,
-        ..._localAvailableAdminUsers,
-      ]);
+  List<SeatUser> get _allKnownUsers =>
+      _dedupeUsers(<SeatUser>[..._localAdmins, ..._localAvailableAdminUsers]);
 
   List<SeatUser> get _admins => _dedupeUsers(
-        _allKnownUsers.where((user) => user.isHost || user.isRoomAdmin),
-      );
+    _allKnownUsers.where((user) => user.isHost || user.isRoomAdmin),
+  );
 
   List<SeatUser> get _availableAdminUsers => _dedupeUsers(
-        _allKnownUsers.where((user) => !user.isHost && !user.isRoomAdmin),
-      );
+    _allKnownUsers.where((user) => !user.isHost && !user.isRoomAdmin),
+  );
 
-  List<SeatUser> get _members => _dedupeUsers(
-        _allKnownUsers.where(_isApprovedRoomMember),
-      );
+  List<SeatUser> get _members =>
+      _dedupeUsers(_allKnownUsers.where(_isApprovedRoomMember));
 
   bool _isApprovedRoomMember(SeatUser user) {
     if (user.id.trim().isEmpty || user.isHost) return false;
@@ -264,6 +262,7 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (sheetContext) => Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.62,

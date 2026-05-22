@@ -2,12 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../../data/cricket_stumps_flow_repository.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../widgets/cricket_room_backgrounds.dart';
 import '../widgets/room_theme.dart';
 import 'cricket_room_mode_signal.dart';
-
 
 class CricketStumpsFlowModule {
   CricketStumpsFlowModule._();
@@ -25,6 +25,7 @@ class CricketStumpsFlowModule {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => _QuickCricketFlowSheet(
         roomId: roomId,
         roomName: roomName,
@@ -49,17 +50,14 @@ class StumpsTeam {
   final List<StumpsPlayer> players;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'players': players.map((player) => player.toJson()).toList(),
-      };
+    'id': id,
+    'name': name,
+    'players': players.map((player) => player.toJson()).toList(),
+  };
 }
 
 class StumpsPlayer {
-  const StumpsPlayer({
-    required this.id,
-    required this.name,
-  });
+  const StumpsPlayer({required this.id, required this.name});
 
   final String id;
   final String name;
@@ -125,8 +123,10 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
   int _playersPerTeamValue = 5;
   final _overs = TextEditingController(text: '5');
   int _wicketsValueState = 4;
-  final List<TextEditingController> _teamAPlayerControllers = <TextEditingController>[];
-  final List<TextEditingController> _teamBPlayerControllers = <TextEditingController>[];
+  final List<TextEditingController> _teamAPlayerControllers =
+      <TextEditingController>[];
+  final List<TextEditingController> _teamBPlayerControllers =
+      <TextEditingController>[];
 
   int get _playerTarget => _playersPerTeamValue;
 
@@ -200,17 +200,16 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
   }
 
   String get _title => switch (_step) {
-        _FlowStep.quick => 'Quick Cricket Match',
-        _FlowStep.toss => 'Toss',
-        _FlowStep.lineups => 'Opening Lineup',
-      };
+    _FlowStep.quick => 'Quick Cricket Match',
+    _FlowStep.toss => 'Toss',
+    _FlowStep.lineups => 'Opening Lineup',
+  };
 
   String get _subtitle => switch (_step) {
-        _FlowStep.quick => '',
-        _FlowStep.toss => 'Choose toss winner and bat/ball decision.',
-        _FlowStep.lineups =>
-          'Pick two opening batsmen and one opening bowler.',
-      };
+    _FlowStep.quick => '',
+    _FlowStep.toss => 'Choose toss winner and bat/ball decision.',
+    _FlowStep.lineups => 'Pick two opening batsmen and one opening bowler.',
+  };
 
   Widget _body() {
     return switch (_step) {
@@ -329,10 +328,9 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
         ),
         const Spacer(),
         FilledButton.icon(
-          onPressed:
-              _tossWinner == null || _decision == null || _saving
-                  ? null
-                  : _confirmToss,
+          onPressed: _tossWinner == null || _decision == null || _saving
+              ? null
+              : _confirmToss,
           icon: const Icon(Icons.check_circle_rounded),
           label: Text(_saving ? 'Saving toss...' : 'Confirm Toss'),
         ),
@@ -347,7 +345,9 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     }
 
     final batting = _battingTeam(fixture);
-    final bowling = batting.id == fixture.teamA.id ? fixture.teamB : fixture.teamA;
+    final bowling = batting.id == fixture.teamA.id
+        ? fixture.teamB
+        : fixture.teamA;
 
     return ListView(
       physics: const BouncingScrollPhysics(),
@@ -376,7 +376,8 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
           onSelected: (player) => setState(() => _bowler = player),
         ),
         FilledButton.icon(
-          onPressed: _striker == null ||
+          onPressed:
+              _striker == null ||
                   _nonStriker == null ||
                   _bowler == null ||
                   _saving
@@ -390,10 +391,12 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
   }
 
   void _makeQuickFixture() {
-    final teamAName =
-        _quickA.text.trim().isEmpty ? 'Team A' : _quickA.text.trim();
-    final teamBName =
-        _quickB.text.trim().isEmpty ? 'Team B' : _quickB.text.trim();
+    final teamAName = _quickA.text.trim().isEmpty
+        ? 'Team A'
+        : _quickA.text.trim();
+    final teamBName = _quickB.text.trim().isEmpty
+        ? 'Team B'
+        : _quickB.text.trim();
 
     setState(() {
       _selectedFixture = StumpsFixture(
@@ -444,10 +447,8 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
       name: team.name,
       players: team.players
           .map(
-            (player) => CricketQuickMatchPlayerSetup(
-              id: player.id,
-              name: player.name,
-            ),
+            (player) =>
+                CricketQuickMatchPlayerSetup(id: player.id, name: player.name),
           )
           .toList(),
     );
@@ -525,7 +526,9 @@ class _QuickCricketFlowSheetState extends State<_QuickCricketFlowSheet> {
     }
 
     final batting = _battingTeam(fixture);
-    final bowling = batting.id == fixture.teamA.id ? fixture.teamB : fixture.teamA;
+    final bowling = batting.id == fixture.teamA.id
+        ? fixture.teamB
+        : fixture.teamA;
 
     setState(() => _saving = true);
     try {
@@ -600,17 +603,23 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: const TextStyle(
-                      color: RoomColors.plum,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w900)),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: RoomColors.plum,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               if (subtitle.trim().isNotEmpty)
-                Text(subtitle,
-                    style: const TextStyle(
-                        color: Color(0xFF7B7088),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800)),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF7B7088),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
             ],
           ),
         ),
@@ -625,9 +634,13 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(text,
-        style: const TextStyle(
-            color: RoomColors.plum, fontWeight: FontWeight.w900));
+    return Text(
+      text,
+      style: const TextStyle(
+        color: RoomColors.plum,
+        fontWeight: FontWeight.w900,
+      ),
+    );
   }
 }
 
@@ -644,19 +657,19 @@ class _Pill extends StatelessWidget {
         color: const Color(0xFFE8FFF0),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(text,
-          style: const TextStyle(
-              color: Color(0xFF0E8F54), fontWeight: FontWeight.w900)),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF0E8F54),
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
 
-
 class _PlayerNameList extends StatelessWidget {
-  const _PlayerNameList({
-    required this.title,
-    required this.controllers,
-  });
+  const _PlayerNameList({required this.title, required this.controllers});
 
   final String title;
   final List<TextEditingController> controllers;
@@ -722,7 +735,6 @@ class _PlayerNameList extends StatelessWidget {
   }
 }
 
-
 class _NumberDropdown extends StatelessWidget {
   const _NumberDropdown({
     required this.label,
@@ -753,16 +765,10 @@ class _NumberDropdown extends StatelessWidget {
             borderSide: BorderSide.none,
           ),
         ),
-        items: List<DropdownMenuItem<int>>.generate(
-          max,
-          (index) {
-            final number = index + 1;
-            return DropdownMenuItem<int>(
-              value: number,
-              child: Text('$number'),
-            );
-          },
-        ),
+        items: List<DropdownMenuItem<int>>.generate(max, (index) {
+          final number = index + 1;
+          return DropdownMenuItem<int>(value: number, child: Text('$number'));
+        }),
         onChanged: (selected) {
           if (selected != null) onChanged(selected);
         },
@@ -821,7 +827,10 @@ class _MatchCard extends StatelessWidget {
       child: Text(
         '${fixture.teamA.name} vs ${fixture.teamB.name}',
         style: const TextStyle(
-            color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -849,10 +858,13 @@ class _Choice extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
           child: Center(
-            child: Text(label,
-                style: TextStyle(
-                    color: selected ? Colors.white : RoomColors.plum,
-                    fontWeight: FontWeight.w900)),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : RoomColors.plum,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
         ),
       ),
@@ -884,11 +896,13 @@ class _Picker extends StatelessWidget {
           spacing: 7,
           runSpacing: 7,
           children: players
-              .map((player) => ChoiceChip(
-                    selected: selected?.id == player.id,
-                    label: Text(player.name),
-                    onSelected: (_) => onSelected(player),
-                  ))
+              .map(
+                (player) => ChoiceChip(
+                  selected: selected?.id == player.id,
+                  label: Text(player.name),
+                  onSelected: (_) => onSelected(player),
+                ),
+              )
               .toList(),
         ),
         const SizedBox(height: 12),

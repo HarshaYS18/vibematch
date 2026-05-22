@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../../data/room_music_controller.dart';
 import '../controllers/live_room_profile_navigator.dart';
 import '../live_room_models.dart';
@@ -66,7 +67,9 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => LiveRoomBlockedListSheet(roomId: roomId),
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+      builder: (_) =>
+          VmFadeSlide(child: LiveRoomBlockedListSheet(roomId: roomId)),
     );
   }
 
@@ -99,14 +102,16 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onReportsTap: () => LiveRoomProfileNavigator.openModulePage(
         context: context,
         title: 'Reports',
-        subtitle: 'Room safety, reports, and moderation queue will connect here.',
+        subtitle:
+            'Room safety, reports, and moderation queue will connect here.',
         icon: Icons.report_gmailerrorred_rounded,
       ),
       onBlockedTap: () => _openBlockedList(context),
       onEffectsTap: () => LiveRoomProfileNavigator.openModulePage(
         context: context,
         title: 'Room effects',
-        subtitle: 'Room entrance effects, seat effects, and background effects will connect here.',
+        subtitle:
+            'Room entrance effects, seat effects, and background effects will connect here.',
         icon: Icons.auto_awesome_rounded,
       ),
       onMusicTap: () => _openMusicModule(context),

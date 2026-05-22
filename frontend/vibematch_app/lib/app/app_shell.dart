@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/icons/vm_icons.dart';
 import '../core/permissions/vm_android_permission_service.dart';
 import '../core/session/vm_session_cleanup_service.dart';
+import '../core/ui/vm_motion.dart';
 import '../core/ui/vm_toast.dart';
 import '../features/auth/data/auth_api_service.dart';
 import '../features/auth/models/current_user.dart';
@@ -24,7 +25,12 @@ import '../features/wallet/data/wallet_realtime_sync_service.dart';
 import 'app_routes.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.currentUser, required this.onLogoutPressed, required this.onRefreshPressed});
+  const AppShell({
+    super.key,
+    required this.currentUser,
+    required this.onLogoutPressed,
+    required this.onRefreshPressed,
+  });
 
   final CurrentUser currentUser;
   final Future<void> Function() onLogoutPressed;
@@ -41,7 +47,8 @@ class _AppShellState extends State<AppShell> {
   StreamSubscription<CurrentUser>? _userSyncSubscription;
   StreamSubscription<void>? _signedOutSubscription;
   final PresenceApiService _presenceApi = const PresenceApiService();
-  final VmAndroidPermissionService _permissionService = const VmAndroidPermissionService();
+  final VmAndroidPermissionService _permissionService =
+      const VmAndroidPermissionService();
   Timer? _presenceHeartbeatTimer;
   int _homeRefreshNonce = 0;
   int _backPressCount = 0;
@@ -66,19 +73,26 @@ class _AppShellState extends State<AppShell> {
     _syncedUser = widget.currentUser;
     _syncVibesPlaybackWithActiveTab();
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(_syncedUser);
-    _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(_onUserSynced);
-    _signedOutSubscription = AuthUserRealtimeService.instance.signedOut.listen((_) => _handleSignedOut());
+    _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(
+      _onUserSynced,
+    );
+    _signedOutSubscription = AuthUserRealtimeService.instance.signedOut.listen(
+      (_) => _handleSignedOut(),
+    );
     _startPresenceHeartbeat();
     _inboxController.addListener(_handleGlobalInboxChanged);
     unawaited(_startGlobalInboxRealtime());
     unawaited(WalletRealtimeSyncService.instance.start());
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_permissionService.requestAppLaunchPermissions()));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_permissionService.requestAppLaunchPermissions()),
+    );
   }
 
   @override
   void didUpdateWidget(covariant AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentUser != widget.currentUser) _onUserSynced(widget.currentUser);
+    if (oldWidget.currentUser != widget.currentUser)
+      _onUserSynced(widget.currentUser);
   }
 
   @override
@@ -114,7 +128,10 @@ class _AppShellState extends State<AppShell> {
     return null;
   }
 
-  String _globalInboxMessageKey(InboxConversation conversation, InboxMessage message) => '${conversation.id}:${message.id ?? message.text}:${message.time}';
+  String _globalInboxMessageKey(
+    InboxConversation conversation,
+    InboxMessage message,
+  ) => '${conversation.id}:${message.id ?? message.text}:${message.time}';
 
   void _handleGlobalInboxChanged() {
     if (!_inboxRealtimeReady || !mounted) return;
@@ -176,13 +193,19 @@ class _AppShellState extends State<AppShell> {
   void _syncVibesPlaybackWithActiveTab() {
     final isVibesTabActive = _selectedTab == VmMainTab.vibes;
     VibeMediaPlaybackGate.setTabPaused(!isVibesTabActive);
-    if (isVibesTabActive) WidgetsBinding.instance.addPostFrameCallback((_) => VibeMediaPlaybackGate.notifyFeedScrolled());
+    if (isVibesTabActive)
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => VibeMediaPlaybackGate.notifyFeedScrolled(),
+      );
   }
 
   void _startPresenceHeartbeat() {
     _presenceHeartbeatTimer?.cancel();
     unawaited(_sendPresenceHeartbeat());
-    _presenceHeartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(_sendPresenceHeartbeat()));
+    _presenceHeartbeatTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_sendPresenceHeartbeat()),
+    );
   }
 
   Future<void> _sendPresenceHeartbeat() async {
@@ -190,7 +213,10 @@ class _AppShellState extends State<AppShell> {
       await _presenceApi.heartbeat();
     } catch (error) {
       final message = error.toString().toLowerCase();
-      final sessionInvalid = message.contains('session replaced') || message.contains('invalid or expired token') || message.contains('please login again');
+      final sessionInvalid =
+          message.contains('session replaced') ||
+          message.contains('invalid or expired token') ||
+          message.contains('please login again');
       if (!sessionInvalid || _sessionLogoutInFlight) return;
       _sessionLogoutInFlight = true;
       await widget.onLogoutPressed();
@@ -199,7 +225,9 @@ class _AppShellState extends State<AppShell> {
 
   void _handleSignedOut() {
     _presenceHeartbeatTimer?.cancel();
-    VmSessionCleanupService.clearUserScopedStateUnawaited(reason: 'app shell signed out');
+    VmSessionCleanupService.clearUserScopedStateUnawaited(
+      reason: 'app shell signed out',
+    );
   }
 
   void _onUserSynced(CurrentUser user) {
@@ -218,16 +246,29 @@ class _AppShellState extends State<AppShell> {
     final activeUser = _activeUser;
     switch (tab) {
       case VmMainTab.home:
-        return HomePage(key: ValueKey('home_$_homeRefreshNonce'), user: activeUser, currentUser: activeUser);
+        return HomePage(
+          key: ValueKey('home_$_homeRefreshNonce'),
+          user: activeUser,
+          currentUser: activeUser,
+        );
       case VmMainTab.vibes:
         return const VibesPage();
       case VmMainTab.inbox:
-        return InboxPage(controller: _inboxController, openConversationId: _pendingInboxOpenConversationId, openConversationRequestNonce: _pendingInboxOpenRequestNonce, onActiveConversationChanged: (conversationId) {
-          _activeInboxConversationId = conversationId;
-          if (mounted) setState(() {});
-        });
+        return InboxPage(
+          controller: _inboxController,
+          openConversationId: _pendingInboxOpenConversationId,
+          openConversationRequestNonce: _pendingInboxOpenRequestNonce,
+          onActiveConversationChanged: (conversationId) {
+            _activeInboxConversationId = conversationId;
+            if (mounted) setState(() {});
+          },
+        );
       case VmMainTab.me:
-        return MePage(user: activeUser, onLogoutPressed: widget.onLogoutPressed, onRefreshPressed: _refreshAndSyncUser);
+        return MePage(
+          user: activeUser,
+          onLogoutPressed: widget.onLogoutPressed,
+          onRefreshPressed: _refreshAndSyncUser,
+        );
     }
   }
 
@@ -249,9 +290,17 @@ class _AppShellState extends State<AppShell> {
     }
     _backPressCount += 1;
     _backPressResetTimer?.cancel();
-    _backPressResetTimer = Timer(const Duration(seconds: 2), () => _backPressCount = 0);
+    _backPressResetTimer = Timer(
+      const Duration(seconds: 2),
+      () => _backPressCount = 0,
+    );
     final remaining = (3 - _backPressCount).clamp(1, 3);
-    VmToast.show(context, 'Press back $remaining more time${remaining == 1 ? '' : 's'} to exit', icon: Icons.touch_app_rounded, duration: const Duration(milliseconds: 1300));
+    VmToast.show(
+      context,
+      'Press back $remaining more time${remaining == 1 ? '' : 's'} to exit',
+      icon: Icons.touch_app_rounded,
+      duration: const Duration(milliseconds: 1300),
+    );
   }
 
   @override
@@ -261,12 +310,29 @@ class _AppShellState extends State<AppShell> {
       onPopInvokedWithResult: _handleAppBack,
       child: Scaffold(
         backgroundColor: const Color(0xFFFAF7F1),
-        body: Stack(children: [
-          _AnimatedTabStage(selectedTab: _selectedTab, previousTab: _previousTab, child: _pageFor(_selectedTab)),
-          const _LiveRoomMiniBubbleLayer(),
-          if (_globalForegroundConversation != null && _globalForegroundMessage != null)
-            Positioned(left: 0, right: 0, top: 0, child: InboxForegroundNotificationBanner(conversation: _globalForegroundConversation!, message: _globalForegroundMessage!, onTap: _openGlobalForegroundNotification, onClose: _dismissGlobalForegroundNotification)),
-        ]),
+        body: Stack(
+          children: [
+            _AnimatedTabStage(
+              selectedTab: _selectedTab,
+              previousTab: _previousTab,
+              child: _pageFor(_selectedTab),
+            ),
+            const _LiveRoomMiniBubbleLayer(),
+            if (_globalForegroundConversation != null &&
+                _globalForegroundMessage != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: InboxForegroundNotificationBanner(
+                  conversation: _globalForegroundConversation!,
+                  message: _globalForegroundMessage!,
+                  onTap: _openGlobalForegroundNotification,
+                  onClose: _dismissGlobalForegroundNotification,
+                ),
+              ),
+          ],
+        ),
         bottomNavigationBar: _VibeBottomNav(
           selectedTab: _selectedTab,
           showOwnerControls: _showOwnerControls,
@@ -279,7 +345,11 @@ class _AppShellState extends State<AppShell> {
 }
 
 class _AnimatedTabStage extends StatelessWidget {
-  const _AnimatedTabStage({required this.selectedTab, required this.previousTab, required this.child});
+  const _AnimatedTabStage({
+    required this.selectedTab,
+    required this.previousTab,
+    required this.child,
+  });
   final VmMainTab selectedTab;
   final VmMainTab previousTab;
   final Widget child;
@@ -288,16 +358,14 @@ class _AnimatedTabStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final direction = selectedTab.tabIndex >= previousTab.tabIndex ? 1.0 : -1.0;
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 260),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      transitionBuilder: (child, animation) {
-        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(position: Tween<Offset>(begin: Offset(0.025 * direction, 0.006), end: Offset.zero).animate(curved), child: child),
-        );
-      },
+      duration: VmMotion.tabDuration,
+      switchInCurve: VmMotion.enterCurve,
+      switchOutCurve: VmMotion.exitCurve,
+      transitionBuilder: (child, animation) => VmMotion.tabTransition(
+        child: child,
+        animation: animation,
+        direction: direction,
+      ),
       child: KeyedSubtree(key: ValueKey(selectedTab), child: child),
     );
   }
@@ -306,16 +374,29 @@ class _AnimatedTabStage extends StatelessWidget {
 class _LiveRoomMiniBubbleLayer extends StatefulWidget {
   const _LiveRoomMiniBubbleLayer();
   @override
-  State<_LiveRoomMiniBubbleLayer> createState() => _LiveRoomMiniBubbleLayerState();
+  State<_LiveRoomMiniBubbleLayer> createState() =>
+      _LiveRoomMiniBubbleLayerState();
 }
 
 class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
-  final LiveRoomMinimizedOverlayService _service = LiveRoomMinimizedOverlayService.instance;
+  final LiveRoomMinimizedOverlayService _service =
+      LiveRoomMinimizedOverlayService.instance;
   @override
-  void initState() { super.initState(); _service.addListener(_onServiceChanged); }
+  void initState() {
+    super.initState();
+    _service.addListener(_onServiceChanged);
+  }
+
   @override
-  void dispose() { _service.removeListener(_onServiceChanged); super.dispose(); }
-  void _onServiceChanged() { if (mounted) setState(() {}); }
+  void dispose() {
+    _service.removeListener(_onServiceChanged);
+    super.dispose();
+  }
+
+  void _onServiceChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_service.isShowing) return const SizedBox.shrink();
@@ -323,15 +404,27 @@ class _LiveRoomMiniBubbleLayerState extends State<_LiveRoomMiniBubbleLayer> {
     final bottomSafeArea = MediaQuery.paddingOf(context).bottom;
     final maxX = size.width - 78;
     final maxY = size.height - bottomSafeArea - 88;
-    return LiveRoomMinimizedBubble(offset: _service.offset, onRestore: _service.restore, onDrag: (details) {
-      final nextOffset = Offset((_service.offset.dx + details.delta.dx).clamp(8.0, maxX), (_service.offset.dy + details.delta.dy).clamp(40.0, maxY));
-      _service.updateOffset(nextOffset);
-    });
+    return LiveRoomMinimizedBubble(
+      offset: _service.offset,
+      onRestore: _service.restore,
+      onDrag: (details) {
+        final nextOffset = Offset(
+          (_service.offset.dx + details.delta.dx).clamp(8.0, maxX),
+          (_service.offset.dy + details.delta.dy).clamp(40.0, maxY),
+        );
+        _service.updateOffset(nextOffset);
+      },
+    );
   }
 }
 
 class _VibeBottomNav extends StatelessWidget {
-  const _VibeBottomNav({required this.selectedTab, required this.showOwnerControls, required this.inboxUnreadCount, required this.onTabSelected});
+  const _VibeBottomNav({
+    required this.selectedTab,
+    required this.showOwnerControls,
+    required this.inboxUnreadCount,
+    required this.onTabSelected,
+  });
   final VmMainTab selectedTab;
   final bool showOwnerControls;
   final int inboxUnreadCount;
@@ -346,20 +439,61 @@ class _VibeBottomNav extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 2, 12, 7),
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.98), borderRadius: BorderRadius.circular(22), border: Border.all(color: softBorder), boxShadow: [BoxShadow(color: deepPlum.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 7))]),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-          _NavItem(icon: VMIcons.home, label: VmMainTab.home.label, active: selectedTab == VmMainTab.home, onTap: () => onTabSelected(VmMainTab.home)),
-          _NavItem(icon: VMIcons.vibes, label: VmMainTab.vibes.label, active: selectedTab == VmMainTab.vibes, onTap: () => onTabSelected(VmMainTab.vibes)),
-          _NavItem(icon: VMIcons.inbox, label: VmMainTab.inbox.label, active: selectedTab == VmMainTab.inbox, badgeCount: inboxUnreadCount, onTap: () => onTabSelected(VmMainTab.inbox)),
-          _NavItem(icon: showOwnerControls ? VMIcons.admin : VMIcons.profile, label: VmMainTab.me.label, active: selectedTab == VmMainTab.me, onTap: () => onTabSelected(VmMainTab.me)),
-        ]),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.98),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: softBorder),
+          boxShadow: [
+            BoxShadow(
+              color: deepPlum.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NavItem(
+              icon: VMIcons.home,
+              label: VmMainTab.home.label,
+              active: selectedTab == VmMainTab.home,
+              onTap: () => onTabSelected(VmMainTab.home),
+            ),
+            _NavItem(
+              icon: VMIcons.vibes,
+              label: VmMainTab.vibes.label,
+              active: selectedTab == VmMainTab.vibes,
+              onTap: () => onTabSelected(VmMainTab.vibes),
+            ),
+            _NavItem(
+              icon: VMIcons.inbox,
+              label: VmMainTab.inbox.label,
+              active: selectedTab == VmMainTab.inbox,
+              badgeCount: inboxUnreadCount,
+              onTap: () => onTabSelected(VmMainTab.inbox),
+            ),
+            _NavItem(
+              icon: showOwnerControls ? VMIcons.admin : VMIcons.profile,
+              label: VmMainTab.me.label,
+              active: selectedTab == VmMainTab.me,
+              onTap: () => onTabSelected(VmMainTab.me),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap, this.badgeCount = 0});
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
   final IconData icon;
   final String label;
   final bool active;
@@ -378,31 +512,80 @@ class _NavItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(15),
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: VmMotion.actionDuration,
+        curve: VmMotion.standardCurve,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: active ? aqua.withValues(alpha: 0.10) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              AnimatedScale(scale: active ? 1.05 : 1.0, duration: const Duration(milliseconds: 160), child: Icon(icon, size: active ? 18 : 17, color: active ? deepPlum : muted)),
-              if (showBadge)
-                Positioned(
-                  right: -9,
-                  top: -7,
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: BoxDecoration(color: coral, borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white, width: 1.2), boxShadow: [BoxShadow(color: coral.withValues(alpha: 0.28), blurRadius: 8, offset: const Offset(0, 3))]),
-                    alignment: Alignment.center,
-                    child: Text(badgeText, style: const TextStyle(color: Colors.white, fontSize: 8, height: 1, fontWeight: FontWeight.w800)),
+        decoration: BoxDecoration(
+          color: active ? aqua.withValues(alpha: 0.10) : Colors.transparent,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedScale(
+                  scale: active ? 1.05 : 1.0,
+                  duration: VmMotion.actionDuration,
+                  curve: VmMotion.standardCurve,
+                  child: Icon(
+                    icon,
+                    size: active ? 18 : 17,
+                    color: active ? deepPlum : muted,
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 1),
-          Text(label, style: TextStyle(fontSize: 8.4, height: 0.98, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? deepPlum : muted)),
-        ]),
+                if (showBadge)
+                  Positioned(
+                    right: -9,
+                    top: -7,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 15,
+                        minHeight: 15,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: coral,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.white, width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: coral.withValues(alpha: 0.28),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        badgeText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 8.4,
+                height: 0.98,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active ? deepPlum : muted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/app_routes.dart';
+import '../../../../core/ui/vm_motion.dart';
 import '../../../experience/presentation/experience_detail_page.dart';
 import '../../../inbox/data/inbox_api_service.dart';
 import '../../../inbox/presentation/inbox_page_modular.dart';
@@ -40,123 +41,155 @@ class LiveRoomMiniProfileLauncher {
     required ValueChanged<String> onAdminMuteToggle,
     required ValueChanged<String> onGiftTap,
   }) {
-    final effectiveCurrentUser = LiveRoomMediaSignalingService.instance.effectiveCurrentUser(currentUser);
+    final effectiveCurrentUser = LiveRoomMediaSignalingService.instance
+        .effectiveCurrentUser(currentUser);
     final viewerPower = _roomPower(effectiveCurrentUser);
     final targetPower = _roomPower(user);
-    final canModerateTarget = user.id != effectiveCurrentUser.id && targetPower < 100 && ((viewerPower >= 100 && targetPower < 100) || (viewerPower >= 90 && targetPower < 90));
+    final canModerateTarget =
+        user.id != effectiveCurrentUser.id &&
+        targetPower < 100 &&
+        ((viewerPower >= 100 && targetPower < 100) ||
+            (viewerPower >= 90 && targetPower < 90));
     final canShowKickOut = canModerateTarget;
-    final initialRelation = _relationFromUserIds(currentUserId: effectiveCurrentUser.id, targetUserId: user.id);
+    final initialRelation = _relationFromUserIds(
+      currentUserId: effectiveCurrentUser.id,
+      targetUserId: user.id,
+    );
 
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => LiveRoomMiniProfileSheet(
-        user: user,
-        currentUser: effectiveCurrentUser,
-        canModerate: canModerateTarget,
-        initialRelation: initialRelation,
-        onAvatarTap: () {
-          Navigator.pop(context);
-          LiveRoomProfileNavigator.openExistingPublicProfile(
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+      builder: (_) => VmFadeSlide(
+        child: LiveRoomMiniProfileSheet(
+          user: user,
+          currentUser: effectiveCurrentUser,
+          canModerate: canModerateTarget,
+          initialRelation: initialRelation,
+          onAvatarTap: () {
+            Navigator.pop(context);
+            LiveRoomProfileNavigator.openExistingPublicProfile(
+              context: context,
+              user: user,
+              privacyMode: privacyMode,
+              roomName: roomName,
+            );
+          },
+          onVipTap: () => LiveRoomProfileNavigator.openVipCentrePage(
             context: context,
             user: user,
-            privacyMode: privacyMode,
-            roomName: roomName,
-          );
-        },
-        onVipTap: () => LiveRoomProfileNavigator.openVipCentrePage(
-          context: context,
-          user: user,
-        ),
-        onSvipTap: () => LiveRoomProfileNavigator.openSvipCentrePage(
-          context: context,
-          user: user,
-        ),
-        onSendingLevelTap: () => _openExperienceDetailPage(
-          context: context,
-          user: user,
-          kind: ExperienceDetailKind.sent,
-          title: 'Sent Lv',
-        ),
-        onReceivingLevelTap: () => _openExperienceDetailPage(
-          context: context,
-          user: user,
-          kind: ExperienceDetailKind.received,
-          title: 'Received Lv',
-        ),
-        onSentRankingTap: () => _openGlobalRankingsSheet(
-          context: context,
-          type: GlobalRankingType.sent,
-        ),
-        onReceivedRankingTap: () => _openGlobalRankingsSheet(
-          context: context,
-          type: GlobalRankingType.received,
-        ),
-        onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
-          context: context,
-          user: user,
-        ),
-        onRelationshipTap: () => LiveRoomProfileNavigator.openLoveAndBondCentre(
-          context: context,
-          user: user,
-        ),
-        onMedalsTap: () => LiveRoomProfileNavigator.openMedalsPage(
-          context: context,
-          user: user,
-        ),
-        onMentionTap: () => onMentionTap(user),
-        onSetAdminTap: () => onSetAdminTap(user.id),
-        onRemoveAdminTap: () {
-          if (onRemoveAdminTap != null) {
-            onRemoveAdminTap(user.id);
-          } else {
-            Navigator.pop(context);
-          }
-        },
-        onReportTap: () {
-          if (onReportTap != null) {
-            onReportTap(user);
-          } else {
-            _openReportSheet(context: context, user: user);
-          }
-        },
-        onLeaveAndLock: () => onLeaveAndLock(seatIndex),
-        onLeaveSeatOnly: () => onLeaveSeatOnly(seatIndex),
-        onSelfMuteToggle: () => onSelfMuteToggle(user.id),
-        onAdminMuteToggle: () => onAdminMuteToggle(user.id),
-        onGiftTap: () => onGiftTap(user.id),
-        onSocialRelationTap: () => _toggleFollowFromMiniProfile(context: context, user: user),
-        onMessageTap: () => _openMessageInfo(context: context, user: user),
-        onKickOutTap: canShowKickOut && onKickOutDurationSelected != null
-            ? () => _openKickOutDurationSheet(
+          ),
+          onSvipTap: () => LiveRoomProfileNavigator.openSvipCentrePage(
+            context: context,
+            user: user,
+          ),
+          onSendingLevelTap: () => _openExperienceDetailPage(
+            context: context,
+            user: user,
+            kind: ExperienceDetailKind.sent,
+            title: 'Sent Lv',
+          ),
+          onReceivingLevelTap: () => _openExperienceDetailPage(
+            context: context,
+            user: user,
+            kind: ExperienceDetailKind.received,
+            title: 'Received Lv',
+          ),
+          onSentRankingTap: () => _openGlobalRankingsSheet(
+            context: context,
+            type: GlobalRankingType.sent,
+          ),
+          onReceivedRankingTap: () => _openGlobalRankingsSheet(
+            context: context,
+            type: GlobalRankingType.received,
+          ),
+          onFamilyTap: () => LiveRoomProfileNavigator.openFamilyPage(
+            context: context,
+            user: user,
+          ),
+          onRelationshipTap: () =>
+              LiveRoomProfileNavigator.openLoveAndBondCentre(
+                context: context,
+                user: user,
+              ),
+          onMedalsTap: () => LiveRoomProfileNavigator.openMedalsPage(
+            context: context,
+            user: user,
+          ),
+          onMentionTap: () => onMentionTap(user),
+          onSetAdminTap: () => onSetAdminTap(user.id),
+          onRemoveAdminTap: () {
+            if (onRemoveAdminTap != null) {
+              onRemoveAdminTap(user.id);
+            } else {
+              Navigator.pop(context);
+            }
+          },
+          onReportTap: () {
+            if (onReportTap != null) {
+              onReportTap(user);
+            } else {
+              _openReportSheet(context: context, user: user);
+            }
+          },
+          onLeaveAndLock: () => onLeaveAndLock(seatIndex),
+          onLeaveSeatOnly: () => onLeaveSeatOnly(seatIndex),
+          onSelfMuteToggle: () => onSelfMuteToggle(user.id),
+          onAdminMuteToggle: () => onAdminMuteToggle(user.id),
+          onGiftTap: () => onGiftTap(user.id),
+          onSocialRelationTap: () =>
+              _toggleFollowFromMiniProfile(context: context, user: user),
+          onMessageTap: () => _openMessageInfo(context: context, user: user),
+          onKickOutTap: canShowKickOut && onKickOutDurationSelected != null
+              ? () => _openKickOutDurationSheet(
                   context: context,
                   user: user,
                   onDurationSelected: onKickOutDurationSelected,
                 )
-            : null,
+              : null,
+        ),
       ),
     );
   }
 
-  static MiniProfileSocialRelation _relationFromUserIds({required String currentUserId, required String targetUserId}) {
-    if (currentUserId == targetUserId) return MiniProfileSocialRelation.following;
+  static MiniProfileSocialRelation _relationFromUserIds({
+    required String currentUserId,
+    required String targetUserId,
+  }) {
+    if (currentUserId == targetUserId)
+      return MiniProfileSocialRelation.following;
     return MiniProfileSocialRelation.follow;
   }
 
-  static Future<MiniProfileSocialRelation> _toggleFollowFromMiniProfile({required BuildContext context, required SeatUser user}) async {
+  static Future<MiniProfileSocialRelation> _toggleFollowFromMiniProfile({
+    required BuildContext context,
+    required SeatUser user,
+  }) async {
     final publicUserId = publicUserIdFromRoomUserId(user.id);
     if (publicUserId == null) {
-      _showMiniToast(context, 'This user does not have a valid public user ID yet.');
+      _showMiniToast(
+        context,
+        'This user does not have a valid public user ID yet.',
+      );
       return MiniProfileSocialRelation.follow;
     }
 
     try {
       final service = const SocialApiService();
       final current = await service.getFollowStatusByPublicUserId(publicUserId);
-      final next = current.isFollowing ? await service.unfollowByPublicUserId(publicUserId) : await service.followByPublicUserId(publicUserId);
+      final next = current.isFollowing
+          ? await service.unfollowByPublicUserId(publicUserId)
+          : await service.followByPublicUserId(publicUserId);
       final relation = _relationFromFollowStatus(next);
-      _showMiniToast(context, next.isFriends ? 'You are friends now.' : next.isFollowing ? 'You are now following ${user.name}.' : 'Unfollowed ${user.name}.');
+      _showMiniToast(
+        context,
+        next.isFriends
+            ? 'You are friends now.'
+            : next.isFollowing
+            ? 'You are now following ${user.name}.'
+            : 'Unfollowed ${user.name}.',
+      );
       return relation;
     } catch (error) {
       _showMiniToast(context, error.toString().replaceFirst('Exception: ', ''));
@@ -164,7 +197,9 @@ class LiveRoomMiniProfileLauncher {
     }
   }
 
-  static MiniProfileSocialRelation _relationFromFollowStatus(FollowStatus status) {
+  static MiniProfileSocialRelation _relationFromFollowStatus(
+    FollowStatus status,
+  ) {
     if (status.isFriends) return MiniProfileSocialRelation.friends;
     if (status.isFollowing) return MiniProfileSocialRelation.following;
     if (status.isFollowedBy) return MiniProfileSocialRelation.followBack;
@@ -175,13 +210,23 @@ class LiveRoomMiniProfileLauncher {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF251538)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF251538),
+        ),
+      );
   }
 
   static int _roomPower(SeatUser user) {
     final id = user.id.toLowerCase();
     final role = user.roleLabel.toLowerCase();
-    final isOwner = user.isHost ||
+    final isOwner =
+        user.isHost ||
         id == 'user_6922022' ||
         id == 'founder_owner' ||
         role.contains('founder owner') ||
@@ -191,7 +236,11 @@ class LiveRoomMiniProfileLauncher {
         role == 'host';
     if (isOwner) return 100;
 
-    final isChannelAdmin = user.isRoomAdmin || role.contains('channel admin') || role.contains('room admin') || role.contains('administrator');
+    final isChannelAdmin =
+        user.isRoomAdmin ||
+        role.contains('channel admin') ||
+        role.contains('room admin') ||
+        role.contains('administrator');
     if (isChannelAdmin) return 90;
 
     return 0;
@@ -244,9 +293,12 @@ class LiveRoomMiniProfileLauncher {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => RoomKickoutDurationSheet(
-          user: user,
-          onDurationSelected: onDurationSelected,
+        sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+        builder: (_) => VmFadeSlide(
+          child: RoomKickoutDurationSheet(
+            user: user,
+            onDurationSelected: onDurationSelected,
+          ),
         ),
       );
     });
@@ -265,7 +317,8 @@ class LiveRoomMiniProfileLauncher {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => MiniProfileReportSheet(user: user),
+        sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+        builder: (_) => VmFadeSlide(child: MiniProfileReportSheet(user: user)),
       );
     });
   }
@@ -291,15 +344,20 @@ class LiveRoomMiniProfileLauncher {
     }
 
     try {
-      final followStatus = await const SocialApiService().getFollowStatusByPublicUserId(publicUserId);
-      await InboxApiService().createDirectConversation(targetUserId: followStatus.targetUser.id);
+      final followStatus = await const SocialApiService()
+          .getFollowStatusByPublicUserId(publicUserId);
+      await InboxApiService().createDirectConversation(
+        targetUserId: followStatus.targetUser.id,
+      );
       await Future<void>.delayed(const Duration(milliseconds: 80));
       if (!context.mounted) return;
       showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => const InboxPage(openPagesInOverlay: true),
+        sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+        builder: (_) =>
+            const VmFadeSlide(child: InboxPage(openPagesInOverlay: true)),
       );
     } catch (error) {
       Future<void>.delayed(const Duration(milliseconds: 80), () {

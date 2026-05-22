@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../../data/room_level_service.dart';
 import '../live_room_models.dart';
 import 'room_contribution_rankings_sheet.dart';
@@ -66,7 +67,8 @@ class RoomTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final openRankings = onRoomRankingsTap ?? () => _openDefaultRoomRankings(context);
+    final openRankings =
+        onRoomRankingsTap ?? () => _openDefaultRoomRankings(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,12 +77,13 @@ class RoomTopBar extends StatelessWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             const gap = 5.0;
-            final actionCount = 1 +
-                (canManageAnnouncement ? 1 : 0) +
-                (canManageRoom ? 1 : 0);
-            final reservedForActions = (27.0 * actionCount) + (gap * actionCount);
-            final maxPillWidth = (constraints.maxWidth - 28.0 - gap - reservedForActions - 12.0)
-                .clamp(96.0, constraints.maxWidth);
+            final actionCount =
+                1 + (canManageAnnouncement ? 1 : 0) + (canManageRoom ? 1 : 0);
+            final reservedForActions =
+                (27.0 * actionCount) + (gap * actionCount);
+            final maxPillWidth =
+                (constraints.maxWidth - 28.0 - gap - reservedForActions - 12.0)
+                    .clamp(96.0, constraints.maxWidth);
 
             return Row(
               mainAxisAlignment: MainAxisAlignment.start,
@@ -95,7 +98,10 @@ class RoomTopBar extends StatelessWidget {
                 ),
                 const SizedBox(width: gap),
                 ConstrainedBox(
-                  constraints: BoxConstraints(minWidth: 96, maxWidth: maxPillWidth),
+                  constraints: BoxConstraints(
+                    minWidth: 96,
+                    maxWidth: maxPillWidth,
+                  ),
                   child: _RoomNamePill(
                     roomName: roomName,
                     privacyMode: privacyMode,
@@ -164,17 +170,20 @@ class RoomTopBar extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RoomInfoSheet(
-        roomName: roomName,
-        roomId: roomId,
-        language: language,
-        privacyMode: privacyMode,
-        canManageAdmins: canManageAdmins,
-        admins: admins,
-        availableAdminUsers: availableAdminUsers,
-        onAddAdmin: onAddAdmin,
-        onRemoveAdmin: onRemoveAdmin,
-        onRemoveRoomMember: onRemoveRoomMember,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+      builder: (_) => VmFadeSlide(
+        child: RoomInfoSheet(
+          roomName: roomName,
+          roomId: roomId,
+          language: language,
+          privacyMode: privacyMode,
+          canManageAdmins: canManageAdmins,
+          admins: admins,
+          availableAdminUsers: availableAdminUsers,
+          onAddAdmin: onAddAdmin,
+          onRemoveAdmin: onRemoveAdmin,
+          onRemoveRoomMember: onRemoveRoomMember,
+        ),
       ),
     );
   }
@@ -184,10 +193,13 @@ class RoomTopBar extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RoomContributionRankingsSheet(
-        roomName: roomName,
-        roomPublicId: roomId,
-        users: const <SeatUser>[],
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
+      builder: (_) => VmFadeSlide(
+        child: RoomContributionRankingsSheet(
+          roomName: roomName,
+          roomPublicId: roomId,
+          users: const <SeatUser>[],
+        ),
       ),
     );
   }
@@ -216,12 +228,16 @@ class _RoomNamePill extends StatelessWidget {
   final bool currentUserIsMember;
   final bool joinRequestPending;
 
-  String get _cleanRoomName => roomName.trim().isEmpty ? 'Room' : roomName.trim();
+  String get _cleanRoomName =>
+      roomName.trim().isEmpty ? 'Room' : roomName.trim();
 
   bool get _showMemberIcon => showJoinButton && currentUserIsMember;
-  bool get _showPendingIcon => showJoinButton && !currentUserIsMember && joinRequestPending;
-  bool get _showPlusButton => showJoinButton && !currentUserIsMember && !joinRequestPending;
-  bool get _showTrailingSlot => _showMemberIcon || _showPendingIcon || _showPlusButton;
+  bool get _showPendingIcon =>
+      showJoinButton && !currentUserIsMember && joinRequestPending;
+  bool get _showPlusButton =>
+      showJoinButton && !currentUserIsMember && !joinRequestPending;
+  bool get _showTrailingSlot =>
+      _showMemberIcon || _showPendingIcon || _showPlusButton;
 
   @override
   Widget build(BuildContext context) {
@@ -246,11 +262,15 @@ class _RoomNamePill extends StatelessWidget {
             fit: FlexFit.loose,
             child: Material(
               color: Colors.transparent,
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(999)),
+              borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(999),
+              ),
               child: InkWell(
                 borderRadius: BorderRadius.horizontal(
                   left: const Radius.circular(999),
-                  right: Radius.circular(canEditRoomName || _showTrailingSlot ? 0 : 999),
+                  right: Radius.circular(
+                    canEditRoomName || _showTrailingSlot ? 0 : 999,
+                  ),
                 ),
                 onTap: onInfoTap,
                 child: Padding(
@@ -287,7 +307,11 @@ class _RoomNamePill extends StatelessWidget {
             ),
           ),
           if (canEditRoomName) ...[
-            Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
+            Container(
+              width: 1,
+              height: 16,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
             Material(
               color: Colors.transparent,
               shape: const CircleBorder(),
@@ -298,20 +322,32 @@ class _RoomNamePill extends StatelessWidget {
                   width: 26,
                   height: 28,
                   child: Center(
-                    child: Icon(Icons.edit_rounded, color: RoomColors.aqua, size: 13),
+                    child: Icon(
+                      Icons.edit_rounded,
+                      color: RoomColors.aqua,
+                      size: 13,
+                    ),
                   ),
                 ),
               ),
             ),
           ],
           if (_showTrailingSlot) ...[
-            Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.12)),
+            Container(
+              width: 1,
+              height: 16,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
             if (_showMemberIcon)
               const SizedBox(
                 width: 28,
                 height: 28,
                 child: Center(
-                  child: Icon(Icons.verified_user_rounded, color: RoomColors.aqua, size: 15),
+                  child: Icon(
+                    Icons.verified_user_rounded,
+                    color: RoomColors.aqua,
+                    size: 15,
+                  ),
                 ),
               )
             else if (_showPendingIcon)
@@ -319,7 +355,11 @@ class _RoomNamePill extends StatelessWidget {
                 width: 28,
                 height: 28,
                 child: Center(
-                  child: Icon(Icons.hourglass_top_rounded, color: RoomColors.gold, size: 15),
+                  child: Icon(
+                    Icons.hourglass_top_rounded,
+                    color: RoomColors.gold,
+                    size: 15,
+                  ),
                 ),
               )
             else
@@ -333,7 +373,11 @@ class _RoomNamePill extends StatelessWidget {
                     width: 28,
                     height: 28,
                     child: Center(
-                      child: Icon(Icons.person_add_alt_1_rounded, color: RoomColors.aqua, size: 15),
+                      child: Icon(
+                        Icons.person_add_alt_1_rounded,
+                        color: RoomColors.aqua,
+                        size: 15,
+                      ),
                     ),
                   ),
                 ),
@@ -350,7 +394,9 @@ class _PrivacyIcon extends StatelessWidget {
   final RoomPrivacyMode mode;
   @override
   Widget build(BuildContext context) {
-    final color = mode == RoomPrivacyMode.open ? RoomColors.aqua : RoomColors.gold;
+    final color = mode == RoomPrivacyMode.open
+        ? RoomColors.aqua
+        : RoomColors.gold;
     return Container(
       width: 16,
       height: 16,
@@ -417,7 +463,11 @@ class _RoomLevelBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.local_fire_department_rounded, color: RoomColors.gold, size: 12),
+            const Icon(
+              Icons.local_fire_department_rounded,
+              color: RoomColors.gold,
+              size: 12,
+            ),
             const SizedBox(width: 3),
             Text(
               'Lv.$level',
@@ -468,7 +518,11 @@ class _TrophyButton extends StatelessWidget {
             ),
           ],
         ),
-        child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 14),
+        child: const Icon(
+          Icons.emoji_events_rounded,
+          color: Colors.white,
+          size: 14,
+        ),
       ),
     ),
   );

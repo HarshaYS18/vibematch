@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
 import '../../../auth/models/current_user.dart';
 import '../../../auth/models/role_badge.dart';
 import '../../../profile/presentation/public_profile_view_page.dart';
@@ -24,8 +25,9 @@ class LiveRoomProfileNavigator {
     final publicUserId = publicUserIdFromRoomUserId(user.id);
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => PublicProfileViewPage(
+      VmMotion.pageRoute<void>(
+        settings: const RouteSettings(name: 'room-public-profile'),
+        page: PublicProfileViewPage(
           user: seatUserToCurrentUser(user),
           publicUserId: publicUserId,
           vipLevel: user.vipLevel,
@@ -134,8 +136,9 @@ class LiveRoomProfileNavigator {
       if (!context.mounted) return;
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => VipProgramPage(
+        VmMotion.pageRoute<void>(
+          settings: const RouteSettings(name: 'room-vip-program'),
+          page: VipProgramPage(
             initialTabIndex: initialTabIndex,
             vipLevel: user.vipLevel,
             svipLevel: user.svipLevel,
@@ -299,7 +302,13 @@ class LiveRoomProfileNavigator {
     Navigator.pop(context);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (!context.mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+      Navigator.push(
+        context,
+        VmMotion.pageRoute<void>(
+          settings: const RouteSettings(name: 'room-action-page'),
+          page: page,
+        ),
+      );
     });
   }
 }

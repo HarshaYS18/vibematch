@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/ui/vm_motion.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
 import '../models/vibe_models.dart';
@@ -13,7 +14,8 @@ import 'vibes_controller.dart';
 class VibesNavigationController {
   const VibesNavigationController._();
 
-  static String? currentUserPublicId() => const AuthApiService().cachedUser?.publicUserId.toString();
+  static String? currentUserPublicId() =>
+      const AuthApiService().cachedUser?.publicUserId.toString();
 
   static bool isSelfVibe(VibeItem vibe) {
     final publicId = currentUserPublicId();
@@ -25,18 +27,25 @@ class VibesNavigationController {
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
           behavior: SnackBarBehavior.floating,
           backgroundColor: const Color(0xFF251538),
         ),
       );
   }
 
-  static void openSettings({required BuildContext context, required VibesController controller}) {
+  static void openSettings({
+    required BuildContext context,
+    required VibesController controller,
+  }) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => VibesSettingsPage(
+      VmMotion.pageRoute<void>(
+        settings: const RouteSettings(name: 'vibes-settings'),
+        page: VibesSettingsPage(
           whoCanMention: controller.whoCanMention,
           whoCanComment: controller.whoCanComment,
           onMentionChanged: controller.setWhoCanMention,
@@ -46,17 +55,25 @@ class VibesNavigationController {
     );
   }
 
-  static void openCreateVibe({required BuildContext context, required VibesController controller}) {
+  static void openCreateVibe({
+    required BuildContext context,
+    required VibesController controller,
+  }) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CreateVibePageModular(
+      VmMotion.pageRoute<void>(
+        settings: const RouteSettings(name: 'create-vibe'),
+        page: CreateVibePageModular(
           canUseMentionAllToday: controller.canUseMentionAllToday,
           onPublish: (newVibe) async {
             try {
               await controller.publishVibe(newVibe);
               if (context.mounted) showAction(context, 'Vibe published.');
             } catch (error) {
-              if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
+              if (context.mounted)
+                showAction(
+                  context,
+                  error.toString().replaceFirst('Exception: ', ''),
+                );
             }
           },
         ),
@@ -64,16 +81,27 @@ class VibesNavigationController {
     );
   }
 
-  static void openVibeDetail({required BuildContext context, required VibesController controller, required VibeItem vibe}) {
+  static void openVibeDetail({
+    required BuildContext context,
+    required VibesController controller,
+    required VibeItem vibe,
+  }) {
     if (vibe.mediaType != VibeMediaType.text) {
-      final mediaVibes = controller.visibleVibes.where((item) => item.mediaType != VibeMediaType.text).toList(growable: false);
-      final idIndex = mediaVibes.indexWhere((item) => item.id.trim().isNotEmpty && item.id == vibe.id);
+      final mediaVibes = controller.visibleVibes
+          .where((item) => item.mediaType != VibeMediaType.text)
+          .toList(growable: false);
+      final idIndex = mediaVibes.indexWhere(
+        (item) => item.id.trim().isNotEmpty && item.id == vibe.id,
+      );
       final fallbackIndex = mediaVibes.indexOf(vibe);
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MediaVibeDetailPager(
+        VmMotion.pageRoute<void>(
+          settings: const RouteSettings(name: 'media-vibe-detail'),
+          page: MediaVibeDetailPager(
             vibes: mediaVibes.isEmpty ? <VibeItem>[vibe] : mediaVibes,
-            initialIndex: idIndex >= 0 ? idIndex : (fallbackIndex >= 0 ? fallbackIndex : 0),
+            initialIndex: idIndex >= 0
+                ? idIndex
+                : (fallbackIndex >= 0 ? fallbackIndex : 0),
           ),
         ),
       );
@@ -81,8 +109,9 @@ class VibesNavigationController {
     }
 
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VibeDetailBackendPage(
+      VmMotion.pageRoute<void>(
+        settings: const RouteSettings(name: 'vibe-detail'),
+        page: VibeDetailBackendPage(
           vibe: vibe,
           onCommentAdded: () => controller.incrementCommentCount(vibe),
           onDeleteVibe: () => controller.deleteVibe(vibe),
@@ -91,13 +120,18 @@ class VibesNavigationController {
     );
   }
 
-  static void openShareSheet({required BuildContext context, required VibesController controller, required VibeItem vibe}) {
+  static void openShareSheet({
+    required BuildContext context,
+    required VibesController controller,
+    required VibeItem vibe,
+  }) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: false,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.18),
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => FriendsInviteSheet(
         title: 'Share ${vibe.authorName}\'s Vibe',
         actionLabel: 'Send',
@@ -106,18 +140,31 @@ class VibesNavigationController {
           try {
             final publicUserId = int.tryParse(friend.id);
             await controller.shareVibe(vibe, targetPublicUserId: publicUserId);
-            if (context.mounted) showAction(context, 'Vibe sent to ${friend.displayName}');
+            if (context.mounted)
+              showAction(context, 'Vibe sent to ${friend.displayName}');
           } catch (error) {
-            if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
+            if (context.mounted)
+              showAction(
+                context,
+                error.toString().replaceFirst('Exception: ', ''),
+              );
           }
         },
       ),
     );
   }
 
-  static Future<void> openVibeActions({required BuildContext context, required VibesController controller, required VibeItem vibe}) async {
+  static Future<void> openVibeActions({
+    required BuildContext context,
+    required VibesController controller,
+    required VibeItem vibe,
+  }) async {
     if (isSelfVibe(vibe)) {
-      await _confirmAndDeleteVibe(context: context, controller: controller, vibe: vibe);
+      await _confirmAndDeleteVibe(
+        context: context,
+        controller: controller,
+        vibe: vibe,
+      );
       return;
     }
 
@@ -125,16 +172,23 @@ class VibesNavigationController {
     if (reason == null || reason.trim().isEmpty) return;
     try {
       await controller.reportVibe(vibe, reason: reason);
-      if (context.mounted) showAction(context, 'Vibe submitted for official review.');
+      if (context.mounted)
+        showAction(context, 'Vibe submitted for official review.');
     } catch (error) {
-      if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
+      if (context.mounted)
+        showAction(context, error.toString().replaceFirst('Exception: ', ''));
     }
   }
 
-  static Future<void> _confirmAndDeleteVibe({required BuildContext context, required VibesController controller, required VibeItem vibe}) async {
+  static Future<void> _confirmAndDeleteVibe({
+    required BuildContext context,
+    required VibesController controller,
+    required VibeItem vibe,
+  }) async {
     final shouldDelete = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => const ConfirmDeleteVibeSheet(),
     );
     if (shouldDelete != true) return;
@@ -142,14 +196,19 @@ class VibesNavigationController {
       await controller.deleteVibe(vibe);
       if (context.mounted) showAction(context, 'Vibe deleted.');
     } catch (error) {
-      if (context.mounted) showAction(context, error.toString().replaceFirst('Exception: ', ''));
+      if (context.mounted)
+        showAction(context, error.toString().replaceFirst('Exception: ', ''));
     }
   }
 
-  static Future<String?> openReportReasonSheet({required BuildContext context, required VibeItem vibe}) {
+  static Future<String?> openReportReasonSheet({
+    required BuildContext context,
+    required VibeItem vibe,
+  }) {
     return showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => ReportReasonSheet(vibe: vibe),
     );
   }

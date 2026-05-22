@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../../core/network/vm_media_config.dart';
+import '../../../core/ui/vm_motion.dart';
 import '../../../main.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
@@ -546,6 +547,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         context: dialogContext,
         useRootNavigator: true,
         barrierDismissible: true,
+        animationStyle: VmMotion.sheetAnimationStyle,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
