@@ -42,9 +42,16 @@ class GiftSlideStackModule extends StatefulWidget {
 }
 
 class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
+  static const int _maxVisibleSlides = 3;
+  static const Duration _slideStagger = Duration(milliseconds: 260);
+
   final Map<String, int> _luckyComboTotals = <String, int>{};
   final Map<String, int> _luckyRewardTotals = <String, int>{};
   final Set<String> _handledFlightIds = <String>{};
+  final List<String> _visibleSlideIds = <String>[];
+  final List<String> _pendingSlideIds = <String>[];
+  final Set<String> _knownSlideIds = <String>{};
+  Timer? _dequeueTimer;
   VoidCallback? _flightListener;
 
   @override
@@ -52,15 +59,57 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
     super.initState();
     _flightListener = _handleGiftFlight;
     GiftFlightBus.latest.addListener(_flightListener!);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncSlides());
+  }
+
+  @override
+  void didUpdateWidget(covariant GiftSlideStackModule oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncSlides();
   }
 
   @override
   void dispose() {
+    _dequeueTimer?.cancel();
     final listener = _flightListener;
     if (listener != null) {
       GiftFlightBus.latest.removeListener(listener);
     }
     super.dispose();
+  }
+
+  void _syncSlides() {
+    final currentIds = widget.slides.map((slide) => slide.id).toSet();
+    var changed = false;
+
+    _knownSlideIds.removeWhere((id) => !currentIds.contains(id));
+    changed = _visibleSlideIds.removeWhere((id) => !currentIds.contains(id)) > 0 || changed;
+    changed = _pendingSlideIds.removeWhere((id) => !currentIds.contains(id)) > 0 || changed;
+
+    for (final slide in widget.slides) {
+      if (_knownSlideIds.add(slide.id)) {
+        if (_visibleSlideIds.length < _maxVisibleSlides && _pendingSlideIds.isEmpty) {
+          _visibleSlideIds.add(slide.id);
+        } else if (!_pendingSlideIds.contains(slide.id)) {
+          _pendingSlideIds.add(slide.id);
+        }
+        changed = true;
+      }
+    }
+
+    if (changed && mounted) setState(() {});
+    _scheduleDequeue();
+  }
+
+  void _scheduleDequeue() {
+    if (_dequeueTimer?.isActive == true) return;
+    if (_pendingSlideIds.isEmpty || _visibleSlideIds.length >= _maxVisibleSlides) return;
+    _dequeueTimer = Timer(_slideStagger, () {
+      if (!mounted) return;
+      if (_pendingSlideIds.isEmpty || _visibleSlideIds.length >= _maxVisibleSlides) return;
+      setState(() => _visibleSlideIds.add(_pendingSlideIds.removeAt(0)));
+      _scheduleDequeue();
+    });
   }
 
   void _handleGiftFlight() {
@@ -77,10 +126,12 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleSlides = widget.slides.where((slide) {
-      final ageSeconds = (15 - slide.remainingSeconds).clamp(0, 15);
-      return ageSeconds <= 5;
-    }).take(1).toList(growable: false);
+    final byId = {for (final slide in widget.slides) slide.id: slide};
+    final visibleSlides = _visibleSlideIds
+        .map((id) => byId[id])
+        .whereType<GiftSlide>()
+        .take(_maxVisibleSlides)
+        .toList(growable: false);
     if (visibleSlides.isEmpty) return const SizedBox.shrink();
     return IgnorePointer(
       ignoring: false,
@@ -92,15 +143,19 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final slide in visibleSlides)
+              for (var index = 0; index < visibleSlides.length; index++)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: GiftSlideCardModule(
-                    key: ValueKey(slide.id),
-                    slide: slide,
-                    displayCombo: math.max(slide.combo, _luckyComboTotals[_slideKey(slide)] ?? slide.combo),
-                    rewardCoins: _luckyRewardTotals[_slideKey(slide)] ?? _rewardCoinsFromSlide(slide),
-                    onComboTap: () => widget.onComboTap(slide),
+                    key: ValueKey(visibleSlides[index].id),
+                    slide: visibleSlides[index],
+                    stackIndex: index,
+                    displayCombo: math.max(
+                      visibleSlides[index].combo,
+                      _luckyComboTotals[_slideKey(visibleSlides[index])] ?? visibleSlides[index].combo,
+                    ),
+                    rewardCoins: _luckyRewardTotals[_slideKey(visibleSlides[index])] ?? _rewardCoinsFromSlide(visibleSlides[index]),
+                    onComboTap: () => widget.onComboTap(visibleSlides[index]),
                   ),
                 ),
             ],
@@ -118,12 +173,14 @@ class GiftSlideCardModule extends StatelessWidget {
     required this.onComboTap,
     required this.displayCombo,
     required this.rewardCoins,
+    this.stackIndex = 0,
   });
 
   final GiftSlide slide;
   final VoidCallback onComboTap;
   final int displayCombo;
   final int rewardCoins;
+  final int stackIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +195,7 @@ class GiftSlideCardModule extends StatelessWidget {
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0 + exitProgress),
-      duration: const Duration(milliseconds: 560),
+      duration: Duration(milliseconds: 560 + (stackIndex * 80)),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         final enter = value.clamp(0.0, 1.0).toDouble();
