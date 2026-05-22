@@ -84,12 +84,19 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
     final currentKeys = widget.slides.map(_slideKey).toSet();
     var changed = false;
 
+    final expiredKeys = _knownSlideKeys
+        .where((key) => !currentKeys.contains(key))
+        .toList(growable: false);
+    for (final key in expiredKeys) {
+      _resetComboSession(key);
+    }
+
     _knownSlideKeys.removeWhere((key) => !currentKeys.contains(key));
     final visibleBefore = _visibleSlideKeys.length;
     final pendingBefore = _pendingSlideKeys.length;
     _visibleSlideKeys.removeWhere((key) => !currentKeys.contains(key));
     _pendingSlideKeys.removeWhere((key) => !currentKeys.contains(key));
-    changed = visibleBefore != _visibleSlideKeys.length || pendingBefore != _pendingSlideKeys.length;
+    changed = visibleBefore != _visibleSlideKeys.length || pendingBefore != _pendingSlideKeys.length || expiredKeys.isNotEmpty;
 
     for (final slide in widget.slides) {
       final key = _slideKey(slide);
@@ -105,6 +112,11 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
 
     if (changed && mounted) setState(() {});
     _scheduleDequeue();
+  }
+
+  void _resetComboSession(String key) {
+    _luckyComboTotals.remove(key);
+    _luckyRewardTotals.remove(key);
   }
 
   void _scheduleDequeue() {
