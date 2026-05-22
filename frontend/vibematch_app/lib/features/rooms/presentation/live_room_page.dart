@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../social/widgets/friends_invite_sheet.dart';
+import '../data/chat_moderation_api_service.dart';
 import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_member_request_service.dart';
 import '../data/live_room_membership_service.dart';
@@ -101,6 +102,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       const LiveRoomVibeSyncController();
   final LiveRoomNavigationController _navigationController =
       const LiveRoomNavigationController();
+  final ChatModerationApiService _chatModerationApi =
+      const ChatModerationApiService();
   late final LiveRoomPresenceController _presenceController;
 
   _PendingSeatInvite? _pendingSeatInvite;

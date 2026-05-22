@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/inbox_controller.dart';
+import '../data/inbox_ai_api_service.dart';
 import '../data/inbox_stories_api_service.dart';
 import '../models/inbox_models.dart';
 import 'pages/cs_report_tasks_page.dart';
@@ -11,6 +12,7 @@ import 'pages/inbox_settings_page.dart';
 import 'pages/locked_chats_page.dart';
 import 'pages/stranger_requests_page.dart';
 import 'widgets/inbox_conversation_card.dart';
+import 'widgets/inbox_ai_helper_sheet.dart';
 import 'widgets/inbox_lock_flow_sheets.dart';
 import 'widgets/inbox_passcode_sheet.dart';
 import 'widgets/inbox_chat_theme_picker_sheet.dart';
@@ -39,6 +41,7 @@ class InboxPage extends StatefulWidget {
 class _InboxPageState extends State<InboxPage> {
   late final InboxController _controller;
   late final bool _ownsController;
+  final InboxAiApiService _inboxAiApi = const InboxAiApiService();
   final InboxStoriesApiService _storiesApi = const InboxStoriesApiService();
   Widget? _panelOverlay;
   Future<List<InboxStoryItem>>? _storiesFuture;
@@ -312,6 +315,33 @@ class _InboxPageState extends State<InboxPage> {
 
   void _openSearch() => _openInboxSubPage(InboxSearchPage(controller: _controller, onOpenConversation: _openConversation, onBackTap: _closePanelOverlay));
 
+  Future<void> _openInboxAiHelper() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => InboxAiHelperSheet(
+        onSearch: _inboxAiApi.search,
+        onOpenResult: _openInboxAiResult,
+      ),
+    );
+  }
+
+  void _openInboxAiResult(InboxAiSearchResult result) {
+    Navigator.pop(context);
+    if (result.isLocked) {
+      _toast('Unlock Inbox to open locked AI results.');
+      _openLockedVault();
+      return;
+    }
+    final conversation = _controller.conversationById(result.conversationId);
+    if (conversation == null) {
+      _toast('Matched ${result.title}; open id ${result.conversationId}.');
+      return;
+    }
+    _openConversation(conversation);
+  }
+
   void _openSettings() {
     _openInboxSubPage(
       InboxSettingsPage(
@@ -493,6 +523,7 @@ class _InboxPageState extends State<InboxPage> {
                       onReportsTap: _openCsReportTasks,
                     ),
                   ),
+                  SliverToBoxAdapter(child: _InboxAiPrompt(onTap: _openInboxAiHelper)),
                   SliverToBoxAdapter(
                     child: FutureBuilder<List<InboxStoryItem>>(
                       future: _storiesFuture,
@@ -610,6 +641,36 @@ class _PullDownHint extends StatelessWidget {
             const SizedBox(width: 5),
             Text(lockedCount == 0 ? 'Pull down to open locked chats' : 'Pull down for $lockedCount locked chat${lockedCount == 1 ? '' : 's'}', style: const TextStyle(color: Color(0xFF5E4B6F), fontSize: 11, fontWeight: FontWeight.w900)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InboxAiPrompt extends StatelessWidget {
+  const _InboxAiPrompt({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFEDEDEF))),
+          child: const Row(
+            children: [
+              Icon(Icons.auto_awesome_rounded, color: Color(0xFF3797F0), size: 18),
+              SizedBox(width: 9),
+              Expanded(child: Text('Find anything in chats...', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xFF71717A), fontSize: 13, fontWeight: FontWeight.w700))),
+              Icon(Icons.keyboard_arrow_up_rounded, color: Color(0xFFB8B8C0), size: 20),
+            ],
+          ),
         ),
       ),
     );

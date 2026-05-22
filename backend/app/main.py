@@ -7,6 +7,8 @@ from sqlalchemy import text
 
 from app.api.routes import (
     admin,
+    admin_support,
+    ai_moderation,
     app_source_registry,
     auth,
     calls,
@@ -28,6 +30,7 @@ from app.api.routes import (
     gift_catalog,
     home_banners,
     inbox,
+    inbox_ai,
     inbox_backup_google,
     inbox_ws,
     internal_test,
@@ -54,8 +57,10 @@ from app.api.routes import (
     room_music_media,
     room_realtime,
     room_realtime_commands,
+    settings,
     social,
     super_owner,
+    support,
     users,
     vibes,
     vip_admin,
@@ -66,6 +71,7 @@ from app.api.routes.store import router as store_router
 from app.database import Base, engine
 from app.models import (
     AdminLog,
+    AiHelpdeskLog,
     AuthIdentity,
     CallParticipant,
     CallSession,
@@ -73,11 +79,11 @@ from app.models import (
     CoinPoolLedger,
     CoinSaleOrder,
     CoinSupplyPool,
-    EconomyRuleLevel,
-    EconomyRuleSet,
     CricketMatch,
     CricketTournament,
     DeviceBan,
+    EconomyRuleLevel,
+    EconomyRuleSet,
     GameBet,
     GameDefinition,
     GamePool,
@@ -88,6 +94,7 @@ from app.models import (
     GiftCatalogCategory,
     GiftCatalogItem,
     GiftTransaction,
+    HelpArticle,
     InboxBackupJob,
     InboxBackupSetting,
     InboxConversation,
@@ -105,6 +112,9 @@ from app.models import (
     LoveBondInventory,
     LoveBondRequest,
     MediaSafetySetting,
+    ModerationCase,
+    ModerationEvent,
+    ModerationEvidence,
     MvpFeatureState,
     ProfileVisit,
     ProfileDisplayAudit,
@@ -119,13 +129,18 @@ from app.models import (
     StoreItem,
     StoreAssetManifest,
     StoreCategory,
+    SupportAttachment,
+    SupportMessage,
+    SupportTicket,
     User,
+    UserAppSetting,
     UserBan,
     UserBlock,
     UserExperienceStatus,
     UserFollow,
     UserNotification,
     UserRoomPresence,
+    UserViolationScore,
     UserRole,
     UserStoreInventory,
     UserStealthState,
@@ -294,8 +309,10 @@ app.include_router(app_source_registry.router)
 app.include_router(users.router)
 app.include_router(role_badges.router)
 app.include_router(admin.router)
+app.include_router(admin_support.router)
 app.include_router(media_safety_admin.router)
 app.include_router(moderation.router)
+app.include_router(ai_moderation.router)
 app.include_router(super_owner.router)
 app.include_router(control_center.router)
 app.include_router(game_pool_admin.router)
@@ -307,6 +324,7 @@ app.include_router(families.router)
 app.include_router(families_economy.router)
 app.include_router(home_banners.router)
 app.include_router(inbox.router)
+app.include_router(inbox_ai.router)
 app.include_router(inbox_backup_google.router)
 app.include_router(love_bonds.router)
 app.include_router(relationship_exp.router)
@@ -315,6 +333,7 @@ app.include_router(calls.router)
 app.include_router(media_realtime_auth.router)
 app.include_router(room_realtime.router)
 app.include_router(room_realtime_commands.router)
+app.include_router(settings.router)
 app.include_router(experience.router)
 app.include_router(experience_room_public.router)
 app.include_router(social.router)
@@ -323,6 +342,7 @@ app.include_router(notifications.router)
 app.include_router(push.router)
 app.include_router(presence.router)
 app.include_router(profile_display.router)
+app.include_router(support.router)
 app.include_router(media.router)
 app.include_router(room_music_media.router)
 app.include_router(mvp_core.router)
