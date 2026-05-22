@@ -7,6 +7,7 @@ import '../../../presentation/live_room_models.dart';
 import '../../../presentation/widgets/gift_flight_bus.dart';
 import '../../../presentation/widgets/gift_flight_overlay.dart';
 import '../../../presentation/widgets/gift_modules/gift_visual.dart';
+import '../../../presentation/widgets/room_theme.dart';
 
 class GiftSlideOverlay extends StatelessWidget {
   const GiftSlideOverlay({
@@ -423,18 +424,18 @@ class _LuckyRewardTicker extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
           color: const Color(0xFF171020).withValues(alpha: 0.88),
-          border: Border.all(color: accent.withValues(alpha: 0.42), width: 0.8),
-          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.16), blurRadius: 12)],
+          border: Border.all(color: RoomColors.gold.withValues(alpha: 0.42), width: 0.8),
+          boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.16), blurRadius: 12)],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.toll_rounded, color: accent, size: 13),
+            const Icon(Icons.toll_rounded, color: RoomColors.gold, size: 13),
             const SizedBox(width: 4),
             Text(
               '+${_compact(rewardCoins)}',
-              style: TextStyle(
-                color: accent,
+              style: const TextStyle(
+                color: RoomColors.gold,
                 fontSize: 11,
                 height: 1,
                 fontWeight: FontWeight.w900,
