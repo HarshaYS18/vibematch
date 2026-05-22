@@ -1,12 +1,13 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class VmAndroidPermissionService {
   const VmAndroidPermissionService();
 
+  bool get _canRequestAndroidPermissions => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   Future<VmPermissionSnapshot> requestAppLaunchPermissions() async {
-    if (!Platform.isAndroid) return VmPermissionSnapshot.empty();
+    if (!_canRequestAndroidPermissions) return VmPermissionSnapshot.empty();
     final permissions = <Permission>[
       Permission.notification,
       Permission.microphone,
@@ -21,19 +22,19 @@ class VmAndroidPermissionService {
   }
 
   Future<bool> ensureMediaUploadPermissions() async {
-    if (!Platform.isAndroid) return true;
+    if (!_canRequestAndroidPermissions) return true;
     final statuses = await [Permission.photos, Permission.videos, Permission.storage].request();
     return statuses.values.any((status) => status.isGranted || status.isLimited);
   }
 
   Future<bool> ensureAudioRoomPermissions() async {
-    if (!Platform.isAndroid) return true;
+    if (!_canRequestAndroidPermissions) return true;
     final statuses = await [Permission.microphone, Permission.bluetoothConnect].request();
     return statuses[Permission.microphone]?.isGranted == true;
   }
 
   Future<bool> ensureVideoCallPermissions() async {
-    if (!Platform.isAndroid) return true;
+    if (!_canRequestAndroidPermissions) return true;
     final statuses = await [Permission.microphone, Permission.camera, Permission.bluetoothConnect].request();
     return statuses[Permission.microphone]?.isGranted == true && statuses[Permission.camera]?.isGranted == true;
   }
