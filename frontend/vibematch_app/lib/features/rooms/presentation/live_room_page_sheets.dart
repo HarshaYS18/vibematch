@@ -512,6 +512,7 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
   }
 
   void _openLeaveSheet() {
+    final restoreState = _buildRestoreState();
     LiveRoomLeaveActionsModule.openLeaveSheet(
       context: context,
       navigationController: _navigationController,
@@ -521,9 +522,24 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       language: widget.language,
       modeTitle: widget.modeTitle,
       onlineCount: _safeOnlineCount,
-      restoreState: _buildRestoreState(),
+      restoreState: restoreState,
       dismissSeatActionPill: dismissRoomSeatActionPill,
       clearFocus: _clearRoomFocus,
+      restoreMinimizedRoom: () {
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (_) => LiveRoomPage(
+              roomName: _roomName,
+              roomId: _roomId,
+              language: widget.language,
+              modeTitle: widget.modeTitle,
+              onlineCount: _safeOnlineCount,
+              initialBackgroundTheme: restoreState.roomState.selectedBackgroundTheme,
+              restoreState: restoreState,
+            ),
+          ),
+        );
+      },
       mountedGetter: () => mounted,
     );
   }
