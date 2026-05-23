@@ -1,67 +1,114 @@
-part of 'live_room_page.dart';
+import 'dart:async';
 
-extension _LiveRoomPageSheets on _LiveRoomPageState {
-  void _openSettingsSheet() {
-    _clearRoomFocus();
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../data/live_room_media_signaling_service.dart';
+import '../../../data/live_room_member_request_service.dart';
+import '../../../data/live_room_membership_service.dart';
+import '../../../data/room_api_service.dart';
+import '../../controllers/live_room_sheet_controller.dart';
+import '../../live_room_models.dart';
+import '../../widgets/cricket_room_backgrounds.dart';
+import '../../widgets/live_room_announcement_sheet.dart';
+import '../../widgets/live_room_background_sheet.dart';
+import '../../widgets/live_room_info_sheet.dart';
+import '../../widgets/live_room_join_requests_sheet.dart';
+import '../../widgets/live_room_privacy_sheet.dart';
+import '../../widgets/live_room_seat_layout_picker_sheet.dart';
+import '../../widgets/live_room_settings_sheet_module.dart';
+import '../../widgets/room_theme.dart';
+import '../../widgets/vibesync_room_module.dart';
+import '../chat/live_room_chat_module.dart';
+import '../cricket/live_room_cricket_module.dart';
+import '../cricket_room_mode_signal.dart';
+import '../games/live_room_games_entry_module.dart';
+import '../lifecycle/live_room_lifecycle_module.dart';
+import '../live_room_controller_bundle.dart';
+import '../seats/live_room_seats_module.dart';
+import '../watch_party/live_room_watch_party_entry_module.dart';
+
+class LiveRoomSettingsModule {
+  const LiveRoomSettingsModule._();
+
+  static void open(LiveRoomControllerBundle bundle) {
+    LiveRoomLifecycleModule.clearFocus(bundle);
     LiveRoomSheetController.showTransparentStatefulSheet<void>(
-      context: context,
+      context: bundle.context,
       isScrollControlled: true,
       builder: (sheetContext, setSheetState) => LiveRoomSettingsSheetModule(
-        roomId: _roomId,
-        privacyMode: _privacyMode,
-        roomImagesEnabled: _roomImagesEnabled,
-        guestMessagesEnabled: _guestMessagesEnabled,
-        applyOnlyModeEnabled: _applyOnlyModeEnabled,
-        joinRequestCount: _pendingRoomMemberRequests.length,
-        cricketModeActive: CricketRoomModeSignal.isActive(_roomId),
-        onBackgroundTap: () => _openBackgroundPickerFromSettings(sheetContext),
-        onCoverPhotoTap: () => _changeRoomCoverPhotoFromSettings(sheetContext),
+        roomId: bundle.roomId,
+        privacyMode: bundle.privacyMode,
+        roomImagesEnabled: bundle.roomImagesEnabled,
+        guestMessagesEnabled: bundle.guestMessagesEnabled,
+        applyOnlyModeEnabled: bundle.applyOnlyModeEnabled,
+        joinRequestCount: bundle.pendingRoomMemberRequests.length,
+        cricketModeActive: CricketRoomModeSignal.isActive(bundle.roomId),
+        onBackgroundTap: () =>
+            openBackgroundPickerFromSettings(bundle, sheetContext),
+        onCoverPhotoTap: () =>
+            changeRoomCoverPhotoFromSettings(bundle, sheetContext),
         onCustomBackgroundTap: () =>
-            _submitCustomBackgroundFromSettings(sheetContext),
-        onPrivacyTap: _openPrivacySheet,
-        onSeatLayoutTap: _openSeatLayoutSheet,
-        onAnnouncementTap: _openAnnouncementSheet,
-        onInboxTap: () => _openInboxPageFromSheet(sheetContext),
-        onJoinRequestsTap: _openJoinRequestsSheet,
-        onVibeSyncTap: () => _openVibeSyncSheetFromSettings(sheetContext),
-        onWatchPartyTap: () => _openWatchPartyFromSettings(sheetContext),
-        onCricketModeTap: () => _openCricketModeFromSettings(sheetContext),
+            submitCustomBackgroundFromSettings(bundle, sheetContext),
+        onPrivacyTap: () => openPrivacySheet(bundle),
+        onSeatLayoutTap: () => openSeatLayoutSheet(bundle),
+        onAnnouncementTap: () => openAnnouncementSheet(bundle),
+        onInboxTap: () =>
+            LiveRoomChatModule.openInboxPageFromSheet(bundle, sheetContext),
+        onJoinRequestsTap: () => openJoinRequestsSheet(bundle),
+        onVibeSyncTap: () =>
+            openVibeSyncSheetFromSettings(bundle, sheetContext),
+        onWatchPartyTap: () => LiveRoomWatchPartyEntryModule.openFromSettings(
+          bundle: bundle,
+          sheetContext: sheetContext,
+        ),
+        onCricketModeTap: () => LiveRoomCricketModule.openFromSettings(
+          bundle: bundle,
+          sheetContext: sheetContext,
+        ),
         onClearChatTap: () {
           LiveRoomMediaSignalingService.instance.broadcastChatCleared();
-          RoomToast.show(context, 'Chat clear broadcasted');
+          RoomToast.show(bundle.context, 'Chat clear broadcasted');
         },
-        canCloseRoom: _currentUser.isHost,
+        canCloseRoom: bundle.currentUser.isHost,
         onToggleRoomImages: (value) {
-          _roomStateController.setRoomImagesEnabled(value);
+          bundle.roomStateController.setRoomImagesEnabled(value);
           setSheetState(() {});
           LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
-            _settingsController.roomImagesSystemMessage(value),
+            bundle.settingsController.roomImagesSystemMessage(value),
           );
         },
         onToggleGuestMessages: (value) {
-          _roomStateController.setGuestMessagesEnabled(value);
+          bundle.roomStateController.setGuestMessagesEnabled(value);
           setSheetState(() {});
           LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
-            _settingsController.guestMessagesSystemMessage(value),
+            bundle.settingsController.guestMessagesSystemMessage(value),
           );
         },
         onToggleApplyOnlyMode: (value) {
-          _roomStateController.setApplyOnlyModeEnabled(value);
+          bundle.roomStateController.setApplyOnlyModeEnabled(value);
           setSheetState(() {});
           LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
-            _settingsController.applyOnlyModeSystemMessage(value),
+            bundle.settingsController.applyOnlyModeSystemMessage(value),
           );
         },
-        onCloseRoom: () => _leaveRoomFromSheet(sheetContext),
+        onCloseRoom: () => LiveRoomLifecycleModule.leaveRoomFromSheet(
+          bundle: bundle,
+          sheetContext: sheetContext,
+        ),
       ),
     );
   }
 
-  Future<void> _changeRoomCoverPhotoFromSettings(
+  static Future<void> changeRoomCoverPhotoFromSettings(
+    LiveRoomControllerBundle bundle,
     BuildContext sheetContext,
   ) async {
-    if (!_viewerCanManageRoom) {
-      RoomToast.show(context, 'Only the host/admin can change the cover photo');
+    if (!bundle.viewerCanManageRoom) {
+      RoomToast.show(
+        bundle.context,
+        'Only the host/admin can change the cover photo',
+      );
       return;
     }
     Navigator.pop(sheetContext);
@@ -70,29 +117,36 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         source: ImageSource.gallery,
         imageQuality: 88,
       );
-      if (file == null || !mounted) return;
-      RoomToast.show(context, 'Uploading room cover photo...');
+      if (file == null || !bundle.mounted) return;
+      RoomToast.show(bundle.context, 'Uploading room cover photo...');
       final api = const RoomApiService();
       final upload = await api.uploadRoomCover(file);
       await api.updateRoomCoverPhoto(
-        roomId: _roomId,
+        roomId: bundle.roomId,
         coverPhotoUrl: upload.url,
       );
-      if (!mounted) return;
-      RoomToast.show(context, 'Room cover photo updated');
-      _insertSystemMessage('Room cover photo updated by ${_currentUser.name}.');
+      if (!bundle.mounted) return;
+      RoomToast.show(bundle.context, 'Room cover photo updated');
+      LiveRoomChatModule.insertSystemMessage(
+        bundle,
+        'Room cover photo updated by ${bundle.currentUser.name}.',
+      );
     } catch (error) {
-      if (!mounted) return;
-      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+      if (!bundle.mounted) return;
+      RoomToast.show(
+        bundle.context,
+        error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
-  Future<void> _submitCustomBackgroundFromSettings(
+  static Future<void> submitCustomBackgroundFromSettings(
+    LiveRoomControllerBundle bundle,
     BuildContext sheetContext,
   ) async {
-    if (!_viewerCanManageRoom) {
+    if (!bundle.viewerCanManageRoom) {
       RoomToast.show(
-        context,
+        bundle.context,
         'Only the host/admin can submit room backgrounds',
       );
       return;
@@ -103,52 +157,64 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         source: ImageSource.gallery,
         imageQuality: 90,
       );
-      if (file == null || !mounted) return;
-      RoomToast.show(context, 'Uploading custom background...');
+      if (file == null || !bundle.mounted) return;
+      RoomToast.show(bundle.context, 'Uploading custom background...');
       final api = const RoomApiService();
       final upload = await api.uploadRoomBackground(file);
       final review = await api.submitCustomBackground(
-        roomId: _roomId,
+        roomId: bundle.roomId,
         imageUrl: upload.url,
       );
-      if (!mounted) return;
-      RoomToast.show(context, 'Submitted for review: ${review.reviewPublicId}');
-      _insertSystemMessage(
+      if (!bundle.mounted) return;
+      RoomToast.show(
+        bundle.context,
+        'Submitted for review: ${review.reviewPublicId}',
+      );
+      LiveRoomChatModule.insertSystemMessage(
+        bundle,
         'Custom room background submitted for review. Current background stays unchanged until approval.',
       );
     } catch (error) {
-      if (!mounted) return;
-      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+      if (!bundle.mounted) return;
+      RoomToast.show(
+        bundle.context,
+        error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
-  Future<void> _openBackgroundPickerFromSettings(
+  static Future<void> openBackgroundPickerFromSettings(
+    LiveRoomControllerBundle bundle,
     BuildContext sheetContext,
   ) async {
-    if (!_viewerCanManageRoom) {
-      RoomToast.show(context, 'Only the host/admin can change room background');
+    if (!bundle.viewerCanManageRoom) {
+      RoomToast.show(
+        bundle.context,
+        'Only the host/admin can change room background',
+      );
       return;
     }
     Navigator.pop(sheetContext);
 
-    if (CricketRoomModeSignal.isActive(_roomId)) {
+    if (CricketRoomModeSignal.isActive(bundle.roomId)) {
       final currentCricketTheme =
-          isCricketRoomBackground(_selectedBackgroundTheme)
-          ? _selectedBackgroundTheme
+          isCricketRoomBackground(bundle.selectedBackgroundTheme)
+          ? bundle.selectedBackgroundTheme
           : cricketFloodlightArenaBackgroundTheme;
       LiveRoomSheetController.showTransparentSheet<void>(
-        context: context,
+        context: bundle.context,
         isScrollControlled: true,
         builder: (context) => CricketRoomBackgroundPickerSheet(
           currentTheme: currentCricketTheme,
           onThemeSelected: (theme) {
-            _roomStateController.setSelectedBackgroundTheme(theme);
+            bundle.roomStateController.setSelectedBackgroundTheme(theme);
             LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
               theme.id,
             );
             RoomToast.show(context, '${theme.name} applied');
-            _insertSystemMessage(
-              '${theme.name} cricket background applied by ${_currentUser.name}.',
+            LiveRoomChatModule.insertSystemMessage(
+              bundle,
+              '${theme.name} cricket background applied by ${bundle.currentUser.name}.',
             );
           },
         ),
@@ -157,12 +223,12 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     }
 
     LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
+      context: bundle.context,
       isScrollControlled: true,
       builder: (context) => RoomBackgroundPickerSheet(
-        currentTheme: isCricketRoomBackground(_selectedBackgroundTheme)
+        currentTheme: isCricketRoomBackground(bundle.selectedBackgroundTheme)
             ? defaultRoomBackgroundTheme
-            : _selectedBackgroundTheme,
+            : bundle.selectedBackgroundTheme,
         onThemeSelected: (theme) {
           if (isCricketRoomBackground(theme)) {
             RoomToast.show(
@@ -171,39 +237,42 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
             );
             return;
           }
-          _roomStateController.setSelectedBackgroundTheme(theme);
+          bundle.roomStateController.setSelectedBackgroundTheme(theme);
           LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
             theme.id,
           );
           RoomToast.show(context, '${theme.name} applied');
-          _insertSystemMessage(
-            '${theme.name} background applied by ${_currentUser.name}.',
+          LiveRoomChatModule.insertSystemMessage(
+            bundle,
+            '${theme.name} background applied by ${bundle.currentUser.name}.',
           );
         },
         onStoreTap: () {
           Navigator.pop(context);
-          _openBackgroundStoreSheet();
+          openBackgroundStoreSheet(bundle);
         },
       ),
     );
   }
 
-  Future<void> _openBackgroundStoreSheet() async {
-    RoomToast.show(context, 'Loading store backgrounds...');
+  static Future<void> openBackgroundStoreSheet(
+    LiveRoomControllerBundle bundle,
+  ) async {
+    RoomToast.show(bundle.context, 'Loading store backgrounds...');
     try {
       final api = const RoomApiService();
       final themes = await api.listRoomThemes();
-      if (!mounted) return;
+      if (!bundle.mounted) return;
       final storeThemes = themes
           .where((theme) => !theme.isDefault && theme.mode != 'cricket')
           .toList(growable: false);
       LiveRoomSheetController.showTransparentSheet<void>(
-        context: context,
+        context: bundle.context,
         isScrollControlled: true,
         builder: (context) => _RoomThemeStoreSheet(
           themes: storeThemes,
           onCustomBackgroundTap: () =>
-              _submitCustomBackgroundFromSettings(context),
+              submitCustomBackgroundFromSettings(bundle, context),
           onThemePressed: (theme) async {
             try {
               var selectedTheme = theme;
@@ -214,20 +283,21 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
                 );
               }
               await api.applyRoomTheme(
-                roomId: _roomId,
+                roomId: bundle.roomId,
                 themeId: selectedTheme.themeId,
               );
-              if (!mounted) return;
+              if (!bundle.mounted) return;
               Navigator.pop(context);
-              _roomStateController.setSelectedBackgroundTheme(
+              bundle.roomStateController.setSelectedBackgroundTheme(
                 _themeFromDto(selectedTheme),
               );
               RoomToast.show(context, '${selectedTheme.name} applied');
-              _insertSystemMessage(
-                '${selectedTheme.name} background applied by ${_currentUser.name}.',
+              LiveRoomChatModule.insertSystemMessage(
+                bundle,
+                '${selectedTheme.name} background applied by ${bundle.currentUser.name}.',
               );
             } catch (error) {
-              if (!mounted) return;
+              if (!bundle.mounted) return;
               RoomToast.show(
                 context,
                 error.toString().replaceFirst('Exception: ', ''),
@@ -237,12 +307,15 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         ),
       );
     } catch (error) {
-      if (!mounted) return;
-      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+      if (!bundle.mounted) return;
+      RoomToast.show(
+        bundle.context,
+        error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
-  RoomBackgroundTheme _themeFromDto(RoomThemeDto theme) {
+  static RoomBackgroundTheme _themeFromDto(RoomThemeDto theme) {
     final isCricket =
         theme.mode == 'cricket' || theme.themeId.startsWith('cricket_');
     return RoomBackgroundTheme(
@@ -272,383 +345,225 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
     );
   }
 
-  void _openCricketModeFromSettings(BuildContext sheetContext) {
+  static void openVibeSyncSheetFromSettings(
+    LiveRoomControllerBundle bundle,
+    BuildContext sheetContext,
+  ) {
     Navigator.pop(sheetContext);
-    _capturePreCricketRoomState();
     Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (!mounted) return;
-      CricketStumpsFlowModule.open(
-        context: context,
-        roomId: _roomId,
-        roomName: _roomName,
-        canManage: _viewerCanManageRoom,
-        previousBackground: _selectedBackgroundTheme,
-        onBackgroundChanged: _roomStateController.setSelectedBackgroundTheme,
-        onSystemMessage: _insertSystemMessage,
-      );
+      if (bundle.mounted) openVibeSyncSheet(bundle);
     });
   }
 
-  void _openWatchPartyFromSettings(BuildContext sheetContext) {
-    Navigator.pop(sheetContext);
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (mounted) {
-        _openInfoSheet(
-          'Watch Party',
-          'Watch Party settings will open here. YouTube link, play/pause/seek sync, and 10-seat watch layout will connect next.',
-        );
-      }
-    });
-  }
-
-  void _openVibeSyncSheetFromSettings(BuildContext sheetContext) {
-    Navigator.pop(sheetContext);
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
-      if (mounted) _openVibeSyncSheet();
-    });
-  }
-
-  void _openVibeSyncSheet() {
-    _clearRoomFocus();
+  static void openVibeSyncSheet(LiveRoomControllerBundle bundle) {
+    LiveRoomLifecycleModule.clearFocus(bundle);
     LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
+      context: bundle.context,
       isScrollControlled: true,
       builder: (context) => VibeSyncControlSheet(
-        state: _vibeSyncState,
-        users: _roomUsers,
-        canManage: _viewerCanManageRoom,
+        state: bundle.vibeSyncState,
+        users: bundle.roomUsers,
+        canManage: bundle.viewerCanManageRoom,
         onPickFirst: (user) {
-          _roomStateController.setVibeSyncState(
-            _vibeSyncController.pickFirstUser(
-              state: _vibeSyncState,
+          bundle.roomStateController.setVibeSyncState(
+            bundle.vibeSyncController.pickFirstUser(
+              state: bundle.vibeSyncState,
               user: user,
             ),
           );
         },
         onPickSecond: (user) {
-          _roomStateController.setVibeSyncState(
-            _vibeSyncController.pickSecondUser(
-              state: _vibeSyncState,
+          bundle.roomStateController.setVibeSyncState(
+            bundle.vibeSyncController.pickSecondUser(
+              state: bundle.vibeSyncState,
               user: user,
             ),
           );
         },
         onAnnounce: () {
           Navigator.pop(context);
-          final announcement = _vibeSyncController.announce(_vibeSyncState);
+          final announcement = bundle.vibeSyncController.announce(
+            bundle.vibeSyncState,
+          );
           if (announcement == null) return;
-          _roomStateController.setVibeSyncState(announcement.state);
-          _insertSystemMessage(announcement.systemMessage);
+          bundle.roomStateController.setVibeSyncState(announcement.state);
+          LiveRoomChatModule.insertSystemMessage(
+            bundle,
+            announcement.systemMessage,
+          );
         },
         onEnd: () {
           Navigator.pop(context);
-          _roomStateController.setVibeSyncState(_vibeSyncController.end());
-          _insertSystemMessage(_vibeSyncController.endSystemMessage());
-        },
-      ),
-    );
-  }
-
-  void _openJoinRequestsSheet() {
-    _clearRoomFocus();
-    LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => LiveRoomJoinRequestsSheet(
-          users: _pendingRoomMemberRequests,
-          onApprove: (user) {
-            _resolveJoinRequest(user, approved: true);
-            setSheetState(() {});
-          },
-          onReject: (user) {
-            _resolveJoinRequest(user, approved: false);
-            setSheetState(() {});
-          },
-        ),
-      ),
-    );
-  }
-
-  void _resolveJoinRequest(SeatUser user, {required bool approved}) {
-    if (!_viewerCanManageAdmins) {
-      RoomToast.show(
-        context,
-        'Only channel host can approve room member requests',
-      );
-      return;
-    }
-    if (approved) {
-      LiveRoomMemberRequestService.instance.approveMembership(user);
-      LiveRoomMembershipService.markMember(roomId: _roomId, userId: user.id);
-    } else {
-      LiveRoomMemberRequestService.instance.rejectMembership(user);
-      LiveRoomMembershipService.markGuest(roomId: _roomId, userId: user.id);
-    }
-    RoomToast.show(
-      context,
-      approved
-          ? '${user.name} approved as room member'
-          : '${user.name} rejected',
-    );
-  }
-
-  void _openPrivacySheet() {
-    _clearRoomFocus();
-    LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => LiveRoomPrivacySheet(
-        currentMode: _privacyMode,
-        onModeChanged: (mode) {
-          _insertSystemMessage(
-            _settingsController.privacyModeSystemMessage(mode),
+          bundle.roomStateController.setVibeSyncState(
+            bundle.vibeSyncController.end(),
+          );
+          LiveRoomChatModule.insertSystemMessage(
+            bundle,
+            bundle.vibeSyncController.endSystemMessage(),
           );
         },
       ),
     );
   }
 
-  void _openGamesSheet() {
-    _clearRoomFocus();
-    LiveRoomGamesActionsModule.openGamesSheet(context: context);
-  }
-
-  void _openSeatLayoutSheet() {
-    if (CricketRoomModeSignal.isActive(_roomId)) {
-      RoomToast.show(context, 'Seat layout is fixed during Cricket Mode');
-      return;
-    }
-    _clearRoomFocus();
+  static void openJoinRequestsSheet(LiveRoomControllerBundle bundle) {
+    LiveRoomLifecycleModule.clearFocus(bundle);
     LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
-      builder: (context) => LiveRoomSeatLayoutPickerSheet(
-        selectedLayout: _seatController.layoutId,
-        onSelected: (layout) {
-          _roomStateController.setSeatLayoutId(layout);
-          _seatController.changeLayout(layout);
-          Navigator.pop(context);
-          RoomToast.show(context, 'Seat layout updated');
-          _insertSystemMessage('Seat layout updated by ${_currentUser.name}.');
-          _autoOccupySeatOneForHostOrAdmin();
-        },
+      context: bundle.context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => LiveRoomJoinRequestsSheet(
+          users: bundle.pendingRoomMemberRequests,
+          onApprove: (user) {
+            resolveJoinRequest(bundle, user, approved: true);
+            setSheetState(() {});
+          },
+          onReject: (user) {
+            resolveJoinRequest(bundle, user, approved: false);
+            setSheetState(() {});
+          },
+        ),
       ),
     );
   }
 
-  void _openEditRoomNameSheet() {
-    _clearRoomFocus();
-    if (!_viewerCanManageAdmins) {
-      RoomToast.show(context, 'Only channel host can edit room name');
-      return;
-    }
-    LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => _RoomNameEditSheet(
-        initialName: _roomName,
-        onSubmit: (name) {
-          Navigator.pop(sheetContext);
-          unawaited(_saveRoomName(name));
-        },
-      ),
-    );
-  }
-
-  Future<void> _saveRoomName(String name) async {
-    final cleanName = name.trim();
-    if (cleanName.isEmpty) {
-      RoomToast.show(context, 'Room name cannot be empty');
-      return;
-    }
-    try {
-      await _roomStateController.setRoomName(cleanName);
-      if (!mounted) return;
-      RoomToast.show(context, 'Room name updated');
-    } catch (error) {
-      if (!mounted) return;
-      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
-    }
-  }
-
-  void _openAnnouncementSheet() {
-    _clearRoomFocus();
-    if (!_viewerCanManageAdmins) {
+  static void resolveJoinRequest(
+    LiveRoomControllerBundle bundle,
+    SeatUser user, {
+    required bool approved,
+  }) {
+    if (!bundle.viewerCanManageAdmins) {
       RoomToast.show(
-        context,
+        bundle.context,
+        'Only channel host can approve room member requests',
+      );
+      return;
+    }
+    if (approved) {
+      LiveRoomMemberRequestService.instance.approveMembership(user);
+      LiveRoomMembershipService.markMember(
+        roomId: bundle.roomId,
+        userId: user.id,
+      );
+    } else {
+      LiveRoomMemberRequestService.instance.rejectMembership(user);
+      LiveRoomMembershipService.markGuest(
+        roomId: bundle.roomId,
+        userId: user.id,
+      );
+    }
+    RoomToast.show(
+      bundle.context,
+      approved
+          ? '${user.name} approved as room member'
+          : '${user.name} rejected',
+    );
+  }
+
+  static void openPrivacySheet(LiveRoomControllerBundle bundle) {
+    LiveRoomLifecycleModule.clearFocus(bundle);
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: bundle.context,
+      isScrollControlled: true,
+      builder: (context) => LiveRoomPrivacySheet(
+        currentMode: bundle.privacyMode,
+        onModeChanged: (mode) {
+          LiveRoomChatModule.insertSystemMessage(
+            bundle,
+            bundle.settingsController.privacyModeSystemMessage(mode),
+          );
+        },
+      ),
+    );
+  }
+
+  static void openGamesSheet(LiveRoomControllerBundle bundle) {
+    LiveRoomGamesEntryModule.openGamesSheet(bundle);
+  }
+
+  static void openSeatLayoutSheet(LiveRoomControllerBundle bundle) {
+    if (CricketRoomModeSignal.isActive(bundle.roomId)) {
+      RoomToast.show(
+        bundle.context,
+        'Seat layout is fixed during Cricket Mode',
+      );
+      return;
+    }
+    LiveRoomLifecycleModule.clearFocus(bundle);
+    LiveRoomSheetController.showTransparentSheet<void>(
+      context: bundle.context,
+      builder: (context) => LiveRoomSeatLayoutPickerSheet(
+        selectedLayout: bundle.seatController.layoutId,
+        onSelected: (layout) {
+          bundle.roomStateController.setSeatLayoutId(layout);
+          bundle.seatController.changeLayout(layout);
+          Navigator.pop(context);
+          RoomToast.show(bundle.context, 'Seat layout updated');
+          LiveRoomChatModule.insertSystemMessage(
+            bundle,
+            'Seat layout updated by ${bundle.currentUser.name}.',
+          );
+          LiveRoomSeatsModule.autoOccupySeatOneForHostOrAdmin(bundle);
+        },
+      ),
+    );
+  }
+
+  static void openAnnouncementSheet(LiveRoomControllerBundle bundle) {
+    LiveRoomLifecycleModule.clearFocus(bundle);
+    if (!bundle.viewerCanManageAdmins) {
+      RoomToast.show(
+        bundle.context,
         'Only channel host can update broad announcement',
       );
       return;
     }
-    _announcementController.text = _roomStateController.announcementText;
+    bundle.announcementController.text =
+        bundle.roomStateController.announcementText;
     LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
+      context: bundle.context,
       isScrollControlled: true,
       builder: (sheetContext) => LiveRoomAnnouncementSheet(
-        controller: _announcementController,
+        controller: bundle.announcementController,
         onSubmit: (message) {
           Navigator.pop(sheetContext);
-          unawaited(_saveAnnouncement(message));
+          unawaited(saveAnnouncement(bundle, message));
         },
       ),
     );
   }
 
-  Future<void> _saveAnnouncement(String message) async {
+  static Future<void> saveAnnouncement(
+    LiveRoomControllerBundle bundle,
+    String message,
+  ) async {
     final cleanMessage = message.trim();
     try {
-      await _roomStateController.setRoomAnnouncement(cleanMessage);
-      if (!mounted) return;
-      _announcementController.clear();
+      await bundle.roomStateController.setRoomAnnouncement(cleanMessage);
+      if (!bundle.mounted) return;
+      bundle.announcementController.clear();
       if (cleanMessage.isNotEmpty) {
         LiveRoomMediaSignalingService.instance.broadcastRoomSystemMessage(
           cleanMessage,
         );
       }
-      RoomToast.show(context, 'Announcement saved');
+      RoomToast.show(bundle.context, 'Announcement saved');
     } catch (error) {
-      if (!mounted) return;
-      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+      if (!bundle.mounted) return;
+      RoomToast.show(
+        bundle.context,
+        error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
-  void _openLeaveSheet() {
-    final restoreState = _buildRestoreState();
-    final roomName = _roomName;
-    final roomId = _roomId;
-    final language = widget.language;
-    final modeTitle = widget.modeTitle;
-    final onlineCount = _safeOnlineCount;
-
-    LiveRoomLeaveActionsModule.openLeaveSheet(
-      context: context,
-      navigationController: _navigationController,
-      roomStateController: _roomStateController,
-      roomName: roomName,
-      roomId: roomId,
-      language: language,
-      modeTitle: modeTitle,
-      onlineCount: onlineCount,
-      restoreState: restoreState,
-      dismissSeatActionPill: dismissRoomSeatActionPill,
-      clearFocus: _clearRoomFocus,
-      restoreMinimizedRoom: () {
-        if (!mounted) return;
-        dismissRoomSeatActionPill();
-        _clearRoomFocus();
-        _roomStateController.setBubbleOffset(
-          LiveRoomMinimizedOverlayService.instance.offset,
-        );
-        _roomStateController.setMinimized(false);
-      },
-      mountedGetter: () => mounted,
-    );
-  }
-
-  void _leaveRoomFromSheet(BuildContext sheetContext) {
-    LiveRoomLeaveActionsModule.leaveRoomFromSheet(
-      context: context,
-      sheetContext: sheetContext,
-      navigationController: _navigationController,
-      roomStateController: _roomStateController,
-      mountedGetter: () => mounted,
-    );
-  }
-
-  void _openInfoSheet(String title, String body) {
+  static void openInfoSheet(
+    LiveRoomControllerBundle bundle,
+    String title,
+    String body,
+  ) {
     LiveRoomSheetController.showTransparentSheet<void>(
-      context: context,
+      context: bundle.context,
       builder: (context) => LiveRoomInfoSheet(title: title, body: body),
-    );
-  }
-}
-
-class _RoomNameEditSheet extends StatefulWidget {
-  const _RoomNameEditSheet({required this.initialName, required this.onSubmit});
-
-  final String initialName;
-  final ValueChanged<String> onSubmit;
-
-  @override
-  State<_RoomNameEditSheet> createState() => _RoomNameEditSheetState();
-}
-
-class _RoomNameEditSheetState extends State<_RoomNameEditSheet> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialName);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-          18,
-          12,
-          18,
-          MediaQuery.paddingOf(context).bottom + 16,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SheetHandle(),
-            const SizedBox(height: 16),
-            const Text(
-              'Edit Room Name',
-              style: TextStyle(
-                color: RoomColors.plum,
-                fontSize: 23,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _controller,
-              maxLength: 120,
-              decoration: InputDecoration(
-                hintText: 'Room name',
-                filled: true,
-                fillColor: RoomColors.pearl,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => widget.onSubmit(_controller.text.trim()),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: RoomColors.plum,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                child: const Text('Save'),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
