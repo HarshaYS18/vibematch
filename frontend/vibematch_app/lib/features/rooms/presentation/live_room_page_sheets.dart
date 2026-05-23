@@ -535,6 +535,9 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
         if (!mounted) return;
         dismissRoomSeatActionPill();
         _clearRoomFocus();
+        _roomStateController.setBubbleOffset(
+          LiveRoomMinimizedOverlayService.instance.offset,
+        );
         _roomStateController.setMinimized(false);
       },
       mountedGetter: () => mounted,

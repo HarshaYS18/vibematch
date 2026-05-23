@@ -15,8 +15,9 @@ class LiveRoomMinimizedOverlayService extends ChangeNotifier {
   static void show({
     required BuildContext context,
     required VoidCallback onRestore,
+    Offset? initialOffset,
   }) {
-    instance._show(onRestore);
+    instance._show(onRestore, initialOffset: initialOffset);
   }
 
   static void hide() {
@@ -34,7 +35,8 @@ class LiveRoomMinimizedOverlayService extends ChangeNotifier {
     callback?.call();
   }
 
-  void _show(VoidCallback onRestore) {
+  void _show(VoidCallback onRestore, {Offset? initialOffset}) {
+    if (initialOffset != null) _offset = initialOffset;
     _onRestore = onRestore;
     notifyListeners();
   }

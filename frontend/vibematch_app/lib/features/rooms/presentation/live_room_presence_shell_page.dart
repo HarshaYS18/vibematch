@@ -309,7 +309,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   }
 
   bool get _shouldBlockRoomWithRetry {
-    return _presenceError != null && !_restoringMinimizedRoom;
+    return _presenceError != null;
   }
 
   @override
@@ -418,7 +418,9 @@ class _RoomNetworkRetryState extends StatelessWidget {
                         shape: BoxShape.circle,
                         color: const Color(0xFFE84C72).withValues(alpha: 0.16),
                         border: Border.all(
-                          color: const Color(0xFFE84C72).withValues(alpha: 0.28),
+                          color: const Color(
+                            0xFFE84C72,
+                          ).withValues(alpha: 0.28),
                         ),
                       ),
                       child: Icon(
@@ -478,7 +480,9 @@ class _RoomNetworkRetryState extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: FilledButton.icon(
-                            onPressed: joining ? null : () => unawaited(onRetry()),
+                            onPressed: joining
+                                ? null
+                                : () => unawaited(onRetry()),
                             icon: joining
                                 ? const SizedBox(
                                     width: 15,

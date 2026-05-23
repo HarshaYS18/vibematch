@@ -140,6 +140,7 @@ class LiveRoomLeaveActionsModule {
     LiveRoomMinimizedOverlayService.show(
       context: rootNavigator.context,
       onRestore: restoreMinimizedRoom,
+      initialOffset: roomStateController.bubbleOffset,
     );
     Navigator.pop(sheetContext);
     if (!mountedGetter()) return;
