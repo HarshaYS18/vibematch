@@ -513,30 +513,37 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
 
   void _openLeaveSheet() {
     final restoreState = _buildRestoreState();
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    final roomName = _roomName;
+    final roomId = _roomId;
+    final language = widget.language;
+    final modeTitle = widget.modeTitle;
+    final onlineCount = _safeOnlineCount;
+
     LiveRoomLeaveActionsModule.openLeaveSheet(
       context: context,
       navigationController: _navigationController,
       roomStateController: _roomStateController,
-      roomName: _roomName,
-      roomId: _roomId,
-      language: widget.language,
-      modeTitle: widget.modeTitle,
-      onlineCount: _safeOnlineCount,
+      roomName: roomName,
+      roomId: roomId,
+      language: language,
+      modeTitle: modeTitle,
+      onlineCount: onlineCount,
       restoreState: restoreState,
       dismissSeatActionPill: dismissRoomSeatActionPill,
       clearFocus: _clearRoomFocus,
       restoreMinimizedRoom: () {
-        Navigator.of(context, rootNavigator: true).push(
+        rootNavigator.push(
           PageRouteBuilder<void>(
             transitionDuration: const Duration(milliseconds: 220),
             reverseTransitionDuration: const Duration(milliseconds: 180),
             pageBuilder: (context, animation, secondaryAnimation) =>
                 LiveRoomPage(
-              roomName: _roomName,
-              roomId: _roomId,
-              language: widget.language,
-              modeTitle: widget.modeTitle,
-              onlineCount: _safeOnlineCount,
+              roomName: roomName,
+              roomId: roomId,
+              language: language,
+              modeTitle: modeTitle,
+              onlineCount: onlineCount,
               initialBackgroundTheme:
                   restoreState.roomState.selectedBackgroundTheme,
               restoreState: restoreState,
