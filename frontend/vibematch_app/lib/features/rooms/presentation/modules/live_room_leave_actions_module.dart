@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../controllers/live_room_navigation_controller.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../controllers/live_room_state_controller.dart';
-import '../live_room_page.dart';
 import '../live_room_restore_state.dart';
 import '../widgets/live_room_leave_sheet.dart';
 import '../widgets/live_room_minimized_overlay_service.dart';
@@ -23,6 +22,7 @@ class LiveRoomLeaveActionsModule {
     required LiveRoomRestoreState restoreState,
     required VoidCallback dismissSeatActionPill,
     required VoidCallback clearFocus,
+    required VoidCallback restoreMinimizedRoom,
     required bool Function() mountedGetter,
   }) {
     dismissSeatActionPill();
@@ -46,12 +46,7 @@ class LiveRoomLeaveActionsModule {
             context: context,
             sheetContext: sheetContext,
             roomStateController: roomStateController,
-            roomName: roomName,
-            roomId: roomId,
-            language: language,
-            modeTitle: modeTitle,
-            onlineCount: onlineCount,
-            restoreState: restoreState,
+            restoreMinimizedRoom: restoreMinimizedRoom,
             mountedGetter: mountedGetter,
           );
         },
@@ -142,12 +137,7 @@ class LiveRoomLeaveActionsModule {
     required BuildContext context,
     required BuildContext sheetContext,
     required LiveRoomStateController roomStateController,
-    required String roomName,
-    required String roomId,
-    required String language,
-    required String modeTitle,
-    required int onlineCount,
-    required LiveRoomRestoreState restoreState,
+    required VoidCallback restoreMinimizedRoom,
     required bool Function() mountedGetter,
   }) {
     final roomNavigator = Navigator.of(context);
@@ -155,21 +145,7 @@ class LiveRoomLeaveActionsModule {
 
     LiveRoomMinimizedOverlayService.show(
       context: rootNavigator.context,
-      onRestore: () {
-        rootNavigator.push(
-          MaterialPageRoute(
-            builder: (_) => LiveRoomPage(
-              roomName: roomName,
-              roomId: roomId,
-              language: language,
-              modeTitle: modeTitle,
-              onlineCount: onlineCount,
-              initialBackgroundTheme: restoreState.roomState.selectedBackgroundTheme,
-              restoreState: restoreState,
-            ),
-          ),
-        );
-      },
+      onRestore: restoreMinimizedRoom,
     );
 
     Navigator.pop(sheetContext);
