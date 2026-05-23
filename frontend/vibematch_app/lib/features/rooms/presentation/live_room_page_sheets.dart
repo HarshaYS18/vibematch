@@ -513,7 +513,6 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
 
   void _openLeaveSheet() {
     final restoreState = _buildRestoreState();
-    final rootNavigator = Navigator.of(context, rootNavigator: true);
     final roomName = _roomName;
     final roomId = _roomId;
     final language = widget.language;
@@ -533,42 +532,10 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       dismissSeatActionPill: dismissRoomSeatActionPill,
       clearFocus: _clearRoomFocus,
       restoreMinimizedRoom: () {
-        rootNavigator.push(
-          PageRouteBuilder<void>(
-            transitionDuration: const Duration(milliseconds: 220),
-            reverseTransitionDuration: const Duration(milliseconds: 180),
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                LiveRoomPage(
-              roomName: roomName,
-              roomId: roomId,
-              language: language,
-              modeTitle: modeTitle,
-              onlineCount: onlineCount,
-              initialBackgroundTheme:
-                  restoreState.roomState.selectedBackgroundTheme,
-              restoreState: restoreState,
-            ),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              final curved = CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-                reverseCurve: Curves.easeInCubic,
-              );
-
-              return FadeTransition(
-                opacity: curved,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(1, 0),
-                    end: Offset.zero,
-                  ).animate(curved),
-                  child: child,
-                ),
-              );
-            },
-          ),
-        );
+        if (!mounted) return;
+        dismissRoomSeatActionPill();
+        _clearRoomFocus();
+        _roomStateController.setMinimized(false);
       },
       mountedGetter: () => mounted,
     );
