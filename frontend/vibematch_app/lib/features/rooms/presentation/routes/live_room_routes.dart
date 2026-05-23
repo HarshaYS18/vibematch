@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/ui/vm_motion.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_presence_shell_page.dart';
 import 'live_room_route_args.dart';
@@ -14,11 +13,12 @@ class LiveRoomRoutes {
       LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(currentUser);
     }
 
-    return VmMotion.pageRoute<void>(
-      settings: RouteSettings(arguments: args),
-      beginOffset: const Offset(1.0, 0.0),
+    return PageRouteBuilder<void>(
       opaque: false,
-      page: LiveRoomPresenceShellPage(
+      maintainState: true,
+      transitionDuration: const Duration(milliseconds: 220),
+      reverseTransitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (context, animation, secondaryAnimation) => LiveRoomPresenceShellPage(
         roomName: args.roomName,
         roomId: args.roomId,
         language: args.language,
@@ -27,6 +27,14 @@ class LiveRoomRoutes {
         currentUser: currentUser,
         lockPassword: args.lockPassword,
       ),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(opacity: curved, child: child);
+      },
     );
   }
 }
