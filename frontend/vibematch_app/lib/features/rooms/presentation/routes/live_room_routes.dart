@@ -8,6 +8,10 @@ import 'live_room_route_args.dart';
 class LiveRoomRoutes {
   const LiveRoomRoutes._();
 
+  static const Duration _standardEntryDuration = Duration(milliseconds: 420);
+  static const Duration _homeTopRightEntryDuration = Duration(milliseconds: 680);
+  static const Duration _exitDuration = Duration(milliseconds: 340);
+
   static PageRouteBuilder<void> liveRoom(LiveRoomRouteViewArgs args) {
     final currentUser = args.currentUser;
     if (currentUser != null) {
@@ -21,9 +25,9 @@ class LiveRoomRoutes {
       opaque: false,
       maintainState: true,
       transitionDuration: isHomeTopRightEntry
-          ? const Duration(milliseconds: 430)
-          : const Duration(milliseconds: 240),
-      reverseTransitionDuration: const Duration(milliseconds: 180),
+          ? _homeTopRightEntryDuration
+          : _standardEntryDuration,
+      reverseTransitionDuration: _exitDuration,
       pageBuilder: (context, animation, secondaryAnimation) =>
           LiveRoomPresenceShellPage(
             roomName: args.roomName,
@@ -48,17 +52,20 @@ class LiveRoomRoutes {
   ) {
     final curved = CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuart,
       reverseCurve: Curves.easeInCubic,
     );
     return FadeTransition(
       opacity: curved,
       child: SlideTransition(
         position: Tween<Offset>(
-          begin: const Offset(0.018, 0.012),
+          begin: const Offset(0.028, 0.018),
           end: Offset.zero,
         ).animate(curved),
-        child: child,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.988, end: 1).animate(curved),
+          child: child,
+        ),
       ),
     );
   }
@@ -69,17 +76,17 @@ class LiveRoomRoutes {
   ) {
     final curved = CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuart,
       reverseCurve: Curves.easeInCubic,
     );
     final fade = CurvedAnimation(
       parent: animation,
-      curve: const Interval(0.06, 1, curve: Curves.easeOutCubic),
+      curve: const Interval(0.04, 1, curve: Curves.easeOutCubic),
       reverseCurve: Curves.easeInCubic,
     );
     final preloadReveal = CurvedAnimation(
       parent: animation,
-      curve: const Interval(0, 0.72, curve: Curves.easeOutCubic),
+      curve: const Interval(0, 0.84, curve: Curves.easeOutQuart),
       reverseCurve: Curves.easeInCubic,
     );
 
@@ -87,18 +94,20 @@ class LiveRoomRoutes {
       opacity: fade,
       child: SlideTransition(
         position: Tween<Offset>(
-          begin: const Offset(0.10, -0.045),
+          begin: const Offset(0.12, -0.055),
           end: Offset.zero,
         ).animate(curved),
         child: ScaleTransition(
           alignment: Alignment.topRight,
-          scale: Tween<double>(begin: 0.965, end: 1).animate(preloadReveal),
+          scale: Tween<double>(begin: 0.955, end: 1).animate(preloadReveal),
           child: AnimatedBuilder(
             animation: preloadReveal,
             child: child,
             builder: (context, child) {
               return ClipRRect(
-                borderRadius: BorderRadius.circular(32 * (1 - preloadReveal.value)),
+                borderRadius: BorderRadius.circular(
+                  34 * (1 - preloadReveal.value),
+                ),
                 child: child,
               );
             },
