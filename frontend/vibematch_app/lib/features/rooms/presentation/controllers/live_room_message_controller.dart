@@ -21,6 +21,16 @@ class LiveRoomMessageController {
     _attachSystemEventListener();
   }
 
+  static const Duration _roomSettingsSystemMessageDuration = Duration(seconds: 5);
+  static const Set<String> _allowedRoomSettingsSystemMessages = <String>{
+    'Images enabled',
+    'Images disabled',
+    'Guest messages enabled',
+    'Guest messages disabled',
+    'Apply mode enabled',
+    'Free mode enabled',
+  };
+
   static LiveRoomMessageController? _activeController;
 
   static void clearActiveRoomChatForEveryone() {
@@ -274,7 +284,12 @@ class LiveRoomMessageController {
     }
 
     if (event.isRoomSystemMessage) {
-      insertTransientSystemMessage(event.message);
+      final cleanMessage = event.message.trim();
+      if (!_allowedRoomSettingsSystemMessages.contains(cleanMessage)) return;
+      insertTransientSystemMessage(
+        cleanMessage,
+        duration: _roomSettingsSystemMessageDuration,
+      );
       return;
     }
 
