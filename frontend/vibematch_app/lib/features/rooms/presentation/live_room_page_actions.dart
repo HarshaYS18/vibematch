@@ -335,7 +335,7 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
       onGiftTap: (userId) {
         Navigator.pop(context);
         _setRoomState(() {
-          _giftController.selectedReceiverIds
+          (_giftControllerInstance ??= _createGiftController()).selectedReceiverIds
             ..clear()
             ..add(userId);
         });
@@ -485,7 +485,7 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     _clearRoomFocus();
     LiveRoomGiftActionsModule.openGiftPanel(
       context: context,
-      giftController: _giftController,
+      giftController: _giftControllerInstance ??= _createGiftController(),
       roomUsers: _roomUsers,
     );
   }
