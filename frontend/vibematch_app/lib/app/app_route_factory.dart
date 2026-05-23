@@ -44,6 +44,7 @@ class AppRouteFactory {
               onlineCount: args.onlineCount,
               currentUser: args.currentUser,
               lockPassword: args.lockPassword,
+              entryTransition: args.entryTransition,
             ),
           );
         }
