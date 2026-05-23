@@ -43,10 +43,8 @@ class LiveRoomLeaveActionsModule {
         onStay: () {
           dismissSeatActionPill();
           _stayAndMinimize(
-            context: context,
             sheetContext: sheetContext,
             roomStateController: roomStateController,
-            restoreMinimizedRoom: restoreMinimizedRoom,
             mountedGetter: mountedGetter,
           );
         },
@@ -89,7 +87,6 @@ class LiveRoomLeaveActionsModule {
     final roomNavigator = Navigator.of(context);
 
     roomStateController.setExitingRoom(true);
-
     LiveRoomMinimizedOverlayService.hide();
     Navigator.pop(sheetContext);
 
@@ -130,21 +127,14 @@ class LiveRoomLeaveActionsModule {
   }
 
   static void _stayAndMinimize({
-    required BuildContext context,
     required BuildContext sheetContext,
     required LiveRoomStateController roomStateController,
-    required VoidCallback restoreMinimizedRoom,
     required bool Function() mountedGetter,
   }) {
-    final rootNavigator = Navigator.of(context, rootNavigator: true);
-    LiveRoomMinimizedOverlayService.show(
-      context: rootNavigator.context,
-      onRestore: restoreMinimizedRoom,
-      initialOffset: roomStateController.bubbleOffset,
-    );
     Navigator.pop(sheetContext);
     if (!mountedGetter()) return;
 
+    LiveRoomMinimizedOverlayService.hide();
     roomStateController.setAllowRoomPop(false);
     roomStateController.setMinimized(true);
   }
