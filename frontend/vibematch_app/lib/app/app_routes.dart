@@ -47,6 +47,11 @@ enum VmMainTab {
   }
 }
 
+enum LiveRoomEntryTransition {
+  standard,
+  homeTopRightRoomIcon,
+}
+
 class VmRoutes {
   const VmRoutes._();
 
@@ -115,6 +120,7 @@ class LiveRoomRouteArgs {
   final int onlineCount;
   final CurrentUser? currentUser;
   final String? lockPassword;
+  final LiveRoomEntryTransition entryTransition;
 
   const LiveRoomRouteArgs({
     required this.roomName,
@@ -124,6 +130,7 @@ class LiveRoomRouteArgs {
     required this.onlineCount,
     this.currentUser,
     this.lockPassword,
+    this.entryTransition = LiveRoomEntryTransition.standard,
   });
 }
 
