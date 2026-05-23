@@ -494,21 +494,12 @@ class _LuckyPulse extends StatelessWidget {
   }
 }
 
-String _slideKey(GiftSlide slide) {
-  return '${slide.senderName.trim().toLowerCase()}|${slide.receiverName.trim().toLowerCase()}|${_baseGiftName(slide.giftName)}';
-}
+String _slideKey(GiftSlide slide) => slide.id;
 
 String _eventKey(GiftFlightEvent event) {
-  return '${event.senderName.trim().toLowerCase()}|${event.receiverName.trim().toLowerCase()}|${event.gift.name.trim().toLowerCase()}';
-}
-
-String _baseGiftName(String value) {
-  return value
-      .trim()
-      .toLowerCase()
-      .replaceAll(RegExp(r'\s+x\d+'), '')
-      .replaceAll(RegExp(r'\s+\+\d+'), '')
-      .trim();
+  return event.id.startsWith('flight-')
+      ? event.id.substring('flight-'.length)
+      : event.id;
 }
 
 int _rewardCoinsFromSlide(GiftSlide slide) {
