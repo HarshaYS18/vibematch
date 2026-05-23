@@ -35,20 +35,20 @@ class _LiveRoomMinimizedBubbleState extends State<LiveRoomMinimizedBubble>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
-      reverseDuration: const Duration(milliseconds: 170),
+      duration: const Duration(milliseconds: 420),
+      reverseDuration: const Duration(milliseconds: 310),
     );
 
     final curved = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuart,
       reverseCurve: Curves.easeInCubic,
     );
 
     _fade = Tween<double>(begin: 0, end: 1).animate(curved);
-    _scale = Tween<double>(begin: 0.82, end: 1).animate(curved);
+    _scale = Tween<double>(begin: 0.78, end: 1).animate(curved);
     _slide = Tween<Offset>(
-      begin: const Offset(-0.18, 0.06),
+      begin: const Offset(-0.22, 0.08),
       end: Offset.zero,
     ).animate(curved);
 
@@ -73,7 +73,7 @@ class _LiveRoomMinimizedBubbleState extends State<LiveRoomMinimizedBubble>
       _pressed = true;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 70));
+    await Future<void>.delayed(const Duration(milliseconds: 110));
 
     if (!mounted) return;
     await _controller.reverse();
@@ -105,15 +105,15 @@ class _LiveRoomMinimizedBubbleState extends State<LiveRoomMinimizedBubble>
                     : _pressed
                         ? 0.94
                         : 1.0,
-                duration: Duration(milliseconds: _restoring ? 165 : 95),
+                duration: Duration(milliseconds: _restoring ? 260 : 140),
                 curve: Curves.easeOutCubic,
                 child: AnimatedOpacity(
                   opacity: _restoring ? 0.0 : 1.0,
-                  duration: const Duration(milliseconds: 165),
+                  duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: 1),
-                    duration: const Duration(milliseconds: 900),
+                    duration: const Duration(milliseconds: 1200),
                     curve: Curves.easeInOut,
                     builder: (context, value, child) {
                       final pulse = _restoring ? 1.0 : 1 + (0.018 * value);
