@@ -22,6 +22,7 @@ class LiveRoomLeaveActionsModule {
     required LiveRoomRestoreState restoreState,
     required VoidCallback dismissSeatActionPill,
     required VoidCallback clearFocus,
+    required VoidCallback restoreMinimizedRoom,
     required bool Function() mountedGetter,
   }) {
     dismissSeatActionPill();
@@ -133,16 +134,8 @@ class LiveRoomLeaveActionsModule {
     Navigator.pop(sheetContext);
     if (!mountedGetter()) return;
 
+    LiveRoomMinimizedOverlayService.hide();
     roomStateController.setAllowRoomPop(false);
     roomStateController.setMinimized(true);
-
-    LiveRoomMinimizedOverlayService.show(
-      context: sheetContext,
-      onRestore: () {
-        if (!mountedGetter()) return;
-        roomStateController.setAllowRoomPop(false);
-        roomStateController.setMinimized(false);
-      },
-    );
   }
 }
