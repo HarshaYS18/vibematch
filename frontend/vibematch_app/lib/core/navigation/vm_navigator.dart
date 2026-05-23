@@ -15,6 +15,7 @@ class VmNavigator {
     required int onlineCount,
     CurrentUser? currentUser,
     String? lockPassword,
+    LiveRoomEntryTransition entryTransition = LiveRoomEntryTransition.standard,
   }) {
     return Navigator.pushNamed<T>(
       context,
@@ -27,6 +28,7 @@ class VmNavigator {
         onlineCount: onlineCount,
         currentUser: currentUser,
         lockPassword: lockPassword,
+        entryTransition: entryTransition,
       ),
     );
   }
