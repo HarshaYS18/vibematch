@@ -119,6 +119,7 @@ class LiveRoomGiftController {
   }
 
   static const int smallGiftFlightThreshold = 200000;
+  static const int comboTriggerSeconds = 15;
 
   final SeatUser currentUser;
   final VoidCallbackLike onChanged;
@@ -381,7 +382,7 @@ class LiveRoomGiftController {
       colors: gift.colors,
       combo: combo,
       baseCombo: combo,
-      remainingSeconds: gift.isVideoGift ? 10 : 15,
+      remainingSeconds: gift.isVideoGift ? 10 : comboTriggerSeconds,
     );
     _startGiftSlide(slide);
     _publishPremiumBroadcastIfNeeded(
@@ -585,7 +586,10 @@ class LiveRoomGiftController {
     if (index < 0) return;
     final active = giftSlides[index];
     final nextCombo = active.combo + active.baseCombo;
-    giftSlides[index] = active.copyWith(combo: nextCombo, remainingSeconds: 15);
+    giftSlides[index] = active.copyWith(
+      combo: nextCombo,
+      remainingSeconds: comboTriggerSeconds,
+    );
     onChanged();
   }
 
@@ -637,33 +641,24 @@ class LiveRoomGiftController {
         ),
       );
 
-      final existingLuckySlideIndex = giftSlides.indexWhere(
-        (item) => _luckyComboContexts.containsKey(item.id),
-      );
-      if (existingLuckySlideIndex != -1) {
-        final oldSlide = giftSlides.removeAt(existingLuckySlideIndex);
-        _giftTimers.remove(oldSlide.id)?.cancel();
-        _luckyComboContexts.remove(oldSlide.id);
-        _luckyComboProcessingSlideIds.remove(oldSlide.id);
+      final activeSlideIndex = giftSlides.indexWhere((item) => item.id == slide.id);
+      if (activeSlideIndex != -1) {
+        final active = giftSlides[activeSlideIndex];
+        giftSlides[activeSlideIndex] = active.copyWith(
+          combo: active.combo + context.baseCombo,
+          remainingSeconds: comboTriggerSeconds,
+        );
+        _luckyComboContexts[slide.id] = context;
+        _publishLuckyFlight(
+          slide: giftSlides[activeSlideIndex],
+          gift: context.gift,
+          receiverName: context.receiverName,
+          combo: context.baseCombo,
+          multiplier: multiplier,
+          rewardCoinAmount: rewardCoinAmount,
+          endAlignment: context.endAlignment,
+        );
       }
-
-      final comboSlide = _createLuckySlide(
-        gift: context.gift,
-        receiverName: context.receiverName,
-        combo: context.baseCombo,
-        multiplier: multiplier,
-      );
-      _luckyComboContexts[comboSlide.id] = context;
-      _startGiftSlide(comboSlide);
-      _publishLuckyFlight(
-        slide: comboSlide,
-        gift: context.gift,
-        receiverName: context.receiverName,
-        combo: context.baseCombo,
-        multiplier: multiplier,
-        rewardCoinAmount: rewardCoinAmount,
-        endAlignment: context.endAlignment,
-      );
       MiniProfileEconomyService.instance.clearCache();
       unawaited(refreshCoinBalance());
     } catch (error) {
@@ -830,13 +825,13 @@ class LiveRoomGiftController {
         return;
       }
       final active = giftSlides[index];
-      if (active.remainingSeconds <= 0) {
+      if (active.remainingSeconds <= 1) {
         timer.cancel();
-        giftSlides.removeAt(index);
+        final completed = giftSlides.removeAt(index);
         _giftTimers.remove(slide.id);
         _luckyComboContexts.remove(slide.id);
         _luckyComboProcessingSlideIds.remove(slide.id);
-        if (!active.isVideoGift) _insertFinalGiftMessage(active);
+        if (!completed.isVideoGift) _insertFinalGiftMessage(completed);
         onChanged();
         return;
       }
@@ -884,7 +879,7 @@ class LiveRoomGiftController {
       colors: _slideColorsForMultiplier(gift.colors, multiplier),
       combo: combo,
       baseCombo: combo,
-      remainingSeconds: gift.isVideoGift ? 10 : 15,
+      remainingSeconds: gift.isVideoGift ? 10 : comboTriggerSeconds,
     );
   }
 
