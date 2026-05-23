@@ -4,7 +4,7 @@ import '../../../../app/app_routes.dart';
 import '../../../../core/ui/vm_motion.dart';
 import '../../../experience/presentation/experience_detail_page.dart';
 import '../../../inbox/data/inbox_api_service.dart';
-import '../../../inbox/presentation/inbox_page_modular.dart';
+import '../../../inbox/presentation/inbox_page.dart';
 import '../../../rankings/data/global_rankings_api_service.dart';
 import '../../../rankings/presentation/global_rankings_sheet.dart';
 import '../../../social/data/social_api_service.dart';

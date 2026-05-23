@@ -12,7 +12,7 @@ import '../features/auth/models/current_user.dart';
 import '../features/home/presentation/home_page_modular.dart';
 import '../features/inbox/controllers/inbox_controller.dart';
 import '../features/inbox/models/inbox_models.dart';
-import '../features/inbox/presentation/inbox_page_modular.dart';
+import '../features/inbox/presentation/inbox_page.dart';
 import '../features/inbox/presentation/widgets/inbox_foreground_notification_banner.dart';
 import '../features/profile/presentation/me_page.dart';
 import '../features/presence/data/presence_api_service.dart';
