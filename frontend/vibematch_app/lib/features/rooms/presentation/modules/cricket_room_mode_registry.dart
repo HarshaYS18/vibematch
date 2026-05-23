@@ -20,25 +20,26 @@ class CricketRoomModeRegistry {
     );
   }
 
-  static CricketRoomModeController syncRoomModeFromSignal({
+  static CricketRoomModeController? syncRoomModeFromSignal({
     required String roomId,
     required String roomName,
     required String currentLayoutId,
   }) {
-    final controller = controllerFor(roomId: roomId, roomName: roomName);
     final shouldBeActive = CricketRoomModeSignal.isActive(roomId);
+    if (!shouldBeActive) {
+      _disposeControllerOnly(roomId);
+      return null;
+    }
+
+    final controller = controllerFor(roomId: roomId, roomName: roomName);
     final setup = CricketRoomModeSignal.setupFor(roomId);
 
-    if (shouldBeActive && !controller.active) {
+    if (!controller.active) {
       controller.startRoomMode(
         currentLayoutId: currentLayoutId,
         currentBackground: cricketFloodlightArenaBackgroundTheme,
         setup: setup,
       );
-    }
-
-    if (!shouldBeActive && controller.active) {
-      controller.endRoomMode();
     }
 
     return controller;
@@ -49,6 +50,7 @@ class CricketRoomModeRegistry {
   }
 
   static void deactivateRoom({required String roomId}) {
+    _disposeControllerOnly(roomId);
     CricketRoomModeSignal.deactivate(roomId);
   }
 
@@ -61,8 +63,16 @@ class CricketRoomModeRegistry {
   }
 
   static void disposeRoom(String roomId) {
-    final safeRoomId = roomId.trim().isEmpty ? roomId : roomId.trim();
+    final safeRoomId = _safeRoomId(roomId);
     _controllers.remove(safeRoomId)?.dispose();
     CricketRoomModeSignal.deactivate(safeRoomId);
+  }
+
+  static void _disposeControllerOnly(String roomId) {
+    _controllers.remove(_safeRoomId(roomId))?.dispose();
+  }
+
+  static String _safeRoomId(String roomId) {
+    return roomId.trim().isEmpty ? roomId : roomId.trim();
   }
 }

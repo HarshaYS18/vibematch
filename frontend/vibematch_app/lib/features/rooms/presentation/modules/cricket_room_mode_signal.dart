@@ -1,19 +1,13 @@
 import 'package:flutter/foundation.dart';
 
 class CricketQuickMatchPlayerSetup {
-  const CricketQuickMatchPlayerSetup({
-    required this.id,
-    required this.name,
-  });
+  const CricketQuickMatchPlayerSetup({required this.id, required this.name});
 
   final String id;
   final String name;
 
   Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'id': id,
-      'name': name,
-    };
+    return <String, Object?>{'id': id, 'name': name};
   }
 
   factory CricketQuickMatchPlayerSetup.fromJson(Map<String, dynamic> json) {
@@ -50,9 +44,9 @@ class CricketQuickMatchTeamSetup {
       name: json['name']?.toString() ?? 'Team',
       players: rawPlayers is List
           ? rawPlayers
-              .whereType<Map<String, dynamic>>()
-              .map(CricketQuickMatchPlayerSetup.fromJson)
-              .toList()
+                .whereType<Map<String, dynamic>>()
+                .map(CricketQuickMatchPlayerSetup.fromJson)
+                .toList()
           : const <CricketQuickMatchPlayerSetup>[],
     );
   }
@@ -110,10 +104,18 @@ class CricketQuickMatchSetup {
       roomName: json['room_name']?.toString() ?? 'Live Room',
       teamA: teamAJson is Map<String, dynamic>
           ? CricketQuickMatchTeamSetup.fromJson(teamAJson)
-          : const CricketQuickMatchTeamSetup(id: 'qa', name: 'Team A', players: []),
+          : const CricketQuickMatchTeamSetup(
+              id: 'qa',
+              name: 'Team A',
+              players: [],
+            ),
       teamB: teamBJson is Map<String, dynamic>
           ? CricketQuickMatchTeamSetup.fromJson(teamBJson)
-          : const CricketQuickMatchTeamSetup(id: 'qb', name: 'Team B', players: []),
+          : const CricketQuickMatchTeamSetup(
+              id: 'qb',
+              name: 'Team B',
+              players: [],
+            ),
       overs: int.tryParse(json['overs']?.toString() ?? '') ?? 5,
       wickets: int.tryParse(json['wickets']?.toString() ?? '') ?? 4,
       battingTeamId: json['batting_team_id']?.toString() ?? '',
@@ -133,8 +135,8 @@ class CricketRoomModeSignal {
 
   static final ValueNotifier<Map<String, CricketQuickMatchSetup>> matchSetups =
       ValueNotifier<Map<String, CricketQuickMatchSetup>>(
-    <String, CricketQuickMatchSetup>{},
-  );
+        <String, CricketQuickMatchSetup>{},
+      );
 
   static bool isActive(String roomId) {
     return activeRoomIds.value.contains(roomId.trim());
@@ -168,6 +170,10 @@ class CricketRoomModeSignal {
   static void deactivate(String roomId) {
     final safeRoomId = roomId.trim();
     if (safeRoomId.isEmpty) return;
+    if (!activeRoomIds.value.contains(safeRoomId) &&
+        !matchSetups.value.containsKey(safeRoomId)) {
+      return;
+    }
 
     final nextActive = <String>{...activeRoomIds.value}..remove(safeRoomId);
     final nextSetups = <String, CricketQuickMatchSetup>{...matchSetups.value}

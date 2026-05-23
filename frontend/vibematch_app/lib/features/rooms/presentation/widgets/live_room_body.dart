@@ -153,18 +153,20 @@ class LiveRoomBody extends StatelessWidget {
 
     return ValueListenableBuilder<Set<String>>(
       valueListenable: CricketRoomModeSignal.activeRoomIds,
-      builder: (context, activeRoomIds, child) {
+      builder: (context, _, child) {
         final cricketController =
             CricketRoomModeRegistry.syncRoomModeFromSignal(
               roomId: roomId,
               roomName: roomName,
               currentLayoutId: layoutId,
             );
-        final cricketModeActive = cricketController.active;
+        final cricketModeActive = cricketController?.active == true;
         final effectiveSeats = cricketModeActive ? _cricketSeats() : seats;
         final activeUser =
             LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser;
-        final canManageCricket = cricketModeActive &&
+        final canManageCricket =
+            cricketModeActive &&
+            cricketController != null &&
             activeUser != null &&
             CricketRoomModeModule.canScore(
               seats: effectiveSeats,
@@ -243,7 +245,7 @@ class LiveRoomBody extends StatelessWidget {
                           children: [
                             if (cricketModeActive)
                               AnimatedBuilder(
-                                animation: cricketController,
+                                animation: cricketController!,
                                 builder: (context, child) =>
                                     CricketRoomModeModule.fixedScoreboard(
                                       state: cricketController.match,
@@ -286,7 +288,7 @@ class LiveRoomBody extends StatelessWidget {
               ),
               if (cricketModeActive)
                 AnimatedBuilder(
-                  animation: cricketController,
+                  animation: cricketController!,
                   builder: (context, child) {
                     return CricketRoomControlsModule(
                       controller: cricketController,
