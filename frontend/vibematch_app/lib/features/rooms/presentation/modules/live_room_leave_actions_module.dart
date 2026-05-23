@@ -43,6 +43,7 @@ class LiveRoomLeaveActionsModule {
         onStay: () {
           dismissSeatActionPill();
           _stayAndMinimize(
+            context: context,
             sheetContext: sheetContext,
             roomStateController: roomStateController,
             restoreMinimizedRoom: restoreMinimizedRoom,
@@ -89,10 +90,6 @@ class LiveRoomLeaveActionsModule {
 
     roomStateController.setExitingRoom(true);
 
-    // Production rule:
-    // Explicit Leave Room is different from minimize/network reconnect.
-    // A real leave must release the current seat first so re-entry comes back
-    // as audience unless the user explicitly takes a seat again.
     LiveRoomMinimizedOverlayService.hide();
     Navigator.pop(sheetContext);
 
@@ -133,18 +130,20 @@ class LiveRoomLeaveActionsModule {
   }
 
   static void _stayAndMinimize({
+    required BuildContext context,
     required BuildContext sheetContext,
     required LiveRoomStateController roomStateController,
     required VoidCallback restoreMinimizedRoom,
     required bool Function() mountedGetter,
   }) {
-    LiveRoomMinimizedOverlayService.show(onRestore: restoreMinimizedRoom);
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    LiveRoomMinimizedOverlayService.show(
+      context: rootNavigator.context,
+      onRestore: restoreMinimizedRoom,
+    );
     Navigator.pop(sheetContext);
     if (!mountedGetter()) return;
 
-    // Keep the existing LiveRoomPage mounted instead of popping/recreating it.
-    // This preserves WebSocket/media subscriptions, seat state, cricket score,
-    // gift timers, presence heartbeat, and realtime user updates while minimized.
     roomStateController.setAllowRoomPop(false);
     roomStateController.setMinimized(true);
   }
