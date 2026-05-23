@@ -24,9 +24,11 @@ class VmMotion {
     required RouteSettings settings,
     required Widget page,
     Offset beginOffset = const Offset(0.045, 0.012),
+    bool opaque = true,
   }) {
     return PageRouteBuilder<T>(
       settings: settings,
+      opaque: opaque,
       transitionDuration: pageDuration,
       reverseTransitionDuration: pageReverseDuration,
       pageBuilder: (context, animation, secondaryAnimation) => page,
