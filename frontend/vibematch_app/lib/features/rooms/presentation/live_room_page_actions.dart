@@ -184,11 +184,25 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
 
   void _insertSystemMessage(String message) {
     final cleanMessage = message.trim();
-    if (!_allowedRoomSettingsSystemMessages.contains(cleanMessage)) return;
-    _roomMessageController.insertTransientSystemMessage(
-      cleanMessage,
-      duration: const Duration(seconds: 5),
-    );
+    if (cleanMessage.isEmpty) return;
+    if (_allowedRoomSettingsSystemMessages.contains(cleanMessage)) {
+      _roomMessageController.insertTransientSystemMessage(
+        cleanMessage,
+        duration: const Duration(seconds: 5),
+      );
+      return;
+    }
+    if (_isRoomSettingsNoiseSystemMessage(cleanMessage)) return;
+    _roomMessageController.insertSystemMessage(cleanMessage);
+  }
+
+  bool _isRoomSettingsNoiseSystemMessage(String message) {
+    return message.startsWith('Room cover photo updated by ') ||
+        message.startsWith('Custom room background submitted for review.') ||
+        message.contains(' background applied by ') ||
+        message.contains(' cricket background applied by ') ||
+        message.startsWith('Seat layout updated by ') ||
+        message.startsWith('Room mode changed to ');
   }
 
   void _clearRoomFocus() {
