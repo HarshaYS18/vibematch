@@ -8,6 +8,7 @@ class LiveRoomMinimizedOverlayService extends ChangeNotifier {
 
   Offset _offset = const Offset(24, 120);
   VoidCallback? _onRestore;
+  bool _restoreInProgress = false;
 
   Offset get offset => _offset;
   bool get isShowing => _onRestore != null;
@@ -31,19 +32,28 @@ class LiveRoomMinimizedOverlayService extends ChangeNotifier {
 
   void restore() {
     final callback = _onRestore;
-    _hide();
-    callback?.call();
+    if (callback == null || _restoreInProgress) return;
+
+    _restoreInProgress = true;
+    callback.call();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreInProgress = false;
+      _hide();
+    });
   }
 
   void _show(VoidCallback onRestore, {Offset? initialOffset}) {
     if (initialOffset != null) _offset = initialOffset;
+    _restoreInProgress = false;
     _onRestore = onRestore;
     notifyListeners();
   }
 
   void _hide() {
-    if (_onRestore == null) return;
+    if (_onRestore == null && !_restoreInProgress) return;
     _onRestore = null;
+    _restoreInProgress = false;
     notifyListeners();
   }
 }
