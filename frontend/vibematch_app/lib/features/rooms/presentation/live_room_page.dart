@@ -361,13 +361,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _handleCricketStartNewMatch() {
     if (!CricketRoomModeSignal.isActive(_roomId)) return;
-    final controller = CricketRoomModeRegistry.controllerFor(
+    _clearRoomFocus();
+    CricketStumpsFlowModule.open(
+      context: context,
       roomId: _roomId,
       roomName: _roomName,
+      canManage: true,
+      previousBackground: _preCricketBackgroundTheme ?? _selectedBackgroundTheme,
+      onBackgroundChanged: _roomStateController.setSelectedBackgroundTheme,
+      onSystemMessage: _insertSystemMessage,
     );
-    controller.startNewMatch();
-    RoomToast.show(context, 'New cricket match started');
-    _insertSystemMessage('New cricket match started by ${_currentUser.name}.');
   }
 
   void _handleCricketEndMatch() {
