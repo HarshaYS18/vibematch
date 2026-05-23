@@ -5,6 +5,7 @@ import 'app/app_route_factory.dart';
 import 'app/app_routes.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'core/notifications/vm_push_notification_service.dart';
+import 'core/security/app_lifecycle_lock_gate.dart';
 import 'firebase_options.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -94,7 +95,7 @@ class VibeMatchApp extends StatelessWidget {
         final media = MediaQuery.of(context);
         return MediaQuery(
           data: media.copyWith(textScaler: media.textScaler.clamp(minScaleFactor: 0.82, maxScaleFactor: 0.92)),
-          child: child ?? const AuthGate(),
+          child: AppLifecycleLockGate(child: child ?? const AuthGate()),
         );
       },
     );
