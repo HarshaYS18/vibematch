@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../core/navigation/vm_navigator.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../auth/models/current_user.dart';
@@ -77,10 +78,11 @@ class HomeNavigationController {
     }
 
     if (existingRoom != null) {
-      await _joinAndEnter(
+      enterRoom(
         context: context,
         room: existingRoom,
         currentUser: currentUser,
+        entryTransition: LiveRoomEntryTransition.homeTopRightRoomIcon,
       );
       return;
     }
@@ -98,10 +100,11 @@ class HomeNavigationController {
 
     final createdRoom = controller.myCreatedRoom;
     if (createdRoom != null) {
-      await _joinAndEnter(
+      enterRoom(
         context: context,
         room: createdRoom,
         currentUser: currentUser,
+        entryTransition: LiveRoomEntryTransition.homeTopRightRoomIcon,
       );
       return;
     }
@@ -123,6 +126,7 @@ class HomeNavigationController {
     required HomeRoom room,
     required CurrentUser? currentUser,
     String? lockPassword,
+    LiveRoomEntryTransition entryTransition = LiveRoomEntryTransition.standard,
   }) {
     VmNavigator.openLiveRoom(
       context,
@@ -133,6 +137,7 @@ class HomeNavigationController {
       onlineCount: room.onlineCount,
       currentUser: currentUser,
       lockPassword: lockPassword,
+      entryTransition: entryTransition,
     );
   }
 
