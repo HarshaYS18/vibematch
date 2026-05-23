@@ -162,7 +162,14 @@ class LiveRoomBody extends StatelessWidget {
             );
         final cricketModeActive = cricketController.active;
         final effectiveSeats = cricketModeActive ? _cricketSeats() : seats;
-        final canManageCricket = cricketModeActive && canManageSeats;
+        final activeUser =
+            LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser;
+        final canManageCricket = cricketModeActive &&
+            activeUser != null &&
+            CricketRoomModeModule.canScore(
+              seats: effectiveSeats,
+              currentUserId: activeUser.id,
+            );
         final effectiveLayoutId = cricketModeActive
             ? CricketRoomRules.fixedLayoutId
             : layoutId;
