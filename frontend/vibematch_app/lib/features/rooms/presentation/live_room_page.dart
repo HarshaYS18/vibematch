@@ -356,7 +356,18 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _capturePreCricketRoomState() {
     if (CricketRoomModeSignal.isActive(_roomId)) return;
     _preCricketLayoutId ??= _seatController.layoutId;
-    _preCricketBackgroundTheme ??= _selectedBackgroundTheme;
+    if (_preCricketBackgroundTheme == null &&
+        !isCricketRoomBackground(_selectedBackgroundTheme)) {
+      _preCricketBackgroundTheme = _selectedBackgroundTheme;
+    }
+  }
+
+  RoomBackgroundTheme _normalBackgroundAfterCricket() {
+    final savedBackground = _preCricketBackgroundTheme;
+    if (savedBackground == null || isCricketRoomBackground(savedBackground)) {
+      return defaultRoomBackgroundTheme;
+    }
+    return savedBackground;
   }
 
   void _handleCricketStartNewMatch() {
@@ -367,7 +378,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       roomId: _roomId,
       roomName: _roomName,
       canManage: true,
-      previousBackground: _preCricketBackgroundTheme ?? _selectedBackgroundTheme,
+      previousBackground: _normalBackgroundAfterCricket(),
       onBackgroundChanged: _roomStateController.setSelectedBackgroundTheme,
       onSystemMessage: _insertSystemMessage,
     );
@@ -376,8 +387,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void _handleCricketEndMatch() {
     final restoreLayout =
         _preCricketLayoutId ?? _roomStateController.seatLayoutId;
-    final restoreBackground =
-        _preCricketBackgroundTheme ?? defaultRoomBackgroundTheme;
+    final restoreBackground = _normalBackgroundAfterCricket();
 
     LiveRoomMediaSignalingService.instance.endCricketMode(_roomId);
     CricketRoomModeSignal.deactivate(_roomId);
@@ -386,6 +396,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     _seatController.changeLayout(restoreLayout);
     _roomStateController.setSeatLayoutId(restoreLayout);
     _roomStateController.setSelectedBackgroundTheme(restoreBackground);
+    LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
+      restoreBackground.id,
+    );
 
     _preCricketLayoutId = null;
     _preCricketBackgroundTheme = null;
