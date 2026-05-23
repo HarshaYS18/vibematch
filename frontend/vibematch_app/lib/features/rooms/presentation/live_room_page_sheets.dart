@@ -527,16 +527,39 @@ extension _LiveRoomPageSheets on _LiveRoomPageState {
       clearFocus: _clearRoomFocus,
       restoreMinimizedRoom: () {
         Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute(
-            builder: (_) => LiveRoomPage(
+          PageRouteBuilder<void>(
+            transitionDuration: const Duration(milliseconds: 220),
+            reverseTransitionDuration: const Duration(milliseconds: 180),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                LiveRoomPage(
               roomName: _roomName,
               roomId: _roomId,
               language: widget.language,
               modeTitle: widget.modeTitle,
               onlineCount: _safeOnlineCount,
-              initialBackgroundTheme: restoreState.roomState.selectedBackgroundTheme,
+              initialBackgroundTheme:
+                  restoreState.roomState.selectedBackgroundTheme,
               restoreState: restoreState,
             ),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              final curved = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              );
+
+              return FadeTransition(
+                opacity: curved,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1, 0),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  child: child,
+                ),
+              );
+            },
           ),
         );
       },
