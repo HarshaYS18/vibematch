@@ -1,6 +1,15 @@
 part of 'live_room_page.dart';
 
 extension _LiveRoomPageActions on _LiveRoomPageState {
+  static const Set<String> _allowedRoomSettingsSystemMessages = <String>{
+    'Images enabled',
+    'Images disabled',
+    'Guest messages enabled',
+    'Guest messages disabled',
+    'Apply mode enabled',
+    'Free mode enabled',
+  };
+
   void _onSeatTap(int index) {
     final seat = _seatController.seats[index];
     if (seat.locked) {
@@ -173,8 +182,14 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
     _clearRoomFocus();
   }
 
-  void _insertSystemMessage(String message) =>
-      _roomMessageController.insertSystemMessage(message);
+  void _insertSystemMessage(String message) {
+    final cleanMessage = message.trim();
+    if (!_allowedRoomSettingsSystemMessages.contains(cleanMessage)) return;
+    _roomMessageController.insertTransientSystemMessage(
+      cleanMessage,
+      duration: const Duration(seconds: 5),
+    );
+  }
 
   void _clearRoomFocus() {
     _messageFocusNode.unfocus();
@@ -418,105 +433,39 @@ extension _LiveRoomPageActions on _LiveRoomPageState {
       controller: _messageController,
       focusNode: _messageFocusNode,
       imagesEnabled: _roomImagesEnabled,
-      onSendText: _sendMessage,
-      onImageTap: () =>
-          RoomToast.show(context, 'Image message picker will connect here'),
-      onSendFloatingText: _sendMessage,
+      onSend: _sendMessage,
+      onPickImage: _pickAndSendRoomImage,
     );
   }
 
-  void _setUserAsAdmin(String userId) {
-    Navigator.pop(context);
-    if (!_viewerCanManageAdmins) {
-      RoomToast.show(context, 'Only channel host can add admins');
+  Future<void> _pickAndSendRoomImage() async {
+    if (!_roomImagesEnabled) {
+      RoomToast.show(context, 'Images are disabled in this room');
       return;
     }
-    _seatController.setUserAsAdmin(userId);
-    _clearRoomFocus();
-  }
 
-  void _removeUserAsAdmin(String userId) {
-    Navigator.pop(context);
-    if (!_viewerCanManageAdmins) {
-      RoomToast.show(context, 'Only channel host can remove admins');
+    if (!_guestMessagesEnabled && !_currentUserIsMember && !_viewerCanManageRoom) {
+      RoomToast.show(context, 'Guests cannot send messages in this room');
       return;
     }
-    _seatController.removeUserAsAdmin(userId);
-    _clearRoomFocus();
-  }
 
-  void _addRoomAdminFromInfo(SeatUser user) {
-    if (!_viewerCanManageAdmins) {
-      RoomToast.show(context, 'Only channel host can add admins');
-      return;
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 84,
+      );
+      if (file == null || !mounted) return;
+      RoomToast.show(context, 'Uploading image...');
+      final upload = await const RoomApiService().uploadRoomCover(file);
+      if (!mounted) return;
+      LiveRoomMessageController.sendActiveRoomImageMessage(
+        imageUrl: upload.url,
+        contentType: upload.contentType,
+      );
+      RoomToast.show(context, 'Image sent');
+    } catch (error) {
+      if (!mounted) return;
+      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
     }
-    _seatController.setUserAsAdmin(user.id);
-    _clearRoomFocus();
-  }
-
-  void _removeRoomAdminFromInfo(SeatUser user) {
-    if (!_viewerCanManageAdmins) {
-      RoomToast.show(context, 'Only channel host can remove admins');
-      return;
-    }
-    _seatController.removeUserAsAdmin(user.id);
-    _clearRoomFocus();
-  }
-
-  void _removeRoomMemberFromInfo(SeatUser user) {
-    if (!_viewerCanManageAdmins) {
-      RoomToast.show(context, 'Only channel host can remove room members');
-      return;
-    }
-    LiveRoomMemberRequestService.instance.removeRoomMember(user);
-    RoomToast.show(context, 'Removing ${user.name} from room members');
-    _clearRoomFocus();
-  }
-
-  void _openReportForUser(SeatUser user) {
-    Navigator.pop(context);
-    _openInfoSheet(
-      'Report submitted',
-      '${user.name} has been sent to the room safety review queue.',
-    );
-  }
-
-  void _openGiftPanel() {
-    _clearRoomFocus();
-    LiveRoomGiftActionsModule.openGiftPanel(
-      context: context,
-      giftController: _giftControllerInstance ??= _createGiftController(),
-      roomUsers: _roomUsers,
-    );
-  }
-
-  void _openInboxPage() {
-    _clearRoomFocus();
-    LiveRoomInboxActionsModule.openInboxSheet(
-      context: context,
-      roomStateController: _roomStateController,
-    );
-  }
-
-  void _openInboxPageFromSheet(BuildContext sheetContext) {
-    LiveRoomInboxActionsModule.openInboxSheetAfterClosingCurrentSheet(
-      pageContext: context,
-      sheetContext: sheetContext,
-      roomStateController: _roomStateController,
-    );
-  }
-
-  void _openEmojiTray() {
-    _clearRoomFocus();
-    LiveRoomEmojiActionsModule.openEmojiTray(context: context);
-  }
-}
-
-extension _FirstOrNullOnIterable<T> on Iterable<T> {
-  T? get firstOrNull {
-    for (final item in this) {
-      return item;
-    }
-    return null;
   }
 }
