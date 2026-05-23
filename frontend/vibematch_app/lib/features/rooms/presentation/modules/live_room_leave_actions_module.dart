@@ -86,11 +86,6 @@ class LiveRoomLeaveActionsModule {
     final roomNavigator = Navigator.of(context);
 
     roomStateController.setExitingRoom(true);
-
-    // Production rule:
-    // Explicit Leave Room is different from minimize/network reconnect.
-    // A real leave must release the current seat first so re-entry comes back
-    // as audience unless the user explicitly takes a seat again.
     LiveRoomMinimizedOverlayService.hide();
     Navigator.pop(sheetContext);
 
@@ -138,12 +133,16 @@ class LiveRoomLeaveActionsModule {
     Navigator.pop(sheetContext);
     if (!mountedGetter()) return;
 
-    // Keep the existing LiveRoomPage mounted. Do not pop the room route and do
-    // not push a new LiveRoomPresenceShellPage on restore. This makes restore
-    // instant and preserves seats, public IDs, chat, gift state, and controllers
-    // in memory.
-    LiveRoomMinimizedOverlayService.hide();
     roomStateController.setAllowRoomPop(false);
     roomStateController.setMinimized(true);
+
+    LiveRoomMinimizedOverlayService.show(
+      context: sheetContext,
+      onRestore: () {
+        if (!mountedGetter()) return;
+        roomStateController.setAllowRoomPop(false);
+        roomStateController.setMinimized(false);
+      },
+    );
   }
 }
