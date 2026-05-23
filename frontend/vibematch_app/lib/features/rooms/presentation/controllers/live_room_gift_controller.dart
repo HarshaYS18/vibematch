@@ -147,6 +147,7 @@ class LiveRoomGiftController {
       <String, _LuckyComboContext>{};
   final Set<String> _luckyComboProcessingSlideIds = <String>{};
   final Set<String> _luckyComboProcessingKeys = <String>{};
+  final Map<String, DateTime> _lastComboTapBySlideId = <String, DateTime>{};
 
   LuckyPacketRoomEvent? activeLuckyPacket;
   Timer? _luckyPacketTimer;
@@ -171,7 +172,8 @@ class LiveRoomGiftController {
 
   void _handleRealtimeUser(CurrentUser user) {
     final currentPublicUserId = _publicUserIdFromSeatUser(currentUser);
-    if (currentPublicUserId == null || currentPublicUserId != user.publicUserId) {
+    if (currentPublicUserId == null ||
+        currentPublicUserId != user.publicUserId) {
       return;
     }
     final nextBalance = user.wallet.coinBalance;
@@ -214,7 +216,9 @@ class LiveRoomGiftController {
     selectedCategory = gift.category;
     selectedCombo = gift.id == 'lucky_packet'
         ? 1
-        : ((gift.categoryKey == 'lucky' || gift.category == GiftCategory.lucky) ? 9 : 1);
+        : ((gift.categoryKey == 'lucky' || gift.category == GiftCategory.lucky)
+              ? 9
+              : 1);
     onChanged();
   }
 
@@ -583,6 +587,7 @@ class LiveRoomGiftController {
 
   void tapGiftCombo(GiftSlide slide) {
     if (slide.isVideoGift || slide.giftName == 'Lucky Packet') return;
+    if (_isDuplicateComboTap(slide.id)) return;
     final luckyContext = _luckyComboContexts[slide.id];
     if (luckyContext != null) {
       unawaited(_triggerLuckyCombo(slide: slide, context: luckyContext));
@@ -598,6 +603,14 @@ class LiveRoomGiftController {
       remainingSeconds: comboTriggerSeconds,
     );
     onChanged();
+  }
+
+  bool _isDuplicateComboTap(String slideId) {
+    final now = DateTime.now();
+    final previous = _lastComboTapBySlideId[slideId];
+    _lastComboTapBySlideId[slideId] = now;
+    return previous != null &&
+        now.difference(previous) < const Duration(milliseconds: 90);
   }
 
   Future<void> _triggerLuckyCombo({
@@ -648,7 +661,9 @@ class LiveRoomGiftController {
         ),
       );
 
-      final activeSlideIndex = giftSlides.indexWhere((item) => item.id == slide.id);
+      final activeSlideIndex = giftSlides.indexWhere(
+        (item) => item.id == slide.id,
+      );
       if (activeSlideIndex != -1) {
         final active = giftSlides[activeSlideIndex];
         giftSlides[activeSlideIndex] = active.copyWith(
@@ -684,6 +699,7 @@ class LiveRoomGiftController {
     _giftTimers.remove(slide.id)?.cancel();
     _luckyComboContexts.remove(slide.id);
     _luckyComboProcessingSlideIds.remove(slide.id);
+    _lastComboTapBySlideId.remove(slide.id);
     giftSlides.removeAt(index);
     onChanged();
   }
@@ -833,6 +849,7 @@ class LiveRoomGiftController {
         _giftTimers.remove(slide.id);
         _luckyComboContexts.remove(slide.id);
         _luckyComboProcessingSlideIds.remove(slide.id);
+        _lastComboTapBySlideId.remove(slide.id);
         return;
       }
       final active = giftSlides[index];
@@ -842,6 +859,7 @@ class LiveRoomGiftController {
         _giftTimers.remove(slide.id);
         _luckyComboContexts.remove(slide.id);
         _luckyComboProcessingSlideIds.remove(slide.id);
+        _lastComboTapBySlideId.remove(slide.id);
         if (!completed.isVideoGift) _insertFinalGiftMessage(completed);
         onChanged();
         return;
@@ -862,8 +880,10 @@ class LiveRoomGiftController {
       _giftTimers.remove(slideId)?.cancel();
       _luckyComboContexts.remove(slideId);
       _luckyComboProcessingSlideIds.remove(slideId);
+      _lastComboTapBySlideId.remove(slideId);
       giftSlides.removeWhere((slide) => slide.id == slideId);
     }
+    if (staleLuckySlideIds.isNotEmpty) _luckyComboProcessingKeys.clear();
   }
 
   void _insertFinalGiftMessage(GiftSlide slide) {
@@ -972,7 +992,8 @@ class LiveRoomGiftController {
   }
 
   Alignment _receiverAlignment(SeatUser? receiver, List<SeatUser> roomUsers) {
-    if (receiver == null || roomUsers.isEmpty) return const Alignment(0.0, -0.20);
+    if (receiver == null || roomUsers.isEmpty)
+      return const Alignment(0.0, -0.20);
     final index = roomUsers.indexWhere((user) => user.id == receiver.id);
     if (index < 0) return const Alignment(0.68, -0.16);
     final column = index % 4;
@@ -996,6 +1017,7 @@ class LiveRoomGiftController {
     _luckyComboContexts.clear();
     _luckyComboProcessingSlideIds.clear();
     _luckyComboProcessingKeys.clear();
+    _lastComboTapBySlideId.clear();
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
     LuckyPacketRoomBus.clearController(this);

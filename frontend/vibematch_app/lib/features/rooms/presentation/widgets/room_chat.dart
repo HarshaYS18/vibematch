@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -38,10 +36,8 @@ class RoomChatFeed extends StatefulWidget {
 
 class _RoomChatFeedState extends State<RoomChatFeed> {
   late final ScrollController _scrollController;
-  Timer? _ticker;
   int _clearedMessageCount = 0;
   int _lastMessageCount = 0;
-  int _tick = 0;
 
   @override
   void initState() {
@@ -52,9 +48,6 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _scrollToBottom(jump: true),
     );
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _tick++);
-    });
   }
 
   @override
@@ -72,7 +65,6 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
   @override
   void dispose() {
     roomChatClearSignal.removeListener(_handleClearChat);
-    _ticker?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -97,7 +89,6 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
 
   @override
   Widget build(BuildContext context) {
-    _tick;
     final newMessageCount = (widget.messages.length - _clearedMessageCount)
         .clamp(0, widget.messages.length);
     if (newMessageCount == 0) return const SizedBox.expand();
@@ -170,8 +161,11 @@ class _CompactChatLine extends StatelessWidget {
         message.isSeatApplication &&
         canManageSeatApplications &&
         !message.applicationResolved;
-    final showAgreedState = message.isSeatApplication && message.applicationApproved;
-    final giftVisual = message.isGift ? _GiftChatVisual.fromMessage(message) : null;
+    final showAgreedState =
+        message.isSeatApplication && message.applicationApproved;
+    final giftVisual = message.isGift
+        ? _GiftChatVisual.fromMessage(message)
+        : null;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -265,38 +259,46 @@ class _CompactChatLine extends StatelessWidget {
     );
   }
 
-  List<InlineSpan> _messageSpans(ChatEntry message, ValueChanged<String>? onMentionTap) {
+  List<InlineSpan> _messageSpans(
+    ChatEntry message,
+    ValueChanged<String>? onMentionTap,
+  ) {
     final tokenMatches = RegExp(r'\s+|\S+').allMatches(message.message);
-    final tokens = tokenMatches.map((match) => match.group(0) ?? '').where((part) => part.isNotEmpty);
+    final tokens = tokenMatches
+        .map((match) => match.group(0) ?? '')
+        .where((part) => part.isNotEmpty);
 
-    return tokens.map((part) {
-      final isWhitespace = part.trim().isEmpty;
-      final isMention = !isWhitespace && part.startsWith('@') && part.length > 1;
-      if (!isMention) {
-        return TextSpan(
-          text: part,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.94),
-            fontSize: 13.4,
-            fontWeight: FontWeight.w700,
-            height: 1.28,
-            letterSpacing: isWhitespace ? 0 : 0.05,
-          ),
-        );
-      }
-      return TextSpan(
-        text: part,
-        recognizer: TapGestureRecognizer()
-          ..onTap = () => onMentionTap?.call(part.replaceFirst('@', '')),
-        style: const TextStyle(
-          color: RoomColors.aqua,
-          fontSize: 13.4,
-          fontWeight: FontWeight.w900,
-          height: 1.28,
-          letterSpacing: 0.05,
-        ),
-      );
-    }).toList(growable: false);
+    return tokens
+        .map((part) {
+          final isWhitespace = part.trim().isEmpty;
+          final isMention =
+              !isWhitespace && part.startsWith('@') && part.length > 1;
+          if (!isMention) {
+            return TextSpan(
+              text: part,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.94),
+                fontSize: 13.4,
+                fontWeight: FontWeight.w700,
+                height: 1.28,
+                letterSpacing: isWhitespace ? 0 : 0.05,
+              ),
+            );
+          }
+          return TextSpan(
+            text: part,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => onMentionTap?.call(part.replaceFirst('@', '')),
+            style: const TextStyle(
+              color: RoomColors.aqua,
+              fontSize: 13.4,
+              fontWeight: FontWeight.w900,
+              height: 1.28,
+              letterSpacing: 0.05,
+            ),
+          );
+        })
+        .toList(growable: false);
   }
 }
 
@@ -369,15 +371,17 @@ class _GiftImageChip extends StatelessWidget {
             ? Image.network(
                 VmApiConfig.mediaUrl(assetUrl),
                 fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => Icon(visual.icon, color: Colors.white, size: 22),
+                errorBuilder: (_, _, _) =>
+                    Icon(visual.icon, color: Colors.white, size: 22),
               )
             : assetPath != null && assetPath.isNotEmpty
-                ? Image.asset(
-                    assetPath,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => Icon(visual.icon, color: Colors.white, size: 22),
-                  )
-                : Icon(visual.icon, color: Colors.white, size: 22),
+            ? Image.asset(
+                assetPath,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) =>
+                    Icon(visual.icon, color: Colors.white, size: 22),
+              )
+            : Icon(visual.icon, color: Colors.white, size: 22),
       ),
     );
   }
@@ -393,12 +397,20 @@ class _GiftChatVisual {
   static _GiftChatVisual? fromMessage(ChatEntry message) {
     final explicitPath = message.giftAssetPath?.trim();
     if (explicitPath != null && explicitPath.isNotEmpty) {
-      return _GiftChatVisual(assetPath: explicitPath, icon: Icons.card_giftcard_rounded);
+      return _GiftChatVisual(
+        assetPath: explicitPath,
+        icon: Icons.card_giftcard_rounded,
+      );
     }
     final rawMessage = message.message.toLowerCase();
     for (final gift in mockGiftItems) {
-      if (rawMessage.contains(gift.name.toLowerCase()) || rawMessage.contains(gift.id.toLowerCase())) {
-        return _GiftChatVisual(assetPath: gift.assetPath, assetUrl: gift.assetUrl, icon: gift.icon);
+      if (rawMessage.contains(gift.name.toLowerCase()) ||
+          rawMessage.contains(gift.id.toLowerCase())) {
+        return _GiftChatVisual(
+          assetPath: gift.assetPath,
+          assetUrl: gift.assetUrl,
+          icon: gift.icon,
+        );
       }
     }
     return const _GiftChatVisual(icon: Icons.card_giftcard_rounded);
@@ -409,7 +421,9 @@ String _giftLeadText(String message) {
   final clean = message.trim();
   if (clean.isEmpty) return 'sent';
   final lower = clean.toLowerCase();
-  final giftNames = mockGiftItems.map((gift) => gift.name).toList(growable: false);
+  final giftNames = mockGiftItems
+      .map((gift) => gift.name)
+      .toList(growable: false);
   for (final giftName in giftNames) {
     final index = lower.indexOf(giftName.toLowerCase());
     if (index > 0) {
@@ -566,7 +580,10 @@ class _ChatAvatar extends StatelessWidget {
       child: url == null || url.isEmpty
           ? Text(
               avatarLetter(senderName),
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
             )
           : null,
     );
@@ -597,7 +614,10 @@ class _ChatImagePreview extends StatelessWidget {
           ),
           child: const Text(
             'Image unavailable',
-            style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),
@@ -606,7 +626,12 @@ class _ChatImagePreview extends StatelessWidget {
 }
 
 class _SeatApplicationActionButton extends StatelessWidget {
-  const _SeatApplicationActionButton({required this.label, required this.background, required this.foreground, required this.onTap});
+  const _SeatApplicationActionButton({
+    required this.label,
+    required this.background,
+    required this.foreground,
+    required this.onTap,
+  });
 
   final String label;
   final Color background;
@@ -625,7 +650,11 @@ class _SeatApplicationActionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
           child: Text(
             label,
-            style: TextStyle(color: foreground, fontSize: 11, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              color: foreground,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ),
