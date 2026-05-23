@@ -1,3 +1,4 @@
+import '../../../../app/app_routes.dart';
 import '../../../auth/models/current_user.dart';
 
 class LiveRoomRouteViewArgs {
@@ -9,6 +10,7 @@ class LiveRoomRouteViewArgs {
     required this.onlineCount,
     this.currentUser,
     this.lockPassword,
+    this.entryTransition = LiveRoomEntryTransition.standard,
   });
 
   final String roomName;
@@ -18,4 +20,5 @@ class LiveRoomRouteViewArgs {
   final int onlineCount;
   final CurrentUser? currentUser;
   final String? lockPassword;
+  final LiveRoomEntryTransition entryTransition;
 }
