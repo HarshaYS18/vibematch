@@ -34,6 +34,8 @@ class LiveRoomSeatController {
   bool micMuted = false;
   List<RoomSeat> seats = <RoomSeat>[];
 
+  bool _preserveRestoredSeatsUntilLiveSnapshot = false;
+
   final Map<String, DateTime> _seatApplyCooldownUntil = <String, DateTime>{};
   final LiveRoomPresenceRepository _presenceRepository =
       LiveRoomPresenceRepository();
@@ -68,12 +70,15 @@ class LiveRoomSeatController {
     String initialLayoutId, {
     LiveRoomSeatRestoreState? restoreState,
   }) {
+    final hasRestoredSeats = restoreState?.seats.isNotEmpty == true;
+
     layoutId = initialLayoutId;
-    seats = restoreState?.seats.isNotEmpty == true
+    seats = hasRestoredSeats
         ? List<RoomSeat>.from(restoreState!.seats)
         : buildSeatsForLayout(layoutId);
     selectedSeatIndex = restoreState?.selectedSeatIndex;
     micMuted = restoreState?.micMuted ?? micMuted;
+    _preserveRestoredSeatsUntilLiveSnapshot = hasRestoredSeats;
     _refreshCurrentUserFromPresence();
     _applyLatestMediaSnapshot();
     LiveRoomMediaSignalingService.instance.joinRoom(currentUser: currentUser);
@@ -150,6 +155,15 @@ class LiveRoomSeatController {
     final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
     if (snapshot == null || seats.isEmpty) return;
 
+    if (_preserveRestoredSeatsUntilLiveSnapshot &&
+        snapshot.peers.isEmpty &&
+        roomUsers.isNotEmpty) {
+      _mergeSnapshotLockState(snapshot);
+      return;
+    }
+
+    _preserveRestoredSeatsUntilLiveSnapshot = false;
+
     final previousUsers = <String, SeatUser>{};
     void rememberUser(SeatUser user) {
       for (final alias in _identityAliases(user.id)) {
@@ -205,6 +219,17 @@ class LiveRoomSeatController {
       if (selectedSeat.user != null) selectedSeatIndex = null;
     }
     onChanged();
+  }
+
+  void _mergeSnapshotLockState(LiveMediaRoomSnapshot snapshot) {
+    var changed = false;
+    for (var i = 0; i < seats.length; i++) {
+      final shouldBeLocked = snapshot.lockedSeatIndexes.contains(i);
+      if (seats[i].locked == shouldBeLocked) continue;
+      seats[i] = seats[i].copyWith(locked: shouldBeLocked);
+      changed = true;
+    }
+    if (changed) onChanged();
   }
 
   SeatUser? _findPreviousUserForPeer(
@@ -877,9 +902,9 @@ class LiveRoomSeatController {
       aliases.add(publicId.toString());
       aliases.add('user_$publicId');
     }
-    final userPrefix = RegExp(r'^user_(\d+)$').firstMatch(value);
+    final userPrefix = RegExp(r'^(user_)(\d+)$').firstMatch(value);
     if (userPrefix != null) {
-      aliases.add(userPrefix.group(1)!);
+      aliases.add(userPrefix.group(2)!);
     }
     return aliases;
   }
