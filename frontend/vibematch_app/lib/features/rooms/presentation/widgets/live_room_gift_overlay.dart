@@ -45,7 +45,6 @@ class LiveRoomGiftOverlay extends StatefulWidget {
 
 class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   static const int _premiumGiftMinCoins = 1000;
-  static const int _legacyControllerComboExtraSeconds = 10;
 
   final List<RibbonMessage> _ribbonMessages = <RibbonMessage>[];
   final List<GiftSlide> _backendGiftSlides = <GiftSlide>[];
@@ -231,7 +230,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         return;
       }
       final active = _backendGiftSlides[index];
-      if (active.remainingSeconds <= 0) {
+      if (active.remainingSeconds <= 1) {
         timer.cancel();
         _backendGiftTimers.remove(slide.id);
         if (!mounted) return;
@@ -326,10 +325,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   }
 
   GiftSlide? _comboDisplaySlide(GiftSlide? slide) {
-    if (slide == null) return null;
-    final displaySeconds = (slide.remainingSeconds - _legacyControllerComboExtraSeconds).clamp(0, 5).toInt();
-    if (displaySeconds <= 0) return null;
-    return slide.copyWith(remainingSeconds: displaySeconds);
+    if (slide == null || slide.remainingSeconds <= 0) return null;
+    return slide;
   }
 
   void _finishVideoGift(GiftSlide slide) {
