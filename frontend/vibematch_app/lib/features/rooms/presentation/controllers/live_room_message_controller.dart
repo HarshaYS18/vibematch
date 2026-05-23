@@ -22,7 +22,9 @@ class LiveRoomMessageController {
     _attachSystemEventListener();
   }
 
-  static const Duration _roomSettingsSystemMessageDuration = Duration(seconds: 5);
+  static const Duration _roomSettingsSystemMessageDuration = Duration(
+    seconds: 5,
+  );
   static const Set<String> _allowedRoomSettingsSystemMessages = <String>{
     'Images enabled',
     'Images disabled',
@@ -342,17 +344,11 @@ class LiveRoomMessageController {
     }
 
     if (event.isRoomSystemMessage) {
-<<<<<<< HEAD
       final cleanMessage = event.message.trim();
-      if (!_allowedRoomSettingsSystemMessages.contains(cleanMessage)) return;
+      if (cleanMessage.isEmpty) return;
       insertTransientSystemMessage(
         cleanMessage,
-        duration: _roomSettingsSystemMessageDuration,
-=======
-      insertTransientSystemMessage(
-        event.message,
         duration: _roomSystemMessageDuration(event),
->>>>>>> 16c9d656 (Refactor live room into modular architecture)
       );
       return;
     }

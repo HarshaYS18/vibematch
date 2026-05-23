@@ -41,7 +41,8 @@ class _InboxChatPageState extends State<InboxChatPage> {
   static const Color pink = Color(0xFFE84C72);
 
   InboxConversation get _conversation =>
-      widget.controller.conversationById(widget.conversation.id) ?? widget.conversation;
+      widget.controller.conversationById(widget.conversation.id) ??
+      widget.conversation;
 
   bool get _readOnly => _conversation.isOfficial || _conversation.isStranger;
 
@@ -52,13 +53,18 @@ class _InboxChatPageState extends State<InboxChatPage> {
     widget.controller.addListener(_handleChanged);
     _textController.addListener(_handleInputChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(widget.controller.openConversationFromBackend(widget.conversation.id));
+      if (mounted)
+        unawaited(
+          widget.controller.openConversationFromBackend(widget.conversation.id),
+        );
     });
   }
 
   @override
   void dispose() {
-    unawaited(widget.controller.closeSecretDriftSession(conversation: _conversation));
+    unawaited(
+      widget.controller.closeSecretDriftSession(conversation: _conversation),
+    );
     widget.controller.clearActiveConversation(widget.conversation.id);
     widget.controller.removeListener(_handleChanged);
     _textController.removeListener(_handleInputChanged);
@@ -85,7 +91,10 @@ class _InboxChatPageState extends State<InboxChatPage> {
   void _sendActivity(String activity) {
     if (_lastActivity == activity) return;
     _lastActivity = activity;
-    widget.controller.sendChatActivity(conversationId: _conversation.id, activity: activity);
+    widget.controller.sendChatActivity(
+      conversationId: _conversation.id,
+      activity: activity,
+    );
   }
 
   void _handleInputChanged() {
@@ -130,8 +139,10 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
   void _openInvitedRoom(InboxMessage message) {
     final conversation = _conversation;
-    final roomName = message.inviteRoomName ?? conversation.currentRoomName ?? 'Live Room';
-    final roomId = message.inviteRoomId ?? conversation.currentRoomId ?? roomName;
+    final roomName =
+        message.inviteRoomName ?? conversation.currentRoomName ?? 'Live Room';
+    final roomId =
+        message.inviteRoomId ?? conversation.currentRoomId ?? roomName;
     Navigator.pushNamed(
       context,
       VmRoutes.liveRoom,
@@ -146,7 +157,9 @@ class _InboxChatPageState extends State<InboxChatPage> {
   }
 
   String _statusText(InboxConversation conversation) {
-    final remote = widget.controller.remoteActivityForConversation(conversation.id);
+    final remote = widget.controller.remoteActivityForConversation(
+      conversation.id,
+    );
     if (remote != null) return remote.replaceAll('_', ' ');
     if (conversation.isOnline) return 'online';
     return conversation.safePresenceText;
@@ -192,11 +205,14 @@ class _InboxChatPageState extends State<InboxChatPage> {
                         padding: const EdgeInsets.only(bottom: 7),
                         child: SwipeReplyMessage(
                           isMine: message.isMine,
-                          onReply: () => setState(() => _replyToText = message.text),
+                          onReply: () =>
+                              setState(() => _replyToText = message.text),
                           child: _MessageBubble(
                             message: message,
                             onLongPress: widget.onMoreTap,
-                            onInviteTap: message.isInvite ? () => _openInvitedRoom(message) : null,
+                            onInviteTap: message.isInvite
+                                ? () => _openInvitedRoom(message)
+                                : null,
                           ),
                         ),
                       );
@@ -205,12 +221,18 @@ class _InboxChatPageState extends State<InboxChatPage> {
                 ),
               ),
               if (_replyToText != null)
-                _ReplyPreview(text: _replyToText!, onClose: () => setState(() => _replyToText = null)),
+                _ReplyPreview(
+                  text: _replyToText!,
+                  onClose: () => setState(() => _replyToText = null),
+                ),
               _Composer(
                 readOnly: _readOnly,
                 controller: _textController,
                 onSend: _sendText,
-                onAttach: () => widget.controller.addMockAttachment(conversationId: conversation.id, type: InboxMessageType.image),
+                onAttach: () => widget.controller.addGeneratedAttachment(
+                  conversationId: conversation.id,
+                  type: InboxMessageType.image,
+                ),
               ),
             ],
           ),
@@ -221,7 +243,13 @@ class _InboxChatPageState extends State<InboxChatPage> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.conversation, required this.statusText, required this.onBack, required this.onCall, required this.onMore});
+  const _TopBar({
+    required this.conversation,
+    required this.statusText,
+    required this.onBack,
+    required this.onCall,
+    required this.onMore,
+  });
 
   final InboxConversation conversation;
   final String statusText;
@@ -236,17 +264,35 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
       child: Row(
         children: [
-          IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _InboxChatPageState.ink, size: 20)),
+          IconButton(
+            onPressed: onBack,
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: _InboxChatPageState.ink,
+              size: 20,
+            ),
+          ),
           Container(
             width: 44,
             height: 44,
             padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: conversation.colors)),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: conversation.colors),
+            ),
             child: CircleAvatar(
               backgroundColor: _InboxChatPageState.plum,
-              backgroundImage: avatarUrl == null || avatarUrl.isEmpty ? null : NetworkImage(avatarUrl),
+              backgroundImage: avatarUrl == null || avatarUrl.isEmpty
+                  ? null
+                  : NetworkImage(avatarUrl),
               child: avatarUrl == null || avatarUrl.isEmpty
-                  ? Text(conversation.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))
+                  ? Text(
+                      conversation.avatarText,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    )
                   : null,
             ),
           ),
@@ -258,18 +304,61 @@ class _TopBar extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(conversation.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _InboxChatPageState.ink, fontSize: 16, fontWeight: FontWeight.w900)),
+                      child: Text(
+                        conversation.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _InboxChatPageState.ink,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ),
-                    if (conversation.isOfficial) const Icon(Icons.verified_rounded, color: Color(0xFFC99A3B), size: 16),
+                    if (conversation.isOfficial)
+                      const Icon(
+                        Icons.verified_rounded,
+                        color: Color(0xFFC99A3B),
+                        size: 16,
+                      ),
                   ],
                 ),
-                Text(statusText, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF756A7D), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                Text(
+                  statusText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF756A7D),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),
-          IconButton(onPressed: onCall, icon: const Icon(Icons.call_rounded, color: _InboxChatPageState.ink, size: 21)),
-          IconButton(onPressed: onCall, icon: const Icon(Icons.videocam_rounded, color: _InboxChatPageState.ink, size: 22)),
-          IconButton(onPressed: onMore, icon: const Icon(Icons.more_horiz_rounded, color: _InboxChatPageState.ink)),
+          IconButton(
+            onPressed: onCall,
+            icon: const Icon(
+              Icons.call_rounded,
+              color: _InboxChatPageState.ink,
+              size: 21,
+            ),
+          ),
+          IconButton(
+            onPressed: onCall,
+            icon: const Icon(
+              Icons.videocam_rounded,
+              color: _InboxChatPageState.ink,
+              size: 22,
+            ),
+          ),
+          IconButton(
+            onPressed: onMore,
+            icon: const Icon(
+              Icons.more_horiz_rounded,
+              color: _InboxChatPageState.ink,
+            ),
+          ),
         ],
       ),
     );
@@ -277,7 +366,11 @@ class _TopBar extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, required this.onLongPress, required this.onInviteTap});
+  const _MessageBubble({
+    required this.message,
+    required this.onLongPress,
+    required this.onInviteTap,
+  });
 
   final InboxMessage message;
   final VoidCallback onLongPress;
@@ -292,10 +385,19 @@ class _MessageBubble extends StatelessWidget {
         onLongPress: onLongPress,
         onDoubleTap: onLongPress,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.76),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.76,
+          ),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              gradient: mine ? const LinearGradient(colors: [_InboxChatPageState.violet, _InboxChatPageState.pink]) : null,
+              gradient: mine
+                  ? const LinearGradient(
+                      colors: [
+                        _InboxChatPageState.violet,
+                        _InboxChatPageState.pink,
+                      ],
+                    )
+                  : null,
               color: mine ? null : Colors.white.withValues(alpha: 0.94),
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(21),
@@ -303,7 +405,15 @@ class _MessageBubble extends StatelessWidget {
                 bottomLeft: Radius.circular(mine ? 21 : 7),
                 bottomRight: Radius.circular(mine ? 7 : 21),
               ),
-              boxShadow: [BoxShadow(color: const Color(0xFF251538).withValues(alpha: mine ? 0.13 : 0.055), blurRadius: 16, offset: const Offset(0, 8))],
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(
+                    0xFF251538,
+                  ).withValues(alpha: mine ? 0.13 : 0.055),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -322,9 +432,21 @@ class _MessageBubble extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.meeting_room_rounded, color: mine ? Colors.white : _InboxChatPageState.aqua, size: 20),
+            Icon(
+              Icons.meeting_room_rounded,
+              color: mine ? Colors.white : _InboxChatPageState.aqua,
+              size: 20,
+            ),
             const SizedBox(width: 8),
-            Flexible(child: Text(message.inviteRoomName ?? message.text, style: TextStyle(color: mine ? Colors.white : _InboxChatPageState.ink, fontWeight: FontWeight.w900))),
+            Flexible(
+              child: Text(
+                message.inviteRoomName ?? message.text,
+                style: TextStyle(
+                  color: mine ? Colors.white : _InboxChatPageState.ink,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -343,18 +465,53 @@ class _MessageBubble extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(bottom: 7),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(color: mine ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFF1EAF8), borderRadius: BorderRadius.circular(12)),
-            child: Text(message.replyToText!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF74647F), fontSize: 11.5, fontWeight: FontWeight.w800)),
+            decoration: BoxDecoration(
+              color: mine
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : const Color(0xFFF1EAF8),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              message.replyToText!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: mine ? Colors.white70 : const Color(0xFF74647F),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
-        Text(text, style: TextStyle(color: mine ? Colors.white : _InboxChatPageState.ink, fontSize: 14, height: 1.34, fontWeight: FontWeight.w700)),
+        Text(
+          text,
+          style: TextStyle(
+            color: mine ? Colors.white : _InboxChatPageState.ink,
+            fontSize: 14,
+            height: 1.34,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 5),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(message.time, style: TextStyle(color: mine ? Colors.white70 : const Color(0xFF9A8FA4), fontSize: 10.3, fontWeight: FontWeight.w800)),
+            Text(
+              message.time,
+              style: TextStyle(
+                color: mine ? Colors.white70 : const Color(0xFF9A8FA4),
+                fontSize: 10.3,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             if (mine) ...[
               const SizedBox(width: 5),
-              Icon(message.status == InboxMessageStatus.read ? Icons.done_all_rounded : Icons.done_rounded, color: Colors.white70, size: 13),
+              Icon(
+                message.status == InboxMessageStatus.read
+                    ? Icons.done_all_rounded
+                    : Icons.done_rounded,
+                color: Colors.white70,
+                size: 13,
+              ),
             ],
           ],
         ),
@@ -374,10 +531,30 @@ class _ReplyPreview extends StatelessWidget {
       color: _InboxChatPageState.paper,
       child: Row(
         children: [
-          Container(width: 3, height: 30, decoration: BoxDecoration(color: _InboxChatPageState.aqua, borderRadius: BorderRadius.circular(99))),
+          Container(
+            width: 3,
+            height: 30,
+            decoration: BoxDecoration(
+              color: _InboxChatPageState.aqua,
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
           const SizedBox(width: 9),
-          Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF756A7D), fontWeight: FontWeight.w800))),
-          IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded, size: 18)),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF756A7D),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded, size: 18),
+          ),
         ],
       ),
     );
@@ -385,7 +562,12 @@ class _ReplyPreview extends StatelessWidget {
 }
 
 class _Composer extends StatelessWidget {
-  const _Composer({required this.readOnly, required this.controller, required this.onSend, required this.onAttach});
+  const _Composer({
+    required this.readOnly,
+    required this.controller,
+    required this.onSend,
+    required this.onAttach,
+  });
   final bool readOnly;
   final TextEditingController controller;
   final VoidCallback onSend;
@@ -395,27 +577,52 @@ class _Composer extends StatelessWidget {
   Widget build(BuildContext context) {
     final canSend = controller.text.trim().isNotEmpty && !readOnly;
     return Container(
-      padding: EdgeInsets.fromLTRB(10, 8, 10, 10 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+        10,
+        8,
+        10,
+        10 + MediaQuery.paddingOf(context).bottom,
+      ),
       color: _InboxChatPageState.paper,
       child: Row(
         children: [
-          _RoundIcon(icon: Icons.add_rounded, onTap: readOnly ? null : onAttach),
+          _RoundIcon(
+            icon: Icons.add_rounded,
+            onTap: readOnly ? null : onAttach,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 13),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.045), blurRadius: 13, offset: const Offset(0, 6))]),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.045),
+                    blurRadius: 13,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
               child: TextField(
                 controller: controller,
                 enabled: !readOnly,
                 minLines: 1,
                 maxLines: 4,
-                decoration: InputDecoration(hintText: readOnly ? 'Read-only chat' : 'Message', border: InputBorder.none),
+                decoration: InputDecoration(
+                  hintText: readOnly ? 'Read-only chat' : 'Message',
+                  border: InputBorder.none,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
-          _RoundIcon(icon: canSend ? Icons.arrow_upward_rounded : Icons.mic_rounded, onTap: canSend ? onSend : null, filled: canSend),
+          _RoundIcon(
+            icon: canSend ? Icons.arrow_upward_rounded : Icons.mic_rounded,
+            onTap: canSend ? onSend : null,
+            filled: canSend,
+          ),
         ],
       ),
     );
@@ -423,7 +630,11 @@ class _Composer extends StatelessWidget {
 }
 
 class _RoundIcon extends StatelessWidget {
-  const _RoundIcon({required this.icon, required this.onTap, this.filled = false});
+  const _RoundIcon({
+    required this.icon,
+    required this.onTap,
+    this.filled = false,
+  });
   final IconData icon;
   final VoidCallback? onTap;
   final bool filled;
@@ -435,8 +646,22 @@ class _RoundIcon extends StatelessWidget {
       child: Container(
         width: 38,
         height: 38,
-        decoration: BoxDecoration(color: filled ? _InboxChatPageState.plum : Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 5))]),
-        child: Icon(icon, color: filled ? Colors.white : _InboxChatPageState.plum, size: 21),
+        decoration: BoxDecoration(
+          color: filled ? _InboxChatPageState.plum : Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          color: filled ? Colors.white : _InboxChatPageState.plum,
+          size: 21,
+        ),
       ),
     );
   }
@@ -451,7 +676,15 @@ class _SlimNotice extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       color: const Color(0xFFEFE7F7),
-      child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: _InboxChatPageState.plum, fontSize: 12, fontWeight: FontWeight.w900)),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: _InboxChatPageState.plum,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
