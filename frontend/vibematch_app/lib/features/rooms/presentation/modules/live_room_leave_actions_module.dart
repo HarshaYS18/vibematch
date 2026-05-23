@@ -22,6 +22,7 @@ class LiveRoomLeaveActionsModule {
     required LiveRoomRestoreState restoreState,
     required VoidCallback dismissSeatActionPill,
     required VoidCallback clearFocus,
+    required VoidCallback restoreMinimizedRoom,
     required bool Function() mountedGetter,
   }) {
     dismissSeatActionPill();
@@ -42,8 +43,10 @@ class LiveRoomLeaveActionsModule {
         onStay: () {
           dismissSeatActionPill();
           _stayAndMinimize(
+            context: context,
             sheetContext: sheetContext,
             roomStateController: roomStateController,
+            restoreMinimizedRoom: restoreMinimizedRoom,
             mountedGetter: mountedGetter,
           );
         },
@@ -131,19 +134,49 @@ class LiveRoomLeaveActionsModule {
   }
 
   static void _stayAndMinimize({
+    required BuildContext context,
     required BuildContext sheetContext,
     required LiveRoomStateController roomStateController,
+    required VoidCallback restoreMinimizedRoom,
     required bool Function() mountedGetter,
   }) {
+    final roomNavigator = Navigator.of(context);
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+
+    LiveRoomMinimizedOverlayService.show(
+      context: rootNavigator.context,
+      onRestore: restoreMinimizedRoom,
+    );
+
     Navigator.pop(sheetContext);
     if (!mountedGetter()) return;
 
-    // Keep the existing LiveRoomPage mounted. Do not pop the room route and do
-    // not push a new LiveRoomPresenceShellPage on restore. This makes restore
-    // instant and preserves seats, public IDs, chat, gift state, and controllers
-    // in memory.
-    LiveRoomMinimizedOverlayService.hide();
-    roomStateController.setAllowRoomPop(false);
-    roomStateController.setMinimized(true);
+    roomStateController.setAllowRoomPop(true);
+
+    void tryPopRoomRoute(int attempt) {
+      if (!mountedGetter()) return;
+
+      if (roomNavigator.canPop()) {
+        roomNavigator.pop();
+        return;
+      }
+
+      if (rootNavigator.canPop()) {
+        rootNavigator.pop();
+        return;
+      }
+
+      if (attempt < 3) {
+        Future<void>.delayed(
+          const Duration(milliseconds: 90),
+          () => tryPopRoomRoute(attempt + 1),
+        );
+        return;
+      }
+
+      roomStateController.setAllowRoomPop(false);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => tryPopRoomRoute(0));
   }
 }
