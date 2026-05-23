@@ -19,8 +19,10 @@ class InboxController extends ChangeNotifier {
     InboxCallController? callController,
   }) : _apiService = apiService ?? InboxApiService(),
        _backupApiService = backupApiService ?? const InboxBackupApiService(),
-       _preferencesApiService = preferencesApiService ?? const InboxPreferencesApiService(),
-       _messageToolsApiService = messageToolsApiService ?? InboxMessageToolsApiService(),
+       _preferencesApiService =
+           preferencesApiService ?? const InboxPreferencesApiService(),
+       _messageToolsApiService =
+           messageToolsApiService ?? InboxMessageToolsApiService(),
        _socketService = socketService ?? InboxSocketService(),
        _callController = callController ?? InboxCallController();
 
@@ -49,7 +51,7 @@ class InboxController extends ChangeNotifier {
   InboxBackupJob? lastBackupJob;
   InboxBackupJob? lastRestoreJob;
   String? lastGoogleDriveAuthorizationUrl;
-  String? lastDebugOtp;
+  String? lastSecurityCode;
   InboxPreferenceSettings preferenceSettings = const InboxPreferenceSettings(
     strangersCanMessage: true,
     strangersCanMentionInVibes: true,
@@ -68,13 +70,15 @@ class InboxController extends ChangeNotifier {
   bool get deviceUnlockEnabled => preferenceSettings.deviceUnlockEnabled;
   String get onlineVisibility => preferenceSettings.onlineVisibility;
   String get lastSeenVisibility => preferenceSettings.lastSeenVisibility;
-  String get typingActivityVisibility => preferenceSettings.typingActivityVisibility;
+  String get typingActivityVisibility =>
+      preferenceSettings.typingActivityVisibility;
   String get storyVisibility => preferenceSettings.storyVisibility;
   String get defaultChatTheme => preferenceSettings.defaultChatTheme;
   String get defaultWallpaperKey => preferenceSettings.defaultWallpaperKey;
   String? get defaultWallpaperUrl => preferenceSettings.defaultWallpaperUrl;
   String? _activeConversationId;
-  final Map<String, String> _remoteActivityByConversationId = <String, String>{};
+  final Map<String, String> _remoteActivityByConversationId =
+      <String, String>{};
 
   String? remoteActivityForConversation(String conversationId) {
     final value = _remoteActivityByConversationId[conversationId];
@@ -87,12 +91,10 @@ class InboxController extends ChangeNotifier {
 
   final List<String> filters = const [
     'All',
+    'Friends',
+    'Stranger Messages',
     'Unread',
-    'Online',
-    'Room Invites',
-    'Official',
-    'Strangers',
-    'Blocked',
+    'Calls',
   ];
 
   List<InboxConversation> _conversations = <InboxConversation>[];
@@ -119,8 +121,25 @@ class InboxController extends ChangeNotifier {
         .where((chat) => !chat.isArchived)
         .toList();
     switch (selectedFilter) {
+      case 'Friends':
+        return base.where((chat) => chat.isMutualFollowChat).toList();
+      case 'Stranger Messages':
+      case 'Strangers':
+        return base
+            .where((chat) => chat.type == InboxConversationType.stranger)
+            .toList();
       case 'Unread':
         return base.where((chat) => chat.unreadCount > 0).toList();
+      case 'Calls':
+        return base
+            .where(
+              (chat) =>
+                  chat.isCallLog ||
+                  chat.messages.any(
+                    (message) => message.type == InboxMessageType.callLog,
+                  ),
+            )
+            .toList();
       case 'Online':
         return base.where((chat) => chat.isOnline).toList();
       case 'Room Invites':
@@ -130,10 +149,6 @@ class InboxController extends ChangeNotifier {
       case 'Official':
         return base
             .where((chat) => chat.type == InboxConversationType.official)
-            .toList();
-      case 'Strangers':
-        return base
-            .where((chat) => chat.type == InboxConversationType.stranger)
             .toList();
       case 'Blocked':
         return base.where((chat) => chat.isBlocked).toList();
@@ -188,7 +203,9 @@ class InboxController extends ChangeNotifier {
     _syncLegacyPreferenceFlags();
     _safeNotify();
     try {
-      preferenceSettings = await _preferencesApiService.updatePreferences(settings);
+      preferenceSettings = await _preferencesApiService.updatePreferences(
+        settings,
+      );
       _syncLegacyPreferenceFlags();
       _safeNotify();
     } catch (error) {
@@ -242,9 +259,11 @@ class InboxController extends ChangeNotifier {
   }
 
   Future<String?> startLockSetup(String mobileNumber) async {
-    lastDebugOtp = await _apiService.startLockSetup(mobileNumber: mobileNumber);
+    lastSecurityCode = await _apiService.startLockSetup(
+      mobileNumber: mobileNumber,
+    );
     _safeNotify();
-    return lastDebugOtp;
+    return lastSecurityCode;
   }
 
   Future<void> verifyLockSetup({
@@ -284,12 +303,12 @@ class InboxController extends ChangeNotifier {
   }
 
   Future<String?> startLockRecovery(String mobileNumber) async {
-    lastDebugOtp = await _apiService.startLockRecovery(
+    lastSecurityCode = await _apiService.startLockRecovery(
       mobileNumber: mobileNumber,
     );
     lockStatus = lockStatus.copyWith(recoveryRequested: true);
     _safeNotify();
-    return lastDebugOtp;
+    return lastSecurityCode;
   }
 
   Future<void> verifyLockRecovery({
@@ -325,7 +344,9 @@ class InboxController extends ChangeNotifier {
           final message = _apiService.messageFromJson(rawMessage);
           _appendOrReconcileMessage(conversationId, message);
           if (!message.isMine && _activeConversationId == conversationId) {
-            Future<void>.microtask(() => openConversationFromBackend(conversationId));
+            Future<void>.microtask(
+              () => openConversationFromBackend(conversationId),
+            );
           }
         }
         break;
@@ -411,15 +432,24 @@ class InboxController extends ChangeNotifier {
 
     var conversationId = event['conversation_id']?.toString();
     final rawCall = event['call'];
-    if ((conversationId == null || conversationId.isEmpty || conversationId == 'null') && rawCall is Map<String, dynamic>) {
+    if ((conversationId == null ||
+            conversationId.isEmpty ||
+            conversationId == 'null') &&
+        rawCall is Map<String, dynamic>) {
       conversationId = rawCall['conversation_id']?.toString();
     }
-    if (conversationId == null || conversationId.isEmpty || conversationId == 'null') return true;
+    if (conversationId == null ||
+        conversationId.isEmpty ||
+        conversationId == 'null')
+      return true;
 
     final conversation = conversationById(conversationId);
     if (conversation == null) return true;
 
-    _callController.handleRealtimeEvent(event: event, conversation: conversation);
+    _callController.handleRealtimeEvent(
+      event: event,
+      conversation: conversation,
+    );
     return true;
   }
 
@@ -584,7 +614,9 @@ class InboxController extends ChangeNotifier {
   }
 
   void setStrangersCanMentionInVibes(bool value) {
-    _savePreferences(preferenceSettings.copyWith(strangersCanMentionInVibes: value));
+    _savePreferences(
+      preferenceSettings.copyWith(strangersCanMentionInVibes: value),
+    );
   }
 
   void setReadReceiptsEnabled(bool value) {
@@ -604,7 +636,9 @@ class InboxController extends ChangeNotifier {
   }
 
   void setTypingActivityVisibility(String value) {
-    _savePreferences(preferenceSettings.copyWith(typingActivityVisibility: value));
+    _savePreferences(
+      preferenceSettings.copyWith(typingActivityVisibility: value),
+    );
   }
 
   void setStoryVisibility(String value) {
@@ -786,7 +820,10 @@ class InboxController extends ChangeNotifier {
   }) async {
     if (!message.isMine || message.status != InboxMessageStatus.failed) return;
 
-    final retrying = message.copyWith(status: InboxMessageStatus.sending, time: 'Now');
+    final retrying = message.copyWith(
+      status: InboxMessageStatus.sending,
+      time: 'Now',
+    );
 
     _updateMessage(
       conversationId: conversationId,
@@ -831,7 +868,7 @@ class InboxController extends ChangeNotifier {
     };
   }
 
-  void addMockAttachment({
+  void addGeneratedAttachment({
     required String conversationId,
     required InboxMessageType type,
   }) {

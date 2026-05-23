@@ -251,7 +251,8 @@ class InboxConversation {
   bool get isGroup => type == InboxConversationType.group;
   bool get isStoryReply => type == InboxConversationType.storyReply;
   bool get isCallLog => type == InboxConversationType.callLog;
-  bool get isMutualFollowChat => type == InboxConversationType.chat && !isStranger;
+  bool get isMutualFollowChat =>
+      type == InboxConversationType.chat && !isStranger;
   bool get hasAvatarUrl => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
   bool get hasChatStreak => chatStreakCount > 0;
   String get secretDriftLabel => 'Secret Drift is on';
@@ -274,7 +275,11 @@ class InboxConversation {
       return 'last seen at $timeLabel';
     }
 
-    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final yesterday = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(const Duration(days: 1));
     if (_isSameDate(seen, yesterday)) {
       return 'last seen yesterday at $timeLabel';
     }
@@ -314,8 +319,9 @@ class InboxConversation {
   }
 
   String get listPreviewText {
-    if (isLockedByBackend) return 'Locked chat • tap to unlock';
-    if (isStrangerHub) return '$requestCount message request${requestCount == 1 ? '' : 's'} waiting';
+    if (isLockedByBackend) return 'Locked chat - tap to unlock';
+    if (isStrangerHub)
+      return '$requestCount message request${requestCount == 1 ? '' : 's'} waiting';
     return subtitle;
   }
 
@@ -375,11 +381,14 @@ class InboxConversation {
       isStrangerHub: isStrangerHub ?? this.isStrangerHub,
       requestCount: requestCount ?? this.requestCount,
       chatStreakCount: chatStreakCount ?? this.chatStreakCount,
-      chatStreakActiveToday: chatStreakActiveToday ?? this.chatStreakActiveToday,
+      chatStreakActiveToday:
+          chatStreakActiveToday ?? this.chatStreakActiveToday,
       secretDriftEnabled: secretDriftEnabled ?? this.secretDriftEnabled,
       chatTheme: chatTheme ?? this.chatTheme,
       wallpaperKey: wallpaperKey ?? this.wallpaperKey,
-      wallpaperUrl: clearWallpaperUrl ? null : wallpaperUrl ?? this.wallpaperUrl,
+      wallpaperUrl: clearWallpaperUrl
+          ? null
+          : wallpaperUrl ?? this.wallpaperUrl,
     );
   }
 }
@@ -446,9 +455,14 @@ class InboxMessage {
   bool get isLoveBondRequest =>
       loveBondRequestId != null || type == InboxMessageType.relationshipRequest;
   bool get isSystem => type == InboxMessageType.system;
-  bool get hasAttachmentUrl => attachmentUrl != null && attachmentUrl!.trim().isNotEmpty;
-  bool get hasLocalAttachmentPath => localAttachmentPath != null && localAttachmentPath!.trim().isNotEmpty;
-  String? get effectiveRemoteMediaUrl => attachmentUrl?.trim().isNotEmpty == true ? attachmentUrl!.trim() : expiredMediaUrl?.trim();
+  bool get hasAttachmentUrl =>
+      attachmentUrl != null && attachmentUrl!.trim().isNotEmpty;
+  bool get hasLocalAttachmentPath =>
+      localAttachmentPath != null && localAttachmentPath!.trim().isNotEmpty;
+  String? get effectiveRemoteMediaUrl =>
+      attachmentUrl?.trim().isNotEmpty == true
+      ? attachmentUrl!.trim()
+      : expiredMediaUrl?.trim();
 
   InboxMessage copyWith({
     String? id,
