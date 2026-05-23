@@ -189,6 +189,13 @@ class LiveRoomGiftController {
     return normalSlides.isEmpty ? null : normalSlides.first;
   }
 
+  bool _isLuckyGiftSlide(GiftSlide slide) {
+    final name = slide.giftName.toLowerCase();
+    return name.contains('lucky') ||
+        name.contains('spin') ||
+        _luckyComboContexts.containsKey(slide.id);
+  }
+
   void ensureDefaultReceiver(List<SeatUser> roomUsers) {
     if (selectedReceiverIds.isEmpty && roomUsers.isNotEmpty) {
       selectedReceiverIds.add(roomUsers.first.id);
@@ -811,6 +818,10 @@ class LiveRoomGiftController {
   }
 
   void _startGiftSlide(GiftSlide slide) {
+    if (_isLuckyGiftSlide(slide)) {
+      _removeActiveLuckySlidesExcept(slide.id);
+    }
+
     giftSlides.insert(0, slide);
     onChanged();
     if (slide.isVideoGift) _insertFinalGiftMessage(slide);
@@ -840,6 +851,19 @@ class LiveRoomGiftController {
       );
       onChanged();
     });
+  }
+
+  void _removeActiveLuckySlidesExcept(String keepSlideId) {
+    final staleLuckySlideIds = giftSlides
+        .where((slide) => slide.id != keepSlideId && _isLuckyGiftSlide(slide))
+        .map((slide) => slide.id)
+        .toList(growable: false);
+    for (final slideId in staleLuckySlideIds) {
+      _giftTimers.remove(slideId)?.cancel();
+      _luckyComboContexts.remove(slideId);
+      _luckyComboProcessingSlideIds.remove(slideId);
+      giftSlides.removeWhere((slide) => slide.id == slideId);
+    }
   }
 
   void _insertFinalGiftMessage(GiftSlide slide) {
