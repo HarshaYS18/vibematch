@@ -43,7 +43,6 @@ class LiveRoomLeaveActionsModule {
         onStay: () {
           dismissSeatActionPill();
           _stayAndMinimize(
-            context: context,
             sheetContext: sheetContext,
             roomStateController: roomStateController,
             restoreMinimizedRoom: restoreMinimizedRoom,
@@ -134,49 +133,19 @@ class LiveRoomLeaveActionsModule {
   }
 
   static void _stayAndMinimize({
-    required BuildContext context,
     required BuildContext sheetContext,
     required LiveRoomStateController roomStateController,
     required VoidCallback restoreMinimizedRoom,
     required bool Function() mountedGetter,
   }) {
-    final roomNavigator = Navigator.of(context);
-    final rootNavigator = Navigator.of(context, rootNavigator: true);
-
-    LiveRoomMinimizedOverlayService.show(
-      context: rootNavigator.context,
-      onRestore: restoreMinimizedRoom,
-    );
-
+    LiveRoomMinimizedOverlayService.show(onRestore: restoreMinimizedRoom);
     Navigator.pop(sheetContext);
     if (!mountedGetter()) return;
 
-    roomStateController.setAllowRoomPop(true);
-
-    void tryPopRoomRoute(int attempt) {
-      if (!mountedGetter()) return;
-
-      if (roomNavigator.canPop()) {
-        roomNavigator.pop();
-        return;
-      }
-
-      if (rootNavigator.canPop()) {
-        rootNavigator.pop();
-        return;
-      }
-
-      if (attempt < 3) {
-        Future<void>.delayed(
-          const Duration(milliseconds: 90),
-          () => tryPopRoomRoute(attempt + 1),
-        );
-        return;
-      }
-
-      roomStateController.setAllowRoomPop(false);
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => tryPopRoomRoute(0));
+    // Keep the existing LiveRoomPage mounted instead of popping/recreating it.
+    // This preserves WebSocket/media subscriptions, seat state, cricket score,
+    // gift timers, presence heartbeat, and realtime user updates while minimized.
+    roomStateController.setAllowRoomPop(false);
+    roomStateController.setMinimized(true);
   }
 }
