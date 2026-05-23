@@ -16,7 +16,7 @@ class LiveRoomRoutes {
 
     return VmMotion.pageRoute<void>(
       settings: RouteSettings(arguments: args),
-      beginOffset: const Offset(0.02, 0.018),
+      beginOffset: const Offset(1.0, 0.0),
       page: LiveRoomPresenceShellPage(
         roomName: args.roomName,
         roomId: args.roomId,
