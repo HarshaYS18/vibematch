@@ -124,4 +124,85 @@ void main() {
       'sent to Lucky Receiver Lucky Star x500 x9',
     );
   });
+
+  test('lucky local and backend combo echoes stay in one chat row', () {
+    const currentUser = SeatUser(
+      id: '7000000001',
+      name: 'Lucky Sender',
+      roleLabel: 'Member',
+      familyName: '',
+      relationshipText: '',
+      vipLevel: 2,
+      sendingLevel: 4,
+      receivingLevel: 1,
+      sentExp: 0,
+      receivedExp: 0,
+      medals: <String>[],
+      avatarColors: <Color>[Colors.orange, Colors.pink],
+      isCurrentUser: true,
+    );
+    final controller = LiveRoomMessageController(
+      currentUser: currentUser,
+      onChanged: () {},
+      restoreState: const LiveRoomMessageRestoreState(
+        messages: <ChatEntry>[],
+        joinRequestUsers: <SeatUser>[],
+      ),
+    );
+
+    controller.insertEntry(
+      ChatEntry(
+        senderName: 'Lucky Sender',
+        senderId: 'LUCKYROOM_user_7000000001',
+        message: 'sent to Lucky Receiver Lucky Star x100 x18',
+        isGift: true,
+        giftAssetPath: 'assets/gifts/lucky/lucky_star.webp',
+      ),
+    );
+
+    LiveRoomSystemEventBus.publish(
+      LiveRoomSystemEvent.fromJson(<String, dynamic>{
+        'id': 'gift_combo_7000000001_2',
+        'event_type': 'room_gift_sent',
+        'room_id': 'LUCKYROOM',
+        'actor_user_id': 'user_7000000001',
+        'actor_name': 'Lucky Sender',
+        'target_user_id': 'user_7000000002',
+        'target_name': 'Lucky Receiver',
+        'gift_id': 'lucky_star',
+        'gift_name': 'Lucky Star',
+        'gift_type': 'lucky',
+        'quantity': 9,
+        'coin_value': 100,
+        'total_coin_value': 900,
+        'is_lucky': true,
+        'lucky_multiplier': 500,
+        'lucky_reward_coin_amount': 450000,
+        'asset_path': 'assets/gifts/lucky/lucky_star.webp',
+        'created_at': '2026-09-13T10:00:02Z',
+      }),
+    );
+
+    expect(controller.messages, hasLength(1));
+    expect(
+      controller.messages.single.message,
+      'sent to Lucky Receiver Lucky Star x500 x9',
+    );
+
+    controller.insertEntry(
+      ChatEntry(
+        senderName: 'Lucky Sender',
+        senderId: '7000000001',
+        message: 'sent to Lucky Receiver Lucky Star x500 x27',
+        isGift: true,
+        giftAssetPath: 'assets/gifts/lucky/lucky_star.webp',
+      ),
+    );
+
+    expect(controller.messages, hasLength(1));
+    expect(
+      controller.messages.single.message,
+      'sent to Lucky Receiver Lucky Star x500 x27',
+    );
+  });
 }
