@@ -87,42 +87,31 @@ class _LiveRoomMinimizedBubbleState extends State<LiveRoomMinimizedBubble>
     return Positioned(
       left: widget.offset.dx,
       top: widget.offset.dy,
-      child: FadeTransition(
-        opacity: _fade,
-        child: SlideTransition(
-          position: _slide,
-          child: ScaleTransition(
-            scale: _scale,
-            child: GestureDetector(
-              onTap: _restoreWithTransition,
-              onPanUpdate: _restoring ? null : widget.onDrag,
-              onTapDown: (_) => _setPressed(true),
-              onTapCancel: () => _setPressed(false),
-              onTapUp: (_) => _setPressed(false),
-              child: AnimatedScale(
-                scale: _restoring
-                    ? 0.76
-                    : _pressed
-                        ? 0.94
-                        : 1.0,
-                duration: Duration(milliseconds: _restoring ? 260 : 140),
-                curve: Curves.easeOutCubic,
-                child: AnimatedOpacity(
-                  opacity: _restoring ? 0.0 : 1.0,
-                  duration: const Duration(milliseconds: 260),
+      child: RepaintBoundary(
+        child: FadeTransition(
+          opacity: _fade,
+          child: SlideTransition(
+            position: _slide,
+            child: ScaleTransition(
+              scale: _scale,
+              child: GestureDetector(
+                onTap: _restoreWithTransition,
+                onPanUpdate: _restoring ? null : widget.onDrag,
+                onTapDown: (_) => _setPressed(true),
+                onTapCancel: () => _setPressed(false),
+                onTapUp: (_) => _setPressed(false),
+                child: AnimatedScale(
+                  scale: _restoring
+                      ? 0.76
+                      : _pressed
+                      ? 0.94
+                      : 1.0,
+                  duration: Duration(milliseconds: _restoring ? 260 : 140),
                   curve: Curves.easeOutCubic,
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0, end: 1),
-                    duration: const Duration(milliseconds: 1200),
-                    curve: Curves.easeInOut,
-                    builder: (context, value, child) {
-                      final pulse = _restoring ? 1.0 : 1 + (0.018 * value);
-                      return Transform.scale(scale: pulse, child: child);
-                    },
-                    onEnd: () {
-                      if (!mounted || _restoring) return;
-                      setState(() {});
-                    },
+                  child: AnimatedOpacity(
+                    opacity: _restoring ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
                     child: Material(
                       type: MaterialType.transparency,
                       child: Container(
