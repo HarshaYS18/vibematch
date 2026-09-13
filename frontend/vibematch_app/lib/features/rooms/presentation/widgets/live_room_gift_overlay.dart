@@ -51,6 +51,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   final List<RibbonMessage> _ribbonMessages = <RibbonMessage>[];
   final List<GiftSlide> _backendGiftSlides = <GiftSlide>[];
   final Map<String, Timer> _backendGiftTimers = <String, Timer>{};
+  final Map<String, String> _backendLuckySlideIdsBySession = <String, String>{};
   final Set<String> _handledBackendGiftIds = <String>{};
   VoidCallback? _backendGiftListener;
 
@@ -73,6 +74,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       timer.cancel();
     }
     _backendGiftTimers.clear();
+    _backendLuckySlideIdsBySession.clear();
     super.dispose();
   }
 
@@ -115,14 +117,15 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     _publishBackendPremiumBroadcast(event, gift, slide);
     if (isGlobalBroadcast) return;
 
-    // The sender already has the committed local slide. Lucky combo taps then
-    // produce another authoritative backend event for the same presentation.
-    // Keep the backend event for everyone else, but do not create a second
-    // sender-side slide/flight for the same live combo session.
+    // The sender already owns the locally committed combo slide. Never add the
+    // authoritative echo as a second card/flight on the sender device.
     if (_hasLocalSenderPresentation(event, gift)) return;
 
     if (event.showGiftSlide || slide.isVideoGift) {
-      _startBackendGiftSlide(slide);
+      _startBackendGiftSlide(
+        slide,
+        luckySessionKey: event.isLuckyGift ? _luckySessionKey(event) : null,
+      );
     }
     _publishBackendGiftFlight(event, gift, slide);
   }
@@ -156,6 +159,19 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   String _withoutMultiplier(String value) {
     return value.replaceAll(RegExp(r'(\s+x\d+)+\s*$'), '').trim();
+  }
+
+  String _luckySessionKey(LiveRoomSystemEvent event) {
+    final actor = event.actorUserId.trim().isNotEmpty
+        ? event.actorUserId
+        : event.actorName;
+    final target = event.targetUserId.trim().isNotEmpty
+        ? event.targetUserId
+        : event.targetName;
+    final gift = event.giftId.trim().isNotEmpty
+        ? event.giftId
+        : _withoutMultiplier(event.giftName);
+    return '${_normalize(actor)}|${_normalize(target)}|${_normalize(gift)}';
   }
 
   GiftItem _giftItemForEvent(LiveRoomSystemEvent event) {
@@ -271,38 +287,70 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     return gift.colors;
   }
 
-  void _startBackendGiftSlide(GiftSlide slide) {
+  void _startBackendGiftSlide(
+    GiftSlide slide, {
+    String? luckySessionKey,
+  }) {
     if (!mounted) return;
+
+    var activeSlideId = slide.id;
     setState(() {
-      if (_isLuckySlide(slide)) {
-        final staleLuckySlideIds = _backendGiftSlides
-            .where((item) => item.id != slide.id && _isLuckySlide(item))
-            .map((item) => item.id)
-            .toList(growable: false);
-        for (final slideId in staleLuckySlideIds) {
-          _backendGiftTimers.remove(slideId)?.cancel();
+      if (luckySessionKey != null) {
+        final existingSlideId = _backendLuckySlideIdsBySession[luckySessionKey];
+        final existingIndex = existingSlideId == null
+            ? -1
+            : _backendGiftSlides.indexWhere((item) => item.id == existingSlideId);
+        if (existingIndex >= 0) {
+          final existing = _backendGiftSlides[existingIndex];
+          final merged = GiftSlide(
+            id: existing.id,
+            senderName: slide.senderName,
+            receiverName: slide.receiverName,
+            giftName: slide.giftName,
+            giftIcon: slide.giftIcon,
+            giftAssetPath: slide.giftAssetPath,
+            videoAssetPath: slide.videoAssetPath,
+            giftAssetUrl: slide.giftAssetUrl,
+            videoUrl: slide.videoUrl,
+            colors: slide.colors,
+            combo: existing.combo + slide.combo,
+            baseCombo: existing.baseCombo,
+            remainingSeconds: 10,
+          );
+          activeSlideId = existing.id;
+          _backendGiftSlides.removeAt(existingIndex);
+          _backendGiftSlides.insert(0, merged);
+        } else {
+          _backendLuckySlideIdsBySession[luckySessionKey] = slide.id;
+          _backendGiftSlides.removeWhere((item) => item.id == slide.id);
+          _backendGiftSlides.insert(0, slide);
         }
-        _backendGiftSlides.removeWhere(
-          (item) => staleLuckySlideIds.contains(item.id),
-        );
+      } else {
+        _backendGiftSlides.removeWhere((item) => item.id == slide.id);
+        _backendGiftSlides.insert(0, slide);
       }
-      _backendGiftSlides.removeWhere((item) => item.id == slide.id);
-      _backendGiftSlides.insert(0, slide);
     });
-    _backendGiftTimers[slide.id]?.cancel();
-    _backendGiftTimers[slide.id] = Timer.periodic(const Duration(seconds: 1), (
+
+    _restartBackendGiftTimer(activeSlideId);
+  }
+
+  void _restartBackendGiftTimer(String slideId) {
+    _backendGiftTimers.remove(slideId)?.cancel();
+    _backendGiftTimers[slideId] = Timer.periodic(const Duration(seconds: 1), (
       timer,
     ) {
-      final index = _backendGiftSlides.indexWhere((item) => item.id == slide.id);
+      final index = _backendGiftSlides.indexWhere((item) => item.id == slideId);
       if (index < 0) {
         timer.cancel();
-        _backendGiftTimers.remove(slide.id);
+        _backendGiftTimers.remove(slideId);
+        _removeLuckySessionForSlide(slideId);
         return;
       }
       final active = _backendGiftSlides[index];
       if (active.remainingSeconds <= 1) {
         timer.cancel();
-        _backendGiftTimers.remove(slide.id);
+        _backendGiftTimers.remove(slideId);
+        _removeLuckySessionForSlide(slideId);
         if (!mounted) return;
         setState(() => _backendGiftSlides.removeAt(index));
         return;
@@ -316,11 +364,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     });
   }
 
-  bool _isLuckySlide(GiftSlide slide) {
-    final name = slide.giftName.toLowerCase();
-    return name.contains('lucky') ||
-        name.contains('packet') ||
-        name.contains('spin');
+  void _removeLuckySessionForSlide(String slideId) {
+    _backendLuckySlideIdsBySession.removeWhere((_, value) => value == slideId);
   }
 
   void _publishBackendPremiumBroadcast(
@@ -459,6 +504,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   void _finishVideoGift(GiftSlide slide) {
     if (_backendGiftSlides.any((item) => item.id == slide.id)) {
       _backendGiftTimers.remove(slide.id)?.cancel();
+      _removeLuckySessionForSlide(slide.id);
       if (!mounted) return;
       setState(
         () => _backendGiftSlides.removeWhere((item) => item.id == slide.id),
