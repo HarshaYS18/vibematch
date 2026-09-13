@@ -71,5 +71,65 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(GiftSlideCardModule), findsOneWidget);
+    expect(find.text('x18'), findsWidgets);
+  });
+
+  testWidgets('receiver lucky combo stays one slide and accumulates quantity', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: LiveRoomGiftOverlay(
+            slides: const <GiftSlide>[],
+            activeComboSlide: null,
+            bottomPadding: 0,
+            currentUserId: 'user_7000000002',
+            onComboTap: (_) {},
+            onComboButtonTap: () {},
+            onVideoGiftFinished: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    void publishLucky({required String id, required int multiplier}) {
+      LiveRoomSystemEventBus.publish(
+        LiveRoomSystemEvent.fromJson(<String, dynamic>{
+          'id': id,
+          'event_type': 'room_gift_sent',
+          'room_id': 'LUCKYROOM',
+          'actor_user_id': 'user_7000000001',
+          'actor_name': 'Sender',
+          'target_user_id': 'user_7000000002',
+          'target_name': 'Receiver',
+          'gift_id': 'crystal_hunt',
+          'gift_name': 'Crystal Hunt',
+          'gift_type': 'lucky',
+          'quantity': 9,
+          'coin_value': 89,
+          'total_coin_value': 801,
+          'is_lucky': true,
+          'lucky_multiplier': multiplier,
+          'lucky_reward_coin_amount': 1000,
+          'show_gift_slide': true,
+          'show_premium_broadcast': false,
+          'show_gift_flight': true,
+          'created_at': '2026-09-13T12:00:00Z',
+        }),
+      );
+    }
+
+    publishLucky(id: 'gift_combo_receiver_1', multiplier: 500);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(GiftSlideCardModule), findsOneWidget);
+    expect(find.text('x9'), findsOneWidget);
+
+    publishLucky(id: 'gift_combo_receiver_2', multiplier: 100);
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byType(GiftSlideCardModule), findsOneWidget);
+    expect(find.text('x18'), findsOneWidget);
+    expect(find.text('x9'), findsNothing);
   });
 }
