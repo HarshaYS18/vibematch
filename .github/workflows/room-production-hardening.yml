@@ -1,0 +1,68 @@
+name: Room Production Hardening
+
+on:
+  push:
+    branches:
+      - chatgpt/room-production-hardening
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'backend_media/**'
+      - 'frontend/vibematch_app/**'
+      - '.github/workflows/room-production-hardening.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Run backend regression tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+  media-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend_media
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend_media/package-lock.json
+      - name: Install media dependencies
+        run: npm ci
+      - name: Typecheck media service
+        run: npm run typecheck
+      - name: Build media service
+        run: npm run build
+
+  flutter-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/vibematch_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+      - name: Run Flutter tests
+        run: flutter test
