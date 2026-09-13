@@ -10,6 +10,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/network/vm_media_config.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../../main.dart';
+import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
 import '../presentation/modules/cricket_room_mode_signal.dart';
@@ -45,9 +46,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   bool _appInForeground = true;
   bool _foregroundServiceStarted = false;
   bool _showingRoomBlockDialog = false;
+  int _commandSequence = 0;
 
   final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot =
-      ValueNotifier<LiveMediaRoomSnapshot?>(null);
+      _VersionedRoomSnapshotNotifier();
 
   final ValueNotifier<LiveMediaRoomBlock?> roomBlock =
       ValueNotifier<LiveMediaRoomBlock?>(null);
@@ -691,6 +693,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     return <String, Object?>{
       'room_id': safeRoomId,
+      'access_token': const AuthApiService().cachedAccessToken,
       'peer_id': stablePeerId,
       'user_id': user.id,
       'display_name': user.name,
@@ -739,14 +742,17 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     }
 
     try {
+      final commandId =
+          '${DateTime.now().microsecondsSinceEpoch}_${_commandSequence++}';
       final message = jsonEncode(<String, Object?>{
         'type': type,
+        'command_id': commandId,
         'payload': payload,
       });
 
       channel.sink.add(message);
 
-      _debug('media sent: $type $payload');
+      _debug('media sent: $type command=$commandId');
     } catch (error) {
       _debug('media send failed for $type: $error');
       _resetConnectionState();
@@ -763,6 +769,18 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       _debug('media received: $type $payload');
 
       if (payload is! Map<String, dynamic>) return;
+
+      if (type == 'command/ack') {
+        return;
+      }
+
+      if (type == 'command/error') {
+        _debug(
+          'room command rejected: '
+          '${payload['command_type']} ${payload['message']}',
+        );
+        return;
+      }
 
       if (type == 'room/system_event') {
         LiveRoomSystemEventBus.publish(LiveRoomSystemEvent.fromJson(payload));
@@ -964,6 +982,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     roomSnapshot.value = LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
+      stateVersion: snapshot.stateVersion,
       peerCount: snapshot.peerCount,
       lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
@@ -988,6 +1007,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     roomSnapshot.value = LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
+      stateVersion: snapshot.stateVersion,
       peerCount: snapshot.peerCount,
       lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
@@ -1090,6 +1110,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     return LiveMediaRoomSnapshot(
       roomId: snapshot.roomId,
+      stateVersion: snapshot.stateVersion,
       peerCount: snapshot.peerCount,
       lockedSeatIndexes: snapshot.lockedSeatIndexes,
       peers: snapshot.peers.map((peer) {
@@ -1342,11 +1363,13 @@ class LiveMediaRoomSnapshot {
     required this.roomId,
     required this.peers,
     int? peerCount,
+    this.stateVersion = 0,
     this.lockedSeatIndexes = const <int>{},
   }) : peerCount = peerCount ?? peers.length;
 
   final String roomId;
   final int peerCount;
+  final int stateVersion;
   final List<LiveMediaPeerSnapshot> peers;
   final Set<int> lockedSeatIndexes;
 
@@ -1371,13 +1394,35 @@ class LiveMediaRoomSnapshot {
         : <int>{};
 
     final parsedPeerCount = int.tryParse(json['peer_count']?.toString() ?? '');
+    final stateVersion = int.tryParse(
+          json['state_version']?.toString() ?? '',
+        ) ??
+        0;
 
     return LiveMediaRoomSnapshot(
       roomId: json['room_id']?.toString() ?? '',
       peerCount: parsedPeerCount ?? peers.length,
+      stateVersion: stateVersion,
       peers: peers,
       lockedSeatIndexes: lockedSeatIndexes,
     );
+  }
+}
+
+class _VersionedRoomSnapshotNotifier
+    extends ValueNotifier<LiveMediaRoomSnapshot?> {
+  _VersionedRoomSnapshotNotifier() : super(null);
+
+  @override
+  set value(LiveMediaRoomSnapshot? next) {
+    final current = super.value;
+    if (next != null &&
+        current != null &&
+        next.roomId == current.roomId &&
+        next.stateVersion < current.stateVersion) {
+      return;
+    }
+    super.value = next;
   }
 }
 
