@@ -24,7 +24,7 @@ class _LuckyWinCelebrationOverlayState
   final Set<String> _seenEventIds = <String>{};
   final Queue<String> _seenEventOrder = Queue<String>();
 
-  AnimationController? _controller;
+  late final AnimationController _controller;
   _LuckyWinPresentation? _active;
   VoidCallback? _roomEventListener;
   Timer? _nextTimer;
@@ -32,6 +32,12 @@ class _LuckyWinCelebrationOverlayState
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: _LuckyWinTier.big.duration,
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) _finishActive();
+      });
     _roomEventListener = _handleRoomEvent;
     LiveRoomSystemEventBus.latestEvent.addListener(_roomEventListener!);
   }
@@ -43,7 +49,7 @@ class _LuckyWinCelebrationOverlayState
       LiveRoomSystemEventBus.latestEvent.removeListener(listener);
     }
     _nextTimer?.cancel();
-    _controller?.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -55,7 +61,6 @@ class _LuckyWinCelebrationOverlayState
     if (tier == null || !_rememberEvent(event.id)) return;
 
     final presentation = _LuckyWinPresentation(
-      id: event.id,
       senderName: event.actorName.trim().isEmpty
           ? 'Vibe User'
           : event.actorName.trim(),
@@ -69,22 +74,12 @@ class _LuckyWinCelebrationOverlayState
     );
 
     final active = _active;
-    if (active == null) {
+    if (active == null || presentation.tier.rank > active.tier.rank) {
       _start(presentation);
       return;
     }
 
-    // A bigger win should never sit behind a smaller celebration. Preempt a
-    // lower tier immediately; same/lower tiers are queued to avoid visual
-    // chaos when several lucky gifts resolve at once.
-    if (presentation.tier.rank > active.tier.rank) {
-      _start(presentation);
-      return;
-    }
-
-    if (_queue.length >= _maxQueuedEvents) {
-      _queue.removeFirst();
-    }
+    if (_queue.length >= _maxQueuedEvents) _queue.removeFirst();
     _queue.addLast(presentation);
   }
 
@@ -101,47 +96,28 @@ class _LuckyWinCelebrationOverlayState
 
   void _start(_LuckyWinPresentation presentation) {
     _nextTimer?.cancel();
-    _controller?.dispose();
-
-    final controller = AnimationController(
-      vsync: this,
-      duration: presentation.tier.duration,
-    );
-    _controller = controller;
+    _controller
+      ..stop()
+      ..duration = presentation.tier.duration
+      ..reset();
     setState(() => _active = presentation);
-
-    controller.addStatusListener((status) {
-      if (status != AnimationStatus.completed ||
-          !identical(_controller, controller)) {
-        return;
-      }
-      _finish(controller);
-    });
-    controller.forward();
+    _controller.forward();
   }
 
-  void _finish(AnimationController completedController) {
-    // Avoid disposing an AnimationController inside its own status callback.
-    scheduleMicrotask(() {
-      if (!mounted || !identical(_controller, completedController)) return;
-      completedController.dispose();
-      _controller = null;
-      setState(() => _active = null);
-      if (_queue.isEmpty) return;
-      _nextTimer = Timer(const Duration(milliseconds: 120), () {
-        if (!mounted || _queue.isEmpty || _active != null) return;
-        _start(_queue.removeFirst());
-      });
+  void _finishActive() {
+    if (!mounted || _active == null) return;
+    setState(() => _active = null);
+    if (_queue.isEmpty) return;
+    _nextTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted || _active != null || _queue.isEmpty) return;
+      _start(_queue.removeFirst());
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final presentation = _active;
-    final controller = _controller;
-    if (presentation == null || controller == null) {
-      return const SizedBox.shrink();
-    }
+    if (presentation == null) return const SizedBox.shrink();
 
     return Positioned.fill(
       key: const ValueKey('lucky-win-celebration'),
@@ -154,10 +130,10 @@ class _LuckyWinCelebrationOverlayState
                 '${presentation.senderName} sent ${presentation.giftName} to '
                 '${presentation.receiverName}.',
             child: AnimatedBuilder(
-              animation: controller,
+              animation: _controller,
               builder: (context, _) => _LuckyWinScene(
                 presentation: presentation,
-                progress: controller.value,
+                progress: _controller.value,
               ),
             ),
           ),
@@ -191,9 +167,9 @@ class _LuckyWinScene extends StatelessWidget {
         0.42 *
         impact;
     final heartbeat =
-        1 + (math.sin(progress * math.pi * tier.pulseCycles) * tier.pulseScale);
-    final heroScale = (0.58 + (enter * 0.42)) * heartbeat;
-    final flash = (1 - _phase(progress, 0.0, 0.18)) * tier.flashOpacity;
+        1 + math.sin(progress * math.pi * tier.pulseCycles) * tier.pulseScale;
+    final heroScale = (0.58 + enter * 0.42) * heartbeat;
+    final flash = (1 - _phase(progress, 0, 0.18)) * tier.flashOpacity;
 
     return Opacity(
       opacity: visibility,
@@ -203,7 +179,6 @@ class _LuckyWinScene extends StatelessWidget {
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: RadialGradient(
-                center: Alignment.center,
                 radius: 0.92,
                 colors: [
                   tier.colors.first.withValues(
@@ -222,14 +197,7 @@ class _LuckyWinScene extends StatelessWidget {
             ),
           ),
           CustomPaint(
-            painter: _LuckyRayPainter(
-              progress: progress,
-              tier: tier,
-              opacity: visibility,
-            ),
-          ),
-          CustomPaint(
-            painter: _LuckyParticlePainter(
+            painter: _LuckyEffectsPainter(
               progress: progress,
               tier: tier,
               opacity: visibility,
@@ -242,13 +210,6 @@ class _LuckyWinScene extends StatelessWidget {
                 scale: heroScale,
                 child: _LuckyWinHero(presentation: presentation),
               ),
-            ),
-          ),
-          CustomPaint(
-            painter: _LuckyRingPainter(
-              progress: progress,
-              tier: tier,
-              opacity: visibility,
             ),
           ),
           if (flash > 0)
@@ -380,19 +341,7 @@ class _LuckyWinHero extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Flexible(
-                      child: Text(
-                        presentation.senderName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.84),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ),
+                    Flexible(child: _NameText(presentation.senderName)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Icon(
@@ -401,19 +350,7 @@ class _LuckyWinHero extends StatelessWidget {
                         size: 18,
                       ),
                     ),
-                    Flexible(
-                      child: Text(
-                        presentation.receiverName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.84),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ),
+                    Flexible(child: _NameText(presentation.receiverName)),
                   ],
                 ),
                 if (presentation.rewardCoins > 0) ...[
@@ -475,9 +412,28 @@ class _LuckyWinHero extends StatelessWidget {
   }
 }
 
+class _NameText extends StatelessWidget {
+  const _NameText(this.value);
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.84),
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        decoration: TextDecoration.none,
+      ),
+    );
+  }
+}
+
 class _CornerBolt extends StatelessWidget {
   const _CornerBolt({required this.color, required this.turns});
-
   final Color color;
   final double turns;
 
@@ -495,8 +451,8 @@ class _CornerBolt extends StatelessWidget {
   }
 }
 
-class _LuckyRingPainter extends CustomPainter {
-  const _LuckyRingPainter({
+class _LuckyEffectsPainter extends CustomPainter {
+  const _LuckyEffectsPainter({
     required this.progress,
     required this.tier,
     required this.opacity,
@@ -510,125 +466,107 @@ class _LuckyRingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final shortest = math.min(size.width, size.height);
-    for (var i = 0; i < tier.ringCount; i++) {
-      final delayed = _phase(progress, i * 0.07, math.min(1, 0.58 + i * 0.07));
-      if (delayed <= 0 || delayed >= 1) continue;
-      final radius = shortest * (0.10 + delayed * 0.56);
-      final alpha = (1 - delayed) * opacity * 0.74;
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5 + ((1 - delayed) * 3.5)
-        ..color = tier.colors[i % tier.colors.length].withValues(alpha: alpha);
-      canvas.drawCircle(center, radius, paint);
-    }
-  }
+    final fill = Paint()..style = PaintingStyle.fill;
 
-  @override
-  bool shouldRepaint(covariant _LuckyRingPainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.opacity != opacity;
-}
-
-class _LuckyRayPainter extends CustomPainter {
-  const _LuckyRayPainter({
-    required this.progress,
-    required this.tier,
-    required this.opacity,
-  });
-
-  final double progress;
-  final _LuckyWinTier tier;
-  final double opacity;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final shortest = math.min(size.width, size.height);
-    final rotation = progress * math.pi * (tier == _LuckyWinTier.jackpot ? 1.8 : 1.0);
+    // Rotating rays create the large jackpot halo without dozens of widgets.
     final rayCount = tier == _LuckyWinTier.jackpot ? 24 : 16;
-    final paint = Paint()..style = PaintingStyle.fill;
+    final rotation = progress * math.pi *
+        (tier == _LuckyWinTier.jackpot ? 1.8 : 1.0);
     for (var i = 0; i < rayCount; i++) {
-      final angle = rotation + ((math.pi * 2 * i) / rayCount);
+      final angle = rotation + math.pi * 2 * i / rayCount;
       final inner = shortest * 0.15;
-      final outer = shortest * (tier == _LuckyWinTier.jackpot ? 0.68 : 0.56);
+      final outer = shortest *
+          (tier == _LuckyWinTier.jackpot ? 0.68 : 0.56);
       final width = i.isEven ? 0.025 : 0.014;
       final p1 = center + Offset(math.cos(angle), math.sin(angle)) * inner;
-      final p2 = center + Offset(math.cos(angle - width), math.sin(angle - width)) * outer;
-      final p3 = center + Offset(math.cos(angle + width), math.sin(angle + width)) * outer;
-      paint.color = tier.colors[i % tier.colors.length].withValues(
+      final p2 = center +
+          Offset(math.cos(angle - width), math.sin(angle - width)) * outer;
+      final p3 = center +
+          Offset(math.cos(angle + width), math.sin(angle + width)) * outer;
+      fill.color = tier.colors[i % tier.colors.length].withValues(
         alpha: opacity * (i.isEven ? 0.13 : 0.07),
       );
       canvas.drawPath(
-        Path()..moveTo(p1.dx, p1.dy)..lineTo(p2.dx, p2.dy)..lineTo(p3.dx, p3.dy)..close(),
-        paint,
+        Path()
+          ..moveTo(p1.dx, p1.dy)
+          ..lineTo(p2.dx, p2.dy)
+          ..lineTo(p3.dx, p3.dy)
+          ..close(),
+        fill,
       );
     }
-  }
 
-  @override
-  bool shouldRepaint(covariant _LuckyRayPainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.opacity != opacity;
-}
+    // Expanding shockwave rings make each tier land with a visible impact.
+    for (var i = 0; i < tier.ringCount; i++) {
+      final delayed = _phase(
+        progress,
+        i * 0.07,
+        math.min(1.0, 0.58 + i * 0.07),
+      );
+      if (delayed <= 0 || delayed >= 1) continue;
+      final ringPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5 + (1 - delayed) * 3.5
+        ..color = tier.colors[i % tier.colors.length].withValues(
+          alpha: (1 - delayed) * opacity * 0.74,
+        );
+      canvas.drawCircle(
+        center,
+        shortest * (0.10 + delayed * 0.56),
+        ringPaint,
+      );
+    }
 
-class _LuckyParticlePainter extends CustomPainter {
-  const _LuckyParticlePainter({
-    required this.progress,
-    required this.tier,
-    required this.opacity,
-  });
-
-  final double progress;
-  final _LuckyWinTier tier;
-  final double opacity;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final shortest = math.min(size.width, size.height);
-    final paint = Paint()..style = PaintingStyle.fill;
-
+    // Deterministic particles keep animation repeatable and cheap to repaint.
     for (var i = 0; i < tier.particleCount; i++) {
       final delay = (i % 9) * 0.018;
-      final local = _phase(progress, delay, math.min(1, 0.76 + delay));
+      final local = _phase(
+        progress,
+        delay,
+        math.min(1.0, 0.76 + delay),
+      );
       if (local <= 0 || local >= 1) continue;
 
-      final angle = (i * 2.399963229728653) +
+      final angle = i * 2.399963229728653 +
           math.sin(i * 0.71) * 0.28 +
           progress * (i.isEven ? 0.34 : -0.22);
-      final speed = 0.26 + ((i % 7) / 7) * 0.48;
+      final speed = 0.26 + (i % 7) / 7 * 0.48;
       final distance = shortest * speed * Curves.easeOutCubic.transform(local);
       final arc = math.sin(local * math.pi) * shortest * 0.07 *
           (i.isEven ? -1 : 1);
       final position = center +
           Offset(math.cos(angle), math.sin(angle)) * distance +
-          Offset(0, arc + (local * local * shortest * 0.08));
-      final particleFade = math.sin(local * math.pi).clamp(0.0, 1.0).toDouble();
+          Offset(0, arc + local * local * shortest * 0.08);
+      final fade = math.sin(local * math.pi).clamp(0.0, 1.0).toDouble();
       final radius = 2.0 + (i % 4) * 1.35;
-      final color = tier.colors[i % tier.colors.length];
-      paint.color = color.withValues(alpha: opacity * particleFade * 0.94);
+      fill.color = tier.colors[i % tier.colors.length].withValues(
+        alpha: opacity * fade * 0.94,
+      );
 
       if (i % 5 == 0) {
-        final rect = Rect.fromCenter(
-          center: position,
-          width: radius * 1.45,
-          height: radius * 3.8,
-        );
         canvas.save();
         canvas.translate(position.dx, position.dy);
         canvas.rotate(angle + progress * math.pi * 4);
-        canvas.translate(-position.dx, -position.dy);
         canvas.drawRRect(
-          RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-          paint,
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset.zero,
+              width: radius * 1.45,
+              height: radius * 3.8,
+            ),
+            const Radius.circular(2),
+          ),
+          fill,
         );
         canvas.restore();
       } else {
-        canvas.drawCircle(position, radius, paint);
+        canvas.drawCircle(position, radius, fill);
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _LuckyParticlePainter oldDelegate) =>
+  bool shouldRepaint(covariant _LuckyEffectsPainter oldDelegate) =>
       oldDelegate.progress != progress || oldDelegate.opacity != opacity;
 }
 
@@ -672,7 +610,12 @@ enum _LuckyWinTier {
     rank: 3,
     title: 'JACKPOT',
     duration: Duration(milliseconds: 4200),
-    colors: <Color>[Color(0xFFFFE66D), Color(0xFFFF2D95), Color(0xFF22D3EE), Color(0xFF8B5CF6)],
+    colors: <Color>[
+      Color(0xFFFFE66D),
+      Color(0xFFFF2D95),
+      Color(0xFF22D3EE),
+      Color(0xFF8B5CF6),
+    ],
     icon: Icons.workspace_premium_rounded,
     particleCount: 92,
     ringCount: 6,
@@ -729,7 +672,6 @@ enum _LuckyWinTier {
 
 class _LuckyWinPresentation {
   const _LuckyWinPresentation({
-    required this.id,
     required this.senderName,
     required this.receiverName,
     required this.giftName,
@@ -738,7 +680,6 @@ class _LuckyWinPresentation {
     required this.tier,
   });
 
-  final String id;
   final String senderName;
   final String receiverName;
   final String giftName;
