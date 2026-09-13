@@ -76,6 +76,14 @@ class LiveRoomPresenceRepository {
     activeParticipants.value = List<SeatUser>.unmodifiable(next);
   }
 
+  static void _removeParticipant(String userId) {
+    final next = activeParticipants.value
+        .where((user) => user.id != userId)
+        .toList(growable: false);
+    if (next.length == activeParticipants.value.length) return;
+    activeParticipants.value = List<SeatUser>.unmodifiable(next);
+  }
+
   static void updateParticipantRoomAdmin({
     required String roomId,
     required String userId,
@@ -133,7 +141,7 @@ class LiveRoomPresenceRepository {
     );
     final snapshot = LiveRoomPresenceSnapshot.fromJson(response);
     publishParticipants(
-      snapshot.participants,
+      LiveRoomPresenceSnapshot.onlineParticipants(response['participants']),
       roomId: snapshot.roomId.isEmpty ? roomId : snapshot.roomId,
     );
     return snapshot;
@@ -156,10 +164,7 @@ class LiveRoomPresenceRepository {
       headers: _jsonHeaders(),
       body: {'public_user_id': publicUserId},
     );
-    final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
-    _activeRoomId = roomId;
-    publishParticipant(user);
-    return user;
+    return _applyRosterMutation(roomId, response);
   }
 
   Future<SeatUser> removeRoomMember({
@@ -170,10 +175,7 @@ class LiveRoomPresenceRepository {
       '/rooms/$roomId/members/$publicUserId',
       headers: _headers(),
     );
-    final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
-    _activeRoomId = roomId;
-    publishParticipant(user);
-    return user;
+    return _applyRosterMutation(roomId, response);
   }
 
   Future<SeatUser> addRoomAdmin({
@@ -185,10 +187,7 @@ class LiveRoomPresenceRepository {
       headers: _jsonHeaders(),
       body: {'public_user_id': publicUserId},
     );
-    final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
-    _activeRoomId = roomId;
-    publishParticipant(user);
-    return user;
+    return _applyRosterMutation(roomId, response);
   }
 
   Future<SeatUser> removeRoomAdmin({
@@ -199,9 +198,20 @@ class LiveRoomPresenceRepository {
       '/rooms/$roomId/admins/$publicUserId',
       headers: _headers(),
     );
+    return _applyRosterMutation(roomId, response);
+  }
+
+  SeatUser _applyRosterMutation(
+    String roomId,
+    Map<String, dynamic> response,
+  ) {
     final user = LiveRoomPresenceSnapshot.participantToSeatUser(response);
     _activeRoomId = roomId;
-    publishParticipant(user);
+    if (response['is_online'] == true) {
+      publishParticipant(user);
+    } else {
+      _removeParticipant(user.id);
+    }
     return user;
   }
 
@@ -269,7 +279,7 @@ class LiveRoomPresenceSnapshot {
     return LiveRoomPresenceSnapshot(
       roomId: room['id']?.toString() ?? '',
       onlineCount: _int(room['online_count']),
-      participants: _participants(json['participants']),
+      participants: onlineParticipants(json['participants']),
       joinedUser: joinedRaw is Map<String, dynamic>
           ? participantToSeatUser(joinedRaw)
           : null,
@@ -283,6 +293,15 @@ class LiveRoomPresenceSnapshot {
       onlineCount: _int(json['online_count']),
       participants: _participants(json['participants']),
     );
+  }
+
+  static List<SeatUser> onlineParticipants(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .where((participant) => participant['is_online'] == true)
+        .map(participantToSeatUser)
+        .toList(growable: false);
   }
 
   static List<SeatUser> _participants(dynamic raw) {
