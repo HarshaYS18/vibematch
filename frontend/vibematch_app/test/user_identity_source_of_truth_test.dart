@@ -110,6 +110,18 @@ void main() {
       expect(currentUser.wallet.receiveLevel, roomUser.receivingLevel);
       expect(currentUser.roleDisplayLabel, roomUser.roleLabel);
     });
+
+    test('preserves VIP from an already-extracted identity VIP object', () {
+      final identity = UserIdentitySnapshot.fromJson(<String, dynamic>{
+        'id': 44,
+        'public_user_id': 6418000044,
+        'display_name': 'Canonical User',
+        'vip': <String, dynamic>{'level': 25, 'is_active': true},
+      });
+
+      expect(identity.vip.vipLevel, 25);
+      expect(identity.vip.vipIsActive, isTrue);
+    });
   });
 
   group('VIP and wallet normalization', () {
@@ -126,6 +138,18 @@ void main() {
 
       expect(none.vipIsActive, isFalse);
       expect(active.vipIsActive, isTrue);
+    });
+
+    test('direct VIP payload normalizes level and active state', () {
+      final direct = UserVipSummary.fromJson(<String, dynamic>{
+        'level': 25,
+        'is_active': true,
+      });
+
+      expect(direct.vipLevel, 25);
+      expect(direct.vipIsActive, isTrue);
+      expect(direct.svipLevel, 0);
+      expect(direct.svipIsActive, isFalse);
     });
 
     test('all send and receive level aliases normalize consistently', () {
