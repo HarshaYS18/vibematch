@@ -182,20 +182,45 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     )
                     continue
 
+                authenticated_user_id: int | None = None
                 with SessionLocal() as db:
                     try:
                         token = _join_token(payload)
                         if not token:
                             raise HTTPException(status_code=401, detail="Room access token required")
                         user = get_current_user_from_token(db, token)
+                        # Capture the scalar before execute_room_command commits. SQLAlchemy
+                        # expires ORM attributes on commit; reading user.id after the session
+                        # closes raises DetachedInstanceError and used to tear down every room
+                        # websocket immediately after a successful join.
+                        authenticated_user_id = int(user.id)
                         room = room_or_404(db, room_id)
-                        snapshot = await execute_room_command(
-                            db,
-                            room,
-                            user,
-                            "room/join",
-                            payload,
+
+                        # The REST room-enter flow normally establishes authoritative
+                        # participant/presence state before the realtime socket attaches.
+                        # Do not repeat the same write transaction when that state is already
+                        # active. Besides being redundant, concurrent REST + websocket joins
+                        # can contend on user_room_presence and produce PostgreSQL deadlocks.
+                        participant = (
+                            db.query(RoomParticipant)
+                            .filter(
+                                RoomParticipant.room_id == room.id,
+                                RoomParticipant.user_id == authenticated_user_id,
+                            )
+                            .first()
                         )
+                        if participant is not None and participant.is_active:
+                            room_permission_service.require_join(db, room, user)
+                            snapshot = client_room_snapshot(db, room)
+                            db.commit()
+                        else:
+                            snapshot = await execute_room_command(
+                                db,
+                                room,
+                                user,
+                                "room/join",
+                                payload,
+                            )
                     except HTTPException as exc:
                         db.rollback()
                         await room_realtime_connections.send_json(
@@ -210,10 +235,56 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                             },
                         )
                         continue
+                    except Exception:
+                        db.rollback()
+                        await _send_error(
+                            websocket,
+                            room_id=room_id,
+                            command_id=command_id,
+                            command_type=command_type,
+                            status_code=500,
+                            message="Room realtime join failed; reconnecting",
+                        )
+                        try:
+                            await websocket.close(code=1011)
+                        except Exception:
+                            pass
+                        break
+
+                if authenticated_user_id is None:
+                    await _send_error(
+                        websocket,
+                        room_id=room_id,
+                        command_id=command_id,
+                        command_type=command_type,
+                        status_code=401,
+                        message="Room authentication failed",
+                    )
+                    continue
 
                 active_room_id = room_id
-                active_user_id = user.id
-                await room_realtime_connections.connect_room(room_id, websocket, user.id)
+                active_user_id = authenticated_user_id
+                await room_realtime_connections.connect_room(
+                    room_id,
+                    websocket,
+                    authenticated_user_id,
+                )
+
+                # Existing room clients receive room/joined from the authoritative join
+                # transaction. The joining socket was not registered yet, so send exactly
+                # one direct join event to it as the lifecycle signal that also starts the
+                # mediasoup audio session on Flutter.
+                await room_realtime_connections.send_json(
+                    websocket,
+                    {
+                        "type": "room/joined",
+                        "payload": {
+                            "room_id": room_id,
+                            "room": snapshot,
+                            "target_user_id": authenticated_user_id,
+                        },
+                    },
+                )
                 await room_realtime_connections.send_json(
                     websocket,
                     {"type": "room.snapshot", "payload": {"room_id": room_id, "room": snapshot}},
