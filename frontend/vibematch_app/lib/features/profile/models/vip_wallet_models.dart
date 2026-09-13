@@ -1,4 +1,4 @@
-﻿class UserVipSummary {
+class UserVipSummary {
   const UserVipSummary({
     required this.vipLevel,
     required this.svipLevel,
@@ -19,24 +19,53 @@
 
   factory UserVipSummary.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const UserVipSummary.empty();
-    final colors = json['name_gradient_colors'];
+
     final vip = _map(json['vip']);
     final svip = _map(json['svip']);
+    final vipLevel = _clamp(
+      _firstInt([json['vip_level'], json['vipLevel'], vip['level']]),
+      max: 50,
+    );
+    final svipLevel = _clamp(
+      _firstInt([json['svip_level'], json['svipLevel'], svip['level']]),
+      max: 10,
+    );
+    final colors =
+        json['name_gradient_colors'] ?? json['nameGradientColors'];
+
     return UserVipSummary(
-      vipLevel: _firstPositive([json['vip_level'], vip['level']]),
-      svipLevel: _firstPositive([json['svip_level'], svip['level']]),
-      vipIsActive: _bool(json['vip_is_active'], fallback: true),
-      svipIsActive: _bool(json['svip_is_active'], fallback: _firstPositive([json['svip_level'], svip['level']]) > 0),
-      svipExpiresAt: _date(json['svip_expires_at']),
-      nameGradientKey: (json['name_gradient_key'] ?? 'default').toString(),
-      nameGradientColors: colors is List ? colors.map((item) => item.toString()).where((item) => item.trim().isNotEmpty).toList() : const <String>[],
+      vipLevel: vipLevel,
+      svipLevel: svipLevel,
+      vipIsActive: _bool(
+        json['vip_is_active'] ?? json['vipIsActive'],
+        fallback: vipLevel > 0,
+      ),
+      svipIsActive: _bool(
+        json['svip_is_active'] ?? json['svipIsActive'],
+        fallback: svipLevel > 0,
+      ),
+      svipExpiresAt: _date(
+        json['svip_expires_at'] ??
+            json['svipExpiresAt'] ??
+            svip['expires_at'] ??
+            svip['expiresAt'],
+      ),
+      nameGradientKey:
+          (json['name_gradient_key'] ?? json['nameGradientKey'] ?? 'default')
+              .toString(),
+      nameGradientColors: colors is List
+          ? colors
+                .map((item) => item.toString().trim())
+                .where((item) => item.isNotEmpty)
+                .toList(growable: false)
+          : const <String>[],
     );
   }
 
   const UserVipSummary.empty()
       : vipLevel = 0,
         svipLevel = 0,
-        vipIsActive = true,
+        vipIsActive = false,
         svipIsActive = false,
         svipExpiresAt = null,
         nameGradientKey = 'default',
@@ -56,7 +85,8 @@
     };
   }
 
-  bool get hasActiveSvipGradient => svipIsActive && svipLevel > 0 && nameGradientColors.length >= 2;
+  bool get hasActiveSvipGradient =>
+      svipIsActive && svipLevel > 0 && nameGradientColors.length >= 2;
 }
 
 class UserWalletSummary {
@@ -88,22 +118,60 @@ class UserWalletSummary {
 
   factory UserWalletSummary.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const UserWalletSummary.empty();
+
     final sent = _map(json['sent']);
     final received = _map(json['received']);
-    final lifetimeSendExp = _firstPositive([json['lifetime_send_exp'], sent['total_exp'], json['lifetime_coins_spent']]);
-    final lifetimeReceiveExp = _firstPositive([json['lifetime_receive_exp'], received['total_exp'], json['lifetime_coins_received_as_gifts']]);
+    final levels = _map(json['levels']);
+
+    final lifetimeSendExp = _firstInt([
+      json['lifetime_send_exp'],
+      json['send_exp'],
+      sent['total_exp'],
+      levels['send_exp'],
+      json['lifetime_coins_spent'],
+    ]);
+    final lifetimeReceiveExp = _firstInt([
+      json['lifetime_receive_exp'],
+      json['receive_exp'],
+      received['total_exp'],
+      levels['receive_exp'],
+      json['lifetime_coins_received_as_gifts'],
+    ]);
+
     return UserWalletSummary(
-      coinBalance: _int(json['coin_balance']),
-      rubyBalance: _int(json['ruby_balance']),
-      lifetimeCoinsSpent: _int(json['lifetime_coins_spent']),
-      lifetimeCoinsReceivedAsGifts: _int(json['lifetime_coins_received_as_gifts']),
-      lifetimeRubiesEarned: _int(json['lifetime_rubies_earned']),
-      monthlyGiftCoinsSent: _int(json['monthly_gift_coins_sent']),
-      monthlyGiftCoinsReceived: _int(json['monthly_gift_coins_received']),
+      coinBalance: _nonNegativeInt(json['coin_balance'] ?? json['coins']),
+      rubyBalance: _nonNegativeInt(json['ruby_balance'] ?? json['rubies']),
+      lifetimeCoinsSpent: _nonNegativeInt(json['lifetime_coins_spent']),
+      lifetimeCoinsReceivedAsGifts: _nonNegativeInt(
+        json['lifetime_coins_received_as_gifts'],
+      ),
+      lifetimeRubiesEarned: _nonNegativeInt(json['lifetime_rubies_earned']),
+      monthlyGiftCoinsSent: _firstInt([
+        json['monthly_gift_coins_sent'],
+        json['monthly_sent_coins'],
+      ]),
+      monthlyGiftCoinsReceived: _firstInt([
+        json['monthly_gift_coins_received'],
+        json['monthly_received_coins'],
+      ]),
       lifetimeSendExp: lifetimeSendExp,
       lifetimeReceiveExp: lifetimeReceiveExp,
-      sendLevel: _firstPositive([json['sent_level'], sent['level']]),
-      receiveLevel: _firstPositive([json['receive_level'], received['level']]),
+      sendLevel: _firstInt([
+        json['sent_level'],
+        json['send_level'],
+        json['sending_level'],
+        sent['level'],
+        levels['send_level'],
+        levels['sent_level'],
+      ]),
+      receiveLevel: _firstInt([
+        json['receive_level'],
+        json['received_level'],
+        json['receiving_level'],
+        received['level'],
+        levels['receive_level'],
+        levels['received_level'],
+      ]),
     );
   }
 
@@ -119,6 +187,7 @@ class UserWalletSummary {
       'lifetime_send_exp': lifetimeSendExp,
       'lifetime_receive_exp': lifetimeReceiveExp,
       'sent_level': sendLevel,
+      'send_level': sendLevel,
       'receive_level': receiveLevel,
       'sent': {'level': sendLevel, 'total_exp': lifetimeSendExp},
       'received': {'level': receiveLevel, 'total_exp': lifetimeReceiveExp},
@@ -145,19 +214,30 @@ Map<String, dynamic> _map(dynamic value) {
   return const <String, dynamic>{};
 }
 
-int _firstPositive(List<dynamic> values) {
+int _firstInt(List<dynamic> values) {
   for (final value in values) {
-    final parsed = _int(value);
-    if (parsed > 0) return parsed;
+    final parsed = _nullableInt(value);
+    if (parsed != null) return parsed < 0 ? 0 : parsed;
   }
   return 0;
 }
 
-int _int(dynamic value) {
+int _nonNegativeInt(dynamic value) {
+  final parsed = _nullableInt(value) ?? 0;
+  return parsed < 0 ? 0 : parsed;
+}
+
+int? _nullableInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
+  if (value is String) return int.tryParse(value.trim());
+  return null;
+}
+
+int _clamp(int value, {required int max}) {
+  if (value < 0) return 0;
+  if (value > max) return max;
+  return value;
 }
 
 bool _bool(dynamic value, {bool fallback = false}) {
@@ -165,14 +245,20 @@ bool _bool(dynamic value, {bool fallback = false}) {
   if (value is num) return value != 0;
   if (value is String) {
     final normalized = value.trim().toLowerCase();
-    if (normalized == 'true' || normalized == '1' || normalized == 'yes') return true;
-    if (normalized == 'false' || normalized == '0' || normalized == 'no') return false;
+    if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+      return false;
+    }
   }
   return fallback;
 }
 
 DateTime? _date(dynamic value) {
   if (value is DateTime) return value;
-  if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value);
+  if (value is String && value.trim().isNotEmpty) {
+    return DateTime.tryParse(value.trim());
+  }
   return null;
 }
