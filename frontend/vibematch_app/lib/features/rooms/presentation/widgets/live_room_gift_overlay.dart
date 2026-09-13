@@ -78,7 +78,8 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   void _handleBackendRoomEvent() {
     final event = LiveRoomSystemEventBus.latestEvent.value;
-    if (event == null || !event.isRoomGiftSent) return;
+    final isGlobalBroadcast = event?.type == 'global_gift_broadcast';
+    if (event == null || (!event.isRoomGiftSent && !isGlobalBroadcast)) return;
     if (!_handledBackendGiftIds.add(event.id)) return;
 
     final gift = _giftItemForEvent(event);
@@ -111,11 +112,50 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       remainingSeconds: 10,
     );
 
+    _publishBackendPremiumBroadcast(event, gift, slide);
+    if (isGlobalBroadcast) return;
+
+    // The sender already has the committed local slide. Lucky combo taps then
+    // produce another authoritative backend event for the same presentation.
+    // Keep the backend event for everyone else, but do not create a second
+    // sender-side slide/flight for the same live combo session.
+    if (_hasLocalSenderPresentation(event, gift)) return;
+
     if (event.showGiftSlide || slide.isVideoGift) {
       _startBackendGiftSlide(slide);
     }
-    _publishBackendPremiumBroadcast(event, gift, slide);
     _publishBackendGiftFlight(event, gift, slide);
+  }
+
+  bool _hasLocalSenderPresentation(
+    LiveRoomSystemEvent event,
+    GiftItem gift,
+  ) {
+    if (!_sameRoomUserId(widget.currentUserId, event.actorUserId)) return false;
+    final target = _normalize(event.targetName);
+    final eventGift = _normalize(_withoutMultiplier(event.giftName));
+    final catalogGift = _normalize(_withoutMultiplier(gift.name));
+    return widget.slides.any((slide) {
+      if (_normalize(slide.receiverName) != target) return false;
+      final localGift = _normalize(_withoutMultiplier(slide.giftName));
+      return localGift == eventGift || localGift == catalogGift;
+    });
+  }
+
+  bool _sameRoomUserId(String? left, String? right) {
+    String normalizeId(String? value) {
+      final text = value?.trim().toLowerCase() ?? '';
+      if (text.startsWith('user_')) return text.substring(5);
+      return text;
+    }
+
+    final a = normalizeId(left);
+    final b = normalizeId(right);
+    return a.isNotEmpty && a == b;
+  }
+
+  String _withoutMultiplier(String value) {
+    return value.replaceAll(RegExp(r'(\s+x\d+)+\s*$'), '').trim();
   }
 
   GiftItem _giftItemForEvent(LiveRoomSystemEvent event) {
