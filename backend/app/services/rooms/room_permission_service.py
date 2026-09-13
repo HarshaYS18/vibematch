@@ -64,15 +64,29 @@ def require_room_view(db: Session, room: Room, user: User | None) -> None:
 
 
 def require_join(db: Session, room: Room, user: User | None) -> None:
+    """Require an authenticated, currently active room participant.
+
+    Realtime and HTTP room commands share this guard.  Checking only room
+    visibility allowed an authenticated caller to invoke open-room chat/seat
+    commands without ever joining the room, which could create state that had
+    no corresponding active presence.  Keep presence as the source of truth:
+    every joined action must have an active RoomParticipant row.
+    """
     if user is None:
         raise HTTPException(status_code=401, detail="Login required")
     require_room_view(db, room, user)
-    if is_founder_or_owner(user) or is_room_owner(room, user):
-        return
-    if room.is_members_only:
-        participant = participant_for(db, room, user)
-        if not participant or not participant.is_member:
-            raise HTTPException(status_code=403, detail="Members-only room requires membership approval")
+
+    participant = participant_for(db, room, user)
+    if participant is None or not participant.is_active:
+        raise HTTPException(status_code=409, detail="Join the room before performing this action")
+
+    if room.is_members_only and not (
+        participant.is_member
+        or participant.is_room_admin
+        or is_room_owner(room, user)
+        or is_founder_or_owner(user)
+    ):
+        raise HTTPException(status_code=403, detail="Members-only room requires membership approval")
 
 
 def require_room_admin(db: Session, room: Room, actor: User | None) -> None:
