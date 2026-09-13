@@ -201,14 +201,16 @@ class LiveRoomMessageController {
 
   void _detachSystemEventListener() {
     final listener = _systemEventListener;
-    if (listener != null)
+    if (listener != null) {
       LiveRoomSystemEventBus.latestEvent.removeListener(listener);
+    }
     _systemEventListener = null;
     final seatApplicationListener = _seatApplicationListener;
-    if (seatApplicationListener != null)
+    if (seatApplicationListener != null) {
       LiveRoomSeatApplicationEventBus.latestEvent.removeListener(
         seatApplicationListener,
       );
+    }
     _seatApplicationListener = null;
   }
 
@@ -290,13 +292,40 @@ class LiveRoomMessageController {
     }
 
     if (event.isRoomGiftSent) {
+      final senderName = event.actorName.trim().isEmpty
+          ? 'Vibe User'
+          : event.actorName.trim();
+      final receiverName = event.targetName.trim().isEmpty
+          ? 'user'
+          : event.targetName.trim();
+      final giftName = event.giftName.trim().isEmpty
+          ? 'Gift'
+          : event.giftName.trim();
+      final quantity = event.giftQuantity <= 0 ? 1 : event.giftQuantity;
+      final luckySuffix = event.isLuckyGift && event.luckyMultiplier > 0
+          ? ' x${event.luckyMultiplier}'
+          : '';
+      _insertOrUpdateGiftEntry(
+        ChatEntry(
+          senderName: senderName,
+          senderId: event.actorUserId,
+          senderAvatarUrl: event.actorAvatarUrl,
+          message: 'sent to $receiverName $giftName$luckySuffix x$quantity',
+          vipLevel: event.actorVipLevel,
+          sendingLevel: event.actorSendingLevel,
+          receivingLevel: event.actorReceivingLevel,
+          isGift: true,
+          giftAssetPath: event.giftAssetPath,
+        ),
+      );
       return;
     }
 
     if (event.isUserEntered) {
       if (event.targetUserId == currentUser.id ||
-          event.actorUserId == currentUser.id)
+          event.actorUserId == currentUser.id) {
         return;
+      }
       final name = event.targetName.trim().isNotEmpty
           ? event.targetName
           : event.actorName;
@@ -363,8 +392,9 @@ class LiveRoomMessageController {
       return;
     }
 
-    if (event.message.trim().isNotEmpty)
+    if (event.message.trim().isNotEmpty) {
       insertTransientSystemMessage(event.message);
+    }
   }
 
   void _insertOrUpdateGiftEntry(ChatEntry entry) {
@@ -439,14 +469,13 @@ class LiveRoomMessageController {
       final entry = messages[i];
       if (!entry.isSeatApplication ||
           entry.applicationApproved ||
-          entry.applicationRejected)
+          entry.applicationRejected) {
         continue;
+      }
       if (!_sameRoomUserId(entry.senderId, event.targetUserId)) continue;
       final eventSeatIndex = event.seatIndex;
       if (eventSeatIndex != null && entry.seatIndex != eventSeatIndex) continue;
-      final seatLabel = entry.seatIndex == null
-          ? ''
-          : ' ${entry.seatIndex! + 1}';
+      final seatLabel = entry.seatIndex == null ? '' : ' ${entry.seatIndex! + 1}';
       final updatedEntry = entry.copyWith(
         message: approved
             ? '${entry.senderName} seat$seatLabel request agreed'
@@ -518,5 +547,3 @@ class LiveRoomMessageController {
     });
   }
 }
-
-typedef VoidCallbackLike = void Function();
