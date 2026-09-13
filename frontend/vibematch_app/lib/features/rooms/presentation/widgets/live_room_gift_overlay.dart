@@ -47,11 +47,14 @@ class LiveRoomGiftOverlay extends StatefulWidget {
 
 class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   static const int _premiumGiftMinCoins = 1000;
+  static const Duration _senderLuckyOutcomeLifetime = Duration(seconds: 20);
 
   final List<RibbonMessage> _ribbonMessages = <RibbonMessage>[];
   final List<GiftSlide> _backendGiftSlides = <GiftSlide>[];
   final Map<String, Timer> _backendGiftTimers = <String, Timer>{};
   final Map<String, String> _backendLuckySlideIdsBySession = <String, String>{};
+  final Map<String, _SenderLuckyOutcome> _senderLuckyOutcomes =
+      <String, _SenderLuckyOutcome>{};
   final Set<String> _handledBackendGiftIds = <String>{};
   VoidCallback? _backendGiftListener;
 
@@ -75,6 +78,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     }
     _backendGiftTimers.clear();
     _backendLuckySlideIdsBySession.clear();
+    _senderLuckyOutcomes.clear();
     super.dispose();
   }
 
@@ -117,9 +121,29 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     _publishBackendPremiumBroadcast(event, gift, slide);
     if (isGlobalBroadcast) return;
 
-    // The sender already owns the locally committed combo slide. Never add the
-    // authoritative echo as a second card/flight on the sender device.
-    if (_hasLocalSenderPresentation(event, gift)) return;
+    // HTTP gift sends broadcast before the sender necessarily receives the
+    // HTTP response that creates its local slide. Suppress every room echo
+    // authored by this user, not only echoes for a slide that already exists.
+    // For lucky gifts, retain the latest authoritative outcome so the local
+    // slide shows the newest multiplier once it appears/updates.
+    if (_sameRoomUserId(widget.currentUserId, event.actorUserId)) {
+      if (event.isLuckyGift) {
+        final key = _presentationSessionKey(
+          receiverName: event.targetName,
+          giftName: gift.name,
+        );
+        if (mounted) {
+          setState(() {
+            _senderLuckyOutcomes[key] = _SenderLuckyOutcome(
+              multiplier: event.luckyMultiplier,
+              colors: _colorsForBackendEvent(event, gift),
+              receivedAt: DateTime.now(),
+            );
+          });
+        }
+      }
+      return;
+    }
 
     if (event.showGiftSlide || slide.isVideoGift) {
       _startBackendGiftSlide(
@@ -128,21 +152,6 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       );
     }
     _publishBackendGiftFlight(event, gift, slide);
-  }
-
-  bool _hasLocalSenderPresentation(
-    LiveRoomSystemEvent event,
-    GiftItem gift,
-  ) {
-    if (!_sameRoomUserId(widget.currentUserId, event.actorUserId)) return false;
-    final target = _normalize(event.targetName);
-    final eventGift = _normalize(_withoutMultiplier(event.giftName));
-    final catalogGift = _normalize(_withoutMultiplier(gift.name));
-    return widget.slides.any((slide) {
-      if (_normalize(slide.receiverName) != target) return false;
-      final localGift = _normalize(_withoutMultiplier(slide.giftName));
-      return localGift == eventGift || localGift == catalogGift;
-    });
   }
 
   bool _sameRoomUserId(String? left, String? right) {
@@ -161,6 +170,13 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     return value.replaceAll(RegExp(r'(\s+x\d+)+\s*$'), '').trim();
   }
 
+  String _presentationSessionKey({
+    required String receiverName,
+    required String giftName,
+  }) {
+    return '${_normalize(receiverName)}|${_normalize(_withoutMultiplier(giftName))}';
+  }
+
   String _luckySessionKey(LiveRoomSystemEvent event) {
     final actor = event.actorUserId.trim().isNotEmpty
         ? event.actorUserId
@@ -172,6 +188,36 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         ? event.giftId
         : _withoutMultiplier(event.giftName);
     return '${_normalize(actor)}|${_normalize(target)}|${_normalize(gift)}';
+  }
+
+  GiftSlide _decorateLocalSenderSlide(GiftSlide slide) {
+    final key = _presentationSessionKey(
+      receiverName: slide.receiverName,
+      giftName: slide.giftName,
+    );
+    final outcome = _senderLuckyOutcomes[key];
+    if (outcome == null) return slide;
+    if (DateTime.now().difference(outcome.receivedAt) >
+        _senderLuckyOutcomeLifetime) {
+      _senderLuckyOutcomes.remove(key);
+      return slide;
+    }
+    final baseName = _withoutMultiplier(slide.giftName);
+    return GiftSlide(
+      id: slide.id,
+      senderName: slide.senderName,
+      receiverName: slide.receiverName,
+      giftName: '$baseName x${outcome.multiplier}',
+      giftIcon: slide.giftIcon,
+      giftAssetPath: slide.giftAssetPath,
+      videoAssetPath: slide.videoAssetPath,
+      giftAssetUrl: slide.giftAssetUrl,
+      videoUrl: slide.videoUrl,
+      colors: outcome.colors,
+      combo: slide.combo,
+      baseCombo: slide.baseCombo,
+      remainingSeconds: slide.remainingSeconds,
+    );
   }
 
   GiftItem _giftItemForEvent(LiveRoomSystemEvent event) {
@@ -269,7 +315,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   String _giftDisplayName(LiveRoomSystemEvent event, GiftItem gift) {
     final base = event.giftName.trim().isEmpty ? gift.name : event.giftName.trim();
-    if (!event.isLuckyGift || event.luckyMultiplier <= 0) return base;
+    if (!event.isLuckyGift) return base;
     return '$base x${event.luckyMultiplier}';
   }
 
@@ -431,10 +477,13 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final localSlides = widget.slides
+        .map(_decorateLocalSenderSlide)
+        .toList(growable: false);
     final combinedSlides = <GiftSlide>[
-      ...widget.slides,
+      ...localSlides,
       ..._backendGiftSlides.where(
-        (backendSlide) => !widget.slides.any(
+        (backendSlide) => !localSlides.any(
           (localSlide) =>
               localSlide.id == backendSlide.id ||
               _samePresentation(localSlide, backendSlide),
@@ -460,7 +509,10 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             slides: normalSlides,
             onComboTap: (slide) {
               if (_isBackendSlide(slide)) return;
-              widget.onComboTap(slide);
+              final localSlide = widget.slides
+                  .where((item) => item.id == slide.id)
+                  .firstOrNull;
+              widget.onComboTap(localSlide ?? slide);
             },
           ),
           CleanVideoGiftOverlay(
@@ -511,6 +563,19 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       );
       return;
     }
-    widget.onVideoGiftFinished(slide);
+    final localSlide = widget.slides.where((item) => item.id == slide.id).firstOrNull;
+    widget.onVideoGiftFinished(localSlide ?? slide);
   }
+}
+
+class _SenderLuckyOutcome {
+  const _SenderLuckyOutcome({
+    required this.multiplier,
+    required this.colors,
+    required this.receivedAt,
+  });
+
+  final int multiplier;
+  final List<Color> colors;
+  final DateTime receivedAt;
 }
