@@ -22,8 +22,30 @@ class UserVipSummary {
 
     final vip = _map(json['vip']);
     final svip = _map(json['svip']);
+
+    // UserIdentitySnapshot may receive either an aggregate user/VIP payload or
+    // an already-extracted VIP object. Support both shapes here so VIP state
+    // has one normalization path throughout the app.
+    final isAggregatePayload =
+        json.containsKey('vip') ||
+        json.containsKey('svip') ||
+        json.containsKey('vip_level') ||
+        json.containsKey('vipLevel') ||
+        json.containsKey('svip_level') ||
+        json.containsKey('svipLevel');
+
+    final directVipLevel = isAggregatePayload ? null : json['level'];
+    final directVipActive = isAggregatePayload
+        ? null
+        : json['is_active'] ?? json['isActive'] ?? json['active'];
+
     final vipLevel = _clamp(
-      _firstInt([json['vip_level'], json['vipLevel'], vip['level']]),
+      _firstInt([
+        json['vip_level'],
+        json['vipLevel'],
+        vip['level'],
+        directVipLevel,
+      ]),
       max: 50,
     );
     final svipLevel = _clamp(
@@ -37,7 +59,7 @@ class UserVipSummary {
       vipLevel: vipLevel,
       svipLevel: svipLevel,
       vipIsActive: _bool(
-        json['vip_is_active'] ?? json['vipIsActive'],
+        json['vip_is_active'] ?? json['vipIsActive'] ?? directVipActive,
         fallback: vipLevel > 0,
       ),
       svipIsActive: _bool(
