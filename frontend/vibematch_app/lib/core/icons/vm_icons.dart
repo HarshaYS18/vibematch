@@ -117,35 +117,61 @@ enum VMIconAssetType {
 }
 
 /// Use this widget when a VM-specific icon pack asset exists.
-class VMIconAsset extends StatelessWidget {
-  const VMIconAsset({
+///
+/// Example:
+/// ```dart
+/// VMIcon(
+///   fallback: VMIcons.coin,
+///   assetName: 'gold_coin',
+/// )
+/// ```
+///
+/// Expected paths:
+/// - assets/icons/gold_coin.png
+/// - assets/icons/gold_coin.webp
+///
+/// Keep [fallback] filled so the UI never breaks if an asset is missing while
+/// we are still wiring dynamic/CDN icon packs later.
+class VMIcon extends StatelessWidget {
+  const VMIcon({
     super.key,
-    required this.assetPath,
+    required this.fallback,
+    this.assetName,
+    this.assetType = VMIconAssetType.png,
     this.size = 24,
-    this.fit = BoxFit.contain,
+    this.color,
     this.semanticLabel,
   });
 
-  final String assetPath;
+  final IconData fallback;
+  final String? assetName;
+  final VMIconAssetType assetType;
   final double size;
-  final BoxFit fit;
+  final Color? color;
   final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      assetPath,
-      width: size,
-      height: size,
-      fit: fit,
+    final name = assetName;
+    if (name == null || name.trim().isEmpty) {
+      return Icon(
+        fallback,
+        size: size,
+        color: color,
+        semanticLabel: semanticLabel,
+      );
+    }
+
+    final extension = switch (assetType) {
+      VMIconAssetType.png => 'png',
+      VMIconAssetType.webp => 'webp',
+    };
+
+    return ImageIcon(
+      AssetImage('assets/icons/$name.$extension'),
+      size: size,
+      color: color,
       semanticLabel: semanticLabel,
-      errorBuilder: (context, error, stackTrace) {
-        return Icon(
-          Icons.image_not_supported_outlined,
-          size: size,
-          semanticLabel: semanticLabel,
-        );
-      },
     );
   }
 }
