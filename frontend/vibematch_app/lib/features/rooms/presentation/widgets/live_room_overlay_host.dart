@@ -7,6 +7,7 @@ import '../modules/room_music_overlay.dart';
 import 'live_room_gift_overlay.dart';
 import 'live_room_remote_audio_renderers.dart';
 import 'live_room_seat_invite_notification.dart';
+import 'lucky_win_celebration_overlay.dart';
 import 'vibesync_room_module.dart';
 
 class LiveRoomOverlayHost extends StatelessWidget {
@@ -72,6 +73,10 @@ class LiveRoomOverlayHost extends StatelessWidget {
             );
           },
         ),
+        // Authoritative lucky gift results are celebrated independently from
+        // the combo slide state. This keeps x100/x500/x1000 effects room-wide
+        // without feeding visual state back into combo accounting.
+        const LuckyWinCelebrationOverlay(),
         if (_hasPendingSeatInvite)
           LiveRoomSeatInviteNotification(
             inviterName: pendingSeatInviteInviterName!,
