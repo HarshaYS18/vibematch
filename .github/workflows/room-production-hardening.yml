@@ -66,3 +66,5 @@ jobs:
         run: flutter pub get
       - name: Run Flutter tests
         run: flutter test
+      - name: Build production web bundle
+        run: flutter build web --release
