@@ -1,11 +1,8 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../../presentation/live_room_models.dart';
-import '../../../presentation/widgets/gift_flight_bus.dart';
-import '../../../presentation/widgets/gift_flight_overlay.dart';
 import '../../../presentation/widgets/gift_modules/gift_visual.dart';
 import '../../../presentation/widgets/room_theme.dart';
 
@@ -34,7 +31,11 @@ class GiftSlideOverlay extends StatelessWidget {
 }
 
 class GiftSlideStackModule extends StatefulWidget {
-  const GiftSlideStackModule({super.key, required this.slides, required this.onComboTap});
+  const GiftSlideStackModule({
+    super.key,
+    required this.slides,
+    required this.onComboTap,
+  });
 
   final List<GiftSlide> slides;
   final ValueChanged<GiftSlide> onComboTap;
@@ -47,20 +48,14 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
   static const int _maxVisibleSlides = 3;
   static const Duration _slideStagger = Duration(milliseconds: 220);
 
-  final Map<String, int> _luckyComboTotals = <String, int>{};
-  final Map<String, int> _luckyRewardTotals = <String, int>{};
-  final Set<String> _handledFlightIds = <String>{};
   final List<String> _visibleSlideKeys = <String>[];
   final List<String> _pendingSlideKeys = <String>[];
   final Set<String> _knownSlideKeys = <String>{};
   Timer? _dequeueTimer;
-  VoidCallback? _flightListener;
 
   @override
   void initState() {
     super.initState();
-    _flightListener = _handleGiftFlight;
-    GiftFlightBus.latest.addListener(_flightListener!);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncSlides());
   }
 
@@ -73,10 +68,6 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
   @override
   void dispose() {
     _dequeueTimer?.cancel();
-    final listener = _flightListener;
-    if (listener != null) {
-      GiftFlightBus.latest.removeListener(listener);
-    }
     super.dispose();
   }
 
@@ -84,24 +75,20 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
     final currentKeys = widget.slides.map(_slideKey).toSet();
     var changed = false;
 
-    final expiredKeys = _knownSlideKeys
-        .where((key) => !currentKeys.contains(key))
-        .toList(growable: false);
-    for (final key in expiredKeys) {
-      _resetComboSession(key);
-    }
-
     _knownSlideKeys.removeWhere((key) => !currentKeys.contains(key));
     final visibleBefore = _visibleSlideKeys.length;
     final pendingBefore = _pendingSlideKeys.length;
     _visibleSlideKeys.removeWhere((key) => !currentKeys.contains(key));
     _pendingSlideKeys.removeWhere((key) => !currentKeys.contains(key));
-    changed = visibleBefore != _visibleSlideKeys.length || pendingBefore != _pendingSlideKeys.length || expiredKeys.isNotEmpty;
+    changed =
+        visibleBefore != _visibleSlideKeys.length ||
+        pendingBefore != _pendingSlideKeys.length;
 
     for (final slide in widget.slides) {
       final key = _slideKey(slide);
       if (_knownSlideKeys.add(key)) {
-        if (_visibleSlideKeys.length < _maxVisibleSlides && _pendingSlideKeys.isEmpty) {
+        if (_visibleSlideKeys.length < _maxVisibleSlides &&
+            _pendingSlideKeys.isEmpty) {
           _visibleSlideKeys.add(key);
         } else if (!_pendingSlideKeys.contains(key)) {
           _pendingSlideKeys.add(key);
@@ -114,32 +101,21 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
     _scheduleDequeue();
   }
 
-  void _resetComboSession(String key) {
-    _luckyComboTotals.remove(key);
-    _luckyRewardTotals.remove(key);
-  }
-
   void _scheduleDequeue() {
     if (_dequeueTimer?.isActive == true) return;
-    if (_pendingSlideKeys.isEmpty || _visibleSlideKeys.length >= _maxVisibleSlides) return;
+    if (_pendingSlideKeys.isEmpty ||
+        _visibleSlideKeys.length >= _maxVisibleSlides) {
+      return;
+    }
     _dequeueTimer = Timer(_slideStagger, () {
       if (!mounted) return;
-      if (_pendingSlideKeys.isEmpty || _visibleSlideKeys.length >= _maxVisibleSlides) return;
+      if (_pendingSlideKeys.isEmpty ||
+          _visibleSlideKeys.length >= _maxVisibleSlides) {
+        return;
+      }
       setState(() => _visibleSlideKeys.add(_pendingSlideKeys.removeAt(0)));
       _scheduleDequeue();
     });
-  }
-
-  void _handleGiftFlight() {
-    final event = GiftFlightBus.latest.value;
-    if (event == null) return;
-    if (!_handledFlightIds.add(event.id)) return;
-    if (event.multiplier == null) return;
-
-    final key = _eventKey(event);
-    _luckyComboTotals[key] = (_luckyComboTotals[key] ?? 0) + math.max(1, event.combo);
-    _luckyRewardTotals[key] = (_luckyRewardTotals[key] ?? 0) + math.max(0, event.rewardCoinAmount ?? 0);
-    if (mounted) setState(() {});
   }
 
   @override
@@ -172,11 +148,6 @@ class _GiftSlideStackModuleState extends State<GiftSlideStackModule> {
                     key: ValueKey(_slideKey(visibleSlides[index])),
                     slide: visibleSlides[index],
                     stackIndex: index,
-                    displayCombo: math.max(
-                      visibleSlides[index].combo,
-                      _luckyComboTotals[_slideKey(visibleSlides[index])] ?? visibleSlides[index].combo,
-                    ),
-                    rewardCoins: _luckyRewardTotals[_slideKey(visibleSlides[index])] ?? _rewardCoinsFromSlide(visibleSlides[index]),
                     onComboTap: () => widget.onComboTap(visibleSlides[index]),
                   ),
                 ),
@@ -193,22 +164,19 @@ class GiftSlideCardModule extends StatefulWidget {
     super.key,
     required this.slide,
     required this.onComboTap,
-    required this.displayCombo,
-    required this.rewardCoins,
     this.stackIndex = 0,
   });
 
   final GiftSlide slide;
   final VoidCallback onComboTap;
-  final int displayCombo;
-  final int rewardCoins;
   final int stackIndex;
 
   @override
   State<GiftSlideCardModule> createState() => _GiftSlideCardModuleState();
 }
 
-class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTickerProviderStateMixin {
+class _GiftSlideCardModuleState extends State<GiftSlideCardModule>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _enterController;
   late final Animation<double> _enterCurve;
 
@@ -219,7 +187,10 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTi
       vsync: this,
       duration: Duration(milliseconds: 360 + (widget.stackIndex * 55)),
     );
-    _enterCurve = CurvedAnimation(parent: _enterController, curve: Curves.easeOutCubic);
+    _enterCurve = CurvedAnimation(
+      parent: _enterController,
+      curve: Curves.easeOutCubic,
+    );
     _enterController.forward();
   }
 
@@ -232,8 +203,10 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTi
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final accent = _accentForSlide(widget.slide);
+    final multiplier = _luckyMultiplier(widget.slide);
     final isLucky = _isLuckySlide(widget.slide);
+    final accent = _accentForMultiplier(multiplier, isLucky: isLucky);
+    final giftName = _baseGiftName(widget.slide.giftName);
 
     return AnimatedBuilder(
       animation: _enterCurve,
@@ -259,8 +232,8 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTi
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 232,
-              height: 50,
+              width: 246,
+              height: 54,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -300,7 +273,7 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTi
                   ),
                   Positioned(
                     left: 0,
-                    top: 2,
+                    top: 4,
                     child: GiftVisual(
                       icon: widget.slide.giftIcon,
                       colors: widget.slide.colors,
@@ -312,8 +285,8 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTi
                   ),
                   Positioned(
                     left: 54,
-                    right: 56,
-                    top: 8,
+                    right: 76,
+                    top: 7,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -329,51 +302,52 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTi
                             decoration: TextDecoration.none,
                           ),
                         ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Icon(Icons.arrow_forward_rounded, color: accent, size: 12),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                widget.slide.receiverName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.72),
-                                  fontSize: 10,
-                                  height: 1,
-                                  fontWeight: FontWeight.w800,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 4),
+                        Text(
+                          '$giftName → ${widget.slide.receiverName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 10,
+                            height: 1,
+                            fontWeight: FontWeight.w800,
+                            decoration: TextDecoration.none,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Positioned(
-                    right: 8,
-                    top: 8,
+                    right: 7,
+                    top: 7,
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 150),
-                      transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
+                      transitionBuilder: (child, animation) =>
+                          ScaleTransition(scale: animation, child: child),
                       child: Container(
-                        key: ValueKey('combo-${_slideKey(widget.slide)}-${widget.displayCombo}'),
-                        constraints: const BoxConstraints(minWidth: 43),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        key: ValueKey(
+                          'combo-${_slideKey(widget.slide)}-${widget.slide.combo}',
+                        ),
+                        constraints: const BoxConstraints(minWidth: 62),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(999),
                           color: accent.withValues(alpha: isLucky ? 0.22 : 0.14),
-                          border: Border.all(color: accent.withValues(alpha: 0.44), width: 0.8),
+                          border: Border.all(
+                            color: accent.withValues(alpha: 0.44),
+                            width: 0.8,
+                          ),
                         ),
                         child: Text(
-                          'x${widget.displayCombo}',
+                          'Combo x${widget.slide.combo}',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: accent,
-                            fontSize: 12,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w900,
                             height: 1,
                             decoration: TextDecoration.none,
@@ -382,112 +356,52 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule> with SingleTi
                       ),
                     ),
                   ),
-                  if (isLucky) Positioned(right: 48, top: -3, child: _LuckyPulse(color: accent)),
+                  if (isLucky && multiplier != null)
+                    Positioned(
+                      right: 8,
+                      bottom: -4,
+                      child: _LuckyOutcomeBadge(
+                        multiplier: multiplier,
+                        accent: accent,
+                      ),
+                    ),
                 ],
               ),
             ),
-            if (isLucky)
-              _LuckyRewardTicker(
-                rewardCoins: widget.rewardCoins,
-                accent: accent,
-              ),
           ],
         ),
       ),
     );
   }
-
-  bool _isLuckySlide(GiftSlide slide) {
-    final text = '${slide.giftName} ${slide.giftName.toLowerCase()}';
-    return text.contains('lucky') ||
-        text.contains('packet') ||
-        text.contains('spin') ||
-        RegExp(r'x(0|1|2|5|10|20|50|100|500|1000)').hasMatch(text.toLowerCase());
-  }
-
-  Color _accentForSlide(GiftSlide slide) {
-    final name = slide.giftName.toLowerCase();
-    if (name.contains('x1000')) return const Color(0xFF22D3EE);
-    if (name.contains('x500')) return const Color(0xFFFF2D95);
-    if (name.contains('x100')) return const Color(0xFFFFD166);
-    if (name.contains('x0') || name.contains('try again')) return const Color(0xFFB9ADC8);
-    if (name.contains('lucky') || name.contains('packet') || name.contains('spin')) {
-      return const Color(0xFFFFB545);
-    }
-    return Colors.white;
-  }
 }
 
-class _LuckyRewardTicker extends StatelessWidget {
-  const _LuckyRewardTicker({required this.rewardCoins, required this.accent});
+class _LuckyOutcomeBadge extends StatelessWidget {
+  const _LuckyOutcomeBadge({
+    required this.multiplier,
+    required this.accent,
+  });
 
-  final int rewardCoins;
+  final int multiplier;
   final Color accent;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 170),
-      transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
-      child: Container(
-        key: ValueKey(rewardCoins),
-        margin: const EdgeInsets.only(left: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          color: const Color(0xFF171020).withValues(alpha: 0.88),
-          border: Border.all(color: RoomColors.gold.withValues(alpha: 0.42), width: 0.8),
-          boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.16), blurRadius: 12)],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.toll_rounded, color: RoomColors.gold, size: 13),
-            const SizedBox(width: 4),
-            Text(
-              '+${_compact(rewardCoins)}',
-              style: const TextStyle(
-                color: RoomColors.gold,
-                fontSize: 11,
-                height: 1,
-                fontWeight: FontWeight.w900,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ],
-        ),
+    final label = multiplier <= 0 ? 'TRY AGAIN' : 'WIN x$multiplier';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: const Color(0xFF171020).withValues(alpha: 0.94),
+        border: Border.all(color: accent.withValues(alpha: 0.50), width: 0.8),
       ),
-    );
-  }
-
-  static String _compact(int value) {
-    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1)}M';
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}K';
-    return '$value';
-  }
-}
-
-class _LuckyPulse extends StatelessWidget {
-  const _LuckyPulse({required this.color});
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.74, end: 1.0),
-      duration: const Duration(milliseconds: 720),
-      curve: Curves.easeInOut,
-      builder: (context, value, child) => Opacity(
-        opacity: 1 - ((value - 0.74) / 0.26).clamp(0.0, 1.0) * 0.40,
-        child: Transform.scale(scale: value, child: child),
-      ),
-      child: Container(
-        width: 18,
-        height: 18,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: color.withValues(alpha: 0.55), width: 1.2),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 8)],
+      child: Text(
+        label,
+        style: TextStyle(
+          color: accent,
+          fontSize: 8.5,
+          fontWeight: FontWeight.w900,
+          height: 1,
+          decoration: TextDecoration.none,
         ),
       ),
     );
@@ -496,13 +410,37 @@ class _LuckyPulse extends StatelessWidget {
 
 String _slideKey(GiftSlide slide) => slide.id;
 
-String _eventKey(GiftFlightEvent event) {
-  return event.id.startsWith('flight-')
-      ? event.id.substring('flight-'.length)
-      : event.id;
+String _baseGiftName(String raw) {
+  return raw.replaceAll(RegExp(r'\s+x\d+\s*$'), '').trim();
 }
 
-int _rewardCoinsFromSlide(GiftSlide slide) {
-  final match = RegExp(r'\+(\d+)').firstMatch(slide.giftName.replaceAll(',', ''));
-  return int.tryParse(match?.group(1) ?? '') ?? 0;
+int? _luckyMultiplier(GiftSlide slide) {
+  final match = RegExp(r'\s+x(\d+)\s*$').firstMatch(slide.giftName.trim());
+  if (match == null) return null;
+  return int.tryParse(match.group(1) ?? '');
+}
+
+bool _isLuckySlide(GiftSlide slide) {
+  final name = slide.giftName.toLowerCase();
+  final base = _baseGiftName(name);
+  if (base.contains('lucky') ||
+      base.contains('spin') ||
+      base.contains('hunt') ||
+      base.contains('fortune') ||
+      base.contains('jackpot')) {
+    return true;
+  }
+  final multiplier = _luckyMultiplier(slide);
+  return multiplier != null &&
+      <int>{0, 5, 10, 20, 50, 100, 500, 1000}.contains(multiplier);
+}
+
+Color _accentForMultiplier(int? multiplier, {required bool isLucky}) {
+  final value = multiplier ?? 0;
+  if (value >= 1000) return const Color(0xFF22D3EE);
+  if (value >= 500) return const Color(0xFFFF2D95);
+  if (value >= 100) return const Color(0xFFFFD166);
+  if (isLucky && value <= 0) return const Color(0xFFB9ADC8);
+  if (isLucky) return const Color(0xFFFFB545);
+  return Colors.white;
 }
