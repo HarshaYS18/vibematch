@@ -97,3 +97,6 @@ node_modules/
 # Firebase backend secrets
 backend/secrets/
 
+
+# mediasoup / TypeScript build output
+backend_media/dist/
