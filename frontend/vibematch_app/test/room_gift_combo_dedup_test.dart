@@ -44,6 +44,8 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(GiftSlideCardModule), findsOneWidget);
+    expect(find.text('Combo x18'), findsOneWidget);
+    expect(find.text('WIN x500'), findsOneWidget);
 
     LiveRoomSystemEventBus.publish(
       LiveRoomSystemEvent.fromJson(<String, dynamic>{
@@ -71,7 +73,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(GiftSlideCardModule), findsOneWidget);
-    expect(find.text('x18'), findsWidgets);
+    expect(find.text('Combo x18'), findsOneWidget);
   });
 
   testWidgets('receiver lucky combo stays one slide and accumulates quantity', (
@@ -123,13 +125,15 @@ void main() {
     publishLucky(id: 'gift_combo_receiver_1', multiplier: 500);
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(GiftSlideCardModule), findsOneWidget);
-    expect(find.text('x9'), findsOneWidget);
+    expect(find.text('Combo x9'), findsOneWidget);
+    expect(find.text('WIN x500'), findsOneWidget);
 
     publishLucky(id: 'gift_combo_receiver_2', multiplier: 100);
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.byType(GiftSlideCardModule), findsOneWidget);
-    expect(find.text('x18'), findsOneWidget);
-    expect(find.text('x9'), findsNothing);
+    expect(find.text('Combo x18'), findsOneWidget);
+    expect(find.text('Combo x9'), findsNothing);
+    expect(find.text('WIN x100'), findsOneWidget);
   });
 }
