@@ -29,6 +29,9 @@ ROOM_MODERATION_ROLES = {
 ROOM_PRODUCE_ACTIONS = {"produce_audio", "join_seat"}
 ROOM_CONSUME_ACTIONS = {"consume_audio", "join_room", "create_transport", "connect_transport"}
 ROOM_PRODUCER_OWNER_ACTIONS = {"pause_producer", "resume_producer", "close_producer"}
+ROOM_ACTIONS_REQUIRING_ACTIVE_PRESENCE = (
+    ROOM_PRODUCE_ACTIONS | ROOM_CONSUME_ACTIONS | ROOM_PRODUCER_OWNER_ACTIONS
+)
 
 
 @dataclass(frozen=True)
@@ -49,9 +52,10 @@ def evaluate_media_room_permission(
 ) -> MediaRoomPermissionDecision:
     """Central room/media permission resolver for realtime audio actions.
 
-    This resolver is intentionally backend-only and is safe for mediasoup
-    signaling servers to call through `/media-realtime/verify`. It does not
-    trust user/role/room data coming from clients.
+    Media access is bound to the authoritative room presence and seat state.
+    This prevents a valid JWT from opening a parallel media session without
+    joining the room first, and prevents microphone production before the
+    realtime room service has actually assigned the user a seat.
     """
     if room is None:
         return MediaRoomPermissionDecision(
@@ -94,6 +98,14 @@ def evaluate_media_room_permission(
             context=context,
         )
 
+    if action in ROOM_ACTIONS_REQUIRING_ACTIVE_PRESENCE and participant is None:
+        return MediaRoomPermissionDecision(
+            allowed=False,
+            reason="Join the room before using room media.",
+            permissions=[],
+            context=context,
+        )
+
     if room.is_secret and not (is_owner or is_room_admin or is_member or is_staff_override):
         return MediaRoomPermissionDecision(
             allowed=False,
@@ -118,7 +130,7 @@ def evaluate_media_room_permission(
             context=context,
         )
 
-    if action in ROOM_PRODUCE_ACTIONS:
+    if action == "join_seat":
         if room.apply_only_mode_enabled and not (is_owner or is_room_admin or is_staff_override):
             return MediaRoomPermissionDecision(
                 allowed=False,
@@ -126,7 +138,21 @@ def evaluate_media_room_permission(
                 permissions=[],
                 context=context,
             )
-        if seat_state is not None and seat_state.admin_muted and not (is_owner or is_room_admin or is_moderation_staff):
+
+    if action == "produce_audio":
+        # The room realtime service owns seat assignment.  A seat row is the
+        # durable proof that an ordinary or privileged user is currently
+        # allowed to publish room audio.  In apply-only mode this also means an
+        # approved application can produce after assignment instead of being
+        # permanently rejected just because apply-only remains enabled.
+        if seat_state is None:
+            return MediaRoomPermissionDecision(
+                allowed=False,
+                reason="An occupied room seat is required before publishing audio.",
+                permissions=[],
+                context=context,
+            )
+        if seat_state.admin_muted and not (is_owner or is_room_admin or is_moderation_staff):
             return MediaRoomPermissionDecision(
                 allowed=False,
                 reason="User is admin-muted on mic.",
