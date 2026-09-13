@@ -1,18 +1,13 @@
 import 'dart:async';
 
 import '../../../presence/data/presence_api_service.dart';
-import '../../data/live_room_presence_repository.dart';
 
 class LiveRoomPresenceController {
   LiveRoomPresenceController({
     PresenceApiService presenceApi = const PresenceApiService(),
-    LiveRoomPresenceRepository? roomPresenceRepository,
-  }) : _presenceApi = presenceApi,
-       _roomPresenceRepository =
-           roomPresenceRepository ?? LiveRoomPresenceRepository();
+  }) : _presenceApi = presenceApi;
 
   final PresenceApiService _presenceApi;
-  final LiveRoomPresenceRepository _roomPresenceRepository;
   Timer? _heartbeatTimer;
   bool _left = true;
   String _roomPublicId = '';
@@ -62,14 +57,13 @@ class LiveRoomPresenceController {
     try {
       await _presenceApi.leaveRoom();
     } catch (_) {
-      // Best effort. Backend also expires stale room presence by heartbeat.
+      // Best effort. Backend also expires stale presence by heartbeat.
     }
   }
 
   void dispose() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
-    _roomPresenceRepository.close();
   }
 
   Future<void> _enterRoomPresence() async {
@@ -81,10 +75,8 @@ class LiveRoomPresenceController {
         isSecret: _isSecret,
       );
     } catch (_) {
-      // Room presence must never block live room loading.
+      // Presence visibility must never block live room loading.
     }
-
-    await _sendRoomParticipantHeartbeat();
   }
 
   Future<void> _sendHeartbeat() async {
@@ -98,23 +90,7 @@ class LiveRoomPresenceController {
         isSecret: _isSecret,
       );
     } catch (_) {
-      // Keep room stable even if heartbeat fails temporarily.
-    }
-
-    await _sendRoomParticipantHeartbeat();
-  }
-
-  Future<void> _sendRoomParticipantHeartbeat() async {
-    if (_left) return;
-    final roomId = _roomPublicId.trim();
-    if (roomId.isEmpty) return;
-
-    try {
-      await _roomPresenceRepository.heartbeat(roomId);
-    } catch (_) {
-      // The websocket room state is still authoritative for visible room UI.
-      // If this heartbeat fails, backend stale cleanup will eventually remove
-      // the participant after the timeout.
+      // Keep the live room stable even if visibility heartbeat fails.
     }
   }
 }
