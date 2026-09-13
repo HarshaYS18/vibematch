@@ -27,6 +27,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     required this.onVideoGiftFinished,
     this.onLuckyPacketGetTap,
     this.onLuckyPacketResultsDismiss,
+    this.currentUserId,
   });
 
   final List<GiftSlide> slides;
@@ -38,6 +39,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
   final ValueChanged<GiftSlide> onVideoGiftFinished;
   final VoidCallback? onLuckyPacketGetTap;
   final VoidCallback? onLuckyPacketResultsDismiss;
+  final String? currentUserId;
 
   @override
   State<LiveRoomGiftOverlay> createState() => _LiveRoomGiftOverlayState();
@@ -52,8 +54,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   final Set<String> _handledBackendGiftIds = <String>{};
   VoidCallback? _backendGiftListener;
 
-  List<GiftItem> get _fullGiftCatalog =>
-      GiftPanel.withMockExtras(mockGiftItems);
+  List<GiftItem> get _fullGiftCatalog => GiftPanel.withMockExtras(mockGiftItems);
 
   @override
   void initState() {
@@ -189,7 +190,6 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       case 'premium_magic_2':
         return 'assets/videos/gifts/premium_magic_2.mp4';
       case 'magic_3':
-        return 'assets/videos/gifts/premium_magic_3.mp4';
       case 'premium_magic_3':
         return 'assets/videos/gifts/premium_magic_3.mp4';
     }
@@ -212,21 +212,22 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   }
 
   String _giftDisplayName(LiveRoomSystemEvent event, GiftItem gift) {
-    final base = event.giftName.trim().isEmpty
-        ? gift.name
-        : event.giftName.trim();
+    final base = event.giftName.trim().isEmpty ? gift.name : event.giftName.trim();
     if (!event.isLuckyGift || event.luckyMultiplier <= 0) return base;
     return '$base x${event.luckyMultiplier}';
   }
 
   List<Color> _colorsForBackendEvent(LiveRoomSystemEvent event, GiftItem gift) {
     if (!event.isLuckyGift) return gift.colors;
-    if (event.luckyMultiplier >= 1000)
+    if (event.luckyMultiplier >= 1000) {
       return const <Color>[Color(0xFF8B5CF6), Color(0xFF22D3EE)];
-    if (event.luckyMultiplier >= 500)
+    }
+    if (event.luckyMultiplier >= 500) {
       return const <Color>[Color(0xFFFF2D95), Color(0xFF00E5FF)];
-    if (event.luckyMultiplier >= 100)
+    }
+    if (event.luckyMultiplier >= 100) {
       return const <Color>[Color(0xFFFFC857), Color(0xFFFF5F7E)];
+    }
     return gift.colors;
   }
 
@@ -252,9 +253,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     _backendGiftTimers[slide.id] = Timer.periodic(const Duration(seconds: 1), (
       timer,
     ) {
-      final index = _backendGiftSlides.indexWhere(
-        (item) => item.id == slide.id,
-      );
+      final index = _backendGiftSlides.indexWhere((item) => item.id == slide.id);
       if (index < 0) {
         timer.cancel();
         _backendGiftTimers.remove(slide.id);
@@ -335,13 +334,25 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     );
   }
 
+  bool _samePresentation(GiftSlide local, GiftSlide backend) {
+    return _normalize(local.senderName) == _normalize(backend.senderName) &&
+        _normalize(local.receiverName) == _normalize(backend.receiverName) &&
+        _normalize(local.giftName) == _normalize(backend.giftName) &&
+        local.combo == backend.combo;
+  }
+
+  bool _isBackendSlide(GiftSlide slide) =>
+      _backendGiftSlides.any((item) => item.id == slide.id);
+
   @override
   Widget build(BuildContext context) {
     final combinedSlides = <GiftSlide>[
       ...widget.slides,
       ..._backendGiftSlides.where(
         (backendSlide) => !widget.slides.any(
-          (localSlide) => localSlide.id == backendSlide.id,
+          (localSlide) =>
+              localSlide.id == backendSlide.id ||
+              _samePresentation(localSlide, backendSlide),
         ),
       ),
     ];
@@ -351,11 +362,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     final videoSlides = combinedSlides
         .where((slide) => slide.isVideoGift)
         .toList(growable: false);
-    final rawComboSlide =
-        widget.activeComboSlide ??
-        normalSlides
-            .where((slide) => slide.giftName != 'Lucky Packet')
-            .firstOrNull;
+    final rawComboSlide = widget.activeComboSlide;
     final comboSlide = _comboDisplaySlide(rawComboSlide);
 
     return SizedBox.expand(
@@ -364,7 +371,13 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         clipBehavior: Clip.none,
         children: [
           const PremiumGiftBroadcastOverlay(),
-          GiftSlideOverlay(slides: normalSlides, onComboTap: widget.onComboTap),
+          GiftSlideOverlay(
+            slides: normalSlides,
+            onComboTap: (slide) {
+              if (_isBackendSlide(slide)) return;
+              widget.onComboTap(slide);
+            },
+          ),
           CleanVideoGiftOverlay(
             slides: videoSlides,
             onVideoFinished: _finishVideoGift,
@@ -413,12 +426,5 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       return;
     }
     widget.onVideoGiftFinished(slide);
-  }
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull {
-    for (final item in this) return item;
-    return null;
   }
 }
