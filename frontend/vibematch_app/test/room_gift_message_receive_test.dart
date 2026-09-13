@@ -6,6 +6,8 @@ import 'package:vibematch_app/features/rooms/presentation/live_room_models.dart'
 import 'package:vibematch_app/features/rooms/presentation/live_room_restore_state.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('received room gift event becomes a gift chat entry', () {
     var changes = 0;
     const currentUser = SeatUser(
