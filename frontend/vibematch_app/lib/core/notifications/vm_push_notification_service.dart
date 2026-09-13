@@ -1,5 +1,4 @@
-﻿import 'dart:convert';
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -41,7 +40,13 @@ class VmPushNotificationService {
     if (_initialized) return;
     _initialized = true;
 
-    FirebaseMessaging.onBackgroundMessage(vmFirebaseMessagingBackgroundHandler);
+    // The current notification implementation is native-only. Web push needs
+    // its own service-worker/VAPID setup and must not block Flutter startup.
+    if (kIsWeb) return;
+
+    FirebaseMessaging.onBackgroundMessage(
+      vmFirebaseMessagingBackgroundHandler,
+    );
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
@@ -68,7 +73,8 @@ class VmPushNotificationService {
   Future<void> _createAndroidChannels() async {
     final android = _localNotifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return;
 
     const callChannel = AndroidNotificationChannel(
@@ -123,11 +129,14 @@ class VmPushNotificationService {
     if (token == null || token.trim().isEmpty) return;
 
     final deviceId = await _authApiService.getCurrentDeviceId();
-    final platform = Platform.isAndroid
-        ? 'android'
-        : Platform.isIOS
-            ? 'ios'
-            : Platform.operatingSystem;
+    final platform = switch (defaultTargetPlatform) {
+      TargetPlatform.android => 'android',
+      TargetPlatform.iOS => 'ios',
+      TargetPlatform.macOS => 'macos',
+      TargetPlatform.windows => 'windows',
+      TargetPlatform.linux => 'linux',
+      TargetPlatform.fuchsia => 'fuchsia',
+    };
 
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/push/device-token')),
