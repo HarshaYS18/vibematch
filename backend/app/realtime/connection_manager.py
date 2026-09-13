@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -14,17 +15,24 @@ from starlette.websockets import WebSocketState
 from app.core.config import settings
 
 
+_REDIS_PREFIX = "funkey:room"
+_SOCKET_LEASE_SECONDS = 30
+_COMMAND_CLAIM_SECONDS = 5 * 60
+
+
 class RealtimeConnectionManager:
-    """Local socket registry backed by Redis pub/sub for cross-worker delivery."""
+    """Local socket registry backed by Redis for cross-worker delivery and leases."""
 
     def __init__(self) -> None:
         self._room_clients: dict[str, set[WebSocket]] = defaultdict(set)
         self._client_rooms: dict[WebSocket, set[str]] = defaultdict(set)
         self._client_users: dict[WebSocket, int | None] = {}
+        self._client_connection_ids: dict[WebSocket, str] = {}
         self._room_versions: dict[str, int] = {}
         self._instance_id = uuid4().hex
         self._redis: Redis = Redis.from_url(settings.redis_url, decode_responses=True)
         self._listener_task: asyncio.Task[None] | None = None
+        self._local_command_claims: dict[str, float] = {}
 
     async def _ensure_listener(self) -> None:
         if self._listener_task is not None and not self._listener_task.done():
@@ -35,7 +43,7 @@ class RealtimeConnectionManager:
         while True:
             pubsub = self._redis.pubsub(ignore_subscribe_messages=True)
             try:
-                await pubsub.psubscribe("funkey:room:*")
+                await pubsub.psubscribe(f"{_REDIS_PREFIX}:events:*")
                 async for message in pubsub.listen():
                     raw = message.get("data")
                     if not isinstance(raw, str):
@@ -51,11 +59,11 @@ class RealtimeConnectionManager:
                     if not room_id or not isinstance(payload, dict):
                         continue
                     target = envelope.get("target_user_id")
-                    await self._deliver_local(
-                        room_id,
-                        payload,
-                        int(target) if target is not None else None,
-                    )
+                    try:
+                        target_user_id = int(target) if target is not None else None
+                    except (TypeError, ValueError):
+                        target_user_id = None
+                    await self._deliver_local(room_id, payload, target_user_id)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -71,6 +79,8 @@ class RealtimeConnectionManager:
         self._room_clients[room_public_id].add(websocket)
         self._client_rooms[websocket].add(room_public_id)
         self._client_users[websocket] = user_id
+        self._client_connection_ids.setdefault(websocket, uuid4().hex)
+        await self.touch_connection(websocket)
 
     def disconnect(self, websocket: WebSocket) -> list[str]:
         rooms = list(self._client_rooms.pop(websocket, set()))
@@ -81,7 +91,23 @@ class RealtimeConnectionManager:
                 if not sockets:
                     self._room_clients.pop(room_public_id, None)
         self._client_users.pop(websocket, None)
+        self._client_connection_ids.pop(websocket, None)
         return rooms
+
+    async def release_connection(self, websocket: WebSocket) -> list[tuple[str, int]]:
+        rooms = list(self._client_rooms.get(websocket, set()))
+        user_id = self._client_users.get(websocket)
+        connection_id = self._client_connection_ids.get(websocket)
+        released: list[tuple[str, int]] = []
+        if user_id is not None and connection_id:
+            for room_id in rooms:
+                released.append((room_id, user_id))
+                try:
+                    await self._redis.zrem(self._lease_key(room_id, user_id), connection_id)
+                except Exception:
+                    pass
+        self.disconnect(websocket)
+        return released
 
     def connected_count(self, room_public_id: str) -> int:
         return len(self._room_clients.get(room_public_id, set()))
@@ -139,7 +165,10 @@ class RealtimeConnectionManager:
             "payload": payload,
         }
         try:
-            await self._redis.publish(f"funkey:room:{room_public_id}", json.dumps(envelope, default=str))
+            await self._redis.publish(
+                f"{_REDIS_PREFIX}:events:{room_public_id}",
+                json.dumps(envelope, default=str),
+            )
         except Exception:
             pass
 
@@ -152,6 +181,70 @@ class RealtimeConnectionManager:
         event = self._decorate(payload)
         await self._deliver_local(room_public_id, event, user_id)
         await self._publish(room_public_id, event, user_id)
+
+    @staticmethod
+    def _lease_key(room_public_id: str, user_id: int) -> str:
+        return f"{_REDIS_PREFIX}:leases:{room_public_id}:{user_id}"
+
+    async def touch_connection(self, websocket: WebSocket) -> None:
+        user_id = self._client_users.get(websocket)
+        connection_id = self._client_connection_ids.get(websocket)
+        if user_id is None or not connection_id:
+            return
+        now = time.time()
+        expires_at = now + _SOCKET_LEASE_SECONDS
+        for room_id in self._client_rooms.get(websocket, set()):
+            key = self._lease_key(room_id, user_id)
+            try:
+                pipe = self._redis.pipeline(transaction=False)
+                pipe.zadd(key, {connection_id: expires_at})
+                pipe.zremrangebyscore(key, "-inf", now)
+                pipe.expire(key, _SOCKET_LEASE_SECONDS * 3)
+                await pipe.execute()
+            except Exception:
+                pass
+
+    async def has_room_user_connections(self, room_public_id: str, user_id: int) -> bool:
+        for client in self._room_clients.get(room_public_id, set()):
+            if self._client_users.get(client) == user_id and self._is_connected(client):
+                return True
+        key = self._lease_key(room_public_id, user_id)
+        try:
+            pipe = self._redis.pipeline(transaction=False)
+            pipe.zremrangebyscore(key, "-inf", time.time())
+            pipe.zcard(key)
+            _, count = await pipe.execute()
+            return int(count or 0) > 0
+        except Exception:
+            return False
+
+    async def claim_command(self, room_public_id: str, user_id: int, command_id: str) -> bool:
+        safe_id = command_id.strip()
+        if not safe_id:
+            return True
+        key = f"{_REDIS_PREFIX}:commands:{room_public_id}:{user_id}:{safe_id}"
+        try:
+            return bool(await self._redis.set(key, self._instance_id, ex=_COMMAND_CLAIM_SECONDS, nx=True))
+        except Exception:
+            now = time.monotonic()
+            for item, expires_at in list(self._local_command_claims.items()):
+                if expires_at <= now:
+                    self._local_command_claims.pop(item, None)
+            if key in self._local_command_claims:
+                return False
+            self._local_command_claims[key] = now + _COMMAND_CLAIM_SECONDS
+            return True
+
+    async def release_command_claim(self, room_public_id: str, user_id: int, command_id: str) -> None:
+        safe_id = command_id.strip()
+        if not safe_id:
+            return
+        key = f"{_REDIS_PREFIX}:commands:{room_public_id}:{user_id}:{safe_id}"
+        self._local_command_claims.pop(key, None)
+        try:
+            await self._redis.delete(key)
+        except Exception:
+            pass
 
 
 room_realtime_connections = RealtimeConnectionManager()
