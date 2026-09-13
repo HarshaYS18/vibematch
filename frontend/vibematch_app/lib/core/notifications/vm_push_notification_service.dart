@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -29,45 +30,55 @@ class VmPushNotificationService {
   static const String _generalChannelId = 'funkey_general';
   static const String _generalChannelName = 'FunKey notifications';
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications =
+  // Keep Firebase/plugin objects lazy. Constructing FirebaseMessaging.instance
+  // on an unsupported or unconfigured platform can throw before callers have a
+  // chance to apply their platform guards.
+  late final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  late final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   final AuthApiService _authApiService = const AuthApiService();
 
   bool _initialized = false;
 
+  bool get _supportsCurrentFirebaseConfig {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android;
+  }
+
   Future<void> initialize() async {
-    if (_initialized) return;
+    if (_initialized || !_supportsCurrentFirebaseConfig) return;
     _initialized = true;
 
-    // The current notification implementation is native-only. Web push needs
-    // its own service-worker/VAPID setup and must not block Flutter startup.
-    if (kIsWeb) return;
+    try {
+      FirebaseMessaging.onBackgroundMessage(
+        vmFirebaseMessagingBackgroundHandler,
+      );
 
-    FirebaseMessaging.onBackgroundMessage(
-      vmFirebaseMessagingBackgroundHandler,
-    );
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initSettings = InitializationSettings(android: androidInit);
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidInit);
+      await _localNotifications.initialize(
+        settings: initSettings,
+        onDidReceiveNotificationResponse: _handleLocalNotificationResponse,
+        onDidReceiveBackgroundNotificationResponse:
+            vmLocalNotificationBackgroundTapHandler,
+      );
 
-    await _localNotifications.initialize(
-      settings: initSettings,
-      onDidReceiveNotificationResponse: _handleLocalNotificationResponse,
-      onDidReceiveBackgroundNotificationResponse:
-          vmLocalNotificationBackgroundTapHandler,
-    );
+      await _createAndroidChannels();
+      await _requestPermission();
 
-    await _createAndroidChannels();
-    await _requestPermission();
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedMessage);
+      _messaging.onTokenRefresh.listen((token) {
+        unawaited(registerCurrentToken(tokenOverride: token));
+      });
 
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedMessage);
-    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-      registerCurrentToken(tokenOverride: token);
-    });
-
-    await registerCurrentToken();
+      await registerCurrentToken();
+    } catch (error, stackTrace) {
+      _initialized = false;
+      debugPrint('Push initialization failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> _createAndroidChannels() async {
@@ -100,7 +111,7 @@ class VmPushNotificationService {
   }
 
   Future<void> _requestPermission() async {
-    if (kIsWeb) return;
+    if (!_supportsCurrentFirebaseConfig) return;
 
     await _messaging.requestPermission(
       alert: true,
@@ -120,58 +131,82 @@ class VmPushNotificationService {
   }
 
   Future<void> registerCurrentToken({String? tokenOverride}) async {
-    if (kIsWeb) return;
+    if (!_supportsCurrentFirebaseConfig) return;
 
-    final accessToken = _authApiService.cachedAccessToken;
-    if (accessToken == null || accessToken.trim().isEmpty) return;
+    try {
+      final accessToken = _authApiService.cachedAccessToken;
+      if (accessToken == null || accessToken.trim().isEmpty) return;
 
-    final token = tokenOverride ?? await _messaging.getToken();
-    if (token == null || token.trim().isEmpty) return;
+      final token = tokenOverride ?? await _messaging.getToken();
+      if (token == null || token.trim().isEmpty) return;
 
-    final deviceId = await _authApiService.getCurrentDeviceId();
-    final platform = switch (defaultTargetPlatform) {
-      TargetPlatform.android => 'android',
-      TargetPlatform.iOS => 'ios',
-      TargetPlatform.macOS => 'macos',
-      TargetPlatform.windows => 'windows',
-      TargetPlatform.linux => 'linux',
-      TargetPlatform.fuchsia => 'fuchsia',
-    };
+      final deviceId = await _authApiService.getCurrentDeviceId();
+      final platform = switch (defaultTargetPlatform) {
+        TargetPlatform.android => 'android',
+        TargetPlatform.iOS => 'ios',
+        TargetPlatform.macOS => 'macos',
+        TargetPlatform.windows => 'windows',
+        TargetPlatform.linux => 'linux',
+        TargetPlatform.fuchsia => 'fuchsia',
+      };
 
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/push/device-token')),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
-      body: jsonEncode({
-        'device_id': deviceId,
-        'platform': platform,
-        'fcm_token': token,
-        'app_package': 'com.funkey.app',
-      }),
-    );
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      debugPrint(
-        'FCM token registration failed: ${response.statusCode} ${response.body}',
+      final response = await http.post(
+        Uri.parse(VmApiConfig.endpoint('/push/device-token')),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({
+          'device_id': deviceId,
+          'platform': platform,
+          'fcm_token': token,
+          'app_package': 'com.funkey.app',
+        }),
       );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          'FCM token registration failed: '
+          '${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (error, stackTrace) {
+      // Push registration is auxiliary infrastructure and must never make auth
+      // or the main application unusable.
+      debugPrint('FCM token registration error: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
   Future<void> deleteCurrentTokenOnLogout() async {
-    final accessToken = _authApiService.cachedAccessToken;
-    if (accessToken == null || accessToken.trim().isEmpty) return;
+    if (!_supportsCurrentFirebaseConfig) return;
 
-    final deviceId = await _authApiService.getCurrentDeviceId();
+    try {
+      final accessToken = _authApiService.cachedAccessToken;
+      if (accessToken == null || accessToken.trim().isEmpty) return;
 
-    await http.delete(
-      Uri.parse(VmApiConfig.endpoint('/push/device-token/$deviceId')),
-      headers: {'Authorization': 'Bearer $accessToken'},
-    );
+      final deviceId = await _authApiService.getCurrentDeviceId();
+      final response = await http.delete(
+        Uri.parse(VmApiConfig.endpoint('/push/device-token/$deviceId')),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          'FCM token cleanup failed: ${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (error, stackTrace) {
+      // Logout/session cleanup must remain successful even when push cleanup
+      // cannot reach Firebase or the backend.
+      debugPrint('FCM token cleanup error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    if (!_supportsCurrentFirebaseConfig) return;
+
     final data = message.data;
     final type = data['type']?.toString();
     final isCall = type == 'inbox_call';
