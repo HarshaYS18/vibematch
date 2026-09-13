@@ -16,9 +16,34 @@ from app.core.config import settings
 
 
 _REDIS_PREFIX = "funkey:room"
+_GLOBAL_ROOM_ID = "__global__"
 _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
 _COMMAND_CLAIM_SECONDS = 5 * 60
+
+
+def build_global_premium_gift_event(
+    room_public_id: str,
+    event: dict[str, Any],
+) -> dict[str, Any] | None:
+    body = event.get("payload")
+    if not isinstance(body, dict):
+        return None
+    event_type = str(body.get("event_type") or body.get("type") or "")
+    if event_type != "room_gift_sent":
+        return None
+    if not bool(body.get("show_premium_broadcast")):
+        return None
+
+    global_event = dict(event)
+    global_body = dict(body)
+    global_body["event_type"] = "global_gift_broadcast"
+    global_body["type"] = "global_gift_broadcast"
+    global_body["broadcast_scope"] = "global"
+    global_body["source_room_id"] = room_public_id
+    global_body["message"] = ""
+    global_event["payload"] = global_body
+    return global_event
 
 
 class RealtimeConnectionManager:
@@ -56,9 +81,14 @@ class RealtimeConnectionManager:
                         continue
                     if envelope.get("origin") == self._instance_id:
                         continue
-                    room_id = str(envelope.get("room_id") or "")
                     payload = envelope.get("payload")
-                    if not room_id or not isinstance(payload, dict):
+                    if not isinstance(payload, dict):
+                        continue
+                    if envelope.get("scope") == "global":
+                        await self._deliver_global_local(payload)
+                        continue
+                    room_id = str(envelope.get("room_id") or "")
+                    if not room_id:
                         continue
                     target = envelope.get("target_user_id")
                     try:
@@ -76,7 +106,12 @@ class RealtimeConnectionManager:
                 except Exception:
                     pass
 
-    async def connect_room(self, room_public_id: str, websocket: WebSocket, user_id: int | None = None) -> None:
+    async def connect_room(
+        self,
+        room_public_id: str,
+        websocket: WebSocket,
+        user_id: int | None = None,
+    ) -> None:
         await self._ensure_listener()
         self._room_clients[room_public_id].add(websocket)
         self._client_rooms[websocket].add(room_public_id)
@@ -85,7 +120,9 @@ class RealtimeConnectionManager:
         await self.touch_connection(websocket)
         task = self._lease_tasks.get(websocket)
         if task is None or task.done():
-            self._lease_tasks[websocket] = asyncio.create_task(self._refresh_connection_lease(websocket))
+            self._lease_tasks[websocket] = asyncio.create_task(
+                self._refresh_connection_lease(websocket)
+            )
 
     async def _refresh_connection_lease(self, websocket: WebSocket) -> None:
         try:
@@ -123,7 +160,10 @@ class RealtimeConnectionManager:
             for room_id in rooms:
                 released.append((room_id, user_id))
                 try:
-                    await self._redis.zrem(self._lease_key(room_id, user_id), connection_id)
+                    await self._redis.zrem(
+                        self._lease_key(room_id, user_id),
+                        connection_id,
+                    )
                 except Exception:
                     pass
         self.disconnect(websocket)
@@ -158,7 +198,12 @@ class RealtimeConnectionManager:
         except (TypeError, ValueError):
             return None
 
-    async def _deliver_local(self, room_public_id: str, payload: dict[str, Any], target_user_id: int | None = None) -> None:
+    async def _deliver_local(
+        self,
+        room_public_id: str,
+        payload: dict[str, Any],
+        target_user_id: int | None = None,
+    ) -> None:
         version = self._version(payload)
         current = self._room_versions.get(room_public_id)
         if version is not None and current is not None and version < current:
@@ -170,13 +215,25 @@ class RealtimeConnectionManager:
                 continue
             await self.send_json(client, payload)
 
+    async def _deliver_global_local(self, payload: dict[str, Any]) -> None:
+        clients: set[WebSocket] = set()
+        for room_clients in self._room_clients.values():
+            clients.update(room_clients)
+        for client in list(clients):
+            await self.send_json(client, payload)
+
     def _decorate(self, payload: dict[str, Any]) -> dict[str, Any]:
         event = dict(payload)
         event.setdefault("event_id", uuid4().hex)
         event.setdefault("sent_at", datetime.now(timezone.utc).isoformat())
         return event
 
-    async def _publish(self, room_public_id: str, payload: dict[str, Any], target_user_id: int | None = None) -> None:
+    async def _publish(
+        self,
+        room_public_id: str,
+        payload: dict[str, Any],
+        target_user_id: int | None = None,
+    ) -> None:
         await self._ensure_listener()
         envelope = {
             "origin": self._instance_id,
@@ -192,12 +249,43 @@ class RealtimeConnectionManager:
         except Exception:
             pass
 
+    async def _publish_global(self, payload: dict[str, Any]) -> None:
+        await self._ensure_listener()
+        envelope = {
+            "origin": self._instance_id,
+            "scope": "global",
+            "room_id": _GLOBAL_ROOM_ID,
+            "payload": payload,
+        }
+        try:
+            await self._redis.publish(
+                f"{_REDIS_PREFIX}:events:{_GLOBAL_ROOM_ID}",
+                json.dumps(envelope, default=str),
+            )
+        except Exception:
+            pass
+
+    async def broadcast_global(self, payload: dict[str, Any]) -> None:
+        event = self._decorate(payload)
+        await self._deliver_global_local(event)
+        await self._publish_global(event)
+
     async def broadcast_room(self, room_public_id: str, payload: dict[str, Any]) -> None:
         event = self._decorate(payload)
         await self._deliver_local(room_public_id, event)
         await self._publish(room_public_id, event)
 
-    async def send_room_user(self, room_public_id: str, user_id: int, payload: dict[str, Any]) -> None:
+        global_gift_event = build_global_premium_gift_event(room_public_id, event)
+        if global_gift_event is not None:
+            await self._deliver_global_local(global_gift_event)
+            await self._publish_global(global_gift_event)
+
+    async def send_room_user(
+        self,
+        room_public_id: str,
+        user_id: int,
+        payload: dict[str, Any],
+    ) -> None:
         event = self._decorate(payload)
         await self._deliver_local(room_public_id, event, user_id)
         await self._publish(room_public_id, event, user_id)
@@ -224,7 +312,11 @@ class RealtimeConnectionManager:
             except Exception:
                 pass
 
-    async def has_room_user_connections(self, room_public_id: str, user_id: int) -> bool:
+    async def has_room_user_connections(
+        self,
+        room_public_id: str,
+        user_id: int,
+    ) -> bool:
         for client in self._room_clients.get(room_public_id, set()):
             if self._client_users.get(client) == user_id and self._is_connected(client):
                 return True
@@ -238,13 +330,25 @@ class RealtimeConnectionManager:
         except Exception:
             return True
 
-    async def claim_command(self, room_public_id: str, user_id: int, command_id: str) -> bool:
+    async def claim_command(
+        self,
+        room_public_id: str,
+        user_id: int,
+        command_id: str,
+    ) -> bool:
         safe_id = command_id.strip()
         if not safe_id:
             return True
         key = f"{_REDIS_PREFIX}:commands:{room_public_id}:{user_id}:{safe_id}"
         try:
-            return bool(await self._redis.set(key, self._instance_id, ex=_COMMAND_CLAIM_SECONDS, nx=True))
+            return bool(
+                await self._redis.set(
+                    key,
+                    self._instance_id,
+                    ex=_COMMAND_CLAIM_SECONDS,
+                    nx=True,
+                )
+            )
         except Exception:
             now = time.monotonic()
             for item, expires_at in list(self._local_command_claims.items()):
@@ -255,7 +359,12 @@ class RealtimeConnectionManager:
             self._local_command_claims[key] = now + _COMMAND_CLAIM_SECONDS
             return True
 
-    async def release_command_claim(self, room_public_id: str, user_id: int, command_id: str) -> None:
+    async def release_command_claim(
+        self,
+        room_public_id: str,
+        user_id: int,
+        command_id: str,
+    ) -> None:
         safe_id = command_id.strip()
         if not safe_id:
             return
