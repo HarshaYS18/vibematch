@@ -17,6 +17,7 @@ from app.core.config import settings
 
 _REDIS_PREFIX = "funkey:room"
 _SOCKET_LEASE_SECONDS = 30
+_SOCKET_LEASE_REFRESH_SECONDS = 10
 _COMMAND_CLAIM_SECONDS = 5 * 60
 
 
@@ -28,6 +29,7 @@ class RealtimeConnectionManager:
         self._client_rooms: dict[WebSocket, set[str]] = defaultdict(set)
         self._client_users: dict[WebSocket, int | None] = {}
         self._client_connection_ids: dict[WebSocket, str] = {}
+        self._lease_tasks: dict[WebSocket, asyncio.Task[None]] = {}
         self._room_versions: dict[str, int] = {}
         self._instance_id = uuid4().hex
         self._redis: Redis = Redis.from_url(settings.redis_url, decode_responses=True)
@@ -81,8 +83,26 @@ class RealtimeConnectionManager:
         self._client_users[websocket] = user_id
         self._client_connection_ids.setdefault(websocket, uuid4().hex)
         await self.touch_connection(websocket)
+        task = self._lease_tasks.get(websocket)
+        if task is None or task.done():
+            self._lease_tasks[websocket] = asyncio.create_task(self._refresh_connection_lease(websocket))
+
+    async def _refresh_connection_lease(self, websocket: WebSocket) -> None:
+        try:
+            while websocket in self._client_rooms and self._is_connected(websocket):
+                await asyncio.sleep(_SOCKET_LEASE_REFRESH_SECONDS)
+                if websocket not in self._client_rooms:
+                    return
+                await self.touch_connection(websocket)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return
 
     def disconnect(self, websocket: WebSocket) -> list[str]:
+        task = self._lease_tasks.pop(websocket, None)
+        if task is not None and not task.done():
+            task.cancel()
         rooms = list(self._client_rooms.pop(websocket, set()))
         for room_public_id in rooms:
             sockets = self._room_clients.get(room_public_id)
@@ -216,7 +236,7 @@ class RealtimeConnectionManager:
             _, count = await pipe.execute()
             return int(count or 0) > 0
         except Exception:
-            return False
+            return True
 
     async def claim_command(self, room_public_id: str, user_id: int, command_id: str) -> bool:
         safe_id = command_id.strip()
