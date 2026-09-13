@@ -57,6 +57,15 @@ class _LiveRoomControllerScopeState extends State<LiveRoomControllerScope> {
   }
 
   @override
+  void didUpdateWidget(covariant LiveRoomControllerScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.config.onlineCount != widget.config.onlineCount) {
+      bundle.updateBackendOnlineCount(widget.config.onlineCount);
+    }
+  }
+
+  @override
   void dispose() {
     bundle.dispose();
     super.dispose();

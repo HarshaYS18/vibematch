@@ -81,11 +81,13 @@ class LiveRoomControllerBundle {
     required LiveRoomContextGetter contextGetter,
     required LiveRoomMountedGetter mountedGetter,
   }) : _contextGetter = contextGetter,
-       _mountedGetter = mountedGetter;
+       _mountedGetter = mountedGetter,
+       _backendOnlineCount = config.onlineCount;
 
   final LiveRoomControllerConfig config;
   final LiveRoomContextGetter _contextGetter;
   final LiveRoomMountedGetter _mountedGetter;
+  int _backendOnlineCount;
 
   late final LiveRoomMentionTextController messageController;
   late final TextEditingController announcementController;
@@ -189,12 +191,18 @@ class LiveRoomControllerBundle {
 
   int get safeOnlineCount {
     return moderationController.safeOnlineCount(
-      backendOnlineCount: config.onlineCount,
+      backendOnlineCount: _backendOnlineCount,
       visibleRoomUsersCount: allRoomUsers.length,
     );
   }
 
   bool get currentUserIsSeated => seatController.currentUserIsSeated;
+
+  void updateBackendOnlineCount(int value) {
+    final nextValue = value < 0 ? 0 : value;
+    if (_backendOnlineCount == nextValue) return;
+    _backendOnlineCount = nextValue;
+  }
 
   void initialize({
     required VoidCallback onRoomStateChanged,

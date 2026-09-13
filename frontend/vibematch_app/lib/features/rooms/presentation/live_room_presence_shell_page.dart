@@ -44,13 +44,17 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
 class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   final LiveRoomPresenceRepository _presenceRepository =
       LiveRoomPresenceRepository();
+  final ValueNotifier<SeatUser?> _enteredUser = ValueNotifier<SeatUser?>(null);
+  final ValueNotifier<String?> _livePresenceWarning = ValueNotifier<String?>(
+    null,
+  );
+
   Timer? _heartbeatTimer;
   Timer? _enteredMessageTimer;
   LiveRoomPresenceSnapshot? _snapshot;
-  SeatUser? _enteredUser;
   bool _joining = true;
   bool _autoSeatAttempted = false;
-  bool _identitySeeded = false;
+  bool _presenceEstablished = false;
   String? _presenceError;
 
   int get _onlineCount => _snapshot?.onlineCount ?? widget.initialOnlineCount;
@@ -66,7 +70,6 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     final currentUser = widget.currentUser;
     if (currentUser != null) {
       LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(currentUser);
-      _identitySeeded = true;
     }
 
     if (_restoringMinimizedRoom) {
@@ -85,6 +88,8 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
         _presenceRepository.leaveRoom(widget.roomId).catchError((_) => 0),
       );
     }
+    _enteredUser.dispose();
+    _livePresenceWarning.dispose();
     _presenceRepository.close();
     super.dispose();
   }
@@ -99,7 +104,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       participants: cachedParticipants,
     );
     _joining = false;
-    _identitySeeded = true;
+    _presenceEstablished = true;
     _presenceError = null;
     _startHeartbeat();
     _restoreSavedSeatIfNeeded();
@@ -181,32 +186,48 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   }
 
   Future<void> _joinPresence() async {
-    setState(() {
-      _joining = true;
-      _presenceError = null;
-    });
+    if (!_joining || _presenceError != null) {
+      setState(() {
+        _joining = true;
+        _presenceError = null;
+      });
+    }
+
     try {
       final snapshot = await _presenceRepository.joinRoom(
         widget.roomId,
         lockPassword: widget.lockPassword,
       );
       if (!mounted) return;
+
       _seedIdentityFromPresence(snapshot);
+      _livePresenceWarning.value = null;
+
       setState(() {
         _snapshot = snapshot;
         _joining = false;
-        _identitySeeded = true;
+        _presenceEstablished = true;
         _presenceError = null;
       });
+
       _showEnteredMessageIfNeeded(snapshot);
       _autoSeatIfAllowed(snapshot);
       _startHeartbeat();
     } catch (error) {
       if (!mounted) return;
+
+      final message = _cleanPresenceError(error);
+      if (_presenceEstablished) {
+        _joining = false;
+        _livePresenceWarning.value = message;
+        _startHeartbeat();
+        return;
+      }
+
       _heartbeatTimer?.cancel();
       setState(() {
         _joining = false;
-        _presenceError = _cleanPresenceError(error);
+        _presenceError = message;
       });
     }
   }
@@ -240,10 +261,10 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       return;
     }
     _enteredMessageTimer?.cancel();
-    setState(() => _enteredUser = joinedUser);
+    _enteredUser.value = joinedUser;
     _enteredMessageTimer = Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
-      setState(() => _enteredUser = null);
+      _enteredUser.value = null;
     });
   }
 
@@ -288,18 +309,25 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     try {
       final snapshot = await _presenceRepository.heartbeat(widget.roomId);
       if (!mounted) return;
+
       _seedIdentityFromPresence(snapshot);
-      setState(() {
+      _livePresenceWarning.value = null;
+
+      final onlineCountChanged = _onlineCount != snapshot.onlineCount;
+      if (onlineCountChanged) {
+        setState(() {
+          _snapshot = snapshot;
+          _presenceError = null;
+        });
+      } else {
         _snapshot = snapshot;
         _presenceError = null;
-      });
+      }
+
       _autoSeatIfAllowed(snapshot);
     } catch (error) {
       if (!mounted) return;
-      _heartbeatTimer?.cancel();
-      setState(() {
-        _presenceError = _cleanPresenceError(error);
-      });
+      _livePresenceWarning.value = _cleanPresenceError(error);
     }
   }
 
@@ -309,7 +337,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   }
 
   bool get _shouldBlockRoomWithRetry {
-    return _presenceError != null;
+    return !_presenceEstablished && _presenceError != null;
   }
 
   @override
@@ -337,13 +365,32 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
           initialBackgroundTheme: widget.initialBackgroundTheme,
           restoreState: widget.restoreState,
         ),
-        if (_enteredUser != null)
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 66,
-            left: 18,
-            right: 18,
-            child: _RoomEnteredSystemToast(user: _enteredUser!),
-          ),
+        ValueListenableBuilder<SeatUser?>(
+          valueListenable: _enteredUser,
+          builder: (context, user, child) {
+            if (user == null) return const SizedBox.shrink();
+            return Positioned(
+              top: MediaQuery.paddingOf(context).top + 66,
+              left: 18,
+              right: 18,
+              child: _RoomEnteredSystemToast(user: user),
+            );
+          },
+        ),
+        ValueListenableBuilder<String?>(
+          valueListenable: _livePresenceWarning,
+          builder: (context, message, child) {
+            if (message == null || message.trim().isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Positioned(
+              top: MediaQuery.paddingOf(context).top + 112,
+              left: 18,
+              right: 18,
+              child: const _RoomPresenceWarningToast(),
+            );
+          },
+        ),
       ],
     );
   }
@@ -571,6 +618,56 @@ class _RoomEnteredSystemToast extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoomPresenceWarningToast extends StatelessWidget {
+  const _RoomPresenceWarningToast();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: const Color(0xFF120D1F).withValues(alpha: 0.90),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: const Color(0xFFFFC857).withValues(alpha: 0.30),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              color: Color(0xFFFFC857),
+              size: 17,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Presence reconnecting. Live audio stays active.',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
