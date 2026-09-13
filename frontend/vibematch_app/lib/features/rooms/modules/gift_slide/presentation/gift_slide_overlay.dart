@@ -321,37 +321,29 @@ class _GiftSlideCardModuleState extends State<GiftSlideCardModule>
                   Positioned(
                     right: 7,
                     top: 7,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 150),
-                      transitionBuilder: (child, animation) =>
-                          ScaleTransition(scale: animation, child: child),
-                      child: Container(
-                        key: ValueKey(
-                          'combo-${_slideKey(widget.slide)}-${widget.slide.combo}',
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 62),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: accent.withValues(alpha: isLucky ? 0.22 : 0.14),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.44),
+                          width: 0.8,
                         ),
-                        constraints: const BoxConstraints(minWidth: 62),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          color: accent.withValues(alpha: isLucky ? 0.22 : 0.14),
-                          border: Border.all(
-                            color: accent.withValues(alpha: 0.44),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Text(
-                          'Combo x${widget.slide.combo}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: accent,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w900,
-                            height: 1,
-                            decoration: TextDecoration.none,
-                          ),
+                      ),
+                      child: Text(
+                        'Combo x${widget.slide.combo}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: accent,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                          decoration: TextDecoration.none,
                         ),
                       ),
                     ),
