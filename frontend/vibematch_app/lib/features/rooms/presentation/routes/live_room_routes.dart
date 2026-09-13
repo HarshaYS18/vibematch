@@ -100,18 +100,7 @@ class LiveRoomRoutes {
         child: ScaleTransition(
           alignment: Alignment.topRight,
           scale: Tween<double>(begin: 0.955, end: 1).animate(preloadReveal),
-          child: AnimatedBuilder(
-            animation: preloadReveal,
-            child: child,
-            builder: (context, child) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(
-                  34 * (1 - preloadReveal.value),
-                ),
-                child: child,
-              );
-            },
-          ),
+          child: RepaintBoundary(child: child),
         ),
       ),
     );
