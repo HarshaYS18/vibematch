@@ -1,6 +1,9 @@
 import 'controllers/live_room_state_controller.dart';
 import 'live_room_models.dart';
 
+/// Lightweight callback type shared by room presentation controllers.
+typedef VoidCallbackLike = void Function();
+
 class LiveRoomRestoreState {
   const LiveRoomRestoreState({
     required this.roomState,
