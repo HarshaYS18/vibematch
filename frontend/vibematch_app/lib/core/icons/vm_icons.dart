@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Central icon registry for VibeMatch.
 ///
 /// Feature screens should use this file instead of importing random icon packs
-/// directly. This lets us change icon packs/styles from one place without
-/// touching every UI module.
+/// directly. Keeping navigation icons on Flutter's built-in Material set avoids
+/// coupling application startup to a third-party icon font package.
 abstract final class VMIcons {
-  // Main navigation. These are already using Phosphor.
-  static const IconData home = PhosphorIconsBold.house;
-  static const IconData vibes = PhosphorIconsBold.shootingStar;
-  static const IconData create = PhosphorIconsFill.plusCircle;
-  static const IconData inbox = PhosphorIconsBold.chatCircle;
-  static const IconData profile = PhosphorIconsBold.user;
+  // Main navigation.
+  static const IconData home = Icons.home_rounded;
+  static const IconData vibes = Icons.auto_awesome_rounded;
+  static const IconData create = Icons.add_circle_rounded;
+  static const IconData inbox = Icons.chat_bubble_rounded;
+  static const IconData profile = Icons.person_rounded;
 
   // Global actions.
   static const IconData search = Icons.search_rounded;
@@ -118,61 +117,35 @@ enum VMIconAssetType {
 }
 
 /// Use this widget when a VM-specific icon pack asset exists.
-///
-/// Example:
-/// ```dart
-/// VMIcon(
-///   fallback: VMIcons.coin,
-///   assetName: 'gold_coin',
-/// )
-/// ```
-///
-/// Expected paths:
-/// - assets/icons/gold_coin.png
-/// - assets/icons/gold_coin.webp
-///
-/// Keep [fallback] filled so the UI never breaks if an asset is missing while
-/// we are still wiring dynamic/CDN icon packs later.
-class VMIcon extends StatelessWidget {
-  const VMIcon({
+class VMIconAsset extends StatelessWidget {
+  const VMIconAsset({
     super.key,
-    required this.fallback,
-    this.assetName,
-    this.assetType = VMIconAssetType.png,
+    required this.assetPath,
     this.size = 24,
-    this.color,
+    this.fit = BoxFit.contain,
     this.semanticLabel,
   });
 
-  final IconData fallback;
-  final String? assetName;
-  final VMIconAssetType assetType;
+  final String assetPath;
   final double size;
-  final Color? color;
+  final BoxFit fit;
   final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    final name = assetName;
-    if (name == null || name.trim().isEmpty) {
-      return Icon(
-        fallback,
-        size: size,
-        color: color,
-        semanticLabel: semanticLabel,
-      );
-    }
-
-    final extension = switch (assetType) {
-      VMIconAssetType.png => 'png',
-      VMIconAssetType.webp => 'webp',
-    };
-
-    return ImageIcon(
-      AssetImage('assets/icons/$name.$extension'),
-      size: size,
-      color: color,
+    return Image.asset(
+      assetPath,
+      width: size,
+      height: size,
+      fit: fit,
       semanticLabel: semanticLabel,
+      errorBuilder: (context, error, stackTrace) {
+        return Icon(
+          Icons.image_not_supported_outlined,
+          size: size,
+          semanticLabel: semanticLabel,
+        );
+      },
     );
   }
 }
