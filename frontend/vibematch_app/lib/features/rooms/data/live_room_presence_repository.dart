@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../auth/data/auth_api_service.dart';
+import '../../auth/models/user_identity_snapshot.dart';
 import '../presentation/live_room_models.dart';
 
 class LiveRoomPresenceRepository {
@@ -253,6 +254,7 @@ class LiveRoomPresenceRepository {
     ..._headers(),
     'Content-Type': 'application/json',
   };
+
   void close() => _apiClient.close();
 }
 
@@ -313,65 +315,50 @@ class LiveRoomPresenceSnapshot {
   }
 
   static SeatUser participantToSeatUser(Map<String, dynamic> json) {
-    final publicUserId = json['public_user_id']?.toString() ?? '';
-    final displayName =
-        _text(json['display_name']) ??
-        _text(json['username']) ??
-        (publicUserId.isEmpty ? 'Vibe User' : 'User $publicUserId');
-    final vip = json['vip'] is Map<String, dynamic>
-        ? json['vip'] as Map<String, dynamic>
-        : <String, dynamic>{};
-    final svipLevel = _int(vip['svip_level']);
-    final vipLevel = _int(vip['vip_level']);
-    final avatarUrl = _text(json['avatar_url']) ?? _text(json['avatarUrl']);
+    final identity = UserIdentitySnapshot.fromJson(json);
     final isOwner = json['is_owner'] == true;
     final isRoomAdmin = json['is_room_admin'] == true;
     final isMember = json['is_member'] == true;
-    final role = _text(json['primary_role']) ?? 'user';
+    final roleLabel = isOwner
+        ? 'Channel Host'
+        : isRoomAdmin
+        ? 'Admin'
+        : isMember
+        ? 'Member'
+        : identity.roleDisplayLabel;
+
+    final avatarFrame = identity.equippedItems.avatarFrame;
+    final chatBubble = identity.equippedItems.chatBubble;
+
     return SeatUser(
-      id: 'user_$publicUserId',
-      name: displayName,
-      roleLabel: isOwner
-          ? 'Channel Host'
-          : isRoomAdmin
-          ? 'Admin'
-          : isMember
-          ? 'Member'
-          : _roleLabel(role),
+      id: identity.roomUserId,
+      name: identity.visibleName,
+      roleLabel: roleLabel,
       familyName: '',
       familyLevel: 'bronze',
       relationshipText: '',
-      vipLevel: vipLevel,
-      svipLevel: svipLevel,
-      sendingLevel: _int(json['sending_level'] ?? json['sendingLevel']),
-      receivingLevel: _int(json['receiving_level'] ?? json['receivingLevel']),
-      sentExp: _int(json['sent_exp'] ?? json['sentExp']),
-      receivedExp: _int(json['received_exp'] ?? json['receivedExp']),
+      vipLevel: identity.vip.vipLevel,
+      svipLevel: identity.vip.svipLevel,
+      sendingLevel: identity.sendLevel,
+      receivingLevel: identity.receiveLevel,
+      sentExp: identity.sentExp,
+      receivedExp: identity.receivedExp,
       medals: const [],
-      avatarColors: _avatarColors(publicUserId),
-      avatarUrl: avatarUrl,
+      avatarColors: _avatarColors(
+        identity.publicUserId > 0
+            ? identity.publicUserId.toString()
+            : identity.roomUserId,
+      ),
+      nameGradientColors: identity.vip.nameGradientColors,
+      avatarUrl: identity.avatarUrl,
+      equippedAvatarFrameAssetPath: avatarFrame?.assetPath,
+      equippedAvatarFrameImageUrl: avatarFrame?.bestImageUrl,
+      equippedChatBubbleAssetPath: chatBubble?.assetPath,
+      equippedChatBubbleImageUrl: chatBubble?.bestImageUrl,
       isHost: isOwner,
       isRoomAdmin: isRoomAdmin || isOwner,
     );
   }
-}
-
-String _roleLabel(String role) {
-  final normalized = role.toLowerCase();
-  if (normalized.contains('founder') ||
-      normalized == 'owner' ||
-      normalized.contains('super_owner')) {
-    return 'Official';
-  }
-  if (normalized.contains('superadmin') || normalized.contains('super_admin')) {
-    return 'Executive';
-  }
-  if (normalized == 'admin') return 'Associate';
-  if (normalized.contains('agency_owner') || normalized == 'bd') {
-    return 'Agency';
-  }
-  if (normalized == 'host' || normalized == 'agency_member') return 'Host';
-  return '';
 }
 
 List<Color> _avatarColors(String seed) {
@@ -383,11 +370,6 @@ List<Color> _avatarColors(String seed) {
     const [Color(0xFF4A9BFF), Color(0xFF12C7B7)],
   ];
   return palettes[hash % palettes.length];
-}
-
-String? _text(dynamic value) {
-  final text = value?.toString().trim();
-  return text == null || text.isEmpty ? null : text;
 }
 
 int _int(dynamic value) {
