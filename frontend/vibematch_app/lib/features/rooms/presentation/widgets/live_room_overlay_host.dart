@@ -68,6 +68,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
                   controller?.claimLuckyPacket(roomUsers),
               onLuckyPacketResultsDismiss:
                   controller?.dismissLuckyPacketResults,
+              currentUserId: controller?.currentUser.id,
             );
           },
         ),
