@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../data/lucky_packet_realtime_service.dart';
 import '../../controllers/live_room_gift_controller.dart';
 import '../economy/gold_coin_icon.dart';
 import '../room_theme.dart';
@@ -18,6 +21,7 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    LuckyPacketRealtimeService.instance.attach();
     return ValueListenableBuilder<LuckyPacketRoomEvent?>(
       valueListenable: LuckyPacketRoomBus.packet,
       builder: (context, busPacket, child) {
@@ -25,8 +29,12 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
         if (activePacket == null) return const SizedBox.shrink();
 
         final isUsingBusPacket = packet == null && busPacket != null;
-        final resolvedGetTap = isUsingBusPacket ? LuckyPacketRoomBus.claim : onGetTap;
-        final resolvedDismissResults = isUsingBusPacket ? LuckyPacketRoomBus.dismissResults : onDismissResults;
+        final resolvedGetTap = isUsingBusPacket
+            ? () => unawaited(LuckyPacketRealtimeService.instance.claim())
+            : onGetTap;
+        final resolvedDismissResults = isUsingBusPacket
+            ? LuckyPacketRealtimeService.instance.dismiss
+            : onDismissResults;
 
         return Positioned.fill(
           child: IgnorePointer(
@@ -35,7 +43,9 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
               children: [
                 if (activePacket.phase != LuckyPacketPhase.countdown)
                   Positioned.fill(
-                    child: Container(color: Colors.black.withValues(alpha: 0.34)),
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.34),
+                    ),
                   ),
                 if (activePacket.phase == LuckyPacketPhase.countdown)
                   Positioned(
@@ -79,9 +89,19 @@ class _LuckyPacketTimerPill extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(colors: [Color(0xFFFFD166), Color(0xFFE84C72)]),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.34)),
-              boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.36), blurRadius: 18, offset: const Offset(0, 8))],
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFD166), Color(0xFFE84C72)],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.34),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: RoomColors.coral.withValues(alpha: 0.36),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: const Text('🧧', style: TextStyle(fontSize: 27)),
           ),
@@ -93,10 +113,25 @@ class _LuckyPacketTimerPill extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
                 color: const Color(0xFF12101D),
-                border: Border.all(color: RoomColors.gold.withValues(alpha: 0.55)),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.30), blurRadius: 8, offset: const Offset(0, 3))],
+                border: Border.all(
+                  color: RoomColors.gold.withValues(alpha: 0.55),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.30),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              child: Text('${packet.remainingSeconds}s', style: const TextStyle(color: RoomColors.gold, fontSize: 10.5, fontWeight: FontWeight.w900)),
+              child: Text(
+                '${packet.remainingSeconds}s',
+                style: const TextStyle(
+                  color: RoomColors.gold,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ),
         ],
@@ -134,20 +169,43 @@ class _LuckyPacketDialog extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: [Color(0xFF35162B), Color(0xFF17111F), Color(0xFF2A1334)],
             ),
-            border: Border.all(color: RoomColors.gold.withValues(alpha: 0.30)),
-            boxShadow: [BoxShadow(color: RoomColors.coral.withValues(alpha: 0.36), blurRadius: 30, offset: const Offset(0, 16))],
+            border: Border.all(
+              color: RoomColors.gold.withValues(alpha: 0.30),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: RoomColors.coral.withValues(alpha: 0.36),
+                blurRadius: 30,
+                offset: const Offset(0, 16),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(packet.senderName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
+              Text(
+                packet.senderName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               const SizedBox(height: 4),
               Text(
-                packet.message.trim().isEmpty ? 'sent a Lucky Packet to ${packet.winnerCount} people' : packet.message.trim(),
+                packet.message.trim().isEmpty
+                    ? 'sent a Lucky Packet to ${packet.winnerCount} people'
+                    : packet.message.trim(),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.66), fontSize: 11.5, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.66),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 16),
               AnimatedContainer(
@@ -161,28 +219,66 @@ class _LuckyPacketDialog extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: packet.claimedByCurrentUser || isResults
-                        ? const [Color(0xFFFFE1A3), Color(0xFFFFA84D), Color(0xFFB34A28)]
-                        : const [Color(0xFFE84C72), Color(0xFF9A2248), Color(0xFF50192D)],
+                        ? const [
+                            Color(0xFFFFE1A3),
+                            Color(0xFFFFA84D),
+                            Color(0xFFB34A28),
+                          ]
+                        : const [
+                            Color(0xFFE84C72),
+                            Color(0xFF9A2248),
+                            Color(0xFF50192D),
+                          ],
                   ),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-                  boxShadow: [BoxShadow(color: RoomColors.gold.withValues(alpha: 0.26), blurRadius: 22, offset: const Offset(0, 10))],
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: RoomColors.gold.withValues(alpha: 0.26),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
                 child: packet.claimedByCurrentUser || isResults
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('OPEN', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                          const Text(
+                            'OPEN',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const GoldCoinIcon(size: 22),
                               const SizedBox(width: 6),
-                              Text('${packet.currentUserReward ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                              Text(
+                                '${packet.currentUserReward ?? 0}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 4),
-                          const Text('received', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w800)),
+                          const Text(
+                            'received',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ],
                       )
                     : const Text('🧧', style: TextStyle(fontSize: 58)),
@@ -196,13 +292,30 @@ class _LuckyPacketDialog extends StatelessWidget {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
-                      gradient: const LinearGradient(colors: [RoomColors.gold, RoomColors.coral]),
+                      gradient: const LinearGradient(
+                        colors: [RoomColors.gold, RoomColors.coral],
+                      ),
                     ),
-                    child: const Text('Get', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+                    child: const Text(
+                      'Get',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                 )
               else if (isClaim)
-                const Text('Reward opened. Total results reveal after 20 seconds.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800))
+                const Text(
+                  'Reward opened. Total results reveal after 20 seconds.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                )
               else if (isResults) ...[
                 _LuckyPacketResults(packet: packet),
                 const SizedBox(height: 10),
@@ -216,7 +329,14 @@ class _LuckyPacketDialog extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.10),
                       border: Border.all(color: Colors.white12),
                     ),
-                    child: const Text('Close', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -235,10 +355,22 @@ class _LuckyPacketDialog extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFF12101D),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.20),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.close_rounded, color: Colors.white, size: 17),
+              child: const Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: 17,
+              ),
             ),
           ),
         ),
@@ -256,7 +388,14 @@ class _LuckyPacketResults extends StatelessWidget {
   Widget build(BuildContext context) {
     final entries = packet.distributions.entries.toList(growable: false);
     if (entries.isEmpty) {
-      return const Text('No claims this round', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800));
+      return const Text(
+        'No claims this round',
+        style: TextStyle(
+          color: Colors.white70,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      );
     }
 
     return ConstrainedBox(
@@ -268,10 +407,28 @@ class _LuckyPacketResults extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 5),
               child: Row(
                 children: [
-                  Expanded(child: Text(entry.key, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800))),
+                  Expanded(
+                    child: Text(
+                      entry.key,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
                   const GoldCoinIcon(size: 12),
                   const SizedBox(width: 4),
-                  Text('${entry.value}', style: const TextStyle(color: RoomColors.gold, fontSize: 11, fontWeight: FontWeight.w900)),
+                  Text(
+                    '${entry.value}',
+                    style: const TextStyle(
+                      color: RoomColors.gold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ],
               ),
             );
