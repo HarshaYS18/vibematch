@@ -1,29 +1,133 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app/app_route_factory.dart';
 import 'app/app_routes.dart';
-import 'features/auth/presentation/auth_gate.dart';
 import 'core/notifications/vm_push_notification_service.dart';
+import 'features/auth/presentation/auth_gate.dart';
 import 'firebase_options.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+void main() {
+  runZonedGuarded<void>(
+    () {
+      WidgetsFlutterBinding.ensureInitialized();
+      _installGlobalErrorHandling();
 
-  runApp(const VibeMatchApp());
+      // Render FunKey immediately. Optional services such as Firebase/push must
+      // never be able to block the first frame or leave the app on a white page.
+      runApp(const VibeMatchApp());
 
-  unawaited(
-    VmPushNotificationService.instance.initialize().catchError((error) {
-      debugPrint('Push notification initialization failed: $error');
-    }),
+      unawaited(_initializeOptionalServices());
+    },
+    (error, stackTrace) {
+      debugPrint('Uncaught FunKey zone error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    },
   );
+}
+
+void _installGlobalErrorHandling() {
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    if (details.stack != null) {
+      debugPrintStack(stackTrace: details.stack);
+    }
+  };
+
+  ErrorWidget.builder = (details) {
+    final message = kDebugMode
+        ? details.exceptionAsString()
+        : 'FunKey hit an unexpected screen error.';
+
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: ColoredBox(
+        color: const Color(0xFFFAF7F1),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 36,
+                    color: Color(0xFF6D5DF6),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'FunKey could not render this screen',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF5A5260),
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+}
+
+Future<void> _initializeOptionalServices() async {
+  // The checked-in FlutterFire configuration currently contains Android
+  // options only. Web must continue to run without Firebase until real web
+  // options are generated and committed; never access currentPlatform on web
+  // because firebase_options.dart intentionally throws there today.
+  if (kIsWeb) {
+    debugPrint(
+      'FunKey bootstrap: Firebase/push skipped on web because web Firebase '
+      'options are not configured.',
+    );
+    return;
+  }
+
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+
+    await VmPushNotificationService.instance.initialize();
+  } catch (error, stackTrace) {
+    // Push/Firebase are non-critical startup services. Report the problem but
+    // keep the core app, auth, rooms, and navigation available.
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'FunKey bootstrap',
+        context: ErrorDescription(
+          'while initializing optional Firebase/push services',
+        ),
+      ),
+    );
+  }
 }
 
 class VibeMatchApp extends StatelessWidget {
