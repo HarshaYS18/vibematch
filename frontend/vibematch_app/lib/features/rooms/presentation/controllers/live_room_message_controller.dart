@@ -25,6 +25,7 @@ class LiveRoomMessageController {
   static const Duration _roomSettingsSystemMessageDuration = Duration(
     seconds: 5,
   );
+  static const Duration _giftMessageMergeWindow = Duration(seconds: 20);
   static const Set<String> _allowedRoomSettingsSystemMessages = <String>{
     'Images enabled',
     'Images disabled',
@@ -56,6 +57,7 @@ class LiveRoomMessageController {
   late List<ChatEntry> messages;
   final List<SeatUser> joinRequestUsers = <SeatUser>[];
   final Set<String> _handledSystemEventIds = <String>{};
+  final Map<String, DateTime> _giftMessageUpdatedAt = <String, DateTime>{};
   VoidCallbackLike? _systemEventListener;
   VoidCallbackLike? _seatApplicationListener;
 
@@ -153,6 +155,7 @@ class LiveRoomMessageController {
 
   void clearChatForEveryone() {
     messages.clear();
+    _giftMessageUpdatedAt.clear();
     insertPersistentSystemMessage(
       'Chat cleared for everyone by ${currentUser.name}',
     );
@@ -355,6 +358,7 @@ class LiveRoomMessageController {
 
     if (event.isChatCleared) {
       messages.clear();
+      _giftMessageUpdatedAt.clear();
       insertTransientSystemMessage(
         event.message.trim().isEmpty
             ? 'Chat cleared for everyone'
@@ -411,15 +415,23 @@ class LiveRoomMessageController {
       giftAssetPath: entry.giftAssetPath,
     );
     final key = _giftMessageKey(cleanEntry);
-    final oldIndex = messages.indexWhere(
-      (item) => item.isGift && _giftMessageKey(item) == key,
-    );
+    final now = DateTime.now();
+    final lastUpdatedAt = _giftMessageUpdatedAt[key];
+    final shouldMerge =
+        lastUpdatedAt != null &&
+        now.difference(lastUpdatedAt) <= _giftMessageMergeWindow;
+    final oldIndex = shouldMerge
+        ? messages.indexWhere(
+            (item) => item.isGift && _giftMessageKey(item) == key,
+          )
+        : -1;
     if (oldIndex >= 0) {
       messages[oldIndex] = cleanEntry;
       if (oldIndex != 0) messages.insert(0, messages.removeAt(oldIndex));
     } else {
       messages.insert(0, cleanEntry);
     }
+    _giftMessageUpdatedAt[key] = now;
     onChanged();
   }
 
@@ -433,15 +445,21 @@ class LiveRoomMessageController {
   }
 
   String _giftMessageKey(ChatEntry entry) {
-    final sender = (entry.senderId?.trim().isNotEmpty ?? false)
-        ? entry.senderId!.trim().toLowerCase()
-        : entry.senderName.trim().toLowerCase();
+    final sender = _canonicalGiftSender(entry);
     final baseMessage = _cleanGiftMessage(entry.message)
         .toLowerCase()
         .replaceAll(RegExp(r'\s+x\d+\b'), '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     return '$sender|$baseMessage';
+  }
+
+  String _canonicalGiftSender(ChatEntry entry) {
+    final aliases = _identityAliases(entry.senderId);
+    for (final alias in aliases) {
+      if (RegExp(r'^user_\d+$').hasMatch(alias)) return alias;
+    }
+    return entry.senderName.trim().toLowerCase();
   }
 
   void _insertUserEnteredByName(String rawName, {String? avatarUrl}) {
