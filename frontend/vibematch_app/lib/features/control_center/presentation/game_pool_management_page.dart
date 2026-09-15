@@ -14,10 +14,19 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
   final _api = _GamePoolCpApi();
 
   List<GamePoolCpItem> _pools = const <GamePoolCpItem>[];
-  GamePoolPair? _junglePair;
   bool _loading = true;
   bool _busy = false;
   String? _error;
+
+  GamePoolCpItem? get _mainPool {
+    for (final pool in _pools) {
+      if (_isMainPool(pool)) return pool;
+    }
+    return null;
+  }
+
+  List<GamePoolCpItem> get _gamePools =>
+      _pools.where((pool) => !_isMainPool(pool)).toList(growable: false);
 
   @override
   void initState() {
@@ -39,11 +48,9 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
 
     try {
       final pools = await _api.listPools();
-      final jungle = await _api.getPoolPair('jackpot_king');
       if (!mounted) return;
       setState(() {
         _pools = pools;
-        _junglePair = jungle;
         _loading = false;
       });
     } catch (error) {
@@ -105,75 +112,130 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
     });
   }
 
-  Future<void> _openTransferSheet({required bool allocate}) async {
+  Future<void> _openTransferSheet({
+    required GamePoolCpItem game,
+    required bool addToGame,
+  }) async {
+    final main = _mainPool;
+    if (main == null) {
+      _toast('Main pool is unavailable. Refresh and try again.', danger: true);
+      return;
+    }
+
     final amount = TextEditingController();
-    final reason = TextEditingController(
-      text: allocate
-          ? 'Super Owner allocate to Jungle Hunt game pool'
-          : 'Super Owner withdraw from Jungle Hunt game pool',
-    );
+    final gameName = _gameName(game.gameKey);
+    final sourceAvailable =
+        addToGame ? main.availableBalance : game.availableBalance;
+    final from = addToGame ? 'Main Pool' : gameName;
+    final to = addToGame ? gameName : 'Main Pool';
 
     await _showSheet(
-      title: allocate ? 'Allocate to Jungle Hunt' : 'Withdraw to Main Pool',
-      subtitle: allocate
-          ? 'Move coins from Main Game House Pool to Jungle Hunt.'
-          : 'Move available coins from Jungle Hunt back to Main Game House Pool.',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: amount,
-            keyboardType: TextInputType.number,
-            decoration: _input('Coin amount'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: reason,
-            minLines: 2,
-            maxLines: 3,
-            decoration: _input('Reason'),
-          ),
-          const SizedBox(height: 14),
-          _PrimaryButton(
-            busy: _busy,
-            icon: allocate
-                ? Icons.call_made_rounded
-                : Icons.call_received_rounded,
-            label: allocate ? 'Allocate' : 'Withdraw',
-            onPressed: () {
-              final value = int.tryParse(amount.text.trim()) ?? 0;
-              final safeReason = reason.text.trim();
-              if (value <= 0 || safeReason.length < 3) {
-                return _toast(
-                  'Amount and reason are required.',
-                  danger: true,
-                );
-              }
+      title: addToGame ? 'Add coins to $gameName' : 'Return coins to Main Pool',
+      subtitle: '$from → $to',
+      child: StatefulBuilder(
+        builder: (context, setSheetState) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SimpleInfoCard(
+              icon: Icons.account_balance_wallet_rounded,
+              title: 'Available to move',
+              value: _fmt(sourceAvailable),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: amount,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setSheetState(() {}),
+              decoration: _input(
+                'How many coins?',
+                helper: 'Enter an amount up to ${_fmt(sourceAvailable)}.',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _AmountChip(
+                  label: '25%',
+                  onTap: () {
+                    amount.text = (sourceAvailable * 0.25).floor().toString();
+                    setSheetState(() {});
+                  },
+                ),
+                _AmountChip(
+                  label: '50%',
+                  onTap: () {
+                    amount.text = (sourceAvailable * 0.50).floor().toString();
+                    setSheetState(() {});
+                  },
+                ),
+                _AmountChip(
+                  label: '75%',
+                  onTap: () {
+                    amount.text = (sourceAvailable * 0.75).floor().toString();
+                    setSheetState(() {});
+                  },
+                ),
+                _AmountChip(
+                  label: 'All',
+                  onTap: () {
+                    amount.text = sourceAvailable.toString();
+                    setSheetState(() {});
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _PrimaryButton(
+              busy: _busy,
+              icon: addToGame
+                  ? Icons.arrow_downward_rounded
+                  : Icons.arrow_upward_rounded,
+              label: addToGame ? 'Add coins' : 'Return coins',
+              onPressed: () {
+                final value = int.tryParse(amount.text.trim()) ?? 0;
+                if (value <= 0) {
+                  _toast('Enter a coin amount greater than zero.', danger: true);
+                  return;
+                }
+                if (value > sourceAvailable) {
+                  _toast(
+                    'You can move at most ${_fmt(sourceAvailable)} coins.',
+                    danger: true,
+                  );
+                  return;
+                }
 
-              _closeSheetAndRun(
-                () => allocate
-                    ? _api.allocate(
-                        gameKey: 'jackpot_king',
-                        amount: value,
-                        reason: safeReason,
-                      )
-                    : _api.withdraw(
-                        gameKey: 'jackpot_king',
-                        amount: value,
-                        reason: safeReason,
-                      ),
-                allocate
-                    ? 'Allocated to Jungle Hunt pool.'
-                    : 'Withdrawn to Main pool.',
-              );
-            },
-          ),
-        ],
+                final reason = addToGame
+                    ? 'Admin added coins to ${game.gameKey} game pool'
+                    : 'Admin returned coins from ${game.gameKey} game pool';
+
+                _closeSheetAndRun(
+                  () => addToGame
+                      ? _api.allocate(
+                          gameKey: game.gameKey,
+                          amount: value,
+                          reason: reason,
+                        )
+                      : _api.withdraw(
+                          gameKey: game.gameKey,
+                          amount: value,
+                          reason: reason,
+                        ),
+                  addToGame
+                      ? '${_fmt(value)} coins added to $gameName.'
+                      : '${_fmt(value)} coins returned to Main Pool.',
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
 
     amount.dispose();
-    reason.dispose();
   }
 
   Future<void> _openSettingsSheet(GamePoolCpItem pool) async {
@@ -183,27 +245,39 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
         TextEditingController(text: pool.dailyLossLimit.toString());
     final maxSingle =
         TextEditingController(text: pool.maxSinglePayout.toString());
-    final rtp =
-        TextEditingController(text: pool.rtpTargetBasisPoints.toString());
-    final reason = TextEditingController(
-      text: 'Super Owner game pool risk settings update',
+    final rtpPercent = TextEditingController(
+      text: _formatPercent(pool.rtpTargetBasisPoints / 100),
     );
     var status = pool.status;
+    final gameName = _gameName(pool.gameKey);
 
     await _showSheet(
-      title: 'Pool settings',
-      subtitle: '${pool.gameKey} • ${pool.poolType}',
+      title: 'Manage $gameName',
+      subtitle: 'Simple safety controls for this game.',
       child: StatefulBuilder(
         builder: (context, setSheetState) => Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<String>(
               initialValue: status,
-              decoration: _input('Status'),
+              decoration: _input(
+                'Game status',
+                helper: 'Pause a game without changing its money or limits.',
+              ),
               items: const [
-                DropdownMenuItem(value: 'ACTIVE', child: Text('ACTIVE')),
-                DropdownMenuItem(value: 'FROZEN', child: Text('FROZEN')),
-                DropdownMenuItem(value: 'CLOSED', child: Text('CLOSED')),
+                DropdownMenuItem(
+                  value: 'ACTIVE',
+                  child: Text('Running'),
+                ),
+                DropdownMenuItem(
+                  value: 'FROZEN',
+                  child: Text('Paused'),
+                ),
+                DropdownMenuItem(
+                  value: 'CLOSED',
+                  child: Text('Stopped'),
+                ),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -211,62 +285,75 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
                 }
               },
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: dailyPayout,
-                    keyboardType: TextInputType.number,
-                    decoration: _input('Daily payout cap'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: dailyLoss,
-                    keyboardType: TextInputType.number,
-                    decoration: _input('Daily loss limit'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: maxSingle,
-                    keyboardType: TextInputType.number,
-                    decoration: _input('Max single payout'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: rtp,
-                    keyboardType: TextInputType.number,
-                    decoration: _input('RTP bps'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             TextField(
-              controller: reason,
-              minLines: 2,
-              maxLines: 3,
-              decoration: _input('Reason'),
+              controller: dailyPayout,
+              keyboardType: TextInputType.number,
+              decoration: _input(
+                'Daily payout limit',
+                helper: 'Maximum coins this game can pay out in one day.',
+              ),
             ),
             const SizedBox(height: 14),
+            TextField(
+              controller: dailyLoss,
+              keyboardType: TextInputType.number,
+              decoration: _input(
+                'Daily loss limit',
+                helper: 'Safety limit for how much the pool can lose in one day.',
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: maxSingle,
+              keyboardType: TextInputType.number,
+              decoration: _input(
+                'Largest single win',
+                helper: 'Maximum coins one player can win in one result.',
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: rtpPercent,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: _input(
+                'Target player return (%)',
+                helper: 'Example: 85 means a target return of 85%.',
+              ),
+            ),
+            const SizedBox(height: 14),
+            const _HelpNote(
+              text:
+                  'Changes apply immediately and are automatically recorded in the admin audit log.',
+            ),
+            const SizedBox(height: 16),
             _PrimaryButton(
               busy: _busy,
-              icon: Icons.save_rounded,
-              label: 'Save settings',
+              icon: Icons.check_circle_rounded,
+              label: 'Save changes',
               onPressed: () {
-                final safeReason = reason.text.trim();
-                if (safeReason.length < 3) {
-                  return _toast('Reason is required.', danger: true);
+                final payout = int.tryParse(dailyPayout.text.trim());
+                final loss = int.tryParse(dailyLoss.text.trim());
+                final maxWin = int.tryParse(maxSingle.text.trim());
+                final rtp = double.tryParse(rtpPercent.text.trim());
+
+                if (payout == null || payout < 0) {
+                  _toast('Enter a valid daily payout limit.', danger: true);
+                  return;
+                }
+                if (loss == null || loss < 0) {
+                  _toast('Enter a valid daily loss limit.', danger: true);
+                  return;
+                }
+                if (maxWin == null || maxWin < 0) {
+                  _toast('Enter a valid largest single win.', danger: true);
+                  return;
+                }
+                if (rtp == null || rtp < 0 || rtp > 100) {
+                  _toast('Target player return must be from 0% to 100%.',
+                      danger: true);
+                  return;
                 }
 
                 _closeSheetAndRun(
@@ -274,21 +361,13 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
                     gameKey: pool.gameKey,
                     poolType: pool.poolType,
                     status: status,
-                    dailyPayoutCap:
-                        int.tryParse(dailyPayout.text.trim()) ??
-                            pool.dailyPayoutCap,
-                    dailyLossLimit:
-                        int.tryParse(dailyLoss.text.trim()) ??
-                            pool.dailyLossLimit,
-                    maxSinglePayout:
-                        int.tryParse(maxSingle.text.trim()) ??
-                            pool.maxSinglePayout,
-                    rtpTargetBasisPoints:
-                        int.tryParse(rtp.text.trim()) ??
-                            pool.rtpTargetBasisPoints,
-                    reason: safeReason,
+                    dailyPayoutCap: payout,
+                    dailyLossLimit: loss,
+                    maxSinglePayout: maxWin,
+                    rtpTargetBasisPoints: (rtp * 100).round(),
+                    reason: 'Admin updated ${pool.gameKey} game safety settings',
                   ),
-                  'Game pool settings updated.',
+                  '$gameName settings saved.',
                 );
               },
             ),
@@ -300,13 +379,20 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
     dailyPayout.dispose();
     dailyLoss.dispose();
     maxSingle.dispose();
-    rtp.dispose();
-    reason.dispose();
+    rtpPercent.dispose();
   }
 
-  InputDecoration _input(String label) => InputDecoration(
+  InputDecoration _input(String label, {String? helper}) => InputDecoration(
         labelText: label,
+        helperText: helper,
+        helperMaxLines: 2,
+        filled: true,
+        fillColor: const Color(0xFFFFFCF8),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFE8DED3)),
+        ),
       );
 
   Future<void> _showSheet({
@@ -323,7 +409,10 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
           bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -345,25 +434,25 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   Text(
                     title,
                     style: const TextStyle(
                       color: Color(0xFF251538),
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   Text(
                     subtitle,
                     style: const TextStyle(
                       color: Color(0xFF7B6A86),
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   child,
                 ],
               ),
@@ -376,7 +465,8 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    final pair = _junglePair;
+    final main = _mainPool;
+    final games = _gamePools;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
@@ -385,11 +475,15 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
         foregroundColor: const Color(0xFF251538),
         elevation: 0,
         title: const Text(
-          'Game Pool Management',
+          'Game Money',
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
         actions: [
-          IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _busy ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
         ],
       ),
       body: _loading
@@ -407,43 +501,46 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
                     ),
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
                     children: [
-                      _HeroPoolCard(pair: pair),
+                      const _PageIntro(),
                       const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _SmallPoolButton(
-                              icon: Icons.call_made_rounded,
-                              title: 'Allocate',
-                              subtitle: 'Main → Jungle',
-                              onTap: () =>
-                                  _openTransferSheet(allocate: true),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _SmallPoolButton(
-                              icon: Icons.call_received_rounded,
-                              title: 'Withdraw',
-                              subtitle: 'Jungle → Main',
-                              onTap: () =>
-                                  _openTransferSheet(allocate: false),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      const _GamePoolSectionHeader(
-                        title: 'Pool settings',
-                        subtitle: 'Risk controls',
-                      ),
-                      const SizedBox(height: 10),
-                      ..._pools.map(
-                        (pool) => _GamePoolCard(
-                          pool: pool,
-                          onSettings: () => _openSettingsSheet(pool),
+                      _MainPoolCard(pool: main),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Games',
+                        style: TextStyle(
+                          color: Color(0xFF251538),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Add money, return money, or change safety limits.',
+                        style: TextStyle(
+                          color: Color(0xFF7B6A86),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (games.isEmpty)
+                        const _EmptyGamesCard()
+                      else
+                        ...games.map(
+                          (pool) => _SimpleGameCard(
+                            pool: pool,
+                            busy: _busy,
+                            onAddCoins: () => _openTransferSheet(
+                              game: pool,
+                              addToGame: true,
+                            ),
+                            onReturnCoins: () => _openTransferSheet(
+                              game: pool,
+                              addToGame: false,
+                            ),
+                            onManage: () => _openSettingsSheet(pool),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -451,32 +548,58 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
   }
 }
 
-class _HeroPoolCard extends StatelessWidget {
-  const _HeroPoolCard({required this.pair});
+class _PageIntro extends StatelessWidget {
+  const _PageIntro();
 
-  final GamePoolPair? pair;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF3CF),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFFFD76B)),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.lightbulb_rounded, color: Color(0xFF9D6800)),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Keep it simple: the Main Pool holds the money. Each game gets only the coins it needs. You can pause a game or change its limits at any time.',
+                style: TextStyle(
+                  color: Color(0xFF5D4311),
+                  fontSize: 12.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _MainPoolCard extends StatelessWidget {
+  const _MainPoolCard({required this.pool});
+
+  final GamePoolCpItem? pool;
 
   @override
   Widget build(BuildContext context) {
-    final main = pair?.mainPool;
-    final game = pair?.gamePool;
-
+    final value = pool;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(26),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF120D1F),
-            Color(0xFF3A194D),
-            Color(0xFFFFC857),
-          ],
+          colors: [Color(0xFF1B1029), Color(0xFF4C2260)],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF251538).withValues(alpha: 0.18),
-            blurRadius: 22,
-            offset: const Offset(0, 12),
+            color: const Color(0xFF251538).withValues(alpha: 0.16),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -485,155 +608,30 @@ class _HeroPoolCard extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.account_balance_rounded,
-                color: Color(0xFFFFF0A8),
-                size: 28,
-              ),
-              SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  'Production Game House Pools',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _HeroMetric(
-                  label: 'Main Available',
-                  value: main == null ? '--' : _fmt(main.availableBalance),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _HeroMetric(
-                  label: 'Jungle Available',
-                  value: game == null ? '--' : _fmt(game.availableBalance),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _HeroMetric(
-                  label: 'Main Reserved',
-                  value: main == null ? '--' : _fmt(main.reservedBalance),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _HeroMetric(
-                  label: 'Jungle Reserved',
-                  value: game == null ? '--' : _fmt(game.reservedBalance),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroMetric extends StatelessWidget {
-  const _HeroMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.13),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.74),
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      );
-}
-
-class _SmallPoolButton extends StatelessWidget {
-  const _SmallPoolButton({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Ink(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFEDE3D7)),
-          ),
-          child: Row(
-            children: [
               CircleAvatar(
-                backgroundColor: const Color(0xFFFFC857),
-                foregroundColor: const Color(0xFF251538),
-                child: Icon(icon),
+                backgroundColor: Color(0xFFFFC857),
+                foregroundColor: Color(0xFF251538),
+                child: Icon(Icons.account_balance_rounded),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 11),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
-                      style: const TextStyle(
-                        color: Color(0xFF251538),
-                        fontSize: 13,
+                      'Main Pool',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF7B6A86),
-                        fontSize: 11,
+                      'Your central game money reserve',
+                      style: TextStyle(
+                        color: Color(0xFFD8C8E4),
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -642,31 +640,68 @@ class _SmallPoolButton extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 18),
+          const Text(
+            'Available',
+            style: TextStyle(
+              color: Color(0xFFD8C8E4),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value == null ? '--' : _fmt(value.availableBalance),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          if (value != null && value.reservedBalance > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${_fmt(value.reservedBalance)} currently reserved',
+              style: const TextStyle(
+                color: Color(0xFFD8C8E4),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
-class _GamePoolCard extends StatelessWidget {
-  const _GamePoolCard({required this.pool, required this.onSettings});
+class _SimpleGameCard extends StatelessWidget {
+  const _SimpleGameCard({
+    required this.pool,
+    required this.busy,
+    required this.onAddCoins,
+    required this.onReturnCoins,
+    required this.onManage,
+  });
 
   final GamePoolCpItem pool;
-  final VoidCallback onSettings;
+  final bool busy;
+  final VoidCallback onAddCoins;
+  final VoidCallback onReturnCoins;
+  final VoidCallback onManage;
 
   @override
   Widget build(BuildContext context) {
-    final frozen = pool.status != 'ACTIVE';
+    final running = pool.status == 'ACTIVE';
+    final gameName = _gameName(pool.gameKey);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: frozen
-              ? const Color(0xFFE84C72).withValues(alpha: 0.30)
-              : const Color(0xFFEDE3D7),
-        ),
+        border: Border.all(color: const Color(0xFFEDE3D7)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -675,78 +710,86 @@ class _GamePoolCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 backgroundColor:
-                    frozen ? const Color(0xFFE84C72) : const Color(0xFF12C7B7),
+                    running ? const Color(0xFF12C7B7) : const Color(0xFFF2A93B),
                 foregroundColor: Colors.white,
                 child: Icon(
-                  frozen
-                      ? Icons.pause_circle_rounded
-                      : Icons.sports_esports_rounded,
+                  running
+                      ? Icons.sports_esports_rounded
+                      : Icons.pause_rounded,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 11),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      pool.gameKey,
+                      gameName,
                       style: const TextStyle(
                         color: Color(0xFF251538),
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${pool.poolType} • ${pool.status}',
-                      style: const TextStyle(
-                        color: Color(0xFF7B6A86),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    const SizedBox(height: 3),
+                    _StatusText(status: pool.status),
                   ],
                 ),
               ),
-              Text(
-                _fmt(pool.availableBalance),
-                style: const TextStyle(
-                  color: Color(0xFF251538),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'Available',
+                    style: TextStyle(
+                      color: Color(0xFF7B6A86),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _fmt(pool.availableBalance),
+                    style: const TextStyle(
+                      color: Color(0xFF251538),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _ActionButton(
+                  icon: Icons.add_circle_outline_rounded,
+                  label: 'Add coins',
+                  onPressed: busy ? null : onAddCoins,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ActionButton(
+                  icon: Icons.keyboard_return_rounded,
+                  label: 'Return coins',
+                  onPressed: busy ? null : onReturnCoins,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _PoolPill(label: 'Balance', value: _fmt(pool.balance)),
-              _PoolPill(label: 'Reserved', value: _fmt(pool.reservedBalance)),
-              _PoolPill(label: 'Daily cap', value: _fmt(pool.dailyPayoutCap)),
-              _PoolPill(
-                label: 'Loss limit',
-                value: _fmt(pool.dailyLossLimit),
-              ),
-              _PoolPill(
-                label: 'Max payout',
-                value: _fmt(pool.maxSinglePayout),
-              ),
-              _PoolPill(
-                label: 'RTP',
-                value: '${pool.rtpTargetBasisPoints} bps',
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onSettings,
-              icon: const Icon(Icons.settings_rounded),
-              label: const Text('Settings'),
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : onManage,
+              icon: const Icon(Icons.tune_rounded),
+              label: const Text(
+                'Manage game limits',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ),
         ],
@@ -755,61 +798,192 @@ class _GamePoolCard extends StatelessWidget {
   }
 }
 
-class _PoolPill extends StatelessWidget {
-  const _PoolPill({required this.label, required this.value});
+class _StatusText extends StatelessWidget {
+  const _StatusText({required this.status});
 
-  final String label;
-  final String value;
+  final String status;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFAF7F1),
-          borderRadius: BorderRadius.circular(999),
+  Widget build(BuildContext context) {
+    final label = _statusLabel(status);
+    final running = status == 'ACTIVE';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: running ? const Color(0xFF12A795) : const Color(0xFFF2A93B),
+            shape: BoxShape.circle,
+          ),
         ),
-        child: Text(
-          '$label: $value',
+        const SizedBox(width: 6),
+        Text(
+          label,
           style: const TextStyle(
-            color: Color(0xFF251538),
-            fontSize: 11,
+            color: Color(0xFF7B6A86),
+            fontSize: 11.5,
             fontWeight: FontWeight.w800,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => FilledButton.tonalIcon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
       );
 }
 
-class _GamePoolSectionHeader extends StatelessWidget {
-  const _GamePoolSectionHeader({
-    required this.title,
-    required this.subtitle,
-  });
+class _AmountChip extends StatelessWidget {
+  const _AmountChip({required this.label, required this.onTap});
 
-  final String title;
-  final String subtitle;
+  final String label;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
+  Widget build(BuildContext context) => ActionChip(
+        onPressed: onTap,
+        label: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+      );
+}
+
+class _SimpleInfoCard extends StatelessWidget {
+  const _SimpleInfoCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFAF7F1),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: const Color(0xFFFFC857),
+              foregroundColor: const Color(0xFF251538),
+              child: Icon(icon),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF7B6A86),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              value,
               style: const TextStyle(
                 color: Color(0xFF251538),
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
               ),
             ),
-          ),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: Color(0xFF7B6A86),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+          ],
+        ),
+      );
+}
+
+class _HelpNote extends StatelessWidget {
+  const _HelpNote({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F8F6),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              size: 19,
+              color: Color(0xFF138A7E),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: Color(0xFF356A64),
+                  fontSize: 11.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _EmptyGamesCard extends StatelessWidget {
+  const _EmptyGamesCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFEDE3D7)),
+        ),
+        child: const Column(
+          children: [
+            Icon(
+              Icons.sports_esports_outlined,
+              size: 36,
+              color: Color(0xFF7B6A86),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'No game pools yet',
+              style: TextStyle(
+                color: Color(0xFF251538),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
       );
 }
 
@@ -864,7 +1038,7 @@ class _PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
         width: double.infinity,
-        height: 50,
+        height: 52,
         child: FilledButton.icon(
           onPressed: busy ? null : onPressed,
           icon: busy
@@ -901,14 +1075,6 @@ class _GamePoolCpApi {
         .whereType<Map<String, dynamic>>()
         .map(GamePoolCpItem.fromJson)
         .toList(growable: false);
-  }
-
-  Future<GamePoolPair> getPoolPair(String gameKey) async {
-    final json = await _apiClient.getMap(
-      '/super-owner/game-pools/$gameKey',
-      headers: _headers(),
-    );
-    return GamePoolPair.fromJson(json);
   }
 
   Future<void> allocate({
@@ -970,29 +1136,13 @@ class _GamePoolCpApi {
     final token = _authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
       throw Exception(
-        'Please login again before opening Game Pool Management.',
+        'Please login again before opening Game Money.',
       );
     }
     return {'Authorization': 'Bearer $token'};
   }
 
   void close() => _apiClient.close();
-}
-
-class GamePoolPair {
-  const GamePoolPair({required this.mainPool, required this.gamePool});
-
-  final GamePoolCpItem mainPool;
-  final GamePoolCpItem gamePool;
-
-  factory GamePoolPair.fromJson(Map<String, dynamic> json) => GamePoolPair(
-        mainPool: GamePoolCpItem.fromJson(
-          Map<String, dynamic>.from(json['main_pool'] as Map),
-        ),
-        gamePool: GamePoolCpItem.fromJson(
-          Map<String, dynamic>.from(json['game_pool'] as Map),
-        ),
-      );
 }
 
 class GamePoolCpItem {
@@ -1035,6 +1185,39 @@ class GamePoolCpItem {
         maxSinglePayout: _int(json['max_single_payout']),
         rtpTargetBasisPoints: _int(json['rtp_target_basis_points']),
       );
+}
+
+bool _isMainPool(GamePoolCpItem pool) =>
+    pool.gameKey.trim().toUpperCase() == 'GLOBAL';
+
+String _gameName(String gameKey) {
+  final normalized = gameKey.trim().toLowerCase();
+  if (normalized == 'jackpot_king') return 'Jungle Hunt';
+  if (normalized.isEmpty) return 'Game';
+
+  return normalized
+      .split('_')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+}
+
+String _statusLabel(String status) {
+  switch (status) {
+    case 'ACTIVE':
+      return 'Running';
+    case 'FROZEN':
+      return 'Paused';
+    case 'CLOSED':
+      return 'Stopped';
+    default:
+      return status;
+  }
+}
+
+String _formatPercent(double value) {
+  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+  return value.toStringAsFixed(2);
 }
 
 String _fmt(int value) {
