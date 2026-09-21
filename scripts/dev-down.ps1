@@ -41,10 +41,21 @@ function Stop-OwnedProcess([string]$Name) {
     Remove-Item -LiteralPath $metadataPath -Force
 }
 
+function Get-ContainerManagedLabel([string]$Name) {
+    $labelsJson = & docker container inspect --format '{{json .Config.Labels}}' $Name 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $labelsJson) { return $null }
+    try {
+        $labels = $labelsJson | ConvertFrom-Json
+        return $labels.'com.vibematch.dev.managed'
+    } catch {
+        return $null
+    }
+}
+
 function Stop-ManagedContainer([string]$Name) {
-    $managed = & docker container inspect --format '{{ index .Config.Labels "com.vibematch.dev.managed" }}' $Name 2>$null
-    if ($LASTEXITCODE -ne 0) { return }
-    if ($managed.Trim() -ne 'true') {
+    $managed = Get-ContainerManagedLabel $Name
+    if ($null -eq $managed) { return }
+    if ($managed -ne 'true') {
         Write-Warning "Refusing to stop '$Name': it is not marked as managed by this workflow."
         return
     }
