@@ -69,8 +69,11 @@ def evaluate_media_room_permission(
 
     role = role_service.get_primary_role(user)
     is_owner = room.owner_user_id == user.id
-    participant = _participant(db, room.id, user.id)
-    has_active_participant_record = bool(participant and participant.is_active)
+    active_participant = _active_participant(db, room.id, user.id)
+    participant = active_participant
+    if participant is None and has_active_room_connection:
+        participant = _participant(db, room.id, user.id)
+    has_active_participant_record = active_participant is not None
     has_active_room_presence = (
         has_active_participant_record
         or bool(participant is not None and has_active_room_connection)
@@ -200,6 +203,18 @@ def evaluate_media_room_permission(
         reason=None,
         permissions=permissions,
         context=context,
+    )
+
+
+def _active_participant(db: Session, room_id: int, user_id: int) -> RoomParticipant | None:
+    return (
+        db.query(RoomParticipant)
+        .filter(
+            RoomParticipant.room_id == room_id,
+            RoomParticipant.user_id == user_id,
+            RoomParticipant.is_active == True,  # noqa: E712
+        )
+        .first()
     )
 
 
