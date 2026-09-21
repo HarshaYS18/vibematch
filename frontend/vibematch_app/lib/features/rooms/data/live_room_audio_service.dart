@@ -344,8 +344,7 @@ class LiveRoomAudioService {
       if (!isCurrentSocket()) return;
       _debug('audio new producer $payload');
       final info = RemoteProducerInfo.fromPayload(payload);
-      if (info == null || info.peerId == _peerId || info.kind != 'audio')
-        return;
+      if (info == null || _isSelfProducer(info) || info.kind != 'audio') return;
       _producerInfoById[info.producerId] = info;
       if (_remoteConsumersByProducerId.containsKey(info.producerId) ||
           _consumingProducerIds.contains(info.producerId) ||
@@ -974,11 +973,22 @@ class LiveRoomAudioService {
     if (rawProducers is! List) return;
     for (final item in rawProducers) {
       final info = RemoteProducerInfo.fromPayload(item);
-      if (info == null || info.peerId == _peerId || info.kind != 'audio')
-        continue;
+      if (info == null || _isSelfProducer(info) || info.kind != 'audio') continue;
       _producerInfoById[info.producerId] = info;
       _pendingProducerIds.add(info.producerId);
     }
+  }
+
+  bool _isSelfProducer(RemoteProducerInfo info) {
+    if (info.peerId == _peerId) return true;
+
+    final roomUserId = _currentUser?.id.trim() ?? '';
+    final publicUserId = roomUserId.startsWith('user_')
+        ? roomUserId.substring('user_'.length)
+        : '';
+    return publicUserId.isNotEmpty &&
+        info.publicUserId != null &&
+        info.publicUserId == publicUserId;
   }
 
   Future<void> _consumePendingProducers() async {
@@ -1527,12 +1537,14 @@ class RemoteProducerInfo {
     required this.producerId,
     required this.peerId,
     required this.kind,
+    this.publicUserId,
     this.seatNo,
   });
 
   final String producerId;
   final String peerId;
   final String kind;
+  final String? publicUserId;
   final int? seatNo;
 
   static RemoteProducerInfo? fromPayload(dynamic payload) {
@@ -1541,6 +1553,10 @@ class RemoteProducerInfo {
     final producerId = map['producerId']?.toString();
     final peerId = map['peerId']?.toString();
     final kind = map['kind']?.toString() ?? 'audio';
+    final peer = map['peer'];
+    final publicUserId =
+        map['publicUserId']?.toString() ??
+        (peer is Map ? peer['publicUserId']?.toString() : null);
     if (producerId == null ||
         producerId.isEmpty ||
         peerId == null ||
@@ -1550,6 +1566,7 @@ class RemoteProducerInfo {
       producerId: producerId,
       peerId: peerId,
       kind: kind,
+      publicUserId: publicUserId,
       seatNo: int.tryParse(map['seatNo']?.toString() ?? ''),
     );
   }
