@@ -65,7 +65,7 @@ def resolve_room_media(
         has_active_room_connection=has_active_room_user_lease(
             redis_client,
             room_public_id,
-            int(current_user.id),
+            current_user.id,
         ),
     )
     if not permission["allowed"]:
