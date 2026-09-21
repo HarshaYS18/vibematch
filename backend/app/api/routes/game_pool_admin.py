@@ -15,7 +15,7 @@ from app.schemas.game_pools import (
 from app.services import game_pool_service
 from app.services.audit_log_service import create_admin_log
 
-router = APIRouter(prefix="/super-owner/game-pools", tags=["Super Owner Game Pools"])
+router = APIRouter(prefix="/admin/games/pools", tags=["Admin Game Pools"])
 
 
 @router.get("", response_model=list[GamePoolResponse])
