@@ -18,7 +18,7 @@ from app.schemas.games import (
 from app.services import global_jungle_game_service_v2 as game_service
 from app.services import role_service
 
-router = APIRouter(prefix="/games", tags=["Games"])
+router = APIRouter(prefix="/games", tags=["Games"])\nadmin_router = APIRouter(prefix="/admin/games", tags=["Admin Games"])
 
 
 def _require_owner_or_above(user: User) -> None:
@@ -42,14 +42,14 @@ def get_jungle_hunt_history(limit: int = 30, db: Session = Depends(get_db), curr
     return GameRoundHistoryResponse(**game_service.get_history(db, limit=limit))
 
 
-@router.post("/admin/seed-defaults", response_model=GameDefinitionResponse)
+@admin_router.post("/seed-defaults", response_model=GameDefinitionResponse)
 def seed_default_games(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_owner_or_above(current_user)
     definition = game_service.seed_default_games(db, current_user)
     return GameDefinitionResponse(**game_service._definition_payload(definition))
 
 
-@router.put("/admin/catalog/{game_key}", response_model=GameDefinitionResponse)
+@admin_router.put("/catalog/{game_key}", response_model=GameDefinitionResponse)
 def upsert_game_definition(game_key: str, payload: GameAdminUpsertRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_owner_or_above(current_user)
     definition = game_service.upsert_definition(db, current_user, game_key, payload.model_dump())
