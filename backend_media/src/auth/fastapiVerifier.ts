@@ -22,7 +22,7 @@ export async function verifyMediaAction(params: {
   const timeout = setTimeout(() => controller.abort(), config.verifyTimeoutMs);
 
   try {
-    const response = await fetch(`${config.fastApiBaseUrl}/media-realtime/verify`, {
+    const response = await fetch(`${config.fastApiBaseUrl}/api/v1/media-realtime/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
