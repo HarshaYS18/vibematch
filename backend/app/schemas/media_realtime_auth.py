@@ -5,6 +5,7 @@ class MediaRealtimeVerifyRequest(BaseModel):
     room_public_id: str | None = Field(default=None, max_length=80)
     device_id: str | None = Field(default=None, max_length=255)
     requested_action: str = Field(default="join_room", max_length=80)
+    media_node_id: str | None = Field(default=None, max_length=120)
 
 
 class MediaRealtimeUserResponse(BaseModel):
