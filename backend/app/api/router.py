@@ -22,7 +22,7 @@ from app.api.routes import (
 from app.api.routes.rooms import cricket, rooms
 from app.api.routes.store import router as store_router
 
-api_router = APIRouter()
+api_router = APIRouter(prefix="/api/v1")
 
 # System and identity.
 for router in (
