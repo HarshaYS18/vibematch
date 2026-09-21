@@ -38,6 +38,17 @@ function Get-ContainerState([string]$Name) {
     return $state.Trim()
 }
 
+function Get-ContainerManagedLabel([string]$Name) {
+    $labelsJson = & docker container inspect --format '{{json .Config.Labels}}' $Name 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $labelsJson) { return $null }
+    try {
+        $labels = $labelsJson | ConvertFrom-Json
+        return $labels.'com.vibematch.dev.managed'
+    } catch {
+        return $null
+    }
+}
+
 function Start-ManagedContainer([string]$Name, [string[]]$CreateArgs) {
     $state = Get-ContainerState $Name
     if ($null -eq $state) {
@@ -45,8 +56,8 @@ function Start-ManagedContainer([string]$Name, [string[]]$CreateArgs) {
         if ($LASTEXITCODE -ne 0) { throw "Could not create Docker container '$Name'." }
         Write-Host "Started new container $Name"
     } elseif ($state -ne 'true') {
-        $managed = & docker container inspect --format '{{ index .Config.Labels "com.vibematch.dev.managed" }}' $Name
-        if ($managed.Trim() -ne 'true') {
+        $managed = Get-ContainerManagedLabel $Name
+        if ($managed -ne 'true') {
             throw "Refusing to start existing unmanaged container '$Name'."
         }
         & docker start $Name | Out-Null
