@@ -1,4 +1,5 @@
 import hmac
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ from app.services import media_node_registry_service
 from app.services.media_realtime_auth_service import verify_media_realtime_request
 
 router = APIRouter(prefix="/media-realtime", tags=["Media Realtime Auth"])
+logger = logging.getLogger("uvicorn.error")
 
 
 def _verify_media_node_identity(http_request: Request, payload: MediaRealtimeVerifyRequest) -> None:
@@ -70,4 +72,29 @@ def verify_media_realtime_access(
         device_id=payload.device_id,
         has_active_room_connection=has_active_room_connection,
     )
+    permission_context = (
+        result.get("mediasoup_context", {}).get("permission_context", {})
+        if isinstance(result, dict)
+        else {}
+    )
+    if not result.get("allowed", False):
+        logger.warning(
+            "media_auth.denied user_id=%s room_id=%s action=%s reason=%s participant_active=%s socket_lease=%s",
+            current_user.id,
+            room_public_id,
+            payload.requested_action,
+            result.get("reason"),
+            permission_context.get("has_active_participant_record"),
+            permission_context.get("has_active_room_connection"),
+        )
+    elif (
+        permission_context.get("has_active_room_connection")
+        and not permission_context.get("has_active_participant_record")
+    ):
+        logger.warning(
+            "media_auth.live_lease_bridged_stale_participant user_id=%s room_id=%s action=%s",
+            current_user.id,
+            room_public_id,
+            payload.requested_action,
+        )
     return MediaRealtimeVerifyResponse(**result)
