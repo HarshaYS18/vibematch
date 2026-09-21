@@ -2,8 +2,11 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from app.models.call_session import CallParticipantStatus, CallSessionStatus
+from fastapi import HTTPException
+
+from app.models.call_session import CallParticipantStatus, CallSessionStatus, CallSessionType
 from app.models.role import RoleName
+from app.services import call_session_service
 from app.services import media_realtime_auth_service as auth
 
 
@@ -29,3 +32,29 @@ class CallMediaPermissionsTests(TestCase):
     def test_video_requires_video_call(self):
         self.assertFalse(self.verify(action="produce_video")["allowed"])
         self.assertTrue(self.verify(action="produce_video", video=True)["allowed"])
+
+
+class CallSessionNamespaceTests(TestCase):
+    def test_general_calls_generate_media_namespace_when_room_is_absent(self):
+        db = MagicMock()
+        actor = SimpleNamespace(id=1)
+        session = call_session_service.create_call_session(
+            db=db,
+            actor=actor,
+            participant_user_ids=[2],
+            call_type=CallSessionType.DIRECT_AUDIO,
+        )
+        self.assertTrue(session.room_public_id.startswith("call_room_"))
+
+    def test_client_cannot_claim_server_call_namespace(self):
+        db = MagicMock()
+        actor = SimpleNamespace(id=1)
+        with self.assertRaises(HTTPException) as raised:
+            call_session_service.create_call_session(
+                db=db,
+                actor=actor,
+                participant_user_ids=[2],
+                call_type=CallSessionType.DIRECT_AUDIO,
+                room_public_id="call_room_client_supplied",
+            )
+        self.assertEqual(400, raised.exception.status_code)
