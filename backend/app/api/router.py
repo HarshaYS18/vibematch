@@ -73,6 +73,6 @@ for router in (
     admin.router, admin_support.router, moderation.router, ai_moderation.router,
     media_safety_admin.router, vip_admin.router, super_owner.router,
     control_center.router, game_pool_admin.router, game_props_admin.router,
-    economy_admin.router,
+    economy_admin.router, games.admin_router,
 ):
     api_router.include_router(router)
