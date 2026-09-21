@@ -4,6 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.routes.room_realtime_commands import client_room_snapshot
 from app.api.routes.users import get_current_user
@@ -256,7 +257,7 @@ def _get_room_for_host_update(
     return room
 
 
-async def _record_and_broadcast(
+def _record_event_snapshot(
     db: Session,
     room: Room,
     *,
@@ -266,8 +267,9 @@ async def _record_and_broadcast(
     target_user_id: int | None = None,
     event_payload: dict | None = None,
     extra: dict | None = None,
-) -> dict:
+) -> tuple[str, dict, dict]:
     room = _locked_room(db, room)
+    room_public_id = room.room_public_id
     room_action_service.record_room_event(
         db,
         room,
@@ -280,31 +282,62 @@ async def _record_and_broadcast(
     db.refresh(room)
     snapshot = client_room_snapshot(db, room)
     db.commit()
-    payload = {"room_id": room.room_public_id, "room": snapshot}
+    payload = {"room_id": room_public_id, "room": snapshot}
     if extra:
         payload.update(extra)
+    return room_public_id, snapshot, payload
+
+
+async def _record_and_broadcast(
+    db: Session,
+    room: Room,
+    *,
+    event_type: str,
+    actor_user_id: int | None = None,
+    target_user_id: int | None = None,
+    event_payload: dict | None = None,
+    extra: dict | None = None,
+) -> dict:
+    room_public_id, snapshot, payload = await run_in_threadpool(
+        _record_event_snapshot,
+        db,
+        room,
+        event_type=event_type,
+        actor_user_id=actor_user_id,
+        target_user_id=target_user_id,
+        event_payload=event_payload,
+        extra=extra,
+    )
     await room_realtime_connections.broadcast_room(
-        room.room_public_id,
+        room_public_id,
         {"type": wire_type, "payload": payload},
     )
+    return snapshot
+
+
+def _closed_room_snapshot(db: Session, room_id: str) -> dict | None:
+    room = (
+        db.query(Room)
+        .filter(Room.room_public_id == room_id, Room.is_active.is_(True))
+        .first()
+    )
+    if room is None:
+        return None
+    snapshot = client_room_snapshot(db, room)
+    db.commit()
     return snapshot
 
 
 async def _broadcast_closed_room_sessions(
     db: Session,
     room_ids: list[str],
-    user: User,
+    user_id: int,
+    public_user_id: int,
 ) -> None:
     for room_id in room_ids:
-        room = (
-            db.query(Room)
-            .filter(Room.room_public_id == room_id, Room.is_active.is_(True))
-            .first()
-        )
-        if room is None:
+        snapshot = await run_in_threadpool(_closed_room_snapshot, db, room_id)
+        if snapshot is None:
             continue
-        snapshot = client_room_snapshot(db, room)
-        db.commit()
         await room_realtime_connections.broadcast_room(
             room_id,
             {
@@ -312,8 +345,8 @@ async def _broadcast_closed_room_sessions(
                 "payload": {
                     "room_id": room_id,
                     "room": snapshot,
-                    "target_user_id": user.id,
-                    "target_public_user_id": user.public_user_id,
+                    "target_user_id": user_id,
+                    "target_public_user_id": public_user_id,
                     "reason": "joined_another_room",
                 },
             },
@@ -724,6 +757,31 @@ async def join_live_room(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    user_id = int(current_user.id)
+    public_user_id = int(current_user.public_user_id)
+    joined, was_active = await run_in_threadpool(
+        _prepare_join, db, room_public_id, current_user,
+        payload.lock_password if payload else None,
+    )
+    await _broadcast_closed_room_sessions(db, joined.closed_room_ids, user_id, public_user_id)
+    if not was_active:
+        room = await run_in_threadpool(
+            lambda: db.query(Room).filter(Room.room_public_id == room_public_id).first()
+        )
+        if room is not None:
+            await _record_and_broadcast(
+                db,
+                room,
+                event_type="room.joined",
+                wire_type="room/joined",
+                actor_user_id=user_id,
+            )
+    return joined
+
+
+def _prepare_join(
+    db: Session, room_public_id: str, current_user: User, lock_password: str | None,
+) -> tuple[RoomJoinResponse, bool]:
     room_before = (
         db.query(Room)
         .filter(Room.room_public_id == room_public_id)
@@ -744,25 +802,14 @@ async def join_live_room(
         db=db,
         room_public_id=room_public_id,
         current_user=current_user,
-        lock_password=payload.lock_password if payload else None,
+        lock_password=lock_password,
     )
     if joined is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Room not found or not accessible",
         )
-    await _broadcast_closed_room_sessions(db, joined.closed_room_ids, current_user)
-    if not was_active:
-        room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
-        if room is not None:
-            await _record_and_broadcast(
-                db,
-                room,
-                event_type="room.joined",
-                wire_type="room/joined",
-                actor_user_id=current_user.id,
-            )
-    return joined
+    return joined, was_active
 
 
 @router.post("/{room_public_id}/heartbeat", response_model=RoomJoinResponse)

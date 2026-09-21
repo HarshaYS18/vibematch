@@ -515,9 +515,7 @@ def participant_to_response(db: Session, participant: RoomParticipant, room: Roo
     user = participant.user
     user_roles = get_user_roles(user)
     primary_role = get_primary_role(user)
-    wallet = economy_level_service.get_or_create_wallet(db, user.id)
-    levels = economy_level_service.wallet_level_payload(db, wallet)
-    economy_level_service.sync_vip_status(db, user.id, levels)
+    levels = economy_level_service.user_level_payload(db, user.id)
     is_online = bool(participant.is_active)
     is_owner = room.owner_user_id == user.id
     is_admin = participant.is_room_admin or is_owner
@@ -532,7 +530,7 @@ def participant_to_response(db: Session, participant: RoomParticipant, room: Roo
         primary_role=primary_role.value,
         primary_role_badge=get_primary_role_badge(primary_role),
         role_badges=get_role_badges(user_roles),
-        vip=profile_service.vip_summary(db, user),
+        vip=profile_service.vip_summary(db, user, levels),
         equipped_items=profile_service.equipped_items_summary(db, user),
         sending_level=int(levels["sent"].get("level") or 0),
         receiving_level=int(levels["received"].get("level") or 0),
@@ -639,7 +637,12 @@ def join_room(db: Session, room_public_id: str, current_user: User, lock_passwor
     db.refresh(participant)
     participants = roster_participants(db, room)
     db.commit()
-    return RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=not was_active, closed_room_ids=sorted(closed_room_ids))
+    response = RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=not was_active, closed_room_ids=sorted(closed_room_ids))
+    # participant_to_response may create wallet, experience and VIP rows. Commit
+    # those writes before the async route broadcasts, or a concurrent room join
+    # can wait on this transaction while blocking the FastAPI event loop.
+    db.commit()
+    return response
 
 
 def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinResponse | None:
@@ -663,7 +666,9 @@ def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> Room
     db.refresh(room)
     participants = roster_participants(db, room)
     db.commit()
-    return RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=False)
+    response = RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=False)
+    db.commit()
+    return response
 
 
 def leave_room(db: Session, room_public_id: str, current_user: User) -> RoomLeaveResponse | None:
@@ -683,7 +688,9 @@ def list_room_participants(db: Session, room_public_id: str, current_user: User)
         return None
     participants = roster_participants(db, room)
     db.commit()
-    return RoomParticipantsResponse(room_id=room.room_public_id, online_count=room.online_count, participants=[participant_to_response(db, participant, room) for participant in participants])
+    response = RoomParticipantsResponse(room_id=room.room_public_id, online_count=room.online_count, participants=[participant_to_response(db, participant, room) for participant in participants])
+    db.commit()
+    return response
 
 
 def list_trending_rooms(db: Session, language: str | None = None, category: str | None = None, limit: int = 30) -> list[RoomTrendingResponse]:

@@ -20,6 +20,7 @@ const envSchema = z.object({
   SOCKET_PING_TIMEOUT_MS: z.coerce.number().int().min(5000).default(20000),
   SOCKET_PING_INTERVAL_MS: z.coerce.number().int().min(5000).default(25000),
   VERIFY_TIMEOUT_MS: z.coerce.number().int().min(1000).default(6000),
+  MEDIA_REGISTRY_DIAGNOSTICS: z.enum(['true', 'false']).default('false'),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -31,6 +32,7 @@ export const config = {
   fastApiBaseUrl: parsed.FASTAPI_BASE_URL.replace(/\/$/, ''),
   corsOrigin: parsed.CORS_ORIGIN,
   verifyTimeoutMs: parsed.VERIFY_TIMEOUT_MS,
+  registryDiagnostics: parsed.MEDIA_REGISTRY_DIAGNOSTICS === 'true',
   registry: {
     nodeId: parsed.MEDIA_NODE_ID.trim() || os.hostname(),
     publicUrl: parsed.MEDIA_PUBLIC_URL.replace(/\/$/, ''),

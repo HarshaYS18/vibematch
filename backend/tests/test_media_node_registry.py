@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 import fakeredis
-from redis.exceptions import ConnectionError
+from redis.exceptions import ConnectionError, TimeoutError
 
 from app.services import media_node_registry_service as registry
 
@@ -50,6 +50,14 @@ class MediaRegistryTests(TestCase):
         with self.assertRaises(registry.MediaNodeUnavailable):
             registry.resolve_room_node(self.redis, "room")
 
+    def test_same_node_id_restart_reuses_sticky_assignment(self):
+        self.heartbeat("a")
+        registry.resolve_room_node(self.redis, "room")
+        self.redis.expire(registry.NODE_PREFIX + "a", 0)
+        self.heartbeat("a")
+        self.assertEqual(registry.resolve_room_node(self.redis, "room").node_id, "a")
+        self.assertTrue(registry.room_is_assigned_to_node(self.redis, "room", "a"))
+
     def test_pending_assignments_reserve_capacity_atomically(self):
         self.heartbeat(max_rooms=2)
         def assign(index):
@@ -71,6 +79,18 @@ class MediaRegistryTests(TestCase):
         self.assertGreater(self.redis.ttl(registry.ROOM_PREFIX + "room"), 5)
 
     def test_redis_failure_is_unavailable_not_local_fallback(self):
-        with patch.object(self.redis, "scan_iter", side_effect=ConnectionError("offline")):
+        with patch.object(self.redis, "eval", side_effect=ConnectionError("offline")):
             with self.assertRaises(registry.MediaNodeUnavailable):
                 registry.resolve_room_node(self.redis, "room")
+
+    def test_redis_command_timeout_is_unavailable(self):
+        with patch.object(self.redis, "eval", side_effect=TimeoutError("timed out")):
+            with self.assertRaises(registry.MediaNodeUnavailable):
+                self.heartbeat()
+            with self.assertRaises(registry.MediaNodeUnavailable):
+                registry.resolve_room_node(self.redis, "room")
+
+    def test_discovery_uses_one_atomic_command_without_scanning(self):
+        self.heartbeat("a")
+        with patch.object(self.redis, "scan_iter", side_effect=AssertionError("hot path scanned Redis")):
+            self.assertEqual(registry.resolve_room_node(self.redis, "room").node_id, "a")

@@ -66,7 +66,7 @@ for router in (
     game_settlements.router, store_router, coin_sales.router, experience.router,
 ):
     api_router.include_router(router)
-api_router.include_router(lucky_packets.router, prefix="/economy", tags=["Economy", "Lucky Packets"])
+api_router.include_router(lucky_packets.router)
 
 # Administrative surfaces.
 for router in (

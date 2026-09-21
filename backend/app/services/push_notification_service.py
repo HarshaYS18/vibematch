@@ -15,6 +15,30 @@ from app.models.user import User
 FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging"
 
 
+def assert_firebase_configuration(
+    project_id: str | None = None,
+    service_account_path: str | None = None,
+) -> None:
+    """Validate configured FCM credentials at startup without exposing keys."""
+    configured_project = (settings.FCM_PROJECT_ID if project_id is None else project_id).strip()
+    configured_path = (settings.FIREBASE_SERVICE_ACCOUNT_PATH if service_account_path is None else service_account_path).strip()
+    if not configured_project and not configured_path:
+        return
+    if not configured_project or not configured_path:
+        raise RuntimeError("FCM_PROJECT_ID and FIREBASE_SERVICE_ACCOUNT_PATH must be configured together.")
+    path = Path(configured_path)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    if not path.is_file():
+        raise RuntimeError("Firebase service account file is missing.")
+    try:
+        credentials = service_account.Credentials.from_service_account_file(str(path), scopes=[FCM_SCOPE])
+    except Exception:
+        raise RuntimeError("Firebase service account file is invalid.") from None
+    if credentials.project_id != configured_project:
+        raise RuntimeError("Firebase service account project does not match FCM_PROJECT_ID.")
+
+
 def upsert_device_token(
     db: Session,
     *,

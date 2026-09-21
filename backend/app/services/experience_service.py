@@ -5,6 +5,7 @@ from app.models.room import Room
 from app.models.user import User
 from app.services import economy_rules_service
 from app.services import level_progression_service as progression
+from app.services.get_or_create_service import get_or_create_unique
 
 MAX_EXP_LEVEL = progression.MAX_LEVEL
 
@@ -25,23 +26,11 @@ def progress_payload(level: int, total_exp: int, track: progression.ProgressionT
 
 
 def get_or_create_user_exp(db: Session, user_id: int) -> UserExperienceStatus:
-    status = db.query(UserExperienceStatus).filter(UserExperienceStatus.user_id == user_id).first()
-    if status:
-        return status
-    status = UserExperienceStatus(user_id=user_id)
-    db.add(status)
-    db.flush()
-    return status
+    return get_or_create_unique(db, UserExperienceStatus, UserExperienceStatus.user_id, user_id)
 
 
 def get_or_create_room_exp(db: Session, room_id: int) -> RoomExperienceStatus:
-    status = db.query(RoomExperienceStatus).filter(RoomExperienceStatus.room_id == room_id).first()
-    if status:
-        return status
-    status = RoomExperienceStatus(room_id=room_id)
-    db.add(status)
-    db.flush()
-    return status
+    return get_or_create_unique(db, RoomExperienceStatus, RoomExperienceStatus.room_id, room_id)
 
 
 def apply_gift_exp(

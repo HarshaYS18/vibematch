@@ -41,7 +41,7 @@ class CanonicalApiContractTests(unittest.TestCase):
             "/health", "/app/source-of-truth/master",
             "/families/{family_id}/members",
             "/rooms/{room_public_id}/realtime/snapshot",
-            "/ws/room-realtime", "/economy/lucky-packets",
+            "/ws/room-realtime", "/lucky-packets", "/lucky-packets/active",
             "/admin/games/pools", "/admin/games/props/jungle-hunt",
             "/admin/games/seed-defaults", "/admin/games/catalog/{game_key}",
             "/rooms/{room_public_id}/media", "/admin/media/nodes", "/support/tickets",
@@ -50,7 +50,7 @@ class CanonicalApiContractTests(unittest.TestCase):
             self.assertIn(expected, paths)
 
     def test_retired_admin_and_economy_prefixes_are_absent(self):
-        retired = ("/super-owner", "/control-center", "/games/admin", "/economy/admin", "/wallet/", "/moderation/")
+        retired = ("/super-owner", "/control-center", "/games/admin", "/economy/admin", "/economy/lucky-packets", "/wallet/", "/moderation/")
         for route in api_router.routes:
             self.assertTrue(route.path.startswith("/api/v1/"))
             self.assertFalse(route.path.removeprefix("/api/v1").startswith(retired), route.path)

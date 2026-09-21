@@ -12,11 +12,14 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     REDIS_CONNECT_TIMEOUT_SECONDS: float = 2.0
     REDIS_SOCKET_TIMEOUT_SECONDS: float = 2.0
+    DB_LOCK_TIMEOUT_MS: int = 1000
+    DB_STATEMENT_TIMEOUT_MS: int = 3000
 
     # Media control plane / node registry
     MEDIA_INTERNAL_TOKEN: str = "change-this-media-internal-token"
     MEDIA_NODE_TTL_SECONDS: int = 30
     MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS: int = 86400
+    MEDIA_REGISTRY_TRACE: bool = False
 
     # JWT
     JWT_SECRET_KEY: str = "change-this-secret-key-in-production"

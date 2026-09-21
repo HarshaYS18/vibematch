@@ -96,6 +96,12 @@ node_modules/
 
 # Firebase backend secrets
 backend/secrets/
+# Keep the exact server-side service account path protected even if this
+# directory is later narrowed to permit non-secret documentation files.
+backend/secrets/firebase-service-account.json
+
+# Local process metadata and logs written by scripts/dev-*.ps1.
+scripts/.dev-runtime/
 
 
 # mediasoup / TypeScript build output

@@ -2,7 +2,8 @@ import http from 'node:http';
 import cors from 'cors';
 import express from 'express';
 import { config } from './config.js';
-import { markMediaNodeOffline, heartbeatMediaNode, registryIsHealthy } from './control/registryClient.js';
+import { markMediaNodeOffline, heartbeatMediaNode, registryIsHealthy, RegistryRequestError } from './control/registryClient.js';
+import { HeartbeatLoop } from './control/heartbeatLoop.js';
 import { WorkerManager } from './mediasoup/workerManager.js';
 import { RoomManager } from './mediasoup/roomManager.js';
 import { createSocketServer } from './signaling/socketServer.js';
@@ -49,20 +50,25 @@ app.get('/', (_request, response) => {
 const httpServer = http.createServer(app);
 const io = createSocketServer(httpServer, roomManager);
 
-let heartbeatTimer: NodeJS.Timeout | undefined;
-let heartbeatInFlight: Promise<void> | undefined;
-
 async function sendHeartbeat(): Promise<void> {
-  if (heartbeatInFlight || shuttingDown || !workerManager.isReady) return;
-  heartbeatInFlight = heartbeatMediaNode(roomManager.getStats());
+  if (shuttingDown || !workerManager.isReady) return;
   try {
-    await heartbeatInFlight;
+    await heartbeatMediaNode(roomManager.getStats());
   } catch (error) {
-    console.error('[media] registry heartbeat failed', error);
-  } finally {
-    heartbeatInFlight = undefined;
+    if (error instanceof RegistryRequestError) {
+      console.error('[media] registry heartbeat failed', {
+        requestId: error.requestId,
+        elapsedMs: error.elapsedMs,
+        phase: error.phase,
+        error: error.message,
+      });
+    } else {
+      console.error('[media] registry heartbeat failed', error);
+    }
   }
 }
+
+const heartbeatLoop = new HeartbeatLoop(config.registry.heartbeatIntervalMs, sendHeartbeat);
 
 httpServer.listen(config.port, config.host, () => {
   console.log(`[media] node=${config.registry.nodeId} running on http://${config.host}:${config.port}`);
@@ -70,8 +76,7 @@ httpServer.listen(config.port, config.host, () => {
   console.log(
     `[media] mediasoup listenIp=${config.mediasoup.listenIp} announcedIp=${config.mediasoup.announcedIp} rtcPorts=${config.mediasoup.minPort}-${config.mediasoup.maxPort}`,
   );
-  void sendHeartbeat();
-  heartbeatTimer = setInterval(() => void sendHeartbeat(), config.registry.heartbeatIntervalMs);
+  heartbeatLoop.start();
 });
 
 let shuttingDown = false;
@@ -79,10 +84,10 @@ async function shutdown(signal: string, exitCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[media] received ${signal}; draining process.`);
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatLoop.stop();
   // An in-flight heartbeat must finish before unregistering, or it could
   // resurrect this node after the offline request.
-  await heartbeatInFlight?.catch(() => undefined);
+  await heartbeatLoop.waitForIdle().catch(() => undefined);
   try {
     await markMediaNodeOffline();
   } catch (error) {

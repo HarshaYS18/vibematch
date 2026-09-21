@@ -1,6 +1,8 @@
 import hmac
+import logging
+import time
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.api.routes.super_owner import require_super_owner
@@ -20,6 +22,15 @@ from app.services.media_realtime_auth_service import verify_media_realtime_reque
 
 
 router = APIRouter(tags=["Room Media"])
+logger = logging.getLogger("uvicorn.error")
+
+
+def _log_heartbeat_sent(request_id: str, started: float) -> None:
+    logger.info(
+        "media_registry.heartbeat.response_sent request_id=%s elapsed_ms=%.1f",
+        request_id,
+        (time.monotonic() - started) * 1000,
+    )
 
 
 def _internal_media_auth(request: Request) -> None:
@@ -71,9 +82,15 @@ def resolve_room_media(
     response_model=MediaNodeResponse,
     include_in_schema=False,
 )
-def media_node_heartbeat(payload: MediaNodeHeartbeatRequest, request: Request):
+def media_node_heartbeat(payload: MediaNodeHeartbeatRequest, request: Request, background_tasks: BackgroundTasks):
+    started = time.monotonic()
+    request_id = request.headers.get("x-request-id", "-")[:64]
+    if settings.MEDIA_REGISTRY_TRACE:
+        logger.info("media_registry.heartbeat.received request_id=%s node_id=%s", request_id, payload.node_id)
     _internal_media_auth(request)
     try:
+        if settings.MEDIA_REGISTRY_TRACE:
+            logger.info("media_registry.heartbeat.redis_start request_id=%s", request_id)
         node = media_node_registry_service.heartbeat_node(
             get_redis(),
             node_id=payload.node_id,
@@ -85,7 +102,11 @@ def media_node_heartbeat(payload: MediaNodeHeartbeatRequest, request: Request):
             room_ids=payload.room_ids,
         )
     except media_node_registry_service.MediaNodeUnavailable as exc:
+        logger.warning("media_registry.heartbeat.failed request_id=%s elapsed_ms=%.1f", request_id, (time.monotonic() - started) * 1000)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if settings.MEDIA_REGISTRY_TRACE:
+        logger.info("media_registry.heartbeat.redis_complete request_id=%s elapsed_ms=%.1f", request_id, (time.monotonic() - started) * 1000)
+        background_tasks.add_task(_log_heartbeat_sent, request_id, started)
     return _node_response(node)
 
 

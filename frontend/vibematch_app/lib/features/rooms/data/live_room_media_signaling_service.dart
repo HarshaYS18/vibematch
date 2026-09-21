@@ -19,6 +19,7 @@ import '../presentation/widgets/room_theme.dart';
 import 'live_room_audio_service.dart';
 import 'live_room_foreground_service.dart';
 import 'live_room_presence_repository.dart';
+import 'seat_authority_gate.dart';
 
 class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   LiveRoomMediaSignalingService._() {
@@ -47,6 +48,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   bool _foregroundServiceStarted = false;
   bool _showingRoomBlockDialog = false;
   int _commandSequence = 0;
+  final SeatAuthorityGate _seatAuthorityGate = SeatAuthorityGate();
 
   final ValueNotifier<LiveMediaRoomSnapshot?> roomSnapshot =
       _VersionedRoomSnapshotNotifier();
@@ -87,6 +89,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       roomSnapshot.value = null;
       roomBlock.value = null;
       seatInvite.value = null;
+      _seatAuthorityGate.cancelPendingSeat();
     }
   }
 
@@ -234,7 +237,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (seatIndex < 0) return;
 
     seatInvite.value = null;
-    LiveRoomAudioService.instance.takeSeat(seatIndex, micEnabled: micEnabled);
+    _seatAuthorityGate.requestSeat(seatIndex, micEnabled: micEnabled);
 
     final payload = <String, Object?>{'seat_index': seatIndex};
     if (micEnabled != null) payload['mic_enabled'] = micEnabled;
@@ -256,7 +259,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void acceptSeatInvite({required int seatIndex}) {
     if (seatIndex < 0) return;
     seatInvite.value = null;
-    LiveRoomAudioService.instance.takeSeat(seatIndex);
+    _seatAuthorityGate.requestSeat(seatIndex);
     _send('seat_invite/accept', <String, Object?>{'seat_index': seatIndex});
   }
 
@@ -282,6 +285,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   void leaveSeat() {
+    _seatAuthorityGate.cancelPendingSeat();
     LiveRoomAudioService.instance.leaveSeat();
 
     _send('seat/leave', <String, Object?>{});
@@ -351,7 +355,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       return;
     }
 
-    LiveRoomAudioService.instance.setSelfMuted(!enabled);
+    // FastAPI's following room snapshot confirms both seat ownership and the
+    // mic state.  Do not start a producer merely because this command was sent.
+    _seatAuthorityGate.requestMicEnabled(enabled);
+    if (!enabled) LiveRoomAudioService.instance.setSelfMuted(true);
 
     _send('mic/set_enabled', <String, Object?>{'enabled': enabled});
   }
@@ -469,6 +476,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   Future<void> leaveRoom() async {
     _shouldStayConnected = false;
+    _seatAuthorityGate.cancelPendingSeat();
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
 
@@ -498,6 +506,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }) async {
     roomBlock.value = block;
     _shouldStayConnected = false;
+    _seatAuthorityGate.cancelPendingSeat();
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
 
@@ -779,6 +788,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
           'room command rejected: '
           '${payload['command_type']} ${payload['message']}',
         );
+        if (payload['command_type']?.toString() == 'seat/take') {
+          _seatAuthorityGate.rejectSeatRequest();
+          LiveRoomAudioService.instance.leaveSeat();
+        }
         return;
       }
 
@@ -1172,13 +1185,34 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       }
     }
 
-    if (currentPeer == null || currentPeer.seatIndex == null) {
+    final decision = _seatAuthorityGate.observe(
+      authoritativeSeatIndex: currentPeer?.seatIndex,
+      authoritativeMicEnabled: currentPeer?.micEnabled ?? false,
+      adminMuted: currentPeer?.adminMuted ?? false,
+    );
+
+    if (decision.awaitSeatConfirmation) {
+      _debug(
+        'awaiting authoritative seat confirmation before changing local audio',
+      );
+      return;
+    }
+
+    if (decision.shouldLeaveSeat) {
       _debug('current user is no longer seated; forcing local audio leaveSeat');
       LiveRoomAudioService.instance.leaveSeat();
       return;
     }
 
-    if (currentPeer.adminMuted) {
+    final confirmedSeatIndex = decision.confirmedSeatIndex;
+    if (confirmedSeatIndex != null) {
+      LiveRoomAudioService.instance.takeSeat(
+        confirmedSeatIndex,
+        micEnabled: decision.micEnabled,
+      );
+    }
+
+    if (currentPeer?.adminMuted == true) {
       _debug('admin mute enforced from room snapshot for current user');
       LiveRoomAudioService.instance.setSelfMuted(true);
     }
@@ -1394,10 +1428,8 @@ class LiveMediaRoomSnapshot {
         : <int>{};
 
     final parsedPeerCount = int.tryParse(json['peer_count']?.toString() ?? '');
-    final stateVersion = int.tryParse(
-          json['state_version']?.toString() ?? '',
-        ) ??
-        0;
+    final stateVersion =
+        int.tryParse(json['state_version']?.toString() ?? '') ?? 0;
 
     return LiveMediaRoomSnapshot(
       roomId: json['room_id']?.toString() ?? '',

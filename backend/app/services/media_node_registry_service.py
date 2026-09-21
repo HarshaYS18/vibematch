@@ -14,6 +14,7 @@ NODE_PREFIX = "funkey:media:nodes:"
 ROOM_PREFIX = "funkey:media:rooms:"
 DRAIN_PREFIX = "funkey:media:draining:"
 RESERVATION_PREFIX = "funkey:media:reservations:"
+NODE_INDEX_KEY = "funkey:media:node_index"
 
 # All keys live in one Redis primary (Redis Cluster is not supported). Lua keeps
 # selection, reservations and sticky assignment atomic across API replicas.
@@ -31,8 +32,9 @@ if existing then
 end
 local best = nil
 local score = math.huge
-for i = 2, #KEYS do
-    local raw = redis.call('GET', KEYS[i])
+redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
+for _, node_id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[2], now, '+inf')) do
+    local raw = redis.call('GET', ARGV[1] .. node_id)
     if raw then
         local node = cjson.decode(raw)
         local reservations = ARGV[2] .. node.node_id
@@ -60,6 +62,8 @@ local now = tonumber(redis.call('TIME')[1])
 node.updated_at = now
 local raw = cjson.encode(node)
 redis.call('SET', KEYS[1], raw, 'EX', ARGV[2])
+redis.call('ZADD', KEYS[4], now + tonumber(ARGV[2]), node.node_id)
+redis.call('ZREMRANGEBYSCORE', KEYS[4], '-inf', now)
 for _, room in ipairs(cjson.decode(ARGV[5])) do
     if redis.call('GET', ARGV[3] .. room) == node.node_id then
         redis.call('EXPIRE', ARGV[3] .. room, ARGV[4])
@@ -81,6 +85,12 @@ else redis.call('DEL', KEYS[2]) end
 raw = cjson.encode(node)
 redis.call('SET', KEYS[1], raw, 'KEEPTTL')
 return raw
+"""
+
+REMOVE_SCRIPT = """
+redis.call('DEL', KEYS[1], KEYS[2])
+redis.call('ZREM', KEYS[3], ARGV[1])
+return 1
 """
 
 
@@ -191,8 +201,8 @@ def heartbeat_node(
     )
     try:
         raw = redis.eval(
-            HEARTBEAT_SCRIPT, 3, _node_key(node_id), DRAIN_PREFIX + node_id,
-            RESERVATION_PREFIX + node_id,
+            HEARTBEAT_SCRIPT, 4, _node_key(node_id), DRAIN_PREFIX + node_id,
+            RESERVATION_PREFIX + node_id, NODE_INDEX_KEY,
             json.dumps(asdict(node), separators=(",", ":")),
             settings.MEDIA_NODE_TTL_SECONDS, ROOM_PREFIX,
             settings.MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS,
@@ -222,7 +232,7 @@ def set_node_draining(redis: Redis, node_id: str, draining: bool) -> MediaNode:
 
 def remove_node(redis: Redis, node_id: str) -> None:
     try:
-        redis.delete(_node_key(node_id), RESERVATION_PREFIX + node_id)
+        redis.eval(REMOVE_SCRIPT, 3, _node_key(node_id), RESERVATION_PREFIX + node_id, NODE_INDEX_KEY, node_id)
     except RedisError as exc:
         raise MediaNodeUnavailable("Media registry is unavailable.") from exc
 
@@ -230,9 +240,8 @@ def remove_node(redis: Redis, node_id: str) -> None:
 def resolve_room_node(redis: Redis, room_public_id: str) -> MediaNode:
     assignment_key = _room_key(room_public_id)
     try:
-        keys = sorted(redis.scan_iter(match=f"{NODE_PREFIX}*"))
         raw = redis.eval(
-            RESOLVE_SCRIPT, len(keys) + 1, assignment_key, *keys,
+            RESOLVE_SCRIPT, 2, assignment_key, NODE_INDEX_KEY,
             NODE_PREFIX, RESERVATION_PREFIX, room_public_id,
             settings.MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS,
             max(settings.MEDIA_NODE_TTL_SECONDS * 2, 60),

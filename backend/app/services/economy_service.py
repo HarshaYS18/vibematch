@@ -23,18 +23,13 @@ from app.models.economy import (
 from app.models.room import Room
 from app.models.user import User
 from app.services import experience_service
+from app.services.get_or_create_service import get_or_create_unique
 
 RUBY_EARNING_BASIS_POINTS = 3000
 
 
 def get_or_create_wallet(db: Session, user_id: int) -> UserWallet:
-    wallet = db.query(UserWallet).filter(UserWallet.user_id == user_id).first()
-    if wallet:
-        return wallet
-    wallet = UserWallet(user_id=user_id)
-    db.add(wallet)
-    db.flush()
-    return wallet
+    return get_or_create_unique(db, UserWallet, UserWallet.user_id, user_id)
 
 
 def get_pool_for_user(db: Session, user_id: int, pool_type: CoinSupplyPoolType) -> CoinSupplyPool | None:

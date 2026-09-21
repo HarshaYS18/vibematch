@@ -5,6 +5,7 @@ on:
     branches:
       - chatgpt/room-production-hardening
       - chatgpt/backend-media-consolidation-v1
+      - codex/backend-media-consolidation-checkpoint
   pull_request:
     paths:
       - 'backend/**'

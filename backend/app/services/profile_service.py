@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.models.vip_status import UserVipStatus
 from app.services import economy_level_service, role_badge_service, role_service, store_service
 
 SVIP_NAME_GRADIENTS: dict[int, dict[str, object]] = {
@@ -26,10 +27,9 @@ def _gradient_for_svip(svip_level: int, is_active: bool) -> dict[str, object]:
     return SVIP_NAME_GRADIENTS.get(min(svip_level, 10), SVIP_NAME_GRADIENTS[10])
 
 
-def vip_summary(db: Session, user: User) -> dict:
-    wallet = economy_level_service.get_or_create_wallet(db, user.id)
-    levels = economy_level_service.wallet_level_payload(db, wallet)
-    status = economy_level_service.sync_vip_status(db, user.id, levels)
+def vip_summary(db: Session, user: User, levels: dict | None = None) -> dict:
+    levels = levels or economy_level_service.user_level_payload(db, user.id)
+    status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user.id).first()
     vip_level = int((levels.get("vip") or {}).get("level") or 0)
     svip_level = int((levels.get("svip") or {}).get("level") or 0)
     svip_active = svip_level > 0
@@ -39,7 +39,7 @@ def vip_summary(db: Session, user: User) -> dict:
         "svip_level": svip_level,
         "vip_is_active": vip_level > 0,
         "svip_is_active": svip_active,
-        "svip_expires_at": status.svip_expires_at if svip_active else None,
+        "svip_expires_at": status.svip_expires_at if status and svip_active else None,
         "name_gradient_key": str(gradient["key"]),
         "name_gradient_colors": list(gradient["colors"]),
     }

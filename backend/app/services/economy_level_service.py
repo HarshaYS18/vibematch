@@ -5,10 +5,12 @@ from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
 from app.models.economy import EconomyCurrency, EconomyDirection, GiftTransaction, UserWallet, WalletLedger
+from app.models.experience import UserExperienceStatus
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
-from app.services import economy_rules_service, economy_service, experience_service
+from app.services import economy_rules_service, economy_service
 from app.services import level_progression_service as progression
+from app.services.get_or_create_service import get_or_create_unique
 
 OFFICIAL_RECHARGE_SOURCE_TYPES = {
     "RECHARGE",
@@ -82,10 +84,7 @@ def sync_vip_status(db: Session, user_id: int, levels: dict | None = None) -> Us
     vip_level = int((safe_levels.get("vip") or {}).get("level") or 0)
     svip_level = int((safe_levels.get("svip") or {}).get("level") or 0)
 
-    status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user_id).first()
-    if status is None:
-        status = UserVipStatus(user_id=user_id)
-        db.add(status)
+    status = get_or_create_unique(db, UserVipStatus, UserVipStatus.user_id, user_id)
 
     status.vip_level = vip_level
     status.svip_level = svip_level
@@ -98,20 +97,27 @@ def sync_vip_status(db: Session, user_id: int, levels: dict | None = None) -> Us
 
 
 def wallet_level_payload(db: Session, wallet: UserWallet) -> dict:
-    recharge = recharge_exp_totals(db, wallet.user_id)
-    monthly_gifts = monthly_gift_coin_totals(db, wallet.user_id)
-    user_exp = experience_service.get_or_create_user_exp(db, wallet.user_id)
+    return user_level_payload(db, wallet.user_id)
+
+
+def user_level_payload(db: Session, user_id: int) -> dict:
+    """Derive public levels without creating wallet or experience rows on reads."""
+    recharge = recharge_exp_totals(db, user_id)
+    monthly_gifts = monthly_gift_coin_totals(db, user_id)
+    user_exp = db.query(UserExperienceStatus).filter(UserExperienceStatus.user_id == user_id).first()
+    sent_exp = int(user_exp.send_total_exp or 0) if user_exp else 0
+    received_exp = int(user_exp.receive_total_exp or 0) if user_exp else 0
     return {
         "lifetime_recharge_coin_exp": recharge["lifetime"],
         "monthly_recharge_coin_exp": recharge["monthly"],
         "monthly_gift_coins_sent": monthly_gifts["sent"],
         "monthly_gift_coins_received": monthly_gifts["received"],
-        "lifetime_send_exp": user_exp.send_total_exp,
-        "lifetime_receive_exp": user_exp.receive_total_exp,
+        "lifetime_send_exp": sent_exp,
+        "lifetime_receive_exp": received_exp,
         "vip": economy_rules_service.progress_payload(db, recharge["lifetime"], "vip"),
         "svip": economy_rules_service.progress_payload(db, recharge["monthly"], "svip"),
-        "sent": economy_rules_service.progress_payload(db, user_exp.send_total_exp, "send"),
-        "received": economy_rules_service.progress_payload(db, user_exp.receive_total_exp, "receive"),
+        "sent": economy_rules_service.progress_payload(db, sent_exp, "send"),
+        "received": economy_rules_service.progress_payload(db, received_exp, "receive"),
     }
 
 

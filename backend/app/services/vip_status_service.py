@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
 from app.services import role_service
+from app.services.get_or_create_service import get_or_create_unique
 
 
 def _get_user_by_public_id(db: Session, public_user_id: int) -> User:
@@ -16,11 +17,7 @@ def _get_user_by_public_id(db: Session, public_user_id: int) -> User:
 
 
 def get_or_create_vip_status(db: Session, user: User) -> UserVipStatus:
-    status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user.id).first()
-    if status:
-        return status
-    status = UserVipStatus(user_id=user.id)
-    db.add(status)
+    status = get_or_create_unique(db, UserVipStatus, UserVipStatus.user_id, user.id)
     db.commit()
     db.refresh(status)
     return status

@@ -54,9 +54,11 @@ class LiveRoomAudioService {
   final Set<String> _pendingProducerIds = <String>{};
   final Set<String> _consumingProducerIds = <String>{};
   final Set<String> _closingRemoteProducerIds = <String>{};
-  final Map<String, RemoteProducerInfo> _producerInfoById = <String, RemoteProducerInfo>{};
+  final Map<String, RemoteProducerInfo> _producerInfoById =
+      <String, RemoteProducerInfo>{};
   final Map<String, dynamic> _remoteConsumersByProducerId = <String, dynamic>{};
-  final Map<String, RTCVideoRenderer> _remoteAudioRenderersByProducerId = <String, RTCVideoRenderer>{};
+  final Map<String, RTCVideoRenderer> _remoteAudioRenderersByProducerId =
+      <String, RTCVideoRenderer>{};
 
   final ValueNotifier<bool> connected = ValueNotifier<bool>(false);
   final ValueNotifier<bool> joined = ValueNotifier<bool>(false);
@@ -65,17 +67,25 @@ class LiveRoomAudioService {
   final ValueNotifier<int> remoteAudioCount = ValueNotifier<int>(0);
   final ValueNotifier<List<RTCVideoRenderer>> remoteAudioRenderers =
       ValueNotifier<List<RTCVideoRenderer>>(<RTCVideoRenderer>[]);
-  final ValueNotifier<List<AudioSeatSnapshot>> seats = ValueNotifier<List<AudioSeatSnapshot>>(<AudioSeatSnapshot>[]);
-  final ValueNotifier<Set<String>> activeSpeakerPeerIds = ValueNotifier<Set<String>>(<String>{});
+  final ValueNotifier<List<AudioSeatSnapshot>> seats =
+      ValueNotifier<List<AudioSeatSnapshot>>(<AudioSeatSnapshot>[]);
+  final ValueNotifier<Set<String>> activeSpeakerPeerIds =
+      ValueNotifier<Set<String>>(<String>{});
   final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
 
   bool get isJoined => _joined;
   String? get roomId => _roomId;
   String? get peerId => _peerId;
 
-  Future<void> joinRoom({required String roomId, required SeatUser currentUser}) async {
+  Future<void> joinRoom({
+    required String roomId,
+    required SeatUser currentUser,
+  }) async {
     final safeRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
-    final safePeerId = '${safeRoomId}_${currentUser.id}'.replaceAll(RegExp(r'[^a-zA-Z0-9_\\-]'), '_');
+    final safePeerId = '${safeRoomId}_${currentUser.id}'.replaceAll(
+      RegExp(r'[^a-zA-Z0-9_\\-]'),
+      '_',
+    );
 
     _shouldStayConnected = true;
     _roomId = safeRoomId;
@@ -141,7 +151,6 @@ class LiveRoomAudioService {
     unawaited(_syncLocalMicCapture());
   }
 
-
   Future<bool> startRoomMusic({
     required String url,
     required String title,
@@ -155,7 +164,9 @@ class LiveRoomAudioService {
 
     if (!_canSendRoomEvent()) {
       _scheduleRecovery('start room music while disconnected');
-      _setError('Audio room is not connected yet. Try again after joining audio.');
+      _setError(
+        'Audio room is not connected yet. Try again after joining audio.',
+      );
       return false;
     }
 
@@ -276,8 +287,10 @@ class LiveRoomAudioService {
           })
           .build(),
     );
+    bool isCurrentSocket() => identical(_socket, socket);
 
     socket.onConnect((_) {
+      if (!isCurrentSocket()) return;
       connected.value = true;
       _debug('audio socket connected $audioUrl');
       if (_shouldStayConnected && _roomId != null && _currentUser != null) {
@@ -286,6 +299,7 @@ class LiveRoomAudioService {
     });
 
     socket.onDisconnect((_) {
+      if (!isCurrentSocket()) return;
       connected.value = false;
       _joined = false;
       _joinInFlight = false;
@@ -296,32 +310,46 @@ class LiveRoomAudioService {
       unawaited(_closeAllRemoteConsumers());
       _closeSendTransport();
       _closeRecvTransport();
-      _debug('audio socket disconnected; desiredSeat=$_desiredSeatIndex desiredMuted=$_desiredSelfMuted');
+      _debug(
+        'audio socket disconnected; desiredSeat=$_desiredSeatIndex desiredMuted=$_desiredSelfMuted',
+      );
       if (_shouldStayConnected) _scheduleRecovery('audio socket disconnected');
     });
 
     socket.onConnectError((dynamic error) {
+      if (!isCurrentSocket()) return;
       _setError('Audio socket connect error: $error');
       if (_shouldStayConnected) _scheduleRecovery('audio connect error');
     });
-    socket.onError((dynamic error) => _setError('Audio socket error: $error'));
+    socket.onError((dynamic error) {
+      if (isCurrentSocket()) _setError('Audio socket error: $error');
+    });
 
-    socket.on('activeSpeakers', _handleActiveSpeakers);
-    socket.on('peerJoined', (dynamic payload) => _debug('audio peer joined $payload'));
+    socket.on('activeSpeakers', (dynamic payload) {
+      if (isCurrentSocket()) _handleActiveSpeakers(payload);
+    });
+    socket.on('peerJoined', (dynamic payload) {
+      if (isCurrentSocket()) _debug('audio peer joined $payload');
+    });
     socket.on('peerLeft', (dynamic payload) {
+      if (!isCurrentSocket()) return;
       _debug('audio peer left $payload');
       if (payload is Map) _removeActiveSpeaker(payload['peerId']?.toString());
     });
 
     socket.on('newProducer', (dynamic payload) {
+      if (!isCurrentSocket()) return;
       _debug('audio new producer $payload');
       final info = RemoteProducerInfo.fromPayload(payload);
-      if (info == null || info.peerId == _peerId || info.kind != 'audio') return;
+      if (info == null || info.peerId == _peerId || info.kind != 'audio')
+        return;
       _producerInfoById[info.producerId] = info;
       if (_remoteConsumersByProducerId.containsKey(info.producerId) ||
           _consumingProducerIds.contains(info.producerId) ||
           _pendingProducerIds.contains(info.producerId)) {
-        _debug('consume skipped duplicate producer event producer=${info.producerId}');
+        _debug(
+          'consume skipped duplicate producer event producer=${info.producerId}',
+        );
         return;
       }
       _pendingProducerIds.add(info.producerId);
@@ -329,12 +357,14 @@ class LiveRoomAudioService {
     });
 
     socket.on('producerClosed', (dynamic payload) {
+      if (!isCurrentSocket()) return;
       _debug('audio producer closed $payload');
       if (payload is Map) {
         final producerId = payload['producerId']?.toString();
         final peerId = payload['peerId']?.toString();
         _removeActiveSpeaker(peerId);
-        if (producerId != null && producerId.isNotEmpty) unawaited(_closeRemoteConsumer(producerId));
+        if (producerId != null && producerId.isNotEmpty)
+          unawaited(_closeRemoteConsumer(producerId));
       }
     });
 
@@ -352,22 +382,25 @@ class LiveRoomAudioService {
       throw StateError('Room id is required before media discovery.');
     }
 
-    final endpoint = Uri.parse(
-      VmApiConfig.endpoint('/rooms/${Uri.encodeComponent(roomId)}/media'),
-    ).replace(
-      queryParameters: <String, String>{
-        if (deviceId != null && deviceId.trim().isNotEmpty)
-          'device_id': deviceId.trim(),
-      },
-    );
+    final endpoint =
+        Uri.parse(
+          VmApiConfig.endpoint('/rooms/${Uri.encodeComponent(roomId)}/media'),
+        ).replace(
+          queryParameters: <String, String>{
+            if (deviceId != null && deviceId.trim().isNotEmpty)
+              'device_id': deviceId.trim(),
+          },
+        );
 
-    final response = await http.get(
-      endpoint,
-      headers: <String, String>{
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
-    ).timeout(const Duration(seconds: 8));
+    final response = await http
+        .get(
+          endpoint,
+          headers: <String, String>{
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $accessToken',
+          },
+        )
+        .timeout(const Duration(seconds: 8));
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(
@@ -390,7 +423,8 @@ class LiveRoomAudioService {
   void _sendJoinRoom() {
     final safeRoomId = _roomId;
     final safePeerId = _peerId;
-    if (safeRoomId == null || safePeerId == null || _socket?.connected != true) return;
+    if (safeRoomId == null || safePeerId == null || _socket?.connected != true)
+      return;
     if (_joined) {
       _debug('join skipped already joined room=$safeRoomId');
       return;
@@ -401,10 +435,19 @@ class LiveRoomAudioService {
     }
     _joinInFlight = true;
     _debug('join requested room=$safeRoomId peer=$safePeerId');
+    final socketAtJoin = _socket;
     _emitWithAck(
       'joinRoom',
-      <String, Object?>{'roomId': safeRoomId, 'roomPublicId': safeRoomId, 'peerId': safePeerId},
+      <String, Object?>{
+        'roomId': safeRoomId,
+        'roomPublicId': safeRoomId,
+        'peerId': safePeerId,
+      },
       onAck: (ack) {
+        if (!identical(_socket, socketAtJoin)) {
+          _debug('ignoring join acknowledgement from a replaced audio socket');
+          return;
+        }
         _joinInFlight = false;
         if (ack['ok'] == true) {
           _joined = true;
@@ -418,7 +461,8 @@ class LiveRoomAudioService {
           final error = ack['error']?.toString() ?? 'unknown';
           final statusCode = int.tryParse(ack['statusCode']?.toString() ?? '');
           _setError('Audio join failed: $error');
-          if (statusCode == 409 || error.contains('assigned to a different media node')) {
+          if (statusCode == 409 ||
+              error.contains('assigned to a different media node')) {
             unawaited(_rediscoverAssignedMediaNode('media assignment changed'));
             return;
           }
@@ -429,10 +473,16 @@ class LiveRoomAudioService {
   }
 
   Future<void> _rediscoverAssignedMediaNode(String reason) async {
-    if (_rediscovering || !_shouldStayConnected || _roomId == null || _currentUser == null) return;
+    if (_rediscovering ||
+        !_shouldStayConnected ||
+        _roomId == null ||
+        _currentUser == null)
+      return;
     _rediscovering = true;
     try {
       _debug('audio media rediscovery running: $reason');
+      _recoveryTimer?.cancel();
+      _recoveryTimer = null;
       final socket = _socket;
       _socket = null;
       socket?.dispose();
@@ -457,13 +507,16 @@ class LiveRoomAudioService {
     await _consumePendingProducers();
     final desiredSeat = _desiredSeatIndex;
     if (desiredSeat != null) {
-      _debug('restoring desired audio seat=$desiredSeat muted=$_desiredSelfMuted');
+      _debug(
+        'restoring desired audio seat=$desiredSeat muted=$_desiredSelfMuted',
+      );
       takeSeat(desiredSeat, micEnabled: !_desiredSelfMuted);
     }
   }
 
   void _scheduleRecovery(String reason) {
-    if (!_shouldStayConnected || _roomId == null || _currentUser == null) return;
+    if (!_shouldStayConnected || _roomId == null || _currentUser == null)
+      return;
     if (_recoveryTimer?.isActive ?? false) return;
     _debug('audio recovery scheduled: $reason');
     _recoveryTimer = Timer(const Duration(milliseconds: 900), () {
@@ -473,7 +526,11 @@ class LiveRoomAudioService {
   }
 
   Future<void> _recoverSession(String reason) async {
-    if (!_shouldStayConnected || _roomId == null || _currentUser == null || _recovering) return;
+    if (!_shouldStayConnected ||
+        _roomId == null ||
+        _currentUser == null ||
+        _recovering)
+      return;
     _recovering = true;
     try {
       _debug('audio recovery running: $reason');
@@ -496,16 +553,24 @@ class LiveRoomAudioService {
   Future<void> _startLocalMicCapture() async {
     if (_localAudioStream != null) return;
     try {
-      final stream = await navigator.mediaDevices.getUserMedia(<String, dynamic>{
-        'audio': <String, dynamic>{'echoCancellation': true, 'noiseSuppression': true, 'autoGainControl': true},
-        'video': false,
-      });
+      final stream = await navigator.mediaDevices.getUserMedia(
+        <String, dynamic>{
+          'audio': <String, dynamic>{
+            'echoCancellation': true,
+            'noiseSuppression': true,
+            'autoGainControl': true,
+          },
+          'video': false,
+        },
+      );
       for (final track in stream.getAudioTracks()) {
         track.enabled = true;
       }
       _localAudioStream = stream;
       localMicCapturing.value = true;
-      _debug('local mic capture started tracks=${stream.getAudioTracks().length}');
+      _debug(
+        'local mic capture started tracks=${stream.getAudioTracks().length}',
+      );
     } catch (error) {
       _setError('Local mic capture failed: $error');
     }
@@ -517,7 +582,9 @@ class LiveRoomAudioService {
     if (rawCaps == null) return;
     _deviceLoading = true;
     try {
-      final caps = RtpCapabilities.fromMap(Map<String, dynamic>.from(rawCaps as Map));
+      final caps = RtpCapabilities.fromMap(
+        Map<String, dynamic>.from(rawCaps as Map),
+      );
       final device = Device();
       await device.load(routerRtpCapabilities: caps);
       _device = device;
@@ -538,8 +605,16 @@ class LiveRoomAudioService {
 
     _sendTransportCreating = true;
     try {
-      final ack = await _emitWithAckFuture('createWebRtcTransport', <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'direction': 'send'});
-      if (ack['ok'] != true) throw Exception(ack['error'] ?? 'createWebRtcTransport failed');
+      final ack = await _emitWithAckFuture(
+        'createWebRtcTransport',
+        <String, Object?>{
+          'roomId': _roomId,
+          'peerId': _peerId,
+          'direction': 'send',
+        },
+      );
+      if (ack['ok'] != true)
+        throw Exception(ack['error'] ?? 'createWebRtcTransport failed');
 
       final params = _transportParamsFromAck(ack);
       final transport = device.createSendTransportFromMap(
@@ -551,7 +626,9 @@ class LiveRoomAudioService {
           _serverAudioProducerId ??= producer.id;
           _audioProducer = producer;
           audioPublishing.value = true;
-          _debug('audio producer callback id=${producer.id} kind=${producer.kind}');
+          _debug(
+            'audio producer callback id=${producer.id} kind=${producer.kind}',
+          );
         },
       );
 
@@ -559,15 +636,19 @@ class LiveRoomAudioService {
 
       transport.on('produce', (dynamic data) async {
         try {
-          final produceAck = await _emitWithAckFuture('produce', <String, Object?>{
-            'roomId': _roomId,
-            'peerId': _peerId,
-            'transportId': transport.id,
-            'kind': data['kind'],
-            'rtpParameters': _toPlainMap(data['rtpParameters']),
-          });
+          final produceAck =
+              await _emitWithAckFuture('produce', <String, Object?>{
+                'roomId': _roomId,
+                'peerId': _peerId,
+                'transportId': transport.id,
+                'kind': data['kind'],
+                'rtpParameters': _toPlainMap(data['rtpParameters']),
+              });
           if (produceAck['ok'] == true) {
-            final producerId = produceAck['producerId']?.toString() ?? produceAck['id']?.toString() ?? '';
+            final producerId =
+                produceAck['producerId']?.toString() ??
+                produceAck['id']?.toString() ??
+                '';
             if (producerId.isEmpty) {
               data['errback']('produce failed: missing producer id');
               return;
@@ -590,12 +671,17 @@ class LiveRoomAudioService {
       transport.on('connectionstatechange', (dynamic state) {
         _debug('send transport state=$state');
         final stateText = state.toString().toLowerCase();
-        if (stateText.contains('connected')) _scheduleProduceRetry('send transport connected');
+        if (stateText.contains('connected'))
+          _scheduleProduceRetry('send transport connected');
       });
 
       _sendTransport = transport;
-      _sendTransportWarmupUntil = DateTime.now().add(const Duration(milliseconds: 1400));
-      _debug('send transport created id=${transport.id}; warming up before produce');
+      _sendTransportWarmupUntil = DateTime.now().add(
+        const Duration(milliseconds: 1400),
+      );
+      _debug(
+        'send transport created id=${transport.id}; warming up before produce',
+      );
     } catch (error) {
       _setError('Send transport create failed: $error');
     } finally {
@@ -641,17 +727,29 @@ class LiveRoomAudioService {
     if (_recvTransport != null || _recvTransportCreating) return;
     _recvTransportCreating = true;
     try {
-      final ack = await _emitWithAckFuture('createWebRtcTransport', <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'direction': 'recv'});
-      if (ack['ok'] != true) throw Exception(ack['error'] ?? 'create recv transport failed');
+      final ack = await _emitWithAckFuture(
+        'createWebRtcTransport',
+        <String, Object?>{
+          'roomId': _roomId,
+          'peerId': _peerId,
+          'direction': 'recv',
+        },
+      );
+      if (ack['ok'] != true)
+        throw Exception(ack['error'] ?? 'create recv transport failed');
 
       final params = _transportParamsFromAck(ack);
       final transport = device.createRecvTransportFromMap(
         params,
-        consumerCallback: (Consumer consumer, dynamic _) => _attachRemoteConsumer(consumer),
+        consumerCallback: (Consumer consumer, dynamic _) =>
+            _attachRemoteConsumer(consumer),
       );
 
       _bindTransportConnect(transport, label: 'recv');
-      transport.on('connectionstatechange', (dynamic state) => _debug('recv transport state=$state'));
+      transport.on(
+        'connectionstatechange',
+        (dynamic state) => _debug('recv transport state=$state'),
+      );
 
       _recvTransport = transport;
       _debug('recv transport created id=${transport.id}');
@@ -666,16 +764,20 @@ class LiveRoomAudioService {
     transport.on('connect', (dynamic data) async {
       try {
         final dtlsParameters = _toPlainMap(data['dtlsParameters']);
-        final connectAck = await _emitWithAckFuture('connectWebRtcTransport', <String, Object?>{
-          'roomId': _roomId,
-          'peerId': _peerId,
-          'transportId': transport.id,
-          'dtlsParameters': dtlsParameters,
-        });
+        final connectAck = await _emitWithAckFuture(
+          'connectWebRtcTransport',
+          <String, Object?>{
+            'roomId': _roomId,
+            'peerId': _peerId,
+            'transportId': transport.id,
+            'dtlsParameters': dtlsParameters,
+          },
+        );
         if (connectAck['ok'] == true) {
           data['callback']();
           _debug('$label transport connected id=${transport.id}');
-          if (label == 'send') _scheduleProduceRetry('send transport connect callback');
+          if (label == 'send')
+            _scheduleProduceRetry('send transport connect callback');
         } else {
           data['errback'](connectAck['error'] ?? 'connectTransport failed');
         }
@@ -686,7 +788,10 @@ class LiveRoomAudioService {
   }
 
   Future<void> _ensurePublishingAudio() async {
-    if (_producerCreating || _audioProducer != null || _serverAudioProducerId != null) return;
+    if (_producerCreating ||
+        _audioProducer != null ||
+        _serverAudioProducerId != null)
+      return;
     if (!_seated || _selfMuted || _localAudioStream == null) return;
     _producerCreating = true;
     try {
@@ -695,9 +800,14 @@ class LiveRoomAudioService {
       final transport = _sendTransport;
       final stream = _localAudioStream;
       if (transport == null || stream == null) return;
-      if (!_seated || _selfMuted || _audioProducer != null || _serverAudioProducerId != null) return;
+      if (!_seated ||
+          _selfMuted ||
+          _audioProducer != null ||
+          _serverAudioProducerId != null)
+        return;
       final audioTracks = stream.getAudioTracks();
-      if (audioTracks.isEmpty) throw Exception('No local audio track available');
+      if (audioTracks.isEmpty)
+        throw Exception('No local audio track available');
       final audioTrack = audioTracks.first;
       try {
         final maybeProducer = await transport.produce(
@@ -718,21 +828,36 @@ class LiveRoomAudioService {
       } catch (error, stackTrace) {
         final message = error.toString();
         if (_isRecoverableProduceStartupError(message)) {
-          _debug('audio produce startup race detected; rebuilding send pipeline and retrying');
-          _scheduleProduceRetry('recoverable produce error', rebuildPipeline: true);
+          _debug(
+            'audio produce startup race detected; rebuilding send pipeline and retrying',
+          );
+          _scheduleProduceRetry(
+            'recoverable produce error',
+            rebuildPipeline: true,
+          );
           return;
         }
         _debug('$error\n$stackTrace');
         rethrow;
       }
-      _debug('audio produce requested serverProducer=$_serverAudioProducerId localProducer=${_audioProducer?.id}');
+      _debug(
+        'audio produce requested serverProducer=$_serverAudioProducerId localProducer=${_audioProducer?.id}',
+      );
       if (_serverAudioProducerId == null && _audioProducer == null) {
-        _scheduleProduceRetry('producer callback watchdog', rebuildPipeline: true);
+        _scheduleProduceRetry(
+          'producer callback watchdog',
+          rebuildPipeline: true,
+        );
       }
     } catch (error) {
       if (_isRecoverableProduceStartupError(error.toString())) {
-        _debug('audio produce recoverable outer error; rebuilding send pipeline and retrying');
-        _scheduleProduceRetry('recoverable outer produce error', rebuildPipeline: true);
+        _debug(
+          'audio produce recoverable outer error; rebuilding send pipeline and retrying',
+        );
+        _scheduleProduceRetry(
+          'recoverable outer produce error',
+          rebuildPipeline: true,
+        );
       } else {
         _setError('Audio produce failed: $error');
       }
@@ -743,11 +868,18 @@ class LiveRoomAudioService {
 
   bool _isRecoverableProduceStartupError(String message) {
     final lower = message.toLowerCase();
-    return lower.contains('null check operator used on a null value') || lower.contains('track is null') || lower.contains('addtransceiver');
+    return lower.contains('null check operator used on a null value') ||
+        lower.contains('track is null') ||
+        lower.contains('addtransceiver');
   }
 
   void _scheduleProduceRetry(String reason, {bool rebuildPipeline = false}) {
-    if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null || _serverAudioProducerId != null) return;
+    if (!_seated ||
+        _selfMuted ||
+        _localAudioStream == null ||
+        _audioProducer != null ||
+        _serverAudioProducerId != null)
+      return;
     if (rebuildPipeline) _rebuildSendPipelineOnRetry = true;
     if (_produceRetryTimer?.isActive ?? false) return;
     if (_produceRetryCount >= 3) {
@@ -755,17 +887,32 @@ class LiveRoomAudioService {
       return;
     }
     _produceRetryCount += 1;
-    _debug('audio produce retry scheduled #$_produceRetryCount reason=$reason rebuild=$_rebuildSendPipelineOnRetry');
-    _produceRetryTimer = Timer(Duration(milliseconds: 700 + (_produceRetryCount * 400)), () {
-      _produceRetryTimer = null;
-      if (!_seated || _selfMuted || _audioProducer != null || _serverAudioProducerId != null) return;
-      _debug('audio produce retry running #$_produceRetryCount rebuild=$_rebuildSendPipelineOnRetry');
-      unawaited(_runProduceRetry());
-    });
+    _debug(
+      'audio produce retry scheduled #$_produceRetryCount reason=$reason rebuild=$_rebuildSendPipelineOnRetry',
+    );
+    _produceRetryTimer = Timer(
+      Duration(milliseconds: 700 + (_produceRetryCount * 400)),
+      () {
+        _produceRetryTimer = null;
+        if (!_seated ||
+            _selfMuted ||
+            _audioProducer != null ||
+            _serverAudioProducerId != null)
+          return;
+        _debug(
+          'audio produce retry running #$_produceRetryCount rebuild=$_rebuildSendPipelineOnRetry',
+        );
+        unawaited(_runProduceRetry());
+      },
+    );
   }
 
   Future<void> _runProduceRetry() async {
-    if (!_seated || _selfMuted || _audioProducer != null || _serverAudioProducerId != null) return;
+    if (!_seated ||
+        _selfMuted ||
+        _audioProducer != null ||
+        _serverAudioProducerId != null)
+      return;
     if (_rebuildSendPipelineOnRetry) {
       _rebuildSendPipelineOnRetry = false;
       _debug('audio produce retry rebuilding mic stream and send transport');
@@ -775,7 +922,12 @@ class LiveRoomAudioService {
       if (!_seated || _selfMuted) return;
       await _startLocalMicCapture();
     }
-    if (!_seated || _selfMuted || _localAudioStream == null || _audioProducer != null || _serverAudioProducerId != null) return;
+    if (!_seated ||
+        _selfMuted ||
+        _localAudioStream == null ||
+        _audioProducer != null ||
+        _serverAudioProducerId != null)
+      return;
     await _ensurePublishingAudio();
   }
 
@@ -789,7 +941,8 @@ class LiveRoomAudioService {
     if (rawProducers is! List) return;
     for (final item in rawProducers) {
       final info = RemoteProducerInfo.fromPayload(item);
-      if (info == null || info.peerId == _peerId || info.kind != 'audio') continue;
+      if (info == null || info.peerId == _peerId || info.kind != 'audio')
+        continue;
       _producerInfoById[info.producerId] = info;
       _pendingProducerIds.add(info.producerId);
     }
@@ -798,7 +951,9 @@ class LiveRoomAudioService {
   Future<void> _consumePendingProducers() async {
     if (_pendingProducerIds.isEmpty) return;
     if (_consumePendingRunning) {
-      _debug('consume pending skipped because loop is already running count=${_pendingProducerIds.length}');
+      _debug(
+        'consume pending skipped because loop is already running count=${_pendingProducerIds.length}',
+      );
       return;
     }
     _consumePendingRunning = true;
@@ -815,7 +970,8 @@ class LiveRoomAudioService {
   }
 
   Future<void> _consumeProducer(String producerId) async {
-    if (_remoteConsumersByProducerId.containsKey(producerId) || _consumingProducerIds.contains(producerId)) {
+    if (_remoteConsumersByProducerId.containsKey(producerId) ||
+        _consumingProducerIds.contains(producerId)) {
       _debug('consume skipped duplicate producer=$producerId');
       _pendingProducerIds.remove(producerId);
       return;
@@ -837,8 +993,12 @@ class LiveRoomAudioService {
       if (ack['ok'] != true) throw Exception(ack['error'] ?? 'consume failed');
 
       final params = _consumerParamsFromAck(ack, producerId: producerId);
-      final rtpParameters = RtpParameters.fromMap(Map<String, dynamic>.from(params['rtpParameters'] as Map));
-      final kind = (params['kind']?.toString() ?? 'audio') == 'audio' ? RTCRtpMediaType.RTCRtpMediaTypeAudio : RTCRtpMediaType.RTCRtpMediaTypeVideo;
+      final rtpParameters = RtpParameters.fromMap(
+        Map<String, dynamic>.from(params['rtpParameters'] as Map),
+      );
+      final kind = (params['kind']?.toString() ?? 'audio') == 'audio'
+          ? RTCRtpMediaType.RTCRtpMediaTypeAudio
+          : RTCRtpMediaType.RTCRtpMediaTypeVideo;
 
       transport.consume(
         id: params['id']?.toString() ?? '',
@@ -846,7 +1006,10 @@ class LiveRoomAudioService {
         peerId: info.peerId,
         kind: kind,
         rtpParameters: rtpParameters,
-        appData: <String, dynamic>{'producerId': producerId, 'peerId': info.peerId},
+        appData: <String, dynamic>{
+          'producerId': producerId,
+          'peerId': info.peerId,
+        },
       );
       _pendingProducerIds.remove(producerId);
       _debug('consume requested producer=$producerId peer=${info.peerId}');
@@ -861,7 +1024,9 @@ class LiveRoomAudioService {
     try {
       final producerId = consumer.producerId;
       if (_remoteConsumersByProducerId.containsKey(producerId)) {
-        _debug('remote renderer attach skipped duplicate producer=$producerId consumer=${consumer.id}');
+        _debug(
+          'remote renderer attach skipped duplicate producer=$producerId consumer=${consumer.id}',
+        );
         try {
           consumer.close();
         } catch (_) {}
@@ -872,13 +1037,17 @@ class LiveRoomAudioService {
       try {
         consumer.track.enabled = true;
       } catch (error) {
-        _debug('remote audio track enable failed producer=$producerId error=$error');
+        _debug(
+          'remote audio track enable failed producer=$producerId error=$error',
+        );
       }
 
       try {
         consumer.resume();
       } catch (error) {
-        _debug('local consumer resume failed producer=$producerId error=$error');
+        _debug(
+          'local consumer resume failed producer=$producerId error=$error',
+        );
       }
 
       if (!kIsWeb) {
@@ -895,23 +1064,35 @@ class LiveRoomAudioService {
 
       _remoteAudioRenderersByProducerId[producerId] = renderer;
       remoteAudioCount.value = _remoteConsumersByProducerId.length;
-      remoteAudioRenderers.value =
-          List<RTCVideoRenderer>.from(_remoteAudioRenderersByProducerId.values);
-      _debug('remote renderer attached producer=$producerId count=${remoteAudioRenderers.value.length}');
+      remoteAudioRenderers.value = List<RTCVideoRenderer>.from(
+        _remoteAudioRenderersByProducerId.values,
+      );
+      _debug(
+        'remote renderer attached producer=$producerId count=${remoteAudioRenderers.value.length}',
+      );
 
-      final resumeAck = await _emitWithAckFuture('resumeConsumer', <String, Object?>{
-        'roomId': _roomId,
-        'peerId': _peerId,
-        'consumerId': consumer.id,
-        'producerId': producerId,
-      });
+      final resumeAck =
+          await _emitWithAckFuture('resumeConsumer', <String, Object?>{
+            'roomId': _roomId,
+            'peerId': _peerId,
+            'consumerId': consumer.id,
+            'producerId': producerId,
+          });
 
       if (resumeAck['ok'] != true) {
-        _debug('server consumer resume failed producer=$producerId ack=$resumeAck');
+        _debug(
+          'server consumer resume failed producer=$producerId ack=$resumeAck',
+        );
       }
 
-      consumer.on('transportclose', () => unawaited(_closeRemoteConsumer(producerId)));
-      consumer.on('trackended', () => unawaited(_closeRemoteConsumer(producerId)));
+      consumer.on(
+        'transportclose',
+        () => unawaited(_closeRemoteConsumer(producerId)),
+      );
+      consumer.on(
+        'trackended',
+        () => unawaited(_closeRemoteConsumer(producerId)),
+      );
 
       _debug(
         'remote audio consumer attached/resumed '
@@ -941,13 +1122,18 @@ class LiveRoomAudioService {
     try {
       producer.close();
     } catch (_) {}
-    if (serverProducerId != null && serverProducerId.isNotEmpty && _canSendRoomEvent()) {
+    if (serverProducerId != null &&
+        serverProducerId.isNotEmpty &&
+        _canSendRoomEvent()) {
       final ack = await _emitWithAckFuture('closeProducer', <String, Object?>{
         'roomId': _roomId,
         'peerId': _peerId,
         'producerId': serverProducerId,
       });
-      if (ack['ok'] != true) _debug('server producer close failed producer=$serverProducerId ack=$ack');
+      if (ack['ok'] != true)
+        _debug(
+          'server producer close failed producer=$serverProducerId ack=$ack',
+        );
     }
     audioPublishing.value = false;
     _removeActiveSpeaker(_peerId);
@@ -1009,10 +1195,12 @@ class LiveRoomAudioService {
       await renderer?.dispose();
     } catch (_) {}
     remoteAudioCount.value = _remoteConsumersByProducerId.length;
-    remoteAudioRenderers.value =
-        List<RTCVideoRenderer>.from(_remoteAudioRenderersByProducerId.values);
+    remoteAudioRenderers.value = List<RTCVideoRenderer>.from(
+      _remoteAudioRenderersByProducerId.values,
+    );
     _closingRemoteProducerIds.remove(producerId);
-    if (consumer != null || renderer != null) _debug('remote audio consumer closed producer=$producerId');
+    if (consumer != null || renderer != null)
+      _debug('remote audio consumer closed producer=$producerId');
   }
 
   Future<void> _closeAllRemoteConsumers() async {
@@ -1027,7 +1215,8 @@ class LiveRoomAudioService {
 
   void _handleActiveSpeakers(dynamic payload) {
     if (payload is! Map) return;
-    final roomId = payload['roomId']?.toString() ?? payload['room_id']?.toString();
+    final roomId =
+        payload['roomId']?.toString() ?? payload['room_id']?.toString();
     if (roomId != null && _roomId != null && roomId != _roomId) return;
 
     final rawSpeakers = payload['speakers'];
@@ -1035,7 +1224,8 @@ class LiveRoomAudioService {
     if (rawSpeakers is List) {
       for (final item in rawSpeakers) {
         if (item is! Map) continue;
-        final peerId = item['peerId']?.toString() ?? item['peer_id']?.toString();
+        final peerId =
+            item['peerId']?.toString() ?? item['peer_id']?.toString();
         if (peerId == null || peerId.isEmpty) continue;
         next.add(peerId);
       }
@@ -1054,7 +1244,10 @@ class LiveRoomAudioService {
   void _scheduleSpeakerSilenceFallback() {
     _activeSpeakerSilenceTimer?.cancel();
     if (activeSpeakerPeerIds.value.isEmpty) return;
-    _activeSpeakerSilenceTimer = Timer(const Duration(milliseconds: 900), _clearActiveSpeakers);
+    _activeSpeakerSilenceTimer = Timer(
+      const Duration(milliseconds: 900),
+      _clearActiveSpeakers,
+    );
   }
 
   void _clearActiveSpeakers() {
@@ -1065,7 +1258,8 @@ class LiveRoomAudioService {
   }
 
   void _removeActiveSpeaker(String? peerId) {
-    if (peerId == null || peerId.isEmpty || activeSpeakerPeerIds.value.isEmpty) return;
+    if (peerId == null || peerId.isEmpty || activeSpeakerPeerIds.value.isEmpty)
+      return;
     final next = Set<String>.from(activeSpeakerPeerIds.value)..remove(peerId);
     if (_setEquals(activeSpeakerPeerIds.value, next)) return;
     activeSpeakerPeerIds.value = next;
@@ -1088,18 +1282,30 @@ class LiveRoomAudioService {
     return Map<String, dynamic>.from(mapped as Map);
   }
 
-  bool _canSendRoomEvent() => _socket?.connected == true && _joined && _roomId != null && _peerId != null;
+  bool _canSendRoomEvent() =>
+      _socket?.connected == true &&
+      _joined &&
+      _roomId != null &&
+      _peerId != null;
 
-  void _emitWithAck(String event, Map<String, Object?> payload, {required void Function(Map<String, dynamic> ack) onAck}) {
+  void _emitWithAck(
+    String event,
+    Map<String, Object?> payload, {
+    required void Function(Map<String, dynamic> ack) onAck,
+  }) {
     final socket = _socket;
     if (socket == null) return;
     _debug('audio send $event $payload');
     var completed = false;
-    socket.emitWithAck(event, payload, ack: (dynamic rawAck) {
-      if (completed) return;
-      completed = true;
-      onAck(_normalizeAck(rawAck));
-    });
+    socket.emitWithAck(
+      event,
+      payload,
+      ack: (dynamic rawAck) {
+        if (completed) return;
+        completed = true;
+        onAck(_normalizeAck(rawAck));
+      },
+    );
     Timer(const Duration(seconds: 8), () {
       if (completed) return;
       completed = true;
@@ -1107,16 +1313,33 @@ class LiveRoomAudioService {
     });
   }
 
-  Future<Map<String, dynamic>> _emitWithAckFuture(String event, Map<String, Object?> payload) {
+  Future<Map<String, dynamic>> _emitWithAckFuture(
+    String event,
+    Map<String, Object?> payload,
+  ) {
     final socket = _socket;
-    if (socket == null) return Future<Map<String, dynamic>>.value(<String, dynamic>{'ok': false, 'error': 'Socket not connected'});
+    if (socket == null)
+      return Future<Map<String, dynamic>>.value(<String, dynamic>{
+        'ok': false,
+        'error': 'Socket not connected',
+      });
     final completer = Completer<Map<String, dynamic>>();
     _debug('audio send $event $payload');
-    socket.emitWithAck(event, payload, ack: (dynamic rawAck) {
-      if (completer.isCompleted) return;
-      completer.complete(_normalizeAck(rawAck));
-    });
-    return completer.future.timeout(const Duration(seconds: 8), onTimeout: () => <String, dynamic>{'ok': false, 'error': '$event timed out'});
+    socket.emitWithAck(
+      event,
+      payload,
+      ack: (dynamic rawAck) {
+        if (completer.isCompleted) return;
+        completer.complete(_normalizeAck(rawAck));
+      },
+    );
+    return completer.future.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () => <String, dynamic>{
+        'ok': false,
+        'error': '$event timed out',
+      },
+    );
   }
 
   Map<String, dynamic> _normalizeAck(dynamic rawAck) {
@@ -1127,7 +1350,10 @@ class LiveRoomAudioService {
     final ack = Map<String, dynamic>.from(rawAck);
     final data = ack['data'];
     if (data is Map) {
-      final merged = <String, dynamic>{...Map<String, dynamic>.from(data), ...ack};
+      final merged = <String, dynamic>{
+        ...Map<String, dynamic>.from(data),
+        ...ack,
+      };
       merged.remove('data');
       return merged;
     }
@@ -1145,7 +1371,9 @@ class LiveRoomAudioService {
     required String producerId,
   }) {
     final params = ack['params'];
-    final raw = params is Map ? Map<String, dynamic>.from(params) : Map<String, dynamic>.from(ack);
+    final raw = params is Map
+        ? Map<String, dynamic>.from(params)
+        : Map<String, dynamic>.from(ack);
     return <String, dynamic>{
       'id': raw['id'] ?? raw['consumerId'] ?? '',
       'producerId': raw['producerId'] ?? producerId,
@@ -1165,24 +1393,28 @@ class LiveRoomAudioService {
 
     for (final seat in next) {
       if (seat.peerId == safePeerId) {
-        updated.add(AudioSeatSnapshot(
-          seatNo: seat.seatNo,
-          selfMuted: true,
-          adminMuted: seat.adminMuted,
-          locked: seat.locked,
-        ));
+        updated.add(
+          AudioSeatSnapshot(
+            seatNo: seat.seatNo,
+            selfMuted: true,
+            adminMuted: seat.adminMuted,
+            locked: seat.locked,
+          ),
+        );
         continue;
       }
 
       if (seat.seatNo == seatNo) {
-        updated.add(AudioSeatSnapshot(
-          seatNo: seatNo,
-          peerId: safePeerId,
-          producerId: seat.producerId,
-          selfMuted: _selfMuted,
-          adminMuted: seat.adminMuted,
-          locked: seat.locked,
-        ));
+        updated.add(
+          AudioSeatSnapshot(
+            seatNo: seatNo,
+            peerId: safePeerId,
+            producerId: seat.producerId,
+            selfMuted: _selfMuted,
+            adminMuted: seat.adminMuted,
+            locked: seat.locked,
+          ),
+        );
         replaced = true;
         continue;
       }
@@ -1191,11 +1423,13 @@ class LiveRoomAudioService {
     }
 
     if (!replaced) {
-      updated.add(AudioSeatSnapshot(
-        seatNo: seatNo,
-        peerId: safePeerId,
-        selfMuted: _selfMuted,
-      ));
+      updated.add(
+        AudioSeatSnapshot(
+          seatNo: seatNo,
+          peerId: safePeerId,
+          selfMuted: _selfMuted,
+        ),
+      );
     }
 
     updated.sort((a, b) => a.seatNo.compareTo(b.seatNo));
@@ -1206,40 +1440,37 @@ class LiveRoomAudioService {
     final safePeerId = _peerId;
     if (safePeerId == null || safePeerId.isEmpty) return;
 
-    seats.value = _normalizedSeatList()
-        .map((seat) {
-          if (seat.peerId != safePeerId) return seat;
-          return AudioSeatSnapshot(
-            seatNo: seat.seatNo,
-            selfMuted: true,
-            adminMuted: seat.adminMuted,
-            locked: seat.locked,
-          );
-        })
-        .toList();
+    seats.value = _normalizedSeatList().map((seat) {
+      if (seat.peerId != safePeerId) return seat;
+      return AudioSeatSnapshot(
+        seatNo: seat.seatNo,
+        selfMuted: true,
+        adminMuted: seat.adminMuted,
+        locked: seat.locked,
+      );
+    }).toList();
   }
 
   void _applyLocalMuteSnapshot(bool muted) {
     final safePeerId = _peerId;
     if (safePeerId == null || safePeerId.isEmpty) return;
 
-    seats.value = _normalizedSeatList()
-        .map((seat) {
-          if (seat.peerId != safePeerId) return seat;
-          return AudioSeatSnapshot(
-            seatNo: seat.seatNo,
-            peerId: seat.peerId,
-            producerId: seat.producerId,
-            selfMuted: muted,
-            adminMuted: seat.adminMuted,
-            locked: seat.locked,
-          );
-        })
-        .toList();
+    seats.value = _normalizedSeatList().map((seat) {
+      if (seat.peerId != safePeerId) return seat;
+      return AudioSeatSnapshot(
+        seatNo: seat.seatNo,
+        peerId: seat.peerId,
+        producerId: seat.producerId,
+        selfMuted: muted,
+        adminMuted: seat.adminMuted,
+        locked: seat.locked,
+      );
+    }).toList();
   }
 
   List<AudioSeatSnapshot> _normalizedSeatList() {
-    if (seats.value.isNotEmpty) return List<AudioSeatSnapshot>.from(seats.value);
+    if (seats.value.isNotEmpty)
+      return List<AudioSeatSnapshot>.from(seats.value);
 
     return List<AudioSeatSnapshot>.generate(
       12,
@@ -1259,7 +1490,12 @@ class LiveRoomAudioService {
 }
 
 class RemoteProducerInfo {
-  const RemoteProducerInfo({required this.producerId, required this.peerId, required this.kind, this.seatNo});
+  const RemoteProducerInfo({
+    required this.producerId,
+    required this.peerId,
+    required this.kind,
+    this.seatNo,
+  });
 
   final String producerId;
   final String peerId;
@@ -1272,13 +1508,29 @@ class RemoteProducerInfo {
     final producerId = map['producerId']?.toString();
     final peerId = map['peerId']?.toString();
     final kind = map['kind']?.toString() ?? 'audio';
-    if (producerId == null || producerId.isEmpty || peerId == null || peerId.isEmpty) return null;
-    return RemoteProducerInfo(producerId: producerId, peerId: peerId, kind: kind, seatNo: int.tryParse(map['seatNo']?.toString() ?? ''));
+    if (producerId == null ||
+        producerId.isEmpty ||
+        peerId == null ||
+        peerId.isEmpty)
+      return null;
+    return RemoteProducerInfo(
+      producerId: producerId,
+      peerId: peerId,
+      kind: kind,
+      seatNo: int.tryParse(map['seatNo']?.toString() ?? ''),
+    );
   }
 }
 
 class AudioSeatSnapshot {
-  const AudioSeatSnapshot({required this.seatNo, this.peerId, this.producerId, this.selfMuted = false, this.adminMuted = false, this.locked = false});
+  const AudioSeatSnapshot({
+    required this.seatNo,
+    this.peerId,
+    this.producerId,
+    this.selfMuted = false,
+    this.adminMuted = false,
+    this.locked = false,
+  });
 
   final int seatNo;
   final String? peerId;
@@ -1300,6 +1552,11 @@ class AudioSeatSnapshot {
 
   static List<AudioSeatSnapshot> listFromJson(dynamic raw) {
     if (raw is! List) return const <AudioSeatSnapshot>[];
-    return raw.whereType<Map>().map((item) => AudioSeatSnapshot.fromJson(Map<String, dynamic>.from(item))).toList();
+    return raw
+        .whereType<Map>()
+        .map(
+          (item) => AudioSeatSnapshot.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList();
   }
 }

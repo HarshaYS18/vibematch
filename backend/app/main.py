@@ -9,6 +9,7 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.schema_guard import assert_database_schema_current
 from app.database import engine
+from app.services.push_notification_service import assert_firebase_configuration
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -21,6 +22,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 async def lifespan(_app: FastAPI):
     if settings.ENFORCE_SCHEMA_CURRENT or settings.APP_ENV.lower() in {"production", "prod"}:
         assert_database_schema_current(engine)
+    assert_firebase_configuration()
     yield
 
 
