@@ -10,6 +10,10 @@ import type {
 } from '../types/mediaTypes.js';
 import type { WorkerManager } from './workerManager.js';
 
+export function canonicalPeerId(roomPublicId: string, publicUserId: number): string {
+  return `${roomPublicId}_user_${publicUserId}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
 export class RoomManager {
   private readonly rooms = new Map<string, RoomState>();
   private readonly pendingRooms = new Map<string, Promise<RoomState>>();
@@ -74,6 +78,7 @@ export class RoomManager {
 
     const peer: PeerState = {
       socketId: params.socketId,
+      peerId: canonicalPeerId(params.room.roomPublicId, params.user.public_user_id),
       user: params.user,
       bearerToken: params.bearerToken,
       deviceId: params.deviceId,
@@ -131,7 +136,7 @@ export class RoomManager {
         producers.push({
           producerId: producer.id,
           id: producer.id,
-          peerId: peer.socketId,
+          peerId: peer.peerId,
           kind: producer.kind,
           publicUserId: peer.user.public_user_id,
         });
