@@ -55,24 +55,33 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         mediaLog('joinRoom.received', socket.id, { roomPublicId: input.roomPublicId });
         const existingPeer = roomManager.getPeer(socket.id);
         if (existingPeer?.roomPublicId === input.roomPublicId) {
+          await verifyPeerAction(existingPeer, 'join_room');
           const existingRoom = requireRoom(roomManager, existingPeer.roomPublicId);
           await socket.join(existingRoom.roomPublicId);
           mediaLog('joinRoom.reused', socket.id, { roomPublicId: existingRoom.roomPublicId });
           return joinRoomPayload(roomManager, existingRoom, existingPeer);
         }
-        if (existingPeer) {
-          const closed = roomManager.closePeer(socket.id);
-          if (closed.roomPublicId) {
-            await socket.leave(closed.roomPublicId);
-            socket.to(closed.roomPublicId).emit('peerLeft', { socketId: socket.id, peerId: socket.id, producerIds: closed.producerIds });
-          }
-        }
+
+        // Authorize the destination before disturbing an active room. This keeps
+        // a valid current media session intact when the requested room is denied.
         const verified = await verifyMediaAction({
           bearerToken: auth.bearerToken,
           requestedAction: 'join_room',
           roomPublicId: input.roomPublicId,
           deviceId: input.deviceId ?? auth.deviceId,
         });
+
+        if (existingPeer) {
+          const existingRoom = roomManager.getPeerRoom(socket.id);
+          if (existingRoom?.peers.size === 1) {
+            await stopRoomMusic(existingRoom, io, 'room-switch');
+          }
+          const closed = roomManager.closePeer(socket.id);
+          if (closed.roomPublicId) {
+            await socket.leave(closed.roomPublicId);
+            socket.to(closed.roomPublicId).emit('peerLeft', { socketId: socket.id, peerId: socket.id, producerIds: closed.producerIds });
+          }
+        }
         mediaLog('joinRoom.verified', socket.id, {
           roomPublicId: input.roomPublicId,
           publicUserId: verified.user.public_user_id,
@@ -98,6 +107,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
       await safeAck('getRouterRtpCapabilities', socket.id, ack, async () => {
         const peer = requirePeer(roomManager, socket.id);
         const room = requireRoom(roomManager, peer.roomPublicId);
+        await verifyPeerAction(peer, 'consume_audio');
         mediaLog('rtpCapabilities.sent', socket.id, { roomPublicId: room.roomPublicId });
         return { rtpCapabilities: roomManager.getRtpCapabilities(room) };
       });
@@ -158,8 +168,8 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         const input = produceSchema.parse(payload);
         const peer = requirePeer(roomManager, socket.id);
         mediaLog('produce.received', socket.id, { roomPublicId: peer.roomPublicId, transportId: input.transportId, kind: input.kind });
-        await verifyPeerAction(peer, 'produce_audio');
-        closeExistingPeerProducers(roomManager, peer, socket);
+        await verifyPeerAction(peer, input.kind === 'video' ? 'produce_video' : 'produce_audio');
+        closeExistingPeerProducers(roomManager, peer, socket, input.kind);
         const transport = requireTransport(peer, input.transportId);
         const producer = await transport.produce({
           kind: input.kind,
@@ -222,6 +232,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         const peer = requirePeer(roomManager, socket.id);
         const consumer = peer.consumers.get(input.consumerId);
         if (!consumer) throw new Error('Consumer not found.');
+        await verifyPeerAction(peer, 'consume_audio');
         await consumer.resume();
         mediaLog('consumer.resume.ok', socket.id, { consumerId: consumer.id });
         return { consumerId: consumer.id };
@@ -300,6 +311,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
     });
 
     socket.on('disconnect', async (reason) => {
+      await socketOperations.get(socket.id);
       const leavingRoom = roomManager.getPeerRoom(socket.id);
       if (leavingRoom?.peers.size === 1) {
         await stopRoomMusic(leavingRoom, io, 'room-empty');
@@ -348,10 +360,12 @@ function closeExistingPeerProducers(
   roomManager: RoomManager,
   peer: PeerState,
   socket: { to(room: string): { emit(event: string, payload: unknown): void } },
+  kind: string,
 ): void {
   const existingProducerIds = [...peer.producers.keys()];
   for (const producerId of existingProducerIds) {
     const producer = peer.producers.get(producerId);
+    if (producer?.kind !== kind) continue;
     producer?.close();
     peer.producers.delete(producerId);
     roomManager.closeConsumersForProducer(peer.roomPublicId, producerId);
@@ -438,7 +452,20 @@ function publicPeer(peer: PeerState) {
   };
 }
 
+const socketOperations = new Map<string, Promise<void>>();
+
 async function safeAck<T>(eventName: string, socketId: string, ack: Ack<T> | undefined, handler: () => Promise<T>): Promise<void> {
+  const previous = socketOperations.get(socketId) ?? Promise.resolve();
+  const operation = previous.then(() => executeAck(eventName, socketId, ack, handler));
+  socketOperations.set(socketId, operation);
+  try {
+    await operation;
+  } finally {
+    if (socketOperations.get(socketId) === operation) socketOperations.delete(socketId);
+  }
+}
+
+async function executeAck<T>(eventName: string, socketId: string, ack: Ack<T> | undefined, handler: () => Promise<T>): Promise<void> {
   try {
     const data = await handler();
     ack?.(ackPayload(data));

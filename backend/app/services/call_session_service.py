@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
 from app.models.call_session import (
     CallParticipant,
@@ -91,15 +92,9 @@ def update_call_participant(
     is_muted: bool | None = None,
     is_camera_enabled: bool | None = None,
 ) -> CallSession:
-    participant = _participant(db=db, session_id=session.id, user_id=user.id)
-    if participant is None:
-        participant = CallParticipant(
-            call_session_id=session.id,
-            user_id=user.id,
-            status=CallParticipantStatus.INVITED,
-        )
-        db.add(participant)
-        db.flush()
+    participant = require_call_participant(db=db, session=session, user=user)
+    if session.status not in {CallSessionStatus.RINGING, CallSessionStatus.CONNECTING, CallSessionStatus.ACTIVE}:
+        raise HTTPException(status_code=409, detail="Call has ended.")
 
     now = datetime.utcnow()
     if status is not None:
@@ -136,6 +131,7 @@ def end_call_session(
     actor: User,
     end_reason: str | None = None,
 ) -> CallSession:
+    require_call_participant(db=db, session=session, user=actor)
     now = datetime.utcnow()
     session.status = CallSessionStatus.ENDED
     session.ended_at = now
@@ -163,6 +159,13 @@ def end_call_session(
     db.commit()
     db.refresh(session)
     return session
+
+
+def require_call_participant(*, db: Session, session: CallSession, user: User) -> CallParticipant:
+    participant = _participant(db=db, session_id=session.id, user_id=user.id)
+    if participant is None:
+        raise HTTPException(status_code=403, detail="Call participation required.")
+    return participant
 
 
 def serialize_call_session(*, db: Session, session: CallSession) -> dict:

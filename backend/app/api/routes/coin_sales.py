@@ -14,6 +14,7 @@ from app.schemas.coin_sales import (
 from app.services import coin_sales_service
 
 router = APIRouter(prefix="/coin-sales", tags=["Coin Sales"])
+admin_router = APIRouter(prefix="/admin/economy/coin-sales", tags=["Admin Coin Sales"])
 
 
 def _pool_response(pool: CoinSupplyPool) -> CoinSellerPoolResponse:
@@ -38,7 +39,7 @@ def my_supply_pools(db: Session = Depends(get_db), current_user: User = Depends(
     return [_pool_response(pool) for pool in coin_sales_service.get_seller_pools(db, current_user)]
 
 
-@router.post("/admin/grant-supply", response_model=CoinSellerPoolResponse)
+@admin_router.post("/grant-supply", response_model=CoinSellerPoolResponse)
 def grant_supply_to_seller(payload: CoinSellerSupplyGrantRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     pool = coin_sales_service.grant_supply_to_seller(
         db=db,

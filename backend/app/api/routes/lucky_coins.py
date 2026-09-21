@@ -15,7 +15,7 @@ from app.schemas.lucky_coins import (
 )
 from app.services import house_pool_service
 
-router = APIRouter(prefix="/lucky-coins", tags=["Lucky Coins"])
+router = APIRouter(prefix="/economy/lucky-coins", tags=["Lucky Coins"])
 
 
 def _get_or_create_wallet_for_update(db: Session, user_id: int) -> UserWallet:

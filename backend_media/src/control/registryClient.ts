@@ -16,6 +16,7 @@ export function registryIsHealthy(): boolean {
 export async function heartbeatMediaNode(stats: MediaRuntimeStats): Promise<void> {
   const response = await fetch(`${config.fastApiBaseUrl}/api/v1/internal/media/nodes/heartbeat`, {
     method: 'POST',
+    signal: AbortSignal.timeout(config.verifyTimeoutMs),
     headers: {
       'Content-Type': 'application/json',
       'X-Media-Internal-Token': config.registry.internalToken,
@@ -42,6 +43,7 @@ export async function markMediaNodeOffline(): Promise<void> {
     `${config.fastApiBaseUrl}/api/v1/internal/media/nodes/${encodeURIComponent(config.registry.nodeId)}`,
     {
       method: 'DELETE',
+      signal: AbortSignal.timeout(config.verifyTimeoutMs),
       headers: {
         'X-Media-Internal-Token': config.registry.internalToken,
       },

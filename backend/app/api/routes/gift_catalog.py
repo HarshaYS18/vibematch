@@ -12,6 +12,7 @@ from app.services.audit_log_service import create_admin_log
 from app.services.role_service import get_primary_role
 
 router = APIRouter(prefix="/gifts", tags=["Gifts"])
+admin_router = APIRouter(prefix="/admin/economy/gifts", tags=["Admin Gifts"])
 
 DISPLAY_MODES = {"normal", "large_80"}
 
@@ -156,7 +157,7 @@ def roll_lucky_gift(payload: LuckyGiftRollRequest, current_user: User = Depends(
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
-@router.post("/admin/catalog/seed-defaults")
+@admin_router.post("/catalog/seed-defaults")
 def seed_default_gift_catalog(payload: AdminReasonRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_gift_catalog_admin(current_user)
     result = gift_catalog_service.seed_default_catalog(db)
@@ -165,13 +166,13 @@ def seed_default_gift_catalog(payload: AdminReasonRequest, db: Session = Depends
     return {"status": "ok", **result, "catalog": _apply_display_modes_to_catalog(gift_catalog_service.admin_catalog_snapshot(db), db)}
 
 
-@router.get("/admin/catalog")
+@admin_router.get("/catalog")
 def get_admin_gift_catalog(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_gift_catalog_admin(current_user)
     return _apply_display_modes_to_catalog(gift_catalog_service.admin_catalog_snapshot(db), db)
 
 
-@router.put("/admin/categories/{category_key}")
+@admin_router.put("/categories/{category_key}")
 def upsert_gift_category(category_key: str, payload: GiftCategoryAdminPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_gift_catalog_admin(current_user)
     path_key = _clean_key(category_key)
@@ -194,7 +195,7 @@ def upsert_gift_category(category_key: str, payload: GiftCategoryAdminPayload, d
     return _category_response(category)
 
 
-@router.patch("/admin/categories/{category_key}/enabled")
+@admin_router.patch("/categories/{category_key}/enabled")
 def set_gift_category_enabled(category_key: str, payload: GiftCategoryEnabledPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_gift_catalog_admin(current_user)
     key = _clean_key(category_key)
@@ -208,7 +209,7 @@ def set_gift_category_enabled(category_key: str, payload: GiftCategoryEnabledPay
     return _category_response(category)
 
 
-@router.put("/admin/items/{gift_id}")
+@admin_router.put("/items/{gift_id}")
 def upsert_gift_item(gift_id: str, payload: GiftItemAdminPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_gift_catalog_admin(current_user)
     path_id = gift_id.strip()
@@ -253,7 +254,7 @@ def upsert_gift_item(gift_id: str, payload: GiftItemAdminPayload, db: Session = 
     return _item_response(item)
 
 
-@router.patch("/admin/items/{gift_id}/enabled")
+@admin_router.patch("/items/{gift_id}/enabled")
 def set_gift_item_enabled(gift_id: str, payload: GiftItemEnabledPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_gift_catalog_admin(current_user)
     item = db.query(GiftCatalogItem).filter(GiftCatalogItem.gift_id == gift_id.strip()).first()

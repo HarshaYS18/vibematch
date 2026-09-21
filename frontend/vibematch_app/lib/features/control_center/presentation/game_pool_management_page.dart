@@ -1068,7 +1068,7 @@ class _GamePoolCpApi {
 
   Future<List<GamePoolCpItem>> listPools() async {
     final json = await _apiClient.getList(
-      '/super-owner/game-pools',
+      '/admin/games/pools',
       headers: _headers(),
     );
     return json
@@ -1083,7 +1083,7 @@ class _GamePoolCpApi {
     required String reason,
   }) async =>
       _apiClient.postMap(
-        '/super-owner/game-pools/allocate',
+        '/admin/games/pools/allocate',
         headers: _headers(),
         body: {
           'game_key': gameKey,
@@ -1098,7 +1098,7 @@ class _GamePoolCpApi {
     required String reason,
   }) async =>
       _apiClient.postMap(
-        '/super-owner/game-pools/withdraw',
+        '/admin/games/pools/withdraw',
         headers: _headers(),
         body: {
           'game_key': gameKey,
@@ -1118,7 +1118,7 @@ class _GamePoolCpApi {
     required String reason,
   }) async =>
       _apiClient.postMap(
-        '/super-owner/game-pools/settings',
+        '/admin/games/pools/settings',
         headers: _headers(),
         body: {
           'game_key': gameKey,

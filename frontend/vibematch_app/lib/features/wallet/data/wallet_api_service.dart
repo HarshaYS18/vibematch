@@ -13,7 +13,7 @@ class WalletApiService {
 
   Future<VmWallet> getWallet() async {
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/wallet/me')),
+      Uri.parse(VmApiConfig.endpoint('/wallets/me')),
       headers: _headers(),
     );
     _throwIfBad(response, 'Failed to load wallet');
@@ -26,7 +26,7 @@ class WalletApiService {
 
   Future<List<VmWalletLedgerEntry>> getLedger({int limit = 50}) async {
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/wallet/ledger?limit=$limit')),
+      Uri.parse(VmApiConfig.endpoint('/wallets/ledger?limit=$limit')),
       headers: _headers(),
     );
     _throwIfBad(response, 'Failed to load wallet ledger');
@@ -39,7 +39,7 @@ class WalletApiService {
 
   Future<VmWallet> recharge({required int amountInr}) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/wallet/recharge')),
+      Uri.parse(VmApiConfig.endpoint('/wallets/recharge')),
       headers: _headers(),
       body: jsonEncode({
         'amount_inr': amountInr,
@@ -57,7 +57,7 @@ class WalletApiService {
 
   Future<VmWallet> convertRuby({required int rubyAmount}) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/wallet/rubies/convert')),
+      Uri.parse(VmApiConfig.endpoint('/wallets/rubies/convert')),
       headers: _headers(),
       body: jsonEncode({'ruby_amount': rubyAmount}),
     );

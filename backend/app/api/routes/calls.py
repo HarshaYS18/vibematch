@@ -58,6 +58,7 @@ def get_call_session(
     session = call_session_service.get_call_session(db=db, call_public_id=call_public_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Call session not found.")
+    call_session_service.require_call_participant(db=db, session=session, user=current_user)
     return call_session_service.serialize_call_session(db=db, session=session)
 
 

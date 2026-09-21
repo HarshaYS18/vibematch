@@ -50,12 +50,17 @@ const httpServer = http.createServer(app);
 const io = createSocketServer(httpServer, roomManager);
 
 let heartbeatTimer: NodeJS.Timeout | undefined;
+let heartbeatInFlight: Promise<void> | undefined;
 
 async function sendHeartbeat(): Promise<void> {
+  if (heartbeatInFlight || shuttingDown || !workerManager.isReady) return;
+  heartbeatInFlight = heartbeatMediaNode(roomManager.getStats());
   try {
-    await heartbeatMediaNode(roomManager.getStats());
+    await heartbeatInFlight;
   } catch (error) {
     console.error('[media] registry heartbeat failed', error);
+  } finally {
+    heartbeatInFlight = undefined;
   }
 }
 
@@ -70,11 +75,14 @@ httpServer.listen(config.port, config.host, () => {
 });
 
 let shuttingDown = false;
-async function shutdown(signal: string) {
+async function shutdown(signal: string, exitCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[media] received ${signal}; draining process.`);
   if (heartbeatTimer) clearInterval(heartbeatTimer);
+  // An in-flight heartbeat must finish before unregistering, or it could
+  // resurrect this node after the offline request.
+  await heartbeatInFlight?.catch(() => undefined);
   try {
     await markMediaNodeOffline();
   } catch (error) {
@@ -82,9 +90,10 @@ async function shutdown(signal: string) {
   }
   io.close();
   workerManager.close();
-  httpServer.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 5000).unref();
+  httpServer.close(() => process.exit(exitCode));
+  setTimeout(() => process.exit(exitCode || 1), 5000).unref();
 }
 
+workerManager.onDied(() => void shutdown('mediasoup worker died', 1));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));

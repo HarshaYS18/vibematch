@@ -12,7 +12,7 @@ class GiftCatalogAdminApiService {
 
   Future<Map<String, dynamic>> getCatalog() async {
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/gifts/admin/catalog')),
+      Uri.parse(VmApiConfig.endpoint('/admin/economy/gifts/catalog')),
       headers: await _headers(),
     );
     _throwIfBad(response, 'Failed to load gift catalog admin');
@@ -21,7 +21,7 @@ class GiftCatalogAdminApiService {
 
   Future<Map<String, dynamic>> seedDefaults({required String reason}) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/gifts/admin/catalog/seed-defaults')),
+      Uri.parse(VmApiConfig.endpoint('/admin/economy/gifts/catalog/seed-defaults')),
       headers: await _headers(),
       body: jsonEncode({'reason': reason.trim()}),
     );
@@ -35,7 +35,7 @@ class GiftCatalogAdminApiService {
     required String reason,
   }) async {
     final response = await http.patch(
-      Uri.parse(VmApiConfig.endpoint('/gifts/admin/categories/$categoryKey/enabled')),
+      Uri.parse(VmApiConfig.endpoint('/admin/economy/gifts/categories/$categoryKey/enabled')),
       headers: await _headers(),
       body: jsonEncode({'is_enabled': enabled, 'reason': reason.trim()}),
     );
@@ -49,7 +49,7 @@ class GiftCatalogAdminApiService {
     required String reason,
   }) async {
     final response = await http.patch(
-      Uri.parse(VmApiConfig.endpoint('/gifts/admin/items/$giftId/enabled')),
+      Uri.parse(VmApiConfig.endpoint('/admin/economy/gifts/items/$giftId/enabled')),
       headers: await _headers(),
       body: jsonEncode({'is_enabled': enabled, 'reason': reason.trim()}),
     );
@@ -65,7 +65,7 @@ class GiftCatalogAdminApiService {
     required String reason,
   }) async {
     final response = await http.put(
-      Uri.parse(VmApiConfig.endpoint('/gifts/admin/categories/$key')),
+      Uri.parse(VmApiConfig.endpoint('/admin/economy/gifts/categories/$key')),
       headers: await _headers(),
       body: jsonEncode({
         'key': key.trim(),
@@ -83,7 +83,7 @@ class GiftCatalogAdminApiService {
     final giftId = payload['gift_id']?.toString().trim() ?? '';
     if (giftId.isEmpty) throw Exception('Gift ID is required');
     final response = await http.put(
-      Uri.parse(VmApiConfig.endpoint('/gifts/admin/items/$giftId')),
+      Uri.parse(VmApiConfig.endpoint('/admin/economy/gifts/items/$giftId')),
       headers: await _headers(),
       body: jsonEncode(payload),
     );

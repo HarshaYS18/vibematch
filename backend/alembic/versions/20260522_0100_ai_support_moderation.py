@@ -6,6 +6,7 @@ Create Date: 2026-05-22 01:00:00.000000
 """
 
 from alembic import op
+from legacy_snapshot import is_fresh_bootstrap, create_table, add_column, create_index
 import sqlalchemy as sa
 
 
@@ -16,7 +17,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    if is_fresh_bootstrap(op.get_bind()):
+        return
+    create_table(
         "support_tickets",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("public_id", sa.String(length=80), nullable=False),
@@ -53,9 +56,9 @@ def upgrade() -> None:
         "updated_at",
         "resolved_at",
     ]:
-        op.create_index(f"ix_support_tickets_{column}", "support_tickets", [column])
+        create_index(f"ix_support_tickets_{column}", "support_tickets", [column])
 
-    op.create_table(
+    create_table(
         "support_messages",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("public_id", sa.String(length=80), nullable=False),
@@ -72,9 +75,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("public_id"),
     )
     for column in ["id", "public_id", "ticket_id", "sender_user_id", "sender_role", "is_ai_generated", "created_at"]:
-        op.create_index(f"ix_support_messages_{column}", "support_messages", [column])
+        create_index(f"ix_support_messages_{column}", "support_messages", [column])
 
-    op.create_table(
+    create_table(
         "support_attachments",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("ticket_id", sa.Integer(), nullable=False),
@@ -91,9 +94,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     for column in ["id", "ticket_id", "message_id", "uploaded_by_user_id", "moderation_status", "created_at"]:
-        op.create_index(f"ix_support_attachments_{column}", "support_attachments", [column])
+        create_index(f"ix_support_attachments_{column}", "support_attachments", [column])
 
-    op.create_table(
+    create_table(
         "help_articles",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("slug", sa.String(length=120), nullable=False),
@@ -108,9 +111,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("slug"),
     )
     for column in ["id", "slug", "category", "is_published", "created_at"]:
-        op.create_index(f"ix_help_articles_{column}", "help_articles", [column])
+        create_index(f"ix_help_articles_{column}", "help_articles", [column])
 
-    op.create_table(
+    create_table(
         "ai_helpdesk_logs",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=True),
@@ -128,9 +131,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     for column in ["id", "user_id", "ticket_id", "provider", "intent", "category", "priority", "created_at"]:
-        op.create_index(f"ix_ai_helpdesk_logs_{column}", "ai_helpdesk_logs", [column])
+        create_index(f"ix_ai_helpdesk_logs_{column}", "ai_helpdesk_logs", [column])
 
-    op.create_table(
+    create_table(
         "moderation_events",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("public_id", sa.String(length=80), nullable=False),
@@ -152,9 +155,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("public_id"),
     )
     for column in ["id", "public_id", "actor_user_id", "target_user_id", "room_id", "content_type", "surface", "decision", "severity", "provider", "created_at"]:
-        op.create_index(f"ix_moderation_events_{column}", "moderation_events", [column])
+        create_index(f"ix_moderation_events_{column}", "moderation_events", [column])
 
-    op.create_table(
+    create_table(
         "moderation_cases",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("public_id", sa.String(length=80), nullable=False),
@@ -176,9 +179,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("public_id"),
     )
     for column in ["id", "public_id", "opened_by_user_id", "target_user_id", "room_id", "status", "category", "priority", "created_at", "updated_at", "closed_at"]:
-        op.create_index(f"ix_moderation_cases_{column}", "moderation_cases", [column])
+        create_index(f"ix_moderation_cases_{column}", "moderation_cases", [column])
 
-    op.create_table(
+    create_table(
         "moderation_evidence",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("case_id", sa.Integer(), nullable=False),
@@ -194,9 +197,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     for column in ["id", "case_id", "event_id", "evidence_type", "moderation_status", "created_at"]:
-        op.create_index(f"ix_moderation_evidence_{column}", "moderation_evidence", [column])
+        create_index(f"ix_moderation_evidence_{column}", "moderation_evidence", [column])
 
-    op.create_table(
+    create_table(
         "user_violation_scores",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
@@ -211,9 +214,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("user_id"),
     )
     for column in ["id", "user_id", "score", "severity", "last_event_id", "updated_at"]:
-        op.create_index(f"ix_user_violation_scores_{column}", "user_violation_scores", [column])
+        create_index(f"ix_user_violation_scores_{column}", "user_violation_scores", [column])
 
-    op.create_table(
+    create_table(
         "user_app_settings",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
@@ -225,7 +228,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("user_id"),
     )
     for column in ["id", "user_id", "created_at", "updated_at"]:
-        op.create_index(f"ix_user_app_settings_{column}", "user_app_settings", [column])
+        create_index(f"ix_user_app_settings_{column}", "user_app_settings", [column])
 
 
 def downgrade() -> None:

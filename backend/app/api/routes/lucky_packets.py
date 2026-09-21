@@ -14,7 +14,7 @@ from app.schemas.lucky_packet import (
 )
 from app.services import lucky_packet_service
 
-router = APIRouter(prefix="/lucky-packets", tags=["Economy Lucky Packets"])
+router = APIRouter(prefix="/lucky-packets", tags=["Lucky Packets"])
 
 
 def _room_from_public_id(db: Session, room_public_id: str) -> Room:

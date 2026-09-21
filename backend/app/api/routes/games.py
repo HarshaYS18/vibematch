@@ -18,7 +18,8 @@ from app.schemas.games import (
 from app.services import global_jungle_game_service_v2 as game_service
 from app.services import role_service
 
-router = APIRouter(prefix="/games", tags=["Games"])\nadmin_router = APIRouter(prefix="/admin/games", tags=["Admin Games"])
+router = APIRouter(prefix="/games", tags=["Games"])
+admin_router = APIRouter(prefix="/admin/games", tags=["Admin Games"])
 
 
 def _require_owner_or_above(user: User) -> None:

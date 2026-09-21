@@ -6,6 +6,7 @@ Create Date: 2026-05-18 01:00:00.000000
 """
 
 from alembic import op
+from legacy_snapshot import is_fresh_bootstrap, create_table, add_column, create_index
 import sqlalchemy as sa
 
 
@@ -37,12 +38,14 @@ SPECIAL_PERMISSION_VALUES = [
 
 
 def upgrade() -> None:
+    if is_fresh_bootstrap(op.get_bind()):
+        return
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         for value in SPECIAL_PERMISSION_VALUES:
             op.execute(f"ALTER TYPE specialpermissionname ADD VALUE IF NOT EXISTS '{value}'")
 
-    op.create_table(
+    create_table(
         "economy_rule_sets",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("track_key", sa.String(length=40), nullable=False),
@@ -64,11 +67,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("track_key", "version", name="uq_economy_rule_set_track_version"),
     )
-    op.create_index("ix_economy_rule_sets_track_key", "economy_rule_sets", ["track_key"])
-    op.create_index("ix_economy_rule_sets_is_active", "economy_rule_sets", ["is_active"])
-    op.create_index("ix_economy_rule_sets_is_published", "economy_rule_sets", ["is_published"])
+    create_index("ix_economy_rule_sets_track_key", "economy_rule_sets", ["track_key"])
+    create_index("ix_economy_rule_sets_is_active", "economy_rule_sets", ["is_active"])
+    create_index("ix_economy_rule_sets_is_published", "economy_rule_sets", ["is_published"])
 
-    op.create_table(
+    create_table(
         "economy_rule_levels",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("rule_set_id", sa.Integer(), nullable=False),
@@ -83,10 +86,10 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("rule_set_id", "level", name="uq_economy_rule_level_set_level"),
     )
-    op.create_index("ix_economy_rule_levels_rule_set_id", "economy_rule_levels", ["rule_set_id"])
-    op.create_index("ix_economy_rule_levels_level", "economy_rule_levels", ["level"])
+    create_index("ix_economy_rule_levels_rule_set_id", "economy_rule_levels", ["rule_set_id"])
+    create_index("ix_economy_rule_levels_level", "economy_rule_levels", ["level"])
 
-    op.create_table(
+    create_table(
         "store_categories",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("category_key", sa.String(length=80), nullable=False),
@@ -104,8 +107,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("category_key"),
     )
-    op.create_index("ix_store_categories_category_key", "store_categories", ["category_key"])
-    op.create_index("ix_store_categories_is_active", "store_categories", ["is_active"])
+    create_index("ix_store_categories_category_key", "store_categories", ["category_key"])
+    create_index("ix_store_categories_is_active", "store_categories", ["is_active"])
 
     for column in [
         sa.Column("item_type", sa.String(length=60), nullable=False, server_default="store_item"),
@@ -126,13 +129,13 @@ def upgrade() -> None:
         sa.Column("metadata_json", sa.JSON(), nullable=True),
         sa.Column("admin_notes", sa.Text(), nullable=True),
     ]:
-        op.add_column("store_items", column)
+        add_column("store_items", column)
 
-    op.add_column("user_store_inventory", sa.Column("ownership_type", sa.String(length=40), nullable=False, server_default="purchase"))
-    op.add_column("user_store_inventory", sa.Column("granted_by_user_id", sa.Integer(), nullable=True))
-    op.create_index("ix_user_store_inventory_granted_by_user_id", "user_store_inventory", ["granted_by_user_id"])
+    add_column("user_store_inventory", sa.Column("ownership_type", sa.String(length=40), nullable=False, server_default="purchase"))
+    add_column("user_store_inventory", sa.Column("granted_by_user_id", sa.Integer(), nullable=True))
+    create_index("ix_user_store_inventory_granted_by_user_id", "user_store_inventory", ["granted_by_user_id"])
 
-    op.create_table(
+    create_table(
         "store_asset_manifests",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("manifest_key", sa.String(length=120), nullable=False),
@@ -147,10 +150,10 @@ def upgrade() -> None:
         sa.Column("published_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_store_asset_manifests_manifest_key", "store_asset_manifests", ["manifest_key"])
-    op.create_index("ix_store_asset_manifests_status", "store_asset_manifests", ["status"])
+    create_index("ix_store_asset_manifests_manifest_key", "store_asset_manifests", ["manifest_key"])
+    create_index("ix_store_asset_manifests_status", "store_asset_manifests", ["status"])
 
-    op.create_table(
+    create_table(
         "user_stealth_states",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
@@ -165,10 +168,10 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("user_id"),
     )
-    op.create_index("ix_user_stealth_states_user_id", "user_stealth_states", ["user_id"])
-    op.create_index("ix_user_stealth_states_is_enabled", "user_stealth_states", ["is_enabled"])
+    create_index("ix_user_stealth_states_user_id", "user_stealth_states", ["user_id"])
+    create_index("ix_user_stealth_states_is_enabled", "user_stealth_states", ["is_enabled"])
 
-    op.create_table(
+    create_table(
         "profile_display_audits",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("actor_user_id", sa.Integer(), nullable=True),
@@ -182,7 +185,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["target_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_profile_display_audits_action", "profile_display_audits", ["action"])
+    create_index("ix_profile_display_audits_action", "profile_display_audits", ["action"])
 
 
 def downgrade() -> None:

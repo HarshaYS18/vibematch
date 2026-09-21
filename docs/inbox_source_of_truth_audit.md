@@ -167,7 +167,7 @@ New DB tables:
 - `call_sessions`
 - `call_participants`
 
-No Alembic migration was added in this pass; current project pattern uses `Base.metadata.create_all` plus runtime guards for local beta/dev testing.
+Historical note: schema bootstrap has since moved entirely to Alembic. Follow PRODUCTION_RUNBOOK.md; application startup only validates the migration head.
 
 ## What is fully wired now
 

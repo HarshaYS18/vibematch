@@ -6,6 +6,7 @@ Create Date: 2026-05-17 01:00:00.000000
 """
 
 from alembic import op
+from legacy_snapshot import is_fresh_bootstrap, create_table, add_column, create_index
 import sqlalchemy as sa
 
 
@@ -16,7 +17,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    if is_fresh_bootstrap(op.get_bind()):
+        return
+    create_table(
         "room_seat_states",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("room_id", sa.Integer(), nullable=False),
@@ -39,13 +42,13 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("room_id", "seat_index", name="uq_room_seat_state_room_seat"),
     )
-    op.create_index(op.f("ix_room_seat_states_id"), "room_seat_states", ["id"], unique=False)
-    op.create_index(op.f("ix_room_seat_states_room_id"), "room_seat_states", ["room_id"], unique=False)
-    op.create_index(op.f("ix_room_seat_states_seat_index"), "room_seat_states", ["seat_index"], unique=False)
-    op.create_index(op.f("ix_room_seat_states_occupant_user_id"), "room_seat_states", ["occupant_user_id"], unique=False)
-    op.create_index(op.f("ix_room_seat_states_is_locked"), "room_seat_states", ["is_locked"], unique=False)
+    create_index(op.f("ix_room_seat_states_id"), "room_seat_states", ["id"], unique=False)
+    create_index(op.f("ix_room_seat_states_room_id"), "room_seat_states", ["room_id"], unique=False)
+    create_index(op.f("ix_room_seat_states_seat_index"), "room_seat_states", ["seat_index"], unique=False)
+    create_index(op.f("ix_room_seat_states_occupant_user_id"), "room_seat_states", ["occupant_user_id"], unique=False)
+    create_index(op.f("ix_room_seat_states_is_locked"), "room_seat_states", ["is_locked"], unique=False)
 
-    op.create_table(
+    create_table(
         "room_realtime_events",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("room_id", sa.Integer(), nullable=False),
@@ -60,16 +63,16 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["room_id"], ["rooms.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_room_realtime_events_id"), "room_realtime_events", ["id"], unique=False)
-    op.create_index(op.f("ix_room_realtime_events_room_id"), "room_realtime_events", ["room_id"], unique=False)
-    op.create_index(op.f("ix_room_realtime_events_room_public_id"), "room_realtime_events", ["room_public_id"], unique=False)
-    op.create_index(op.f("ix_room_realtime_events_event_type"), "room_realtime_events", ["event_type"], unique=False)
-    op.create_index(op.f("ix_room_realtime_events_actor_user_id"), "room_realtime_events", ["actor_user_id"], unique=False)
-    op.create_index(op.f("ix_room_realtime_events_target_user_id"), "room_realtime_events", ["target_user_id"], unique=False)
-    op.create_index(op.f("ix_room_realtime_events_sequence"), "room_realtime_events", ["sequence"], unique=False)
-    op.create_index(op.f("ix_room_realtime_events_created_at"), "room_realtime_events", ["created_at"], unique=False)
+    create_index(op.f("ix_room_realtime_events_id"), "room_realtime_events", ["id"], unique=False)
+    create_index(op.f("ix_room_realtime_events_room_id"), "room_realtime_events", ["room_id"], unique=False)
+    create_index(op.f("ix_room_realtime_events_room_public_id"), "room_realtime_events", ["room_public_id"], unique=False)
+    create_index(op.f("ix_room_realtime_events_event_type"), "room_realtime_events", ["event_type"], unique=False)
+    create_index(op.f("ix_room_realtime_events_actor_user_id"), "room_realtime_events", ["actor_user_id"], unique=False)
+    create_index(op.f("ix_room_realtime_events_target_user_id"), "room_realtime_events", ["target_user_id"], unique=False)
+    create_index(op.f("ix_room_realtime_events_sequence"), "room_realtime_events", ["sequence"], unique=False)
+    create_index(op.f("ix_room_realtime_events_created_at"), "room_realtime_events", ["created_at"], unique=False)
 
-    op.create_table(
+    create_table(
         "room_chat_messages",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("room_id", sa.Integer(), nullable=False),
@@ -85,13 +88,13 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["sender_user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_room_chat_messages_id"), "room_chat_messages", ["id"], unique=False)
-    op.create_index(op.f("ix_room_chat_messages_room_id"), "room_chat_messages", ["room_id"], unique=False)
-    op.create_index(op.f("ix_room_chat_messages_room_public_id"), "room_chat_messages", ["room_public_id"], unique=False)
-    op.create_index(op.f("ix_room_chat_messages_sender_user_id"), "room_chat_messages", ["sender_user_id"], unique=False)
-    op.create_index(op.f("ix_room_chat_messages_message_type"), "room_chat_messages", ["message_type"], unique=False)
-    op.create_index(op.f("ix_room_chat_messages_is_deleted"), "room_chat_messages", ["is_deleted"], unique=False)
-    op.create_index(op.f("ix_room_chat_messages_created_at"), "room_chat_messages", ["created_at"], unique=False)
+    create_index(op.f("ix_room_chat_messages_id"), "room_chat_messages", ["id"], unique=False)
+    create_index(op.f("ix_room_chat_messages_room_id"), "room_chat_messages", ["room_id"], unique=False)
+    create_index(op.f("ix_room_chat_messages_room_public_id"), "room_chat_messages", ["room_public_id"], unique=False)
+    create_index(op.f("ix_room_chat_messages_sender_user_id"), "room_chat_messages", ["sender_user_id"], unique=False)
+    create_index(op.f("ix_room_chat_messages_message_type"), "room_chat_messages", ["message_type"], unique=False)
+    create_index(op.f("ix_room_chat_messages_is_deleted"), "room_chat_messages", ["is_deleted"], unique=False)
+    create_index(op.f("ix_room_chat_messages_created_at"), "room_chat_messages", ["created_at"], unique=False)
 
 
 def downgrade() -> None:

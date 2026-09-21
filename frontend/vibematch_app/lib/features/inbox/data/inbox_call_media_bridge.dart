@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:mediasfu_mediasoup_client/mediasfu_mediasoup_client.dart' as ms;
 
-import '../../../core/network/vm_media_config.dart';
+import '../../../core/network/vm_api_config.dart';
+import '../../auth/data/auth_api_service.dart';
 import '../../audio_mediasoup/data/mediasoup_socket_service.dart';
 import '../../audio_mediasoup/models/mediasoup_producer_state.dart';
 import '../../audio_mediasoup/models/mediasoup_room_state.dart';
@@ -66,7 +69,18 @@ class InboxCallMediaBridge {
     try {
       await leave();
       final peerId = _peerIdFor(session);
-      final roomState = await _socketService.connectAndJoin(serverUrl: VmMediaConfig.audioUrl, roomId: roomId, peerId: peerId);
+      final token = const AuthApiService().cachedAccessToken;
+      if (token == null || token.isEmpty) throw StateError('Please log in again.');
+      final discovery = await http.get(
+        Uri.parse(VmApiConfig.endpoint('/rooms/${Uri.encodeComponent(roomId)}/media')),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+      if (discovery.statusCode != 200) throw StateError('Call media is unavailable (${discovery.statusCode}).');
+      final node = jsonDecode(discovery.body) as Map<String, dynamic>;
+      final roomState = await _socketService.connectAndJoin(
+        serverUrl: node['signaling_url'] as String, roomId: roomId,
+        peerId: peerId, audioToken: token,
+      );
       await _loadDevice(roomState);
       await _startLocalMedia(session);
       await _publishLocalTracks(session);
@@ -91,7 +105,7 @@ class InboxCallMediaBridge {
     final producer = _audioProducer;
     if (producer == null || producer.closed) return;
     muted ? producer.pause() : producer.resume();
-    if (_socketService.connected) await _socketService.setSelfMuted(muted);
+    if (_socketService.connected) await _socketService.setProducerPaused(producer.id, muted);
   }
 
   Future<void> setCameraEnabled(bool enabled) async {
@@ -102,6 +116,7 @@ class InboxCallMediaBridge {
     final producer = _videoProducer;
     if (producer == null || producer.closed) return;
     enabled ? producer.resume() : producer.pause();
+    if (_socketService.connected) await _socketService.setProducerPaused(producer.id, !enabled);
   }
 
   Future<void> switchCamera() async {
@@ -277,6 +292,7 @@ class InboxCallMediaBridge {
     );
 
     final consumer = await completer.future.timeout(const Duration(seconds: 10), onTimeout: () => throw TimeoutException('Timed out while consuming ${producer.producerId}'));
+    await _socketService.resumeConsumer(consumer.id);
     _consumersByProducerId[producer.producerId] = consumer;
     _remoteStreamsByProducerId[producer.producerId] = consumer.stream;
     _remoteKindsByProducerId[producer.producerId] = kind;
@@ -370,6 +386,7 @@ class InboxCallMediaBridge {
     final params = response['params'];
     if (params is Map<String, dynamic>) return params;
     if (params is Map) return params.cast<String, dynamic>();
+    if (response['id'] != null) return response;
     throw StateError('Missing transport params');
   }
 

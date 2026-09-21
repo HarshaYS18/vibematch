@@ -12,8 +12,7 @@ Create Date: 2026-09-21
 
 from alembic import op
 
-from app import models  # noqa: F401 - registers every ORM table on Base.metadata
-from app.database import Base
+from legacy_snapshot import MARKER, create_missing_tables, assert_snapshot_columns, is_fresh_bootstrap
 
 
 revision = "20260921_0110"
@@ -83,7 +82,7 @@ RUNTIME_SCHEMA_STATEMENTS = [
         "CREATE INDEX IF NOT EXISTS ix_inbox_message_user_states_user_id ON inbox_message_user_states(user_id)",
         "CREATE TABLE IF NOT EXISTS inbox_stories (id SERIAL PRIMARY KEY, public_id VARCHAR(80) UNIQUE NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id), media_type VARCHAR(40) NOT NULL, media_url VARCHAR(700) NOT NULL, caption TEXT, visibility VARCHAR(40) DEFAULT 'friends' NOT NULL, metadata_json JSON, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, expires_at TIMESTAMP NOT NULL, deleted_at TIMESTAMP)",
         "CREATE INDEX IF NOT EXISTS ix_inbox_stories_public_id ON inbox_stories(public_id)",
-        "CREATE INDEX IF NOT EXISTS ix_inbox_stories_user_id ON inbox_stories(user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_inbox_stories_user_id ON inbox_stories(owner_user_id)",
         "CREATE INDEX IF NOT EXISTS ix_inbox_stories_expires_at ON inbox_stories(expires_at)",
         "CREATE TABLE IF NOT EXISTS inbox_story_views (id SERIAL PRIMARY KEY, story_id INTEGER NOT NULL REFERENCES inbox_stories(id), viewer_user_id INTEGER NOT NULL REFERENCES users(id), viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(story_id, viewer_user_id))",
         "CREATE INDEX IF NOT EXISTS ix_inbox_story_views_story_id ON inbox_story_views(story_id)",
@@ -204,10 +203,8 @@ SPECIAL_PERMISSION_VALUES = [
 def upgrade() -> None:
     bind = op.get_bind()
 
-    # Historical databases relied on create_all() for the original table set.
-    # Running it here (and only here) transfers that bootstrap responsibility
-    # into Alembic while preserving existing installations via checkfirst.
-    Base.metadata.create_all(bind=bind, checkfirst=True)
+    # Frozen definitions make replay independent of future ORM changes.
+    create_missing_tables(bind)
 
     if bind.dialect.name == "postgresql":
         for permission in SPECIAL_PERMISSION_VALUES:
@@ -221,6 +218,8 @@ def upgrade() -> None:
         )
 
     for statement in RUNTIME_SCHEMA_STATEMENTS:
+        if statement.startswith("CREATE TABLE"):
+            continue
         # Enum and cdn_media_assets mutations above are handled explicitly to
         # avoid executing them twice.
         if statement.startswith("ALTER TYPE specialpermissionname"):
@@ -233,6 +232,10 @@ def upgrade() -> None:
         op.execute(statement)
     for statement in INBOX_SCHEMA_INDEXES:
         op.execute(statement)
+
+    assert_snapshot_columns(bind)
+    if is_fresh_bootstrap(bind):
+        op.execute(f"DROP TABLE {MARKER}")
 
 
 def downgrade() -> None:

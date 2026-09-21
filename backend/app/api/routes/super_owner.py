@@ -34,7 +34,7 @@ from app.services.role_service import get_primary_role
 from app.models.role import RoleName
 from app.services.special_permission_service import grant_special_permission
 
-router = APIRouter(prefix="/super-owner", tags=["Super Owner"])
+router = APIRouter(tags=["Super Owner"])
 
 
 def require_super_owner(user: User) -> None:
@@ -74,14 +74,14 @@ def _target_user_by_identifier(db: Session, value: str) -> User:
     return user
 
 
-@router.get("/coin-pools", response_model=list[SuperOwnerPoolResponse])
+@router.get("/admin/economy/coin-pools", response_model=list[SuperOwnerPoolResponse])
 def list_coin_pools(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     pools = db.query(CoinSupplyPool).order_by(CoinSupplyPool.id.asc()).all()
     return [_pool_response(pool) for pool in pools]
 
 
-@router.post("/coins/mint", response_model=SuperOwnerPoolResponse)
+@router.post("/admin/economy/coins/mint", response_model=SuperOwnerPoolResponse)
 def mint_coins(payload: SuperOwnerMintCoinsRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     pool = mint_to_pool(db=db, actor=current_user, target_pool_type=payload.target_pool_type, target_user_id=payload.target_user_id, amount=payload.amount, reason=payload.reason)
@@ -89,7 +89,7 @@ def mint_coins(payload: SuperOwnerMintCoinsRequest, db: Session = Depends(get_db
     return _pool_response(pool)
 
 
-@router.post("/coins/send-all", response_model=SuperOwnerActionResponse)
+@router.post("/admin/economy/coins/send-all", response_model=SuperOwnerActionResponse)
 def send_coins_to_all(payload: SuperOwnerSendCoinsAllRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     query = db.query(User)
@@ -107,7 +107,7 @@ def send_coins_to_all(payload: SuperOwnerSendCoinsAllRequest, db: Session = Depe
     return SuperOwnerActionResponse(message=f"Sent {payload.coin_amount} coins to {len(users)} users")
 
 
-@router.post("/custom-id", response_model=SuperOwnerActionResponse)
+@router.post("/admin/users/custom-id", response_model=SuperOwnerActionResponse)
 def assign_custom_id(payload: SuperOwnerCustomIdRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     target = _target_user(db, payload.target_user_id)
@@ -121,7 +121,7 @@ def assign_custom_id(payload: SuperOwnerCustomIdRequest, db: Session = Depends(g
     return SuperOwnerActionResponse(message="Custom ID updated", resource_id=str(target.id))
 
 
-@router.post("/inbox-lock/code", response_model=SuperOwnerInboxLockCodeResponse)
+@router.post("/admin/users/inbox-lock/code", response_model=SuperOwnerInboxLockCodeResponse)
 def set_inbox_lock_code(payload: SuperOwnerInboxLockCodeRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     target = _target_user_by_identifier(db, payload.user_identifier)
@@ -130,7 +130,7 @@ def set_inbox_lock_code(payload: SuperOwnerInboxLockCodeRequest, db: Session = D
     return SuperOwnerInboxLockCodeResponse(message="Inbox lock setup/reset code updated", user_id=target.id, public_user_id=target.public_user_id, display_custom_id=target.display_custom_id, username=target.username, display_name=target.display_name, lock_enabled=setting.is_enabled, recovery_requested=setting.recovery_requested, mode=payload.mode)
 
 
-@router.post("/stealth", response_model=SuperOwnerActionResponse)
+@router.post("/admin/users/stealth", response_model=SuperOwnerActionResponse)
 def set_stealth(payload: SuperOwnerStealthRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     target = _target_user(db, payload.target_user_id)
@@ -146,29 +146,13 @@ def set_stealth(payload: SuperOwnerStealthRequest, db: Session = Depends(get_db)
     return SuperOwnerActionResponse(message="Stealth updated", resource_id=str(target.id))
 
 
-@router.get("/special-permissions/options")
+@router.get("/admin/users/special-permissions/options")
 def list_special_permission_options(current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     return [{"value": permission.value, "label": permission.value.replace("_", " ").title()} for permission in SpecialPermissionName]
 
 
-@router.post("/special-permissions/grant", response_model=SuperOwnerActionResponse)
-def grant_permission(payload: SuperOwnerSpecialPermissionGrantRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    require_super_owner(current_user)
-    target = _target_user(db, payload.target_user_id)
-    permission = grant_special_permission(db=db, user_id=target.id, permission=payload.permission, granted_by_user_id=current_user.id, reason=payload.reason, expires_at=payload.expires_at)
-    create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=target.id, action="SUPER_OWNER_SPECIAL_PERMISSION_GRANTED", resource_type="special_permission", resource_id=str(permission.id), reason=payload.reason, metadata_json={"permission": payload.permission.value})
-    return SuperOwnerActionResponse(message="Special permission granted", resource_id=str(permission.id))
-
-
-@router.get("/special-permissions", response_model=list[dict])
-def list_permissions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    require_super_owner(current_user)
-    items = db.query(SpecialPermission).order_by(SpecialPermission.id.desc()).limit(200).all()
-    return [{"id": item.id, "user_id": item.user_id, "permission": item.permission.value, "is_active": item.is_active, "reason": item.reason, "created_at": item.created_at.isoformat()} for item in items]
-
-
-@router.post("/vip-adjust", response_model=SuperOwnerVipResponse)
+@router.post("/admin/users/vip-adjust", response_model=SuperOwnerVipResponse)
 def adjust_vip(payload: SuperOwnerVipAdjustmentRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     target = _target_user(db, payload.target_user_id)
@@ -190,7 +174,7 @@ def adjust_vip(payload: SuperOwnerVipAdjustmentRequest, db: Session = Depends(ge
     return SuperOwnerVipResponse(user_id=target.id, vip_level=status.vip_level, svip_level=status.svip_level, vip_is_active=status.vip_is_active, svip_is_active=status.svip_is_active, svip_expires_at=status.svip_expires_at)
 
 
-@router.post("/levels-adjust", response_model=SuperOwnerWalletResponse)
+@router.post("/admin/users/levels-adjust", response_model=SuperOwnerWalletResponse)
 def adjust_levels(payload: SuperOwnerLevelAdjustmentRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     target = _target_user(db, payload.target_user_id)
@@ -207,21 +191,21 @@ def adjust_levels(payload: SuperOwnerLevelAdjustmentRequest, db: Session = Depen
     return _wallet_response(target.id, db)
 
 
-@router.get("/logs", response_model=list[SuperOwnerLogResponse])
+@router.get("/admin/moderation/owner-logs", response_model=list[SuperOwnerLogResponse])
 def list_logs(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     logs = db.query(AdminLog).order_by(AdminLog.id.desc()).limit(200).all()
     return [SuperOwnerLogResponse(id=log.id, actor_user_id=log.actor_user_id, target_user_id=log.target_user_id, action=log.action, resource_type=log.resource_type, resource_id=log.resource_id, reason=log.reason, created_at=log.created_at) for log in logs]
 
 
-@router.get("/reviews", response_model=list[SuperOwnerReviewDetailResponse])
+@router.get("/admin/moderation/reviews", response_model=list[SuperOwnerReviewDetailResponse])
 def list_reviews(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     logs = db.query(AdminLog).order_by(AdminLog.id.desc()).limit(50).all()
     return [SuperOwnerReviewDetailResponse(id=log.id, kind=log.resource_type or "audit", title=log.action, status="reviewed" if log.action.endswith("_BLOCKED") else "open", reason=log.reason, metadata=log.metadata_json if isinstance(log.metadata_json, dict) else None, created_at=log.created_at) for log in logs]
 
 
-@router.get("/reviews/{review_id}", response_model=SuperOwnerReviewDetailResponse)
+@router.get("/admin/moderation/reviews/{review_id}", response_model=SuperOwnerReviewDetailResponse)
 def get_review_detail(review_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     log = db.query(AdminLog).filter(AdminLog.id == review_id).first()

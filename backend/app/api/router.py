@@ -13,7 +13,7 @@ from app.api.routes import (
     game_settlements, games, games_master, gift_catalog, health, home_banners,
     inbox, inbox_ai, inbox_backup_google, inbox_calls, inbox_message_tools,
     inbox_preferences, inbox_stories, inbox_ws, love_bonds, lucky_coins,
-    lucky_gifts, lucky_packets, media, media_control, media_realtime_auth, media_safety_admin,
+    lucky_gifts, lucky_gift_admin, lucky_packets, media, media_control, media_realtime_auth, media_safety_admin,
     moderation, notifications, presence, profile_display, push, rankings,
     relationship_exp, role_badges, room_levels, room_music_media,
     room_realtime, room_realtime_commands, settings, social, super_owner,
@@ -26,7 +26,7 @@ api_router = APIRouter(prefix="/api/v1")
 
 # System and identity.
 for router in (
-    health.router, auth.router, app_source_registry.router, users.router,
+    health.router, auth.router, app_source_registry.router, users.router, support.router,
     settings.router, profile_display.router, role_badges.router,
 ):
     api_router.include_router(router)
@@ -73,6 +73,8 @@ for router in (
     admin.router, admin_support.router, moderation.router, ai_moderation.router,
     media_safety_admin.router, vip_admin.router, super_owner.router,
     control_center.router, game_pool_admin.router, game_props_admin.router,
-    economy_admin.router, games.admin_router,
+    economy_admin.router, games.admin_router, gift_catalog.admin_router,
+    rooms.admin_router, coin_sales.admin_router, lucky_gift_admin.router,
+    home_banners.admin_router, vibes.admin_router,
 ):
     api_router.include_router(router)

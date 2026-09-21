@@ -1,0 +1,52 @@
+.\PRODUCTION_RUNBOOK.md:15:2. **`backend_media` mediasoup media plane** — default signaling port `4100`
+.\PRODUCTION_RUNBOOK.md:29:The former `audio-server/`, `media-server/` and `services/mediasoup-audio-server/` implementations have been removed.
+.\PRODUCTION_RUNBOOK.md:35:Do not add `Base.metadata.create_all()`, runtime `ALTER TABLE`, runtime `CREATE TABLE`, or another startup schema patcher under `backend/app`.
+.\PRODUCTION_RUNBOOK.md:91:curl http://127.0.0.1:4100/health
+.\PRODUCTION_RUNBOOK.md:92:curl http://127.0.0.1:4100/ready
+.\scripts\check_backend_architecture.py:13:    ROOT / "audio-server",
+.\scripts\check_backend_architecture.py:14:    ROOT / "media-server",
+.\scripts\check_backend_architecture.py:15:    ROOT / "services" / "mediasoup-audio-server",
+.\scripts\check_backend_architecture.py:29:    "ALTER TABLE",
+.\scripts\check_backend_architecture.py:30:    "CREATE TABLE",
+.\scripts\check_backend_architecture.py:31:    "CREATE INDEX",
+.\scripts\check_backend_architecture.py:37:    "Base.metadata.create_all",
+.\scripts\check_backend_architecture.py:38:    "_ensure_runtime_schema",
+.\docs\inbox_source_of_truth_audit.md:170:No Alembic migration was added in this pass; current project pattern uses `Base.metadata.create_all` plus runtime guards for local beta/dev testing.
+.\docs\internal-testing-ready-v1.md:154:cd "D:\Vibe Match\vibematch\services\mediasoup-audio-server"
+.\docs\master-source-of-truth-architecture.md:108:      "yearly": 9000,
+.\docs\production_realtime_media_architecture.md:12:4. `backend_media` Node service on port `4100`
+.\docs\production_realtime_media_architecture.md:21:- `audio-server/`
+.\docs\production_realtime_media_architecture.md:22:- `media-server/`
+.\docs\production_realtime_media_architecture.md:23:- `services/mediasoup-audio-server/`
+.\games_raw\slot_game\windows\CMakeLists.txt:42:  target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
+.\frontend\vibematch_app\run_lan_auto.ps1:27:  "VM_MEDIA_WS_URL": "ws://${ip}:9000/ws",
+.\frontend\vibematch_app\run_lan_auto.ps1:28:  "VM_AUDIO_URL": "http://${ip}:4000",
+.\frontend\vibematch_app\windows\CMakeLists.txt:42:  target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
+.\frontend\vibematch_app\lib\features\control_center\presentation\game_props_page.dart:387:    return _apiClient.getMap('/super-owner/game-props/jungle-hunt', headers: _headers());
+.\frontend\vibematch_app\lib\features\control_center\presentation\game_props_page.dart:391:    await _apiClient.postMap('/super-owner/game-props/jungle-hunt', headers: _headers(), body: body);
+.\frontend\vibematch_app\lib\features\control_center\presentation\game_pool_management_page.dart:1071:      '/super-owner/game-pools',
+.\frontend\vibematch_app\lib\features\control_center\presentation\game_pool_management_page.dart:1086:        '/super-owner/game-pools/allocate',
+.\frontend\vibematch_app\lib\features\control_center\presentation\game_pool_management_page.dart:1101:        '/super-owner/game-pools/withdraw',
+.\frontend\vibematch_app\lib\features\control_center\presentation\game_pool_management_page.dart:1121:        '/super-owner/game-pools/settings',
+.\backend_media\src\config.ts:7:  MEDIA_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(4100),
+.\backend_media\src\config.ts:9:  MEDIA_PUBLIC_URL: z.string().url().default('http://127.0.0.1:4100'),
+.\frontend\vibematch_app\lib\features\audio_mediasoup\presentation\mediasoup_audio_test_page.dart:33:  final TextEditingController _serverController = TextEditingController(text: 'http://10.0.2.2:4000');
+.\frontend\vibematch_app\lib\core\network\vm_media_config.dart:40:      return 'http://10.0.2.2:4100';
+.\frontend\vibematch_app\lib\core\network\vm_media_config.dart:44:      return 'http://127.0.0.1:4100';
+.\frontend\vibematch_app\lib\core\network\vm_media_config.dart:47:    return 'http://${VmApiConfig.betaVpsHost}:4100';
+.\backend_media\README.md:41:curl http://127.0.0.1:4100/health
+.\backend_media\README.md:48:MEDIA_SERVICE_PORT=4100
+.\backend_media\README.md:62:- media service signaling port, default `4100`
+.\backend_media\Dockerfile:20:EXPOSE 4100
+.\backend_media\.env.example:2:MEDIA_SERVICE_PORT=4100
+.\backend_media\.env.example:4:MEDIA_PUBLIC_URL=http://127.0.0.1:4100
+.\frontend\vibematch_app\test\user_identity_source_of_truth_test.dart:41:      'sent_exp': 9000,
+.\frontend\vibematch_app\test\user_identity_source_of_truth_test.dart:72:      expect(identity.sentExp, 9000);
+.\frontend\vibematch_app\lib\features\profile\presentation\love_bonds\models\love_bond_models.dart:291:    if (level <= 15) return 9000 + ((level - 10) * 3600);
+.\backend\app\schemas\inbox.py:74:    text: str = Field(min_length=1, max_length=4000)
+.\backend\app\schemas\inbox.py:85:    text: str | None = Field(default=None, min_length=1, max_length=4000)
+.\backend\app\schemas\support.py:50:    message: str = Field(min_length=4, max_length=4000)
+.\backend\app\schemas\support.py:55:    message: str = Field(min_length=1, max_length=4000)
+.\backend\app\schemas\support.py:60:    message: str | None = Field(default=None, max_length=4000)
+.\backend\app\schemas\support.py:135:    text: str = Field(min_length=1, max_length=4000)
+.\backend\app\services\lucky_gift_props_service.py:181:        return "HIGH_COMBO_BOOST", {0: 8500, 1: 9500, 2: 9500, 5: 10500, 10: 11000, 20: 12500, 50: 13500, 100: 9000, 500: 2500, 1000: 1200}

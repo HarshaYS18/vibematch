@@ -3,6 +3,7 @@ export type MediaAction =
   | 'create_transport'
   | 'connect_transport'
   | 'produce_audio'
+  | 'produce_video'
   | 'consume_audio'
   | 'pause_producer'
   | 'resume_producer'
@@ -40,7 +41,7 @@ export interface MediaWebRtcTransport {
   sctpParameters?: unknown;
   connect(options: { dtlsParameters: never }): Promise<void>;
   produce(options: {
-    kind: 'audio';
+    kind: 'audio' | 'video';
     rtpParameters: never;
     appData?: Record<string, unknown>;
   }): Promise<MediaProducer>;

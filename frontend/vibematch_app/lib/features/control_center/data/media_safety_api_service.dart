@@ -13,7 +13,7 @@ class MediaSafetyApiService {
 
   Future<MediaSafetyDashboard> loadDashboard() async {
     final json = await _apiClient.getMap(
-      '/admin/media-safety/dashboard',
+      '/admin/media/safety/dashboard',
       headers: _headers(),
     );
     return MediaSafetyDashboard.fromJson(json);
@@ -26,7 +26,7 @@ class MediaSafetyApiService {
     int limit = 50,
   }) async {
     final json = await _apiClient.getList(
-      '/admin/media-safety/assets',
+      '/admin/media/safety/assets',
       headers: _headers(),
       queryParameters: {
         'media_type': mediaType,
@@ -43,7 +43,7 @@ class MediaSafetyApiService {
 
   Future<List<MediaSafetySetting>> loadSettings() async {
     final json = await _apiClient.getList(
-      '/admin/media-safety/settings',
+      '/admin/media/safety/settings',
       headers: _headers(),
     );
     return json
@@ -59,7 +59,7 @@ class MediaSafetyApiService {
     String reason = 'Media Safety Control Center update',
   }) async {
     final json = await _apiClient.patchMap(
-      '/admin/media-safety/settings/$key',
+      '/admin/media/safety/settings/$key',
       headers: _headers(),
       body: {
         'value_json': valueJson,
@@ -75,7 +75,7 @@ class MediaSafetyApiService {
     required String reason,
   }) async {
     final json = await _apiClient.postMap(
-      '/admin/media-safety/assets/$mediaId/approve',
+      '/admin/media/safety/assets/$mediaId/approve',
       headers: _headers(),
       body: {'reason': reason},
     );
@@ -87,7 +87,7 @@ class MediaSafetyApiService {
     required String reason,
   }) async {
     final json = await _apiClient.postMap(
-      '/admin/media-safety/assets/$mediaId/reject',
+      '/admin/media/safety/assets/$mediaId/reject',
       headers: _headers(),
       body: {'reason': reason},
     );
@@ -99,7 +99,7 @@ class MediaSafetyApiService {
     required String reason,
   }) async {
     final json = await _apiClient.postMap(
-      '/admin/media-safety/assets/$mediaId/retry-delete',
+      '/admin/media/safety/assets/$mediaId/retry-delete',
       headers: _headers(),
       body: {'reason': reason},
     );
@@ -108,7 +108,7 @@ class MediaSafetyApiService {
 
   Future<MediaCleanupResult> cleanupExpiredInboxMedia({int limit = 100}) async {
     final json = await _apiClient.postMap(
-      '/admin/media-safety/cleanup/inbox-expired',
+      '/admin/media/safety/cleanup/inbox-expired',
       headers: _headers(),
       queryParameters: {'limit': '$limit'},
     );

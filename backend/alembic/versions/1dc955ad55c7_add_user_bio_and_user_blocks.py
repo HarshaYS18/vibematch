@@ -8,15 +8,18 @@ Create Date: 2026-05-11 14:16:45.537491
 from typing import Sequence, Union
 
 from alembic import op
+from legacy_snapshot import is_fresh_bootstrap
 
 
 revision: str = "1dc955ad55c7"
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = "20260501_0000"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    if is_fresh_bootstrap(op.get_bind()):
+        return
     # Add users.bio only if it does not already exist.
     op.execute(
         """

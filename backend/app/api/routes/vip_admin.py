@@ -7,7 +7,7 @@ from app.models.user import User
 from app.schemas.vip_status import UserVipStatusResponse, UserVipStatusUpdateRequest
 from app.services import vip_status_service
 
-router = APIRouter(prefix="/admin/vip", tags=["VIP Admin"])
+router = APIRouter(prefix="/admin/users/vip", tags=["VIP Admin"])
 
 
 @router.get("/users/{public_user_id}", response_model=UserVipStatusResponse)

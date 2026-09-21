@@ -14,7 +14,7 @@ class VipAdminApiService {
   Future<UserVipSummary> getUserVipStatus(int publicUserId) async {
     final token = _token();
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/admin/vip/users/$publicUserId')),
+      Uri.parse(VmApiConfig.endpoint('/admin/users/vip/users/$publicUserId')),
       headers: {'Authorization': 'Bearer $token'},
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -34,7 +34,7 @@ class VipAdminApiService {
   }) async {
     final token = _token();
     final response = await http.put(
-      Uri.parse(VmApiConfig.endpoint('/admin/vip/users/$publicUserId')),
+      Uri.parse(VmApiConfig.endpoint('/admin/users/vip/users/$publicUserId')),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

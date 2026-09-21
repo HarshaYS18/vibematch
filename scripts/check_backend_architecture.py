@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import ast
+import json
+import re
 import sys
 
 
@@ -69,14 +72,46 @@ def main() -> int:
     backend_app = ROOT / "backend" / "app"
     if backend_app.exists():
         for source in backend_app.rglob("*.py"):
-            text = source.read_text(encoding="utf-8")
-            upper = text.upper()
+            # Some historical source files include a UTF-8 BOM. It is valid
+            # Python source and must not hide architecture violations.
+            text = source.read_text(encoding="utf-8-sig")
+            try:
+                tree = ast.parse(text, filename=str(source))
+            except SyntaxError as exc:
+                errors.append(f"invalid Python: {source.relative_to(ROOT)}:{exc.lineno}: {exc.msg}")
+                continue
+            upper = re.sub(r"\s+", " ", text.upper())
             for token in DDL_TOKENS:
                 if token in upper:
                     errors.append(
                         "runtime DDL is forbidden outside Alembic migrations: "
                         f"{source.relative_to(ROOT)} contains {token}"
                     )
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in {"create_all", "drop_all", "create_table", "add_column", "create_index"}:
+                    errors.append(f"runtime schema mutation: {source.relative_to(ROOT)}:{node.lineno}")
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and re.search(r"ensure_.*schema", node.name):
+                    errors.append(f"runtime schema repair function: {source.relative_to(ROOT)}:{node.lineno}")
+                if isinstance(node, ast.Call) and any(k.arg == "prefix" and isinstance(k.value, ast.Constant) and k.value.value == "/api/v1" for k in node.keywords):
+                    if source != backend_app / "api" / "router.py":
+                        errors.append(f"duplicate API root ownership: {source.relative_to(ROOT)}")
+
+    # Detect executable implementations under arbitrary new directory names.
+    for manifest in ROOT.rglob("package.json"):
+        if any(part in {"node_modules", ".git", "build", ".dart_tool"} for part in manifest.parts):
+            continue
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        dependencies = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
+        if "mediasoup" in dependencies and manifest.parent != ROOT / "backend_media":
+            errors.append(f"noncanonical media executable: {manifest.relative_to(ROOT)}")
+
+    retired_paths = ("/games/admin", "/economy/admin", "/super-owner/game-pools", "/super-owner/game-props", "/gifts/admin")
+    for source in (ROOT / "frontend" / "vibematch_app" / "lib").rglob("*.dart"):
+        text = source.read_text(encoding="utf-8")
+        if any(path in text for path in retired_paths):
+            errors.append(f"retired API consumer: {source.relative_to(ROOT)}")
+        if re.search(r"https?://[^\s'\"]+:(4000|4100|9000)", text):
+            errors.append(f"hard-coded media host: {source.relative_to(ROOT)}")
 
     router_py = ROOT / "backend" / "app" / "api" / "router.py"
     if router_py.exists():

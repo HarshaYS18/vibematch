@@ -20,7 +20,7 @@ export const connectTransportSchema = z.object({
 
 export const produceSchema = z.object({
   transportId: z.string().min(1),
-  kind: z.enum(['audio']),
+  kind: z.enum(['audio', 'video']),
   rtpParameters: z.unknown(),
   appData: z.record(z.unknown()).optional().default({}),
 });

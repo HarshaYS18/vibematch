@@ -15,7 +15,7 @@ from app.schemas.economy import RubyWithdrawRequestCreate
 from app.services import economy_level_service, economy_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
-router = APIRouter(prefix="/wallet", tags=["Wallet"])
+router = APIRouter(prefix="/wallets", tags=["Wallets"])
 
 COINS_PER_RUPEE = 1_000
 PRICE_PER_LAKH_COINS_INR = 100

@@ -8,5 +8,5 @@ class ApiEndpoints {
   static const String myCreatedRoom = '/rooms/my-created-room';
 
   static const String homeBanners = '/home-banners';
-  static const String homeBannersManage = '/home-banners/manage';
+  static const String homeBannersManage = '/admin/media/banners';
 }

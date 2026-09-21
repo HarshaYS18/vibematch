@@ -1040,16 +1040,6 @@ class LiveRoomAudioService {
     activeSpeakerPeerIds.value = next;
   }
 
-  void _dropInactiveSpeakersForSeats(List<AudioSeatSnapshot> nextSeats) {
-    if (activeSpeakerPeerIds.value.isEmpty) return;
-    final allowed = nextSeats
-        .where((seat) => seat.peerId != null && seat.peerId!.isNotEmpty && !seat.selfMuted && !seat.adminMuted)
-        .map((seat) => seat.peerId!)
-        .toSet();
-    final next = activeSpeakerPeerIds.value.intersection(allowed);
-    if (!_setEquals(activeSpeakerPeerIds.value, next)) activeSpeakerPeerIds.value = next;
-  }
-
   bool _setEquals(Set<String> a, Set<String> b) {
     if (a.length != b.length) return false;
     for (final item in a) {
@@ -1224,24 +1214,6 @@ class LiveRoomAudioService {
       12,
       (index) => AudioSeatSnapshot(seatNo: index + 1, selfMuted: true),
     );
-  }
-
-  void _handleSeatAck(Map<String, dynamic> ack) {
-    if (ack['ok'] == true) {
-      final rawSeats = ack['seats'];
-      if (rawSeats is List) {
-        seats.value = AudioSeatSnapshot.listFromJson(rawSeats);
-      }
-      return;
-    }
-
-    final error = ack['error']?.toString() ?? 'unknown';
-    if (error.contains('timed out')) {
-      _debug('Audio seat action timed out; keeping local optimistic seat state.');
-      return;
-    }
-
-    _setError('Audio seat action failed: $error');
   }
 
   void _setError(String message) {

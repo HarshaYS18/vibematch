@@ -384,11 +384,11 @@ class _GamePropsApi {
   final AuthApiService _authApiService;
 
   Future<Map<String, dynamic>> getProps() {
-    return _apiClient.getMap('/super-owner/game-props/jungle-hunt', headers: _headers());
+    return _apiClient.getMap('/admin/games/props/jungle-hunt', headers: _headers());
   }
 
   Future<void> saveProps(Map<String, dynamic> body) async {
-    await _apiClient.postMap('/super-owner/game-props/jungle-hunt', headers: _headers(), body: body);
+    await _apiClient.postMap('/admin/games/props/jungle-hunt', headers: _headers(), body: body);
   }
 
   Map<String, String> _headers() {

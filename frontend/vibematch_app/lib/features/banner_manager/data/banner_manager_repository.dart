@@ -42,7 +42,7 @@ class BannerManagerRepository {
     required int sortOrder,
   }) async {
     final response = await _apiClient.postMap(
-      ApiEndpoints.homeBanners,
+      ApiEndpoints.homeBannersManage,
       headers: _authHeaders(),
       body: {
         'placement': section.placement,
@@ -61,7 +61,7 @@ class BannerManagerRepository {
 
   Future<ManagedBanner> setActive({required int bannerId, required bool isActive}) async {
     final response = await _apiClient.patchMap(
-      '/home-banners/$bannerId/active',
+      '/admin/media/banners/$bannerId/active',
       queryParameters: {'is_active': isActive.toString()},
       headers: _authHeaders(),
     );

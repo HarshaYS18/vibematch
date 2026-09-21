@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { Server } from 'socket.io';
+import type { types } from 'mediasoup';
 
 import type { RoomState } from '../types/mediaTypes.js';
 
@@ -8,8 +9,8 @@ const SERVER_MUSIC_PEER_ID = 'server-room-music';
 
 type ActiveMusic = {
   id: string;
-  producer: any;
-  transport: any;
+  producer: types.Producer;
+  transport: types.PlainTransport;
   ffmpeg: ChildProcessWithoutNullStreams;
   title: string;
   url: string;
@@ -37,7 +38,7 @@ export async function startRoomMusic(params: {
 
   await stopRoomMusic(params.room, params.io, 'replace');
 
-  const router = params.room.router as any;
+  const router = params.room.router as unknown as types.Router;
   const transport = await router.createPlainTransport({
     listenIp: { ip: process.env.PLAIN_TRANSPORT_LISTEN_IP || '127.0.0.1' },
     rtcpMux: true,
@@ -118,6 +119,11 @@ export async function startRoomMusic(params: {
     if (current?.id !== state.id) return;
     void stopRoomMusic(params.room, params.io, 'ffmpeg-exit');
   });
+  ffmpeg.on('error', (error) => {
+    console.error('[media:music] ffmpeg failed', error);
+    const current = activeMusicByRoom.get(params.room.roomPublicId);
+    if (current?.id === state.id) void stopRoomMusic(params.room, params.io, 'ffmpeg-error');
+  });
   producer.on('transportclose', () => {
     if (!ffmpeg.killed) ffmpeg.kill('SIGTERM');
   });
@@ -160,13 +166,13 @@ export async function stopRoomMusic(
 
   try {
     if (!current.ffmpeg.killed) current.ffmpeg.kill('SIGTERM');
-  } catch {}
+  } catch { /* Process may already have exited. */ }
   try {
     if (!current.producer.closed) current.producer.close();
-  } catch {}
+  } catch { /* Producer may already be closed with its router. */ }
   try {
     if (!current.transport.closed) current.transport.close();
-  } catch {}
+  } catch { /* Transport may already be closed with its worker. */ }
 
   room.serverProducers.delete(current.producer.id);
   io.to(room.roomPublicId).emit('producerClosed', {

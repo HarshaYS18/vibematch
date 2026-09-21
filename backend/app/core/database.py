@@ -1,1 +1,9 @@
-"""Compatibility aliases for the canonical database module.\n\nNew code imports from app.database. This file deliberately creates no\nengine/session of its own.\n"""\n\nfrom app.database import Base, SessionLocal, engine, get_db\n\n__all__ = ["Base", "SessionLocal", "engine", "get_db"]\n
+"""Compatibility aliases for the canonical database module.
+
+New code imports from :mod:`app.database`. This module deliberately creates no
+engine or session of its own.
+"""
+
+from app.database import Base, SessionLocal, engine, get_db
+
+__all__ = ["Base", "SessionLocal", "engine", "get_db"]

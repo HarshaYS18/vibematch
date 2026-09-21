@@ -9,10 +9,12 @@ const mediaCodecs = [
     clockRate: 48000,
     channels: 2,
   },
+  { kind: 'video' as const, mimeType: 'video/VP8', clockRate: 90000 },
 ];
 
 export class WorkerManager {
   private worker: MediaWorker | null = null;
+  private readonly deathHandlers = new Set<() => void>();
 
   async start(): Promise<void> {
     this.worker = (await mediasoup.createWorker({
@@ -23,9 +25,14 @@ export class WorkerManager {
     })) as unknown as MediaWorker;
 
     this.worker.on('died', () => {
-      console.error('[mediasoup] worker died; exiting process for supervisor restart.');
-      setTimeout(() => process.exit(1), 500);
+      this.worker = null;
+      console.error('[mediasoup] worker died; draining process for supervisor restart.');
+      for (const handler of this.deathHandlers) handler();
     });
+  }
+
+  onDied(handler: () => void): void {
+    this.deathHandlers.add(handler);
   }
 
   async createRouter(): Promise<MediaRouter> {

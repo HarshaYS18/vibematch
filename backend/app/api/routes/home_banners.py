@@ -14,6 +14,7 @@ from app.services.home_banner_service import (
 )
 
 router = APIRouter(prefix="/home-banners", tags=["Home Banners"])
+admin_router = APIRouter(prefix="/admin/media/banners", tags=["Admin Banners"])
 
 
 @router.get("", response_model=list[HomeBannerResponse])
@@ -24,7 +25,7 @@ def get_home_banners(
     return list_active_home_banners(db=db, placement=placement)
 
 
-@router.get("/manage", response_model=list[HomeBannerResponse])
+@admin_router.get("", response_model=list[HomeBannerResponse])
 def get_manageable_home_banners(
     placement: str | None = Query(default=None),
     db: Session = Depends(get_db),
@@ -34,7 +35,7 @@ def get_manageable_home_banners(
     return list_manageable_home_banners(db=db, placement=placement)
 
 
-@router.post("", response_model=HomeBannerResponse)
+@admin_router.post("", response_model=HomeBannerResponse)
 def create_home_banner_route(
     payload: HomeBannerCreateRequest,
     db: Session = Depends(get_db),
@@ -43,7 +44,7 @@ def create_home_banner_route(
     return create_home_banner(db=db, current_user=current_user, payload=payload)
 
 
-@router.patch("/{banner_id}/active", response_model=HomeBannerResponse)
+@admin_router.patch("/{banner_id}/active", response_model=HomeBannerResponse)
 def update_home_banner_active(
     banner_id: int,
     is_active: bool,

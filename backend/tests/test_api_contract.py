@@ -27,7 +27,7 @@ class CanonicalApiContractTests(unittest.TestCase):
         self.assertEqual({}, duplicates, f"Duplicate API registrations found: {duplicates}")
 
     def test_parallel_legacy_surfaces_are_not_registered(self):
-        paths = {route.path for route in api_router.routes}
+        paths = {route.path.removeprefix("/api/v1") for route in api_router.routes}
         self.assertNotIn("/control-center/source-of-truth", paths)
         self.assertNotIn("/rooms/{room_public_id}/realtime-snapshot", paths)
         self.assertFalse(any(path.startswith("/mvp") for path in paths))
@@ -36,15 +36,24 @@ class CanonicalApiContractTests(unittest.TestCase):
             self.assertNotIn(legacy, paths)
 
     def test_canonical_routes_exist(self):
-        paths = {route.path for route in api_router.routes}
+        paths = {route.path.removeprefix("/api/v1") for route in api_router.routes}
         for expected in {
             "/health", "/app/source-of-truth/master",
             "/families/{family_id}/members",
             "/rooms/{room_public_id}/realtime/snapshot",
-            "/ws/room-realtime", "/economy/lucky-packets",
-            "/wallet/me", "/wallet/rubies/convert", "/wallet/rubies/withdraw", "/economy/gifts/send", "/gifts/catalog", "/store/catalog",
+            "/ws/room-realtime", "/lucky-packets",
+            "/admin/games/pools", "/admin/games/props/jungle-hunt",
+            "/admin/games/seed-defaults", "/admin/games/catalog/{game_key}",
+            "/rooms/{room_public_id}/media", "/admin/media/nodes", "/support/tickets",
+            "/wallets/me", "/wallets/rubies/convert", "/wallets/rubies/withdraw", "/economy/gifts/send", "/gifts/catalog", "/store/catalog",
         }:
             self.assertIn(expected, paths)
+
+    def test_retired_admin_and_economy_prefixes_are_absent(self):
+        retired = ("/super-owner", "/control-center", "/games/admin", "/economy/admin", "/wallet/", "/moderation/")
+        for route in api_router.routes:
+            self.assertTrue(route.path.startswith("/api/v1/"))
+            self.assertFalse(route.path.removeprefix("/api/v1").startswith(retired), route.path)
 
     def test_route_module_names_do_not_shadow_packages(self):
         root = Path(__file__).resolve().parents[1] / "app" / "api" / "routes"

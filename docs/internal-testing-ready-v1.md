@@ -146,24 +146,9 @@ flutter run -d chrome
 
 Use Chrome first. Android emulator can be tested after Chrome works.
 
-### 9. Start WebRTC audio server later
+### 9. Media and deployment
 
-Only after backend and Flutter open cleanly:
-
-```powershell
-cd "D:\Vibe Match\vibematch\services\mediasoup-audio-server"
-copy .env.example .env
-npm install
-npm run check
-npm start
-```
-
-Then run:
-
-```powershell
-cd "D:\Vibe Match\vibematch\frontend\vibematch_app"
-flutter run -t lib/main_mediasoup_test.dart
-```
+This historical checklist is superseded by [PRODUCTION_RUNBOOK.md](../PRODUCTION_RUNBOOK.md). Use backend_media and authenticated API discovery for room and call media.
 
 ## Internal testing pass criteria
 

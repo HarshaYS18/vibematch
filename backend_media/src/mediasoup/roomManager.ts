@@ -12,6 +12,7 @@ import type { WorkerManager } from './workerManager.js';
 
 export class RoomManager {
   private readonly rooms = new Map<string, RoomState>();
+  private readonly pendingRooms = new Map<string, Promise<RoomState>>();
 
   constructor(private readonly workerManager: WorkerManager) {}
 
@@ -22,10 +23,22 @@ export class RoomManager {
       return existing;
     }
 
-    if (this.rooms.size >= config.registry.maxRooms) {
+    const pending = this.pendingRooms.get(roomPublicId);
+    if (pending) return pending;
+    if (this.rooms.size + this.pendingRooms.size >= config.registry.maxRooms) {
       throw new Error('Media node room capacity reached.');
     }
 
+    const creation = this.createRoom(roomPublicId);
+    this.pendingRooms.set(roomPublicId, creation);
+    try {
+      return await creation;
+    } finally {
+      this.pendingRooms.delete(roomPublicId);
+    }
+  }
+
+  private async createRoom(roomPublicId: string): Promise<RoomState> {
     const router = await this.workerManager.createRouter();
     const room: RoomState = {
       roomPublicId,

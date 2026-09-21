@@ -6,6 +6,7 @@ Create Date: 2026-05-12 18:30:00.000000
 """
 
 from alembic import op
+from legacy_snapshot import is_fresh_bootstrap, create_table, add_column, create_index
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -51,7 +52,7 @@ def _index_exists(table_name: str, index_name: str) -> bool:
 
 def _create_index_if_missing(index_name: str, table_name: str, columns: list[str]) -> None:
     if _table_exists(table_name) and not _index_exists(table_name, index_name):
-        op.create_index(index_name, table_name, columns, unique=False)
+        create_index(index_name, table_name, columns, unique=False)
 
 
 def _drop_index_if_exists(index_name: str, table_name: str) -> None:
@@ -60,6 +61,8 @@ def _drop_index_if_exists(index_name: str, table_name: str) -> None:
 
 
 def upgrade() -> None:
+    if is_fresh_bootstrap(op.get_bind()):
+        return
     bind = op.get_bind()
 
     postgresql.ENUM(
@@ -81,7 +84,7 @@ def upgrade() -> None:
     ).create(bind, checkfirst=True)
 
     if not _table_exists("cricket_tournaments"):
-        op.create_table(
+        create_table(
             "cricket_tournaments",
             sa.Column("id", sa.Integer(), nullable=False),
             sa.Column("room_public_id", sa.String(length=32), nullable=False),
@@ -112,7 +115,7 @@ def upgrade() -> None:
     _create_index_if_missing("ix_cricket_tournaments_created_by_user_id", "cricket_tournaments", ["created_by_user_id"])
 
     if not _table_exists("cricket_matches"):
-        op.create_table(
+        create_table(
             "cricket_matches",
             sa.Column("id", sa.Integer(), nullable=False),
             sa.Column("tournament_id", sa.Integer(), nullable=True),

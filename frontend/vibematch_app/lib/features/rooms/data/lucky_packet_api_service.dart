@@ -17,7 +17,7 @@ class LuckyPacketApiService {
     required String message,
   }) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/economy/lucky-packets')),
+      Uri.parse(VmApiConfig.endpoint('/lucky-packets')),
       headers: _headers(),
       body: jsonEncode({
         'room_public_id': roomPublicId,
@@ -32,7 +32,7 @@ class LuckyPacketApiService {
 
   Future<LuckyPacketApiResult?> fetchActive({required String roomPublicId}) async {
     final uri = Uri.parse(
-      VmApiConfig.endpoint('/economy/lucky-packets/active'),
+      VmApiConfig.endpoint('/lucky-packets/active'),
     ).replace(queryParameters: {'room_public_id': roomPublicId});
     final response = await http.get(uri, headers: _headers());
     _throwIfBad(response, 'Lucky Packet refresh failed');
@@ -43,7 +43,7 @@ class LuckyPacketApiService {
 
   Future<LuckyPacketApiResult> fetchPacket(String packetId) async {
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/economy/lucky-packets/$packetId')),
+      Uri.parse(VmApiConfig.endpoint('/lucky-packets/$packetId')),
       headers: _headers(),
     );
     _throwIfBad(response, 'Lucky Packet refresh failed');
@@ -52,7 +52,7 @@ class LuckyPacketApiService {
 
   Future<LuckyPacketApiResult> claim(String packetId) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/economy/lucky-packets/$packetId/claim')),
+      Uri.parse(VmApiConfig.endpoint('/lucky-packets/$packetId/claim')),
       headers: _headers(),
     );
     _throwIfBad(response, 'Lucky Packet claim failed');
@@ -61,7 +61,7 @@ class LuckyPacketApiService {
 
   Future<LuckyPacketApiResult> finalize(String packetId) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/economy/lucky-packets/$packetId/finalize')),
+      Uri.parse(VmApiConfig.endpoint('/lucky-packets/$packetId/finalize')),
       headers: _headers(),
     );
     _throwIfBad(response, 'Lucky Packet finalize failed');

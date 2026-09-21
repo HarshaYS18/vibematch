@@ -56,7 +56,7 @@ class ControlCenterApiService {
     String? deviceId,
   }) async {
     await _apiClient.postMap(
-      '/moderation/users/ban',
+      '/admin/moderation/users/ban',
       headers: _headers(),
       body: {
         'target_user_id': targetUserId,
@@ -72,7 +72,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/moderation/users/unban',
+      '/admin/moderation/users/unban',
       headers: _headers(),
       body: {'target_user_id': targetUserId, 'reason': reason},
     );
@@ -80,7 +80,7 @@ class ControlCenterApiService {
 
   Future<List<UserBanItem>> loadUserBans() async {
     final json = await _apiClient.getList(
-      '/moderation/users/bans',
+      '/admin/moderation/users/bans',
       headers: _headers(),
     );
     return json
@@ -91,7 +91,7 @@ class ControlCenterApiService {
 
   Future<List<DeviceBanItem>> loadDeviceBans() async {
     final json = await _apiClient.getList(
-      '/moderation/devices/bans',
+      '/admin/moderation/devices/bans',
       headers: _headers(),
     );
     return json
@@ -105,7 +105,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/moderation/devices/unban',
+      '/admin/moderation/devices/unban',
       headers: _headers(),
       body: {'device_id': deviceId, 'reason': reason},
     );
@@ -113,7 +113,7 @@ class ControlCenterApiService {
 
   Future<List<SuperOwnerPoolItem>> loadCoinPools() async {
     final json = await _apiClient.getList(
-      '/super-owner/coin-pools',
+      '/admin/economy/coin-pools',
       headers: _headers(),
     );
     return json
@@ -129,7 +129,7 @@ class ControlCenterApiService {
     int? targetUserId,
   }) async {
     await _apiClient.postMap(
-      '/super-owner/coins/mint',
+      '/admin/economy/coins/mint',
       headers: _headers(),
       body: {
         'target_pool_type': poolType,
@@ -146,7 +146,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/super-owner/coins/send-all',
+      '/admin/economy/coins/send-all',
       headers: _headers(),
       body: {
         'coin_amount': coinAmount,
@@ -162,7 +162,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/super-owner/custom-id',
+      '/admin/users/custom-id',
       headers: _headers(),
       body: {
         'target_user_id': targetUserId,
@@ -178,7 +178,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/super-owner/stealth',
+      '/admin/users/stealth',
       headers: _headers(),
       body: {
         'target_user_id': targetUserId,
@@ -190,7 +190,7 @@ class ControlCenterApiService {
 
   Future<List<SpecialPermissionOption>> loadSpecialPermissionOptions() async {
     final json = await _apiClient.getList(
-      '/super-owner/special-permissions/options',
+      '/admin/users/special-permissions/options',
       headers: _headers(),
     );
     return json
@@ -205,7 +205,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/super-owner/special-permissions/grant',
+      '/admin/users/special-permissions/grant',
       headers: _headers(),
       body: {
         'target_user_id': targetUserId,
@@ -224,7 +224,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/super-owner/vip-adjust',
+      '/admin/users/vip-adjust',
       headers: _headers(),
       body: {
         'target_user_id': targetUserId,
@@ -245,7 +245,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/super-owner/levels-adjust',
+      '/admin/users/levels-adjust',
       headers: _headers(),
       body: {
         'target_user_id': targetUserId,
@@ -259,7 +259,7 @@ class ControlCenterApiService {
 
   Future<List<SuperOwnerLogItem>> loadSuperOwnerLogs() async {
     final json = await _apiClient.getList(
-      '/super-owner/logs',
+      '/admin/moderation/owner-logs',
       headers: _headers(),
     );
     return json
@@ -270,7 +270,7 @@ class ControlCenterApiService {
 
   Future<List<SuperOwnerReviewItem>> loadReviewItems() async {
     final json = await _apiClient.getList(
-      '/super-owner/reviews',
+      '/admin/moderation/reviews',
       headers: _headers(),
     );
     return json
@@ -281,7 +281,7 @@ class ControlCenterApiService {
 
   Future<SuperOwnerReviewItem> loadReviewDetail(int reviewId) async {
     final json = await _apiClient.getMap(
-      '/super-owner/reviews/$reviewId',
+      '/admin/moderation/reviews/$reviewId',
       headers: _headers(),
     );
     return SuperOwnerReviewItem.fromJson(json);
@@ -289,7 +289,7 @@ class ControlCenterApiService {
 
   Future<List<ControlCenterEconomyRuleSet>> loadEconomyRuleSets() async {
     final json = await _apiClient.getList(
-      '/control-center/economy/rules',
+      '/admin/economy/rules',
       headers: _headers(),
     );
     return json
@@ -305,7 +305,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     await _apiClient.postMap(
-      '/control-center/economy/rules/$trackKey',
+      '/admin/economy/rules/$trackKey',
       headers: _headers(),
       body: {'title': title, 'levels': levels, 'reason': reason},
     );
@@ -313,7 +313,7 @@ class ControlCenterApiService {
 
   Future<List<ControlCenterStoreCategory>> loadStoreCategories() async {
     final json = await _apiClient.getList(
-      '/control-center/store/categories',
+      '/admin/economy/store/categories',
       headers: _headers(),
     );
     return json
@@ -326,7 +326,7 @@ class ControlCenterApiService {
     String? category,
   }) async {
     final json = await _apiClient.getList(
-      '/control-center/store/items',
+      '/admin/economy/store/items',
       headers: _headers(),
       queryParameters: {'category': category},
     );
@@ -338,7 +338,7 @@ class ControlCenterApiService {
 
   Future<void> upsertStoreCategory(Map<String, dynamic> payload) async {
     await _apiClient.postMap(
-      '/control-center/store/categories',
+      '/admin/economy/store/categories',
       headers: _headers(),
       body: payload,
     );
@@ -346,7 +346,7 @@ class ControlCenterApiService {
 
   Future<void> upsertStoreItem(Map<String, dynamic> payload) async {
     await _apiClient.postMap(
-      '/control-center/store/items',
+      '/admin/economy/store/items',
       headers: _headers(),
       body: payload,
     );
@@ -356,7 +356,7 @@ class ControlCenterApiService {
     Map<String, dynamic> manifest,
   ) {
     return _apiClient.postMap(
-      '/control-center/store/manifest/preview',
+      '/admin/economy/store/manifest/preview',
       headers: _headers(),
       body: {'manifest': manifest},
     );
@@ -367,7 +367,7 @@ class ControlCenterApiService {
     required String reason,
   }) {
     return _apiClient.postMap(
-      '/control-center/store/manifest/import',
+      '/admin/economy/store/manifest/import',
       headers: _headers(),
       body: {'manifest': manifest, 'reason': reason},
     );
@@ -375,7 +375,7 @@ class ControlCenterApiService {
 
   Future<StealthState> loadMyStealthState() async {
     final json = await _apiClient.getMap(
-      '/control-center/stealth/me',
+      '/users/me/stealth',
       headers: _headers(),
     );
     return StealthState.fromJson(json);
@@ -386,7 +386,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     final json = await _apiClient.postMap(
-      '/control-center/stealth/me',
+      '/users/me/stealth',
       headers: _headers(),
       body: {'enabled': enabled, 'reason': reason},
     );
@@ -399,7 +399,7 @@ class ControlCenterApiService {
     required String reason,
   }) async {
     final json = await _apiClient.postMap(
-      '/control-center/stealth/grants',
+      '/admin/users/stealth/grants',
       headers: _headers(),
       body: {
         'target_user_id': targetUserId,

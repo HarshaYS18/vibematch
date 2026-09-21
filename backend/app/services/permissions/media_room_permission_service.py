@@ -148,7 +148,7 @@ def evaluate_media_room_permission(
                 context=context,
             )
 
-    if action == "produce_audio":
+    if action in {"produce_audio", "resume_producer"}:
         # The room realtime service owns seat assignment.  A seat row is the
         # durable proof that an ordinary or privileged user is currently
         # allowed to publish room audio.  In apply-only mode this also means an

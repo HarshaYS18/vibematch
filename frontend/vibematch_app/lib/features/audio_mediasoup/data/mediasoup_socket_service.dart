@@ -14,13 +14,11 @@ class MediasoupSocketService {
   String? _peerId;
 
   final StreamController<String> _logController = StreamController<String>.broadcast();
-  final StreamController<List<dynamic>> _seatEventController = StreamController<List<dynamic>>.broadcast();
   final StreamController<MediasoupProducerState> _producerController = StreamController<MediasoupProducerState>.broadcast();
   final StreamController<String> _producerClosedController = StreamController<String>.broadcast();
   final StreamController<String> _peerLeftController = StreamController<String>.broadcast();
 
   Stream<String> get logs => _logController.stream;
-  Stream<List<dynamic>> get seatEvents => _seatEventController.stream;
   Stream<MediasoupProducerState> get newProducers => _producerController.stream;
   Stream<String> get producerClosedEvents => _producerClosedController.stream;
   Stream<String> get peerLeftEvents => _peerLeftController.stream;
@@ -34,7 +32,7 @@ class MediasoupSocketService {
     required String serverUrl,
     required String roomId,
     required String peerId,
-    String? audioToken,
+    required String audioToken,
   }) async {
     await disconnect();
 
@@ -46,6 +44,7 @@ class MediasoupSocketService {
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
+          .setAuth({'token': audioToken})
           .disableAutoConnect()
           .enableReconnection()
           .setReconnectionAttempts(8)
@@ -75,10 +74,10 @@ class MediasoupSocketService {
     final response = await _emitAck('joinRoom', <String, dynamic>{
       'roomId': roomId,
       'peerId': peerId,
-      if (audioToken != null && audioToken.isNotEmpty) 'audioToken': audioToken,
     });
 
     _ensureOk(response, 'joinRoom');
+    _peerId = _socket?.id;
 
     _log('joined room=$roomId peer=$peerId');
 
@@ -88,48 +87,14 @@ class MediasoupSocketService {
     );
   }
 
-  Future<Map<String, dynamic>> takeSeat(int seatNo) async {
-    final response = await _emitAck('takeSeat', _roomPayload(<String, dynamic>{
-      'seatNo': seatNo,
-    }));
-
-    _ensureOk(response, 'takeSeat');
-    _log('take seat $seatNo');
-    return response;
+  Future<void> setProducerPaused(String producerId, bool paused) async {
+    final event = paused ? 'pauseProducer' : 'resumeProducer';
+    _ensureOk(await _emitAck(event, {'producerId': producerId}), event);
   }
 
-  Future<Map<String, dynamic>> leaveSeat() async {
-    final response = await _emitAck('leaveSeat', _roomPayload());
-    _ensureOk(response, 'leaveSeat');
-    _log('leave seat');
-    return response;
+  Future<void> resumeConsumer(String consumerId) async {
+    _ensureOk(await _emitAck('resumeConsumer', {'consumerId': consumerId}), 'resumeConsumer');
   }
-
-  Future<Map<String, dynamic>> setSelfMuted(bool muted) async {
-    final response = await _emitAck('setSelfMuted', _roomPayload(<String, dynamic>{
-      'muted': muted,
-    }));
-
-    _ensureOk(response, 'setSelfMuted');
-    _log('self muted=$muted');
-    return response;
-  }
-
-  Future<Map<String, dynamic>> setAdminMuted({
-    required String targetPeerId,
-    required bool muted,
-  }) async {
-    final response = await _emitAck('setAdminMuted', <String, dynamic>{
-      'roomId': _requireRoomId(),
-      'targetPeerId': targetPeerId,
-      'muted': muted,
-    });
-
-    _ensureOk(response, 'setAdminMuted');
-    _log('admin muted peer=$targetPeerId muted=$muted');
-    return response;
-  }
-
   Future<Map<String, dynamic>> createTransport({
     required String direction,
   }) async {
@@ -199,7 +164,6 @@ class MediasoupSocketService {
   void dispose() {
     disconnect();
     _logController.close();
-    _seatEventController.close();
     _producerController.close();
     _producerClosedController.close();
     _peerLeftController.close();
@@ -224,14 +188,6 @@ class MediasoupSocketService {
       _peerLeftController.add(peerId);
     });
 
-    socket.on('seatsUpdated', (dynamic data) {
-      final map = _asMap(data);
-      final seats = map['seats'];
-      if (seats is List) {
-        _seatEventController.add(seats);
-      }
-      _log('seats updated');
-    });
 
     socket.on('newProducer', (dynamic data) {
       final map = _asMap(data);

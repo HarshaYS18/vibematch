@@ -14,7 +14,7 @@ from app.services.role_service import get_primary_role
 from app.services.special_permission_service import grant_special_permission
 from app.models.role import RoleName
 
-router = APIRouter(prefix="/control-center", tags=["Control Center"])
+router = APIRouter(tags=["Control Center"])
 
 
 def _owner_control(actor: User) -> None:
@@ -23,13 +23,13 @@ def _owner_control(actor: User) -> None:
 
 
 
-@router.get("/economy/rules")
+@router.get("/admin/economy/rules")
 def list_economy_rules(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _owner_control(current_user)
     return economy_rules_service.list_rule_sets(db)
 
 
-@router.post("/economy/rules/{track_key}")
+@router.post("/admin/economy/rules/{track_key}")
 def update_economy_rule_set(
     track_key: str,
     payload: EconomyRuleSetUpdateRequest,
@@ -46,13 +46,13 @@ def update_economy_rule_set(
     )
 
 
-@router.get("/store/categories")
+@router.get("/admin/economy/store/categories")
 def list_store_categories(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _owner_control(current_user)
     return store_control_center_service.list_categories(db)
 
 
-@router.post("/store/categories")
+@router.post("/admin/economy/store/categories")
 def upsert_store_category(
     payload: StoreCategoryUpsertRequest,
     db: Session = Depends(get_db),
@@ -61,7 +61,7 @@ def upsert_store_category(
     return store_control_center_service.upsert_category(db, actor=current_user, data=payload.model_dump())
 
 
-@router.get("/store/items")
+@router.get("/admin/economy/store/items")
 def list_store_items(
     category: str | None = Query(default=None),
     db: Session = Depends(get_db),
@@ -71,7 +71,7 @@ def list_store_items(
     return store_control_center_service.list_items(db, category=category)
 
 
-@router.post("/store/items")
+@router.post("/admin/economy/store/items")
 def upsert_store_item(
     payload: StoreItemUpsertRequest,
     db: Session = Depends(get_db),
@@ -80,13 +80,13 @@ def upsert_store_item(
     return store_control_center_service.upsert_item(db, actor=current_user, data=payload.model_dump())
 
 
-@router.post("/store/manifest/preview")
+@router.post("/admin/economy/store/manifest/preview")
 def preview_store_manifest(payload: ManifestImportRequest, current_user: User = Depends(get_current_user)):
     _owner_control(current_user)
     return store_control_center_service.preview_manifest(payload.manifest)
 
 
-@router.post("/store/manifest/import")
+@router.post("/admin/economy/store/manifest/import")
 def import_store_manifest(
     payload: ManifestImportRequest,
     db: Session = Depends(get_db),
@@ -95,7 +95,7 @@ def import_store_manifest(
     return store_control_center_service.import_manifest(db, actor=current_user, payload=payload.manifest, reason=payload.reason)
 
 
-@router.get("/stealth/me", response_model=StealthStateResponse)
+@router.get("/users/me/stealth", response_model=StealthStateResponse)
 def get_my_stealth_state(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     state = profile_display_service.get_or_create_stealth_state(db, current_user.id)
     can_use = room_permission_service.can_use_hidden_presence(db, current_user)
@@ -103,7 +103,7 @@ def get_my_stealth_state(db: Session = Depends(get_db), current_user: User = Dep
     return StealthStateResponse(user_id=current_user.id, is_enabled=bool(state.is_enabled), can_use_stealth=can_use, updated_at=state.updated_at)
 
 
-@router.post("/stealth/me", response_model=StealthStateResponse)
+@router.post("/users/me/stealth", response_model=StealthStateResponse)
 def toggle_my_stealth(
     payload: StealthToggleRequest,
     db: Session = Depends(get_db),
@@ -119,7 +119,7 @@ def toggle_my_stealth(
     return StealthStateResponse(user_id=current_user.id, is_enabled=bool(state.is_enabled), can_use_stealth=True, updated_at=state.updated_at)
 
 
-@router.post("/stealth/grants", response_model=StealthStateResponse)
+@router.post("/admin/users/stealth/grants", response_model=StealthStateResponse)
 def grant_stealth(
     payload: StealthGrantRequest,
     db: Session = Depends(get_db),

@@ -206,7 +206,7 @@ def list_login_history_for_device(
     return history
 
 
-@router.get("/special-permissions", response_model=list[SpecialPermissionResponse])
+@router.get("/users/special-permissions", response_model=list[SpecialPermissionResponse])
 def list_special_permissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -217,7 +217,7 @@ def list_special_permissions(
     return permissions
 
 
-@router.post("/special-permissions/grant", response_model=SpecialPermissionActionResponse)
+@router.post("/users/special-permissions/grant", response_model=SpecialPermissionActionResponse)
 def grant_user_special_permission(
     payload: GrantSpecialPermissionRequest,
     db: Session = Depends(get_db),
@@ -290,7 +290,7 @@ def grant_user_special_permission(
     )
 
 
-@router.post("/special-permissions/revoke", response_model=SpecialPermissionActionResponse)
+@router.post("/users/special-permissions/revoke", response_model=SpecialPermissionActionResponse)
 def revoke_user_special_permission(
     payload: RevokeSpecialPermissionRequest,
     db: Session = Depends(get_db),

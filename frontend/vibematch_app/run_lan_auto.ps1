@@ -24,8 +24,6 @@ if (!(Test-Path $envDir)) {
 @"
 {
   "VM_API_BASE_URL": "http://${ip}:8000",
-  "VM_MEDIA_WS_URL": "ws://${ip}:9000/ws",
-  "VM_AUDIO_URL": "http://${ip}:4000",
   "VM_GOOGLE_ANDROID_SERVER_CLIENT_ID": "112046889240-db25nkdrkv5i0qtcveo878g3e9v8gctb.apps.googleusercontent.com"
 }
 "@ | Set-Content -Encoding UTF8 $envFile

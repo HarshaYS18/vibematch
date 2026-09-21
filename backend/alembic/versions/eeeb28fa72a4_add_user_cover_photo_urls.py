@@ -8,6 +8,7 @@ Create Date: 2026-05-11
 from typing import Sequence, Union
 
 from alembic import op
+from legacy_snapshot import is_fresh_bootstrap
 
 
 revision: str = "eeeb28fa72a4"
@@ -17,6 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    if is_fresh_bootstrap(op.get_bind()):
+        return
     op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_photo_urls JSON;")
 
 

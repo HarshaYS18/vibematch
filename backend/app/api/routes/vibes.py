@@ -35,6 +35,7 @@ from app.schemas.vibes import (
 from app.services import cdn_media_service, inbox_service, notification_service
 
 router = APIRouter(prefix="/vibes", tags=["Vibes"])
+admin_router = APIRouter(prefix="/admin/moderation/vibes", tags=["Admin Vibes"])
 
 _REVIEW_ROLES = {"founder_owner", "owner", "superadmin", "admin", "monitor", "cs"}
 _MENTION_ALL_DAILY_LIMIT = 2
@@ -232,7 +233,7 @@ def list_public_user_vibes(public_user_id: int, limit: int = Query(default=30, g
     return [_post_response(db, post, current_user) for post in posts]
 
 
-@router.get("/reports", response_model=VibeReportQueueResponse)
+@admin_router.get("/reports", response_model=VibeReportQueueResponse)
 def list_vibe_reports(status: str | None = Query(default="PENDING"), limit: int = Query(default=50, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_report_reviewer(current_user)
     query = db.query(VibeReport).join(VibePost, VibeReport.post_id == VibePost.id)
@@ -242,7 +243,7 @@ def list_vibe_reports(status: str | None = Query(default="PENDING"), limit: int 
     return VibeReportQueueResponse(reports=[_report_queue_item(report) for report in reports])
 
 
-@router.post("/reports/{report_id}/review", response_model=VibeReportResponse)
+@admin_router.post("/reports/{report_id}/review", response_model=VibeReportResponse)
 def review_vibe_report(report_id: int, payload: VibeReportReviewRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_report_reviewer(current_user)
     report = db.query(VibeReport).filter(VibeReport.id == report_id).first()

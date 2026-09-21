@@ -34,7 +34,7 @@ from app.services.ban_service import (
 from app.services.role_service import get_primary_role
 
 
-router = APIRouter(prefix="/moderation", tags=["Moderation"])
+router = APIRouter(prefix="/admin/moderation", tags=["Moderation"])
 
 
 HIGH_LEVEL_BAN_OVERRIDE_ROLES = {

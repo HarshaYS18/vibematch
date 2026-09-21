@@ -31,7 +31,7 @@ class CoinSalesApiService {
   }) async {
     final token = _token();
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/coin-sales/admin/grant-supply')),
+      Uri.parse(VmApiConfig.endpoint('/admin/economy/coin-sales/grant-supply')),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

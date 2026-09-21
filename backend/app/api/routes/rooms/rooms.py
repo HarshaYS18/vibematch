@@ -80,6 +80,7 @@ from app.services.role_service import get_user_roles
 
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
+admin_router = APIRouter(prefix="/admin/rooms", tags=["Admin Rooms"])
 
 
 def _role_values(user: User) -> set[str]:
@@ -424,7 +425,7 @@ def submit_custom_background(
     )
 
 
-@router.get(
+@admin_router.get(
     "/custom-background-reviews",
     response_model=list[RoomThemeReviewResponse],
 )
@@ -435,7 +436,7 @@ def get_pending_custom_background_reviews(
     return list_pending_custom_background_reviews(db, current_user)
 
 
-@router.post(
+@admin_router.post(
     "/custom-background-reviews/{review_public_id}",
     response_model=RoomThemeReviewResponse,
 )

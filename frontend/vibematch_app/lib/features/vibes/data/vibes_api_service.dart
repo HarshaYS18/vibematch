@@ -141,7 +141,7 @@ class VibesApiService {
   }) async {
     final response = await http.get(
       Uri.parse(
-        VmApiConfig.endpoint('/vibes/reports'),
+        VmApiConfig.endpoint('/admin/moderation/vibes/reports'),
       ).replace(queryParameters: {'status': status, 'limit': '$limit'}),
       headers: _authHeaders(),
     );
@@ -160,7 +160,7 @@ class VibesApiService {
     bool deletePost = false,
   }) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/vibes/reports/$reportId/review')),
+      Uri.parse(VmApiConfig.endpoint('/admin/moderation/vibes/reports/$reportId/review')),
       headers: _authHeaders(contentType: true),
       body: jsonEncode({'status': status, 'delete_post': deletePost}),
     );

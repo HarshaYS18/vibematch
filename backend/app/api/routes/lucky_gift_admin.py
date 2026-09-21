@@ -24,7 +24,7 @@ from app.schemas.lucky_gifts_admin import (
 from app.services import lucky_gift_house_service, lucky_gift_props_service
 from app.services.audit_log_service import create_admin_log
 
-router = APIRouter(prefix="/super-owner/lucky-gifts", tags=["Super Owner Lucky Gifts"])
+router = APIRouter(prefix="/admin/economy/lucky-gifts", tags=["Super Owner Lucky Gifts"])
 
 
 def _metadata(raw: str | None) -> dict[str, Any]:

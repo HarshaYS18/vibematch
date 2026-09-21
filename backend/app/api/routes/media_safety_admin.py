@@ -28,7 +28,7 @@ from app.services import cdn_media_service, inbox_service
 from app.services.audit_log_service import create_admin_log
 
 
-router = APIRouter(prefix="/admin/media-safety", tags=["Admin Media Safety"])
+router = APIRouter(prefix="/admin/media/safety", tags=["Admin Media Safety"])
 
 
 def _require_media_safety_access(current_user: User) -> None:

@@ -6,6 +6,7 @@ Create Date: 2026-09-13 12:00:00.000000
 """
 
 from alembic import op
+from legacy_snapshot import is_fresh_bootstrap, create_table, add_column, create_index
 import sqlalchemy as sa
 
 
@@ -16,7 +17,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    if is_fresh_bootstrap(op.get_bind()):
+        return
+    create_table(
         "lucky_packets",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("public_id", sa.String(length=80), nullable=False),
@@ -39,15 +42,15 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("public_id"),
     )
-    op.create_index("ix_lucky_packets_public_id", "lucky_packets", ["public_id"], unique=True)
-    op.create_index("ix_lucky_packets_room_id", "lucky_packets", ["room_id"], unique=False)
-    op.create_index("ix_lucky_packets_sender_user_id", "lucky_packets", ["sender_user_id"], unique=False)
-    op.create_index("ix_lucky_packets_status", "lucky_packets", ["status"], unique=False)
-    op.create_index("ix_lucky_packets_opens_at", "lucky_packets", ["opens_at"], unique=False)
-    op.create_index("ix_lucky_packets_closes_at", "lucky_packets", ["closes_at"], unique=False)
-    op.create_index("ix_lucky_packets_created_at", "lucky_packets", ["created_at"], unique=False)
+    create_index("ix_lucky_packets_public_id", "lucky_packets", ["public_id"], unique=True)
+    create_index("ix_lucky_packets_room_id", "lucky_packets", ["room_id"], unique=False)
+    create_index("ix_lucky_packets_sender_user_id", "lucky_packets", ["sender_user_id"], unique=False)
+    create_index("ix_lucky_packets_status", "lucky_packets", ["status"], unique=False)
+    create_index("ix_lucky_packets_opens_at", "lucky_packets", ["opens_at"], unique=False)
+    create_index("ix_lucky_packets_closes_at", "lucky_packets", ["closes_at"], unique=False)
+    create_index("ix_lucky_packets_created_at", "lucky_packets", ["created_at"], unique=False)
 
-    op.create_table(
+    create_table(
         "lucky_packet_claims",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("packet_id", sa.Integer(), nullable=False),
@@ -59,9 +62,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("packet_id", "user_id", name="uq_lucky_packet_claim_user"),
     )
-    op.create_index("ix_lucky_packet_claims_packet_id", "lucky_packet_claims", ["packet_id"], unique=False)
-    op.create_index("ix_lucky_packet_claims_user_id", "lucky_packet_claims", ["user_id"], unique=False)
-    op.create_index("ix_lucky_packet_claims_created_at", "lucky_packet_claims", ["created_at"], unique=False)
+    create_index("ix_lucky_packet_claims_packet_id", "lucky_packet_claims", ["packet_id"], unique=False)
+    create_index("ix_lucky_packet_claims_user_id", "lucky_packet_claims", ["user_id"], unique=False)
+    create_index("ix_lucky_packet_claims_created_at", "lucky_packet_claims", ["created_at"], unique=False)
 
 
 def downgrade() -> None:

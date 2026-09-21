@@ -12,6 +12,76 @@ from app.core.config import settings
 
 NODE_PREFIX = "funkey:media:nodes:"
 ROOM_PREFIX = "funkey:media:rooms:"
+DRAIN_PREFIX = "funkey:media:draining:"
+RESERVATION_PREFIX = "funkey:media:reservations:"
+
+# All keys live in one Redis primary (Redis Cluster is not supported). Lua keeps
+# selection, reservations and sticky assignment atomic across API replicas.
+RESOLVE_SCRIPT = """
+local now = tonumber(redis.call('TIME')[1])
+local existing = redis.call('GET', KEYS[1])
+if existing then
+    local raw = redis.call('GET', ARGV[1] .. existing)
+    if raw then
+        redis.call('EXPIRE', KEYS[1], ARGV[4])
+        redis.call('ZADD', ARGV[2] .. existing, now + tonumber(ARGV[5]), ARGV[3])
+        redis.call('EXPIRE', ARGV[2] .. existing, ARGV[4])
+        return raw
+    end
+end
+local best = nil
+local score = math.huge
+for i = 2, #KEYS do
+    local raw = redis.call('GET', KEYS[i])
+    if raw then
+        local node = cjson.decode(raw)
+        local reservations = ARGV[2] .. node.node_id
+        redis.call('ZREMRANGEBYSCORE', reservations, '-inf', now)
+        local rooms = math.max(node.room_count, redis.call('ZCARD', reservations))
+        local load = math.max(rooms / node.max_rooms, node.peer_count / node.max_peers)
+        if not node.draining and rooms < node.max_rooms and node.peer_count < node.max_peers and load < score then
+            best = raw
+            score = load
+        end
+    end
+end
+if not best then return false end
+local node = cjson.decode(best)
+redis.call('SET', KEYS[1], node.node_id, 'EX', ARGV[4])
+redis.call('ZADD', ARGV[2] .. node.node_id, now + tonumber(ARGV[5]), ARGV[3])
+redis.call('EXPIRE', ARGV[2] .. node.node_id, ARGV[4])
+return best
+"""
+
+HEARTBEAT_SCRIPT = """
+local node = cjson.decode(ARGV[1])
+node.draining = redis.call('GET', KEYS[2]) == '1'
+local now = tonumber(redis.call('TIME')[1])
+node.updated_at = now
+local raw = cjson.encode(node)
+redis.call('SET', KEYS[1], raw, 'EX', ARGV[2])
+for _, room in ipairs(cjson.decode(ARGV[5])) do
+    if redis.call('GET', ARGV[3] .. room) == node.node_id then
+        redis.call('EXPIRE', ARGV[3] .. room, ARGV[4])
+        redis.call('ZADD', KEYS[3], now + tonumber(ARGV[2]), room)
+    end
+end
+redis.call('ZREMRANGEBYSCORE', KEYS[3], '-inf', now)
+redis.call('EXPIRE', KEYS[3], ARGV[4])
+return raw
+"""
+
+DRAIN_SCRIPT = """
+local raw = redis.call('GET', KEYS[1])
+if not raw then return false end
+local node = cjson.decode(raw)
+node.draining = ARGV[1] == '1'
+if node.draining then redis.call('SET', KEYS[2], '1')
+else redis.call('DEL', KEYS[2]) end
+raw = cjson.encode(node)
+redis.call('SET', KEYS[1], raw, 'KEEPTTL')
+return raw
+"""
 
 
 class MediaNodeUnavailable(RuntimeError):
@@ -109,7 +179,6 @@ def heartbeat_node(
     max_peers: int,
     room_ids: list[str],
 ) -> MediaNode:
-    existing = get_node(redis, node_id)
     node = MediaNode(
         node_id=node_id,
         public_url=public_url.rstrip("/"),
@@ -117,55 +186,40 @@ def heartbeat_node(
         peer_count=max(peer_count, 0),
         max_rooms=max(max_rooms, 1),
         max_peers=max(max_peers, 1),
-        draining=existing.draining if existing is not None else False,
+        draining=False,
         updated_at=time.time(),
     )
     try:
-        redis.set(
-            _node_key(node_id),
+        raw = redis.eval(
+            HEARTBEAT_SCRIPT, 3, _node_key(node_id), DRAIN_PREFIX + node_id,
+            RESERVATION_PREFIX + node_id,
             json.dumps(asdict(node), separators=(",", ":")),
-            ex=settings.MEDIA_NODE_TTL_SECONDS,
+            settings.MEDIA_NODE_TTL_SECONDS, ROOM_PREFIX,
+            settings.MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS,
+            json.dumps([room.strip() for room in room_ids if room.strip()]),
         )
-        for room_public_id in room_ids:
-            room_public_id = room_public_id.strip()
-            if not room_public_id:
-                continue
-            assignment_key = _room_key(room_public_id)
-            if redis.get(assignment_key) == node_id:
-                redis.expire(assignment_key, settings.MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS)
     except RedisError as exc:
         raise MediaNodeUnavailable("Media registry is unavailable.") from exc
-    return node
+    return _decode_node(raw)
 
 
 def set_node_draining(redis: Redis, node_id: str, draining: bool) -> MediaNode:
-    node = get_node(redis, node_id)
-    if node is None:
-        raise MediaNodeUnavailable("Media node is not registered or its heartbeat expired.")
-    updated = MediaNode(
-        node_id=node.node_id,
-        public_url=node.public_url,
-        room_count=node.room_count,
-        peer_count=node.peer_count,
-        max_rooms=node.max_rooms,
-        max_peers=node.max_peers,
-        draining=draining,
-        updated_at=node.updated_at,
-    )
     try:
-        redis.set(
-            _node_key(node_id),
-            json.dumps(asdict(updated), separators=(",", ":")),
-            ex=settings.MEDIA_NODE_TTL_SECONDS,
+        raw = redis.eval(
+            DRAIN_SCRIPT, 2, _node_key(node_id), DRAIN_PREFIX + node_id,
+            "1" if draining else "0",
         )
     except RedisError as exc:
         raise MediaNodeUnavailable("Media registry is unavailable.") from exc
-    return updated
+    node = _decode_node(raw)
+    if node is None:
+        raise MediaNodeUnavailable("Media node is not registered or its heartbeat expired.")
+    return node
 
 
 def remove_node(redis: Redis, node_id: str) -> None:
     try:
-        redis.delete(_node_key(node_id))
+        redis.delete(_node_key(node_id), RESERVATION_PREFIX + node_id)
     except RedisError as exc:
         raise MediaNodeUnavailable("Media registry is unavailable.") from exc
 
@@ -173,33 +227,17 @@ def remove_node(redis: Redis, node_id: str) -> None:
 def resolve_room_node(redis: Redis, room_public_id: str) -> MediaNode:
     assignment_key = _room_key(room_public_id)
     try:
-        existing_id = redis.get(assignment_key)
-        if existing_id:
-            node = get_node(redis, str(existing_id))
-            if node is not None:
-                redis.expire(assignment_key, settings.MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS)
-                return node
-            redis.delete(assignment_key)
-
-        candidates = [node for node in list_nodes(redis) if node.has_capacity]
-        if not candidates:
-            raise MediaNodeUnavailable("No healthy media node currently has room capacity.")
-
-        candidate = min(candidates, key=lambda item: (item.load_score, item.room_count, item.peer_count, item.node_id))
-        claimed = redis.set(
-            assignment_key,
-            candidate.node_id,
-            nx=True,
-            ex=settings.MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS,
+        keys = sorted(redis.scan_iter(match=f"{NODE_PREFIX}*"))
+        raw = redis.eval(
+            RESOLVE_SCRIPT, len(keys) + 1, assignment_key, *keys,
+            NODE_PREFIX, RESERVATION_PREFIX, room_public_id,
+            settings.MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS,
+            max(settings.MEDIA_NODE_TTL_SECONDS * 2, 60),
         )
-        if claimed:
-            return candidate
-
-        winner_id = redis.get(assignment_key)
-        winner = get_node(redis, str(winner_id)) if winner_id else None
-        if winner is not None:
-            return winner
-        raise MediaNodeUnavailable("Unable to establish a stable media-node assignment.")
+        node = _decode_node(raw)
+        if node is None:
+            raise MediaNodeUnavailable("No healthy media node currently has room capacity.")
+        return node
     except RedisError as exc:
         raise MediaNodeUnavailable("Media registry is unavailable.") from exc
 
@@ -207,6 +245,8 @@ def resolve_room_node(redis: Redis, room_public_id: str) -> MediaNode:
 def room_is_assigned_to_node(redis: Redis, room_public_id: str, node_id: str) -> bool:
     try:
         assigned = redis.get(_room_key(room_public_id))
-        return bool(assigned and str(assigned) == node_id and get_node(redis, node_id) is not None)
+        if isinstance(assigned, bytes):
+            assigned = assigned.decode("utf-8")
+        return bool(assigned == node_id and get_node(redis, node_id) is not None)
     except RedisError as exc:
         raise MediaNodeUnavailable("Media registry is unavailable.") from exc
