@@ -17,7 +17,7 @@ from app.schemas.game_props import (
 from app.services import house_pool_service, jungle_hunt_props_runtime_service, lucky_gift_props_service
 from app.services.audit_log_service import create_admin_log
 
-router = APIRouter(prefix="/super-owner/game-props", tags=["Super Owner Game Props"])
+router = APIRouter(prefix="/admin/games/props", tags=["Admin Game Props"])
 
 LUCKY_GIFT_POOL_KEY = "lucky_gifts"
 LUCKY_GIFT_POOL_TYPE = GamePoolType.GAME_HOUSE_POOL.value
