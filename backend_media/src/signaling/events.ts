@@ -39,6 +39,14 @@ export const consumerActionSchema = z.object({
   consumerId: z.string().min(1),
 });
 
+export const roomMusicStartSchema = z.object({
+  url: z.string().url().max(2000),
+  title: z.string().max(200).optional().default('Room music'),
+  seekMs: z.coerce.number().int().min(0).max(24 * 60 * 60 * 1000).optional().default(0),
+});
+
+export const roomMusicStopSchema = z.object({}).passthrough();
+
 export const leaveRoomSchema = z.object({
   roomPublicId: z.string().min(1).max(80).optional(),
   roomId: z.string().min(1).max(80).optional(),
