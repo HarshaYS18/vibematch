@@ -5,6 +5,12 @@ import { z } from 'zod';
 const envSchema = z.object({
   MEDIA_SERVICE_HOST: z.string().default('0.0.0.0'),
   MEDIA_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(4100),
+  MEDIA_NODE_ID: z.string().default(''),
+  MEDIA_PUBLIC_URL: z.string().url().default('http://127.0.0.1:4100'),
+  MEDIA_INTERNAL_TOKEN: z.string().min(16).default('change-this-media-internal-token'),
+  MEDIA_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().min(3000).default(10000),
+  MEDIA_MAX_ROOMS: z.coerce.number().int().min(1).default(250),
+  MEDIA_MAX_PEERS: z.coerce.number().int().min(1).default(5000),
   FASTAPI_BASE_URL: z.string().url().default('http://127.0.0.1:8000'),
   CORS_ORIGIN: z.string().default('*'),
   MEDIASOUP_LISTEN_IP: z.string().default('0.0.0.0'),
@@ -25,6 +31,14 @@ export const config = {
   fastApiBaseUrl: parsed.FASTAPI_BASE_URL.replace(/\/$/, ''),
   corsOrigin: parsed.CORS_ORIGIN,
   verifyTimeoutMs: parsed.VERIFY_TIMEOUT_MS,
+  registry: {
+    nodeId: parsed.MEDIA_NODE_ID.trim() || os.hostname(),
+    publicUrl: parsed.MEDIA_PUBLIC_URL.replace(/\/$/, ''),
+    internalToken: parsed.MEDIA_INTERNAL_TOKEN,
+    heartbeatIntervalMs: parsed.MEDIA_HEARTBEAT_INTERVAL_MS,
+    maxRooms: parsed.MEDIA_MAX_ROOMS,
+    maxPeers: parsed.MEDIA_MAX_PEERS,
+  },
   socket: {
     pingTimeout: parsed.SOCKET_PING_TIMEOUT_MS,
     pingInterval: parsed.SOCKET_PING_INTERVAL_MS,
