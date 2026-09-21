@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -22,6 +23,7 @@ from app.services.rooms import room_action_service, room_permission_service
 
 
 router = APIRouter(tags=["Room Realtime"])
+logger = logging.getLogger("uvicorn.error")
 _DISCONNECT_GRACE_SECONDS = 5
 
 
@@ -94,6 +96,69 @@ async def _send_error(
     )
 
 
+async def _leave_current_room_connection(
+    websocket: WebSocket,
+    *,
+    room_id: str,
+    user: User,
+    db: Session,
+    command_id: str,
+    command_type: str,
+    payload: dict,
+) -> bool:
+    """Leave this websocket without evicting another live session.
+
+    Returns True when the caller should stop processing this websocket.
+    """
+    await room_realtime_connections.release_connection(websocket)
+
+    if await room_realtime_connections.has_room_user_connections(
+        room_id,
+        int(user.id),
+    ):
+        room = room_or_404(db, room_id)
+        snapshot = client_room_snapshot(db, room)
+        db.commit()
+        logger.info(
+            "room_realtime.connection_leave_preserved_presence room_id=%s user_id=%s",
+            room_id,
+            user.id,
+        )
+        await _send_ack(
+            websocket,
+            room_id=room_id,
+            command_id=command_id,
+            command_type=command_type,
+            state_version=int(snapshot.get("state_version") or 0),
+        )
+        try:
+            await websocket.close(code=1000)
+        except Exception:
+            pass
+        return True
+
+    room = room_or_404(db, room_id)
+    snapshot = await execute_room_command(
+        db,
+        room,
+        user,
+        command_type,
+        payload,
+    )
+    await _send_ack(
+        websocket,
+        room_id=room_id,
+        command_id=command_id,
+        command_type=command_type,
+        state_version=int(snapshot.get("state_version") or 0),
+    )
+    try:
+        await websocket.close(code=1000)
+    except Exception:
+        pass
+    return True
+
+
 async def _finalize_disconnect(
     room_id: str,
     user_id: int,
@@ -126,6 +191,13 @@ async def _finalize_disconnect(
             return
 
         was_stealth = bool(participant.is_stealth)
+        logger.info(
+            "room_realtime.disconnect_finalize_deactivate room_id=%s user_id=%s disconnected_at=%s last_seen_at=%s",
+            room_id,
+            user_id,
+            disconnected_at.isoformat(),
+            participant.last_seen_at.isoformat() if participant.last_seen_at else None,
+        )
         room_action_service.leave_room(db, room, user, release_seat=True)
         db.commit()
         db.refresh(room)
@@ -382,6 +454,20 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         )
                         continue
 
+                    if command_type == "room/leave":
+                        await _leave_current_room_connection(
+                            websocket,
+                            room_id=room_id,
+                            user=user,
+                            db=db,
+                            command_id=command_id,
+                            command_type=command_type,
+                            payload=payload,
+                        )
+                        active_room_id = None
+                        active_user_id = None
+                        break
+
                     if command_id:
                         claimed = await room_realtime_connections.claim_command(
                             room_id,
@@ -415,12 +501,6 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         command_type=command_type,
                         state_version=int(snapshot.get("state_version") or 0),
                     )
-                    if command_type == "room/leave":
-                        try:
-                            await websocket.close(code=1000)
-                        except Exception:
-                            pass
-                        break
                 except HTTPException as exc:
                     db.rollback()
                     if claimed and command_id:
