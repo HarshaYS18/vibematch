@@ -27,10 +27,19 @@ def create_call_session(
     is_group = call_type in {CallSessionType.GROUP_AUDIO, CallSessionType.GROUP_VIDEO}
     participant_ids = _unique_participant_ids([actor.id, *participant_user_ids])
 
+    clean_room_public_id = (room_public_id or "").strip() or None
+    if clean_room_public_id is not None and clean_room_public_id.startswith("call_room_"):
+        raise HTTPException(
+            status_code=400,
+            detail="call_room_* media namespaces are server-generated.",
+        )
+    if clean_room_public_id is None:
+        clean_room_public_id = f"call_room_{uuid4().hex[:18]}"
+
     session = CallSession(
         call_public_id=f"call_{uuid4().hex}",
         conversation_id=conversation_id,
-        room_public_id=room_public_id,
+        room_public_id=clean_room_public_id,
         call_type=call_type,
         status=CallSessionStatus.RINGING,
         started_by_user_id=actor.id,
