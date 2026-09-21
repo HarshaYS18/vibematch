@@ -72,7 +72,8 @@ def evaluate_media_room_permission(
     participant = _participant(db, room.id, user.id)
     has_active_participant_record = bool(participant and participant.is_active)
     has_active_room_presence = (
-        has_active_participant_record or has_active_room_connection
+        has_active_participant_record
+        or bool(participant is not None and has_active_room_connection)
     )
     is_room_admin = bool(participant and participant.is_room_admin)
     is_member = bool(participant and participant.is_member)
