@@ -262,7 +262,6 @@ def _record_event_snapshot(
     room: Room,
     *,
     event_type: str,
-    wire_type: str,
     actor_user_id: int | None = None,
     target_user_id: int | None = None,
     event_payload: dict | None = None,
