@@ -42,12 +42,16 @@ def has_active_room_user_lease(
     record remains the normal authorization path.
     """
     safe_room_id = (room_public_id or "").strip()
-    if not safe_room_id or user_id <= 0:
+    try:
+        resolved_user_id = int(user_id)
+    except (TypeError, ValueError):
+        return False
+    if not safe_room_id or resolved_user_id <= 0:
         return False
     try:
         current = time.time() if now is None else now
         count = redis_client.zcount(
-            room_user_lease_key(safe_room_id, user_id),
+            room_user_lease_key(safe_room_id, resolved_user_id),
             current,
             "+inf",
         )
