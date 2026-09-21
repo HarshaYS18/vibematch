@@ -353,7 +353,12 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
 
                 claimed = False
                 try:
-                    room = room_or_404(db, room_id)
+                    room = room_or_404(db, room_id, for_update=True)
+                    room_action_service.refresh_authenticated_room_presence(
+                        db,
+                        room,
+                        user,
+                    )
 
                     if command_type == "room/snapshot":
                         room_permission_service.require_room_view(db, room, user)
