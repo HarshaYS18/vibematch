@@ -199,6 +199,42 @@ class MediaRoomLivePresenceTests(TestCase):
             verify.call_args.kwargs["has_active_room_connection"]
         )
 
+    def test_live_connection_without_participant_record_is_denied(self):
+        room = SimpleNamespace(
+            id=3,
+            room_public_id="VM123456",
+            owner_user_id=99,
+            is_secret=False,
+            is_locked=False,
+            is_members_only=False,
+            apply_only_mode_enabled=False,
+        )
+        user = SimpleNamespace(id=7)
+
+        with (
+            patch.object(
+                permissions.role_service,
+                "get_primary_role",
+                return_value=RoleName.USER,
+            ),
+            patch.object(permissions, "_participant", return_value=None),
+            patch.object(permissions, "_active_kickout", return_value=None),
+            patch.object(permissions, "_occupied_seat", return_value=None),
+        ):
+            decision = permissions.evaluate_media_room_permission(
+                db=SimpleNamespace(),
+                user=user,
+                room=room,
+                action="join_room",
+                has_active_room_connection=True,
+            )
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(
+            decision.reason,
+            "Join the room before using room media.",
+        )
+
     def test_live_connection_does_not_bypass_kickout(self):
         room = SimpleNamespace(
             id=3,
