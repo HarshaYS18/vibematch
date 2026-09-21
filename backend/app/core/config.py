@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:postgres@localhost:5432/vibematch"
     redis_url: str = "redis://localhost:6379/0"
 
+    # Media control plane / node registry
+    MEDIA_INTERNAL_TOKEN: str = "change-this-media-internal-token"
+    MEDIA_NODE_TTL_SECONDS: int = 30
+    MEDIA_ROOM_ASSIGNMENT_TTL_SECONDS: int = 86400
+
     # JWT
     JWT_SECRET_KEY: str = "change-this-secret-key-in-production"
     JWT_ALGORITHM: str = "HS256"
