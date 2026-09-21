@@ -132,6 +132,7 @@ export interface CallbackResponse<T = unknown> {
   ok: boolean;
   data?: T;
   error?: string;
+  statusCode?: number;
 }
 
 export type Ack<T = unknown> = (response: CallbackResponse<T>) => void;
