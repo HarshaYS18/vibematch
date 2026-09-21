@@ -61,7 +61,7 @@ def verify_media_realtime_access(
         and has_active_room_user_lease(
             get_redis(),
             room_public_id,
-            int(current_user.id),
+            current_user.id,
         )
     )
     result = verify_media_realtime_request(
