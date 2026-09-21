@@ -1,51 +1,65 @@
 # Production Realtime Media Architecture
 
-## Active Media Path
+## Active media path
 
-FastAPI remains the source of truth for room access, permissions, room state, seats, kicks, roles, and profile/economy display data.
+FunKey uses a control-plane/media-plane split:
 
-The active production media stack is:
+1. Flutter joins the application room through FastAPI realtime APIs.
+2. Flutter resolves media through `GET /api/v1/rooms/{room_public_id}/media`.
+3. FastAPI authorizes access and assigns a healthy media node through Redis.
+4. Flutter connects to the returned `signaling_url`.
+5. `backend_media` owns mediasoup routers, transports, producers and consumers.
+6. Sensitive signaling actions are re-authorized against FastAPI.
 
-1. Flutter `LiveRoomPage`
-2. `LiveRoomMediaSignalingService`
-3. `LiveRoomAudioService`
-4. `backend_media` Node service on port `4100`
-5. mediasoup transports, producers, and consumers
+FastAPI remains authoritative for authentication, bans, room membership, room state, seats, roles, kicks and application permissions. `backend_media` is authoritative only for media transport state.
 
-`backend_media` only routes realtime media. It verifies sensitive actions with FastAPI before joining rooms, creating or connecting transports, producing audio, consuming audio, and producer actions.
+## Canonical media implementation
 
-## Legacy Media Folders
+There is exactly one executable media implementation in this repository:
 
-These folders are legacy/reference only and must not be started as production services:
+- `backend_media/`
 
-- `audio-server/`
-- `media-server/`
-- `services/mediasoup-audio-server/`
-- `frontend/vibematch_app/lib/features/audio_mediasoup/`
+The former `audio-server/`, `media-server/`, and `services/mediasoup-audio-server/` implementations were removed during production consolidation. They must not be restored as parallel signaling services.
 
-## Audio Fixes Completed
+TURN infrastructure, when used, lives under `infra/turn/`.
 
-- `joinRoom` is idempotent per backend media socket for the same room.
-- Repeated `joinRoom` returns the existing peer/session payload and logs `[media] joinRoom.reused`.
-- Send and receive WebRTC transports are reused per peer direction.
-- Transport reuse logs `[media] transport.reused`.
-- A peer can consume a given producer only once.
-- Duplicate consume requests return the existing consumer payload and log `[media] consume.reused`.
-- Duplicate mic producers are replaced by closing the old producer and notifying the room once.
-- Disconnect, leave, close producer, and duplicate producer replacement clean producer/consumer/transport state.
-- `backend_media` now logs the mediasoup listen/announced IP on startup. Local dev defaults to auto-detecting the LAN IPv4 address when `MEDIASOUP_ANNOUNCED_IP` is empty, because advertising `127.0.0.1` makes WebRTC signaling succeed while remote devices cannot receive RTP.
-- Flutter audio join now has an in-flight guard.
-- Flutter receive transport creation and consume loops are idempotent.
-- Flutter treats the server `produce` ack as the canonical mic producer state, preventing the producer watchdog from creating a second mic producer after a successful ack.
-- Flutter remote audio renderers remain mounted in the visible page tree as tiny `RTCVideoView` widgets.
-- Flutter Web no longer forces speakerphone output routing.
+## Media discovery and scaling
 
-## Seat Action Pill
+Clients must not hard-code a media host or choose a media node directly. FastAPI stores media-node heartbeats, drain state, short-lived capacity reservations and sticky room assignments in Redis.
 
-The live-room seat UI should keep the established admin action pill. Media work must not redesign or replace that pill. Normal users still use the existing take-seat/apply-seat path and do not see admin-only controls.
+Draining a node prevents new assignments while allowing already assigned rooms to continue while the node remains healthy. Actual replica creation and termination belongs to the deployment orchestrator.
 
-## Deferred Work
+See [PRODUCTION_RUNBOOK.md](../PRODUCTION_RUNBOOK.md) for startup, health, drain and deployment procedures.
 
-- Manual cross-browser audio validation is still required to confirm browser autoplay/output behavior after signaling succeeds.
-- Relationship between room seat state and media producer state can be made richer later by adding canonical producer IDs into FastAPI room snapshots.
-- Legacy media folders should stay in place until the team decides on a cleanup/migration window.
+## Room and seat ownership
+
+Room realtime/FastAPI owns seat assignment and application room state. A media socket must not become a second source of truth for seats.
+
+For ordinary room audio, producing audio requires the authoritative room/seat permission checks to pass. Media transport cleanup must not mutate application seat state independently.
+
+## Call media
+
+Inbox calls use server-generated `call_room_*` media namespaces. Only persisted joined call participants can resolve or use those namespaces. Call media uses the same FastAPI discovery and `backend_media` signaling path as room media.
+
+## Reliability invariants
+
+- Joining the same media room is idempotent.
+- A peer reuses transport state where appropriate.
+- A producer is consumed at most once per peer.
+- Producer/consumer/transport state is cleaned on disconnect and leave.
+- Media nodes heartbeat into the FastAPI registry and fail readiness when the control-plane registry cannot be maintained.
+- Clients re-resolve media through FastAPI rather than relying on a stale node address.
+- Production deployments set the mediasoup announced address and RTC port range for the real NAT/network topology.
+
+## Verification
+
+The consolidation CI verifies:
+
+- architecture invariants
+- Alembic graph and PostgreSQL migration replay
+- backend regression tests
+- `backend_media` typecheck, build, lint and lifecycle tests
+- Flutter tests and analysis
+- Flutter production web build
+
+Manual multi-device RTP/audio validation is still required for each deployment/network environment because NAT, firewall, TURN and browser autoplay behavior cannot be fully proven by repository CI.
