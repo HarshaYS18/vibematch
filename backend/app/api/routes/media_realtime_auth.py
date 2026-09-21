@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.redis_client import get_redis
 from app.database import get_db
 from app.models.user import User
+from app.realtime.connection_manager import has_active_room_user_lease
 from app.schemas.media_realtime_auth import MediaRealtimeVerifyRequest, MediaRealtimeVerifyResponse
 from app.services import media_node_registry_service
 from app.services.media_realtime_auth_service import verify_media_realtime_request
@@ -52,11 +53,21 @@ def verify_media_realtime_access(
     """Verify user permissions and, for media servers, sticky node ownership."""
     _verify_media_node_identity(http_request, payload)
 
+    room_public_id = (payload.room_public_id or "").strip()
+    has_active_room_connection = bool(
+        room_public_id
+        and has_active_room_user_lease(
+            get_redis(),
+            room_public_id,
+            int(current_user.id),
+        )
+    )
     result = verify_media_realtime_request(
         db=db,
         user=current_user,
         room_public_id=payload.room_public_id,
         requested_action=payload.requested_action,
         device_id=payload.device_id,
+        has_active_room_connection=has_active_room_connection,
     )
     return MediaRealtimeVerifyResponse(**result)
