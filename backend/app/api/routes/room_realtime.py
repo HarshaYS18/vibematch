@@ -123,18 +123,6 @@ async def _finalize_disconnect(room_id: str, user_id: int) -> None:
         )
 
 
-@router.get("/rooms/{room_public_id}/realtime-snapshot")
-def get_room_realtime_snapshot(
-    room_public_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    room = room_or_404(db, room_public_id)
-    room_permission_service.require_room_view(db, room, current_user)
-    snapshot = client_room_snapshot(db, room)
-    db.commit()
-    return {"room_id": room_public_id, "room": snapshot}
-
 
 @router.websocket("/ws/room-realtime")
 async def room_realtime_socket(websocket: WebSocket) -> None:

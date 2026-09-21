@@ -20,13 +20,7 @@ class AppSourceTruthRepository {
     return AppSourceTruthRegistry.fromJson(json);
   }
 
-  Future<AppSourceTruthRegistry> loadControlCenterRegistry() async {
-    final json = await _apiClient.getMap(
-      '/control-center/source-of-truth',
-      headers: _headers(),
-    );
-    return AppSourceTruthRegistry.fromJson(json);
-  }
+  Future<AppSourceTruthRegistry> loadControlCenterRegistry() => loadMasterRegistry();
 
   Map<String, String> _headers() {
     final token = _authApiService.cachedAccessToken;

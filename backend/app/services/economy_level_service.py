@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.economy import EconomyCurrency, EconomyDirection, GiftTransaction, UserWallet, WalletLedger
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
-from app.services import economy_rules_service, experience_service
+from app.services import economy_rules_service, economy_service, experience_service
 from app.services import level_progression_service as progression
 
 OFFICIAL_RECHARGE_SOURCE_TYPES = {
@@ -22,13 +22,8 @@ OFFICIAL_RECHARGE_SOURCE_TYPES = {
 
 
 def get_or_create_wallet(db: Session, user_id: int) -> UserWallet:
-    wallet = db.query(UserWallet).filter(UserWallet.user_id == user_id).first()
-    if wallet:
-        return wallet
-    wallet = UserWallet(user_id=user_id)
-    db.add(wallet)
-    db.flush()
-    return wallet
+    """Compatibility wrapper around the canonical economy wallet repository."""
+    return economy_service.get_or_create_wallet(db, user_id)
 
 
 def _current_month_filter(query):

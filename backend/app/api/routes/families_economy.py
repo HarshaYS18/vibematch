@@ -70,31 +70,6 @@ def get_family_master(family_id: int, db: Session = Depends(get_db)):
     return _family_payload(_family_row(db, family_id), family_id)
 
 
-@router.get("/{family_id}/members")
-def get_family_members(
-    family_id: int,
-    page: int = Query(default=1, ge=1),
-    limit: int = Query(default=30, ge=1, le=100),
-    sort: str = Query(default="role"),
-    db: Session = Depends(get_db),
-):
-    query = db.query(FamilyMemberStats).filter(FamilyMemberStats.family_id == family_id)
-    if sort == "contribution_weekly":
-        query = query.order_by(FamilyMemberStats.weekly_contribution.desc())
-    elif sort == "joined_at":
-        query = query.order_by(FamilyMemberStats.joined_at.desc())
-    else:
-        query = query.order_by(FamilyMemberStats.family_role.asc(), FamilyMemberStats.total_contribution.desc())
-    offset = (page - 1) * limit
-    rows = query.offset(offset).limit(limit + 1).all()
-    visible = rows[:limit]
-    return {
-        "family_id": family_id,
-        "members": [_member_payload(db, row, offset + index, row.weekly_contribution) for index, row in enumerate(visible, start=1)],
-        "pagination": {"page": page, "limit": limit, "has_more": len(rows) > limit},
-        "sort": sort,
-    }
-
 
 @router.get("/{family_id}/exp")
 def get_family_exp(family_id: int, db: Session = Depends(get_db)):

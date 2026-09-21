@@ -5,69 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api.routes import (
-    admin,
-    admin_support,
-    ai_moderation,
-    app_source_registry,
-    auth,
-    calls,
-    coin_sales,
-    control_center,
-    economy,
-    economy_admin,
-    economy_gift_public,
-    economy_master,
-    experience,
-    experience_room_public,
-    families,
-    families_economy,
-    game_pool_admin,
-    game_props_admin,
-    game_settlements,
-    games,
-    games_master,
-    gift_catalog,
-    home_banners,
-    inbox,
-    inbox_ai,
-    inbox_backup_google,
-    inbox_ws,
-    internal_test,
-    love_bonds,
-    lucky_coins,
-    lucky_gifts,
-    media,
-    media_realtime_auth,
-    media_safety_admin,
-    moderation,
-    mvp_core,
-    mvp_economy,
-    mvp_operations,
-    mvp_room_modes,
-    mvp_social,
-    notifications,
-    presence,
-    profile_display,
-    push,
-    rankings,
-    relationship_exp,
-    role_badges,
-    room_levels,
-    room_music_media,
-    room_realtime,
-    room_realtime_commands,
-    settings,
-    social,
-    super_owner,
-    support,
-    users,
-    vibes,
-    vip_admin,
-    wallet,
-)
-from app.api.routes.rooms import cricket, rooms
-from app.api.routes.store import router as store_router
+from app.api.router import api_router
 from app.database import Base, engine
 from app.models import (
     AdminLog,
@@ -299,70 +237,6 @@ def root():
     return {"message": "Vibe Match backend running", "status": "ok"}
 
 
-@app.get("/health")
-def health():
-    return {"status": "healthy", "service": "vibe-match-backend"}
 
 
-app.include_router(auth.router)
-app.include_router(app_source_registry.router)
-app.include_router(users.router)
-app.include_router(role_badges.router)
-app.include_router(admin.router)
-app.include_router(admin_support.router)
-app.include_router(media_safety_admin.router)
-app.include_router(moderation.router)
-app.include_router(ai_moderation.router)
-app.include_router(super_owner.router)
-app.include_router(control_center.router)
-app.include_router(game_pool_admin.router)
-app.include_router(game_props_admin.router)
-app.include_router(rooms.router)
-app.include_router(room_levels.router)
-app.include_router(cricket.router)
-app.include_router(families.router)
-app.include_router(families_economy.router)
-app.include_router(home_banners.router)
-app.include_router(inbox.router)
-app.include_router(inbox_ai.router)
-app.include_router(inbox_backup_google.router)
-app.include_router(love_bonds.router)
-app.include_router(relationship_exp.router)
-app.include_router(inbox_ws.router)
-app.include_router(calls.router)
-app.include_router(media_realtime_auth.router)
-app.include_router(room_realtime.router)
-app.include_router(room_realtime_commands.router)
-app.include_router(settings.router)
-app.include_router(experience.router)
-app.include_router(experience_room_public.router)
-app.include_router(social.router)
-app.include_router(vibes.router)
-app.include_router(notifications.router)
-app.include_router(push.router)
-app.include_router(presence.router)
-app.include_router(profile_display.router)
-app.include_router(support.router)
-app.include_router(media.router)
-app.include_router(room_music_media.router)
-app.include_router(mvp_core.router)
-app.include_router(mvp_social.router)
-app.include_router(mvp_economy.router)
-app.include_router(mvp_operations.router)
-app.include_router(mvp_room_modes.router)
-app.include_router(internal_test.router)
-app.include_router(economy.router)
-app.include_router(economy_master.router)
-app.include_router(economy_gift_public.router)
-app.include_router(gift_catalog.router)
-app.include_router(economy_admin.router)
-app.include_router(games.router)
-app.include_router(games_master.router)
-app.include_router(game_settlements.router)
-app.include_router(lucky_gifts.router)
-app.include_router(lucky_coins.router)
-app.include_router(store_router)
-app.include_router(rankings.router)
-app.include_router(coin_sales.router)
-app.include_router(vip_admin.router)
-app.include_router(wallet.router)
+app.include_router(api_router)
