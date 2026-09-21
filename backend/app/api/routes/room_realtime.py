@@ -473,6 +473,11 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         active_user_id = None
                         break
 
+                    # Keep the same room -> participant lock order used by
+                    # execute_room_command. Reconciliation may lock/update the
+                    # participant row, so acquire the room row first to avoid
+                    # introducing an inverse-order deadlock during reconnects.
+                    room = room_or_404(db, room_id, for_update=True)
                     room_action_service.reconcile_authenticated_room_presence(
                         db,
                         room,
