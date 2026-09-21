@@ -33,6 +33,10 @@ export class WorkerManager {
     return worker.createRouter({ mediaCodecs });
   }
 
+  get isReady(): boolean {
+    return this.worker !== null;
+  }
+
   close(): void {
     this.worker?.close();
     this.worker = null;
