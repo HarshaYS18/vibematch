@@ -1,5 +1,7 @@
 # Inbox Source of Truth Audit
 
+> **Historical audit notice:** this document records an earlier Inbox implementation pass. Statements below about mediasoup being absent, call media being deferred, runtime schema bootstrap, or verification being unavailable are not current. The production source of truth is `PRODUCTION_RUNBOOK.md`, `docs/production_realtime_media_architecture.md`, the canonical `/api/v1` router, and `backend_media/`.
+
 Branch: `economy-control-center-source-of-truth-v1`
 Base commit requested: `6d3d6907 Wire family and love bond store sources`
 
