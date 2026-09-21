@@ -7,7 +7,9 @@ export type MediaAction =
   | 'pause_producer'
   | 'resume_producer'
   | 'close_producer'
-  | 'leave_room';
+  | 'leave_room'
+  | 'start_room_music'
+  | 'stop_room_music';
 
 export type TransportDirection = 'send' | 'recv';
 
@@ -110,10 +112,17 @@ export interface PeerState {
   consumerProducerIds: Map<string, string>;
 }
 
+export interface ServerProducerState {
+  producer: MediaProducer;
+  peerId: string;
+  appData: Record<string, unknown>;
+}
+
 export interface RoomState {
   roomPublicId: string;
   router: MediaRouter;
   peers: Map<string, PeerState>;
+  serverProducers: Map<string, ServerProducerState>;
   createdAt: number;
   lastActiveAt: number;
 }
