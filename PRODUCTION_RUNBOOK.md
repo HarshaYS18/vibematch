@@ -1,62 +1,63 @@
 # FunKey / VibeMatch production runbook
 
-This document describes the service topology that the current repository actually uses.
+This document describes the canonical backend/media runtime on this branch.
 
 ## Runtime topology
 
-There are **two application server processes** in the current branch, plus PostgreSQL and Redis infrastructure:
+There are exactly **two application process types**, plus PostgreSQL and Redis:
 
-1. **FastAPI API + room realtime WebSocket** — port `8000`
-   - REST API
+1. **FastAPI control/API plane** — port `8000`
+   - REST API under `/api/v1`
    - authentication and authorization
-   - room state and presence
-   - `/ws/room-realtime`
-   - `/media-realtime/verify`
+   - room state, seats, presence and realtime WebSocket
+   - inbox/economy/games/admin APIs
+   - media authorization and media-node assignment
+   - media-node registry backed by Redis
 
-   The room WebSocket is mounted in `backend/app/main.py`; it is **not a separate Python server process** in the current codebase.
+2. **Canonical mediasoup media worker: `backend_media/`** — port `4100` by default
+   - mediasoup workers/routers
+   - Socket.IO signaling
+   - audio producers/consumers
+   - room/music media runtime
+   - periodic heartbeats to FastAPI
+   - no independent authority for users, room membership, seats, bans or permissions
 
-2. **`backend_media` mediasoup / Socket.IO service** — port `4100`
-   - mediasoup worker/router
-   - audio send/receive transports
-   - producer/consumer signaling
-   - calls FastAPI for JWT-backed media authorization
+Infrastructure:
+- PostgreSQL — durable application state
+- Redis — realtime coordination, media-node registry and sticky room-to-node assignment
 
-Infrastructure required by the application:
+The old `audio-server/`, `media-server/`, and `services/mediasoup-audio-server/` implementations were removed from this branch. Git history remains the archive; do not restore them as production entrypoints.
 
-- PostgreSQL
-- Redis
+## Database ownership
 
-The older `audio-server/` service on port `4000` is legacy. The Flutter client currently points at `backend_media` on port `4100`; do not run the old service as the production audio endpoint.
+Alembic is the only database schema authority.
 
-## Local development startup
+Application startup does not call `Base.metadata.create_all()` and must not execute runtime `ALTER TABLE`/`CREATE TABLE` mutations. FastAPI verifies that the database is at the current Alembic head and fails fast when it is not.
 
-### FastAPI
-
-PowerShell:
-
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Linux/macOS:
+Before starting or restarting the API after a deploy:
 
 ```bash
 cd backend
-source .venv/bin/activate
+alembic upgrade head
+```
+
+Do not add startup-time schema repair code. Add a new Alembic revision instead.
+
+## Local development
+
+### FastAPI
+
+```bash
+cd backend
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Health check:
-
+Health:
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Expected response contains `"status":"healthy"`.
-
-### Mediasoup service
+### Media worker
 
 ```bash
 cd backend_media
@@ -66,46 +67,34 @@ npm run build
 npm run dev
 ```
 
-Health check:
-
+Health/readiness:
 ```bash
 curl http://127.0.0.1:4100/health
-```
-
-## Restarting Uvicorn
-
-For a foreground development process, stop it with `Ctrl+C`, then restart:
-
-```bash
-cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-For production, do not use `--reload`. Run the API under systemd, Docker, or another process supervisor and restart that unit/container instead of manually killing Python processes.
-
-Example systemd commands when the unit is named `vibematch-api`:
-
-```bash
-sudo systemctl restart vibematch-api
-sudo systemctl status vibematch-api --no-pager
-sudo journalctl -u vibematch-api -n 200 --no-pager
-```
-
-Example media-service commands when the unit is named `vibematch-media`:
-
-```bash
-sudo systemctl restart vibematch-media
-sudo systemctl status vibematch-media --no-pager
-sudo journalctl -u vibematch-media -n 200 --no-pager
+curl http://127.0.0.1:4100/ready
 ```
 
 ## Production boot order
 
-Start PostgreSQL and Redis first, then FastAPI, then `backend_media`, and finally deploy/start the Flutter client. `backend_media` depends on FastAPI authorization for sensitive media actions.
+1. Start PostgreSQL and Redis.
+2. Run `alembic upgrade head`.
+3. Start FastAPI.
+4. Start one or more `backend_media` workers.
+5. Route public API/WebSocket traffic through the gateway/load balancer.
+
+A media worker is ready only after mediasoup is initialized and it has successfully registered with FastAPI. Workers heartbeat into the registry; FastAPI assigns rooms to healthy non-draining nodes and preserves sticky assignments in Redis.
+
+## Media scaling/draining
+
+Scale by adding/removing `backend_media` replicas. Each replica must have:
+- a unique `MEDIA_NODE_ID`
+- a client-reachable `MEDIA_PUBLIC_URL`
+- the same `MEDIA_INTERNAL_TOKEN` as FastAPI
+- a valid public `MEDIASOUP_ANNOUNCED_IP`
+- an open RTC UDP/TCP port range
+
+To drain a node, mark it draining through the admin media endpoint. Draining nodes stop receiving new room assignments while existing assignments remain stable until they expire or the node leaves the registry.
 
 ## Required production checks
-
-Before deployment:
 
 ```bash
 cd backend
@@ -121,21 +110,25 @@ flutter pub get
 flutter test
 ```
 
-The branch also contains `.github/workflows/room-production-hardening.yml`, which runs these checks on pushes to `chatgpt/room-production-hardening`.
+## Realtime/media invariants
 
-## Realtime security invariants
+- FastAPI is authoritative for identity, room membership, seats, moderation and permissions.
+- The media worker never trusts a client-provided user identity or seat state as authority.
+- Publishing audio is re-authorized against FastAPI.
+- Room-to-media-node assignment is owned by the FastAPI/Redis control plane.
+- Redis failure makes media assignment unavailable rather than silently creating a second source of truth.
+- PostgreSQL and Redis remain private infrastructure; public clients connect only to approved API/media gateway endpoints.
 
-- WebSocket actor identity comes from the access token, never from a client-supplied user id.
-- Joined room actions require an active `RoomParticipant` record.
-- Media access requires active room presence.
-- Publishing microphone audio requires an authoritative occupied room seat.
-- In apply-only rooms, the assigned seat is the proof of approval; approved users can publish only after assignment.
-- Redis distributes room realtime events and connection leases across FastAPI workers.
+## Production process management
 
-## Deployment notes
+Do not use `--reload` in production. Run FastAPI and media workers under Docker, systemd, Kubernetes or another supervisor.
 
-- Put FastAPI and `backend_media` behind TLS (`https` / `wss`) for public traffic.
-- Set the mediasoup announced IP to the public IP reachable by clients.
-- Open the configured mediasoup RTC UDP/TCP port range in the firewall.
-- Keep PostgreSQL and Redis private; do not expose them directly to the internet.
-- Run database migrations deliberately before starting production workers. The current backend still contains beta-era runtime schema guards, so migration cleanup should be completed before treating schema startup behavior as fully production-grade.
+Example:
+
+```bash
+sudo systemctl restart vibematch-api
+sudo systemctl restart vibematch-media
+sudo systemctl status vibematch-api vibematch-media --no-pager
+```
+
+Keep TLS enabled for all public HTTP/WebSocket traffic.
