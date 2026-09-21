@@ -200,7 +200,10 @@ def heartbeat_node(
         )
     except RedisError as exc:
         raise MediaNodeUnavailable("Media registry is unavailable.") from exc
-    return _decode_node(raw)
+    decoded = _decode_node(raw)
+    if decoded is None:
+        raise MediaNodeUnavailable("Media node heartbeat returned invalid registry data.")
+    return decoded
 
 
 def set_node_draining(redis: Redis, node_id: str, draining: bool) -> MediaNode:
