@@ -13,7 +13,7 @@ from app.api.routes import (
     game_settlements, games, games_master, gift_catalog, health, home_banners,
     inbox, inbox_ai, inbox_backup_google, inbox_calls, inbox_message_tools,
     inbox_preferences, inbox_stories, inbox_ws, love_bonds, lucky_coins,
-    lucky_gifts, lucky_packets, media, media_realtime_auth, media_safety_admin,
+    lucky_gifts, lucky_packets, media, media_control, media_realtime_auth, media_safety_admin,
     moderation, notifications, presence, profile_display, push, rankings,
     relationship_exp, role_badges, room_levels, room_music_media,
     room_realtime, room_realtime_commands, settings, social, super_owner,
@@ -42,7 +42,7 @@ for router in (
 # Rooms and realtime.
 for router in (
     rooms.router, room_levels.router, cricket.router, room_realtime.router,
-    room_realtime_commands.router, media_realtime_auth.router,
+    room_realtime_commands.router, media_control.router, media_realtime_auth.router,
 ):
     api_router.include_router(router)
 
