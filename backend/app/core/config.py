@@ -61,6 +61,41 @@ class Settings(BaseSettings):
             return ["*"]
         return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.strip().lower() in {"production", "prod"}
+
+    def validate_runtime_settings(self) -> None:
+        """Fail closed when production is configured with development defaults."""
+        if not self.is_production:
+            return
+
+        problems: list[str] = []
+        if self.JWT_SECRET_KEY.startswith("change-this") or len(self.JWT_SECRET_KEY) < 32:
+            problems.append("JWT_SECRET_KEY must be a strong production secret")
+        if self.MEDIA_INTERNAL_TOKEN.startswith("change-this") or len(self.MEDIA_INTERNAL_TOKEN) < 32:
+            problems.append("MEDIA_INTERNAL_TOKEN must be a strong shared secret")
+        if self.cors_allowed_origins == ["*"]:
+            problems.append("CORS_ALLOWED_ORIGINS must list explicit production origins")
+        if self.ENABLE_DEV_LOGIN:
+            problems.append("ENABLE_DEV_LOGIN must be false in production")
+        if self.MEDIA_STORAGE_DRIVER.strip().lower() == "local":
+            problems.append("MEDIA_STORAGE_DRIVER cannot be local in production")
+        if not self.MEDIA_CDN_BASE_URL.strip():
+            problems.append("MEDIA_CDN_BASE_URL is required in production")
+        if self.MEDIA_STORAGE_DRIVER.strip().lower() == "s3":
+            required_s3 = {
+                "MEDIA_S3_BUCKET": self.MEDIA_S3_BUCKET,
+                "MEDIA_S3_ACCESS_KEY_ID": self.MEDIA_S3_ACCESS_KEY_ID,
+                "MEDIA_S3_SECRET_ACCESS_KEY": self.MEDIA_S3_SECRET_ACCESS_KEY,
+            }
+            missing = [name for name, value in required_s3.items() if not value.strip()]
+            if missing:
+                problems.append("missing S3 settings: " + ", ".join(missing))
+
+        if problems:
+            raise RuntimeError("Unsafe production configuration: " + "; ".join(problems))
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
