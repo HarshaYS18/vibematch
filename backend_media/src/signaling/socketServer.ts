@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import { config } from '../config.js';
+import { startRoomMusic, stopRoomMusic } from '../media/musicSourceManager.js';
 import { extractBearerToken, MediaAuthorizationError, verifyMediaAction } from '../auth/fastapiVerifier.js';
 import type { Ack, MediaAction, MediaConsumer, MediaProducer, MediaWebRtcTransport, PeerState, RoomState } from '../types/mediaTypes.js';
 import type { RoomManager } from '../mediasoup/roomManager.js';
@@ -13,6 +14,8 @@ import {
   leaveRoomSchema,
   produceSchema,
   producerActionSchema,
+  roomMusicStartSchema,
+  roomMusicStopSchema,
   socketAuthSchema,
 } from './events.js';
 
@@ -245,9 +248,47 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
       });
     });
 
+    socket.on('startRoomMusic', async (payload: unknown, ack?: Ack) => {
+      await safeAck('startRoomMusic', socket.id, ack, async () => {
+        const input = roomMusicStartSchema.parse(payload);
+        const peer = requirePeer(roomManager, socket.id);
+        await verifyPeerAction(peer, 'start_room_music');
+        const room = requireRoom(roomManager, peer.roomPublicId);
+        const music = await startRoomMusic({
+          room,
+          io,
+          controllerPeerId: peer.socketId,
+          url: input.url,
+          title: input.title,
+          seekMs: input.seekMs,
+        });
+        mediaLog('roomMusic.start.ok', socket.id, {
+          roomPublicId: peer.roomPublicId,
+          producerId: music.producerId,
+        });
+        return { music };
+      });
+    });
+
+    socket.on('stopRoomMusic', async (payload: unknown, ack?: Ack) => {
+      await safeAck('stopRoomMusic', socket.id, ack, async () => {
+        roomMusicStopSchema.parse(payload ?? {});
+        const peer = requirePeer(roomManager, socket.id);
+        await verifyPeerAction(peer, 'stop_room_music');
+        const room = requireRoom(roomManager, peer.roomPublicId);
+        await stopRoomMusic(room, io);
+        mediaLog('roomMusic.stop.ok', socket.id, { roomPublicId: peer.roomPublicId });
+        return { stopped: true };
+      });
+    });
+
     socket.on('leaveRoom', async (payload: unknown, ack?: Ack) => {
       await safeAck('leaveRoom', socket.id, ack, async () => {
         leaveRoomSchema.parse(payload ?? {});
+        const leavingRoom = roomManager.getPeerRoom(socket.id);
+        if (leavingRoom?.peers.size === 1) {
+          await stopRoomMusic(leavingRoom, io, 'room-empty');
+        }
         const closed = roomManager.closePeer(socket.id);
         if (closed.roomPublicId) {
           await socket.leave(closed.roomPublicId);
@@ -258,7 +299,11 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
       });
     });
 
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
+      const leavingRoom = roomManager.getPeerRoom(socket.id);
+      if (leavingRoom?.peers.size === 1) {
+        await stopRoomMusic(leavingRoom, io, 'room-empty');
+      }
       const closed = roomManager.closePeer(socket.id);
       mediaLog('socket.disconnected', socket.id, { reason, ...closed });
       if (closed.roomPublicId) {
