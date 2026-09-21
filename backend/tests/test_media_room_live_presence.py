@@ -65,6 +65,11 @@ class MediaRoomLivePresenceTests(TestCase):
             ),
             patch.object(
                 permissions,
+                "_active_participant",
+                return_value=None,
+            ),
+            patch.object(
+                permissions,
                 "_participant",
                 return_value=stale_participant,
             ),
@@ -216,6 +221,11 @@ class MediaRoomLivePresenceTests(TestCase):
                 permissions.role_service,
                 "get_primary_role",
                 return_value=RoleName.USER,
+            ),
+            patch.object(
+                permissions,
+                "_active_participant",
+                return_value=None,
             ),
             patch.object(permissions, "_participant", return_value=None),
             patch.object(permissions, "_active_kickout", return_value=None),
