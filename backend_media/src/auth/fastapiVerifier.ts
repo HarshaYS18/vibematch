@@ -27,18 +27,21 @@ export async function verifyMediaAction(params: {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${params.bearerToken}`,
+        'X-Media-Internal-Token': config.registry.internalToken,
       },
       body: JSON.stringify({
         room_public_id: params.roomPublicId ?? null,
         device_id: params.deviceId ?? null,
         requested_action: params.requestedAction,
+        media_node_id: config.registry.nodeId,
       }),
       signal: controller.signal,
     });
 
     if (!response.ok) {
+      const body = await response.text();
       throw new MediaAuthorizationError(
-        `FastAPI verification failed with status ${response.status}`,
+        `FastAPI verification failed with status ${response.status}: ${body}`,
         response.status,
       );
     }
