@@ -38,7 +38,7 @@ class GiftApiService {
     bool isRelationshipGift = false,
   }) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/gifts/send')),
+      Uri.parse(VmApiConfig.endpoint('/economy/gifts/send')),
       headers: _headers(),
       body: jsonEncode({
         'receiver_public_user_id': receiverPublicUserId,
@@ -64,7 +64,7 @@ class GiftApiService {
     bool isRelationshipGift = false,
   }) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/gifts/send')),
+      Uri.parse(VmApiConfig.endpoint('/economy/gifts/send')),
       headers: _headers(),
       body: jsonEncode({
         'receiver_public_user_id': receiverPublicUserId,
