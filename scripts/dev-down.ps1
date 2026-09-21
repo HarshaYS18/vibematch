@@ -46,7 +46,10 @@ function Get-ContainerManagedLabel([string]$Name) {
     if ($LASTEXITCODE -ne 0 -or -not $labelsJson) { return $null }
     try {
         $labels = $labelsJson | ConvertFrom-Json
-        return $labels.'com.vibematch.dev.managed'
+        if ($null -eq $labels) { return $null }
+        $property = $labels.PSObject.Properties['com.vibematch.dev.managed']
+        if ($null -eq $property) { return $null }
+        return [string]$property.Value
     } catch {
         return $null
     }
