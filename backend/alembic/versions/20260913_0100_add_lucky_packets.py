@@ -6,7 +6,7 @@ Create Date: 2026-09-13 12:00:00.000000
 """
 
 from alembic import op
-from legacy_snapshot import create_table, create_index
+from legacy_snapshot import is_fresh_bootstrap, create_table, add_column, create_index
 import sqlalchemy as sa
 
 
@@ -17,6 +17,8 @@ depends_on = None
 
 
 def upgrade() -> None:
+    if is_fresh_bootstrap(op.get_bind()):
+        return
     create_table(
         "lucky_packets",
         sa.Column("id", sa.Integer(), nullable=False),
