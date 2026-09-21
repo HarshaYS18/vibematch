@@ -199,6 +199,45 @@ def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | Non
     return snapshot
 
 
+def reconcile_authenticated_room_presence(
+    db: Session,
+    room: Room,
+    user: User,
+) -> None:
+    """Repair stale durable presence for an already-authenticated room socket.
+
+    This never creates a missing participant. Entry restrictions and
+    single-active-room rules are rechecked before an existing inactive row is
+    reactivated.
+    """
+    participant = (
+        db.query(RoomParticipant)
+        .filter(
+            RoomParticipant.room_id == room.id,
+            RoomParticipant.user_id == user.id,
+        )
+        .with_for_update()
+        .first()
+    )
+    if participant is None or participant.is_active:
+        return
+
+    assert_room_entry_allowed(db, room, user)
+    if user_has_active_room_conflict(db, user.id, room.room_public_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This account is already active in another chatroom",
+        )
+
+    now = datetime.utcnow()
+    participant.is_active = True
+    participant.last_seen_at = now
+    participant.left_at = None
+    user.last_seen_at = now
+    mark_user_room_presence_active(db, room, user)
+    db.flush()
+
+
 def heartbeat_room(db: Session, room: Room, user: User) -> dict[str, Any]:
     assert_room_entry_allowed(db, room, user)
     if user_has_active_room_conflict(db, user.id, room.room_public_id):
