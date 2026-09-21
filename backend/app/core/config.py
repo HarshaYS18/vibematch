@@ -2,7 +2,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "Vibe Match"
+    APP_NAME: str = "FunKey"
+    APP_ENV: str = "development"
+    ENFORCE_SCHEMA_CURRENT: bool = True
+    CORS_ALLOWED_ORIGINS: str = "*"
 
     # Database / Redis from .env
     database_url: str = "postgresql://postgres:postgres@localhost:5432/vibematch"
@@ -16,9 +19,7 @@ class Settings(BaseSettings):
     # Founder Owner
     FOUNDER_OWNER_PUBLIC_ID: int = 6922022
 
-    # Dynamic gift assets. In production set this to your CDN, e.g.
-    # https://cdn.funkey.app. When empty, API still returns local bundled
-    # fallback paths for closed-beta testing.
+    # Dynamic gift assets. In production set this to your CDN.
     GIFT_CDN_BASE_URL: str = ""
 
     # Production media storage.
@@ -40,13 +41,20 @@ class Settings(BaseSettings):
     # Google Drive backup OAuth
     GOOGLE_DRIVE_CLIENT_ID: str = ""
     GOOGLE_DRIVE_CLIENT_SECRET: str = ""
-    GOOGLE_DRIVE_REDIRECT_URI: str = "http://127.0.0.1:8000/inbox/backup/google/callback"
+    GOOGLE_DRIVE_REDIRECT_URI: str = "http://127.0.0.1:8000/api/v1/inbox/backup/google/callback"
     GOOGLE_DRIVE_SCOPES: str = "https://www.googleapis.com/auth/drive.file"
     INBOX_BACKUP_ENCRYPTION_KEY: str = "change-this-32-byte-key-before-production"
 
     # Firebase Cloud Messaging HTTP v1
     FCM_PROJECT_ID: str = ""
     FIREBASE_SERVICE_ACCOUNT_PATH: str = ""
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        raw = self.CORS_ALLOWED_ORIGINS.strip()
+        if not raw or raw == "*":
+            return ["*"]
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
     model_config = SettingsConfigDict(
         env_file=".env",
