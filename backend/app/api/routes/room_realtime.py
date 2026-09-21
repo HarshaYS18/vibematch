@@ -415,6 +415,12 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         command_type=command_type,
                         state_version=int(snapshot.get("state_version") or 0),
                     )
+                    if command_type == "room/leave":
+                        try:
+                            await websocket.close(code=1000)
+                        except Exception:
+                            pass
+                        break
                 except HTTPException as exc:
                     db.rollback()
                     if claimed and command_id:
