@@ -98,6 +98,7 @@ export interface SocketAuthContext {
 
 export interface PeerState {
   socketId: string;
+  peerId: string;
   user: VerifiedMediaUser;
   bearerToken: string;
   deviceId?: string;
