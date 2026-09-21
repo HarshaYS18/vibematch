@@ -24,7 +24,7 @@ def create_index(name, table, columns, **kwargs):
 
 
 def snapshot():
-    return json.loads(Path(__file__).with_name("alembic") / "schema_20260921.json".read_text(encoding="utf-8"))
+    return json.loads((Path(__file__).with_name("alembic") / "schema_20260921.json").read_text(encoding="utf-8"))
 
 
 def is_fresh_bootstrap(bind):
