@@ -19,6 +19,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    settings.validate_runtime_settings()
     if settings.ENFORCE_SCHEMA_CURRENT:
         assert_database_schema_current(engine)
     yield
