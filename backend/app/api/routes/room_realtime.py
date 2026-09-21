@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
@@ -83,7 +84,11 @@ async def _send_error(
     )
 
 
-async def _finalize_disconnect(room_id: str, user_id: int) -> None:
+async def _finalize_disconnect(
+    room_id: str,
+    user_id: int,
+    disconnected_at: datetime,
+) -> None:
     await asyncio.sleep(_DISCONNECT_GRACE_SECONDS)
     if await room_realtime_connections.has_room_user_connections(room_id, user_id):
         return
@@ -97,10 +102,22 @@ async def _finalize_disconnect(room_id: str, user_id: int) -> None:
                 RoomParticipant.room_id == room.id,
                 RoomParticipant.user_id == user_id,
             )
+            .with_for_update()
             .first()
         )
         if user is None or participant is None or not participant.is_active:
             return
+
+        # A replacement websocket or REST join can begin during the disconnect
+        # grace window before it is visible in the connection manager. Those
+        # joins refresh last_seen_at under the same participant row lock. Do
+        # not let this stale disconnect task deactivate a newer room session.
+        if (
+            participant.last_seen_at is not None
+            and participant.last_seen_at > disconnected_at
+        ):
+            return
+
         was_stealth = bool(participant.is_stealth)
         room_action_service.leave_room(db, room, user, release_seat=True)
         db.commit()
@@ -195,10 +212,15 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                                 RoomParticipant.room_id == room.id,
                                 RoomParticipant.user_id == authenticated_user_id,
                             )
+                            .with_for_update()
                             .first()
                         )
                         if participant is not None and participant.is_active:
                             room_permission_service.require_join(db, room, user)
+                            now = datetime.utcnow()
+                            participant.last_seen_at = now
+                            participant.left_at = None
+                            user.last_seen_at = now
                             snapshot = client_room_snapshot(db, room)
                             db.commit()
                         else:
@@ -419,6 +441,9 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         message="Room command failed",
                     )
     finally:
+        disconnected_at = datetime.utcnow()
         released = await room_realtime_connections.release_connection(websocket)
         for room_id, user_id in released:
-            asyncio.create_task(_finalize_disconnect(room_id, user_id))
+            asyncio.create_task(
+                _finalize_disconnect(room_id, user_id, disconnected_at)
+            )
