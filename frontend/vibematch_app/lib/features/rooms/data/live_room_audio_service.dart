@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:mediasfu_mediasoup_client/mediasfu_mediasoup_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
-import '../../../core/network/vm_media_config.dart';
+import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../presentation/live_room_models.dart';
 
@@ -258,8 +261,20 @@ class LiveRoomAudioService {
 
     final deviceId = await authApi.getCurrentDeviceId();
 
+    late final String audioUrl;
+    try {
+      audioUrl = await _resolveAssignedMediaUrl(
+        accessToken: accessToken,
+        deviceId: deviceId,
+      );
+    } catch (error) {
+      _connecting = false;
+      _setError('Audio node discovery failed: $error');
+      return;
+    }
+
     final socket = io.io(
-      VmMediaConfig.audioUrl,
+      audioUrl,
       io.OptionBuilder()
           .setTransports(<String>['websocket'])
           .disableAutoConnect()
@@ -276,7 +291,7 @@ class LiveRoomAudioService {
 
     socket.onConnect((_) {
       connected.value = true;
-      _debug('audio socket connected ${VmMediaConfig.audioUrl}');
+      _debug('audio socket connected $audioUrl');
       if (_shouldStayConnected && _roomId != null && _currentUser != null) {
         _sendJoinRoom();
       }
@@ -353,6 +368,50 @@ class LiveRoomAudioService {
     _socket = socket;
     socket.connect();
     _connecting = false;
+  }
+
+  Future<String> _resolveAssignedMediaUrl({
+    required String accessToken,
+    String? deviceId,
+  }) async {
+    final roomId = _roomId;
+    if (roomId == null || roomId.trim().isEmpty) {
+      throw StateError('Room id is required before media discovery.');
+    }
+
+    final endpoint = Uri.parse(
+      VmApiConfig.endpoint('/rooms/${Uri.encodeComponent(roomId)}/media'),
+    ).replace(
+      queryParameters: <String, String>{
+        if (deviceId != null && deviceId.trim().isNotEmpty)
+          'device_id': deviceId.trim(),
+      },
+    );
+
+    final response = await http.get(
+      endpoint,
+      headers: <String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    ).timeout(const Duration(seconds: 8));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'Media discovery returned ${response.statusCode}: ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw StateError('Media discovery returned an invalid response.');
+    }
+
+    final signalingUrl = decoded['signaling_url']?.toString().trim() ?? '';
+    if (signalingUrl.isEmpty) {
+      throw StateError('Media discovery did not return signaling_url.');
+    }
+    return signalingUrl;
   }
 
   void _sendJoinRoom() {
