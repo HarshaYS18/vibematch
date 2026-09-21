@@ -468,6 +468,12 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         active_user_id = None
                         break
 
+                    room_action_service.reconcile_authenticated_room_presence(
+                        db,
+                        room,
+                        user,
+                    )
+
                     if command_id:
                         claimed = await room_realtime_connections.claim_command(
                             room_id,
