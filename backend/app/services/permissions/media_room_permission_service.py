@@ -50,6 +50,7 @@ def evaluate_media_room_permission(
     room: Room | None,
     action: str,
     device_id: str | None = None,
+    has_active_room_connection: bool = False,
 ) -> MediaRoomPermissionDecision:
     """Central room/media permission resolver for realtime audio actions.
 
@@ -68,7 +69,11 @@ def evaluate_media_room_permission(
 
     role = role_service.get_primary_role(user)
     is_owner = room.owner_user_id == user.id
-    participant = _active_participant(db, room.id, user.id)
+    participant = _participant(db, room.id, user.id)
+    has_active_participant_record = bool(participant and participant.is_active)
+    has_active_room_presence = (
+        has_active_participant_record or has_active_room_connection
+    )
     is_room_admin = bool(participant and participant.is_room_admin)
     is_member = bool(participant and participant.is_member)
     is_staff_override = role in STAFF_ROOM_OVERRIDE_ROLES
@@ -83,7 +88,9 @@ def evaluate_media_room_permission(
         "is_room_member": is_member,
         "is_staff_override": is_staff_override,
         "is_moderation_staff": is_moderation_staff,
-        "has_active_participant_record": participant is not None,
+        "has_active_participant_record": has_active_participant_record,
+        "has_active_room_connection": has_active_room_connection,
+        "has_active_room_presence": has_active_room_presence,
         "has_active_kickout": active_kickout is not None,
         "has_occupied_seat": seat_state is not None,
         "seat_index": getattr(seat_state, "seat_index", None),
@@ -99,7 +106,7 @@ def evaluate_media_room_permission(
             context=context,
         )
 
-    if action in ROOM_ACTIONS_REQUIRING_ACTIVE_PRESENCE and participant is None:
+    if action in ROOM_ACTIONS_REQUIRING_ACTIVE_PRESENCE and not has_active_room_presence:
         return MediaRoomPermissionDecision(
             allowed=False,
             reason="Join the room before using room media.",
@@ -195,13 +202,12 @@ def evaluate_media_room_permission(
     )
 
 
-def _active_participant(db: Session, room_id: int, user_id: int) -> RoomParticipant | None:
+def _participant(db: Session, room_id: int, user_id: int) -> RoomParticipant | None:
     return (
         db.query(RoomParticipant)
         .filter(
             RoomParticipant.room_id == room_id,
             RoomParticipant.user_id == user_id,
-            RoomParticipant.is_active == True,  # noqa: E712
         )
         .first()
     )
