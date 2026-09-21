@@ -17,6 +17,8 @@ MEDIA_REALTIME_ACTIONS = {
     "leave_room",
     "join_seat",
     "leave_seat",
+    "start_room_music",
+    "stop_room_music",
 }
 
 _MEDIA_ACTIONS_REQUIRING_ROOM = {
@@ -30,6 +32,8 @@ _MEDIA_ACTIONS_REQUIRING_ROOM = {
     "close_producer",
     "join_seat",
     "leave_seat",
+    "start_room_music",
+    "stop_room_music",
 }
 
 
@@ -56,6 +60,8 @@ def _permission_set(action: str) -> list[str]:
         base.append("MIC_OR_SEAT_PERMISSION_REQUIRED")
     if action in {"pause_producer", "resume_producer", "close_producer"}:
         base.append("PRODUCER_OWNER_REQUIRED")
+    if action in {"start_room_music", "stop_room_music"}:
+        base.append("ROOM_MUSIC_CONTROL_REQUIRED")
     return base
 
 
