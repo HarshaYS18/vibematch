@@ -29,8 +29,9 @@ ROOM_MODERATION_ROLES = {
 ROOM_PRODUCE_ACTIONS = {"produce_audio", "join_seat"}
 ROOM_CONSUME_ACTIONS = {"consume_audio", "join_room", "create_transport", "connect_transport"}
 ROOM_PRODUCER_OWNER_ACTIONS = {"pause_producer", "resume_producer", "close_producer"}
+ROOM_MUSIC_ACTIONS = {"start_room_music", "stop_room_music"}
 ROOM_ACTIONS_REQUIRING_ACTIVE_PRESENCE = (
-    ROOM_PRODUCE_ACTIONS | ROOM_CONSUME_ACTIONS | ROOM_PRODUCER_OWNER_ACTIONS
+    ROOM_PRODUCE_ACTIONS | ROOM_CONSUME_ACTIONS | ROOM_PRODUCER_OWNER_ACTIONS | ROOM_MUSIC_ACTIONS
 )
 
 
@@ -130,6 +131,14 @@ def evaluate_media_room_permission(
             context=context,
         )
 
+    if action in ROOM_MUSIC_ACTIONS and not (is_owner or is_room_admin or is_moderation_staff):
+        return MediaRoomPermissionDecision(
+            allowed=False,
+            reason="Room music control requires room owner, room admin, or moderation staff access.",
+            permissions=[],
+            context=context,
+        )
+
     if action == "join_seat":
         if room.apply_only_mode_enabled and not (is_owner or is_room_admin or is_staff_override):
             return MediaRoomPermissionDecision(
@@ -175,6 +184,8 @@ def evaluate_media_room_permission(
         permissions.append("CAN_LISTEN")
     if action in ROOM_PRODUCER_OWNER_ACTIONS:
         permissions.append("PRODUCER_OWNER_CHECK_REQUIRED_BY_SIGNALING")
+    if action in ROOM_MUSIC_ACTIONS:
+        permissions.append("ROOM_MUSIC_CONTROL")
 
     return MediaRoomPermissionDecision(
         allowed=True,
