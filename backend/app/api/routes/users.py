@@ -277,7 +277,6 @@ def search_users(q: str = Query(..., min_length=1, max_length=80), limit: int = 
     return UserSearchResponse(results=[_search_result_payload(db, user, current_user) for user in users])
 
 
-@router.get("/profile/{public_user_id}", response_model=PublicUserProfileResponse)
 @router.get("/{public_user_id}", response_model=PublicUserProfileResponse)
 def get_public_profile(public_user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     user = _get_public_active_user(db, public_user_id)
@@ -287,7 +286,6 @@ def get_public_profile(public_user_id: int, db: Session = Depends(get_db), curre
     return PublicUserProfileResponse(public_user_id=user.public_user_id, display_custom_id=user.display_custom_id, username=user.username, display_name=user.display_name, avatar_url=user.avatar_url, bio=user.bio, cover_photo_urls=user.cover_photo_urls or [], date_of_birth=user.date_of_birth, gender=user.gender, profession=user.profession, marital_status=user.marital_status, friend_gender_preference=user.friend_gender_preference, friend_marital_preference=user.friend_marital_preference, interests=user.interests or [], primary_role=primary_role.value, primary_role_badge=get_primary_role_badge(primary_role), role_badges=get_role_badges(user_roles), vip=profile_service.vip_summary(db, user), wallet=profile_service.wallet_summary(db, user, include_private_balances=False), equipped_items=profile_service.equipped_items_summary(db, user), is_online=False, relationship=_relationship_payload(db, user, current_user), last_seen_at=user.last_seen_at, created_at=user.created_at)
 
 
-@router.get("/me/visitors", response_model=ProfileVisitListResponse)
 @router.get("/me/profile-visitors", response_model=ProfileVisitListResponse)
 def get_my_profile_visitors(limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     visits = db.query(ProfileVisit).filter(ProfileVisit.profile_owner_user_id == current_user.id).order_by(ProfileVisit.last_visited_at.desc()).limit(limit).all()

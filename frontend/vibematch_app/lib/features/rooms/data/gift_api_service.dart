@@ -38,12 +38,11 @@ class GiftApiService {
     bool isRelationshipGift = false,
   }) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/economy/gifts/send-public')),
+      Uri.parse(VmApiConfig.endpoint('/economy/gifts/send')),
       headers: _headers(),
       body: jsonEncode({
         'receiver_public_user_id': receiverPublicUserId,
         'gift_id': giftId,
-        'coin_value': coinValue,
         'quantity': quantity,
         'room_public_id': roomPublicId,
         'relationship_id': relationshipId,
@@ -65,12 +64,11 @@ class GiftApiService {
     bool isRelationshipGift = false,
   }) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/economy/gifts/send-lucky-public')),
+      Uri.parse(VmApiConfig.endpoint('/economy/gifts/send')),
       headers: _headers(),
       body: jsonEncode({
         'receiver_public_user_id': receiverPublicUserId,
         'gift_id': giftId,
-        'coin_value': coinValue,
         'quantity': quantity,
         'room_public_id': roomPublicId,
         'house_risk_score': houseRiskScore,

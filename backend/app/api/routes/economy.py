@@ -19,10 +19,7 @@ from app.schemas.economy import (
     GiftEconomyPreviewRequest,
     GiftEconomyPreviewResponse,
     GiftSendPublicRequest,
-    GiftSendRequest,
     GiftSendResponse,
-    RubyConversionRequest,
-    RubyWithdrawRequestCreate,
 )
 from app.services import (
     economy_level_service,
@@ -421,13 +418,6 @@ def get_public_user_economy_summary(
     return _public_wallet_summary(db, user)
 
 
-@router.get("/users/{user_id}/summary")
-def get_user_economy_summary(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return _public_wallet_summary(db, user)
-
 
 @router.post("/gifts/preview", response_model=GiftEconomyPreviewResponse)
 def preview_gift_economy(payload: GiftEconomyPreviewRequest):
@@ -442,61 +432,9 @@ def preview_gift_economy(payload: GiftEconomyPreviewRequest):
     )
 
 
+
 @router.post("/gifts/send", response_model=GiftSendResponse)
 async def send_gift(
-    payload: GiftSendRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    result = economy_service.send_gift(
-        db=db,
-        sender=current_user,
-        receiver_user_id=payload.receiver_user_id,
-        gift_id=payload.gift_id,
-        coin_value=payload.coin_value,
-        quantity=payload.quantity,
-        room_id=payload.room_id,
-        relationship_id=payload.relationship_id,
-        is_relationship_gift=payload.is_relationship_gift,
-    )
-    exp_updates = (
-        result.get("experience_updates")
-        if isinstance(result.get("experience_updates"), dict)
-        else {}
-    )
-    await inbox_ws_manager.send_to_user(
-        current_user.id,
-        {
-            "event": "experience_updated",
-            "scope": "send",
-            "payload": exp_updates.get("sender"),
-        },
-    )
-    await inbox_ws_manager.send_to_user(
-        payload.receiver_user_id,
-        {
-            "event": "experience_updated",
-            "scope": "receive",
-            "payload": exp_updates.get("receiver"),
-            "ruby": {
-                "earned": result.get("receiver_ruby_amount"),
-                "balance": result.get("receiver_ruby_balance"),
-                "lifetime_rubies_earned": result.get("receiver_lifetime_rubies_earned"),
-            },
-        },
-    )
-    await _broadcast_after_gift(
-        db,
-        room_id=payload.room_id,
-        sender_user_id=current_user.id,
-        receiver_user_id=payload.receiver_user_id,
-        exp_updates=exp_updates,
-    )
-    return GiftSendResponse(**result)
-
-
-@router.post("/gifts/send-public", response_model=GiftSendResponse)
-async def send_gift_public(
     payload: GiftSendPublicRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -505,6 +443,8 @@ async def send_gift_public(
     room = _room_from_public_id(db, payload.room_public_id)
     _require_room_gift_presence(db, room, current_user.id, receiver.id)
     catalog_gift = _catalog_gift_or_error(db, payload.gift_id, payload.quantity)
+    if str(catalog_gift.get("gift_type") or "").lower() == "lucky":
+        return await _send_lucky_gift_authoritative(payload, current_user, db)
     coin_value = int(catalog_gift["coin_value"])
     room_id = room.id if room is not None else None
 
@@ -545,8 +485,7 @@ async def send_gift_public(
     return GiftSendResponse(**result)
 
 
-@router.post("/gifts/send-lucky-public", response_model=GiftSendResponse)
-async def send_lucky_gift_public(
+async def _send_lucky_gift_authoritative(
     payload: GiftSendPublicRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -643,7 +582,7 @@ async def send_lucky_gift_public(
             metadata_json=_metadata_json(
                 {
                     "gift_transaction_id": result["gift_transaction_id"],
-                    "source": "send_lucky_public",
+                    "source": "canonical_gift_send",
                     "lucky_result": lucky_result,
                     "risk": risk_result,
                     "house": house_result,
@@ -700,35 +639,3 @@ async def send_lucky_gift_public(
     return GiftSendResponse(**result)
 
 
-@router.post("/rubies/convert-to-coins", response_model=EconomyWalletResponse)
-def convert_rubies_to_coins(
-    payload: RubyConversionRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    wallet = economy_service.convert_rubies_to_coins(
-        db,
-        current_user,
-        payload.ruby_amount,
-    )
-    return _wallet_response(db, wallet)
-
-
-@router.post("/rubies/withdraw")
-def request_ruby_withdrawal(
-    payload: RubyWithdrawRequestCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    request = economy_service.create_withdraw_request(
-        db=db,
-        user=current_user,
-        ruby_amount=payload.ruby_amount,
-        payout_method=payload.payout_method,
-        payout_account_snapshot=payload.payout_account_snapshot,
-    )
-    return {
-        "id": request.id,
-        "ruby_amount": request.ruby_amount,
-        "status": request.status,
-    }

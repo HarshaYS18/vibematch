@@ -27,14 +27,6 @@ def _self_follow_status(current_user: User) -> FollowStatusResponse:
     )
 
 
-def _get_target_user(db: Session, target_user_id: int, current_user: User) -> User:
-    if target_user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="You cannot use this action on yourself.")
-    target_user = social_service.get_user_by_id(db, target_user_id)
-    if not target_user:
-        raise HTTPException(status_code=404, detail="Target user not found.")
-    return target_user
-
 
 def _get_target_user_by_public_id(db: Session, public_user_id: int, current_user: User) -> User:
     if public_user_id == current_user.public_user_id:
@@ -57,37 +49,6 @@ def _summary_for_user(db: Session, current_user: User, user: User) -> PublicUser
         )
     )
 
-
-@router.get("/users/{target_user_id}/follow-status", response_model=FollowStatusResponse)
-def get_follow_status(
-    target_user_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    if target_user_id == current_user.id:
-        return _self_follow_status(current_user)
-    target_user = _get_target_user(db, target_user_id, current_user)
-    return FollowStatusResponse(**social_service.follow_status(db, current_user, target_user))
-
-
-@router.post("/users/{target_user_id}/follow", response_model=FollowActionResponse)
-def follow_user(
-    target_user_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    target_user = _get_target_user(db, target_user_id, current_user)
-    return FollowActionResponse(**social_service.follow_user(db, current_user, target_user))
-
-
-@router.delete("/users/{target_user_id}/follow", response_model=FollowActionResponse)
-def unfollow_user(
-    target_user_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    target_user = _get_target_user(db, target_user_id, current_user)
-    return FollowActionResponse(**social_service.unfollow_user(db, current_user, target_user))
 
 
 @router.get("/public-users/{public_user_id}/follow-status", response_model=FollowStatusResponse)

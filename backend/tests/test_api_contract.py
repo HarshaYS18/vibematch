@@ -32,6 +32,8 @@ class CanonicalApiContractTests(unittest.TestCase):
         self.assertNotIn("/rooms/{room_public_id}/realtime-snapshot", paths)
         self.assertFalse(any(path.startswith("/mvp") for path in paths))
         self.assertFalse(any(path.startswith("/internal-test") for path in paths))
+        for legacy in {"/users/profile/{public_user_id}", "/users/me/visitors", "/social/users/{target_user_id}/follow", "/economy/users/{user_id}/summary", "/economy/gifts/send-public", "/economy/gifts/send-lucky-public", "/economy/rubies/convert-to-coins", "/experience/rooms/{room_id}"}:
+            self.assertNotIn(legacy, paths)
 
     def test_canonical_routes_exist(self):
         paths = {route.path for route in api_router.routes}
@@ -40,7 +42,7 @@ class CanonicalApiContractTests(unittest.TestCase):
             "/families/{family_id}/members",
             "/rooms/{room_public_id}/realtime/snapshot",
             "/ws/room-realtime", "/economy/lucky-packets",
-            "/wallet/me", "/gifts/catalog", "/store/catalog",
+            "/wallet/me", "/economy/gifts/send", "/gifts/catalog", "/store/catalog",
         }:
             self.assertIn(expected, paths)
 
