@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.redis_client import get_redis
 from app.database import get_db
 from app.models.user import User
+from app.realtime.connection_manager import has_active_room_user_lease
 from app.schemas.media_node import (
     MediaNodeDrainRequest,
     MediaNodeHeartbeatRequest,
@@ -54,18 +55,24 @@ def resolve_room_media(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    redis_client = get_redis()
     permission = verify_media_realtime_request(
         db=db,
         user=current_user,
         room_public_id=room_public_id,
         requested_action="join_room",
         device_id=device_id,
+        has_active_room_connection=has_active_room_user_lease(
+            redis_client,
+            room_public_id,
+            int(current_user.id),
+        ),
     )
     if not permission["allowed"]:
         raise HTTPException(status_code=403, detail=permission["reason"] or "Room media access denied.")
 
     try:
-        node = media_node_registry_service.resolve_room_node(get_redis(), room_public_id)
+        node = media_node_registry_service.resolve_room_node(redis_client, room_public_id)
     except media_node_registry_service.MediaNodeUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
