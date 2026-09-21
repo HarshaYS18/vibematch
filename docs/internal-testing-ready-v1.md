@@ -1,5 +1,7 @@
 # Internal Testing Ready v1
 
+> **Historical branch note:** this checklist describes the old `internal-testing-ready-v1` branch. Its `/internal-test` and `/mvp` surfaces are not part of the consolidated production API and these instructions must not be used as the current startup/runbook. Use `PRODUCTION_RUNBOOK.md` and the canonical `/api/v1` routes instead.
+
 Branch: `internal-testing-ready-v1`
 
 This branch is for beginner-friendly internal testing. It is not for public release.
