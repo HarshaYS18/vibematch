@@ -199,6 +199,39 @@ def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | Non
     return snapshot
 
 
+def refresh_authenticated_room_presence(
+    db: Session,
+    room: Room,
+    user: User,
+) -> None:
+    """Refresh durable presence for an already-authenticated room websocket.
+
+    This is not a new authorization path: callers must already have an
+    authenticated socket bound to this room. Room entry rules are rechecked so
+    kickouts and privacy changes cannot be bypassed.
+    """
+    assert_room_entry_allowed(db, room, user)
+    if user_has_active_room_conflict(db, user.id, room.room_public_id):
+        deactivate_user_in_room(db, room, user.id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This account is already active in another chatroom",
+        )
+    participant = _room_participant(db, room, user)
+    if participant is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Join the room before performing this action",
+        )
+    now = datetime.utcnow()
+    participant.is_active = True
+    participant.last_seen_at = now
+    participant.left_at = None
+    user.last_seen_at = now
+    mark_user_room_presence_active(db, room, user)
+    db.flush()
+
+
 def heartbeat_room(db: Session, room: Room, user: User) -> dict[str, Any]:
     assert_room_entry_allowed(db, room, user)
     if user_has_active_room_conflict(db, user.id, room.room_public_id):
