@@ -182,7 +182,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
           producerId: producer.id,
           id: producer.id,
           kind: producer.kind,
-          peerId: peer.socketId,
+          peerId: peer.peerId,
           peer: publicPeer(peer),
         };
         socket.to(peer.roomPublicId).emit('newProducer', producerPayload);
@@ -253,7 +253,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
         const peer = requirePeer(roomManager, socket.id);
         await verifyPeerAction(peer, 'close_producer');
         if (!roomManager.closeProducer(peer, input.producerId)) throw new Error('Producer not found.');
-        socket.to(peer.roomPublicId).emit('producerClosed', { producerId: input.producerId, peerId: peer.socketId });
+        socket.to(peer.roomPublicId).emit('producerClosed', { producerId: input.producerId, peerId: peer.peerId });
         mediaLog('producer.close.ok', socket.id, { producerId: input.producerId });
         return { producerId: input.producerId };
       });
@@ -369,7 +369,7 @@ function closeExistingPeerProducers(
     producer?.close();
     peer.producers.delete(producerId);
     roomManager.closeConsumersForProducer(peer.roomPublicId, producerId);
-    socket.to(peer.roomPublicId).emit('producerClosed', { producerId, peerId: peer.socketId });
+    socket.to(peer.roomPublicId).emit('producerClosed', { producerId, peerId: peer.peerId });
     mediaLog('producer.duplicateClosed', peer.socketId, { producerId });
   }
 }
@@ -443,7 +443,7 @@ function joinRoomPayload(roomManager: RoomManager, room: RoomState, peer: PeerSt
 function publicPeer(peer: PeerState) {
   return {
     socketId: peer.socketId,
-    peerId: peer.socketId,
+    peerId: peer.peerId,
     publicUserId: peer.user.public_user_id,
     displayName: peer.user.display_name,
     avatarUrl: peer.user.avatar_url,
