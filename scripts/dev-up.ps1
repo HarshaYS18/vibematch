@@ -104,10 +104,23 @@ function Test-OwnedProcessRunning([string]$Name) {
 }
 
 function Assert-PortAvailable([int]$Port, [string]$Service) {
-    $listeners = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue
-    if ($listeners) {
-        throw "$Service cannot start: TCP port $Port is already in use. The script will not stop an existing process."
+    $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+    if (-not $listeners) { return }
+
+    $details = @()
+    foreach ($listener in $listeners) {
+        $pidValue = [int]$listener.OwningProcess
+        try {
+            $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $pidValue" -ErrorAction Stop
+            $command = [string]$proc.CommandLine
+            $details += "PID $pidValue ($($proc.Name)): $command"
+        } catch {
+            $details += "PID $pidValue (process details unavailable)"
+        }
     }
+
+    $detailText = $details -join [Environment]::NewLine
+    throw "$Service cannot start: TCP port $Port is already in use. The script will not stop an existing process.$([Environment]::NewLine)$detailText"
 }
 
 function Start-OwnedProcess([string]$Name, [string]$FilePath, [string[]]$Arguments, [string]$WorkingDirectory, [hashtable]$EnvironmentOverrides = @{}) {
