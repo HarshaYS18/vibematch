@@ -81,6 +81,18 @@ function Wait-ForContainerCommand([string]$Name, [string[]]$Command, [string]$Se
     throw "$Service container '$Name' did not become ready within 30 seconds."
 }
 
+function Wait-ForHttpHealthy([string]$Url, [string]$Service, [int]$TimeoutSeconds = 30) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -TimeoutSec 2 -UseBasicParsing
+            if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) { return }
+        } catch { }
+        Start-Sleep -Milliseconds 500
+    } while ((Get-Date) -lt $deadline)
+    throw "$Service did not become healthy at '$Url' within $TimeoutSeconds seconds."
+}
+
 function Test-OwnedProcessRunning([string]$Name) {
     $metadataPath = Join-Path $runtimeDir "$Name.json"
     if (-not (Test-Path $metadataPath)) { return $false }
@@ -167,6 +179,7 @@ Start-OwnedProcess 'fastapi' $venvPython @('-m', 'uvicorn', 'app.main:app', '--h
     database_url = "postgresql://postgres:postgres@127.0.0.1:$PostgresPort/vibematch"
     redis_url = "redis://127.0.0.1:$RedisPort/0"
 }
+Wait-ForHttpHealthy "http://127.0.0.1:$ApiPort/health" 'FastAPI'
 Push-Location $mediaDir
 try { & npm.cmd run build } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'backend_media build failed.' }
