@@ -25,7 +25,7 @@ class GameApiService {
 
   Future<GameDefinition> seedDefaultGames() async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/games/admin/seed-defaults')),
+      Uri.parse(VmApiConfig.endpoint('/admin/games/seed-defaults')),
       headers: await _headers(),
     );
     _throwIfFailed(response, 'seed default games');
