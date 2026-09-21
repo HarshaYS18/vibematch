@@ -36,6 +36,16 @@ def _join_token(payload: dict) -> str:
     return str(payload.get("access_token") or "").strip()
 
 
+def _disconnect_is_superseded(
+    participant: RoomParticipant,
+    disconnected_at: datetime,
+) -> bool:
+    return bool(
+        participant.last_seen_at is not None
+        and participant.last_seen_at > disconnected_at
+    )
+
+
 async def _send_ack(
     websocket: WebSocket,
     *,
@@ -112,10 +122,7 @@ async def _finalize_disconnect(
         # grace window before it is visible in the connection manager. Those
         # joins refresh last_seen_at under the same participant row lock. Do
         # not let this stale disconnect task deactivate a newer room session.
-        if (
-            participant.last_seen_at is not None
-            and participant.last_seen_at > disconnected_at
-        ):
+        if _disconnect_is_superseded(participant, disconnected_at):
             return
 
         was_stealth = bool(participant.is_stealth)
