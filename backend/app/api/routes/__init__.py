@@ -1,1 +1,5 @@
-"""Route implementations.\n\nPublic route registration belongs exclusively in app.api.router. Importing this\npackage must never mutate another router.\n"""\n
+"""Route implementations.
+
+Public route registration belongs exclusively in app.api.router.
+Importing this package must never mutate another router.
+"""
