@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     # Database / Redis from .env
     database_url: str = "postgresql://postgres:postgres@localhost:5432/vibematch"
     redis_url: str = "redis://localhost:6379/0"
+    REDIS_CONNECT_TIMEOUT_SECONDS: float = 2.0
+    REDIS_SOCKET_TIMEOUT_SECONDS: float = 2.0
 
     # Media control plane / node registry
     MEDIA_INTERNAL_TOKEN: str = "change-this-media-internal-token"
