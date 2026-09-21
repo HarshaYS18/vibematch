@@ -22,6 +22,10 @@ export class RoomManager {
       return existing;
     }
 
+    if (this.rooms.size >= config.registry.maxRooms) {
+      throw new Error('Media node room capacity reached.');
+    }
+
     const router = await this.workerManager.createRouter();
     const room: RoomState = {
       roomPublicId,
@@ -49,6 +53,10 @@ export class RoomManager {
   }): PeerState {
     const existing = params.room.peers.get(params.socketId);
     if (existing) return existing;
+
+    if (this.getStats().peerCount >= config.registry.maxPeers) {
+      throw new Error('Media node peer capacity reached.');
+    }
 
     const peer: PeerState = {
       socketId: params.socketId,
@@ -84,6 +92,18 @@ export class RoomManager {
       if (room.peers.has(socketId)) return room;
     }
     return undefined;
+  }
+
+  getStats(): { roomCount: number; peerCount: number; roomIds: string[] } {
+    let peerCount = 0;
+    for (const room of this.rooms.values()) {
+      peerCount += room.peers.size;
+    }
+    return {
+      roomCount: this.rooms.size,
+      peerCount,
+      roomIds: [...this.rooms.keys()],
+    };
   }
 
   getRtpCapabilities(room: RoomState): unknown {
