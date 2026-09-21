@@ -183,6 +183,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
           id: producer.id,
           kind: producer.kind,
           peerId: peer.peerId,
+          publicUserId: peer.user.public_user_id,
           peer: publicPeer(peer),
         };
         socket.to(peer.roomPublicId).emit('newProducer', producerPayload);
