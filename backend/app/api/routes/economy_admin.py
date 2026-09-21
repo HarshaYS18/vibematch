@@ -9,7 +9,7 @@ from app.schemas.economy import AllocatePoolCoinsRequest, EconomyPoolResponse, G
 from app.services import economy_level_service, economy_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
-router = APIRouter(prefix="/economy/admin", tags=["Economy Admin"])
+router = APIRouter(prefix="/admin/economy", tags=["Admin Economy"])
 
 
 def _pool_response(pool: CoinSupplyPool) -> EconomyPoolResponse:
