@@ -1,20 +1,33 @@
-name: Room Production Hardening
+name: Backend Media Architecture
 
 on:
   push:
     branches:
       - chatgpt/room-production-hardening
+      - chatgpt/backend-media-consolidation-v1
   pull_request:
     paths:
       - 'backend/**'
       - 'backend_media/**'
       - 'frontend/vibematch_app/**'
+      - 'scripts/check_backend_architecture.py'
+      - 'PRODUCTION_RUNBOOK.md'
       - '.github/workflows/room-production-hardening.yml'
 
 permissions:
   contents: read
 
 jobs:
+  architecture-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify canonical backend/media architecture
+        run: python scripts/check_backend_architecture.py
+
   backend-tests:
     runs-on: ubuntu-latest
     defaults:
