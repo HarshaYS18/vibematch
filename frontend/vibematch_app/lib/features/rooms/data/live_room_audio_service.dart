@@ -107,22 +107,12 @@ class LiveRoomAudioService {
     _seated = true;
     if (!_selfMuted) _produceRetryCount = 0;
     unawaited(_syncLocalMicCapture());
+    // Seat ownership is authoritative in FastAPI room realtime. The audio
+    // service only tracks local media intent; produce_audio is re-authorized
+    // by FastAPI before mediasoup accepts a producer.
     if (!_canSendRoomEvent()) {
       _scheduleRecovery('takeSeat while disconnected');
-      return;
     }
-    _emitWithAck(
-      'takeSeat',
-      <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'seatNo': seatIndex + 1},
-      onAck: (ack) {
-        _handleSeatAck(ack);
-        if (ack['ok'] == true) {
-          _seated = true;
-          if (!_selfMuted) _produceRetryCount = 0;
-          unawaited(_syncLocalMicCapture());
-        }
-      },
-    );
   }
 
   void leaveSeat() {
@@ -132,10 +122,8 @@ class LiveRoomAudioService {
     _seated = false;
     _selfMuted = true;
     _desiredSelfMuted = true;
-    if (!_canSendRoomEvent()) return;
     _cancelProduceRetry();
     unawaited(_stopPublishingAndCapture());
-    _emitWithAck('leaveSeat', <String, Object?>{'roomId': _roomId, 'peerId': _peerId}, onAck: _handleSeatAck);
   }
 
   void setSelfMuted(bool muted) {
@@ -150,7 +138,6 @@ class LiveRoomAudioService {
       return;
     }
     unawaited(_syncLocalMicCapture());
-    _emitWithAck('setSelfMuted', <String, Object?>{'roomId': _roomId, 'peerId': _peerId, 'muted': muted}, onAck: _handleSeatAck);
   }
 
 
@@ -317,21 +304,6 @@ class LiveRoomAudioService {
       if (_shouldStayConnected) _scheduleRecovery('audio connect error');
     });
     socket.onError((dynamic error) => _setError('Audio socket error: $error'));
-
-    socket.on('seatsUpdated', (dynamic payload) {
-      if (payload is Map) {
-        final nextSeats = AudioSeatSnapshot.listFromJson(payload['seats']);
-        seats.value = nextSeats;
-        _seated = nextSeats.any((seat) => seat.peerId == _peerId);
-        _dropInactiveSpeakersForSeats(nextSeats);
-        if (!_seated && _desiredSeatIndex == null) {
-          _selfMuted = true;
-          _cancelProduceRetry();
-          unawaited(_stopPublishingAndCapture());
-        }
-        _debug('audio seats updated count=${seats.value.length} seated=$_seated desiredSeat=$_desiredSeatIndex');
-      }
-    });
 
     socket.on('activeSpeakers', _handleActiveSpeakers);
     socket.on('peerJoined', (dynamic payload) => _debug('audio peer joined $payload'));
