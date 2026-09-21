@@ -32,8 +32,9 @@ export async function heartbeatMediaNode(stats: MediaRuntimeStats): Promise<void
     }),
   });
 
+  const body = await response.text();
   if (!response.ok) {
-    throw new Error(`media registry heartbeat failed status=${response.status} body=${await response.text()}`);
+    throw new Error(`media registry heartbeat failed status=${response.status} body=${body}`);
   }
   lastSuccessfulHeartbeatAt = Date.now();
 }
@@ -49,7 +50,8 @@ export async function markMediaNodeOffline(): Promise<void> {
       },
     },
   );
+  const body = await response.text();
   if (!response.ok && response.status !== 404) {
-    throw new Error(`media registry offline failed status=${response.status}`);
+    throw new Error(`media registry offline failed status=${response.status} body=${body}`);
   }
 }
