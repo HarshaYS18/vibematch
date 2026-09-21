@@ -102,7 +102,6 @@ class MediaRoomLivePresenceTests(TestCase):
             "Join the room before using room media.",
         )
 
-
     def test_media_discovery_passes_live_room_lease_to_permission_check(self):
         redis_client = fakeredis.FakeRedis(decode_responses=True)
         user = SimpleNamespace(id=7)
@@ -267,6 +266,11 @@ class MediaRoomLivePresenceTests(TestCase):
                 permissions.role_service,
                 "get_primary_role",
                 return_value=RoleName.USER,
+            ),
+            patch.object(
+                permissions,
+                "_active_participant",
+                return_value=None,
             ),
             patch.object(
                 permissions,
