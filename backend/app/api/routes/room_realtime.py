@@ -326,6 +326,11 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         continue
                     except Exception:
                         db.rollback()
+                        logger.exception(
+                            "room_realtime.join_failed room_id=%s command_id=%s",
+                            room_id,
+                            command_id,
+                        )
                         await _send_error(
                             websocket,
                             room_id=room_id,
@@ -525,6 +530,13 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     )
                 except Exception:
                     db.rollback()
+                    logger.exception(
+                        "room_realtime.command_failed room_id=%s user_id=%s command=%s command_id=%s",
+                        room_id,
+                        user.id,
+                        command_type,
+                        command_id,
+                    )
                     if claimed and command_id:
                         await room_realtime_connections.release_command_claim(
                             room_id,
