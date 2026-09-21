@@ -74,6 +74,7 @@ def verify_media_realtime_request(
     room_public_id: str | None,
     requested_action: str,
     device_id: str | None = None,
+    has_active_room_connection: bool = False,
 ) -> dict:
     """Single backend source of truth for mediasoup/signaling authorization.
 
@@ -200,6 +201,7 @@ def verify_media_realtime_request(
             room=room,
             action=action,
             device_id=device_id,
+            has_active_room_connection=has_active_room_connection,
         )
         permission_context = decision.context
         if not decision.allowed:
