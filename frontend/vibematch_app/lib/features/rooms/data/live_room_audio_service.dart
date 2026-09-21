@@ -34,6 +34,7 @@ class LiveRoomAudioService {
   DateTime? _sendTransportWarmupUntil;
   int? _desiredSeatIndex;
   int _produceRetryCount = 0;
+  int _joinPresenceRetryCount = 0;
   bool _joined = false;
   bool _connecting = false;
   bool _selfMuted = true;
@@ -88,6 +89,7 @@ class LiveRoomAudioService {
     );
 
     _shouldStayConnected = true;
+    _joinPresenceRetryCount = 0;
     _roomId = safeRoomId;
     _peerId = safePeerId;
     _currentUser = currentUser;
@@ -222,6 +224,7 @@ class LiveRoomAudioService {
     await _closeAllRemoteConsumers();
     _joined = false;
     _joinInFlight = false;
+    _joinPresenceRetryCount = 0;
     _seated = false;
     _selfMuted = true;
     joined.value = false;
@@ -450,6 +453,7 @@ class LiveRoomAudioService {
         }
         _joinInFlight = false;
         if (ack['ok'] == true) {
+          _joinPresenceRetryCount = 0;
           _joined = true;
           joined.value = true;
           _routerRtpCapabilities = ack['rtpCapabilities'];
@@ -464,6 +468,30 @@ class LiveRoomAudioService {
           if (statusCode == 409 ||
               error.contains('assigned to a different media node')) {
             unawaited(_rediscoverAssignedMediaNode('media assignment changed'));
+            return;
+          }
+          if (statusCode == 403 &&
+              error.contains('Join the room before using room media')) {
+            const delays = <Duration>[
+              Duration(milliseconds: 900),
+              Duration(milliseconds: 1500),
+              Duration(milliseconds: 2500),
+              Duration(seconds: 4),
+              Duration(seconds: 5),
+              Duration(seconds: 5),
+            ];
+            if (_joinPresenceRetryCount >= delays.length) {
+              _debug(
+                'audio join recovery paused after repeated room-presence denial',
+              );
+              return;
+            }
+            final delay = delays[_joinPresenceRetryCount];
+            _joinPresenceRetryCount += 1;
+            _scheduleRecovery(
+              'audio join awaiting authoritative room presence',
+              delay: delay,
+            );
             return;
           }
           _scheduleRecovery('audio join failed');
@@ -514,12 +542,17 @@ class LiveRoomAudioService {
     }
   }
 
-  void _scheduleRecovery(String reason) {
+  void _scheduleRecovery(
+    String reason, {
+    Duration delay = const Duration(milliseconds: 900),
+  }) {
     if (!_shouldStayConnected || _roomId == null || _currentUser == null)
       return;
     if (_recoveryTimer?.isActive ?? false) return;
-    _debug('audio recovery scheduled: $reason');
-    _recoveryTimer = Timer(const Duration(milliseconds: 900), () {
+    _debug(
+      'audio recovery scheduled: $reason in ${delay.inMilliseconds}ms',
+    );
+    _recoveryTimer = Timer(delay, () {
       _recoveryTimer = null;
       unawaited(_recoverSession(reason));
     });
