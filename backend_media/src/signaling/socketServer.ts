@@ -475,8 +475,9 @@ async function executeAck<T>(eventName: string, socketId: string, ack: Ack<T> | 
       : error instanceof Error
         ? error.message
         : 'Unknown media signaling error.';
-    mediaLog(`${eventName}.failed`, socketId, { error: message });
-    ack?.({ ok: false, error: message });
+    const statusCode = error instanceof MediaAuthorizationError ? error.statusCode : undefined;
+    mediaLog(`${eventName}.failed`, socketId, { error: message, statusCode });
+    ack?.({ ok: false, error: message, statusCode });
   }
 }
 
