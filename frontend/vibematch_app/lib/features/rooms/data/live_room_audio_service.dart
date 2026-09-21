@@ -46,6 +46,7 @@ class LiveRoomAudioService {
   bool _producerCreating = false;
   bool _rebuildSendPipelineOnRetry = false;
   bool _recovering = false;
+  bool _rediscovering = false;
   bool _joinInFlight = false;
   bool _consumePendingRunning = false;
   Future<void>? _recvTransportFuture;
@@ -414,11 +415,41 @@ class LiveRoomAudioService {
           _debug('audio join ok room=$safeRoomId peer=$safePeerId');
           unawaited(_restoreDesiredAudioStateAfterJoin());
         } else {
-          _setError('Audio join failed: ${ack['error'] ?? 'unknown'}');
+          final error = ack['error']?.toString() ?? 'unknown';
+          final statusCode = int.tryParse(ack['statusCode']?.toString() ?? '');
+          _setError('Audio join failed: $error');
+          if (statusCode == 409 || error.contains('assigned to a different media node')) {
+            unawaited(_rediscoverAssignedMediaNode('media assignment changed'));
+            return;
+          }
           _scheduleRecovery('audio join failed');
         }
       },
     );
+  }
+
+  Future<void> _rediscoverAssignedMediaNode(String reason) async {
+    if (_rediscovering || !_shouldStayConnected || _roomId == null || _currentUser == null) return;
+    _rediscovering = true;
+    try {
+      _debug('audio media rediscovery running: $reason');
+      final socket = _socket;
+      _socket = null;
+      socket?.dispose();
+      connected.value = false;
+      _joined = false;
+      _joinInFlight = false;
+      joined.value = false;
+      _cancelProduceRetry();
+      await _stopPublishingAndCapture();
+      await _closeAllRemoteConsumers();
+      _closeSendTransport();
+      _closeRecvTransport();
+      await _connectIfNeeded();
+      if (_socket?.connected == true) _sendJoinRoom();
+    } finally {
+      _rediscovering = false;
+    }
   }
 
   Future<void> _restoreDesiredAudioStateAfterJoin() async {
