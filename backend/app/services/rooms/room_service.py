@@ -621,15 +621,7 @@ def get_room_by_public_id(db: Session, room_public_id: str) -> RoomDetailRespons
 
 
 def join_room(db: Session, room_public_id: str, current_user: User, lock_password: str | None = None) -> RoomJoinResponse | None:
-    # All mutating room flows acquire the room row before participant/presence
-    # rows. Realtime seat commands use the same order. Keeping one lock order
-    # prevents REST room entry racing seat/take into a PostgreSQL deadlock.
-    room = (
-        db.query(Room)
-        .filter(Room.room_public_id == room_public_id, Room.is_active.is_(True))
-        .with_for_update()
-        .first()
-    )
+    room = get_room_model_by_public_id(db, room_public_id)
     if not room:
         return None
     assert_room_entry_allowed(db, room, current_user, lock_password=lock_password)
@@ -654,12 +646,7 @@ def join_room(db: Session, room_public_id: str, current_user: User, lock_passwor
 
 
 def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinResponse | None:
-    room = (
-        db.query(Room)
-        .filter(Room.room_public_id == room_public_id, Room.is_active.is_(True))
-        .with_for_update()
-        .first()
-    )
+    room = get_room_model_by_public_id(db, room_public_id)
     if not room:
         return None
     assert_room_entry_allowed(db, room, current_user)
