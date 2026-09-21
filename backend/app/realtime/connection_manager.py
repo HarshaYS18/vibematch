@@ -22,6 +22,40 @@ _SOCKET_LEASE_REFRESH_SECONDS = 10
 _COMMAND_CLAIM_SECONDS = 5 * 60
 
 
+def room_user_lease_key(room_public_id: str, user_id: int) -> str:
+    return f"{_REDIS_PREFIX}:leases:{room_public_id}:{user_id}"
+
+
+def has_active_room_user_lease(
+    redis_client: Any,
+    room_public_id: str,
+    user_id: int,
+    *,
+    now: float | None = None,
+) -> bool:
+    """Return whether FastAPI has an unexpired authenticated room socket lease.
+
+    The lease is written only after a room websocket authenticates and joins
+    the room. Media authorization can therefore use it as cross-worker proof
+    of a live control-plane session when the durable participant flag is
+    temporarily stale. Redis failure is fail-closed here; the DB participant
+    record remains the normal authorization path.
+    """
+    safe_room_id = (room_public_id or "").strip()
+    if not safe_room_id or user_id <= 0:
+        return False
+    try:
+        current = time.time() if now is None else now
+        count = redis_client.zcount(
+            room_user_lease_key(safe_room_id, user_id),
+            current,
+            "+inf",
+        )
+        return int(count or 0) > 0
+    except Exception:
+        return False
+
+
 def build_global_premium_gift_event(
     room_public_id: str,
     event: dict[str, Any],
@@ -292,7 +326,7 @@ class RealtimeConnectionManager:
 
     @staticmethod
     def _lease_key(room_public_id: str, user_id: int) -> str:
-        return f"{_REDIS_PREFIX}:leases:{room_public_id}:{user_id}"
+        return room_user_lease_key(room_public_id, user_id)
 
     async def touch_connection(self, websocket: WebSocket) -> None:
         user_id = self._client_users.get(websocket)
