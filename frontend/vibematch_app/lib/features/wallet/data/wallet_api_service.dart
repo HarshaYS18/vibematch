@@ -57,7 +57,7 @@ class WalletApiService {
 
   Future<VmWallet> convertRuby({required int rubyAmount}) async {
     final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/wallet/ruby/convert')),
+      Uri.parse(VmApiConfig.endpoint('/wallet/rubies/convert')),
       headers: _headers(),
       body: jsonEncode({'ruby_amount': rubyAmount}),
     );

@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
+from app.schemas.economy import RubyWithdrawRequestCreate
 from app.services import economy_level_service, economy_service
 from app.websocket.inbox_ws import inbox_ws_manager
 
@@ -274,10 +275,26 @@ async def recharge_wallet(payload: RechargeRequest, current_user: User = Depends
     return response
 
 
-@router.post("/ruby/convert", response_model=WalletResponse)
+@router.post("/rubies/convert", response_model=WalletResponse)
 async def convert_ruby_to_coins(payload: RubyConvertRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     economy_service.convert_rubies_to_coins(db, current_user, payload.ruby_amount)
     response = _wallet_response(db, current_user)
     db.commit()
     await _broadcast_wallet_update(current_user.id, response)
     return response
+
+
+@router.post("/rubies/withdraw")
+def request_ruby_withdrawal(
+    payload: RubyWithdrawRequestCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    request = economy_service.create_withdraw_request(
+        db=db,
+        user=current_user,
+        ruby_amount=payload.ruby_amount,
+        payout_method=payload.payout_method,
+        payout_account_snapshot=payload.payout_account_snapshot,
+    )
+    return {"id": request.id, "ruby_amount": request.ruby_amount, "status": request.status}
