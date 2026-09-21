@@ -31,6 +31,7 @@ export class RoomManager {
       roomPublicId,
       router,
       peers: new Map<string, PeerState>(),
+      serverProducers: new Map(),
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
     };
@@ -123,6 +124,15 @@ export class RoomManager {
         });
       }
     }
+    for (const serverProducer of room.serverProducers.values()) {
+      producers.push({
+        producerId: serverProducer.producer.id,
+        id: serverProducer.producer.id,
+        peerId: serverProducer.peerId,
+        kind: serverProducer.producer.kind,
+        appData: serverProducer.appData,
+      });
+    }
     return producers;
   }
 
@@ -188,6 +198,10 @@ export class RoomManager {
     room.lastActiveAt = Date.now();
 
     if (room.peers.size === 0) {
+      for (const serverProducer of room.serverProducers.values()) {
+        serverProducer.producer.close();
+      }
+      room.serverProducers.clear();
       room.router.close();
       this.rooms.delete(room.roomPublicId);
     }
