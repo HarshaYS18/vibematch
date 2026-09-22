@@ -19,6 +19,5 @@ class PrimeVideoProviderAdapter extends SupportedWebPlaybackAdapter {
          companion:
              companion ??
              CompanionPlaybackAdapter(provider: OttProviderCatalog.primeVideo),
-         telemetry: telemetry,
        );
 }
