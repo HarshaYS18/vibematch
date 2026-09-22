@@ -9,6 +9,10 @@ class WatchProviderCapabilities {
     required this.programmaticPosition,
     required this.playbackRateControl,
     this.fineGrainedPlaybackRateControl = true,
+    this.liveTimelineAvailable = false,
+    this.liveResync = false,
+    this.manualPlayPause = true,
+    this.manualSeek = true,
     required this.externalLaunch,
   });
 
@@ -26,7 +30,37 @@ class WatchProviderCapabilities {
   /// discrete supported rates, so they should set this to false and let the
   /// coordinator use an authoritative seek for medium drift.
   final bool fineGrainedPlaybackRateControl;
+  final bool liveTimelineAvailable;
+  final bool liveResync;
+  final bool manualPlayPause;
+  final bool manualSeek;
   final bool externalLaunch;
+}
+
+class WatchLiveTimeline {
+  const WatchLiveTimeline({
+    required this.seekableStartMs,
+    required this.liveEdgeMs,
+  });
+
+  final int seekableStartMs;
+  final int liveEdgeMs;
+
+  int targetPositionMs(int targetLatencyMs) {
+    final target = liveEdgeMs - targetLatencyMs;
+    if (target < seekableStartMs) return seekableStartMs;
+    if (target > liveEdgeMs) return liveEdgeMs;
+    return target;
+  }
+}
+
+abstract interface class LiveWatchProviderAdapter {
+  Future<WatchLiveTimeline?> currentLiveTimeline();
+}
+
+abstract interface class ExternalWatchProviderAdapter {
+  Future<bool> launchExternal();
+  Future<void> restoreAfterExternalLaunch();
 }
 
 abstract interface class WatchProviderAdapter {
