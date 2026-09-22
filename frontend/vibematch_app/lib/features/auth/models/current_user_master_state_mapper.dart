@@ -34,6 +34,7 @@ CurrentUser currentUserFromMasterStateJson(Map<String, dynamic> json) {
     'role_badges': rolesJson['role_badges'],
     'vip': profileSummary['vip'] ?? json['vip'],
     'wallet': profileSummary['wallet'] ?? json['wallet'],
+    'profile_setup_completed': identity['profile_setup_completed'],
     'is_active': identity['is_active'],
     'is_banned': identity['is_banned'],
     'last_device_id': identity['last_device_id'],

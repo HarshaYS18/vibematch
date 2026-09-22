@@ -1,36 +1,42 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vibematch_app/features/auth/models/current_user.dart';
 import 'package:vibematch_app/features/auth/presentation/auth_gate.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  test('backend-incomplete profile overrides stale local completion flag', () async {
+  test('backend-incomplete profile requires onboarding', () async {
     final user = CurrentUser.mockNormalUser();
-    final key = 'vm_profile_setup_done_${user.publicUserId}';
-    SharedPreferences.setMockInitialValues(<String, Object>{key: true});
-    final prefs = await SharedPreferences.getInstance();
 
-    final needsSetup = await resolveProfileSetupRequirement(user: user, prefs: prefs);
+    final needsSetup = await resolveProfileSetupRequirement(user: user);
 
     expect(needsSetup, isTrue);
-    expect(prefs.getBool(key), isNull);
   });
 
-  test('backend-complete profile self-heals local completion flag', () async {
+  test('backend-complete profile skips onboarding', () async {
     final base = CurrentUser.mockNormalUser();
     final user = CurrentUser.fromJson(<String, dynamic>{
       ...base.toJson(),
+      'display_name': 'Canonical User',
       'avatar_url': 'https://cdn.example/avatar.jpg',
+      'profile_setup_completed': true,
     });
-    final key = 'vm_profile_setup_done_${user.publicUserId}';
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final prefs = await SharedPreferences.getInstance();
 
-    final needsSetup = await resolveProfileSetupRequirement(user: user, prefs: prefs);
+    final needsSetup = await resolveProfileSetupRequirement(user: user);
 
     expect(needsSetup, isFalse);
-    expect(prefs.getBool(key), isTrue);
+  });
+
+  test('explicit backend incomplete state wins over populated local fields', () async {
+    final base = CurrentUser.mockNormalUser();
+    final user = CurrentUser.fromJson(<String, dynamic>{
+      ...base.toJson(),
+      'display_name': 'Canonical User',
+      'avatar_url': 'https://cdn.example/avatar.jpg',
+      'profile_setup_completed': false,
+    });
+
+    expect(
+      await resolveProfileSetupRequirement(user: user),
+      isTrue,
+    );
   });
 }

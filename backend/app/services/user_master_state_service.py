@@ -39,6 +39,7 @@ def _identity(user: User) -> dict[str, Any]:
         "username": user.username,
         "display_name": user.display_name or user.username or f"User {user.public_user_id}",
         "avatar_url": user.avatar_url,
+        "profile_setup_completed": bool((user.display_name or "").strip() and (user.avatar_url or "").strip()),
         "bio": user.bio,
         "cover_photo_urls": user.cover_photo_urls or [],
         "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,

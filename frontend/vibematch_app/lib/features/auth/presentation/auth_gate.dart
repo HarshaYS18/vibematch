@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_shell.dart';
+import '../../../identity/data/identity_repository.dart';
+import '../../../session/data/session_repository.dart';
 import '../data/auth_api_service.dart';
 import '../data/google_sign_in_config.dart';
 import '../data/google_sign_in_session_service.dart';
@@ -12,41 +14,18 @@ import 'profile_setup_page.dart';
 
 Future<bool> resolveProfileSetupRequirement({
   required CurrentUser user,
-  required SharedPreferences prefs,
 }) async {
-  const prefix = 'vm_profile_setup_done_';
-  final setupKey = '$prefix${user.publicUserId}';
-  final alreadyCompleted = prefs.getBool(setupKey) ?? false;
-
-  final hasName = user.displayName?.trim().isNotEmpty == true;
-  final hasAvatar = user.avatarUrl?.trim().isNotEmpty == true;
-  final backendProfileIsComplete = hasName && hasAvatar;
-
-  if (backendProfileIsComplete) {
-    if (!alreadyCompleted) {
-      await prefs.setBool(setupKey, true);
-    }
-    return false;
-  }
-
-  // Local completion is only a hint. Canonical profile state wins.
-  if (alreadyCompleted) {
-    await prefs.remove(setupKey);
-  }
-  return true;
+  return !user.profileSetupCompleted;
 }
 
-
-class AuthGate extends StatefulWidget {
+class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key});
 
   @override
-  State<AuthGate> createState() => _AuthGateState();
+  ConsumerState<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
-  static const String _profileSetupDonePrefix = 'vm_profile_setup_done_';
-
+class _AuthGateState extends ConsumerState<AuthGate> {
   final AuthApiService _authApiService = AuthApiService();
   final GoogleSignInSessionService _googleSignIn =
       GoogleSignInSessionService.instance;
@@ -74,6 +53,8 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   void _handleSessionSignedOut() {
+    ref.read(sessionRepositoryProvider.notifier).handleExternalSignOut();
+    ref.read(identityRepositoryProvider.notifier).clear();
     if (!mounted) return;
     setState(() {
       _currentUser = null;
@@ -89,7 +70,8 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      final user = await _authApiService.restoreCurrentUser();
+      final user = await ref.read(sessionRepositoryProvider.notifier).restore();
+      ref.read(identityRepositoryProvider.notifier).accept(user);
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
@@ -139,17 +121,15 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      await _authApiService.logout();
+      await ref.read(sessionRepositoryProvider.notifier).logout();
+      ref.read(identityRepositoryProvider.notifier).clear();
       await _googleSignIn.signOutIfUsed();
-      final result = await _authApiService.devLogin(
+      final user = await ref.read(sessionRepositoryProvider.notifier).devLogin(
         email: email,
         username: username,
         displayName: displayName,
       );
-      final user = await _authApiService.getCurrentUser(
-        accessToken: result.accessToken,
-        forceRefresh: true,
-      );
+      ref.read(identityRepositoryProvider.notifier).accept(user);
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
@@ -175,7 +155,8 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      await _authApiService.logout();
+      await ref.read(sessionRepositoryProvider.notifier).logout();
+      ref.read(identityRepositoryProvider.notifier).clear();
       await _googleSignIn.signOutIfUsed();
       final account = await _googleSignIn.signIn();
       if (account == null) {
@@ -189,11 +170,10 @@ class _AuthGateState extends State<AuthGate> {
         throw Exception('Google did not return an ID token. ${GoogleSignInConfig.setupHint}');
       }
 
-      final result = await _authApiService.googleLogin(idToken: idToken);
-      final user = await _authApiService.getCurrentUser(
-        accessToken: result.accessToken,
-        forceRefresh: true,
-      );
+      final user = await ref
+          .read(sessionRepositoryProvider.notifier)
+          .googleLogin(idToken: idToken);
+      ref.read(identityRepositoryProvider.notifier).accept(user);
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
@@ -214,7 +194,8 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _logout() async {
-    await _authApiService.logout();
+    await ref.read(sessionRepositoryProvider.notifier).logout();
+    ref.read(identityRepositoryProvider.notifier).clear();
     await _googleSignIn.clearGoogleSessionIfUsed();
     if (!mounted) return;
     setState(() {
@@ -224,19 +205,12 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
-  Future<bool> _shouldShowProfileSetup(CurrentUser user) async {
-    final prefs = await SharedPreferences.getInstance();
-    return resolveProfileSetupRequirement(user: user, prefs: prefs);
-  }
-
-  Future<void> _markProfileSetupCompleted(CurrentUser user) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('$_profileSetupDonePrefix${user.publicUserId}', true);
+  Future<bool> _shouldShowProfileSetup(CurrentUser user) {
+    return resolveProfileSetupRequirement(user: user);
   }
 
   Future<void> _handleProfileSetupCompleted(CurrentUser user) async {
-    await _markProfileSetupCompleted(user);
-    await _authApiService.persistCurrentUser(user);
+    await ref.read(identityRepositoryProvider.notifier).persist(user);
     if (!mounted) return;
     setState(() {
       _currentUser = user;
