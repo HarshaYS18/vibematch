@@ -10,6 +10,16 @@ void main() {
 
     final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
     expect(json['ui_contract'], 'existing_funkey_ui_no_redesign');
+    expect(json['version'], 2);
+
+    final reference = json['reference'] as Map<String, dynamic>;
+    expect(reference['commit'], 'b8189636eacda323cabcf2b07a2bedf94853737d');
+    expect(reference['phase'], 'post_chunk_5_pre_chunk_6');
+    expect(
+      reference['historical_pre_chunk_0_visual_evidence_available'],
+      isFalse,
+    );
+    expect(json['evidence_status'], 'capture_required');
 
     final screens = (json['screens'] as List<dynamic>)
         .whereType<Map<String, dynamic>>()
