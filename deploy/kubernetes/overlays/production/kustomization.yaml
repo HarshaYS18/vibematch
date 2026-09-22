@@ -6,3 +6,16 @@ resources:
   - ../../jobs/migrate.yaml
 patches:
   - path: config.yaml
+images:
+  - name: funkey-api
+    newName: ghcr.io/harshays18/vibematch/funkey-api
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-worker
+    newName: ghcr.io/harshays18/vibematch/funkey-worker
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-realtime
+    newName: ghcr.io/harshays18/vibematch/funkey-realtime
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-media
+    newName: ghcr.io/harshays18/vibematch/funkey-media
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

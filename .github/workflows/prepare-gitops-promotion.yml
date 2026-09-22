@@ -1,0 +1,65 @@
+name: Prepare GitOps Promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [staging, production]
+      api_image:
+        description: Immutable API image (name@sha256:digest)
+        required: true
+      worker_image:
+        description: Immutable worker image (name@sha256:digest)
+        required: true
+      realtime_image:
+        description: Immutable realtime image (name@sha256:digest)
+        required: true
+      media_image:
+        description: Immutable media image (name@sha256:digest)
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  promotion:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/funkey-production-backend-v1
+      - name: Pin immutable image digests
+        run: |
+          python scripts/prepare_gitops_promotion.py \
+            --environment "${{ inputs.environment }}" \
+            --api "${{ inputs.api_image }}" \
+            --worker "${{ inputs.worker_image }}" \
+            --realtime "${{ inputs.realtime_image }}" \
+            --media "${{ inputs.media_image }}"
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+      - name: Render promoted desired state
+        run: kubectl kustomize "deploy/kubernetes/overlays/${{ inputs.environment }}" > /tmp/funkey-promotion.yaml
+      - name: Open promotion pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.environment }}
+        run: |
+          branch="promotion/${TARGET}/${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add "deploy/kubernetes/overlays/${TARGET}/kustomization.yaml"
+          git commit -m "deploy: promote FunKey ${TARGET} images"
+          git push origin "$branch"
+          gh pr create \
+            --base codex/funkey-production-backend-v1 \
+            --head "$branch" \
+            --title "deploy: promote FunKey ${TARGET} images" \
+            --body "Pins signed immutable backend image digests for ${TARGET}. Validate staging, migration compatibility, readiness, dashboards, and rollback before production sync."

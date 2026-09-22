@@ -7,3 +7,10 @@ Run `pwsh scripts/task.ps1 load-test-smoke` after `pwsh scripts/task.ps1 dev`. F
 Run increasing stages only after the preceding stage passes: local correctness, 1k, 10k, 50k, 100k, 250k, 500k, then 1M concurrent users. These are test stages, not supported capacity claims. Each stage needs distributed generators, representative room sizes, churn, reconnect storms, and sustained duration. Record RPS per API pod, WebSockets and messages per gateway, DB connections per pod, Redis ops/sec, JetStream events/sec, and rooms/peers/bandwidth per media node. Stop scaling when p95 latency, error budget, reconnect success, queue age, or dependency saturation crosses its observed safe limit.
 
 The smoke thresholds in scripts are local correctness checks. They are not production SLOs. Media heartbeat/drain and Redis failure exercises belong in a disposable staging cluster with the chaos suite; issuing synthetic node heartbeats against production can corrupt assignments.
+
+
+## Reconnect and soak execution
+
+`reconnect-storm.js` repeatedly upgrades, optionally subscribes to a disposable room, disconnects, and reconnects. Use it while normal room traffic is being generated through the authoritative API to measure reconnect success and gateway fanout recovery. Set `VUS`, `DURATION`, and `HOLD_MS` explicitly for each stage.
+
+A soak run reuses the same scenarios with a longer `DURATION` (for example several hours) and fixed representative concurrency. Do not promote a measured capacity number until HTTP, realtime, worker backlog, Redis, PostgreSQL, JetStream, media CPU/bandwidth, TURN relay use, and client reconnect success were captured from the same environment.

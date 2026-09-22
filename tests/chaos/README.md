@@ -17,4 +17,4 @@ Run chaos exercises in a disposable staging namespace with dashboards and rollba
 | Migration | Simulate failed expand step | Old app stays healthy; rollback follows migration runbook |
 | Zone loss | Cordon/drain one zone | PDB/topology policy preserves minimum replicas where capacity allows |
 
-`api-pod-termination.ps1` automates the first case. It is staging-only and requires `-Execute`; without it the script displays the target and exits. Media, TURN, region, and database tests require provider-specific fault injection and are intentionally not automated against unknown infrastructure.
+`api-pod-termination.ps1` automates API availability during a replica loss. `workload-pod-termination.ps1` exercises realtime or worker replacement, and `media-node-drain.ps1` exercises the media preStop drain lifecycle. All are staging-only and dry-run unless `-Execute` is supplied. Redis, PostgreSQL, TURN, object-storage, and zone/region faults remain provider-specific by design; run them through the selected provider's supported fault-injection controls rather than embedding destructive cloud commands in this repository.

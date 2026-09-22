@@ -12,7 +12,9 @@ on:
       - 'infra/**'
       - 'tests/load/**'
       - 'tests/chaos/**'
+      - 'scripts/prepare_gitops_promotion.py'
       - '.github/workflows/production-platform.yml'
+      - '.github/workflows/prepare-gitops-promotion.yml'
 
 permissions:
   contents: read
@@ -42,6 +44,7 @@ jobs:
       - run: terraform -chdir=infra/terraform fmt -check -recursive
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
+      - run: python -m py_compile scripts/prepare_gitops_promotion.py
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.31.0
@@ -49,6 +52,23 @@ jobs:
       - run: kubectl kustomize deploy/kubernetes/overlays/staging > /tmp/funkey-staging.yaml
       - run: kubectl kustomize deploy/kubernetes/overlays/production > /tmp/funkey-production.yaml
       - run: kubectl kustomize deploy/kubernetes/media > /tmp/funkey-media.yaml
+      - run: kubectl kustomize deploy/observability > /tmp/funkey-observability.yaml
+      - name: Enforce immutable production images
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path("/tmp/funkey-production.yaml").read_text()
+          for image in ("funkey-api", "funkey-worker", "funkey-realtime", "funkey-media"):
+              if f"{image}:dev" in manifest:
+                  raise SystemExit(f"production render still contains mutable dev image: {image}")
+          if manifest.count("@sha256:") < 4:
+              raise SystemExit("production render must pin all backend workloads by digest")
+          PY
+      - name: Parse load and chaos harnesses
+        shell: bash
+        run: |
+          for file in tests/load/*.js; do node --check "$file"; done
+          pwsh -NoProfile -Command 'Get-ChildItem tests/chaos/*.ps1 | ForEach-Object { [scriptblock]::Create((Get-Content $_.FullName -Raw)) | Out-Null }'
       - run: docker compose -f infra/docker-compose.yml --profile app config --quiet
 
   container-builds:

@@ -75,15 +75,15 @@ If FastAPI cannot verify, new connections/subscriptions fail closed and periodic
 
 ## Retry/idempotency behavior
 
-The Redis subscription retries after interruption. HTTP verification uses a bounded timeout and is not retried on behalf of the client. Events may be missed or repeated during reconnect; consumers should deduplicate by `event_id` and refetch snapshots. No value transfer or durable write is performed here.
+The Redis subscription retries after interruption. HTTP verification uses a bounded timeout and is not retried on behalf of the client. Events may be missed during a Redis interruption; the gateway suppresses repeated `event_id` values for five minutes and clients still refetch authoritative snapshots after `resync_required`. No value transfer or durable write is performed here.
 
 ## Scaling behavior
 
-Replicas subscribe independently to the same Redis channel and deliver only to their own connected clients. Correctness does not require load-balancer sticky sessions. `REALTIME_MAX_CONNECTIONS` bounds each pod; measure actual memory, network, Redis ops, and fanout capacity before raising it. User and node leases make routing visible to operators, but PubSub currently broadcasts each backend event to every gateway replica.
+Replicas subscribe independently to the same Redis channel and deliver only to their own connected clients. Correctness does not require load-balancer sticky sessions. `REALTIME_MAX_CONNECTIONS` bounds each pod and `REALTIME_MAX_CONNECTIONS_PER_USER` bounds concurrent devices for one identity. Measure actual memory, network, Redis ops, and fanout capacity before raising either limit. User and node leases make routing visible to operators, but PubSub currently broadcasts each backend event to every gateway replica.
 
 ## Autoscaling metrics
 
-`funkey_realtime_connections`, accepted connections, auth denials, slow client closes, event receive/invalid counts, and Redis subscription health are exposed at `/metrics`. CPU, memory, network egress, and reconnect rates should also feed scaling decisions.
+`funkey_realtime_connections`, accepted connections, auth denials, capacity denials, slow client closes, event receive/invalid/duplicate counts, and Redis subscription health are exposed at `/metrics`. CPU, memory, network egress, and reconnect rates should also feed scaling decisions.
 
 ## Observability
 
@@ -107,4 +107,4 @@ Check Python verification contract parity, client reconnect/snapshot behavior, R
 
 ## Known migration status
 
-FOUNDATION READY. Existing Flutter and Python realtime paths remain active until explicit traffic routing, contract parity, and rollback checks are complete.
+TRANSPORT HARDENED. The gateway has bounded queues, connection/device budgets, authorization revalidation, subscription authorization, event deduplication, Redis fanout recovery signaling, leases, metrics, and graceful drain. Production traffic routing remains a deployment decision and must preserve the authoritative FastAPI/PostgreSQL command path.
