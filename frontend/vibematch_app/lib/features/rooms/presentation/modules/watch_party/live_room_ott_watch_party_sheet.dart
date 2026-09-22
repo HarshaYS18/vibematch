@@ -71,14 +71,25 @@ class _LiveRoomOttWatchPartySheetState
 
   SupportedWebPlaybackAdapter _buildAdapter(OttProviderDefinition provider) {
     final telemetry = ref.read(appTelemetryProvider);
+    Future<void> remountBarrier() => WidgetsBinding.instance.endOfFrame;
+
     if (provider.id == OttProviderCatalog.netflix.id) {
-      return NetflixProviderAdapter(telemetry: telemetry);
+      return NetflixProviderAdapter(
+        telemetry: telemetry,
+        remountBarrier: remountBarrier,
+      );
     }
     if (provider.id == OttProviderCatalog.primeVideo.id) {
-      return PrimeVideoProviderAdapter(telemetry: telemetry);
+      return PrimeVideoProviderAdapter(
+        telemetry: telemetry,
+        remountBarrier: remountBarrier,
+      );
     }
     if (provider.id == OttProviderCatalog.jioHotstar.id) {
-      return JioHotstarProviderAdapter(telemetry: telemetry);
+      return JioHotstarProviderAdapter(
+        telemetry: telemetry,
+        remountBarrier: remountBarrier,
+      );
     }
     throw StateError('Unsupported OTT provider: ${provider.id}');
   }
