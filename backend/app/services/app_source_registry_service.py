@@ -14,7 +14,7 @@ def _endpoint(path: str, purpose: str, *, owner: str = "backend", realtime_safe:
 
 def get_app_source_registry() -> AppSourceRegistryResponse:
     return AppSourceRegistryResponse(
-        version=2,
+        version=3,
         master_api=_endpoint(
             MASTER_STATE,
             "Authenticated user/profile/economy summary used as the app-level master read.",
@@ -25,7 +25,7 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
             "child_writes": "Mutations go through feature child APIs and must return or trigger canonical backend state.",
             "configs": "Display/config data comes from backend config/catalog/rule endpoints before any local fallback.",
             "control_center": "Owner/SuperAdmin Control Center APIs manage rules, catalog, roles, permissions, and stealth.",
-            "live_room": "Stable realtime room entry, privacy, seats, gifts, chat, and settings are protected from broad rewiring.",
+            "live_room": "RoomSessionRepository owns canonical room lifecycle/state; /ws/room-realtime delivers authoritative snapshots and commands while media transport remains separate.",
         },
         tabs=[
             TabSourceRegistryItem(
@@ -52,14 +52,24 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                     _endpoint("/rooms/{room_public_id}/realtime/snapshot", "Canonical live-room read snapshot."),
                 ],
                 child_writes=[
-                    _endpoint("/rooms/{room_public_id}/join", "Entry/privacy/kickout gate."),
-                    _endpoint("/rooms/{room_public_id}/settings", "Room settings mutation."),
-                    _endpoint("/rooms/{room_public_id}/heartbeat", "Active participant heartbeat."),
+                    _endpoint("/rooms/{room_public_id}/realtime/join", "Canonical room entry and privacy gate returning a full room snapshot."),
+                    _endpoint("/rooms/{room_public_id}/realtime/heartbeat", "Presence heartbeat returning an explicitly marked partial room snapshot."),
+                    _endpoint("/rooms/{room_public_id}/realtime/leave", "Canonical room exit returning final room state."),
+                    _endpoint("/rooms/{room_public_id}/realtime/seat/take", "Canonical seat take/request mutation."),
+                    _endpoint("/rooms/{room_public_id}/realtime/seat/leave", "Canonical seat leave mutation."),
+                    _endpoint("/rooms/{room_public_id}/realtime/mic", "Canonical microphone state mutation."),
+                    _endpoint("/rooms/{room_public_id}/settings", "Room settings mutation while settings UI migrates onto RoomSessionRepository."),
                 ],
                 realtime_channels=["/ws/room-realtime"],
                 protected_flows=["room entry", "privacy", "kickout", "seats", "gifts", "chat", "online count"],
-                duplicate_sources_to_retire=["room ranking mock fallback", "local room background fallback after DB catalog migration"],
-                migration_status="protected_live_room_stable",
+                duplicate_sources_to_retire=[
+                    "LiveRoomPresenceRepository lifecycle reads/writes after legacy UI adapters are retired",
+                    "LiveRoomMembershipService process-global cache after all room consumers read RoomSessionRepository",
+                    "LiveRoomMediaSignalingService roomSnapshot as domain state after media-only migration",
+                    "room ranking mock fallback",
+                    "local room background fallback after DB catalog migration",
+                ],
+                migration_status="canonical_room_session_active",
             ),
             TabSourceRegistryItem(
                 tab_key="vibes",
@@ -271,7 +281,7 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
         deferred_work=[
             "Replace remaining mock/fallback sources tab-by-tab only after each canonical child API is verified.",
             "Expose public economy rule/config reads for non-owner VIP/level screens before removing local display config.",
-            "Keep live-room realtime wiring unchanged until a dedicated two-window verification pass migrates display payloads.",
+            "Retire live-room legacy UI caches/controllers only after each consumer has migrated to RoomSessionRepository; keep media signaling transport separate from room domain state.",
             "Add Control Center UI for viewing the source registry after product approves the placement.",
         ],
     )
