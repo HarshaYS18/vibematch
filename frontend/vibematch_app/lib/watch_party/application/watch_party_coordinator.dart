@@ -77,7 +77,8 @@ class WatchPartyCoordinator {
           await _adapter.setPlaybackRate(session.playbackRate);
         }
       } else if (driftAbs >= largeDriftMs ||
-          !capabilities.playbackRateControl) {
+          !capabilities.playbackRateControl ||
+          !capabilities.fineGrainedPlaybackRateControl) {
         if (driftAbs > ignoreDriftMs && capabilities.programmaticSeek) {
           await _adapter.seekTo(targetMs);
         }

@@ -8,6 +8,7 @@ class WatchProviderCapabilities {
     required this.programmaticSeek,
     required this.programmaticPosition,
     required this.playbackRateControl,
+    this.fineGrainedPlaybackRateControl = true,
     required this.externalLaunch,
   });
 
@@ -17,6 +18,14 @@ class WatchProviderCapabilities {
   final bool programmaticSeek;
   final bool programmaticPosition;
   final bool playbackRateControl;
+
+  /// Whether small temporary rate changes (for example 0.95/1.05) can be
+  /// applied accurately enough for drift correction.
+  ///
+  /// Providers such as YouTube expose playback-rate control but only at
+  /// discrete supported rates, so they should set this to false and let the
+  /// coordinator use an authoritative seek for medium drift.
+  final bool fineGrainedPlaybackRateControl;
   final bool externalLaunch;
 }
 
