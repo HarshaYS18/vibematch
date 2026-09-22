@@ -17,6 +17,7 @@ class HomeController extends ChangeNotifier {
   String selectedLanguage = 'All';
   bool isLoadingRooms = false;
   bool isLoadingHomeChrome = false;
+  bool isQuickMatching = false;
   String? loadErrorMessage;
   String? bannerErrorMessage;
   HomeRoom? myCreatedRoom;
@@ -198,6 +199,20 @@ class HomeController extends ChangeNotifier {
   void seeAllRooms() {
     visibleRoomCount = filteredRooms.length;
     notifyListeners();
+  }
+
+  Future<HomeRoom?> quickMatch() async {
+    if (isQuickMatching) return null;
+    isQuickMatching = true;
+    notifyListeners();
+    try {
+      return await _repository.fetchQuickMatch(
+        language: selectedLanguage == 'All' ? null : selectedLanguage,
+      );
+    } finally {
+      isQuickMatching = false;
+      notifyListeners();
+    }
   }
 
   Future<void> retryLoadingRooms() {

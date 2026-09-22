@@ -111,6 +111,34 @@ class HomeNavigationController {
     showToast(context, 'Room saved. Pull to refresh if it does not appear.');
   }
 
+  static Future<void> quickMatch({
+    required BuildContext context,
+    required HomeController controller,
+    required CurrentUser? currentUser,
+  }) async {
+    if (currentUser == null) {
+      showToast(context, 'Login session not ready. Refresh and try again.');
+      return;
+    }
+    try {
+      final room = await controller.quickMatch();
+      if (!context.mounted) return;
+      if (room == null) {
+        showToast(context, 'No public room is available right now.');
+        return;
+      }
+      await _joinAndEnter(
+        context: context,
+        room: room,
+        currentUser: currentUser,
+      );
+    } catch (error) {
+      if (context.mounted) {
+        showToast(context, error.toString().replaceFirst('Exception: ', ''));
+      }
+    }
+  }
+
   static void openRoom({
     required BuildContext context,
     required HomeRoom room,

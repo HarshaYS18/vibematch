@@ -154,6 +154,35 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
     );
   }
 
+  Future<RoomSessionState> activityCommand({
+    required String action,
+    int? expectedRevision,
+    String? kind,
+    String? activityId,
+    String? title,
+    String? phase,
+    String? gameId,
+    int? targetUserId,
+    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? postGame,
+  }) {
+    return _postCanonical(
+      '/rooms/$_roomId/realtime/activity/command',
+      <String, dynamic>{
+        'action': action.trim().toUpperCase(),
+        if (expectedRevision != null) 'expected_revision': expectedRevision,
+        if (kind?.trim().isNotEmpty == true) 'kind': kind!.trim(),
+        if (activityId?.trim().isNotEmpty == true) 'activity_id': activityId!.trim(),
+        if (title?.trim().isNotEmpty == true) 'title': title!.trim(),
+        if (phase?.trim().isNotEmpty == true) 'phase': phase!.trim(),
+        if (gameId?.trim().isNotEmpty == true) 'game_id': gameId!.trim(),
+        if (targetUserId != null) 'target_user_id': targetUserId,
+        if (metadata != null) 'metadata': metadata,
+        if (postGame != null) 'post_game': postGame,
+      },
+    );
+  }
+
   Future<RoomSessionState> _postCanonical(
     String path,
     Map<String, dynamic> body,

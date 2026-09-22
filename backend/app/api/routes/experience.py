@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.services import experience_service
+from app.services import economy_service, experience_service
 from app.services import level_progression_service as progression
 
 router = APIRouter(prefix="/experience", tags=["Experience"])
@@ -90,4 +90,51 @@ def get_experience_tasks():
                 "room": {"max_level": progression.max_level_for_track(progression.ProgressionTrack.ROOM)},
             },
         },
+    }
+
+
+@router.get("/community-events")
+def get_community_events(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return experience_service.community_events_for_user(db, current_user)
+
+
+@router.get("/social-missions")
+def get_social_missions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return {
+        "cycle_key": experience_service.social_mission_cycle_key(),
+        "missions": experience_service.social_missions_for_user(db, current_user),
+    }
+
+
+@router.post("/social-missions/{mission_id}/claim")
+def claim_social_mission(
+    mission_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    missions = experience_service.social_missions_for_user(db, current_user)
+    mission = next((item for item in missions if item["id"] == mission_id), None)
+    if mission is None:
+        raise HTTPException(status_code=404, detail="Social mission not found")
+    if not mission["completed"]:
+        raise HTTPException(status_code=409, detail="Complete this social mission before claiming its reward")
+    reward = mission["reward"]
+    wallet, credited = economy_service.credit_social_mission_reward(
+        db,
+        current_user.id,
+        mission_id=mission_id,
+        cycle_key=str(mission["cycle_key"]),
+        reward_coin_amount=int(reward["amount"]),
+    )
+    refreshed = experience_service.social_missions_for_user(db, current_user)
+    return {
+        "credited": credited,
+        "coin_balance": wallet.coin_balance,
+        "mission": next(item for item in refreshed if item["id"] == mission_id),
     }

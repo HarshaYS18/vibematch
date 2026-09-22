@@ -817,3 +817,48 @@ def set_room_admin(db: Session, room_public_id: str, current_user: User, target_
     db.commit()
     db.refresh(participant)
     return participant_to_response(db, participant, room)
+
+
+def quick_match_room(
+    db: Session,
+    current_user: User,
+    language: str | None = None,
+    category: str | None = None,
+) -> RoomTrendingResponse | None:
+    """Pick one publicly joinable room using the same discovery source of truth."""
+    cleanup_stale_room_participants(db)
+    query = db.query(Room).filter(
+        Room.is_active.is_(True),
+        Room.is_secret.is_(False),
+        Room.is_locked.is_(False),
+        Room.is_members_only.is_(False),
+        Room.online_count > 0,
+    )
+    if language and language.lower() != "all":
+        query = query.filter(Room.language.ilike(language))
+    if category and category.lower() not in {"all", "trending"}:
+        query = query.filter(Room.room_type.ilike(category))
+
+    current_room_ids = {
+        row[0]
+        for row in db.query(RoomParticipant.room_id)
+        .filter(
+            RoomParticipant.user_id == current_user.id,
+            RoomParticipant.is_active.is_(True),
+        )
+        .all()
+    }
+    candidates = (
+        query.order_by(
+            Room.trending_score.desc(),
+            Room.online_count.desc(),
+            Room.updated_at.desc(),
+            Room.id.asc(),
+        )
+        .limit(20)
+        .all()
+    )
+    room = next((item for item in candidates if item.id not in current_room_ids), None)
+    if room is None and candidates:
+        room = candidates[0]
+    return room_to_trending_response(room) if room is not None else None

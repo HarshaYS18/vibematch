@@ -61,3 +61,16 @@ class RoomWatchPartyCommand(RoomRealtimeBaseCommand):
     timeline_mode: str | None = Field(default=None, pattern="^(vod|live)$")
     target_live_latency_ms: int | None = Field(default=None, ge=1000, le=120000)
     target_user_id: int | None = Field(default=None, gt=0)
+
+
+class RoomActivityCommand(RoomRealtimeBaseCommand):
+    action: str = Field(min_length=1, max_length=24)
+    expected_revision: int | None = Field(default=None, ge=0)
+    kind: str | None = Field(default=None, max_length=32)
+    activity_id: str | None = Field(default=None, max_length=120)
+    title: str | None = Field(default=None, max_length=160)
+    phase: str | None = Field(default=None, max_length=32)
+    game_id: str | None = Field(default=None, max_length=120)
+    target_user_id: int | None = Field(default=None, gt=0)
+    metadata: dict[str, object] | None = None
+    post_game: dict[str, object] | None = None

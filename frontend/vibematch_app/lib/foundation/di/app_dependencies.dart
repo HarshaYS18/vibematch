@@ -19,7 +19,7 @@ final appTelemetryProvider = Provider<AppTelemetry>(
 );
 
 final appNetworkClientProvider = Provider<AppNetworkClient>((ref) {
-  final client = ApiClientNetworkAdapter();
+  final client = DeduplicatingAppNetworkClient(ApiClientNetworkAdapter());
   ref.onDispose(client.close);
   return client;
 });

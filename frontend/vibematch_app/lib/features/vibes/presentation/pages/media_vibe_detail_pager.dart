@@ -14,10 +14,12 @@ class MediaVibeDetailPager extends StatefulWidget {
     super.key,
     required this.vibes,
     required this.initialIndex,
+    required this.playbackGate,
   });
 
   final List<VibeItem> vibes;
   final int initialIndex;
+  final VibeMediaPlaybackGate playbackGate;
 
   @override
   State<MediaVibeDetailPager> createState() => _MediaVibeDetailPagerState();
@@ -26,6 +28,7 @@ class MediaVibeDetailPager extends StatefulWidget {
 class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   final VibesApiService _api = const VibesApiService();
   late final PageController _pageController;
+  late final String _pauseLockKey;
   final Map<String, VibeItem> _stateById = <String, VibeItem>{};
 
   List<VibeItem> get _vibes => widget.vibes.where((item) => item.mediaType != VibeMediaType.text).toList(growable: false);
@@ -33,7 +36,8 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   @override
   void initState() {
     super.initState();
-    VibeMediaPlaybackGate.feedPlaybackPaused.value = true;
+    _pauseLockKey = 'media-detail-${identityHashCode(this)}';
+    widget.playbackGate.acquirePauseLock(_pauseLockKey);
     final initialPage = widget.initialIndex.clamp(0, _vibes.isEmpty ? 0 : _vibes.length - 1);
     _pageController = PageController(initialPage: initialPage);
     for (final vibe in _vibes) {
@@ -43,7 +47,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
 
   @override
   void dispose() {
-    VibeMediaPlaybackGate.feedPlaybackPaused.value = false;
+    widget.playbackGate.releasePauseLock(_pauseLockKey);
     _pageController.dispose();
     super.dispose();
   }

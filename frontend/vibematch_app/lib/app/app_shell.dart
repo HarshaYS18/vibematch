@@ -9,6 +9,7 @@ import '../core/ui/vm_motion.dart';
 import '../core/ui/vm_toast.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/home/presentation/home_page_modular.dart';
+import '../game_platform/data/game_bundle_cache.dart';
 import '../features/inbox/presentation/inbox_page.dart';
 import '../features/inbox/presentation/widgets/inbox_foreground_notification_banner.dart';
 import '../features/profile/presentation/me_page.dart';
@@ -51,11 +52,13 @@ class _AppShellState extends ConsumerState<AppShell>
 
   bool _sessionLogoutInFlight = false;
   bool _canonicalRefreshInFlight = false;
+  late final VibeMediaPlaybackGate _vibePlaybackGate;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _vibePlaybackGate = VibeMediaPlaybackGate(initiallyPaused: true);
 
     ref.read(identityRepositoryProvider.notifier).accept(widget.currentUser);
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(
@@ -84,10 +87,18 @@ class _AppShellState extends ConsumerState<AppShell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    VibeMediaPlaybackGate.setTabPaused(true);
-    VibeMediaPlaybackGate.clearPauseLocks();
+    _vibePlaybackGate.setTabPaused(true);
+    _vibePlaybackGate.clearPauseLocks();
+    _vibePlaybackGate.dispose();
     _sourceRegistryRepository.close();
     super.dispose();
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    _vibePlaybackGate.handleMemoryPressure();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    ref.read(gameBundleCacheProvider).clear();
   }
 
   @override
@@ -172,10 +183,10 @@ class _AppShellState extends ConsumerState<AppShell>
 
   void _syncVibesPlaybackWithActiveTab(VmMainTab selectedTab) {
     final isVibesTabActive = selectedTab == VmMainTab.vibes;
-    VibeMediaPlaybackGate.setTabPaused(!isVibesTabActive);
+    _vibePlaybackGate.setTabPaused(!isVibesTabActive);
     if (isVibesTabActive) {
       WidgetsBinding.instance.addPostFrameCallback(
-        (_) => VibeMediaPlaybackGate.notifyFeedScrolled(),
+        (_) => _vibePlaybackGate.notifyFeedScrolled(),
       );
     }
   }
@@ -233,7 +244,10 @@ class _AppShellState extends ConsumerState<AppShell>
         user: activeUser,
         currentUser: activeUser,
       ),
-      const VibesPage(key: PageStorageKey<String>('main-vibes')),
+      VibesPage(
+        key: const PageStorageKey<String>('main-vibes'),
+        playbackGate: _vibePlaybackGate,
+      ),
       InboxPage(
         key: const PageStorageKey<String>('main-inbox'),
         controller: inbox.controller,

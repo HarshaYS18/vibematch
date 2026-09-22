@@ -8,12 +8,14 @@ class HomeHeaderSection extends StatelessWidget {
     super.key,
     required this.myCreatedRoom,
     required this.onMyRoomTap,
+    required this.onQuickMatchTap,
     required this.onSearchTap,
     required this.onNotificationsTap,
   });
 
   final HomeRoom? myCreatedRoom;
   final VoidCallback onMyRoomTap;
+  final VoidCallback onQuickMatchTap;
   final VoidCallback onSearchTap;
   final VoidCallback onNotificationsTap;
 
@@ -50,6 +52,8 @@ class HomeHeaderSection extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          HomeHeaderButton(icon: Icons.shuffle_rounded, onTap: onQuickMatchTap),
+          const SizedBox(width: 7),
           HomeHeaderButton(icon: Icons.search_rounded, onTap: onSearchTap),
           const SizedBox(width: 7),
           HomeHeaderButton(icon: Icons.notifications_rounded, onTap: onNotificationsTap),

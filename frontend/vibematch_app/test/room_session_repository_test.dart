@@ -220,6 +220,82 @@ void main() {
     expect(clientA.state.presence.keys, bReconnected.presence.keys);
   });
 
+  test('two clients converge after a seat transition', () async {
+    final server = _FakeNetworkClient(_room(40, <int>[1, 2]));
+    final clientA = RoomSessionRepository(
+      roomId: 'VM123',
+      networkClient: server,
+      accessTokenProvider: () => 'token-a',
+    );
+    final clientB = RoomSessionRepository(
+      roomId: 'VM123',
+      networkClient: server,
+      accessTokenProvider: () => 'token-b',
+    );
+
+    await clientA.join();
+    await clientB.join();
+
+    server.snapshot = _room(41, <int>[1, 2])
+      ..['participants'] = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'backend_user_id': 1,
+          'public_user_id': 100,
+          'display_name': 'User 1',
+          'is_active': true,
+          'is_room_member': false,
+          'is_room_admin': false,
+          'seat_index': null,
+        },
+        <String, dynamic>{
+          'backend_user_id': 2,
+          'public_user_id': 200,
+          'display_name': 'User 2',
+          'is_active': true,
+          'is_room_member': true,
+          'is_room_admin': false,
+          'seat_index': 1,
+          'mic_enabled': true,
+        },
+      ]
+      ..['seats'] = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'seat_index': 1,
+          'occupant_backend_user_id': 2,
+          'occupant_public_user_id': 200,
+          'mic_enabled': true,
+        },
+      ];
+
+    final afterTake = await clientB.takeSeat(1);
+    clientA.reconcileSnapshot(server.snapshot);
+
+    expect(afterTake.presence[2]!.seatIndex, 1);
+    expect(clientA.state.presence[2]!.seatIndex, 1);
+    expect(clientA.state.seats[1]!.occupantBackendUserId, 2);
+    expect(clientB.state.seats[1]!.occupantBackendUserId, 2);
+  });
+
+  test('activity command stays on canonical room repository', () async {
+    final server = _FakeNetworkClient(_room(45, <int>[1, 2]));
+    final repository = RoomSessionRepository(
+      roomId: 'VM123',
+      networkClient: server,
+      accessTokenProvider: () => 'token',
+    );
+    await repository.join();
+    await repository.activityCommand(
+      action: 'START',
+      kind: 'karaoke',
+      activityId: 'karaoke-night',
+      title: 'Karaoke Night',
+    );
+    expect(
+      server.calls,
+      contains('POST /rooms/VM123/realtime/activity/command'),
+    );
+  });
+
   test('older realtime snapshot cannot roll canonical state backward', () {
     final network = _FakeNetworkClient(_room(50, <int>[1, 2, 3]));
     final repository = RoomSessionRepository(

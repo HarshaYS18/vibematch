@@ -12,12 +12,14 @@ class VibeMediaPlayer extends StatelessWidget {
     required this.onDoubleTap,
     this.respectFeedPause = true,
     this.autoplay = false,
+    this.playbackGate,
   });
 
   final VibeItem vibe;
   final VoidCallback onDoubleTap;
   final bool respectFeedPause;
   final bool autoplay;
+  final VibeMediaPlaybackGate? playbackGate;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +54,7 @@ class VibeMediaPlayer extends StatelessWidget {
           url: mediaUrl,
           respectFeedPause: respectFeedPause,
           autoplay: autoplay,
+          playbackGate: playbackGate,
         ),
       );
     }
@@ -59,6 +62,9 @@ class VibeMediaPlayer extends StatelessWidget {
       onDoubleTap: onDoubleTap,
       child: Image.network(
         mediaUrl,
+        cacheWidth: (MediaQuery.sizeOf(context).width *
+                MediaQuery.devicePixelRatioOf(context))
+            .round(),
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.cover,
@@ -78,6 +84,7 @@ class _NetworkVideoPlayer extends StatefulWidget {
     required this.url,
     required this.respectFeedPause,
     required this.autoplay,
+    required this.playbackGate,
     super.key,
   });
 
@@ -85,6 +92,7 @@ class _NetworkVideoPlayer extends StatefulWidget {
   final String url;
   final bool respectFeedPause;
   final bool autoplay;
+  final VibeMediaPlaybackGate? playbackGate;
 
   @override
   State<_NetworkVideoPlayer> createState() => _NetworkVideoPlayerState();
@@ -100,16 +108,13 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    if (widget.respectFeedPause) {
-      VibeMediaPlaybackGate.feedPlaybackPaused.addListener(
-        _handlePlaybackGateChanged,
-      );
-      VibeMediaPlaybackGate.feedScrollTick.addListener(_handleScrollTick);
-      VibeMediaPlaybackGate.activeFeedVideoKey.addListener(
-        _handleActiveVideoChanged,
-      );
+    final gate = widget.playbackGate;
+    assert(!widget.respectFeedPause || gate != null);
+    if (widget.respectFeedPause && gate != null) {
+      gate.feedPlaybackPaused.addListener(_handlePlaybackGateChanged);
+      gate.feedScrollTick.addListener(_handleScrollTick);
+      gate.activeFeedVideoKey.addListener(_handleActiveVideoChanged);
     }
-    _initializeController();
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _syncAutoplayWithVisibility(),
     );
@@ -119,40 +124,41 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   void didUpdateWidget(covariant _NetworkVideoPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url || oldWidget.videoKey != widget.videoKey) {
-      VibeMediaPlaybackGate.releaseActiveFeedVideo(oldWidget.videoKey);
+      oldWidget.playbackGate?.releaseActiveFeedVideo(oldWidget.videoKey);
       _controller?.dispose();
       _controller = null;
       _isReady = false;
       _hasError = false;
       _showPlayButton = true;
       _manualPlayRequested = false;
-      _initializeController();
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _syncAutoplayWithVisibility(),
+      );
     }
   }
 
   @override
   void dispose() {
-    VibeMediaPlaybackGate.releaseActiveFeedVideo(widget.videoKey);
+    widget.playbackGate?.releaseActiveFeedVideo(widget.videoKey);
     if (widget.respectFeedPause) {
-      VibeMediaPlaybackGate.feedPlaybackPaused.removeListener(
-        _handlePlaybackGateChanged,
-      );
-      VibeMediaPlaybackGate.feedScrollTick.removeListener(_handleScrollTick);
-      VibeMediaPlaybackGate.activeFeedVideoKey.removeListener(
-        _handleActiveVideoChanged,
-      );
+      final gate = widget.playbackGate;
+      gate?.feedPlaybackPaused.removeListener(_handlePlaybackGateChanged);
+      gate?.feedScrollTick.removeListener(_handleScrollTick);
+      gate?.activeFeedVideoKey.removeListener(_handleActiveVideoChanged);
     }
     _controller?.dispose();
     super.dispose();
   }
 
-  void _initializeController() {
+  void _initializeController({bool playAfterReady = false}) {
+    if (_controller != null) return;
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..setLooping(true)
       ..initialize()
           .then((_) {
             if (!mounted) return;
             setState(() => _isReady = true);
+            if (playAfterReady) _manualPlayRequested = true;
             _syncAutoplayWithVisibility();
           })
           .catchError((_) {
@@ -161,7 +167,7 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   }
 
   void _handlePlaybackGateChanged() {
-    if (VibeMediaPlaybackGate.feedPlaybackPaused.value) {
+    if (widget.playbackGate?.feedPlaybackPaused.value == true) {
       _pauseForVisibility(resetManualPlay: false);
       return;
     }
@@ -170,18 +176,22 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
 
   void _handleScrollTick() {
     _syncAutoplayWithVisibility();
+    if (!_isNearViewport() && !_manualPlayRequested) {
+      _disposeControllerForDistance();
+    }
   }
 
   void _handleActiveVideoChanged() {
-    if (VibeMediaPlaybackGate.activeFeedVideoKey.value != widget.videoKey) {
+    if (widget.playbackGate?.activeFeedVideoKey.value != widget.videoKey) {
       _pauseForVisibility(resetManualPlay: false);
+      if (!_isNearViewport()) _disposeControllerForDistance();
     }
   }
 
   bool _shouldAutoplayNow() {
     if (widget.autoplay) return true;
     if (!widget.respectFeedPause) return false;
-    if (VibeMediaPlaybackGate.feedPlaybackPaused.value) return false;
+    if (widget.playbackGate?.feedPlaybackPaused.value == true) return false;
     final renderObject = context.findRenderObject();
     if (renderObject is! RenderBox || !renderObject.hasSize) return false;
     final topLeft = renderObject.localToGlobal(Offset.zero);
@@ -207,16 +217,44 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
   }
 
   void _syncAutoplayWithVisibility() {
-    final controller = _controller;
-    if (!mounted || controller == null || !_isReady) return;
+    if (!mounted) return;
     final shouldPlay = _manualPlayRequested || _shouldAutoplayNow();
-    if (shouldPlay && !VibeMediaPlaybackGate.feedPlaybackPaused.value) {
-      VibeMediaPlaybackGate.claimActiveFeedVideo(widget.videoKey);
+    if (shouldPlay && _controller == null) {
+      _initializeController(playAfterReady: _manualPlayRequested);
+      return;
+    }
+    final controller = _controller;
+    if (controller == null || !_isReady) return;
+    if (shouldPlay && widget.playbackGate?.feedPlaybackPaused.value != true) {
+      widget.playbackGate?.claimActiveFeedVideo(widget.videoKey);
       if (!controller.value.isPlaying) controller.play();
       if (_showPlayButton) setState(() => _showPlayButton = false);
     } else {
       _pauseForVisibility(resetManualPlay: false);
     }
+  }
+
+  bool _isNearViewport() {
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return false;
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery == null) return false;
+    final top = renderObject.localToGlobal(Offset.zero).dy;
+    final bottom = top + renderObject.size.height;
+    final viewportTop = -renderObject.size.height * 0.6;
+    final viewportBottom =
+        mediaQuery.size.height + renderObject.size.height * 0.6;
+    return bottom >= viewportTop && top <= viewportBottom;
+  }
+
+  void _disposeControllerForDistance() {
+    final controller = _controller;
+    if (controller == null) return;
+    _controller = null;
+    _isReady = false;
+    _showPlayButton = true;
+    controller.dispose();
+    if (mounted) setState(() {});
   }
 
   void _pauseForVisibility({required bool resetManualPlay}) {
@@ -229,15 +267,20 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
 
   void _togglePlayback() {
     final controller = _controller;
-    if (controller == null || !_isReady) return;
+    if (controller == null) {
+      _manualPlayRequested = true;
+      _initializeController(playAfterReady: true);
+      return;
+    }
+    if (!_isReady) return;
     if (controller.value.isPlaying) {
       _manualPlayRequested = false;
-      VibeMediaPlaybackGate.releaseActiveFeedVideo(widget.videoKey);
+      widget.playbackGate?.releaseActiveFeedVideo(widget.videoKey);
       controller.pause();
       setState(() => _showPlayButton = true);
     } else {
       _manualPlayRequested = true;
-      VibeMediaPlaybackGate.claimActiveFeedVideo(widget.videoKey);
+      widget.playbackGate?.claimActiveFeedVideo(widget.videoKey);
       controller.play();
       setState(() => _showPlayButton = false);
     }
@@ -254,13 +297,29 @@ class _NetworkVideoPlayerState extends State<_NetworkVideoPlayer> {
           color: Color(0xFF8C8198),
         ),
       );
-    if (controller == null || !_isReady)
+    if (controller == null) {
+      return Material(
+        color: Colors.black,
+        child: InkWell(
+          onTap: _togglePlayback,
+          child: const Center(
+            child: Icon(
+              Icons.play_circle_fill_rounded,
+              color: Colors.white,
+              size: 58,
+            ),
+          ),
+        ),
+      );
+    }
+    if (!_isReady) {
       return const Center(
         child: CircularProgressIndicator(
           color: Color(0xFF111015),
           strokeWidth: 2.6,
         ),
       );
+    }
     final videoSize = controller.value.size;
     final videoWidth = videoSize.width <= 0 ? 9.0 : videoSize.width;
     final videoHeight = videoSize.height <= 0 ? 16.0 : videoSize.height;

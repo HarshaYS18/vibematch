@@ -15,7 +15,7 @@ from app.services.permissions import room_permission_service
 from app.services.rooms.room_kickout_service import create_room_kickout_for_user, deactivate_room_user_for_kickout
 from app.services.rooms.room_service import assert_room_entry_allowed, close_other_active_room_sessions, deactivate_user_in_room, mark_user_room_presence_active, user_has_active_room_conflict
 from app.services.rooms.room_state_service import ensure_room_seats, normalize_layout, room_sequence, room_snapshot, seat_count_for_layout
-from app.services.rooms import watch_party_service
+from app.services.rooms import room_activity_service, watch_party_service
 
 SEAT_APPLICATION_EXPIRY_SECONDS = 20
 SEAT_APPLICATION_COOLDOWN_SECONDS = 30
@@ -292,6 +292,7 @@ def leave_room(db: Session, room: Room, user: User, release_seat: bool = False) 
     deactivate_user_in_room(db, room, user.id, release_seats=release_seat)
     record_room_event(db, room, "room.left", actor_user_id=user.id, payload={"release_seat": release_seat})
     watch_party_service.ensure_controller_after_departure(db, room, user.id)
+    room_activity_service.ensure_controller_after_departure(db, room, user.id)
     db.flush()
     return room_snapshot(db, room)
 

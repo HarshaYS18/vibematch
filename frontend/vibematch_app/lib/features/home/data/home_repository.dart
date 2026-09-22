@@ -65,6 +65,22 @@ class HomeRepository {
         .toList(growable: false);
   }
 
+  Future<HomeRoom?> fetchQuickMatch({
+    String? language,
+    String? category,
+  }) async {
+    final response = await _apiClient.getOptionalMap(
+      ApiEndpoints.roomsQuickMatch,
+      queryParameters: <String, String?>{
+        'language': language,
+        'category': category,
+      },
+      headers: _authHeaders(),
+    );
+    if (response == null || response.isEmpty) return null;
+    return HomeRoomDto.fromJson(response).toDomain();
+  }
+
   Future<List<HomeRoom>> fetchFollowingRooms({
     String? language,
     String? category,

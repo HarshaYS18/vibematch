@@ -8,6 +8,7 @@ class EventsMockData {
   static final List<EventItem> activeEvents = [
     EventItem(
       id: 'event_weekend_001',
+      kind: 'rooms',
       title: 'Weekend Voice Party',
       subtitle: 'Join official rooms, send gifts, and collect limited event badges.',
       status: 'Active now',
@@ -19,6 +20,7 @@ class EventsMockData {
     ),
     EventItem(
       id: 'event_vibes_001',
+      kind: 'missions',
       title: 'Vibes Creator Week',
       subtitle: 'Post Vibes, mention fans, and climb the event activity board.',
       status: 'Active now',
@@ -30,6 +32,7 @@ class EventsMockData {
     ),
     EventItem(
       id: 'promo_recharge_001',
+      kind: 'community',
       title: 'Recharge Bonus Promo',
       subtitle: 'Recharge during the promo window and unlock bonus progress.',
       status: 'Active promo',

@@ -100,6 +100,9 @@ class FamilyController extends ChangeNotifier {
         ..clear()
         ..addAll(response.rankings);
       if (response.rankings.isEmpty) unawaited(refreshRankings());
+      if (hasFamily && profile.id.trim().isNotEmpty) {
+        unawaited(refreshChat());
+      }
       loadingBackend = false;
       backendError = null;
       notifyListeners();
@@ -343,12 +346,38 @@ class FamilyController extends ChangeNotifier {
     }
   }
 
-  bool sendMessage(String text) {
+  Future<void> refreshChat() async {
+    if (!hasFamily || profile.id.trim().isEmpty) return;
+    try {
+      final backendMessages = await _api.getChatMessages(familyId: profile.id);
+      messages
+        ..clear()
+        ..addAll(backendMessages.reversed);
+      backendError = null;
+      notifyListeners();
+    } catch (error) {
+      backendError = error.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<bool> sendMessage(String text) async {
     final clean = text.trim();
-    if (clean.isEmpty || !hasFamily) return false;
-    backendError = 'Family chat is waiting for a backend message endpoint.';
-    notifyListeners();
-    return false;
+    if (clean.isEmpty || !hasFamily || profile.id.trim().isEmpty) return false;
+    try {
+      final sent = await _api.sendChatMessage(
+        familyId: profile.id,
+        text: clean,
+      );
+      messages.insert(0, sent);
+      backendError = null;
+      notifyListeners();
+      return true;
+    } catch (error) {
+      backendError = error.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
   }
 
   void _clearCurrentFamily() {

@@ -9,6 +9,7 @@ import '../presentation/pages/media_vibe_detail_pager.dart';
 import '../presentation/pages/vibe_detail_backend_page.dart';
 import '../presentation/pages/vibes_settings_page.dart';
 import '../presentation/widgets/vibe_action_sheets.dart';
+import '../presentation/widgets/vibe_media_playback_gate.dart';
 import 'vibes_controller.dart';
 
 class VibesNavigationController {
@@ -85,6 +86,7 @@ class VibesNavigationController {
     required BuildContext context,
     required VibesController controller,
     required VibeItem vibe,
+    required VibeMediaPlaybackGate playbackGate,
   }) {
     if (vibe.mediaType != VibeMediaType.text) {
       final mediaVibes = controller.visibleVibes
@@ -99,6 +101,7 @@ class VibesNavigationController {
           settings: const RouteSettings(name: 'media-vibe-detail'),
           page: MediaVibeDetailPager(
             vibes: mediaVibes.isEmpty ? <VibeItem>[vibe] : mediaVibes,
+            playbackGate: playbackGate,
             initialIndex: idIndex >= 0
                 ? idIndex
                 : (fallbackIndex >= 0 ? fallbackIndex : 0),

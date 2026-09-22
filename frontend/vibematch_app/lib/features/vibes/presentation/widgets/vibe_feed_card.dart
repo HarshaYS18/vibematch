@@ -9,6 +9,7 @@ class VibeCardModular extends StatefulWidget {
   const VibeCardModular({
     super.key,
     required this.vibe,
+    required this.playbackGate,
     required this.onProfileTap,
     required this.onLikeTap,
     required this.onCommentTap,
@@ -18,6 +19,7 @@ class VibeCardModular extends StatefulWidget {
   });
 
   final VibeItem vibe;
+  final VibeMediaPlaybackGate playbackGate;
   final VoidCallback onProfileTap;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
@@ -98,7 +100,7 @@ class _VibeCardModularState extends State<VibeCardModular> {
                       SizedBox(
                         width: width,
                         height: mediaHeight,
-                        child: ClipRect(child: VibeMediaPlayer(vibe: widget.vibe, onDoubleTap: _handleDoubleTap)),
+                        child: RepaintBoundary(child: ClipRect(child: VibeMediaPlayer(vibe: widget.vibe, onDoubleTap: _handleDoubleTap, playbackGate: widget.playbackGate))),
                       ),
                     _MetaPanel(
                       vibe: widget.vibe,

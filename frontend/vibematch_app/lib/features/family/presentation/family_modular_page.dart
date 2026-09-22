@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/family_ui_models.dart';
@@ -209,14 +211,15 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     );
   }
 
-  void _sendChat() {
-    final sent = _controller.sendMessage(_chatController.text);
+  Future<void> _sendChat() async {
+    final text = _chatController.text;
+    if (text.trim().isEmpty) return;
+    final sent = await _controller.sendMessage(text);
+    if (!mounted) return;
     if (sent) {
       _chatController.clear();
-    } else if (_chatController.text.trim().isNotEmpty) {
-      _toast(
-        'Family chat will be enabled when the backend message endpoint is available.',
-      );
+    } else {
+      _toast(_controller.backendError ?? 'Could not send family message.');
     }
   }
 
@@ -265,7 +268,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
               child: FamilyChatSection(
                 messages: _controller.messages,
                 controller: _chatController,
-                onSend: _sendChat,
+                onSend: () => unawaited(_sendChat()),
               ),
             ),
           ],

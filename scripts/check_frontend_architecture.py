@@ -145,6 +145,46 @@ if PUBSPEC.exists():
             "frontend/vibematch_app/pubspec.yaml: raw game packages must not be app dependencies"
         )
 
+
+# Chunks 11-14: product migration and performance rules.
+VIBE_PLAYBACK_GATE = (
+    APP / "features" / "vibes" / "presentation" / "widgets" / "vibe_media_playback_gate.dart"
+)
+if VIBE_PLAYBACK_GATE.exists():
+    text = VIBE_PLAYBACK_GATE.read_text(encoding="utf-8-sig")
+    if re.search(r"\bstatic\s+(?:final\s+)?ValueNotifier\b", text):
+        violations.append(
+            "vibe_media_playback_gate.dart: playback arbitration must be AppShell-scoped, not process-global"
+        )
+
+APP_SHELL = APP / "app" / "app_shell.dart"
+if APP_SHELL.exists():
+    text = APP_SHELL.read_text(encoding="utf-8-sig")
+    if "_PersistentTabStage" not in text:
+        violations.append(
+            "app/app_shell.dart: main tabs must remain persistent instead of recreating screens"
+        )
+    if "didHaveMemoryPressure" not in text:
+        violations.append(
+            "app/app_shell.dart: shell must release media/image caches under memory pressure"
+        )
+
+NETWORK_CLIENT = APP / "foundation" / "networking" / "app_network_client.dart"
+if NETWORK_CLIENT.exists():
+    text = NETWORK_CLIENT.read_text(encoding="utf-8-sig")
+    if "DeduplicatingAppNetworkClient" not in text:
+        violations.append(
+            "foundation/networking/app_network_client.dart: canonical GET networking must deduplicate in-flight requests"
+        )
+
+ROOM_SESSION_REPOSITORY = APP / "room_session" / "data" / "room_session_repository.dart"
+if ROOM_SESSION_REPOSITORY.exists():
+    text = ROOM_SESSION_REPOSITORY.read_text(encoding="utf-8-sig")
+    if "/realtime/activity/command" not in text:
+        violations.append(
+            "room_session/data/room_session_repository.dart: room activities must remain on RoomSessionRepository authority"
+        )
+
 if violations:
     print("Frontend architecture guard failed:")
     for violation in violations:

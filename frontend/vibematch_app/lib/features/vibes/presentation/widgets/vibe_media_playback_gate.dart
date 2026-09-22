@@ -1,57 +1,79 @@
 import 'package:flutter/foundation.dart';
 
 class VibeMediaPlaybackGate {
-  const VibeMediaPlaybackGate._();
+  VibeMediaPlaybackGate({bool initiallyPaused = true})
+      : feedPlaybackPaused = ValueNotifier<bool>(initiallyPaused),
+        _tabPaused = initiallyPaused;
 
-  static final ValueNotifier<bool> feedPlaybackPaused = ValueNotifier<bool>(false);
-  static final ValueNotifier<int> feedScrollTick = ValueNotifier<int>(0);
-  static final ValueNotifier<String?> activeFeedVideoKey = ValueNotifier<String?>(null);
-  static final Set<String> _pauseLocks = <String>{};
-  static bool _tabPaused = false;
+  final ValueNotifier<bool> feedPlaybackPaused;
+  final ValueNotifier<int> feedScrollTick = ValueNotifier<int>(0);
+  final ValueNotifier<String?> activeFeedVideoKey = ValueNotifier<String?>(null);
+  final Set<String> _pauseLocks = <String>{};
+  bool _tabPaused;
+  bool _disposed = false;
 
-  static void setTabPaused(bool paused) {
+  void setTabPaused(bool paused) {
+    if (_disposed) return;
     _tabPaused = paused;
     if (paused) activeFeedVideoKey.value = null;
     _syncPausedState();
   }
 
-  static void acquirePauseLock(String key) {
-    if (key.trim().isEmpty) return;
+  void acquirePauseLock(String key) {
+    if (_disposed || key.trim().isEmpty) return;
     _pauseLocks.add(key);
     activeFeedVideoKey.value = null;
     _syncPausedState();
   }
 
-  static void releasePauseLock(String key) {
-    if (key.trim().isEmpty) return;
+  void releasePauseLock(String key) {
+    if (_disposed || key.trim().isEmpty) return;
     _pauseLocks.remove(key);
     _syncPausedState();
   }
 
-  static void claimActiveFeedVideo(String key) {
-    if (key.trim().isEmpty || feedPlaybackPaused.value) return;
+  void claimActiveFeedVideo(String key) {
+    if (_disposed || key.trim().isEmpty || feedPlaybackPaused.value) return;
     if (activeFeedVideoKey.value != key) activeFeedVideoKey.value = key;
   }
 
-  static void releaseActiveFeedVideo(String key) {
-    if (key.trim().isEmpty) return;
+  void releaseActiveFeedVideo(String key) {
+    if (_disposed || key.trim().isEmpty) return;
     if (activeFeedVideoKey.value == key) activeFeedVideoKey.value = null;
   }
 
-  static void clearPauseLocks() {
+  void clearPauseLocks() {
+    if (_disposed) return;
     _pauseLocks.clear();
     _syncPausedState();
   }
 
-  static void notifyFeedScrolled() {
+  void notifyFeedScrolled() {
+    if (_disposed) return;
     feedScrollTick.value += 1;
   }
 
-  static void _syncPausedState() {
+  void handleMemoryPressure() {
+    if (_disposed) return;
+    activeFeedVideoKey.value = null;
+    feedScrollTick.value += 1;
+  }
+
+  void _syncPausedState() {
+    if (_disposed) return;
     final shouldPause = _tabPaused || _pauseLocks.isNotEmpty;
     if (shouldPause) activeFeedVideoKey.value = null;
     if (feedPlaybackPaused.value != shouldPause) {
       feedPlaybackPaused.value = shouldPause;
     }
+  }
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    feedPlaybackPaused.dispose();
+    feedScrollTick.dispose();
+    activeFeedVideoKey.dispose();
+    _pauseLocks.clear();
   }
 }

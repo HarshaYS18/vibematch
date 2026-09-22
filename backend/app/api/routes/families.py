@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.economy_stats import FamilyEconomyStats, FamilyMemberStats
+from app.models.inbox import InboxConversation, InboxParticipant, InboxMessageType
 from app.models.user import User
+from app.services import inbox_service
 
 router = APIRouter(prefix="/families", tags=["Families"])
 
@@ -27,6 +29,10 @@ class FamilyAdminsRequest(BaseModel):
 
 class FamilyInviteRequest(BaseModel):
     user_ids: list[str] = Field(default_factory=list)
+
+
+class FamilyChatMessageRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
 
 
 def _empty_family(user: User) -> dict:
@@ -345,3 +351,102 @@ def send_family_invites(family_id: str, payload: FamilyInviteRequest, db: Sessio
     _require_family_admin(db, parsed_id, current_user)
     valid_targets = [_user_by_any_id(db, raw) for raw in payload.user_ids]
     return {"status": "sent", "sent_count": len([user for user in valid_targets if user is not None])}
+
+
+def _family_chat_public_id(family_id: int) -> str:
+    return f"family_chat_{family_id}"
+
+
+def _ensure_family_chat_conversation(db: Session, family_id: int) -> InboxConversation:
+    family = _family_by_id(db, family_id)
+    conversation = (
+        db.query(InboxConversation)
+        .filter(InboxConversation.public_id == _family_chat_public_id(family_id))
+        .first()
+    )
+    if conversation is None:
+        title = family.family_name or f"Family {family_id}"
+        conversation = InboxConversation(
+            public_id=_family_chat_public_id(family_id),
+            title=title,
+            avatar_text=(title.strip()[:2] or "FK").upper(),
+            conversation_type="family",
+            is_official=False,
+            metadata_json={"family_id": family_id},
+        )
+        db.add(conversation)
+        db.flush()
+
+    active_member_ids = {member.user_id for member in _family_members(db, family_id)}
+    existing = {item.user_id: item for item in conversation.participants}
+    for user_id in active_member_ids:
+        participant = existing.get(user_id)
+        if participant is None:
+            db.add(InboxParticipant(conversation_id=conversation.id, user_id=user_id))
+        elif participant.is_deleted_for_user:
+            participant.is_deleted_for_user = False
+    for user_id, participant in existing.items():
+        if user_id not in active_member_ids:
+            db.delete(participant)
+    conversation.title = family.family_name or conversation.title
+    db.flush()
+    db.expire(conversation, ["participants"])
+    return conversation
+
+
+def _require_family_member(db: Session, family_id: int, user: User) -> FamilyMemberStats:
+    member = (
+        db.query(FamilyMemberStats)
+        .filter(
+            FamilyMemberStats.family_id == family_id,
+            FamilyMemberStats.user_id == user.id,
+        )
+        .first()
+    )
+    if member is None:
+        raise HTTPException(status_code=403, detail="Family membership required")
+    return member
+
+
+@router.get("/{family_id}/chat")
+def get_family_chat(
+    family_id: str,
+    limit: int = 80,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    parsed_id = _parse_family_id(family_id)
+    _require_family_member(db, parsed_id, current_user)
+    conversation = _ensure_family_chat_conversation(db, parsed_id)
+    db.commit()
+    visible = list(conversation.messages)[-max(1, min(limit, 100)):]
+    return {
+        "family_id": parsed_id,
+        "conversation_id": conversation.public_id,
+        "messages": [inbox_service.message_to_dict(message, current_user) for message in visible],
+    }
+
+
+@router.post("/{family_id}/chat/messages")
+def send_family_chat_message(
+    family_id: str,
+    payload: FamilyChatMessageRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    parsed_id = _parse_family_id(family_id)
+    _require_family_member(db, parsed_id, current_user)
+    conversation = _ensure_family_chat_conversation(db, parsed_id)
+    message = inbox_service.send_message(
+        db,
+        conversation,
+        current_user,
+        payload.text,
+        message_type=InboxMessageType.TEXT.value,
+        metadata={"family_id": parsed_id},
+    )
+    return {
+        "family_id": parsed_id,
+        "conversation_id": conversation.public_id,
+        "message": inbox_service.message_to_dict(message, current_user),
+    }

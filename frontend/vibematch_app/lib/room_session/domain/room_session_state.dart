@@ -333,6 +333,7 @@ class RoomSessionState {
       ),
       gifts: Map<String, dynamic>.unmodifiable(_map(snapshot['gifts'])),
       activities: Map<String, dynamic>.unmodifiable(<String, dynamic>{
+        ..._map(snapshot['activity']),
         'pending_room_member_requests': pendingMemberRequests,
         'pending_seat_applications': pendingSeatApplications,
       }),

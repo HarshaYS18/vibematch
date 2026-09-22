@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/vibe_models.dart';
 import '../widgets/vibe_card_modular.dart';
+import '../widgets/vibe_media_playback_gate.dart';
 import '../widgets/vibes_status_widgets.dart';
 
 class VibesFeedSection extends StatelessWidget {
@@ -11,6 +12,7 @@ class VibesFeedSection extends StatelessWidget {
     required this.selectedTab,
     required this.isLoading,
     required this.hasError,
+    required this.playbackGate,
     required this.onProfileTap,
     required this.onLikeTap,
     required this.onCommentTap,
@@ -23,6 +25,7 @@ class VibesFeedSection extends StatelessWidget {
   final VibesFeedTab selectedTab;
   final bool isLoading;
   final bool hasError;
+  final VibeMediaPlaybackGate playbackGate;
   final ValueChanged<VibeItem> onProfileTap;
   final ValueChanged<VibeItem> onLikeTap;
   final ValueChanged<VibeItem> onCommentTap;
@@ -43,6 +46,7 @@ class VibesFeedSection extends StatelessWidget {
         final vibe = vibes[index];
         return VibeCardModular(
           vibe: vibe,
+          playbackGate: playbackGate,
           onProfileTap: () => onProfileTap(vibe),
           onLikeTap: () => onLikeTap(vibe),
           onCommentTap: () => onCommentTap(vibe),

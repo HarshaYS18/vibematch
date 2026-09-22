@@ -19,6 +19,7 @@ from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent
 from app.models.user import User
 from app.realtime.connection_manager import room_realtime_connections
 from app.schemas.room_realtime import (
+    RoomActivityCommand,
     RoomAdminMuteCommand,
     RoomBackgroundThemeCommand,
     RoomChatSendCommand,
@@ -32,7 +33,7 @@ from app.schemas.room_realtime import (
     RoomWatchPartyCommand,
 )
 from app.services.permissions import room_permission_service as policy_permissions
-from app.services.rooms import room_action_service, room_permission_service, room_state_service, watch_party_service
+from app.services.rooms import room_action_service, room_activity_service, room_permission_service, room_state_service, watch_party_service
 from app.services.user_master_state_service import get_user_master_state
 
 
@@ -528,6 +529,53 @@ def _execute_room_command_in_session(
         emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "room_system_message", message, actor=actor)))
         return snapshot
 
+    if event_type.startswith("room_activity/"):
+        action = event_type.split("/", 1)[1].strip().upper()
+        if action == "INVITE":
+            target = resolve_target_user(db, payload)
+            if target is None:
+                raise HTTPException(status_code=404, detail="Activity invite target not found")
+            invite = room_activity_service.record_activity_invite(db, room, actor, target, payload)
+            snapshot = _finish(
+                db,
+                room,
+                emissions,
+                "room_activity/invite_sent",
+                extra={"activity_invite": invite},
+            )
+            emissions.append(
+                RoomCommandEmission(
+                    target="user",
+                    room_id=room.room_public_id,
+                    user_id=target.id,
+                    message={
+                        "type": "room_activity/invite_received",
+                        "payload": {
+                            **invite,
+                            "room": snapshot,
+                            "inviter_public_user_id": actor.public_user_id,
+                            "inviter_name": _display_name(actor),
+                            "inviter_avatar_url": actor.avatar_url,
+                        },
+                    },
+                )
+            )
+            return snapshot
+        activity_state = room_activity_service.apply_activity_command(
+            db,
+            room,
+            actor,
+            action,
+            payload,
+        )
+        return _finish(
+            db,
+            room,
+            emissions,
+            f"room_activity/{action.lower()}",
+            extra={"activity": activity_state},
+        )
+
     if event_type.startswith("watch_party/"):
         action = event_type.split("/", 1)[1].strip().upper()
         watch_state = watch_party_service.apply_watch_party_command(
@@ -748,6 +796,26 @@ async def watch_party_command(
         room,
         current_user,
         f"watch_party/{action.lower()}",
+        payload,
+    )
+    return {"room_id": room_public_id, "room": data}
+
+
+@router.post("/activity/command")
+async def activity_command(
+    room_public_id: str,
+    command: RoomActivityCommand,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    room = room_or_404(db, room_public_id)
+    payload = command.model_dump(exclude_none=True)
+    action = str(payload.pop("action", "")).strip().upper()
+    data = await execute_room_command(
+        db,
+        room,
+        current_user,
+        f"room_activity/{action.lower()}",
         payload,
     )
     return {"room_id": room_public_id, "room": data}

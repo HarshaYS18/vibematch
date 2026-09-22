@@ -269,3 +269,55 @@ def create_game_round(db: Session, game_key: str, entry_fee: int, max_players: i
 def dashboard_for_user(db: Session, user: User) -> dict:
     wallet = get_or_create_wallet(db, user.id)
     return {"wallet": wallet, "seller_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.SELLER_SUPPLY_POOL), "merchant_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.MERCHANT_SUPPLY_POOL), "gaming_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.FRIENDS_GAMING_POOL)}
+
+
+def credit_social_mission_reward(
+    db: Session,
+    user_id: int,
+    *,
+    mission_id: str,
+    cycle_key: str,
+    reward_coin_amount: int,
+) -> tuple[UserWallet, bool]:
+    """Idempotently credit a social mission reward through the existing wallet ledger.
+
+    The user's wallet row is locked before re-checking the ledger so concurrent
+    claim requests for the same mission/cycle converge on one credit without a
+    parallel rewards store.
+    """
+    wallet = get_or_create_wallet(db, user_id)
+    db.flush()
+    wallet = (
+        db.query(UserWallet)
+        .filter(UserWallet.user_id == user_id)
+        .with_for_update()
+        .one()
+    )
+    source_id = f"{mission_id}:{cycle_key}"
+    existing = (
+        db.query(WalletLedger.id)
+        .filter(
+            WalletLedger.user_id == user_id,
+            WalletLedger.source_type == "SOCIAL_MISSION_REWARD",
+            WalletLedger.source_id == source_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        db.commit()
+        db.refresh(wallet)
+        return wallet, False
+
+    _credit_wallet(
+        db,
+        wallet,
+        EconomyCurrency.COIN,
+        reward_coin_amount,
+        "SOCIAL_MISSION_REWARD",
+        source_id,
+        user_id,
+        f"Social mission reward: {mission_id}",
+    )
+    db.commit()
+    db.refresh(wallet)
+    return wallet, True

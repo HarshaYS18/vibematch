@@ -14,7 +14,7 @@ def _endpoint(path: str, purpose: str, *, owner: str = "backend", realtime_safe:
 
 def get_app_source_registry() -> AppSourceRegistryResponse:
     return AppSourceRegistryResponse(
-        version=4,
+        version=5,
         master_api=_endpoint(
             MASTER_STATE,
             "Authenticated user/profile/economy summary used as the app-level master read.",
@@ -36,6 +36,7 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                     _endpoint("/home-banners", "Home event/policy banner data."),
                     _endpoint("/vibes/feed", "Home feed content when shown on the home tab."),
                     _endpoint("/rooms/trending", "Room discovery summaries."),
+                    _endpoint("/rooms/quick-match", "Backend-selected public room for one-tap matchmaking."),
                 ],
                 config_sources=[_endpoint("/control-center/source-of-truth", "Owner-visible source registry.")],
                 control_center_modules=["Banner Manager", "Source Of Truth Registry"],
@@ -59,10 +60,11 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                     _endpoint("/rooms/{room_public_id}/realtime/seat/leave", "Canonical seat leave mutation."),
                     _endpoint("/rooms/{room_public_id}/realtime/mic", "Canonical microphone state mutation."),
                     _endpoint("/rooms/{room_public_id}/realtime/watch-party/command", "Canonical Watch Party LOAD/PLAY/PAUSE/SEEK/CHANGE_CONTENT/SYNC/END/TRANSFER_CONTROL mutation returning authoritative room state."),
+                    _endpoint("/rooms/{room_public_id}/realtime/activity/command", "Canonical karaoke, party and social-game room activity mutation and invite flow."),
                     _endpoint("/rooms/{room_public_id}/settings", "Room settings mutation while settings UI migrates onto RoomSessionRepository."),
                 ],
                 realtime_channels=["/ws/room-realtime"],
-                protected_flows=["room entry", "privacy", "kickout", "seats", "gifts", "chat", "online count", "watch party"],
+                protected_flows=["room entry", "privacy", "kickout", "seats", "gifts", "chat", "online count", "watch party", "room activities"],
                 duplicate_sources_to_retire=[
                     "LiveRoomPresenceRepository lifecycle reads/writes after legacy UI adapters are retired",
                     "LiveRoomMembershipService process-global cache after all room consumers read RoomSessionRepository",

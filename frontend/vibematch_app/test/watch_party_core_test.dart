@@ -145,6 +145,49 @@ void main() {
     expect(adapterB.disposed, isTrue);
   });
 
+  test('seek and reconnect converge to the latest authoritative timeline', () async {
+    final adapterA = _FakeWatchAdapter(providerId: 'fake');
+    final adapterB = _FakeWatchAdapter(providerId: 'fake');
+    final coordinatorA = WatchPartyCoordinator(
+      adapter: adapterA,
+      clock: WatchPartyClock(clientNowMs: () => 1000),
+    );
+    final coordinatorB = WatchPartyCoordinator(
+      adapter: adapterB,
+      clock: WatchPartyClock(clientNowMs: () => 900000),
+    );
+
+    final seekState = _state(
+      _session(positionMs: 60000, anchorMs: 200000, revision: 2),
+      serverTimeMs: 200000,
+    );
+    await coordinatorA.reconcile(seekState);
+    await coordinatorB.reconcile(seekState);
+    expect(adapterA.positionMs, 60000);
+    expect(adapterB.positionMs, 60000);
+
+    await coordinatorB.dispose();
+
+    final reconnectedAdapterB = _FakeWatchAdapter(providerId: 'fake');
+    final reconnectedB = WatchPartyCoordinator(
+      adapter: reconnectedAdapterB,
+      clock: WatchPartyClock(clientNowMs: () => 42),
+    );
+    final currentState = _state(
+      _session(positionMs: 90000, anchorMs: 230000, revision: 3),
+      serverTimeMs: 230000,
+    );
+    await coordinatorA.reconcile(currentState);
+    await reconnectedB.reconcile(currentState);
+
+    expect(adapterA.positionMs, 90000);
+    expect(reconnectedAdapterB.positionMs, 90000);
+    expect(adapterA.positionMs, reconnectedAdapterB.positionMs);
+
+    await coordinatorA.dispose();
+    await reconnectedB.dispose();
+  });
+
   test('medium playing drift uses rate correction instead of a seek', () async {
     var clientNow = 5000;
     final adapter = _FakeWatchAdapter(providerId: 'fake');

@@ -91,6 +91,36 @@ class FamilyApiService {
     );
   }
 
+  Future<List<FamilyChatUiModel>> getChatMessages({
+    required String familyId,
+  }) async {
+    final cleanFamilyId = familyId.trim();
+    if (cleanFamilyId.isEmpty) return const <FamilyChatUiModel>[];
+    final json = await _getMap('/families/$cleanFamilyId/chat');
+    final raw = json['messages'];
+    if (raw is! List) return const <FamilyChatUiModel>[];
+    return raw
+        .whereType<Map>()
+        .map((item) => _chatFromJson(item.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<FamilyChatUiModel> sendChatMessage({
+    required String familyId,
+    required String text,
+  }) async {
+    final cleanFamilyId = familyId.trim();
+    final cleanText = text.trim();
+    if (cleanFamilyId.isEmpty || cleanText.isEmpty) {
+      throw Exception('Family message is empty.');
+    }
+    final json = await _postMap(
+      '/families/$cleanFamilyId/chat/messages',
+      body: <String, dynamic>{'text': cleanText},
+    );
+    return _chatFromJson(_map(json['message']));
+  }
+
   Future<void> sendInvites({
     required String familyId,
     required Set<String> userIds,
@@ -306,4 +336,14 @@ List<Color> _gradient(int seed) {
     const [Color(0xFF34D399), Color(0xFFFFB020)],
   ];
   return gradients[seed.abs() % gradients.length];
+}
+
+
+FamilyChatUiModel _chatFromJson(Map<String, dynamic> json) {
+  return FamilyChatUiModel(
+    senderName: _string(json['sender'], fallback: 'Family member'),
+    message: _string(json['text'], fallback: ''),
+    timeLabel: _string(json['time'], fallback: ''),
+    isMine: _bool(json['is_mine'], fallback: false),
+  );
 }

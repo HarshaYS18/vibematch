@@ -83,6 +83,13 @@ class _HomePageState extends State<HomePage> {
                     controller: _controller,
                     currentUser: activeCurrentUser,
                   ),
+                  onQuickMatchTap: () => unawaited(
+                    HomeNavigationController.quickMatch(
+                      context: context,
+                      controller: _controller,
+                      currentUser: activeCurrentUser,
+                    ),
+                  ),
                   onSearchTap: () => VmNavigator.openSearch(context),
                   onNotificationsTap: () => VmNavigator.openNotifications(context),
                 ),

@@ -64,6 +64,7 @@ from app.services.rooms.room_service import (
     list_following_rooms,
     list_room_participants,
     list_trending_rooms,
+    quick_match_room,
     room_to_detail_response,
     set_room_admin,
     set_room_member,
@@ -411,6 +412,21 @@ def get_trending_rooms(
         language=language,
         category=category,
         limit=limit,
+    )
+
+
+@router.get("/quick-match", response_model=RoomTrendingResponse | None)
+def get_quick_match_room(
+    language: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return quick_match_room(
+        db=db,
+        current_user=current_user,
+        language=language,
+        category=category,
     )
 
 

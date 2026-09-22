@@ -12,7 +12,9 @@ import 'widgets/vibes_header.dart';
 import 'widgets/vibes_status_widgets.dart';
 
 class VibesPage extends StatefulWidget {
-  const VibesPage({super.key});
+  const VibesPage({super.key, required this.playbackGate});
+
+  final VibeMediaPlaybackGate playbackGate;
 
   @override
   State<VibesPage> createState() => _VibesPageState();
@@ -26,7 +28,7 @@ class _VibesPageState extends State<VibesPage> {
     super.initState();
     _controller.addListener(_onControllerChanged);
     unawaited(_controller.loadFeed());
-    WidgetsBinding.instance.addPostFrameCallback((_) => VibeMediaPlaybackGate.notifyFeedScrolled());
+    WidgetsBinding.instance.addPostFrameCallback((_) => widget.playbackGate.notifyFeedScrolled());
   }
 
   @override
@@ -39,7 +41,7 @@ class _VibesPageState extends State<VibesPage> {
   void _onControllerChanged() {
     if (mounted) {
       setState(() {});
-      WidgetsBinding.instance.addPostFrameCallback((_) => VibeMediaPlaybackGate.notifyFeedScrolled());
+      WidgetsBinding.instance.addPostFrameCallback((_) => widget.playbackGate.notifyFeedScrolled());
     }
   }
 
@@ -71,7 +73,7 @@ class _VibesPageState extends State<VibesPage> {
 
   bool _onScrollNotification(ScrollNotification notification) {
     if (notification is ScrollUpdateNotification || notification is ScrollEndNotification || notification is UserScrollNotification) {
-      VibeMediaPlaybackGate.notifyFeedScrolled();
+      widget.playbackGate.notifyFeedScrolled();
     }
     return false;
   }
@@ -125,9 +127,10 @@ class _VibesPageState extends State<VibesPage> {
                   selectedTab: _controller.selectedTab,
                   isLoading: _controller.isLoading,
                   hasError: _controller.loadErrorMessage != null,
+                  playbackGate: widget.playbackGate,
                   onProfileTap: (vibe) => VibesNavigationController.showAction(context, '${vibe.authorName} profile will open.'),
                   onLikeTap: _toggleLike,
-                  onCommentTap: (vibe) => VibesNavigationController.openVibeDetail(context: context, controller: _controller, vibe: vibe),
+                  onCommentTap: (vibe) => VibesNavigationController.openVibeDetail(context: context, controller: _controller, vibe: vibe, playbackGate: widget.playbackGate),
                   onShareTap: (vibe) => VibesNavigationController.openShareSheet(context: context, controller: _controller, vibe: vibe),
                   onSaveTap: _toggleSave,
                   onMoreTap: (vibe) => VibesNavigationController.openVibeActions(context: context, controller: _controller, vibe: vibe),
