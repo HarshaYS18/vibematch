@@ -14,7 +14,7 @@ void main() {
       'lib/watch_party/domain/watch_provider_adapter.dart',
     ).readAsStringSync();
     final guard = File(
-      '../../../scripts/check_frontend_architecture.py',
+      '../../scripts/check_frontend_architecture.py',
     ).readAsStringSync();
 
     expect(repository, contains('WatchPartyRepository'));
