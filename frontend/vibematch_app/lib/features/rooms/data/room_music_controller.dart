@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../media/data/media_upload_service.dart';
-import 'live_room_audio_service.dart';
+import 'live_room_media_signaling_service.dart';
 
 class RoomMusicController {
   RoomMusicController._();
@@ -124,7 +124,7 @@ class RoomMusicController {
 
     try {
       final uploadedUrl = await _ensureUploaded(track);
-      final success = await LiveRoomAudioService.instance.startRoomMusic(
+      final success = await LiveRoomMediaSignalingService.instance.mediaEngine.startRoomMusic(
         url: uploadedUrl,
         title: track.title,
         seekMs: safeSeekMs,
@@ -132,7 +132,7 @@ class RoomMusicController {
 
       if (!success) {
         final sfuError =
-            LiveRoomAudioService.instance.lastError.value ??
+            LiveRoomMediaSignalingService.instance.mediaEngine.lastError.value ??
             'Could not start room music on SFU.';
         state.value = state.value.copyWith(
           isUploading: false,
@@ -199,7 +199,7 @@ class RoomMusicController {
     if (!state.value.isPlaying) return;
     _syncProgressPosition();
     _stopProgressTimer();
-    await LiveRoomAudioService.instance.stopRoomMusic();
+    await LiveRoomMediaSignalingService.instance.mediaEngine.stopRoomMusic();
     state.value = state.value.copyWith(
       isPlaying: false,
       isPaused: true,
@@ -231,7 +231,7 @@ class RoomMusicController {
 
   Future<void> stop() async {
     _stopProgressTimer();
-    await LiveRoomAudioService.instance.stopRoomMusic();
+    await LiveRoomMediaSignalingService.instance.mediaEngine.stopRoomMusic();
     state.value = state.value.copyWith(
       isPlaying: false,
       isPaused: false,

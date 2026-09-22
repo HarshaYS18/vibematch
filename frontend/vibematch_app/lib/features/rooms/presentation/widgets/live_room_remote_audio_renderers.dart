@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-import '../../data/live_room_audio_service.dart';
+import '../../../../room_media/domain/room_media_engine.dart';
+import '../../data/live_room_media_signaling_service.dart';
 
 class LiveRoomRemoteAudioRenderers extends StatefulWidget {
   const LiveRoomRemoteAudioRenderers({super.key});
@@ -19,18 +19,19 @@ class _LiveRoomRemoteAudioRenderersState
   Timer? _audioRouteRefreshTimer;
   bool _audioRouteRefreshRunning = false;
 
+  RoomMediaEngine get _mediaEngine =>
+      LiveRoomMediaSignalingService.instance.mediaEngine;
+
   @override
   void initState() {
     super.initState();
-    LiveRoomAudioService.instance.remoteAudioRenderers.addListener(
-      _syncAudioRouteRefreshTimer,
-    );
+    _mediaEngine.remoteAudioRenderers.addListener(_syncAudioRouteRefreshTimer);
     _syncAudioRouteRefreshTimer();
   }
 
   @override
   void dispose() {
-    LiveRoomAudioService.instance.remoteAudioRenderers.removeListener(
+    _mediaEngine.remoteAudioRenderers.removeListener(
       _syncAudioRouteRefreshTimer,
     );
     _audioRouteRefreshTimer?.cancel();
@@ -38,8 +39,7 @@ class _LiveRoomRemoteAudioRenderersState
   }
 
   void _syncAudioRouteRefreshTimer() {
-    final hasRemoteAudio =
-        LiveRoomAudioService.instance.remoteAudioRenderers.value.isNotEmpty;
+    final hasRemoteAudio = _mediaEngine.remoteAudioRenderers.value.isNotEmpty;
     if (!hasRemoteAudio) {
       _audioRouteRefreshTimer?.cancel();
       _audioRouteRefreshTimer = null;
@@ -47,7 +47,10 @@ class _LiveRoomRemoteAudioRenderersState
     }
 
     // ignore: avoid_print
-    print('[VibeMatchAudio] remote renderer count=${LiveRoomAudioService.instance.remoteAudioRenderers.value.length}');
+    print(
+      '[VibeMatchAudio] remote renderer count='
+      '${_mediaEngine.remoteAudioRenderers.value.length}',
+    );
     unawaited(_preferSystemAudioRoute());
     _audioRouteRefreshTimer ??= Timer.periodic(
       const Duration(seconds: 3),
@@ -56,13 +59,10 @@ class _LiveRoomRemoteAudioRenderersState
   }
 
   Future<void> _preferSystemAudioRoute() async {
-    if (kIsWeb) return;
     if (_audioRouteRefreshRunning) return;
     _audioRouteRefreshRunning = true;
     try {
-      await Helper.setSpeakerphoneOn(false);
-    } catch (_) {
-      // Audio route calls can fail on web/desktop or unsupported devices.
+      await _mediaEngine.preferSystemAudioRoute();
     } finally {
       _audioRouteRefreshRunning = false;
     }
@@ -71,7 +71,7 @@ class _LiveRoomRemoteAudioRenderersState
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<List<RTCVideoRenderer>>(
-      valueListenable: LiveRoomAudioService.instance.remoteAudioRenderers,
+      valueListenable: _mediaEngine.remoteAudioRenderers,
       builder: (context, renderers, _) {
         if (renderers.isEmpty) return const SizedBox.shrink();
 

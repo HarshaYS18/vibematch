@@ -6,7 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../data/live_room_audio_service.dart';
+import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_music_signaling_service.dart';
 import '../../../media/data/media_upload_service.dart';
 import '../widgets/room_theme.dart';
@@ -179,7 +179,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
       return;
     }
 
-    await LiveRoomAudioService.instance.startRoomMusic(
+    await LiveRoomMediaSignalingService.instance.mediaEngine.startRoomMusic(
       url: uploadedUrl,
       title: track.title,
     );
@@ -240,7 +240,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
 
     if (_tracks.isEmpty) {
       unawaited(_player.stop());
-      unawaited(LiveRoomAudioService.instance.stopRoomMusic());
+      unawaited(LiveRoomMediaSignalingService.instance.mediaEngine.stopRoomMusic());
       unawaited(_broadcastMusicControl('stop'));
     }
   }
@@ -256,7 +256,7 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
         _duration = Duration.zero;
       });
       unawaited(_player.stop());
-      unawaited(LiveRoomAudioService.instance.stopRoomMusic());
+      unawaited(LiveRoomMediaSignalingService.instance.mediaEngine.stopRoomMusic());
       unawaited(_broadcastMusicControl('stop'));
       return;
     }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/live_room_audio_service.dart';
+import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import 'room_avatar_frames.dart';
 import 'room_theme.dart';
@@ -145,7 +145,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Set<String>>(
-      valueListenable: LiveRoomAudioService.instance.activeSpeakerPeerIds,
+      valueListenable: LiveRoomMediaSignalingService.instance.mediaEngine.activeSpeakerPeerIds,
       builder: (context, activeSpeakerPeerIds, child) {
         final spec = SeatLayoutSpec.parse(widget.layoutId);
         final totalRows = (spec.hasHostSeats ? 1 : 0) + spec.rows;
@@ -338,7 +338,7 @@ class _SeatAvatar extends StatelessWidget {
 
   bool _isUserSpeaking(SeatUser? user) {
     if (user == null || user.selfMuted || user.adminMuted) return false;
-    final roomId = LiveRoomAudioService.instance.roomId;
+    final roomId = LiveRoomMediaSignalingService.instance.mediaEngine.roomId;
     final peerId = roomId == null ? '' : '${roomId}_${user.id}'.replaceAll(' ', '_');
     return user.isSpeaking || activeSpeakerPeerIds.contains(peerId);
   }

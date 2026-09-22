@@ -22,7 +22,7 @@ class LiveRoomAudioService {
   io.Socket? _socket;
   String? _roomId;
   String? _peerId;
-  SeatUser? _currentUser;
+  String? _currentUserId;
   MediaStream? _localAudioStream;
   Device? _device;
   dynamic _sendTransport;
@@ -86,10 +86,21 @@ class LiveRoomAudioService {
   Future<void> joinRoom({
     required String roomId,
     required SeatUser currentUser,
+  }) {
+    return joinRoomForUser(
+      roomId: roomId,
+      userId: currentUser.id,
+    );
+  }
+
+  Future<void> joinRoomForUser({
+    required String roomId,
+    required String userId,
   }) async {
     final safeRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
-    final safePeerId = '${safeRoomId}_${currentUser.id}'.replaceAll(
-      RegExp(r'[^a-zA-Z0-9_\\-]'),
+    final safeUserId = userId.trim().isEmpty ? 'user' : userId.trim();
+    final safePeerId = '${safeRoomId}_$safeUserId'.replaceAll(
+      RegExp(r'[^a-zA-Z0-9_\-]'),
       '_',
     );
 
@@ -97,7 +108,7 @@ class LiveRoomAudioService {
     _joinPresenceRetryCount = 0;
     _roomId = safeRoomId;
     _peerId = safePeerId;
-    _currentUser = currentUser;
+    _currentUserId = safeUserId;
 
     if (_joined && _socket?.connected == true) {
       _debug('join skipped already joined room=$safeRoomId peer=$safePeerId');
@@ -255,7 +266,7 @@ class LiveRoomAudioService {
     remoteAudioRenderers.value = <RTCVideoRenderer>[];
     _roomId = null;
     _peerId = null;
-    _currentUser = null;
+    _currentUserId = null;
     _routerRtpCapabilities = null;
     _device = null;
     _pendingProducerIds.clear();
@@ -318,7 +329,7 @@ class LiveRoomAudioService {
       if (!isCurrentSocket()) return;
       connected.value = true;
       _debug('audio socket connected $audioUrl');
-      if (_shouldStayConnected && _roomId != null && _currentUser != null) {
+      if (_shouldStayConnected && _roomId != null && _currentUserId != null) {
         _sendJoinRoom();
       }
     });
@@ -525,7 +536,7 @@ class LiveRoomAudioService {
     if (_rediscovering ||
         !_shouldStayConnected ||
         _roomId == null ||
-        _currentUser == null)
+        _currentUserId == null)
       return;
     _rediscovering = true;
     try {
@@ -567,7 +578,7 @@ class LiveRoomAudioService {
     String reason, {
     Duration delay = const Duration(milliseconds: 900),
   }) {
-    if (!_shouldStayConnected || _roomId == null || _currentUser == null)
+    if (!_shouldStayConnected || _roomId == null || _currentUserId == null)
       return;
     if (_recoveryTimer?.isActive ?? false) return;
     _debug(
@@ -582,7 +593,7 @@ class LiveRoomAudioService {
   Future<void> _recoverSession(String reason) async {
     if (!_shouldStayConnected ||
         _roomId == null ||
-        _currentUser == null ||
+        _currentUserId == null ||
         _recovering)
       return;
     _recovering = true;
@@ -1045,6 +1056,36 @@ class LiveRoomAudioService {
     _rebuildSendPipelineOnRetry = false;
   }
 
+  Future<void> consumeRemoteProducer({
+    required String producerId,
+    required String peerId,
+    String kind = 'audio',
+    String? publicUserId,
+    int? seatNo,
+  }) async {
+    final safeProducerId = producerId.trim();
+    final safePeerId = peerId.trim();
+    if (safeProducerId.isEmpty || safePeerId.isEmpty) return;
+
+    final info = RemoteProducerInfo(
+      producerId: safeProducerId,
+      peerId: safePeerId,
+      kind: kind,
+      publicUserId: publicUserId,
+      seatNo: seatNo,
+    );
+
+    if (_isSelfProducer(info) || info.kind != 'audio') return;
+    if (_remoteConsumersByProducerId.containsKey(safeProducerId) ||
+        _consumingProducerIds.contains(safeProducerId)) {
+      return;
+    }
+
+    _producerInfoById[safeProducerId] = info;
+    _pendingProducerIds.add(safeProducerId);
+    await _consumePendingProducers();
+  }
+
   void _rememberProducers(dynamic rawProducers) {
     if (rawProducers is! List) return;
     for (final item in rawProducers) {
@@ -1058,7 +1099,7 @@ class LiveRoomAudioService {
   bool _isSelfProducer(RemoteProducerInfo info) {
     if (info.peerId == _peerId) return true;
 
-    final roomUserId = _currentUser?.id.trim() ?? '';
+    final roomUserId = _currentUserId?.trim() ?? '';
     final publicUserId = roomUserId.startsWith('user_')
         ? roomUserId.substring('user_'.length)
         : '';

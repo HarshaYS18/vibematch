@@ -16,19 +16,24 @@ import '../presentation/live_room_models.dart';
 import '../presentation/modules/cricket_room_mode_signal.dart';
 import '../presentation/widgets/cricket_room_backgrounds.dart';
 import '../presentation/widgets/room_theme.dart';
-import 'live_room_audio_service.dart';
+import '../../../room_media/domain/room_media_engine.dart';
+import '../../../room_media/room_media_engine_factory.dart';
 import 'live_room_log.dart';
 import 'live_room_foreground_service.dart';
 import 'live_room_presence_repository.dart';
 import 'seat_authority_gate.dart';
 
 class LiveRoomMediaSignalingService with WidgetsBindingObserver {
-  LiveRoomMediaSignalingService._() {
+  LiveRoomMediaSignalingService._({
+    RoomMediaEngine? mediaEngine,
+  }) : _mediaEngine = mediaEngine ?? createRoomMediaEngine() {
     WidgetsBinding.instance.addObserver(this);
   }
 
   static final LiveRoomMediaSignalingService instance =
       LiveRoomMediaSignalingService._();
+
+  final RoomMediaEngine _mediaEngine;
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
@@ -75,6 +80,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   String? get roomId => _roomId;
   String? get peerId => _peerId;
   SeatUser? get activeLoggedInSeatUser => _activeLoggedInSeatUser;
+  RoomMediaEngine get mediaEngine => _mediaEngine;
 
   SeatUser effectiveCurrentUser(SeatUser fallback) {
     return _activeLoggedInSeatUser ?? fallback;
@@ -87,6 +93,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     if (_appInForeground) {
       _scheduleReconnect(reason: 'app resumed');
+      _runMediaAction(
+        _mediaEngine.reconnect(),
+        label: 'resume room audio',
+      );
     }
   }
 
@@ -297,7 +307,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   void leaveSeat() {
     _seatAuthorityGate.cancelPendingSeat();
-    LiveRoomAudioService.instance.leaveSeat();
+    _runMediaAction(
+      _mediaEngine.stopPublishingMic(),
+      label: 'stop mic publishing',
+    );
 
     _send('seat/leave', <String, Object?>{});
   }
@@ -360,7 +373,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void setMicEnabled(bool enabled) {
     if (enabled && _currentUserIsAdminMuted()) {
       _debug('mic enable blocked because current user is admin-muted');
-      LiveRoomAudioService.instance.setSelfMuted(true);
+      _runMediaAction(
+        _mediaEngine.mute(),
+        label: 'mute microphone',
+      );
 
       _send('mic/set_enabled', <String, Object?>{'enabled': false});
       return;
@@ -369,7 +385,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     // FastAPI's following room snapshot confirms both seat ownership and the
     // mic state.  Do not start a producer merely because this command was sent.
     _seatAuthorityGate.requestMicEnabled(enabled);
-    if (!enabled) LiveRoomAudioService.instance.setSelfMuted(true);
+    if (!enabled) _runMediaAction(
+        _mediaEngine.mute(),
+        label: 'mute microphone',
+      );
 
     _send('mic/set_enabled', <String, Object?>{'enabled': enabled});
   }
@@ -501,7 +520,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     roomBlock.value = null;
     seatInvite.value = null;
 
-    await LiveRoomAudioService.instance.leaveRoom();
+    await _mediaEngine.leave();
     await _subscription?.cancel();
     _subscription = null;
 
@@ -526,7 +545,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     roomSnapshot.value = null;
     seatInvite.value = null;
 
-    await LiveRoomAudioService.instance.leaveRoom();
+    await _mediaEngine.leave();
     await _subscription?.cancel();
     _subscription = null;
 
@@ -818,7 +837,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         );
         if (payload['command_type']?.toString() == 'seat/take') {
           _seatAuthorityGate.rejectSeatRequest();
-          LiveRoomAudioService.instance.leaveSeat();
+          _runMediaAction(
+      _mediaEngine.stopPublishingMic(),
+      label: 'stop mic publishing',
+    );
         }
         return;
       }
@@ -1009,8 +1031,14 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     if (roomId == null || user == null) return;
 
-    unawaited(
-      LiveRoomAudioService.instance.joinRoom(roomId: roomId, currentUser: user),
+    _runMediaAction(
+      _mediaEngine.join(
+        RoomMediaJoinRequest(
+          roomId: roomId,
+          userId: user.id,
+        ),
+      ),
+      label: 'join room audio',
     );
   }
 
@@ -1228,21 +1256,30 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     if (decision.shouldLeaveSeat) {
       _debug('current user is no longer seated; forcing local audio leaveSeat');
-      LiveRoomAudioService.instance.leaveSeat();
+      _runMediaAction(
+      _mediaEngine.stopPublishingMic(),
+      label: 'stop mic publishing',
+    );
       return;
     }
 
     final confirmedSeatIndex = decision.confirmedSeatIndex;
     if (confirmedSeatIndex != null) {
-      LiveRoomAudioService.instance.takeSeat(
-        confirmedSeatIndex,
-        micEnabled: decision.micEnabled,
+      _runMediaAction(
+        _mediaEngine.publishMic(
+          seatIndex: confirmedSeatIndex,
+          muted: !decision.micEnabled,
+        ),
+        label: 'apply authoritative microphone state',
       );
     }
 
     if (currentPeer?.adminMuted == true) {
       _debug('admin mute enforced from room snapshot for current user');
-      LiveRoomAudioService.instance.setSelfMuted(true);
+      _runMediaAction(
+        _mediaEngine.mute(),
+        label: 'mute microphone',
+      );
     }
   }
 
@@ -1317,7 +1354,21 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (!matchesUser && !matchesPeer) return;
 
     _debug('admin mute enforced on current user audio producer');
-    LiveRoomAudioService.instance.setSelfMuted(true);
+    _runMediaAction(
+        _mediaEngine.mute(),
+        label: 'mute microphone',
+      );
+  }
+
+  void _runMediaAction(
+    Future<void> action, {
+    required String label,
+  }) {
+    unawaited(
+      action.catchError((Object error) {
+        _warn('$label failed: $error');
+      }),
+    );
   }
 
   void _resetConnectionState() {
