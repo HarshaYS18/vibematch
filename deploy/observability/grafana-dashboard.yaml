@@ -20,6 +20,8 @@ data:
         {"type":"timeseries","title":"Realtime slow clients","targets":[{"expr":"sum(rate(funkey_realtime_slow_clients_closed_total[5m]))"}],"gridPos":{"x":0,"y":16,"w":12,"h":8}},
         {"type":"timeseries","title":"Worker retries and DLQ","targets":[{"expr":"sum(rate(funkey_worker_retries_total[5m]))","legendFormat":"retries"},{"expr":"sum(increase(funkey_worker_dead_lettered_total[15m]))","legendFormat":"dead-lettered"}],"gridPos":{"x":12,"y":16,"w":12,"h":8}},
         {"type":"timeseries","title":"Media peers and rooms","targets":[{"expr":"sum(funkey_media_peers)","legendFormat":"peers"},{"expr":"sum(funkey_media_rooms)","legendFormat":"rooms"}],"gridPos":{"x":0,"y":24,"w":12,"h":8}},
-        {"type":"timeseries","title":"DB checked-out connections","targets":[{"expr":"sum(funkey_db_pool_checked_out)"}],"gridPos":{"x":12,"y":24,"w":12,"h":8}}
+        {"type":"timeseries","title":"DB checked-out connections","targets":[{"expr":"sum(funkey_db_pool_checked_out)"}],"gridPos":{"x":12,"y":24,"w":12,"h":8}},
+        {"type":"timeseries","title":"DB queries per request","targets":[{"expr":"sum(rate(funkey_http_db_queries_total[5m])) / clamp_min(sum(rate(funkey_http_requests_total[5m])), 0.001)"}],"gridPos":{"x":0,"y":32,"w":12,"h":8}},
+        {"type":"timeseries","title":"OTel Collector accepted spans","targets":[{"expr":"sum(rate(otelcol_receiver_accepted_spans[5m]))"}],"gridPos":{"x":12,"y":32,"w":12,"h":8}}
       ]
     }

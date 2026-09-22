@@ -35,6 +35,17 @@ spec:
           labels: {severity: page}
           annotations:
             summary: FunKey API database pool is above 85% utilization
+        - alert: FunKeyApiQueryCountRegression
+          expr: |
+            (
+              sum(rate(funkey_http_db_queries_total[10m]))
+              /
+              clamp_min(sum(rate(funkey_http_requests_total[10m])), 0.001)
+            ) > 40
+          for: 15m
+          labels: {severity: ticket}
+          annotations:
+            summary: FunKey API average database queries per request is above 40
     - name: funkey-realtime
       rules:
         - alert: FunKeyRealtimeRedisSubscriptionDown

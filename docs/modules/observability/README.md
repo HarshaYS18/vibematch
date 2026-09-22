@@ -90,7 +90,7 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Repository observability package implemented: structured API/gateway/worker/media operational logs, Prometheus metrics, SLO-style alert rules, dashboard configuration and incident runbooks are present. The actual Prometheus/Grafana/log collector/paging stack and any OpenTelemetry collector/exporter are external environment integrations.
+Repository observability package implemented: structured API/gateway/worker/media operational logs, Prometheus metrics, SLO-style alert rules, dashboard configuration and incident runbooks are present. The repository now includes the OpenTelemetry Collector edge plus Prometheus rules and Grafana dashboard configuration. Tempo, Loki, Prometheus/Grafana installations, the Kubernetes stdout log agent, retention storage, credentials, and paging remain environment integrations and must not be treated as deployed merely because their contracts exist.
 
 ## Chunk 16 tracing contract
 
@@ -98,3 +98,7 @@ Chunk 16 adds opt-in OpenTelemetry tracing to the Python API/worker, W3C `tracep
 continuation through the durable outbox/NATS boundary, and request-scoped SQL query
 counting for N+1 regression tests. Prometheus remains the metric source and telemetry
 export failure remains fail-open. See `docs/architecture/observability-platform.md`.
+
+## Chunk 16 deployed edge
+
+`deploy/observability/otel-collector.yaml` provides the bounded OTLP edge. Applications target the collector service; it exports to environment-supplied Tempo/Loki endpoints. Prometheus metrics remain pull-based.
