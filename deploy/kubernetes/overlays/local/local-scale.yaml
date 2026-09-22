@@ -1,12 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata: {name: funkey-api}
-spec: {replicas: 1}
+spec:
+  replicas: 1
+  template:
+    spec:
+      nodeSelector: null
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata: {name: funkey-realtime}
-spec: {replicas: 1}
+spec:
+  replicas: 1
+  template:
+    spec:
+      nodeSelector: null
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-worker}
+spec:
+  template:
+    spec:
+      nodeSelector: null
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
