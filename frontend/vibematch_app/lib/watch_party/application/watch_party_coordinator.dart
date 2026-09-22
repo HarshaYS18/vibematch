@@ -62,9 +62,21 @@ class WatchPartyCoordinator {
     }
 
     final capabilities = _adapter.capabilities;
-    final targetMs = session.targetPositionMsAt(_clock.serverNowMs);
+    var targetMs = session.targetPositionMsAt(_clock.serverNowMs);
+    var hasReliableTarget = session.timelineMode == WatchTimelineMode.vod;
 
-    if (capabilities.programmaticPosition) {
+    if (session.timelineMode == WatchTimelineMode.live &&
+        capabilities.liveTimelineAvailable &&
+        _adapter is LiveWatchProviderAdapter) {
+      final liveTimeline =
+          await (_adapter as LiveWatchProviderAdapter).currentLiveTimeline();
+      if (liveTimeline != null) {
+        targetMs = liveTimeline.targetPositionMs(session.targetLiveLatencyMs);
+        hasReliableTarget = true;
+      }
+    }
+
+    if (capabilities.programmaticPosition && hasReliableTarget) {
       final localMs = await _adapter.currentPositionMs();
       final driftMs = targetMs - localMs;
       final driftAbs = driftMs.abs();
