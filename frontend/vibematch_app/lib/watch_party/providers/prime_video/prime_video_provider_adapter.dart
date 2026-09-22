@@ -9,6 +9,7 @@ class PrimeVideoProviderAdapter extends SupportedWebPlaybackAdapter {
     OttWebPlaybackHost? host,
     CompanionPlaybackAdapter? companion,
     super.telemetry = const AppTelemetry(),
+    super.remountBarrier,
   }) : super(
          provider: OttProviderCatalog.primeVideo,
          host:
