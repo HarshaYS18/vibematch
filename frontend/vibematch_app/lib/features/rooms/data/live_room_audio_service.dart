@@ -53,7 +53,8 @@ class LiveRoomAudioService {
   bool _consumePendingRunning = false;
   Future<void>? _recvTransportFuture;
   final AudioPublishIntentGate _publishIntentGate = AudioPublishIntentGate();
-  int? _activeProduceGeneration;
+  int? _pendingProduceGeneration;
+  Completer<void>? _produceCompletion;
 
   final Set<String> _pendingProducerIds = <String>{};
   final Set<String> _consumingProducerIds = <String>{};
@@ -692,7 +693,7 @@ class LiveRoomAudioService {
       final transport = device.createSendTransportFromMap(
         params,
         producerCallback: (Producer producer) {
-          final generation = _activeProduceGeneration;
+          final generation = _pendingProduceGeneration;
           if (generation == null || !_isPublishIntentCurrent(generation)) {
             try {
               producer.close();
@@ -701,6 +702,7 @@ class LiveRoomAudioService {
             _debug(
               'discarded producer callback after mute/seat change id=${producer.id}',
             );
+            _completeProduceAttempt();
             return;
           }
 
@@ -713,6 +715,7 @@ class LiveRoomAudioService {
           _debug(
             'audio producer callback id=${producer.id} kind=${producer.kind}',
           );
+          _completeProduceAttempt();
         },
       );
 
@@ -720,6 +723,7 @@ class LiveRoomAudioService {
 
       transport.on('produce', (dynamic data) async {
         try {
+          final generation = _pendingProduceGeneration;
           final produceAck =
               await _emitWithAckFuture('produce', <String, Object?>{
                 'roomId': _roomId,
@@ -734,17 +738,19 @@ class LiveRoomAudioService {
                 produceAck['id']?.toString() ??
                 '';
             if (producerId.isEmpty) {
-              data['errback']('produce failed: missing producer id');
+              final error = StateError('produce failed: missing producer id');
+              data['errback'](error);
+              _completeProduceAttempt(error: error);
               return;
             }
 
-            final generation = _activeProduceGeneration;
             if (generation == null || !_isPublishIntentCurrent(generation)) {
               data['errback']('produce cancelled because microphone is muted');
               unawaited(_closeServerProducerById(producerId));
               _debug(
                 'discarded server producer completed after mute/seat change id=$producerId',
               );
+              _completeProduceAttempt();
               return;
             }
 
@@ -756,10 +762,15 @@ class LiveRoomAudioService {
             data['callback'](producerId);
             _debug('produce ack producer=$producerId');
           } else {
-            data['errback'](produceAck['error'] ?? 'produce failed');
+            final error = StateError(
+              produceAck['error']?.toString() ?? 'produce failed',
+            );
+            data['errback'](error);
+            _completeProduceAttempt(error: error);
           }
-        } catch (error) {
+        } catch (error, stackTrace) {
           data['errback'](error);
+          _completeProduceAttempt(error: error, stackTrace: stackTrace);
         }
       });
 
@@ -888,11 +899,17 @@ class LiveRoomAudioService {
         _serverAudioProducerId != null)
       return;
     if (!_seated || _selfMuted || _localAudioStream == null) return;
+
     final publishGeneration = _publishIntentGate.capture();
+    final completion = Completer<void>();
     _producerCreating = true;
+    _pendingProduceGeneration = publishGeneration;
+    _produceCompletion = completion;
+
     try {
       await _ensureSendTransport();
       await _waitForSendTransportWarmup();
+
       final transport = _sendTransport;
       final stream = _localAudioStream;
       if (transport == null || stream == null) return;
@@ -900,86 +917,59 @@ class LiveRoomAudioService {
           _audioProducer != null ||
           _serverAudioProducerId != null)
         return;
-      final audioTracks = stream.getAudioTracks();
-      if (audioTracks.isEmpty)
-        throw Exception('No local audio track available');
-      final audioTrack = audioTracks.first;
-      _activeProduceGeneration = publishGeneration;
-      try {
-        final maybeProducer = await transport.produce(
-          source: 'mic',
-          stream: stream,
-          track: audioTrack,
-          appData: <String, dynamic>{'mediaTag': 'mic-audio'},
-        );
-        if (maybeProducer != null) {
-          if (!_isPublishIntentCurrent(publishGeneration)) {
-            try {
-              maybeProducer.close();
-            } catch (_) {}
-            unawaited(_closeServerProducerById(maybeProducer.id));
-            if (identical(_audioProducer, maybeProducer)) {
-              _audioProducer = null;
-            }
-            if (_serverAudioProducerId == maybeProducer.id) {
-              _serverAudioProducerId = null;
-            }
-            audioPublishing.value = false;
-            _debug(
-              'discarded local producer completed after mute/seat change id=${maybeProducer.id}',
-            );
-            return;
-          }
 
-          _cancelProduceRetry();
-          _produceRetryCount = 0;
-          _rebuildSendPipelineOnRetry = false;
-          _serverAudioProducerId ??= maybeProducer.id;
-          _audioProducer = maybeProducer;
-          audioPublishing.value = true;
-          _debug('audio publishing started producer=${maybeProducer.id}');
-        }
-      } catch (error, stackTrace) {
-        final message = error.toString();
-        if (_isRecoverableProduceStartupError(message)) {
-          _debug(
-            'audio produce startup race detected; rebuilding send pipeline and retrying',
-          );
-          _scheduleProduceRetry(
-            'recoverable produce error',
-            rebuildPipeline: true,
-          );
-          return;
-        }
-        _debug('$error\n$stackTrace');
-        rethrow;
+      final audioTracks = stream.getAudioTracks();
+      if (audioTracks.isEmpty) {
+        throw Exception('No local audio track available');
       }
-      _debug(
-        'audio produce requested serverProducer=$_serverAudioProducerId localProducer=${_audioProducer?.id}',
+
+      final audioTrack = audioTracks.first;
+      transport.produce(
+        source: 'mic',
+        stream: stream,
+        track: audioTrack,
+        appData: <String, dynamic>{'mediaTag': 'mic-audio'},
       );
-      if (_serverAudioProducerId == null && _audioProducer == null) {
-        _scheduleProduceRetry(
-          'producer callback watchdog',
-          rebuildPipeline: true,
-        );
-      }
-    } catch (error) {
-      if (_isRecoverableProduceStartupError(error.toString())) {
+      _debug('audio produce enqueued generation=$publishGeneration');
+
+      await completion.future.timeout(const Duration(seconds: 8));
+
+      _debug(
+        'audio produce settled serverProducer=$_serverAudioProducerId '
+        'localProducer=${_audioProducer?.id}',
+      );
+    } catch (error, stackTrace) {
+      final message = error.toString();
+      if (_isRecoverableProduceStartupError(message)) {
         _debug(
-          'audio produce recoverable outer error; rebuilding send pipeline and retrying',
+          'audio produce startup race detected; rebuilding send pipeline and retrying',
         );
         _scheduleProduceRetry(
-          'recoverable outer produce error',
+          'recoverable produce error',
           rebuildPipeline: true,
         );
+      } else if (_selfMuted || !_seated) {
+        _debug('audio produce cancelled after mute/seat change: $error');
       } else {
+        _debug('$error\n$stackTrace');
         _setError('Audio produce failed: $error');
       }
     } finally {
-      if (_activeProduceGeneration == publishGeneration) {
-        _activeProduceGeneration = null;
+      if (identical(_produceCompletion, completion)) {
+        _produceCompletion = null;
+      }
+      if (_pendingProduceGeneration == publishGeneration) {
+        _pendingProduceGeneration = null;
       }
       _producerCreating = false;
+
+      if (_seated &&
+          !_selfMuted &&
+          _localAudioStream != null &&
+          _audioProducer == null &&
+          _serverAudioProducerId == null) {
+        _scheduleProduceRetry('publish attempt settled without producer');
+      }
     }
   }
 
@@ -1249,7 +1239,16 @@ class LiveRoomAudioService {
 
   void _invalidatePublishingIntent() {
     _publishIntentGate.invalidate();
-    _activeProduceGeneration = null;
+  }
+
+  void _completeProduceAttempt({Object? error, StackTrace? stackTrace}) {
+    final completion = _produceCompletion;
+    if (completion == null || completion.isCompleted) return;
+    if (error != null) {
+      completion.completeError(error, stackTrace);
+    } else {
+      completion.complete();
+    }
   }
 
   bool _isPublishIntentCurrent(int generation) {
@@ -1319,6 +1318,7 @@ class LiveRoomAudioService {
   }
 
   void _closeSendTransport() {
+    _completeProduceAttempt();
     final transport = _sendTransport;
     _sendTransport = null;
     _sendTransportWarmupUntil = null;
