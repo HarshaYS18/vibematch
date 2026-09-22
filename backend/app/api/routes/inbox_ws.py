@@ -97,8 +97,8 @@ async def inbox_websocket(websocket: WebSocket):
         return
 
     await inbox_ws_manager.connect(user.id, websocket, is_staff=user.is_staff)
-    await _broadcast_presence(user.id, True)
     try:
+        await _broadcast_presence(user.id, True)
         while True:
             payload = await websocket.receive_json()
             event = payload.get("event")
@@ -166,9 +166,12 @@ async def inbox_websocket(websocket: WebSocket):
                     },
                 )
     except WebSocketDisconnect:
-        inbox_ws_manager.disconnect(user.id, websocket)
-        await _broadcast_presence(user.id, False)
+        pass
     except Exception:
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+    finally:
         inbox_ws_manager.disconnect(user.id, websocket)
         await _broadcast_presence(user.id, False)
-        await websocket.close(code=1011)
