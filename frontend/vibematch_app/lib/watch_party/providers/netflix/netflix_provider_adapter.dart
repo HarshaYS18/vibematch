@@ -9,6 +9,7 @@ class NetflixProviderAdapter extends SupportedWebPlaybackAdapter {
     OttWebPlaybackHost? host,
     CompanionPlaybackAdapter? companion,
     super.telemetry = const AppTelemetry(),
+    super.remountBarrier,
   }) : super(
          provider: OttProviderCatalog.netflix,
          host:
