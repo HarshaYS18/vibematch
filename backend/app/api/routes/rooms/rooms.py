@@ -8,7 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.routes.room_realtime_commands import client_room_snapshot
 from app.api.routes.users import get_current_user
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
@@ -313,6 +313,23 @@ async def _record_and_broadcast(
         {"type": wire_type, "payload": payload},
     )
     return snapshot
+
+
+def _read_room_snapshot_for_broadcast(room_public_id: str) -> dict | None:
+    with SessionLocal() as snapshot_db:
+        room = (
+            snapshot_db.query(Room)
+            .filter(
+                Room.room_public_id == room_public_id,
+                Room.is_active.is_(True),
+            )
+            .first()
+        )
+        if room is None:
+            return None
+        snapshot = client_room_snapshot(snapshot_db, room)
+        snapshot_db.commit()
+        return snapshot
 
 
 def _closed_room_snapshot(db: Session, room_id: str) -> dict | None:
@@ -765,16 +782,21 @@ async def join_live_room(
     )
     await _broadcast_closed_room_sessions(db, joined.closed_room_ids, user_id, public_user_id)
     if not was_active:
-        room = await run_in_threadpool(
-            lambda: db.query(Room).filter(Room.room_public_id == room_public_id).first()
+        snapshot = await run_in_threadpool(
+            _read_room_snapshot_for_broadcast,
+            room_public_id,
         )
-        if room is not None:
-            await _record_and_broadcast(
-                db,
-                room,
-                event_type="room.joined",
-                wire_type="room/joined",
-                actor_user_id=user_id,
+        if snapshot is not None:
+            await room_realtime_connections.broadcast_room(
+                room_public_id,
+                {
+                    "type": "room/joined",
+                    "payload": {
+                        "room_id": room_public_id,
+                        "room": snapshot,
+                        "target_user_id": user_id,
+                    },
+                },
             )
     return joined
 
