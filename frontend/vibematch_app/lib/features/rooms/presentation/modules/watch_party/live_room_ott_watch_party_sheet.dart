@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../foundation/di/app_dependencies.dart';
 import '../../../../../room_session/data/room_session_repository.dart';
 import '../../../../../session/data/session_repository.dart';
 import '../../../../../watch_party/application/watch_party_coordinator.dart';
@@ -69,14 +70,15 @@ class _LiveRoomOttWatchPartySheetState
   }
 
   SupportedWebPlaybackAdapter _buildAdapter(OttProviderDefinition provider) {
+    final telemetry = ref.read(appTelemetryProvider);
     if (provider.id == OttProviderCatalog.netflix.id) {
-      return NetflixProviderAdapter();
+      return NetflixProviderAdapter(telemetry: telemetry);
     }
     if (provider.id == OttProviderCatalog.primeVideo.id) {
-      return PrimeVideoProviderAdapter();
+      return PrimeVideoProviderAdapter(telemetry: telemetry);
     }
     if (provider.id == OttProviderCatalog.jioHotstar.id) {
-      return JioHotstarProviderAdapter();
+      return JioHotstarProviderAdapter(telemetry: telemetry);
     }
     throw StateError('Unsupported OTT provider: ${provider.id}');
   }
@@ -143,6 +145,11 @@ class _LiveRoomOttWatchPartySheetState
     final fingerprint =
         '${session.sessionId}|${session.revision}|${state.serverTimeMs}';
     if (_lastImmediateFingerprint == fingerprint) return;
+
+    // Keep the editor aligned with the canonical active session. Local toggle
+    // changes remain local until a command is submitted, but reopening or a
+    // canonical revision never silently resets a live session to VOD.
+    _liveMode = session.isLive;
     _lastImmediateFingerprint = fingerprint;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
