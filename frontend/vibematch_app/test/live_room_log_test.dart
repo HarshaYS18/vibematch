@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/features/rooms/data/live_room_log.dart';
 
 void main() {
-  test('normal live-room traces are quiet by default', () {
+  test('normal traces and warnings are quiet by default', () {
     final messages = <String>[];
     final original = debugPrint;
     debugPrint = (String? message, {int? wrapWidth}) {
@@ -14,12 +14,12 @@ void main() {
     });
 
     LiveRoomLog.trace('Media', 'room snapshot payload');
-    LiveRoomLog.trace('Audio', 'transport state connected');
+    LiveRoomLog.warning('Audio', 'transient reconnect warning');
 
     expect(messages, isEmpty);
   });
 
-  test('actionable warnings remain visible in debug tests', () {
+  test('actionable errors stay visible as one compact line', () {
     final messages = <String>[];
     final original = debugPrint;
     debugPrint = (String? message, {int? wrapWidth}) {
@@ -29,8 +29,33 @@ void main() {
       debugPrint = original;
     });
 
-    LiveRoomLog.warning('Audio', 'producer failed');
+    LiveRoomLog.error(
+      'Audio',
+      'producer failed\nwith a multiline diagnostic payload',
+    );
 
-    expect(messages, contains('[VibeMatchAudio][warn] producer failed'));
+    expect(
+      messages,
+      contains(
+        '[FK:E:Audio] producer failed with a multiline diagnostic payload',
+      ),
+    );
+  });
+
+  test('very long errors are truncated', () {
+    final messages = <String>[];
+    final original = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) messages.add(message);
+    };
+    addTearDown(() {
+      debugPrint = original;
+    });
+
+    LiveRoomLog.error('Media', 'x' * 400);
+
+    expect(messages, hasLength(1));
+    expect(messages.single.length, lessThan(280));
+    expect(messages.single.endsWith('…'), isTrue);
   });
 }
