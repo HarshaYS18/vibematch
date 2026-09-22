@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.schema_guard import assert_database_schema_current
 from app.database import Base
 from app import models  # noqa: F401
+from legacy_snapshot import create_missing_tables
 
 
 def main():
@@ -34,9 +35,11 @@ def main():
                 connection.commit()
                 config.attributes["connection"] = connection
                 if scenario == "legacy":
-                    # Simulate an installed ORM bootstrap at the last legacy head.
-                    # This test-only DDL is deliberately outside backend/app.
-                    Base.metadata.create_all(connection)
+                    # Recreate the frozen pre-takeover schema, not current ORM
+                    # metadata. Current metadata may contain tables introduced
+                    # after the legacy head and would make forward migrations
+                    # fail with duplicate-table errors.
+                    create_missing_tables(connection)
                     command.stamp(config, "20260921_0100")
                     connection.commit()
                 command.upgrade(config, "head")
