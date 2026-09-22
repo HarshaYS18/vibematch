@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -78,7 +78,12 @@ def allocate_pool_coins(payload: AllocatePoolCoinsRequest, current_user: User = 
 
 
 @router.post("/official-recharge", response_model=OfficialRechargeResponse)
-async def official_recharge_wallet(payload: OfficialRechargeRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def official_recharge_wallet(
+    payload: OfficialRechargeRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     result = economy_level_service.credit_official_recharge(
         db=db,
         actor=current_user,
@@ -92,7 +97,11 @@ async def official_recharge_wallet(payload: OfficialRechargeRequest, current_use
     )
     target = result["target"]
     wallet_payload = _wallet_response(db, result["wallet"])
-    await _broadcast_wallet_vip_svip_update(target.id, wallet_payload)
+    background_tasks.add_task(
+        _broadcast_wallet_vip_svip_update,
+        target.id,
+        wallet_payload,
+    )
     return OfficialRechargeResponse(
         order_id=None,
         target_user_id=target.id,

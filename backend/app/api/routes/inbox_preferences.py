@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -38,7 +38,13 @@ def update_preferences(request: InboxPreferenceUpdateRequest, db: Session = Depe
     return InboxPreferenceResponse(**inbox_preference_service.serialize_preferences(pref))
 
 @router.patch("/conversations/{conversation_id}/theme", response_model=InboxConversationResponse)
-async def update_conversation_theme(conversation_id: str, request: InboxConversationThemeRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_conversation_theme(
+    conversation_id: str,
+    request: InboxConversationThemeRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -46,7 +52,14 @@ async def update_conversation_theme(conversation_id: str, request: InboxConversa
         inbox_preference_service.update_conversation_theme(db=db, conversation=conversation, user=current_user, chat_theme=request.chat_theme, wallpaper_key=request.wallpaper_key, wallpaper_url=request.wallpaper_url)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    await inbox_ws_manager.send_to_user(current_user.id, {"event": "inbox_conversation_updated", "conversation_id": conversation.public_id})
+    background_tasks.add_task(
+        inbox_ws_manager.send_to_user,
+        current_user.id,
+        {
+            "event": "inbox_conversation_updated",
+            "conversation_id": conversation.public_id,
+        },
+    )
     payload = inbox_service.conversation_to_dict(conversation, current_user)
     payload.update(inbox_preference_service.conversation_theme_payload(db, conversation, current_user))
     return InboxConversationResponse(**payload)

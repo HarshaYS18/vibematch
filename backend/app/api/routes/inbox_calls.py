@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -31,25 +31,32 @@ def _response(call, *, current_user: User | None = None, conversation=None) -> I
     return InboxCallResponse(**payload)
 
 
-async def _broadcast_call(conversation, call, event: str) -> None:
+def _call_deliveries(conversation, call, event: str) -> list[tuple[int, dict]]:
     call_payload = inbox_call_service.call_to_dict(call)
+    deliveries: list[tuple[int, dict]] = []
     for participant in conversation.participants:
-        await inbox_ws_manager.send_to_user(
-            participant.user_id,
-            {
-                "event": event,
-                "conversation_id": conversation.public_id,
-                "from_self": participant.user_id == call.started_by_user_id,
-                "call": call_payload,
-                "push_contract": inbox_call_contract_service.push_payload_for_call(
-                    conversation,
-                    call,
-                    event=event,
-                    receiver_user_id=participant.user_id,
-                ),
-                "media_contract": inbox_call_contract_service.media_join_contract(call, user_id=participant.user_id),
-            },
+        deliveries.append(
+            (
+                participant.user_id,
+                {
+                    "event": event,
+                    "conversation_id": conversation.public_id,
+                    "from_self": participant.user_id == call.started_by_user_id,
+                    "call": call_payload,
+                    "push_contract": inbox_call_contract_service.push_payload_for_call(
+                        conversation,
+                        call,
+                        event=event,
+                        receiver_user_id=participant.user_id,
+                    ),
+                    "media_contract": inbox_call_contract_service.media_join_contract(
+                        call,
+                        user_id=participant.user_id,
+                    ),
+                },
+            )
         )
+    return deliveries
 
 
 def _send_call_pushes(db: Session, conversation, call, event: str) -> None:
@@ -73,28 +80,45 @@ def _send_call_pushes(db: Session, conversation, call, event: str) -> None:
         )
 
 
-async def _broadcast_summary(conversation, message) -> None:
+def _summary_deliveries(
+    conversation,
+    message,
+) -> tuple[list[tuple[int, dict]], list[int], dict]:
+    deliveries: list[tuple[int, dict]] = []
     for participant in conversation.participants:
         if participant.user is None:
             continue
-        await inbox_ws_manager.send_to_user(
-            participant.user_id,
-            {
-                "event": "inbox_message_created",
-                "conversation_id": conversation.public_id,
-                "message": inbox_service.message_to_dict(message, participant.user),
-            },
+        deliveries.append(
+            (
+                participant.user_id,
+                {
+                    "event": "inbox_message_created",
+                    "conversation_id": conversation.public_id,
+                    "message": inbox_service.message_to_dict(
+                        message,
+                        participant.user,
+                    ),
+                },
+            )
         )
-    await inbox_ws_manager.broadcast_to_users(
-        inbox_service.participant_user_ids(conversation),
-        {"event": "inbox_conversation_updated", "conversation_id": conversation.public_id},
-    )
+    participant_ids = inbox_service.participant_user_ids(conversation)
+    conversation_event = {
+        "event": "inbox_conversation_updated",
+        "conversation_id": conversation.public_id,
+    }
+    return deliveries, participant_ids, conversation_event
+
+
+async def _send_deliveries(deliveries: list[tuple[int, dict]]) -> None:
+    for user_id, payload in deliveries:
+        await inbox_ws_manager.send_to_user(user_id, payload)
 
 
 @router.post("/conversations/{conversation_id}/start", response_model=InboxCallResponse)
-async def start_call(
+def start_call(
     conversation_id: str,
     request: InboxCallStartRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -105,15 +129,17 @@ async def start_call(
         call = inbox_call_service.start_call(db, conversation, current_user, request.call_type.value)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    await _broadcast_call(conversation, call, "inbox_call_started")
+    deliveries = _call_deliveries(conversation, call, "inbox_call_started")
     _send_call_pushes(db, conversation, call, "inbox_call_started")
+    background_tasks.add_task(_send_deliveries, deliveries)
     return _response(call, current_user=current_user, conversation=conversation)
 
 
 @router.post("/conversations/{conversation_id}/{call_id}/accept", response_model=InboxCallResponse)
-async def accept_call(
+def accept_call(
     conversation_id: str,
     call_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -127,7 +153,10 @@ async def accept_call(
         call = inbox_call_service.accept_call(db, call, current_user)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    await _broadcast_call(conversation, call, "inbox_call_accepted")
+    background_tasks.add_task(
+        _send_deliveries,
+        _call_deliveries(conversation, call, "inbox_call_accepted"),
+    )
     return _response(call, current_user=current_user, conversation=conversation)
 
 
@@ -152,10 +181,11 @@ def get_media_contract(
 
 
 @router.post("/conversations/{conversation_id}/{call_id}/decline", response_model=InboxCallResponse)
-async def decline_call(
+def decline_call(
     conversation_id: str,
     call_id: str,
     request: InboxCallDecisionRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -169,16 +199,29 @@ async def decline_call(
         call, message = inbox_call_service.decline_call(db, call, current_user, reason=request.reason)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    await _broadcast_call(conversation, call, "inbox_call_declined")
-    await _broadcast_summary(conversation, message)
+    call_deliveries = _call_deliveries(conversation, call, "inbox_call_declined")
+    summary_deliveries, participant_ids, conversation_event = _summary_deliveries(
+        conversation,
+        message,
+    )
+    background_tasks.add_task(
+        _send_deliveries,
+        call_deliveries + summary_deliveries,
+    )
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
+        participant_ids,
+        conversation_event,
+    )
     return _response(call, current_user=current_user, conversation=conversation)
 
 
 @router.post("/conversations/{conversation_id}/{call_id}/end", response_model=InboxCallResponse)
-async def end_call(
+def end_call(
     conversation_id: str,
     call_id: str,
     request: InboxCallDecisionRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -192,15 +235,28 @@ async def end_call(
         call, message = inbox_call_service.end_call(db, call, current_user, reason=request.reason)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    await _broadcast_call(conversation, call, "inbox_call_ended")
-    await _broadcast_summary(conversation, message)
+    call_deliveries = _call_deliveries(conversation, call, "inbox_call_ended")
+    summary_deliveries, participant_ids, conversation_event = _summary_deliveries(
+        conversation,
+        message,
+    )
+    background_tasks.add_task(
+        _send_deliveries,
+        call_deliveries + summary_deliveries,
+    )
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
+        participant_ids,
+        conversation_event,
+    )
     return _response(call, current_user=current_user, conversation=conversation)
 
 
 @router.post("/conversations/{conversation_id}/{call_id}/missed", response_model=InboxCallSummaryMessageResponse)
-async def mark_missed_call(
+def mark_missed_call(
     conversation_id: str,
     call_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -211,8 +267,20 @@ async def mark_missed_call(
     if not call:
         raise HTTPException(status_code=404, detail="Call not found")
     call, message = inbox_call_service.end_call(db, call, current_user, reason="missed")
-    await _broadcast_call(conversation, call, "inbox_call_missed")
-    await _broadcast_summary(conversation, message)
+    call_deliveries = _call_deliveries(conversation, call, "inbox_call_missed")
+    summary_deliveries, participant_ids, conversation_event = _summary_deliveries(
+        conversation,
+        message,
+    )
+    background_tasks.add_task(
+        _send_deliveries,
+        call_deliveries + summary_deliveries,
+    )
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
+        participant_ids,
+        conversation_event,
+    )
     return InboxCallSummaryMessageResponse(
         message_id=message.public_id,
         conversation_id=conversation.public_id,
