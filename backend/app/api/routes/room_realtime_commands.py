@@ -640,7 +640,12 @@ def heartbeat(
         room_permission_service.require_room_view(db, room, current_user)
         data = room_action_service.heartbeat_room(db, room, current_user)
         db.commit()
-        return {"room_id": room_public_id, "room": data}
+        return {
+            "room_id": room_public_id,
+            "room": data,
+            "snapshot_mode": "partial",
+            "omitted_sections": ["recent_messages"],
+        }
     except Exception:
         db.rollback()
         raise
