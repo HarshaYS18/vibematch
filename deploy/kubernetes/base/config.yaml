@@ -6,6 +6,11 @@ data:
   APP_ENV: staging
   ENFORCE_SCHEMA_CURRENT: "true"
   ENABLE_DEV_LOGIN: "false"
+  RATE_LIMIT_ENABLED: "true"
+  DB_POOL_SIZE: "5"
+  DB_MAX_OVERFLOW: "0"
+  API_MAX_REPLICAS: "30"
+  DB_API_CONNECTION_BUDGET: "150"
   CORS_ALLOWED_ORIGINS: https://app.example.invalid
   MEDIA_STORAGE_DRIVER: s3
   MEDIA_CDN_BASE_URL: https://cdn.example.invalid/media

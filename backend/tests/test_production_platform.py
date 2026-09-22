@@ -36,8 +36,14 @@ class ProductionConfigTests(TestCase):
             CORS_ALLOWED_ORIGINS="https://funkey.example",
             MEDIA_STORAGE_DRIVER="s3", MEDIA_S3_BUCKET="bucket",
             MEDIA_CDN_BASE_URL="https://cdn.funkey.example", RATE_LIMIT_ENABLED=True,
+            database_url="postgresql://funkey:strong-secret@postgres.internal:5432/funkey",
+            redis_url="rediss://cache.internal:6379/0",
         )
         Settings(**safe, _env_file=None).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "database_url\\(default\\)"):
+            Settings(**{**safe, "database_url": "postgresql://postgres:postgres@localhost:5432/vibematch"}, _env_file=None).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "redis_url\\(default\\)"):
+            Settings(**{**safe, "redis_url": "redis://localhost:6379/0"}, _env_file=None).validate_production()
         with self.assertRaisesRegex(RuntimeError, "DB_API_CONNECTION_BUDGET"):
             Settings(**safe, DB_POOL_SIZE=10, DB_API_CONNECTION_BUDGET=100, _env_file=None).validate_production()
 

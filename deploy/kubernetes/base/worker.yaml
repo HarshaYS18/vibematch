@@ -36,6 +36,9 @@ spec:
           envFrom:
             - configMapRef: {name: funkey-config}
             - secretRef: {name: funkey-api-secrets}
+          env:
+            - {name: DB_POOL_SIZE, value: "3"}
+            - {name: DB_MAX_OVERFLOW, value: "0"}
           resources:
             requests: {cpu: 100m, memory: 256Mi}
             limits: {cpu: "1", memory: 768Mi}

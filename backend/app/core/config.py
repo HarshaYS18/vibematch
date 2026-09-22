@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -93,12 +95,28 @@ class Settings(BaseSettings):
             unsafe.append("ENABLE_DEV_LOGIN")
         if self.JWT_ALGORITHM not in {"HS256", "HS384", "HS512"}:
             unsafe.append("JWT_ALGORITHM")
+        db_url = urlsplit(self.database_url)
+        if not db_url.scheme.startswith("postgresql") or not db_url.hostname:
+            unsafe.append("database_url")
+        if self.database_url == "postgresql://postgres:postgres@localhost:5432/vibematch":
+            unsafe.append("database_url(default)")
+        redis_url = urlsplit(self.redis_url)
+        if redis_url.scheme not in {"redis", "rediss"} or not redis_url.hostname:
+            unsafe.append("redis_url")
+        if self.redis_url == "redis://localhost:6379/0":
+            unsafe.append("redis_url(default)")
         if not self.GOOGLE_AUTH_CLIENT_IDS.strip():
             unsafe.append("GOOGLE_AUTH_CLIENT_IDS")
         if self.cors_allowed_origins == ["*"] or any(origin == "*" for origin in self.cors_allowed_origins):
             unsafe.append("CORS_ALLOWED_ORIGINS")
+        elif any(not origin.startswith("https://") for origin in self.cors_allowed_origins):
+            unsafe.append("CORS_ALLOWED_ORIGINS(https)")
         if self.MEDIA_STORAGE_DRIVER.lower() != "s3" or not self.MEDIA_S3_BUCKET or not self.MEDIA_CDN_BASE_URL:
             unsafe.append("MEDIA_STORAGE_DRIVER/MEDIA_S3_BUCKET/MEDIA_CDN_BASE_URL")
+        elif not self.MEDIA_CDN_BASE_URL.startswith("https://"):
+            unsafe.append("MEDIA_CDN_BASE_URL(https)")
+        if self.MEDIA_S3_ENDPOINT_URL and not self.MEDIA_S3_ENDPOINT_URL.startswith("https://"):
+            unsafe.append("MEDIA_S3_ENDPOINT_URL(https)")
         if not self.RATE_LIMIT_ENABLED:
             unsafe.append("RATE_LIMIT_ENABLED")
         if self.DB_POOL_SIZE < 1 or self.DB_MAX_OVERFLOW < 0 or self.API_MAX_REPLICAS < 3:

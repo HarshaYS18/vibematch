@@ -38,6 +38,9 @@ spec:
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
           labelSelector: {matchLabels: {app: funkey-api}}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 256Mi}
       containers:
         - name: api
           image: funkey-api:dev
@@ -46,6 +49,8 @@ spec:
           envFrom:
             - configMapRef: {name: funkey-config}
             - secretRef: {name: funkey-api-secrets}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
           resources:
             requests: {cpu: 250m, memory: 512Mi}
             limits: {cpu: "1", memory: 1Gi}
@@ -65,7 +70,7 @@ spec:
                 command: ["/bin/sh", "-c", "sleep 10"]
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true
             capabilities: {drop: [ALL]}
 ---
 apiVersion: v1
