@@ -11,7 +11,7 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.operational import operational_middleware, render_metrics
 from app.core.rate_limit import rate_limit_middleware
-from app.core.redis_client import get_redis
+from app.core.redis_client import get_async_redis, get_redis
 from app.core.schema_guard import assert_database_schema_current
 from app.database import engine
 from app.services.push_notification_service import assert_firebase_configuration
@@ -19,6 +19,7 @@ from app.services.push_notification_service import assert_firebase_configuration
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 STATIC_DIR = BACKEND_DIR / "static"
+DRAIN_MARKER = Path(settings.DRAIN_MARKER_PATH)
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "uploads").mkdir(parents=True, exist_ok=True)
 
@@ -29,9 +30,15 @@ async def lifespan(_app: FastAPI):
     if settings.ENFORCE_SCHEMA_CURRENT or settings.APP_ENV.lower() in {"production", "prod"}:
         assert_database_schema_current(engine)
     assert_firebase_configuration()
+    try:
+        DRAIN_MARKER.unlink(missing_ok=True)
+    except OSError as exc:
+        if settings.is_production:
+            raise RuntimeError(f"Unable to clear API drain marker: {DRAIN_MARKER}") from exc
     _app.state.draining = False
     yield
     _app.state.draining = True
+    await get_async_redis().aclose()
     get_redis().close()
     engine.dispose()
 
@@ -82,7 +89,7 @@ def live():
 
 @app.get("/ready", tags=["System"])
 def ready():
-    if app.state.draining:
+    if app.state.draining or DRAIN_MARKER.exists():
         return PlainTextResponse("draining", status_code=503)
     try:
         with engine.connect() as connection:

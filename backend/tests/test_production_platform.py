@@ -2,7 +2,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest import TestCase
+from unittest import IsolatedAsyncioTestCase, TestCase
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.routes import auth, media_control, realtime_gateway_auth
 from app.core.config import Settings, settings
-from app.core.rate_limit import check_rate_limit
+from app.core.rate_limit import check_rate_limit, check_rate_limit_async
 from app.database import Base
 from app.models.event_outbox import WorkerProcessedEvent
 from app.models.notification import UserNotification
@@ -86,6 +86,20 @@ class DistributedRateLimitTests(TestCase):
         self.assertTrue(second[0])
         self.assertFalse(third[0])
         self.assertNotIn("192.0.2.1", next(iter(redis.scan_iter())))
+
+
+class AsyncDistributedRateLimitTests(IsolatedAsyncioTestCase):
+    async def test_async_limit_uses_same_distributed_semantics(self):
+        import fakeredis.aioredis
+
+        redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+        try:
+            first = await check_rate_limit_async(redis, category="read", identity="user:7", limit=1, now=120)
+            second = await check_rate_limit_async(redis, category="read", identity="user:7", limit=1, now=120)
+            self.assertTrue(first[0])
+            self.assertFalse(second[0])
+        finally:
+            await redis.aclose()
 
 
 class GatewayAuthTests(TestCase):

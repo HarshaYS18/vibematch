@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = False
     TRUSTED_PROXY_CIDRS: str = ""
     MAX_REQUEST_BYTES: int = 26 * 1024 * 1024
+    DRAIN_MARKER_PATH: str = "/tmp/funkey-api-draining"
 
     # Google Drive backup OAuth
     GOOGLE_DRIVE_CLIENT_ID: str = ""

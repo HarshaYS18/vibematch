@@ -67,7 +67,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "sleep 10"]
+                command: ["/bin/sh", "-c", "touch /tmp/funkey-api-draining; sleep 10"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

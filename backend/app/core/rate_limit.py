@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from redis.exceptions import RedisError
 
 from app.core.config import settings
-from app.core.redis_client import get_redis
+from app.core.redis_client import get_async_redis
 from app.core.security import decode_access_token
 
 
@@ -58,13 +58,27 @@ def _policy(path: str, method: str) -> tuple[str, int]:
     return "read", 600
 
 
-def check_rate_limit(redis_client, *, category: str, identity: str, limit: int, now: float | None = None) -> tuple[bool, int]:
-    now = time.time() if now is None else now
+def _rate_limit_key(*, category: str, identity: str, now: float) -> str:
     bucket = int(now // 60)
     digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
-    key = f"funkey:ratelimit:{category}:{digest}:{bucket}"
-    count, ttl_ms = redis_client.eval(_INCREMENT, 1, key, 120000)
+    return f"funkey:ratelimit:{category}:{digest}:{bucket}"
+
+
+def _rate_limit_result(result, limit: int) -> tuple[bool, int]:
+    count, ttl_ms = result
     return int(count) <= limit, max(1, int(ttl_ms) // 1000 + 1)
+
+
+def check_rate_limit(redis_client, *, category: str, identity: str, limit: int, now: float | None = None) -> tuple[bool, int]:
+    now = time.time() if now is None else now
+    key = _rate_limit_key(category=category, identity=identity, now=now)
+    return _rate_limit_result(redis_client.eval(_INCREMENT, 1, key, 120000), limit)
+
+
+async def check_rate_limit_async(redis_client, *, category: str, identity: str, limit: int, now: float | None = None) -> tuple[bool, int]:
+    now = time.time() if now is None else now
+    key = _rate_limit_key(category=category, identity=identity, now=now)
+    return _rate_limit_result(await redis_client.eval(_INCREMENT, 1, key, 120000), limit)
 
 
 async def rate_limit_middleware(request: Request, call_next):
@@ -75,7 +89,7 @@ async def rate_limit_middleware(request: Request, call_next):
     subject = _subject(request)
     identity = f"user:{subject}" if subject else f"ip:{_client_ip(request)}"
     try:
-        allowed, retry_after = check_rate_limit(get_redis(), category=category, identity=identity, limit=limit)
+        allowed, retry_after = await check_rate_limit_async(get_async_redis(), category=category, identity=identity, limit=limit)
     except RedisError:
         return JSONResponse(status_code=503, content={"detail": "Rate limit service unavailable"})
     if not allowed:
