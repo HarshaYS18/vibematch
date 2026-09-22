@@ -9,7 +9,7 @@ from app.models.follow import UserFollow
 from app.models.presence import UserRoomPresence
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
-from app.models.room_realtime_state import RoomSeatState
+from app.models.room_realtime_state import RoomRealtimeEvent, RoomSeatState
 from app.models.user import User
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
 from app.services import economy_level_service, profile_service
@@ -17,6 +17,7 @@ from app.services.permissions import room_permission_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
 from app.services.rooms.room_kickout_service import active_kickout_for_user
+from app.services.rooms.room_state_service import room_sequence
 
 # Backend truth: a user is considered inside a room only while room heartbeat is fresh.
 # After 5 minutes without room heartbeat, backend closes the active participant row.
@@ -620,6 +621,21 @@ def get_room_by_public_id(db: Session, room_public_id: str) -> RoomDetailRespons
     return room_to_detail_response(room)
 
 
+def _record_join_event(db: Session, room: Room, user_id: int) -> None:
+    event = RoomRealtimeEvent(
+        room_id=room.id,
+        room_public_id=room.room_public_id,
+        event_type="room.joined",
+        actor_user_id=user_id,
+        payload={},
+        privacy_scope="room",
+        sequence=room_sequence(db, room) + 1,
+    )
+    db.add(event)
+    room.updated_at = datetime.utcnow()
+    db.flush()
+
+
 def join_room(db: Session, room_public_id: str, current_user: User, lock_password: str | None = None) -> RoomJoinResponse | None:
     room = get_room_model_by_public_id(db, room_public_id)
     if not room:
@@ -632,6 +648,8 @@ def join_room(db: Session, room_public_id: str, current_user: User, lock_passwor
     participant = _upsert_active_participant(db, room, current_user)
     mark_user_room_presence_active(db, room, current_user)
     _refresh_room_online_count(db, room)
+    if not was_active:
+        _record_join_event(db, room, current_user.id)
     db.commit()
     db.refresh(room)
     db.refresh(participant)
