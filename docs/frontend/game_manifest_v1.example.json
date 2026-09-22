@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "game_id": "jungle_hunt",
+  "config_version": 5,
+  "bridge_version": 1,
+  "bundle_format": "single_html",
+  "entry_path": "index.html",
+  "entry_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "allowed_origins": [
+    "https://games-cdn.example.com"
+  ]
+}

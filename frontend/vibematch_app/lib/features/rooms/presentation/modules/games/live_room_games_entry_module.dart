@@ -7,6 +7,9 @@ class LiveRoomGamesEntryModule {
 
   static void openGamesSheet(LiveRoomControllerBundle bundle) {
     LiveRoomLifecycleModule.clearFocus(bundle);
-    LiveRoomGamesActionsModule.openGamesSheet(context: bundle.context);
+    LiveRoomGamesActionsModule.openGamesSheet(
+      context: bundle.context,
+      roomId: bundle.roomId,
+    );
   }
 }

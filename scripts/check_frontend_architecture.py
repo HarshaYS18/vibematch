@@ -16,6 +16,7 @@ CANONICAL_ROOTS = (
     APP / "room_session",
     APP / "room_media",
     APP / "watch_party",
+    APP / "game_platform",
 )
 
 violations: list[str] = []
@@ -27,8 +28,13 @@ for root in CANONICAL_ROOTS:
         text = path.read_text(encoding="utf-8")
         rel = path.relative_to(ROOT).as_posix()
 
-        if "package:http/http.dart" in text:
-            violations.append(f"{rel}: migrated domain must use AppNetworkClient, not package:http")
+        if (
+            "package:http/http.dart" in text
+            and "/foundation/networking/" not in f"/{rel}"
+        ):
+            violations.append(
+                f"{rel}: migrated domain must use AppNetworkClient, not package:http"
+            )
 
         if re.search(r"\bstatic\s+(?:final\s+)?ValueNotifier\b", text):
             violations.append(f"{rel}: static ValueNotifier is forbidden domain state")
@@ -91,6 +97,53 @@ if WATCH_PARTY_ROOT.exists():
             violations.append(
                 f"{rel}: InAppWebViewController must stay inside OttWebPlaybackHost"
             )
+
+# Chunk 10: gameplay code is remotely delivered behind the canonical game
+# platform. The host owns authenticated API access and the sole game WebView.
+GAME_PLATFORM_ROOT = APP / "game_platform"
+if GAME_PLATFORM_ROOT.exists():
+    for path in GAME_PLATFORM_ROOT.rglob("*.dart"):
+        text = path.read_text(encoding="utf-8-sig")
+        rel = path.relative_to(ROOT).as_posix()
+
+        if "WebSocketChannel" in text or "WebSocket.connect" in text:
+            violations.append(
+                f"{rel}: game runtime must not create a second realtime channel"
+            )
+
+        if (
+            "package:flutter_inappwebview/flutter_inappwebview.dart" in text
+            and "/game_platform/runtime/web/" not in f"/{rel}"
+        ):
+            violations.append(
+                f"{rel}: raw game WebView access belongs behind game_platform/runtime/web"
+            )
+
+ROOM_GAME_ROOT = APP / "features" / "rooms"
+if ROOM_GAME_ROOT.exists():
+    legacy_gameplay_imports = (
+        "jungle_hunt_global_game_page.dart",
+        "jungle_hunt_game_page.dart",
+    )
+    for path in ROOM_GAME_ROOT.rglob("*.dart"):
+        text = path.read_text(encoding="utf-8-sig")
+        rel = path.relative_to(ROOT).as_posix()
+        if any(marker in text for marker in legacy_gameplay_imports):
+            violations.append(
+                f"{rel}: room gameplay must launch GameRuntime, not a bundled gameplay page"
+            )
+
+PUBSPEC = ROOT / "frontend" / "vibematch_app" / "pubspec.yaml"
+if PUBSPEC.exists():
+    pubspec_text = PUBSPEC.read_text(encoding="utf-8")
+    if "assets/games/" in pubspec_text:
+        violations.append(
+            "frontend/vibematch_app/pubspec.yaml: gameplay assets must be remotely hosted"
+        )
+    if "games_raw/" in pubspec_text:
+        violations.append(
+            "frontend/vibematch_app/pubspec.yaml: raw game packages must not be app dependencies"
+        )
 
 if violations:
     print("Frontend architecture guard failed:")
