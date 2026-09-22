@@ -60,6 +60,7 @@ class SupportedWebPlaybackAdapter
   final OttWebPlaybackHost _host;
   final CompanionPlaybackAdapter _companion;
   final AppTelemetry _telemetry;
+  final Future<void> Function()? _embeddedRemountBarrier;
   final OttRemountBarrier _remountBarrier;
 
   static Future<void> _noOpRemountBarrier() async {}
