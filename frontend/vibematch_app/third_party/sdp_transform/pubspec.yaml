@@ -1,0 +1,6 @@
+name: sdp_transform
+version: 0.3.2+funkey.1
+description: FunKey vendored sdp_transform 0.3.2 with noisy null-key debug print removed.
+homepage: https://github.com/flutter-webrtc/dart-sdp-transform
+environment:
+  sdk: '>=3.4.0 <4.0.0'
