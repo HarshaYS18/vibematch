@@ -1643,7 +1643,7 @@ class LiveRoomAudioService {
 
   void _setError(String message) {
     lastError.value = message;
-    _warn(message);
+    LiveRoomLog.error('Audio', message);
   }
 
   void _debug(String message) {
