@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://funkey.example/contracts/events/event-envelope-v1.schema.json",
+  "title": "FunKey Event Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "event_type", "event_version", "occurred_at", "payload"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"},
+    "event_version": {"const": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "request_id": {"type": ["string", "null"], "maxLength": 64},
+    "trace_id": {"type": ["string", "null"], "maxLength": 64},
+    "actor_user_id": {"type": ["integer", "null"]},
+    "payload": {"type": "object"}
+  }
+}

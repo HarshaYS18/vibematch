@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: funkey-production
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/HarshaYS18/vibematch.git
+    targetRevision: codex/funkey-production-backend-v1
+    path: deploy/kubernetes/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: funkey
+  syncPolicy:
+    syncOptions: [CreateNamespace=true]

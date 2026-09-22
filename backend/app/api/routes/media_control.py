@@ -130,6 +130,21 @@ def media_node_offline(node_id: str, request: Request):
     return {"ok": True, "node_id": node_id}
 
 
+@router.post(
+    "/internal/media/nodes/{node_id}/drain",
+    response_model=MediaNodeResponse,
+    include_in_schema=False,
+)
+def media_node_internal_drain(node_id: str, request: Request):
+    """Called by the media node before Kubernetes removes it from service."""
+    _internal_media_auth(request)
+    try:
+        node = media_node_registry_service.set_node_draining(get_redis(), node_id, True)
+    except media_node_registry_service.MediaNodeUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return _node_response(node)
+
+
 @router.get("/admin/media/nodes", response_model=list[MediaNodeResponse], tags=["Admin Media"])
 def admin_list_media_nodes(
     current_user: User = Depends(get_current_user),

@@ -6,10 +6,17 @@ on:
       - chatgpt/room-production-hardening
       - chatgpt/backend-media-consolidation-v1
       - codex/backend-media-consolidation-checkpoint
+      - codex/funkey-production-backend-v1
   pull_request:
     paths:
       - 'backend/**'
       - 'backend_media/**'
+      - 'apps/**'
+      - 'deploy/**'
+      - 'infra/**'
+      - 'tests/load/**'
+      - 'tests/chaos/**'
+      - '.github/workflows/production-platform.yml'
       - 'frontend/vibematch_app/**'
       - 'scripts/check_backend_architecture.py'
       - 'PRODUCTION_RUNBOOK.md'

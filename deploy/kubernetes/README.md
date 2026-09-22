@@ -1,0 +1,27 @@
+# FunKey Kubernetes deployment
+
+`base/` deploys the current Python control plane, Go realtime gateway, and Python JetStream worker. `overlays/local`, `overlays/staging`, and `overlays/production` set environment configuration. `media/` is an opt-in deployment for the canonical `backend_media/` implementation; it must only be applied after the node networking and drain prerequisites below are verified. `jobs/migrate.yaml` is a release gate, not a continuously reconciled Job.
+
+## Required bindings before staging or production
+
+Replace every `example.invalid` endpoint and `:dev` image with actual immutable image digests. Provide `funkey-api-secrets` from an external secret manager with `database_url`, `redis_url`, `JWT_SECRET_KEY`, `MEDIA_INTERNAL_TOKEN`, S3 credentials, and provider credentials that the enabled features need. Production must set `MEDIA_STORAGE_DRIVER=s3` and a real CDN URL. Supply `funkey-realtime-secrets` only if the gateway requires separate secret configuration. Never store these values in Git or a ConfigMap.
+
+Install a supported ingress controller, metrics-server, Prometheus adapter for custom HPA metrics, KEDA, and a Prometheus/OpenTelemetry collector. The API HPA uses CPU plus `funkey_http_inflight_requests`; realtime uses CPU plus `funkey_websocket_connections`. KEDA reads the `FUNKEY_EVENTS` / `funkey-worker` JetStream consumer via NATS monitoring port 8222. Configure the monitoring endpoint so KEDA can reach it without exposing it publicly. Queue age, reconnects, message rate, backpressure, and p95 latency are alert and scaling review signals; CPU is not the sole capacity measure.
+
+Set up autoscaled node pools for system, application/worker, realtime, and media workloads. The provider's node autoscaler must add nodes for pending pods and cordon/drain safe idle nodes. Label media nodes `funkey.io/workload=media` and taint them `funkey.io/media=true:NoSchedule`. Media uses host networking and ports 4100/TCP plus 40000–49999/UDP. One media pod is scheduled per node. `status.hostIP` must be reachable by clients as both signaling and announced WebRTC IP in the supplied media manifest; if the cloud uses private node IPs or TLS termination, adapt the media public address and routing before applying. Use a separate L4/UDP or per-node WebRTC path, not normal HTTP ingress for RTP. Preserve `infra/turn/` for relay connectivity.
+
+The media HPA is bundled only in the opt-in media overlay. Before enabling it, expose custom `funkey_media_peers` and `funkey_media_rooms` metrics through the adapter and verify scale-in on disposable rooms. `preStop` calls loopback `/drain`, waits until `peerCount` reaches zero or 300 seconds, then lets SIGTERM finish. The media service must mark itself draining in the existing FastAPI/Redis registry, reject new joins, and remain alive for assigned rooms during that window. A deadline can still end long lived calls; choose it from measured session duration and run the drain procedure before planned scale-in. Never use a plain pod delete as the regular media scale-in method.
+
+## Release order
+
+1. Build, test, scan, and publish digest-addressed images. Update images in the environment overlay by digest; review the resulting manifest diff.
+2. Verify managed PostgreSQL backup and PITR, Redis single-primary failover, JetStream durability, object storage, DNS/TLS, ingress and adapter health.
+3. Run `jobs/migrate.yaml` once as the expand migration gate and verify Alembic is at head. Do not run destructive drops automatically.
+4. Apply staging overlay; run API, gateway, worker, media discovery and real WebRTC smoke tests. Observe at least one drain and reconnect.
+5. Apply production overlay in a canary/progressive rollout, monitor SLO burn, then increase traffic. Halt and roll back image digest on failure; keep compatible expanded schema until old code is retired.
+
+The included base ingress sends HTTP and WebSocket traffic to distinct services and hosts. Configure the edge CDN/WAF and regional load balancer outside Kubernetes, with TLS, request IDs, body limits, rate limits, and WebSocket idle timeout greater than client ping cadence. Kubernetes readiness removes unhealthy endpoints; liveness only measures process health. Use `kubectl kustomize deploy/kubernetes/overlays/production` to review render output. Argo CD manifests under `deploy/gitops/` provide a reconciliation foundation; production sync is manual until health and SLO gates are connected.
+
+## Connection budget
+
+Use the Terraform preflight contract to enforce `api_max_pods × api_pool_per_pod + worker_max_pods × worker_pool_per_pod + reserved_connections <= database_max_connections`. Reserve migrations, admin, monitoring, and failover capacity. Match actual Python pool settings and HPA maxima before deployment; PgBouncer or a managed pooler is recommended at scale.

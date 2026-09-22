@@ -97,7 +97,7 @@ def _get_or_create_identity_user(db: Session, provider: str, provider_user_id: s
 def _google_profile_from_access_token(access_token: str) -> dict:
     response = requests.get("https://www.googleapis.com/oauth2/v3/userinfo", headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
     if response.status_code < 200 or response.status_code >= 300:
-        raise HTTPException(status_code=401, detail=f"Invalid Google access token: {response.text}")
+        raise HTTPException(status_code=401, detail="Invalid Google access token")
     return response.json()
 
 
@@ -107,7 +107,7 @@ def _google_profile_from_payload(payload: GoogleLoginRequest) -> dict:
         try:
             verified = google_id_token.verify_oauth2_token(token, google_requests.Request())
         except ValueError as exc:
-            raise HTTPException(status_code=401, detail=f"Invalid Google token: {exc}") from exc
+            raise HTTPException(status_code=401, detail="Invalid Google token") from exc
         client_ids = [item.strip() for item in settings.GOOGLE_AUTH_CLIENT_IDS.split(",") if item.strip()]
         if client_ids and str(verified.get("aud") or "") not in client_ids:
             raise HTTPException(status_code=401, detail="Google token audience is not allowed for this app.")
@@ -137,7 +137,7 @@ if settings.ENABLE_DEV_LOGIN:
 def google_login(payload: GoogleLoginRequest, request: Request, db: Session = Depends(get_db)):
     verified = _google_profile_from_payload(payload)
     email = str(verified.get("email") or "").lower().strip()
-    email_verified = bool(verified.get("email_verified", True))
+    email_verified = bool(verified.get("email_verified", False))
     google_sub = str(verified.get("sub") or "").strip()
     if not email or not google_sub or not email_verified:
         raise HTTPException(status_code=401, detail="Google account email is not verified.")

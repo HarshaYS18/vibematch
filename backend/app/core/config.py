@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     REDIS_SOCKET_TIMEOUT_SECONDS: float = 2.0
     DB_LOCK_TIMEOUT_MS: int = 1000
     DB_STATEMENT_TIMEOUT_MS: int = 3000
+    DB_CONNECT_TIMEOUT_SECONDS: int = 5
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 0
+    DB_POOL_TIMEOUT_SECONDS: int = 3
+    DB_POOL_RECYCLE_SECONDS: int = 1800
+    API_MAX_REPLICAS: int = 20
+    DB_API_CONNECTION_BUDGET: int = 100
 
     # Media control plane / node registry
     MEDIA_INTERNAL_TOKEN: str = "change-this-media-internal-token"
@@ -47,6 +54,9 @@ class Settings(BaseSettings):
     # Google Sign-In OAuth client IDs. Comma-separated for web/android/ios clients.
     GOOGLE_AUTH_CLIENT_IDS: str = ""
     ENABLE_DEV_LOGIN: bool = False
+    RATE_LIMIT_ENABLED: bool = False
+    TRUSTED_PROXY_CIDRS: str = ""
+    MAX_REQUEST_BYTES: int = 26 * 1024 * 1024
 
     # Google Drive backup OAuth
     GOOGLE_DRIVE_CLIENT_ID: str = ""
@@ -65,6 +75,38 @@ class Settings(BaseSettings):
         if not raw or raw == "*":
             return ["*"]
         return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.lower() in {"production", "prod"}
+
+    def validate_production(self) -> None:
+        """Reject unsafe deploys before the application accepts traffic."""
+        if not self.is_production:
+            return
+        unsafe = []
+        for name in ("JWT_SECRET_KEY", "MEDIA_INTERNAL_TOKEN", "INBOX_BACKUP_ENCRYPTION_KEY"):
+            value = getattr(self, name).strip()
+            if len(value) < 32 or "change-this" in value.lower():
+                unsafe.append(name)
+        if self.ENABLE_DEV_LOGIN:
+            unsafe.append("ENABLE_DEV_LOGIN")
+        if self.JWT_ALGORITHM not in {"HS256", "HS384", "HS512"}:
+            unsafe.append("JWT_ALGORITHM")
+        if not self.GOOGLE_AUTH_CLIENT_IDS.strip():
+            unsafe.append("GOOGLE_AUTH_CLIENT_IDS")
+        if self.cors_allowed_origins == ["*"] or any(origin == "*" for origin in self.cors_allowed_origins):
+            unsafe.append("CORS_ALLOWED_ORIGINS")
+        if self.MEDIA_STORAGE_DRIVER.lower() != "s3" or not self.MEDIA_S3_BUCKET or not self.MEDIA_CDN_BASE_URL:
+            unsafe.append("MEDIA_STORAGE_DRIVER/MEDIA_S3_BUCKET/MEDIA_CDN_BASE_URL")
+        if not self.RATE_LIMIT_ENABLED:
+            unsafe.append("RATE_LIMIT_ENABLED")
+        if self.DB_POOL_SIZE < 1 or self.DB_MAX_OVERFLOW < 0 or self.API_MAX_REPLICAS < 3:
+            unsafe.append("DB_POOL_SIZE/DB_MAX_OVERFLOW/API_MAX_REPLICAS")
+        if self.API_MAX_REPLICAS * (self.DB_POOL_SIZE + self.DB_MAX_OVERFLOW) > self.DB_API_CONNECTION_BUDGET:
+            unsafe.append("DB_API_CONNECTION_BUDGET")
+        if unsafe:
+            raise RuntimeError("Unsafe production configuration: " + ", ".join(unsafe))
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,0 +1,67 @@
+name: Publish Backend Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/funkey-production-backend-v1]
+    paths:
+      - 'backend/**'
+      - 'apps/**'
+      - 'backend_media/**'
+      - '.github/workflows/publish-backend-images.yml'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: backend/Dockerfile
+            context: .
+          - name: worker
+            dockerfile: apps/worker/Dockerfile
+            context: .
+          - name: realtime
+            dockerfile: apps/realtime-gateway/Dockerfile
+            context: .
+          - name: media
+            dockerfile: backend_media/Dockerfile
+            context: backend_media
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        name: Normalize registry path
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/funkey-${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          provenance: true
+          sbom: true
+          tags: ${{ steps.image.outputs.name }}:sha-${{ github.sha }}
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign immutable digest
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+      - name: Record deployment digest
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "$IMAGE@$DIGEST" >> "$GITHUB_STEP_SUMMARY"

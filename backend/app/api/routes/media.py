@@ -77,7 +77,7 @@ async def _save_upload(file: UploadFile, *, folder: str, max_size: int, allowed_
     content_type = _resolve_content_type(file)
     if content_type not in allowed_types:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {content_type or 'unknown'}")
-    data = await file.read()
+    data = await file.read(max_size + 1)
     size = len(data)
     if size <= 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")

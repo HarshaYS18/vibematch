@@ -1,0 +1,63 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-api
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-api}
+  minReplicas: 3
+  maxReplicas: 30
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 65}
+    - type: Pods
+      pods:
+        metric: {name: funkey_http_inflight_requests}
+        target: {type: AverageValue, averageValue: "50"}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-realtime
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-realtime}
+  minReplicas: 3
+  maxReplicas: 50
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+        - {type: Pods, value: 1, periodSeconds: 120}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 60}
+    - type: Pods
+      pods:
+        metric: {name: funkey_websocket_connections}
+        target: {type: AverageValue, averageValue: "2000"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: funkey-worker
+spec:
+  scaleTargetRef: {name: funkey-worker}
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  triggers:
+    - type: nats-jetstream
+      metadata:
+        natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222
+        account: $G
+        stream: FUNKEY_EVENTS
+        consumer: funkey-worker
+        lagThreshold: "100"
+        activationLagThreshold: "10"

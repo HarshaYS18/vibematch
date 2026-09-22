@@ -10,6 +10,7 @@ from app.models.room import Room, RoomMode
 from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, RoomSeatState
 from app.models.user import User
+from app.services.event_outbox_service import enqueue_event
 from app.services.permissions import room_permission_service
 from app.services.rooms.room_kickout_service import create_room_kickout_for_user, deactivate_room_user_for_kickout
 from app.services.rooms.room_service import assert_room_entry_allowed, close_other_active_room_sessions, deactivate_user_in_room, mark_user_room_presence_active, user_has_active_room_conflict
@@ -43,6 +44,15 @@ def record_room_event(
         sequence=_next_sequence(db, room),
     )
     db.add(event)
+    if event_type in {"room.joined", "room.left", "seat.taken", "seat.left"}:
+        # Keep the durable event and outbox insert in the same transaction.
+        # Never copy command payloads: they may contain a room password.
+        enqueue_event(
+            db, event_type=event_type,
+            actor_user_id=actor_user_id,
+            payload={"room_public_id": room.room_public_id, "actor_user_id": actor_user_id,
+                     "target_user_id": target_user_id},
+        )
     room.updated_at = datetime.utcnow()
     db.flush()
     return event

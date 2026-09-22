@@ -13,6 +13,7 @@ from app.models.room_realtime_state import RoomRealtimeEvent, RoomSeatState
 from app.models.user import User
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
 from app.services import economy_level_service, profile_service
+from app.services.event_outbox_service import enqueue_event
 from app.services.permissions import room_permission_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
@@ -622,6 +623,10 @@ def get_room_by_public_id(db: Session, room_public_id: str) -> RoomDetailRespons
 
 
 def _record_join_event(db: Session, room: Room, user_id: int) -> None:
+    enqueue_event(
+        db, event_type="room.joined", actor_user_id=user_id,
+        payload={"room_public_id": room.room_public_id, "actor_user_id": user_id},
+    )
     event = RoomRealtimeEvent(
         room_id=room.id,
         room_public_id=room.room_public_id,

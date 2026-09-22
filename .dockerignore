@@ -1,0 +1,11 @@
+.git
+.github
+**/__pycache__
+**/*.pyc
+**/.venv
+**/node_modules
+**/dist
+frontend
+games_raw
+docs
+tests

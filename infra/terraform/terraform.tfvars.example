@@ -1,0 +1,45 @@
+environment = "staging"
+
+network = {
+  vpc_id          = "replace-with-provider-vpc-id"
+  private_subnets = ["replace-with-private-subnet-a", "replace-with-private-subnet-b"]
+  public_subnets  = ["replace-with-public-subnet-a", "replace-with-public-subnet-b"]
+  zones           = ["replace-with-zone-a", "replace-with-zone-b"]
+}
+
+kubernetes = {
+  cluster_id = "replace-with-cluster-id"
+  endpoint   = "https://cluster.example.invalid"
+  node_pools = {
+    system      = {min_nodes = 2, max_nodes = 4, workload = "system"}
+    application = {min_nodes = 3, max_nodes = 20, workload = "application"}
+    realtime    = {min_nodes = 3, max_nodes = 50, workload = "realtime"}
+    media       = {min_nodes = 3, max_nodes = 30, workload = "media"}
+  }
+}
+
+services = {
+  postgres_endpoint       = "postgres.example.invalid:5432"
+  redis_primary_endpoint  = "redis.example.invalid:6379"
+  nats_endpoint           = "nats.example.invalid:4222"
+  nats_monitoring_endpoint = "nats-monitoring.example.invalid:8222"
+  object_bucket           = "replace-with-bucket"
+  object_region           = "replace-with-region"
+  cdn_origin              = "https://cdn.example.invalid"
+  api_dns                 = "api.example.invalid"
+  websocket_dns           = "ws.example.invalid"
+  media_dns_suffix        = "media.example.invalid"
+  certificate_ref         = "replace-with-certificate-reference"
+  secret_manager_ref      = "replace-with-secret-manager-reference"
+  workload_identity_ref   = "replace-with-workload-identity-reference"
+  observability_endpoint  = "https://otel.example.invalid"
+}
+
+connection_budget = {
+  database_max_connections = 300
+  api_max_pods             = 30
+  api_pool_per_pod         = 5
+  worker_max_pods          = 20
+  worker_pool_per_pod      = 3
+  reserved_connections    = 60
+}

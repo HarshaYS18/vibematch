@@ -1,23 +1,96 @@
+name: funkey-dev
+
 services:
   postgres:
-    image: postgres:16
-    container_name: vibematch_postgres
-    restart: always
+    image: postgres:16-alpine
     environment:
-      POSTGRES_USER: vibematch_user
-      POSTGRES_PASSWORD: vibematch_pass
-      POSTGRES_DB: vibematch_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - vibematch_postgres_data:/var/lib/postgresql/data
+      POSTGRES_USER: funkey
+      POSTGRES_PASSWORD: funkey_dev_only
+      POSTGRES_DB: funkey
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U funkey -d funkey"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
-    image: redis:7
-    container_name: vibematch_redis
-    restart: always
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  nats:
+    image: nats:2.11-alpine
+    command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
+    volumes: ["nats_data:/data"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    profiles: ["app"]
+    build: {context: .., dockerfile: backend/Dockerfile}
+    working_dir: /app/backend
+    command: ["alembic", "upgrade", "head"]
+    environment: &api_environment
+      APP_ENV: development
+      ENFORCE_SCHEMA_CURRENT: "false"
+      database_url: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+      redis_url: redis://redis:6379/0
+      JWT_SECRET_KEY: local-development-only-secret-change-before-production
+      MEDIA_INTERNAL_TOKEN: local-development-only-media-token-change-me
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
+      ENABLE_DEV_LOGIN: "true"
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  api:
+    profiles: ["app"]
+    build: {context: .., dockerfile: backend/Dockerfile}
+    environment: *api_environment
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+
+  realtime:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/realtime-gateway/Dockerfile}
+    environment:
+      REALTIME_LISTEN_ADDR: :8081
+      REALTIME_AUTH_VERIFY_URL: http://api:8000/api/v1/realtime/verify
+      REALTIME_REDIS_URL: redis://redis:6379/0
+      REALTIME_ORIGINS: http://localhost:3000,http://localhost:8080
+      REALTIME_NODE_ID: realtime-local-1
+      REALTIME_DRAIN_TIMEOUT: 30s
+    ports: ["127.0.0.1:8081:8081"]
+    depends_on:
+      api: {condition: service_started}
+      redis: {condition: service_healthy}
+
+  worker:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      NATS_URL: nats://nats:4222
+    depends_on:
+      nats: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
 
 volumes:
-  vibematch_postgres_data:
+  postgres_data:
+  redis_data:
+  nats_data:

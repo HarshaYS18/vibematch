@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-api}
+spec: {replicas: 1}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-realtime}
+spec: {replicas: 1}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-api}
+spec: {minReplicas: 1, maxReplicas: 1}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-realtime}
+spec: {minReplicas: 1, maxReplicas: 1}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker}
+spec: {minReplicaCount: 1, maxReplicaCount: 1}

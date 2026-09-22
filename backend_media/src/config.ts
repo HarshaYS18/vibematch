@@ -3,6 +3,7 @@ import os from 'node:os';
 import { z } from 'zod';
 
 const envSchema = z.object({
+  APP_ENV: z.string().default('development'),
   MEDIA_SERVICE_HOST: z.string().default('0.0.0.0'),
   MEDIA_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(4100),
   MEDIA_NODE_ID: z.string().default(''),
@@ -21,9 +22,18 @@ const envSchema = z.object({
   SOCKET_PING_INTERVAL_MS: z.coerce.number().int().min(5000).default(25000),
   VERIFY_TIMEOUT_MS: z.coerce.number().int().min(1000).default(6000),
   MEDIA_REGISTRY_DIAGNOSTICS: z.enum(['true', 'false']).default('false'),
+  MEDIA_DRAIN_TIMEOUT_MS: z.coerce.number().int().min(1000).default(120000),
 });
 
 const parsed = envSchema.parse(process.env);
+if (['production', 'prod'].includes(parsed.APP_ENV.toLowerCase())) {
+  const unsafe = [];
+  if (parsed.MEDIA_INTERNAL_TOKEN.includes('change-this') || parsed.MEDIA_INTERNAL_TOKEN.length < 32) unsafe.push('MEDIA_INTERNAL_TOKEN');
+  if (!parsed.MEDIASOUP_ANNOUNCED_IP.trim()) unsafe.push('MEDIASOUP_ANNOUNCED_IP');
+  if (parsed.CORS_ORIGIN === '*') unsafe.push('CORS_ORIGIN');
+  if (!parsed.MEDIA_PUBLIC_URL.startsWith('https://') || /localhost|127\.0\.0\.1/.test(parsed.MEDIA_PUBLIC_URL)) unsafe.push('MEDIA_PUBLIC_URL');
+  if (unsafe.length > 0) throw new Error(`Unsafe production media configuration: ${unsafe.join(', ')}`);
+}
 const announcedIp = parsed.MEDIASOUP_ANNOUNCED_IP.trim() || detectLanIPv4();
 
 export const config = {
@@ -32,6 +42,7 @@ export const config = {
   fastApiBaseUrl: parsed.FASTAPI_BASE_URL.replace(/\/$/, ''),
   corsOrigin: parsed.CORS_ORIGIN,
   verifyTimeoutMs: parsed.VERIFY_TIMEOUT_MS,
+  drainTimeoutMs: parsed.MEDIA_DRAIN_TIMEOUT_MS,
   registryDiagnostics: parsed.MEDIA_REGISTRY_DIAGNOSTICS === 'true',
   registry: {
     nodeId: parsed.MEDIA_NODE_ID.trim() || os.hostname(),

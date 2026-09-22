@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: funkey
+resources:
+  - namespace.yaml
+  - config.yaml
+  - api.yaml
+  - realtime.yaml
+  - worker.yaml
+  - autoscaling.yaml
+  - ingress.yaml
+  - network-policy.yaml

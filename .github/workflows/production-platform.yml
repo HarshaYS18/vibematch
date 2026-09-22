@@ -1,0 +1,88 @@
+name: Production Platform
+
+on:
+  push:
+    branches: [codex/funkey-production-backend-v1]
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'backend/Dockerfile'
+      - 'backend_media/Dockerfile'
+      - 'deploy/**'
+      - 'infra/**'
+      - 'tests/load/**'
+      - 'tests/chaos/**'
+      - '.github/workflows/production-platform.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  go-gateway:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/realtime-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/realtime-gateway/go.mod
+          cache-dependency-path: apps/realtime-gateway/go.sum
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go test -race ./...
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra/terraform fmt -check -recursive
+      - run: terraform -chdir=infra/terraform init -backend=false
+      - run: terraform -chdir=infra/terraform validate
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+      - run: kubectl kustomize deploy/kubernetes/overlays/local > /tmp/funkey-local.yaml
+      - run: kubectl kustomize deploy/kubernetes/overlays/staging > /tmp/funkey-staging.yaml
+      - run: kubectl kustomize deploy/kubernetes/overlays/production > /tmp/funkey-production.yaml
+      - run: kubectl kustomize deploy/kubernetes/media > /tmp/funkey-media.yaml
+      - run: docker compose -f infra/docker-compose.yml --profile app config --quiet
+
+  container-builds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f backend/Dockerfile -t funkey-api:ci .
+      - run: docker build -f apps/worker/Dockerfile -t funkey-worker:ci .
+      - run: docker build -f apps/realtime-gateway/Dockerfile -t funkey-realtime:ci .
+      - run: docker build -f backend_media/Dockerfile -t funkey-media:ci backend_media
+      - uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: funkey-api:ci
+          format: table
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+
+  security-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          artifact-name: funkey-sbom.spdx.json

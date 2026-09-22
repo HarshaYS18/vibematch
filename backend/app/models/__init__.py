@@ -34,6 +34,7 @@ from app.models.login_history import (
 )
 from app.models.follow import UserBlock, UserFollow
 from app.models.notification import UserNotification
+from app.models.event_outbox import EventOutbox, WorkerProcessedEvent
 from app.models.inbox import (
     InboxConversation,
     InboxConversationType,

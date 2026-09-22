@@ -5,6 +5,7 @@ import { startRoomMusic, stopRoomMusic } from '../media/musicSourceManager.js';
 import { extractBearerToken, MediaAuthorizationError, verifyMediaAction } from '../auth/fastapiVerifier.js';
 import type { Ack, MediaAction, MediaConsumer, MediaProducer, MediaWebRtcTransport, PeerState, RoomState } from '../types/mediaTypes.js';
 import type { RoomManager } from '../mediasoup/roomManager.js';
+import { recordJoin } from './metrics.js';
 import {
   connectTransportSchema,
   consumeSchema,
@@ -19,7 +20,7 @@ import {
   socketAuthSchema,
 } from './events.js';
 
-export function createSocketServer(httpServer: HttpServer, roomManager: RoomManager): Server {
+export function createSocketServer(httpServer: HttpServer, roomManager: RoomManager, isDraining: () => boolean = () => false): Server {
   const io = new Server(httpServer, {
     cors: { origin: config.corsOrigin, credentials: true },
     pingTimeout: config.socket.pingTimeout,
@@ -51,6 +52,9 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
     socket.on('joinRoom', async (payload: unknown, ack?: Ack) => {
       await safeAck('joinRoom', socket.id, ack, async () => {
         const input = joinRoomSchema.parse(payload);
+        if (isDraining() && !roomManager.getRoom(input.roomPublicId)) {
+          throw new Error('Media node is draining; resolve media again.');
+        }
         const auth = requireSocketAuth(socket.data.auth);
         mediaLog('joinRoom.received', socket.id, { roomPublicId: input.roomPublicId });
         const existingPeer = roomManager.getPeer(socket.id);
@@ -469,8 +473,10 @@ async function safeAck<T>(eventName: string, socketId: string, ack: Ack<T> | und
 async function executeAck<T>(eventName: string, socketId: string, ack: Ack<T> | undefined, handler: () => Promise<T>): Promise<void> {
   try {
     const data = await handler();
+    if (eventName === 'joinRoom') recordJoin(true);
     ack?.(ackPayload(data));
   } catch (error) {
+    if (eventName === 'joinRoom') recordJoin(false);
     const message = error instanceof MediaAuthorizationError
       ? error.reason ?? error.message
       : error instanceof Error

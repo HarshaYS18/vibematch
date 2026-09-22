@@ -20,6 +20,7 @@ _GLOBAL_ROOM_ID = "__global__"
 _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
 _COMMAND_CLAIM_SECONDS = 5 * 60
+_GATEWAY_CHANNEL = "funkey:realtime:events"
 
 
 def room_user_lease_key(room_public_id: str, user_id: int) -> str:
@@ -303,6 +304,33 @@ class RealtimeConnectionManager:
         except Exception:
             pass
 
+    async def _publish_gateway(
+        self, payload: dict[str, Any], *, room_public_id: str | None = None,
+        user_id: int | None = None,
+    ) -> None:
+        """Mirror committed transport events for Go gateway shadow traffic.
+
+        Redis pub/sub is deliberately best effort; clients recover from the
+        authoritative REST snapshot after reconnect. Durable domain events use
+        the PostgreSQL outbox, not this transport channel.
+        """
+        envelope = {
+            "event_id": str(uuid4()),
+            "event_type": "room.realtime",
+            "event_version": 1,
+            "occurred_at": datetime.now(timezone.utc).isoformat(),
+            "scope": "user" if user_id is not None else "room",
+            "payload": payload,
+        }
+        if user_id is not None:
+            envelope["user_id"] = user_id
+        else:
+            envelope["room_public_id"] = room_public_id
+        try:
+            await self._redis.publish(_GATEWAY_CHANNEL, json.dumps(envelope, default=str))
+        except Exception:
+            pass
+
     async def broadcast_global(self, payload: dict[str, Any]) -> None:
         event = self._decorate(payload)
         await self._deliver_global_local(event)
@@ -312,6 +340,7 @@ class RealtimeConnectionManager:
         event = self._decorate(payload)
         await self._deliver_local(room_public_id, event)
         await self._publish(room_public_id, event)
+        await self._publish_gateway(event, room_public_id=room_public_id)
 
         global_gift_event = build_global_premium_gift_event(room_public_id, event)
         if global_gift_event is not None:
@@ -327,6 +356,7 @@ class RealtimeConnectionManager:
         event = self._decorate(payload)
         await self._deliver_local(room_public_id, event, user_id)
         await self._publish(room_public_id, event, user_id)
+        await self._publish_gateway(event, user_id=user_id)
 
     @staticmethod
     def _lease_key(room_public_id: str, user_id: int) -> str:

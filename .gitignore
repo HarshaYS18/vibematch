@@ -91,6 +91,13 @@ GoogleService-Info.plist
 postgres_data/
 redis_data/
 
+# Terraform local state and provider cache
+**/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfvars.json
+
 # Node if later used
 node_modules/
 

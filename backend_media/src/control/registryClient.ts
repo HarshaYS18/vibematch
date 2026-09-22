@@ -59,6 +59,13 @@ export async function markMediaNodeOffline(): Promise<void> {
   }
 }
 
+export async function markMediaNodeDraining(): Promise<void> {
+  const response = await requestRegistry('POST', `/api/v1/internal/media/nodes/${encodeURIComponent(config.registry.nodeId)}/drain`);
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new RegistryRequestError(`media registry drain failed status=${response.statusCode} body=${response.body}`, response.requestId, response.bodyElapsedMs, 'response');
+  }
+}
+
 async function requestRegistry(method: 'POST' | 'DELETE', path: string, payload?: Record<string, unknown>): Promise<RegistryResponse> {
   const url = new URL(path, config.fastApiBaseUrl);
   const requestId = randomUUID();
