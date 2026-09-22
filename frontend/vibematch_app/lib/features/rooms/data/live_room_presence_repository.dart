@@ -4,6 +4,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/user_identity_snapshot.dart';
+import 'live_room_membership_service.dart';
 import '../presentation/live_room_models.dart';
 
 class LiveRoomPresenceRepository {
@@ -22,6 +23,11 @@ class LiveRoomPresenceRepository {
 
   static String? get currentRoomId => _activeRoomId;
   static List<SeatUser> get currentParticipants => activeParticipants.value;
+
+  static void clearCachedPresence() {
+    _activeRoomId = null;
+    activeParticipants.value = const <SeatUser>[];
+  }
 
   static List<SeatUser> currentParticipantsForRoom(String? roomId) {
     final cleanRoomId = roomId?.trim();
@@ -141,9 +147,15 @@ class LiveRoomPresenceRepository {
       headers: _headers(),
     );
     final snapshot = LiveRoomPresenceSnapshot.fromJson(response);
+    final resolvedRoomId = snapshot.roomId.isEmpty ? roomId : snapshot.roomId;
     publishParticipants(
       LiveRoomPresenceSnapshot.onlineParticipants(response['participants']),
-      roomId: snapshot.roomId.isEmpty ? roomId : snapshot.roomId,
+      roomId: resolvedRoomId,
+    );
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: resolvedRoomId,
+      roomMemberByUserId: snapshot.roomMemberByUserId,
+      onlineCount: snapshot.onlineCount,
     );
     return snapshot;
   }
@@ -213,6 +225,12 @@ class LiveRoomPresenceRepository {
     } else {
       _removeParticipant(user.id);
     }
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: roomId,
+      roomMemberByUserId: {
+        user.id: LiveRoomPresenceSnapshot.isRoomMemberParticipant(response),
+      },
+    );
     return user;
   }
 
@@ -239,6 +257,11 @@ class LiveRoomPresenceRepository {
     }
     final snapshot = LiveRoomPresenceSnapshot.fromJoinJson(response);
     publishParticipants(snapshot.participants, roomId: snapshot.roomId);
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: snapshot.roomId,
+      roomMemberByUserId: snapshot.roomMemberByUserId,
+      onlineCount: snapshot.onlineCount,
+    );
     return snapshot;
   }
 
@@ -263,6 +286,7 @@ class LiveRoomPresenceSnapshot {
     required this.roomId,
     required this.onlineCount,
     required this.participants,
+    this.roomMemberByUserId = const <String, bool>{},
     this.joinedUser,
     this.shouldShowEnteredMessage = false,
   });
@@ -270,6 +294,7 @@ class LiveRoomPresenceSnapshot {
   final String roomId;
   final int onlineCount;
   final List<SeatUser> participants;
+  final Map<String, bool> roomMemberByUserId;
   final SeatUser? joinedUser;
   final bool shouldShowEnteredMessage;
 
@@ -282,6 +307,7 @@ class LiveRoomPresenceSnapshot {
       roomId: room['id']?.toString() ?? '',
       onlineCount: _int(room['online_count']),
       participants: onlineParticipants(json['participants']),
+      roomMemberByUserId: roomMembershipByUserId(json['participants']),
       joinedUser: joinedRaw is Map<String, dynamic>
           ? participantToSeatUser(joinedRaw)
           : null,
@@ -294,7 +320,26 @@ class LiveRoomPresenceSnapshot {
       roomId: json['room_id']?.toString() ?? '',
       onlineCount: _int(json['online_count']),
       participants: _participants(json['participants']),
+      roomMemberByUserId: roomMembershipByUserId(json['participants']),
     );
+  }
+
+  static Map<String, bool> roomMembershipByUserId(dynamic raw) {
+    if (raw is! List) return const <String, bool>{};
+    final result = <String, bool>{};
+    for (final participant in raw.whereType<Map<String, dynamic>>()) {
+      final identity = UserIdentitySnapshot.fromJson(participant);
+      if (identity.backendUserId <= 0 && identity.publicUserId <= 0) continue;
+      result[identity.roomUserId] = isRoomMemberParticipant(participant);
+    }
+    return Map<String, bool>.unmodifiable(result);
+  }
+
+  static bool isRoomMemberParticipant(Map<String, dynamic> json) {
+    return json['is_member'] == true ||
+        json['is_room_member'] == true ||
+        json['is_room_admin'] == true ||
+        json['is_owner'] == true;
   }
 
   static List<SeatUser> onlineParticipants(dynamic raw) {

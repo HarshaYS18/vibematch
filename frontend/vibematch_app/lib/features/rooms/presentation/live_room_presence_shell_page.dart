@@ -107,6 +107,10 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     _presenceEstablished = true;
     _presenceError = null;
     _startHeartbeat();
+    // A minimized-room restore may render cached visual state immediately, but
+    // backend presence is still authoritative. Reconcile now instead of waiting
+    // for the first periodic heartbeat.
+    unawaited(_heartbeat());
     _restoreSavedSeatIfNeeded();
   }
 

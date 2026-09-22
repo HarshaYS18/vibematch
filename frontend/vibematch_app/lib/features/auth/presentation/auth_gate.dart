@@ -62,8 +62,7 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      await _authApiService.restoreSavedSession();
-      final user = await _authApiService.getCurrentUser();
+      final user = await _authApiService.restoreCurrentUser();
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
@@ -206,7 +205,16 @@ class _AuthGateState extends State<AuthGate> {
 
     final hasName = user.displayName?.trim().isNotEmpty == true;
     final hasAvatar = user.avatarUrl?.trim().isNotEmpty == true;
-    return !hasName || !hasAvatar;
+    final backendProfileIsComplete = hasName && hasAvatar;
+    if (backendProfileIsComplete) {
+      // Self-heal the local completion hint from backend-authoritative profile
+      // state. This prevents the onboarding screen from returning after local
+      // cache loss when the server already has a completed profile.
+      await prefs.setBool(setupKey, true);
+      return false;
+    }
+
+    return true;
   }
 
   Future<void> _markProfileSetupCompleted(CurrentUser user) async {

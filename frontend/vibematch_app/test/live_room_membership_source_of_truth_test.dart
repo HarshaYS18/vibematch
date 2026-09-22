@@ -1,0 +1,90 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:vibematch_app/features/rooms/data/live_room_membership_service.dart';
+
+void main() {
+  setUp(LiveRoomMembershipService.clearAll);
+  tearDown(LiveRoomMembershipService.clearAll);
+
+  test('normalizes room participant aliases to one membership identity', () {
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const {'user_6418001001': true},
+    );
+
+    expect(
+      LiveRoomMembershipService.isRoomMember(
+        roomId: 'VM100',
+        userId: '6418001001',
+      ),
+      isTrue,
+    );
+    expect(
+      LiveRoomMembershipService.isRoomMember(
+        roomId: 'VM100',
+        userId: 'USER_6418001001',
+      ),
+      isTrue,
+    );
+  });
+
+  test('backend removal replaces previously confirmed room-member state', () {
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const {'6418001001': true},
+    );
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const {'user_6418001001': false},
+    );
+
+    expect(
+      LiveRoomMembershipService.statusFor(
+        roomId: 'VM100',
+        userId: '6418001001',
+      ),
+      LiveRoomMembershipStatus.guest,
+    );
+  });
+
+  test('participant snapshot does not erase a temporary pending request', () {
+    LiveRoomMembershipService.markPending(
+      roomId: 'VM100',
+      userId: '6418001001',
+    );
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const {'user_6418001001': false},
+    );
+
+    expect(
+      LiveRoomMembershipService.isPending(
+        roomId: 'VM100',
+        userId: '6418001001',
+      ),
+      isTrue,
+    );
+
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const {'user_6418001001': true},
+    );
+    expect(
+      LiveRoomMembershipService.isRoomMember(
+        roomId: 'VM100',
+        userId: '6418001001',
+      ),
+      isTrue,
+    );
+  });
+
+  test('clearAll removes account-scoped room membership projection', () {
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const {'6418001001': true},
+    );
+
+    LiveRoomMembershipService.clearAll();
+
+    expect(LiveRoomMembershipService.snapshots.value, isEmpty);
+  });
+}

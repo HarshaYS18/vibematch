@@ -59,6 +59,43 @@ class AuthApiService {
     }
   }
 
+  /// Restores the locally persisted session, then reconciles it with the
+  /// backend master user snapshot before the authenticated app is shown.
+  ///
+  /// The cached user is only an offline fallback. Authentication failures and
+  /// server-side session replacement always win over local state.
+  Future<CurrentUser> restoreCurrentUser() async {
+    await restoreSavedSession();
+
+    final token = _cachedAccessToken;
+    final cachedUser = _cachedUser;
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('No saved session is available.');
+    }
+
+    try {
+      return await getCurrentUser(accessToken: token, forceRefresh: true);
+    } catch (error) {
+      if (cachedUser == null || _isAuthoritativeSessionFailure(error)) {
+        rethrow;
+      }
+
+      AuthUserRealtimeService.instance.publish(cachedUser);
+      return cachedUser;
+    }
+  }
+
+  bool _isAuthoritativeSessionFailure(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('(401)') ||
+        message.contains('(403)') ||
+        message.contains('invalid or expired token') ||
+        message.contains('session replaced') ||
+        message.contains('user is banned') ||
+        message.contains('user is inactive') ||
+        message.contains('please login again');
+  }
+
   Future<void> _persistSession({
     required String accessToken,
     required CurrentUser user,

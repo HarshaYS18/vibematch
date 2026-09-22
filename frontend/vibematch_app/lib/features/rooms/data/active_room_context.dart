@@ -30,6 +30,11 @@ class ActiveRoomContext {
     _roomName = cleanRoomName.isEmpty ? 'Live Room' : cleanRoomName;
   }
 
+  static void clear() {
+    _roomPublicId = null;
+    _roomName = null;
+  }
+
   static void clearIfMatches(String roomPublicId) {
     final currentRoomId = _roomPublicId?.trim();
     if (currentRoomId == roomPublicId.trim()) {

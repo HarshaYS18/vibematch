@@ -25,7 +25,8 @@ class LiveRoomMembershipSnapshot {
   final String? modeTitle;
   final int? onlineCount;
 
-  String get key => LiveRoomMembershipService.keyFor(roomId: roomId, userId: userId);
+  String get key =>
+      LiveRoomMembershipService.keyFor(roomId: roomId, userId: userId);
 
   LiveRoomMembershipSnapshot copyWith({
     LiveRoomMembershipStatus? status,
@@ -46,14 +47,29 @@ class LiveRoomMembershipSnapshot {
   }
 }
 
+/// In-memory projection of backend room-membership truth.
+///
+/// Permanent membership must never be approved by Flutter. [markPending] is
+/// allowed for temporary request UI, while [applyBackendMembershipSnapshot]
+/// is the only path that confirms or removes room-member state.
 class LiveRoomMembershipService {
   const LiveRoomMembershipService._();
 
   static final ValueNotifier<Map<String, LiveRoomMembershipSnapshot>> snapshots =
       ValueNotifier(<String, LiveRoomMembershipSnapshot>{});
 
+  static String normalizeUserId(String userId) {
+    final clean = userId.trim();
+    if (clean.isEmpty) return '';
+    final match = RegExp(
+      r'^user_(\d+)$',
+      caseSensitive: false,
+    ).firstMatch(clean);
+    return match?.group(1) ?? clean.toLowerCase();
+  }
+
   static String keyFor({required String roomId, required String userId}) =>
-      '${roomId.trim()}::${userId.trim()}';
+      '${roomId.trim()}::${normalizeUserId(userId)}';
 
   static LiveRoomMembershipStatus statusFor({
     required String roomId,
@@ -87,12 +103,12 @@ class LiveRoomMembershipService {
     Set<String> userIds,
   ) {
     final normalizedIds = userIds
-        .map((item) => item.trim())
+        .map(normalizeUserId)
         .where((item) => item.isNotEmpty)
         .toSet();
 
     return snapshots.value.values
-        .where((item) => normalizedIds.contains(item.userId.trim()))
+        .where((item) => normalizedIds.contains(normalizeUserId(item.userId)))
         .where((item) => item.status == LiveRoomMembershipStatus.roomMember)
         .toList(growable: false);
   }
@@ -116,6 +132,56 @@ class LiveRoomMembershipService {
     );
   }
 
+  /// Applies membership flags returned by a backend room snapshot or roster
+  /// mutation. Users not present in [roomMemberByUserId] are left untouched;
+  /// this avoids treating an online-participant list as a complete room roster.
+  static void applyBackendMembershipSnapshot({
+    required String roomId,
+    required Map<String, bool> roomMemberByUserId,
+    String? roomName,
+    String? language,
+    String? modeTitle,
+    int? onlineCount,
+  }) {
+    final cleanRoomId = roomId.trim();
+    if (cleanRoomId.isEmpty || roomMemberByUserId.isEmpty) return;
+
+    final next = Map<String, LiveRoomMembershipSnapshot>.from(snapshots.value);
+    for (final entry in roomMemberByUserId.entries) {
+      final normalizedUserId = normalizeUserId(entry.key);
+      if (normalizedUserId.isEmpty) continue;
+
+      final key = keyFor(roomId: cleanRoomId, userId: normalizedUserId);
+      final previous = next[key];
+      final backendStatus = entry.value
+          ? LiveRoomMembershipStatus.roomMember
+          : LiveRoomMembershipStatus.guest;
+
+      // Pending is temporary UI state until the backend explicitly approves
+      // membership. A generic participant snapshot with is_member=false does
+      // not prove that a separate pending request was rejected.
+      final nextStatus =
+          !entry.value && previous?.status == LiveRoomMembershipStatus.pending
+          ? LiveRoomMembershipStatus.pending
+          : backendStatus;
+
+      next[key] = LiveRoomMembershipSnapshot(
+        roomId: cleanRoomId,
+        userId: normalizedUserId,
+        status: nextStatus,
+        roomName: roomName ?? previous?.roomName,
+        language: language ?? previous?.language,
+        modeTitle: modeTitle ?? previous?.modeTitle,
+        onlineCount: onlineCount ?? previous?.onlineCount,
+      );
+    }
+
+    snapshots.value = Map<String, LiveRoomMembershipSnapshot>.unmodifiable(next);
+  }
+
+  /// Backward-compatible entry point for older callers. New code must confirm
+  /// membership via [applyBackendMembershipSnapshot] from a backend response.
+  @Deprecated('Use applyBackendMembershipSnapshot with backend response data.')
   static void markRoomMember({
     required String roomId,
     required String userId,
@@ -135,6 +201,7 @@ class LiveRoomMembershipService {
     );
   }
 
+  @Deprecated('Use applyBackendMembershipSnapshot with backend response data.')
   static void markMember({
     required String roomId,
     required String userId,
@@ -143,8 +210,6 @@ class LiveRoomMembershipService {
     String? modeTitle,
     int? onlineCount,
   }) {
-    // Backward-compatible method name. The only approved member state in the
-    // room domain is roomMember; never use generic "member" as a contract.
     markRoomMember(
       roomId: roomId,
       userId: userId,
@@ -163,6 +228,11 @@ class LiveRoomMembershipService {
     );
   }
 
+  static void clearAll() {
+    if (snapshots.value.isEmpty) return;
+    snapshots.value = <String, LiveRoomMembershipSnapshot>{};
+  }
+
   static void _setStatus({
     required String roomId,
     required String userId,
@@ -173,7 +243,7 @@ class LiveRoomMembershipService {
     int? onlineCount,
   }) {
     final cleanRoomId = roomId.trim();
-    final cleanUserId = userId.trim();
+    final cleanUserId = normalizeUserId(userId);
     if (cleanRoomId.isEmpty || cleanUserId.isEmpty) return;
 
     final key = keyFor(roomId: cleanRoomId, userId: cleanUserId);
@@ -187,13 +257,13 @@ class LiveRoomMembershipService {
               status: status,
             ))
         .copyWith(
-      status: status,
-      roomName: roomName,
-      language: language,
-      modeTitle: modeTitle,
-      onlineCount: onlineCount,
-    );
+          status: status,
+          roomName: roomName,
+          language: language,
+          modeTitle: modeTitle,
+          onlineCount: onlineCount,
+        );
 
-    snapshots.value = next;
+    snapshots.value = Map<String, LiveRoomMembershipSnapshot>.unmodifiable(next);
   }
 }
