@@ -169,6 +169,10 @@ class InboxController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  Future<void> ensureRealtimeConnected() {
+    return _socketService.connect(onEvent: _handleRealtimeEvent);
+  }
+
   Future<void> loadFromBackend() async {
     isLoading = true;
     errorMessage = null;

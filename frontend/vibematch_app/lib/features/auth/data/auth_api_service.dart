@@ -78,7 +78,7 @@ class AuthApiService {
     try {
       return await getCurrentUser(accessToken: token, forceRefresh: true);
     } catch (error) {
-      if (_isAuthoritativeSessionFailure(error)) {
+      if (isAuthoritativeSessionFailure(error)) {
         await _clearLocalSession(
           reason: 'restored auth session rejected by backend',
           publishSignedOut: true,
@@ -92,10 +92,12 @@ class AuthApiService {
     }
   }
 
-  bool _isAuthoritativeSessionFailure(Object error) {
+  bool isAuthoritativeSessionFailure(Object error) {
     final message = error.toString().toLowerCase();
-    return message.contains('(401)') ||
-        message.contains('(403)') ||
+    final hasAuthStatus = RegExp(
+      r'(^|[^0-9])(401|403)([^0-9]|$)',
+    ).hasMatch(message);
+    return hasAuthStatus ||
         message.contains('invalid or expired token') ||
         message.contains('session replaced') ||
         message.contains('user is banned') ||

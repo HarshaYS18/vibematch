@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi.routing import APIRoute, APIWebSocketRoute
 
 from app.api.router import api_router
+from app.services import app_source_registry_service
 
 
 class CanonicalApiContractTests(unittest.TestCase):
@@ -48,6 +49,55 @@ class CanonicalApiContractTests(unittest.TestCase):
             "/wallets/me", "/wallets/rubies/convert", "/wallets/rubies/withdraw", "/economy/gifts/send", "/gifts/catalog", "/store/catalog",
         }:
             self.assertIn(expected, paths)
+
+    def test_main_shell_source_registry_uses_registered_canonical_routes(self):
+        registry = app_source_registry_service.get_app_source_registry()
+        registered_paths = {
+            route.path.removeprefix("/api/v1")
+            for route in api_router.routes
+            if isinstance(route, APIRoute)
+        }
+
+        self.assertEqual("/users/me/master-state", registry.master_api.path)
+
+        by_key = {item.tab_key: item for item in registry.tabs}
+        for tab_key in {"home", "vibes", "inbox", "profile"}:
+            self.assertIn(tab_key, by_key)
+            self.assertEqual(
+                "/users/me/master-state",
+                by_key[tab_key].master_read,
+            )
+
+        expected_main_shell_reads = {
+            "/home-banners",
+            "/vibes/feed",
+            "/rooms/trending",
+            "/inbox/conversations",
+            "/inbox/lock/status",
+            "/inbox/backup/status",
+            "/profile-display/me",
+            "/profile-display/users/{public_user_id}",
+            "/users/{public_user_id}",
+            "/users/me/profile-visitors",
+        }
+        self.assertTrue(
+            expected_main_shell_reads.issubset(registered_paths),
+            expected_main_shell_reads - registered_paths,
+        )
+
+        profile_reads = {
+            endpoint.path for endpoint in by_key["profile"].child_reads
+        }
+        self.assertIn("/users/{public_user_id}", profile_reads)
+        self.assertIn("/users/me/profile-visitors", profile_reads)
+
+        room_reads = {
+            endpoint.path for endpoint in by_key["rooms"].child_reads
+        }
+        self.assertIn(
+            "/rooms/{room_public_id}/realtime/snapshot",
+            room_reads,
+        )
 
     def test_retired_admin_and_economy_prefixes_are_absent(self):
         retired = ("/super-owner", "/control-center", "/games/admin", "/economy/admin", "/economy/lucky-packets", "/wallet/", "/moderation/")

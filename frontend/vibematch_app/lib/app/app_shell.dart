@@ -23,30 +23,32 @@ import '../features/vibes/presentation/vibes_page_modular.dart';
 import '../features/vibes/presentation/widgets/vibe_media_playback_gate.dart';
 import '../features/wallet/data/wallet_realtime_sync_service.dart';
 import 'app_routes.dart';
+import 'app_source_registry_repository.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
     required this.currentUser,
     required this.onLogoutPressed,
-    required this.onRefreshPressed,
   });
 
   final CurrentUser currentUser;
   final Future<void> Function() onLogoutPressed;
-  final Future<void> Function() onRefreshPressed;
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   VmMainTab _selectedTab = VmMainTab.home;
   VmMainTab _previousTab = VmMainTab.home;
   late CurrentUser _syncedUser;
   StreamSubscription<CurrentUser>? _userSyncSubscription;
   StreamSubscription<void>? _signedOutSubscription;
   final PresenceApiService _presenceApi = const PresenceApiService();
+  final AuthApiService _authApiService = const AuthApiService();
+  final AppSourceRegistryRepository _sourceRegistryRepository =
+      AppSourceRegistryRepository();
   final VmAndroidPermissionService _permissionService =
       const VmAndroidPermissionService();
   Timer? _presenceHeartbeatTimer;
@@ -63,6 +65,7 @@ class _AppShellState extends State<AppShell> {
   String? _activeInboxConversationId;
   Timer? _backPressResetTimer;
   bool _sessionLogoutInFlight = false;
+  bool _canonicalRefreshInFlight = false;
 
   CurrentUser get _activeUser => _syncedUser;
   bool get _showOwnerControls => _activeUser.canSeeOwnerControls;
@@ -70,6 +73,7 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _syncedUser = widget.currentUser;
     _syncVibesPlaybackWithActiveTab();
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(_syncedUser);
@@ -83,6 +87,7 @@ class _AppShellState extends State<AppShell> {
     _inboxController.addListener(_handleGlobalInboxChanged);
     unawaited(_startGlobalInboxRealtime());
     unawaited(WalletRealtimeSyncService.instance.start());
+    unawaited(_validateAppSourceRegistry());
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(_permissionService.requestAppLaunchPermissions()),
     );
@@ -97,6 +102,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     VibeMediaPlaybackGate.setTabPaused(true);
     VibeMediaPlaybackGate.clearPauseLocks();
     _userSyncSubscription?.cancel();
@@ -106,8 +112,59 @@ class _AppShellState extends State<AppShell> {
     _globalForegroundDismissTimer?.cancel();
     _inboxController.removeListener(_handleGlobalInboxChanged);
     _inboxController.dispose();
+    _sourceRegistryRepository.close();
     unawaited(WalletRealtimeSyncService.instance.stop());
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPresenceHeartbeat();
+      unawaited(_reconcileCanonicalShellState());
+      return;
+    }
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _stopPresenceHeartbeat();
+    }
+  }
+
+  Future<void> _validateAppSourceRegistry() async {
+    try {
+      await _sourceRegistryRepository.fetchAndValidate();
+    } catch (error) {
+      debugPrint('[FK:W:SourceRegistry] $error');
+    }
+  }
+
+  Future<void> _reconcileCanonicalShellState() async {
+    if (_canonicalRefreshInFlight || _sessionLogoutInFlight) return;
+    _canonicalRefreshInFlight = true;
+    try {
+      final user = await _authApiService.getCurrentUser(forceRefresh: true);
+      _onUserSynced(user);
+
+      // Realtime transports are delivery mechanisms only. Ensure they are
+      // connected again after a background/resume cycle, then continue from
+      // the canonical REST/master-state snapshot already reconciled above.
+      await Future.wait<void>([
+        _inboxController.ensureRealtimeConnected(),
+        WalletRealtimeSyncService.instance.start(),
+      ]);
+    } catch (error) {
+      if (_authApiService.isAuthoritativeSessionFailure(error) &&
+          !_sessionLogoutInFlight) {
+        _sessionLogoutInFlight = true;
+        await widget.onLogoutPressed();
+      } else {
+        debugPrint('[FK:W:ShellReconcile] $error');
+      }
+    } finally {
+      _canonicalRefreshInFlight = false;
+    }
   }
 
   Future<void> _startGlobalInboxRealtime() async {
@@ -208,15 +265,18 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _stopPresenceHeartbeat() {
+    _presenceHeartbeatTimer?.cancel();
+    _presenceHeartbeatTimer = null;
+  }
+
   Future<void> _sendPresenceHeartbeat() async {
     try {
       await _presenceApi.heartbeat();
     } catch (error) {
-      final message = error.toString().toLowerCase();
-      final sessionInvalid =
-          message.contains('session replaced') ||
-          message.contains('invalid or expired token') ||
-          message.contains('please login again');
+      final sessionInvalid = _authApiService.isAuthoritativeSessionFailure(
+        error,
+      );
       if (!sessionInvalid || _sessionLogoutInFlight) return;
       _sessionLogoutInFlight = true;
       await widget.onLogoutPressed();
@@ -224,7 +284,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _handleSignedOut() {
-    _presenceHeartbeatTimer?.cancel();
+    _stopPresenceHeartbeat();
     VmSessionCleanupService.clearUserScopedStateUnawaited(
       reason: 'app shell signed out',
     );
@@ -237,9 +297,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _refreshAndSyncUser() async {
-    await widget.onRefreshPressed();
-    final cached = const AuthApiService().cachedUser;
-    if (cached != null) _onUserSynced(cached);
+    await _reconcileCanonicalShellState();
   }
 
   Widget _pageFor(VmMainTab tab) {

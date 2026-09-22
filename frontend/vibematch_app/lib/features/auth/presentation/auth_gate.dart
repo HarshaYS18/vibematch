@@ -270,7 +270,6 @@ class _AuthGateState extends State<AuthGate> {
     return AppShell(
       currentUser: user,
       onLogoutPressed: _logout,
-      onRefreshPressed: _checkSavedLogin,
     );
   }
 }

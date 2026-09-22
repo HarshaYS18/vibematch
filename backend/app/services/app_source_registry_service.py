@@ -14,7 +14,7 @@ def _endpoint(path: str, purpose: str, *, owner: str = "backend", realtime_safe:
 
 def get_app_source_registry() -> AppSourceRegistryResponse:
     return AppSourceRegistryResponse(
-        version=1,
+        version=2,
         master_api=_endpoint(
             MASTER_STATE,
             "Authenticated user/profile/economy summary used as the app-level master read.",
@@ -49,7 +49,7 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                 child_reads=[
                     _endpoint("/rooms/trending", "Room discovery list."),
                     _endpoint("/rooms/my-created-room", "Current user's owned room card."),
-                    _endpoint("/rooms/{room_public_id}/realtime-snapshot", "Canonical live-room read snapshot."),
+                    _endpoint("/rooms/{room_public_id}/realtime/snapshot", "Canonical live-room read snapshot."),
                 ],
                 child_writes=[
                     _endpoint("/rooms/{room_public_id}/join", "Entry/privacy/kickout gate."),
@@ -102,8 +102,8 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                 child_reads=[
                     _endpoint("/profile-display/me", "Canonical current profile display payload."),
                     _endpoint("/profile-display/users/{public_user_id}", "Canonical public display payload."),
-                    _endpoint("/users/profile/{public_user_id}", "Public profile compatibility detail."),
-                    _endpoint("/users/me/visitors", "Profile visitor list."),
+                    _endpoint("/users/{public_user_id}", "Public profile compatibility detail."),
+                    _endpoint("/users/me/profile-visitors", "Profile visitor list."),
                 ],
                 child_writes=[
                     _endpoint("/users/me/profile", "Profile edits."),
