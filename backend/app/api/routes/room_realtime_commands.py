@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -9,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models.room import Room
 from app.models.room_kickout import RoomKickout
 from app.models.room_participant import RoomParticipant
@@ -139,9 +141,24 @@ def _system_event(room: Room, event_type: str, message: str, actor: User | None 
     return {"type": "room/system_event", "payload": payload}
 
 
-async def _finish(
+@dataclass(frozen=True)
+class RoomCommandEmission:
+    target: str
+    room_id: str
+    message: dict[str, Any]
+    user_id: int | None = None
+
+
+@dataclass(frozen=True)
+class RoomCommandOutcome:
+    snapshot: dict[str, Any]
+    emissions: list[RoomCommandEmission]
+
+
+def _finish(
     db: Session,
     room: Room,
+    emissions: list[RoomCommandEmission],
     event_type: str,
     *,
     extra: dict[str, Any] | None = None,
@@ -151,9 +168,14 @@ async def _finish(
     db.refresh(room)
     snapshot = client_room_snapshot(db, room, include_chat=include_chat)
     db.commit()
-    await room_realtime_connections.broadcast_room(room.room_public_id, _event(event_type, room, snapshot, extra))
+    emissions.append(
+        RoomCommandEmission(
+            target="room",
+            room_id=room.room_public_id,
+            message=_event(event_type, room, snapshot, extra),
+        )
+    )
     return snapshot
-
 
 def _set_room_admin(db: Session, room: Room, actor: User, target: User, enabled: bool) -> None:
     if not policy_permissions.can_manage_room_admins(db, actor, room.owner_user_id):
@@ -242,14 +264,15 @@ def _server_profile_payload(db: Session, room: Room, user: User, snapshot: dict[
     }
 
 
-async def execute_room_command(
+def _execute_room_command_in_session(
     db: Session,
     room: Room,
     actor: User,
     event_type: str,
     payload: dict[str, Any],
+    emissions: list[RoomCommandEmission],
 ) -> dict[str, Any]:
-    """Apply one authenticated room command, commit it, then broadcast truth."""
+    """Apply one authenticated room command and collect post-commit emissions."""
     room = db.query(Room).filter(Room.id == room.id).with_for_update().one()
 
     if event_type not in {"room/join", "room/leave"}:
@@ -261,11 +284,11 @@ async def execute_room_command(
 
     if event_type == "room/join":
         room_action_service.join_room(db, room, actor, payload)
-        return await _finish(db, room, "room/joined")
+        return _finish(db, room, emissions, "room/joined")
 
     if event_type == "room/leave":
         room_action_service.leave_room(db, room, actor, release_seat=_bool(payload, "release_seat", True))
-        return await _finish(db, room, "room/peer_left")
+        return _finish(db, room, emissions, "room/peer_left")
 
     if event_type == "seat/take":
         room_permission_service.require_seat_take(db, room, actor, actor)
@@ -276,12 +299,12 @@ async def execute_room_command(
             _int(payload, "seat_index"),
             mic_enabled=_bool(payload, "mic_enabled", False),
         )
-        return await _finish(db, room, "seat/updated")
+        return _finish(db, room, emissions, "seat/updated")
 
     if event_type == "seat/leave":
         room_permission_service.require_seat_take(db, room, actor, actor)
         room_action_service.leave_seat(db, room, actor)
-        return await _finish(db, room, "seat/updated")
+        return _finish(db, room, emissions, "seat/updated")
 
     if event_type == "seat_invite/send":
         room_permission_service.require_room_admin(db, room, actor)
@@ -292,27 +315,30 @@ async def execute_room_command(
         previous = room_action_service.latest_seat_invite_id(db, room, actor, target, seat_index)
         room_action_service.send_seat_invite(db, room, actor, target, seat_index)
         next_id = room_action_service.latest_seat_invite_id(db, room, actor, target, seat_index)
-        snapshot = await _finish(db, room, "seat_invite/sent", extra={"target_user_id": target.id, "seat_index": seat_index})
+        snapshot = _finish(db, room, emissions, "seat_invite/sent", extra={"target_user_id": target.id, "seat_index": seat_index})
         if next_id != previous:
             invite_id = f"seat_invite_{room.room_public_id}_{actor.id}_{target.id}_{seat_index}_{uuid4().hex}"
-            await room_realtime_connections.send_room_user(
-                room.room_public_id,
-                target.id,
-                {
-                    "type": "seat_invite/received",
-                    "payload": {
-                        "id": invite_id,
-                        "invite_id": invite_id,
-                        "room_id": room.room_public_id,
-                        "seat_index": seat_index,
-                        "room": snapshot,
-                        "inviter_user_id": _room_user_key(actor),
-                        "inviter_backend_user_id": actor.id,
-                        "inviter_public_user_id": actor.public_user_id,
-                        "inviter_name": _display_name(actor),
-                        "inviter_avatar_url": actor.avatar_url,
+            emissions.append(
+                RoomCommandEmission(
+                    target="user",
+                    room_id=room.room_public_id,
+                    user_id=target.id,
+                    message={
+                        "type": "seat_invite/received",
+                        "payload": {
+                            "id": invite_id,
+                            "invite_id": invite_id,
+                            "room_id": room.room_public_id,
+                            "seat_index": seat_index,
+                            "room": snapshot,
+                            "inviter_user_id": _room_user_key(actor),
+                            "inviter_backend_user_id": actor.id,
+                            "inviter_public_user_id": actor.public_user_id,
+                            "inviter_name": _display_name(actor),
+                            "inviter_avatar_url": actor.avatar_url,
+                        },
                     },
-                },
+                )
             )
         return snapshot
 
@@ -320,15 +346,15 @@ async def execute_room_command(
         seat_index = _int(payload, "seat_index")
         if event_type.endswith("accept"):
             room_action_service.accept_seat_invite(db, room, actor, seat_index)
-            return await _finish(db, room, "seat/updated")
+            return _finish(db, room, emissions, "seat/updated")
         room_action_service.reject_seat_invite(db, room, actor, seat_index)
-        return await _finish(db, room, "seat_invite/rejected", extra={"seat_index": seat_index})
+        return _finish(db, room, emissions, "seat_invite/rejected", extra={"seat_index": seat_index})
 
     if event_type == "seat_application/request":
         room_permission_service.require_join(db, room, actor)
         seat_index = _int(payload, "seat_index")
         room_action_service.take_or_request_seat(db, room, actor, seat_index)
-        return await _finish(db, room, "seat_application/requested", extra={"applicant_user_id": actor.id, "seat_index": seat_index})
+        return _finish(db, room, emissions, "seat_application/requested", extra={"applicant_user_id": actor.id, "seat_index": seat_index})
 
     if event_type == "seat_application/reject":
         room_permission_service.require_room_admin(db, room, actor)
@@ -337,7 +363,7 @@ async def execute_room_command(
             raise HTTPException(status_code=404, detail="Seat applicant not found")
         seat_index = _int(payload, "seat_index")
         room_action_service.reject_seat_application(db, room, actor, target, seat_index)
-        return await _finish(db, room, "seat_application/rejected", extra={"target_user_id": target.id, "seat_index": seat_index})
+        return _finish(db, room, emissions, "seat_application/rejected", extra={"target_user_id": target.id, "seat_index": seat_index})
 
     if event_type == "admin/seat_assign":
         room_permission_service.require_room_admin(db, room, actor)
@@ -345,7 +371,7 @@ async def execute_room_command(
         if target is None:
             raise HTTPException(status_code=404, detail="Seat target not found")
         room_action_service.assign_seat(db, room, actor, target, _int(payload, "seat_index"))
-        return await _finish(db, room, "seat/updated")
+        return _finish(db, room, emissions, "seat/updated")
 
     if event_type in {"admin/seat_leave", "admin/seat_leave_lock"}:
         room_permission_service.require_room_admin(db, room, actor)
@@ -356,7 +382,7 @@ async def execute_room_command(
         room_action_service.leave_seat(db, room, target, actor_user_id=actor.id)
         if event_type.endswith("leave_lock"):
             room_action_service.lock_seat(db, room, seat_index, True, actor_user_id=actor.id)
-        return await _finish(db, room, "seat/updated")
+        return _finish(db, room, emissions, "seat/updated")
 
     if event_type in {"admin/seat_lock", "admin/seat_unlock"}:
         room_permission_service.require_room_admin(db, room, actor)
@@ -367,12 +393,12 @@ async def execute_room_command(
             event_type.endswith("lock") and not event_type.endswith("unlock"),
             actor_user_id=actor.id,
         )
-        return await _finish(db, room, "seat/updated")
+        return _finish(db, room, emissions, "seat/updated")
 
     if event_type == "mic/set_enabled":
         room_permission_service.require_mic_change(db, room, actor)
         room_action_service.set_mic_enabled(db, room, actor, _bool(payload, "enabled"))
-        return await _finish(db, room, "seat/updated")
+        return _finish(db, room, emissions, "seat/updated")
 
     if event_type == "admin_mute/set":
         target = resolve_target_user(db, payload)
@@ -381,7 +407,7 @@ async def execute_room_command(
             raise HTTPException(status_code=404, detail="Mute target not found")
         muted = _bool(payload, "muted")
         room_action_service.set_admin_mute(db, room, target.id, muted, actor_user_id=actor.id)
-        return await _finish(db, room, "admin_mute/updated", extra={"target_user_id": target.id, "user_id": _room_user_key(target), "admin_muted": muted})
+        return _finish(db, room, emissions, "admin_mute/updated", extra={"target_user_id": target.id, "user_id": _room_user_key(target), "admin_muted": muted})
 
     if event_type == "admin/kick":
         target = resolve_target_user(db, payload)
@@ -390,13 +416,16 @@ async def execute_room_command(
         reason = str(payload.get("reason") or "Removed by room admin")
         duration = str(payload.get("duration") or "1h")
         room_action_service.kick_user(db, room, actor, target, reason=reason, duration=duration)
-        snapshot = await _finish(db, room, "room/peer_left", extra={"target_user_id": target.id})
-        await room_realtime_connections.send_room_user(
-            room.room_public_id,
-            target.id,
-            {"type": "room/kicked", "payload": {"room_id": room.room_public_id, "room": snapshot, "reason": reason, "duration": duration, "target_user_id": _room_user_key(target), "target_backend_user_id": target.id, "target_public_user_id": target.public_user_id}},
+        snapshot = _finish(db, room, emissions, "room/peer_left", extra={"target_user_id": target.id})
+        emissions.append(
+            RoomCommandEmission(
+                target="user",
+                room_id=room.room_public_id,
+                user_id=target.id,
+                message={"type": "room/kicked", "payload": {"room_id": room.room_public_id, "room": snapshot, "reason": reason, "duration": duration, "target_user_id": _room_user_key(target), "target_backend_user_id": target.id, "target_public_user_id": target.public_user_id}},
+            )
         )
-        await room_realtime_connections.broadcast_room(room.room_public_id, _system_event(room, "user_removed", f"{_display_name(target)} was removed from the room", actor=actor, target=target))
+        emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "user_removed", f"{_display_name(target)} was removed from the room", actor=actor, target=target)))
         return snapshot
 
     if event_type == "admin/kick_remove":
@@ -404,12 +433,12 @@ async def execute_room_command(
         if target is None:
             raise HTTPException(status_code=404, detail="Kick target not found")
         removed = _remove_kick_for_target(db, room, actor, target)
-        return await _finish(db, room, "kick_block/remove_result", extra={"removed": removed, "target_user_id": _room_user_key(target), "target_backend_user_id": target.id})
+        return _finish(db, room, emissions, "kick_block/remove_result", extra={"removed": removed, "target_user_id": _room_user_key(target), "target_backend_user_id": target.id})
 
     if event_type in {"room_member/request", "room_member/approve", "room_member/reject", "room_member/remove"}:
         if event_type == "room_member/request":
             room_action_service.request_room_membership(db, room, actor)
-            return await _finish(db, room, "room_member/request_updated", extra={"request_user_id": actor.id})
+            return _finish(db, room, emissions, "room_member/request_updated", extra={"request_user_id": actor.id})
         room_permission_service.require_room_admin(db, room, actor)
         target = resolve_target_user(db, payload)
         if target is None:
@@ -423,7 +452,7 @@ async def execute_room_command(
         else:
             room_action_service.remove_room_member(db, room, actor, target)
             decision = "removed"
-        return await _finish(db, room, "room_member/request_updated", extra={"target_user_id": target.id, "decision": decision})
+        return _finish(db, room, emissions, "room_member/request_updated", extra={"target_user_id": target.id, "decision": decision})
 
     if event_type == "room_admin/set":
         target = resolve_target_user(db, payload)
@@ -431,25 +460,25 @@ async def execute_room_command(
             raise HTTPException(status_code=404, detail="Room admin target not found")
         enabled = _bool(payload, "is_room_admin")
         _set_room_admin(db, room, actor, target, enabled)
-        return await _finish(db, room, "room_admin/updated", extra={"target_user_id": _room_user_key(target), "target_backend_user_id": target.id, "target_name": _display_name(target), "is_room_admin": enabled})
+        return _finish(db, room, emissions, "room_admin/updated", extra={"target_user_id": _room_user_key(target), "target_backend_user_id": target.id, "target_name": _display_name(target), "is_room_admin": enabled})
 
     if event_type == "room_settings/seat_layout":
         room_permission_service.require_room_settings(db, room, actor)
         room_action_service.set_seat_layout(db, room, str(payload.get("seat_layout_id") or "5x2"), actor_user_id=actor.id)
-        return await _finish(db, room, "room_settings/updated")
+        return _finish(db, room, emissions, "room_settings/updated")
 
     if event_type == "room_settings/background_theme":
         room_permission_service.require_room_settings(db, room, actor)
         room_action_service.set_background_theme(db, room, str(payload.get("background_theme_id") or "default"), actor_user_id=actor.id)
-        return await _finish(db, room, "room_settings/updated")
+        return _finish(db, room, emissions, "room_settings/updated")
 
     if event_type == "room_settings/privacy":
         room_action_service.set_room_privacy(db, room, actor, str(payload.get("mode") or payload.get("privacy_mode") or "Open"))
-        return await _finish(db, room, "room_settings/updated")
+        return _finish(db, room, emissions, "room_settings/updated")
 
     if event_type == "room_settings/screenshots":
         room_action_service.set_room_screenshots(db, room, actor, _bool(payload, "allow_screenshots", True))
-        return await _finish(db, room, "room_settings/updated")
+        return _finish(db, room, emissions, "room_settings/updated")
 
     if event_type in {"room_settings/images", "room_settings/guest_messages", "room_settings/apply_mode"}:
         if event_type.endswith("images"):
@@ -464,13 +493,13 @@ async def execute_room_command(
             enabled = _bool(payload, "apply_only_mode_enabled", _bool(payload, "enabled", False))
             room_action_service.set_apply_only_mode_enabled(db, room, actor, enabled)
             label = "apply-only seat mode"
-        snapshot = await _finish(db, room, "room_settings/updated")
-        await room_realtime_connections.broadcast_room(room.room_public_id, _system_event(room, "room_system_message", f"{_display_name(actor)} turned {label} {'on' if enabled else 'off'}", actor=actor))
+        snapshot = _finish(db, room, emissions, "room_settings/updated")
+        emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "room_system_message", f"{_display_name(actor)} turned {label} {'on' if enabled else 'off'}", actor=actor)))
         return snapshot
 
     if event_type == "room_settings/announcement":
         room_action_service.set_announcement(db, room, actor, str(payload.get("announcement_text") or ""))
-        return await _finish(db, room, "room_settings/updated")
+        return _finish(db, room, emissions, "room_settings/updated")
 
     if event_type in {"room_chat/send", "room/chat"}:
         room_permission_service.require_chat_send(db, room, actor)
@@ -478,14 +507,14 @@ async def execute_room_command(
         if not text:
             raise HTTPException(status_code=400, detail="Message cannot be empty")
         room_action_service.create_chat_message(db, room, actor, text, message_type=str(payload.get("message_type") or "text"), metadata=payload)
-        return await _finish(db, room, "room.chat.message_created")
+        return _finish(db, room, emissions, "room.chat.message_created")
 
     if event_type == "room/chat_clear":
         room_permission_service.require_room_admin(db, room, actor)
         db.query(RoomChatMessage).filter(RoomChatMessage.room_id == room.id, RoomChatMessage.is_deleted.is_(False)).update({RoomChatMessage.is_deleted: True}, synchronize_session=False)
         room_action_service.record_room_event(db, room, "room.chat.cleared", actor_user_id=actor.id)
-        snapshot = await _finish(db, room, "room/chat_cleared")
-        await room_realtime_connections.broadcast_room(room.room_public_id, _system_event(room, "room_system_message", f"{_display_name(actor)} cleared the room chat", actor=actor))
+        snapshot = _finish(db, room, emissions, "room/chat_cleared")
+        emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "room_system_message", f"{_display_name(actor)} cleared the room chat", actor=actor)))
         return snapshot
 
     if event_type == "room/system_message":
@@ -494,8 +523,8 @@ async def execute_room_command(
         if not message:
             raise HTTPException(status_code=400, detail="System message cannot be empty")
         room_action_service.record_room_event(db, room, "room.system_message", actor_user_id=actor.id, payload={"message": message})
-        snapshot = await _finish(db, room, "room.snapshot")
-        await room_realtime_connections.broadcast_room(room.room_public_id, _system_event(room, "room_system_message", message, actor=actor))
+        snapshot = _finish(db, room, emissions, "room.snapshot")
+        emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "room_system_message", message, actor=actor)))
         return snapshot
 
     if event_type == "profile/update":
@@ -504,7 +533,7 @@ async def execute_room_command(
         db.commit()
         snapshot = client_room_snapshot(db, room)
         db.commit()
-        await room_realtime_connections.broadcast_room(room.room_public_id, {"type": "profile/updated", "payload": _server_profile_payload(db, room, actor, snapshot)})
+        emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message={"type": "profile/updated", "payload": _server_profile_payload(db, room, actor, snapshot)}))
         return snapshot
 
     if event_type in {"room_cricket/start", "room_cricket/end"}:
@@ -516,11 +545,71 @@ async def execute_room_command(
             "background_theme_id": str(payload.get("background_theme_id") or ("cricket_floodlight_arena" if active else "default")),
         }
         room_action_service.record_room_event(db, room, "room.cricket.started" if active else "room.cricket.ended", actor_user_id=actor.id, payload=state_payload)
-        snapshot = await _finish(db, room, "room.snapshot")
-        await room_realtime_connections.broadcast_room(room.room_public_id, {"type": "room_cricket/state", "payload": {"room_id": room.room_public_id, "room": snapshot, "actor_user_id": _room_user_key(actor), "actor_name": _display_name(actor), **state_payload}})
+        snapshot = _finish(db, room, emissions, "room.snapshot")
+        emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message={"type": "room_cricket/state", "payload": {"room_id": room.room_public_id, "room": snapshot, "actor_user_id": _room_user_key(actor), "actor_name": _display_name(actor), **state_payload}}))
         return snapshot
 
     raise HTTPException(status_code=400, detail=f"Unsupported room command: {event_type}")
+
+
+
+def _execute_room_command_transaction(
+    room_public_id: str,
+    actor_user_id: int,
+    event_type: str,
+    payload: dict[str, Any],
+) -> RoomCommandOutcome:
+    emissions: list[RoomCommandEmission] = []
+    with SessionLocal() as db:
+        try:
+            actor = db.query(User).filter(User.id == actor_user_id).first()
+            if actor is None or actor.is_banned or not actor.is_active:
+                raise HTTPException(status_code=401, detail="Room session is no longer valid")
+            room = room_or_404(db, room_public_id)
+            snapshot = _execute_room_command_in_session(db, room, actor, event_type, payload, emissions)
+            return RoomCommandOutcome(snapshot=snapshot, emissions=emissions)
+        except Exception:
+            db.rollback()
+            raise
+
+
+async def _emit_room_command(outcome: RoomCommandOutcome) -> None:
+    for emission in outcome.emissions:
+        if emission.target == "user":
+            if emission.user_id is None:
+                continue
+            await room_realtime_connections.send_room_user(emission.room_id, emission.user_id, emission.message)
+        else:
+            await room_realtime_connections.broadcast_room(emission.room_id, emission.message)
+
+
+async def execute_room_command_by_ids(
+    room_public_id: str,
+    actor_user_id: int,
+    event_type: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    outcome = await asyncio.to_thread(
+        _execute_room_command_transaction,
+        room_public_id,
+        actor_user_id,
+        event_type,
+        payload,
+    )
+    await _emit_room_command(outcome)
+    return outcome.snapshot
+
+
+async def execute_room_command(
+    db: Session,
+    room: Room,
+    actor: User,
+    event_type: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Compatibility wrapper; DB work runs in an isolated worker session."""
+    del db
+    return await execute_room_command_by_ids(str(room.room_public_id), int(actor.id), event_type, payload)
 
 
 @router.get("/snapshot")

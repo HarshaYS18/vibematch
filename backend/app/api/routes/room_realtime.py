@@ -13,6 +13,7 @@ from starlette.websockets import WebSocketState
 from app.api.routes.room_realtime_commands import (
     client_room_snapshot,
     execute_room_command,
+    execute_room_command_by_ids,
     room_or_404,
 )
 from app.api.routes.users import get_current_user, get_current_user_from_token
@@ -56,7 +57,7 @@ def _is_transient_room_db_error(exc: OperationalError) -> bool:
 
 
 async def _execute_room_command_with_retry(
-    db: Session,
+    db: Session | None,
     *,
     room_id: str,
     user_id: int,
@@ -64,23 +65,16 @@ async def _execute_room_command_with_retry(
     payload: dict,
 ) -> dict:
     for attempt in range(len(_ROOM_COMMAND_RETRY_DELAYS_SECONDS) + 1):
-        user = db.query(User).filter(User.id == user_id).first()
-        if user is None or user.is_banned or not user.is_active:
-            raise HTTPException(
-                status_code=401,
-                detail="Room session is no longer valid",
-            )
-        room = room_or_404(db, room_id)
         try:
-            return await execute_room_command(
-                db,
-                room,
-                user,
+            return await execute_room_command_by_ids(
+                room_id,
+                user_id,
                 command_type,
                 payload,
             )
         except OperationalError as exc:
-            db.rollback()
+            if db is not None:
+                db.rollback()
             if (
                 not _is_transient_room_db_error(exc)
                 or attempt >= len(_ROOM_COMMAND_RETRY_DELAYS_SECONDS)
@@ -99,6 +93,65 @@ async def _execute_room_command_with_retry(
             await asyncio.sleep(delay)
     raise RuntimeError("Room command retry loop exhausted")
 
+def _active_room_user(db: Session, user_id: int) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None or user.is_banned or not user.is_active:
+        raise HTTPException(status_code=401, detail="Room session is no longer valid")
+    return user
+
+
+def _prepare_room_join(token: str, room_id: str) -> tuple[int, dict | None]:
+    with SessionLocal() as db:
+        try:
+            user = get_current_user_from_token(db, token)
+            user_id = int(user.id)
+            room = room_or_404(db, room_id)
+            participant = (
+                db.query(RoomParticipant)
+                .filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user_id)
+                .with_for_update()
+                .first()
+            )
+            if participant is None or not participant.is_active:
+                db.rollback()
+                return user_id, None
+            room_permission_service.require_join(db, room, user)
+            now = datetime.utcnow()
+            participant.last_seen_at = now
+            participant.left_at = None
+            user.last_seen_at = now
+            snapshot = client_room_snapshot(db, room)
+            db.commit()
+            return user_id, snapshot
+        except Exception:
+            db.rollback()
+            raise
+
+
+def _room_snapshot_for_user(room_id: str, user_id: int, include_chat: bool = True) -> dict:
+    with SessionLocal() as db:
+        user = _active_room_user(db, user_id)
+        room = room_or_404(db, room_id)
+        room_permission_service.require_room_view(db, room, user)
+        snapshot = client_room_snapshot(db, room, include_chat=include_chat)
+        db.commit()
+        return snapshot
+
+
+def _room_heartbeat_for_user(room_id: str, user_id: int) -> dict:
+    with SessionLocal() as db:
+        try:
+            user = _active_room_user(db, user_id)
+            room = room_or_404(db, room_id, for_update=True)
+            room_action_service.heartbeat_room(db, room, user)
+            db.commit()
+            db.refresh(room)
+            snapshot = client_room_snapshot(db, room, include_chat=False)
+            db.commit()
+            return snapshot
+        except Exception:
+            db.rollback()
+            raise
 
 def _disconnect_is_superseded(
     participant: RoomParticipant,
@@ -162,51 +215,32 @@ async def _leave_current_room_connection(
     websocket: WebSocket,
     *,
     room_id: str,
-    user: User,
-    db: Session,
+    user: User | int,
+    db: Session | None,
     command_id: str,
     command_type: str,
     payload: dict,
 ) -> bool:
-    """Leave this websocket without evicting another live session.
-
-    Returns True when the caller should stop processing this websocket.
-    """
+    """Leave this websocket without evicting another live session."""
+    del db
+    user_id = int(user if isinstance(user, int) else user.id)
     await room_realtime_connections.release_connection(websocket)
 
-    if await room_realtime_connections.has_room_user_connections(
-        room_id,
-        int(user.id),
-    ):
-        room = room_or_404(db, room_id)
-        snapshot = client_room_snapshot(db, room)
-        db.commit()
+    if await room_realtime_connections.has_room_user_connections(room_id, user_id):
+        snapshot = await asyncio.to_thread(_room_snapshot_for_user, room_id, user_id)
         logger.info(
             "room_realtime.connection_leave_preserved_presence room_id=%s user_id=%s",
             room_id,
-            user.id,
+            user_id,
         )
-        await _send_ack(
-            websocket,
-            room_id=room_id,
-            command_id=command_id,
-            command_type=command_type,
-            state_version=int(snapshot.get("state_version") or 0),
+    else:
+        snapshot = await execute_room_command_by_ids(
+            room_id,
+            user_id,
+            command_type,
+            payload,
         )
-        try:
-            await websocket.close(code=1000)
-        except Exception:
-            pass
-        return True
 
-    room = room_or_404(db, room_id)
-    snapshot = await execute_room_command(
-        db,
-        room,
-        user,
-        command_type,
-        payload,
-    )
     await _send_ack(
         websocket,
         room_id=room_id,
@@ -220,38 +254,24 @@ async def _leave_current_room_connection(
         pass
     return True
 
-
-async def _finalize_disconnect(
+def _finalize_disconnect_db(
     room_id: str,
     user_id: int,
     disconnected_at: datetime,
-) -> None:
-    await asyncio.sleep(_DISCONNECT_GRACE_SECONDS)
-    if await room_realtime_connections.has_room_user_connections(room_id, user_id):
-        return
-
+) -> tuple[bool, dict] | None:
     with SessionLocal() as db:
         room = room_or_404(db, room_id, for_update=True)
         user = db.query(User).filter(User.id == user_id).first()
         participant = (
             db.query(RoomParticipant)
-            .filter(
-                RoomParticipant.room_id == room.id,
-                RoomParticipant.user_id == user_id,
-            )
+            .filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user_id)
             .with_for_update()
             .first()
         )
         if user is None or participant is None or not participant.is_active:
-            return
-
-        # A replacement websocket or REST join can begin during the disconnect
-        # grace window before it is visible in the connection manager. Those
-        # joins refresh last_seen_at under the same participant row lock. Do
-        # not let this stale disconnect task deactivate a newer room session.
+            return None
         if _disconnect_is_superseded(participant, disconnected_at):
-            return
-
+            return None
         was_stealth = bool(participant.is_stealth)
         logger.info(
             "room_realtime.disconnect_finalize_deactivate room_id=%s user_id=%s disconnected_at=%s last_seen_at=%s",
@@ -265,7 +285,21 @@ async def _finalize_disconnect(
         db.refresh(room)
         snapshot = client_room_snapshot(db, room)
         db.commit()
+        return was_stealth, snapshot
 
+
+async def _finalize_disconnect(
+    room_id: str,
+    user_id: int,
+    disconnected_at: datetime,
+) -> None:
+    await asyncio.sleep(_DISCONNECT_GRACE_SECONDS)
+    if await room_realtime_connections.has_room_user_connections(room_id, user_id):
+        return
+    result = await asyncio.to_thread(_finalize_disconnect_db, room_id, user_id, disconnected_at)
+    if result is None:
+        return
+    was_stealth, snapshot = result
     if not was_stealth:
         await room_realtime_connections.broadcast_room(
             room_id,
@@ -329,83 +363,54 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 authenticated_user_id: int | None = None
-                with SessionLocal() as db:
-                    try:
-                        token = _join_token(payload)
-                        if not token:
-                            raise HTTPException(status_code=401, detail="Room access token required")
-                        user = get_current_user_from_token(db, token)
-                        # Capture the scalar before execute_room_command commits. SQLAlchemy
-                        # expires ORM attributes on commit; reading user.id after the session
-                        # closes raises DetachedInstanceError and used to tear down every room
-                        # websocket immediately after a successful join.
-                        authenticated_user_id = int(user.id)
-                        room = room_or_404(db, room_id)
-
-                        # The REST room-enter flow normally establishes authoritative
-                        # participant/presence state before the realtime socket attaches.
-                        # Do not repeat the same write transaction when that state is already
-                        # active. Besides being redundant, concurrent REST + websocket joins
-                        # can contend on user_room_presence and produce PostgreSQL deadlocks.
-                        participant = (
-                            db.query(RoomParticipant)
-                            .filter(
-                                RoomParticipant.room_id == room.id,
-                                RoomParticipant.user_id == authenticated_user_id,
-                            )
-                            .with_for_update()
-                            .first()
-                        )
-                        if participant is not None and participant.is_active:
-                            room_permission_service.require_join(db, room, user)
-                            now = datetime.utcnow()
-                            participant.last_seen_at = now
-                            participant.left_at = None
-                            user.last_seen_at = now
-                            snapshot = client_room_snapshot(db, room)
-                            db.commit()
-                        else:
-                            snapshot = await execute_room_command(
-                                db,
-                                room,
-                                user,
-                                "room/join",
-                                payload,
-                            )
-                    except HTTPException as exc:
-                        db.rollback()
-                        await room_realtime_connections.send_json(
-                            websocket,
-                            {
-                                "type": "room/join_blocked",
-                                "payload": {
-                                    "room_id": room_id,
-                                    "reason": str(exc.detail),
-                                    "status_code": exc.status_code,
-                                },
-                            },
-                        )
-                        continue
-                    except Exception:
-                        db.rollback()
-                        logger.exception(
-                            "room_realtime.join_failed room_id=%s command_id=%s",
+                try:
+                    token = _join_token(payload)
+                    if not token:
+                        raise HTTPException(status_code=401, detail="Room access token required")
+                    authenticated_user_id, snapshot = await asyncio.to_thread(
+                        _prepare_room_join,
+                        token,
+                        room_id,
+                    )
+                    if snapshot is None:
+                        snapshot = await execute_room_command_by_ids(
                             room_id,
-                            command_id,
+                            authenticated_user_id,
+                            "room/join",
+                            payload,
                         )
-                        await _send_error(
-                            websocket,
-                            room_id=room_id,
-                            command_id=command_id,
-                            command_type=command_type,
-                            status_code=500,
-                            message="Room realtime join failed; reconnecting",
-                        )
-                        try:
-                            await websocket.close(code=1011)
-                        except Exception:
-                            pass
-                        break
+                except HTTPException as exc:
+                    await room_realtime_connections.send_json(
+                        websocket,
+                        {
+                            "type": "room/join_blocked",
+                            "payload": {
+                                "room_id": room_id,
+                                "reason": str(exc.detail),
+                                "status_code": exc.status_code,
+                            },
+                        },
+                    )
+                    continue
+                except Exception:
+                    logger.exception(
+                        "room_realtime.join_failed room_id=%s command_id=%s",
+                        room_id,
+                        command_id,
+                    )
+                    await _send_error(
+                        websocket,
+                        room_id=room_id,
+                        command_id=command_id,
+                        command_type=command_type,
+                        status_code=500,
+                        message="Room realtime join failed; reconnecting",
+                    )
+                    try:
+                        await websocket.close(code=1011)
+                    except Exception:
+                        pass
+                    break
 
                 if authenticated_user_id is None:
                     await _send_error(
@@ -467,99 +472,16 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
 
             await room_realtime_connections.touch_connection(websocket)
 
-            with SessionLocal() as db:
-                user = db.query(User).filter(User.id == active_user_id).first()
-                if user is None or user.is_banned or not user.is_active:
-                    await _send_error(
+            claimed = False
+            try:
+                if active_user_id is None:
+                    raise HTTPException(status_code=401, detail="Room session is no longer valid")
+
+                if command_type == "room/snapshot":
+                    snapshot = await asyncio.to_thread(_room_snapshot_for_user, room_id, active_user_id)
+                    await room_realtime_connections.send_json(
                         websocket,
-                        room_id=room_id,
-                        command_id=command_id,
-                        command_type=command_type,
-                        status_code=401,
-                        message="Room session is no longer valid",
-                    )
-                    break
-
-                claimed = False
-                try:
-                    room = room_or_404(db, room_id)
-
-                    if command_type == "room/snapshot":
-                        room_permission_service.require_room_view(db, room, user)
-                        snapshot = client_room_snapshot(db, room)
-                        db.commit()
-                        await room_realtime_connections.send_json(
-                            websocket,
-                            {"type": "room.snapshot", "payload": {"room_id": room_id, "room": snapshot}},
-                        )
-                        await _send_ack(
-                            websocket,
-                            room_id=room_id,
-                            command_id=command_id,
-                            command_type=command_type,
-                            state_version=int(snapshot.get("state_version") or 0),
-                        )
-                        continue
-
-                    if command_type == "room/heartbeat":
-                        locked_room = room_or_404(db, room_id, for_update=True)
-                        room_action_service.heartbeat_room(db, locked_room, user)
-                        db.commit()
-                        db.refresh(locked_room)
-                        snapshot = client_room_snapshot(db, locked_room, include_chat=False)
-                        db.commit()
-                        await room_realtime_connections.send_json(
-                            websocket,
-                            {"type": "room.snapshot", "payload": {"room_id": room_id, "room": snapshot}},
-                        )
-                        await _send_ack(
-                            websocket,
-                            room_id=room_id,
-                            command_id=command_id,
-                            command_type=command_type,
-                            state_version=int(snapshot.get("state_version") or 0),
-                        )
-                        continue
-
-                    if command_type == "room/leave":
-                        await _leave_current_room_connection(
-                            websocket,
-                            room_id=room_id,
-                            user=user,
-                            db=db,
-                            command_id=command_id,
-                            command_type=command_type,
-                            payload=payload,
-                        )
-                        active_room_id = None
-                        active_user_id = None
-                        break
-
-                    if command_id:
-                        claimed = await room_realtime_connections.claim_command(
-                            room_id,
-                            user.id,
-                            command_id,
-                        )
-                        if not claimed:
-                            snapshot = client_room_snapshot(db, room)
-                            db.commit()
-                            await _send_ack(
-                                websocket,
-                                room_id=room_id,
-                                command_id=command_id,
-                                command_type=command_type,
-                                state_version=int(snapshot.get("state_version") or 0),
-                                result="duplicate",
-                            )
-                            continue
-
-                    snapshot = await _execute_room_command_with_retry(
-                        db,
-                        room_id=room_id,
-                        user_id=int(user.id),
-                        command_type=command_type,
-                        payload=payload,
+                        {"type": "room.snapshot", "payload": {"room_id": room_id, "room": snapshot}},
                     )
                     await _send_ack(
                         websocket,
@@ -568,45 +490,101 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         command_type=command_type,
                         state_version=int(snapshot.get("state_version") or 0),
                     )
-                except HTTPException as exc:
-                    db.rollback()
-                    if claimed and command_id:
-                        await room_realtime_connections.release_command_claim(
-                            room_id,
-                            user.id,
-                            command_id,
-                        )
-                    await _send_error(
+                    continue
+
+                if command_type == "room/heartbeat":
+                    snapshot = await asyncio.to_thread(_room_heartbeat_for_user, room_id, active_user_id)
+                    await room_realtime_connections.send_json(
+                        websocket,
+                        {"type": "room.snapshot", "payload": {"room_id": room_id, "room": snapshot}},
+                    )
+                    await _send_ack(
                         websocket,
                         room_id=room_id,
                         command_id=command_id,
                         command_type=command_type,
-                        status_code=exc.status_code,
-                        message=str(exc.detail),
+                        state_version=int(snapshot.get("state_version") or 0),
                     )
-                except Exception:
-                    db.rollback()
-                    logger.exception(
-                        "room_realtime.command_failed room_id=%s user_id=%s command=%s command_id=%s",
+                    continue
+
+                if command_type == "room/leave":
+                    await _leave_current_room_connection(
+                        websocket,
+                        room_id=room_id,
+                        user=active_user_id,
+                        db=None,
+                        command_id=command_id,
+                        command_type=command_type,
+                        payload=payload,
+                    )
+                    active_room_id = None
+                    active_user_id = None
+                    break
+
+                if command_id:
+                    claimed = await room_realtime_connections.claim_command(
                         room_id,
-                        user.id,
-                        command_type,
+                        active_user_id,
                         command_id,
                     )
-                    if claimed and command_id:
-                        await room_realtime_connections.release_command_claim(
-                            room_id,
-                            user.id,
-                            command_id,
+                    if not claimed:
+                        snapshot = await asyncio.to_thread(_room_snapshot_for_user, room_id, active_user_id)
+                        await _send_ack(
+                            websocket,
+                            room_id=room_id,
+                            command_id=command_id,
+                            command_type=command_type,
+                            state_version=int(snapshot.get("state_version") or 0),
+                            result="duplicate",
                         )
-                    await _send_error(
-                        websocket,
-                        room_id=room_id,
-                        command_id=command_id,
-                        command_type=command_type,
-                        status_code=500,
-                        message="Room command failed",
-                    )
+                        continue
+
+                snapshot = await _execute_room_command_with_retry(
+                    None,
+                    room_id=room_id,
+                    user_id=active_user_id,
+                    command_type=command_type,
+                    payload=payload,
+                )
+                await _send_ack(
+                    websocket,
+                    room_id=room_id,
+                    command_id=command_id,
+                    command_type=command_type,
+                    state_version=int(snapshot.get("state_version") or 0),
+                )
+            except HTTPException as exc:
+                if claimed and command_id and active_user_id is not None:
+                    await room_realtime_connections.release_command_claim(room_id, active_user_id, command_id)
+                await _send_error(
+                    websocket,
+                    room_id=room_id,
+                    command_id=command_id,
+                    command_type=command_type,
+                    status_code=exc.status_code,
+                    message=str(exc.detail),
+                )
+                if exc.status_code == 401:
+                    break
+            except Exception:
+                logger.exception(
+                    "room_realtime.command_failed room_id=%s user_id=%s command=%s command_id=%s",
+                    room_id,
+                    active_user_id,
+                    command_type,
+                    command_id,
+                )
+                if claimed and command_id and active_user_id is not None:
+                    await room_realtime_connections.release_command_claim(room_id, active_user_id, command_id)
+                await _send_error(
+                    websocket,
+                    room_id=room_id,
+                    command_id=command_id,
+                    command_type=command_type,
+                    status_code=500,
+                    message="Room command failed",
+                )
+
     finally:
         disconnected_at = datetime.utcnow()
         released = await room_realtime_connections.release_connection(websocket)

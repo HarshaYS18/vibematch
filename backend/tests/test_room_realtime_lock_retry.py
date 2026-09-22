@@ -14,8 +14,6 @@ class RoomRealtimeLockRetryTests(IsolatedAsyncioTestCase):
 
     async def test_lock_timeout_is_retried_and_then_succeeds(self):
         db = Mock()
-        user = SimpleNamespace(id=7, is_banned=False, is_active=True)
-        db.query.return_value.filter.return_value.first.return_value = user
         room = SimpleNamespace(id=3, room_public_id="VM123456")
         expected = {"state_version": 42}
         execute = AsyncMock(
@@ -26,8 +24,7 @@ class RoomRealtimeLockRetryTests(IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(room_realtime, "room_or_404", return_value=room),
-            patch.object(room_realtime, "execute_room_command", execute),
+            patch.object(room_realtime, "execute_room_command_by_ids", execute),
             patch.object(room_realtime.asyncio, "sleep", AsyncMock()) as sleep,
         ):
             result = await room_realtime._execute_room_command_with_retry(
@@ -51,8 +48,7 @@ class RoomRealtimeLockRetryTests(IsolatedAsyncioTestCase):
         execute = AsyncMock(side_effect=self._operational_error("23505"))
 
         with (
-            patch.object(room_realtime, "room_or_404", return_value=room),
-            patch.object(room_realtime, "execute_room_command", execute),
+            patch.object(room_realtime, "execute_room_command_by_ids", execute),
             patch.object(room_realtime.asyncio, "sleep", AsyncMock()) as sleep,
         ):
             with self.assertRaises(OperationalError):

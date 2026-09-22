@@ -24,15 +24,14 @@ class RoomRealtimeConnectionLeaveTests(IsolatedAsyncioTestCase):
                 "has_room_user_connections",
                 AsyncMock(return_value=True),
             ),
-            patch.object(room_realtime, "room_or_404", return_value=room),
             patch.object(
                 room_realtime,
-                "client_room_snapshot",
+                "_room_snapshot_for_user",
                 return_value=snapshot,
             ),
             patch.object(
                 room_realtime,
-                "execute_room_command",
+                "execute_room_command_by_ids",
                 AsyncMock(),
             ) as execute,
             patch.object(
@@ -75,10 +74,9 @@ class RoomRealtimeConnectionLeaveTests(IsolatedAsyncioTestCase):
                 "has_room_user_connections",
                 AsyncMock(return_value=False),
             ),
-            patch.object(room_realtime, "room_or_404", return_value=room),
             patch.object(
                 room_realtime,
-                "execute_room_command",
+                "execute_room_command_by_ids",
                 AsyncMock(return_value=snapshot),
             ) as execute,
             patch.object(
@@ -98,7 +96,12 @@ class RoomRealtimeConnectionLeaveTests(IsolatedAsyncioTestCase):
             )
 
         self.assertTrue(should_stop)
-        execute.assert_awaited_once()
+        execute.assert_awaited_once_with(
+            "VM123456",
+            7,
+            "room/leave",
+            {"release_seat": True},
+        )
         websocket.close.assert_awaited_once_with(code=1000)
 
 
