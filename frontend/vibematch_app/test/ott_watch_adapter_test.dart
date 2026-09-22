@@ -105,6 +105,8 @@ const _readyProbe = OttPlaybackProbeResult(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('verified HTML5 capability enables embedded mode', () async {
     final host = _FakeOttHost(probeResult: _readyProbe);
     final companion = CompanionPlaybackAdapter(
