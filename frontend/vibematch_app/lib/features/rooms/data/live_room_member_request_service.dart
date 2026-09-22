@@ -131,67 +131,91 @@ class LiveRoomMemberRequestService {
 
   void _syncFromRoomSnapshot(Map<String, dynamic> roomData) {
     final roomId = roomData['room_id']?.toString() ?? _roomId;
-    final currentUser = _currentUser;
 
     final rawRequests = roomData['pending_room_member_requests'];
-    final requests = rawRequests is List
-        ? rawRequests
-              .whereType<Map<String, dynamic>>()
-              .map(_pendingRequestToSeatUser)
-              .whereType<SeatUser>()
-              .toList(growable: false)
-        : <SeatUser>[];
-    pendingRequests.value = requests;
+    final requestMaps = rawRequests is List
+        ? rawRequests.whereType<Map<String, dynamic>>().toList(growable: false)
+        : const <Map<String, dynamic>>[];
+    pendingRequests.value = requestMaps
+        .map(_pendingRequestToSeatUser)
+        .whereType<SeatUser>()
+        .toList(growable: false);
 
-    final peers = roomData['peers'];
-    if (peers is! List) return;
-
-    final backendMembership = <String, bool>{};
-    for (final rawPeer in peers.whereType<Map<String, dynamic>>()) {
-      final publicUserId = rawPeer['public_user_id']?.toString() ?? '';
-      final backendUserId = rawPeer['backend_user_id']?.toString() ?? rawPeer['user_id']?.toString() ?? '';
-      final aliases = <String>{
-        if (backendUserId.isNotEmpty) backendUserId,
-        if (publicUserId.isNotEmpty) publicUserId,
-        if (publicUserId.isNotEmpty) 'user_$publicUserId',
-      };
-      final status = rawPeer['membership_request_status']?.toString() ?? 'none';
-      final participantType = rawPeer['participant_type']?.toString() ?? 'visitor';
-      final isRoomMember =
-          rawPeer['is_room_member'] == true ||
-          status == 'room_member' ||
-          participantType == 'room_member';
-      final isPending =
-          rawPeer['has_pending_room_member_request'] == true || status == 'pending';
-
-      for (final alias in aliases) {
-        if (isPending) {
-          LiveRoomMembershipService.markPending(roomId: roomId, userId: alias);
-        } else {
+    // Durable membership is separate from online peers. Only this list is
+    // complete enough to reconcile offline members and removals.
+    final rawMembershipRoster = roomData['membership_roster'];
+    if (rawMembershipRoster is List) {
+      final backendMembership = <String, bool>{};
+      for (final rawMember
+          in rawMembershipRoster.whereType<Map<String, dynamic>>()) {
+        final isRoomMember = _isRoomMemberRecord(rawMember);
+        for (final alias in _identityAliases(rawMember)) {
           backendMembership[alias] = isRoomMember;
         }
       }
-
-      if (currentUser != null &&
-          aliases.map(LiveRoomMembershipService.normalizeUserId).contains(
-            LiveRoomMembershipService.normalizeUserId(currentUser.id),
-          )) {
-        if (isPending) {
-          LiveRoomMembershipService.markPending(
-            roomId: roomId,
-            userId: currentUser.id,
-          );
-        } else {
-          backendMembership[currentUser.id] = isRoomMember;
+      LiveRoomMembershipService.applyBackendMembershipSnapshot(
+        roomId: roomId,
+        roomMemberByUserId: backendMembership,
+        completeRoster: true,
+      );
+    } else {
+      // Older snapshots expose active peers only. They can update known users,
+      // but absence here must never remove an offline member.
+      final peers = roomData['peers'];
+      if (peers is List) {
+        final backendMembership = <String, bool>{};
+        for (final rawPeer in peers.whereType<Map<String, dynamic>>()) {
+          final isRoomMember = _isRoomMemberRecord(rawPeer);
+          for (final alias in _identityAliases(rawPeer)) {
+            backendMembership[alias] = isRoomMember;
+          }
         }
+        LiveRoomMembershipService.applyBackendMembershipSnapshot(
+          roomId: roomId,
+          roomMemberByUserId: backendMembership,
+        );
       }
     }
 
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: roomId,
-      roomMemberByUserId: backendMembership,
-      completeRoster: true,
-    );
+    // pending_room_member_requests is a complete backend snapshot, so absence
+    // resolves stale local pending state after approve/reject/remove.
+    if (rawRequests is List) {
+      final pendingUserIds = <String>{};
+      for (final request in requestMaps) {
+        pendingUserIds.addAll(_identityAliases(request));
+      }
+      LiveRoomMembershipService.applyBackendPendingSnapshot(
+        roomId: roomId,
+        pendingUserIds: pendingUserIds,
+      );
+    }
+  }
+
+  Set<String> _identityAliases(Map<String, dynamic> json) {
+    final publicUserId = json['public_user_id']?.toString().trim() ?? '';
+    final backendUserId =
+        json['backend_user_id']?.toString().trim() ??
+        json['user_id']?.toString().trim() ??
+        '';
+    return <String>{
+      if (backendUserId.isNotEmpty) backendUserId,
+      if (publicUserId.isNotEmpty) publicUserId,
+      if (publicUserId.isNotEmpty) 'user_$publicUserId',
+    };
+  }
+
+  bool _isRoomMemberRecord(Map<String, dynamic> json) {
+    final status = json['membership_request_status']?.toString() ?? 'none';
+    final participantType = json['participant_type']?.toString() ?? 'visitor';
+    return json['is_room_member'] == true ||
+        json['is_member'] == true ||
+        json['is_room_admin'] == true ||
+        json['is_host'] == true ||
+        json['is_room_owner'] == true ||
+        status == 'room_member' ||
+        participantType == 'room_member' ||
+        participantType == 'admin' ||
+        participantType == 'owner';
   }
 
   SeatUser? _pendingRequestToSeatUser(Map<String, dynamic> json) {

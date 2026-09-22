@@ -10,6 +10,33 @@ import '../data/google_sign_in_session_service.dart';
 import '../models/current_user.dart';
 import 'profile_setup_page.dart';
 
+Future<bool> resolveProfileSetupRequirement({
+  required CurrentUser user,
+  required SharedPreferences prefs,
+}) async {
+  const prefix = 'vm_profile_setup_done_';
+  final setupKey = '$prefix${user.publicUserId}';
+  final alreadyCompleted = prefs.getBool(setupKey) ?? false;
+
+  final hasName = user.displayName?.trim().isNotEmpty == true;
+  final hasAvatar = user.avatarUrl?.trim().isNotEmpty == true;
+  final backendProfileIsComplete = hasName && hasAvatar;
+
+  if (backendProfileIsComplete) {
+    if (!alreadyCompleted) {
+      await prefs.setBool(setupKey, true);
+    }
+    return false;
+  }
+
+  // Local completion is only a hint. Canonical profile state wins.
+  if (alreadyCompleted) {
+    await prefs.remove(setupKey);
+  }
+  return true;
+}
+
+
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -199,22 +226,7 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<bool> _shouldShowProfileSetup(CurrentUser user) async {
     final prefs = await SharedPreferences.getInstance();
-    final setupKey = '$_profileSetupDonePrefix${user.publicUserId}';
-    final alreadyCompleted = prefs.getBool(setupKey) ?? false;
-    if (alreadyCompleted) return false;
-
-    final hasName = user.displayName?.trim().isNotEmpty == true;
-    final hasAvatar = user.avatarUrl?.trim().isNotEmpty == true;
-    final backendProfileIsComplete = hasName && hasAvatar;
-    if (backendProfileIsComplete) {
-      // Self-heal the local completion hint from backend-authoritative profile
-      // state. This prevents the onboarding screen from returning after local
-      // cache loss when the server already has a completed profile.
-      await prefs.setBool(setupKey, true);
-      return false;
-    }
-
-    return true;
+    return resolveProfileSetupRequirement(user: user, prefs: prefs);
   }
 
   Future<void> _markProfileSetupCompleted(CurrentUser user) async {

@@ -52,8 +52,9 @@ class AuthApiService {
     final savedUserJson = prefs.getString(_userJsonKey);
     if (savedUserJson != null && savedUserJson.trim().isNotEmpty) {
       try {
-        _cachedUser = CurrentUser.fromJson(jsonDecode(savedUserJson) as Map<String, dynamic>);
-        AuthUserRealtimeService.instance.publish(_cachedUser!);
+        _cachedUser = CurrentUser.fromJson(
+          jsonDecode(savedUserJson) as Map<String, dynamic>,
+        );
       } catch (_) {
         _cachedUser = null;
       }
@@ -80,7 +81,7 @@ class AuthApiService {
       if (_isAuthoritativeSessionFailure(error)) {
         await _clearLocalSession(
           reason: 'restored auth session rejected by backend',
-          publishSignedOut: false,
+          publishSignedOut: true,
         );
         rethrow;
       }
@@ -266,20 +267,12 @@ class AuthApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
+      // Send only fields owned by this edit flow. The backend PATCH contract
+      // preserves every omitted canonical profile field.
       body: jsonEncode({
         'display_name': safeName,
         'bio': bio?.trim() ?? '',
         if (avatarUrl != null) 'avatar_url': avatarUrl.trim(),
-        'cover_photo_urls': _cachedUser?.coverPhotoUrls ?? const <String>[],
-        'date_of_birth': _cachedUser?.dateOfBirth == null
-            ? null
-            : _cachedUser!.dateOfBirth!.toIso8601String().split('T').first,
-        'gender': _cachedUser?.gender,
-        'profession': _cachedUser?.profession,
-        'marital_status': _cachedUser?.maritalStatus,
-        'friend_gender_preference': _cachedUser?.friendGenderPreference,
-        'friend_marital_preference': _cachedUser?.friendMaritalPreference,
-        'interests': _cachedUser?.interests ?? const <String>[],
       }),
     );
 

@@ -202,6 +202,57 @@ class LiveRoomMembershipService {
     snapshots.value = Map<String, LiveRoomMembershipSnapshot>.unmodifiable(next);
   }
 
+  /// Reconciles the complete backend pending-request set for a room.
+  ///
+  /// Absence from this set is authoritative: a previously pending request that
+  /// is no longer returned has been approved, rejected, removed, or resolved.
+  static void applyBackendPendingSnapshot({
+    required String roomId,
+    required Set<String> pendingUserIds,
+  }) {
+    final cleanRoomId = roomId.trim();
+    if (cleanRoomId.isEmpty) return;
+
+    final normalizedPendingIds = pendingUserIds
+        .map(normalizeUserId)
+        .where((item) => item.isNotEmpty)
+        .toSet();
+    final pendingKeys = normalizedPendingIds
+        .map((userId) => keyFor(roomId: cleanRoomId, userId: userId))
+        .toSet();
+
+    final next = Map<String, LiveRoomMembershipSnapshot>.from(snapshots.value);
+
+    for (final entry in next.entries.toList(growable: false)) {
+      final previous = entry.value;
+      if (previous.roomId.trim() != cleanRoomId ||
+          previous.status != LiveRoomMembershipStatus.pending ||
+          pendingKeys.contains(entry.key)) {
+        continue;
+      }
+      next[entry.key] = previous.copyWith(
+        status: LiveRoomMembershipStatus.guest,
+      );
+    }
+
+    for (final normalizedUserId in normalizedPendingIds) {
+      final key = keyFor(roomId: cleanRoomId, userId: normalizedUserId);
+      final previous = next[key];
+      if (previous?.status == LiveRoomMembershipStatus.roomMember) {
+        continue;
+      }
+      next[key] = (previous ??
+              LiveRoomMembershipSnapshot(
+                roomId: cleanRoomId,
+                userId: normalizedUserId,
+                status: LiveRoomMembershipStatus.pending,
+              ))
+          .copyWith(status: LiveRoomMembershipStatus.pending);
+    }
+
+    snapshots.value = Map<String, LiveRoomMembershipSnapshot>.unmodifiable(next);
+  }
+
   /// Backward-compatible entry point for older callers. New code must confirm
   /// membership via [applyBackendMembershipSnapshot] from a backend response.
   @Deprecated('Use applyBackendMembershipSnapshot with backend response data.')

@@ -242,23 +242,36 @@ def get_my_master_state(db: Session = Depends(get_db), current_user: User = Depe
 
 @router.patch("/me/profile", response_model=UserMeResponse)
 def update_my_profile(payload: UserProfileUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if payload.display_name is not None:
+    # This is a PATCH endpoint. Only fields explicitly supplied by the client
+    # may mutate canonical profile state; omitted fields must remain untouched.
+    fields_set = payload.model_fields_set
+
+    if "display_name" in fields_set and payload.display_name is not None:
         safe_name = payload.display_name.strip()
         if len(safe_name) < 2:
             raise HTTPException(status_code=400, detail="Display name must be at least 2 characters")
         current_user.display_name = safe_name
-    if payload.bio is not None:
+    if "bio" in fields_set:
         current_user.bio = _clean_optional(payload.bio)
-    if payload.avatar_url is not None:
+    if "avatar_url" in fields_set:
         current_user.avatar_url = _validate_profile_media_url(db, user=current_user, url=payload.avatar_url, media_type=CdnMediaType.PROFILE_PICTURE, label="avatar")
-    current_user.cover_photo_urls = _validate_cover_photo_urls(db, user=current_user, urls=payload.cover_photo_urls)
-    current_user.date_of_birth = payload.date_of_birth
-    current_user.gender = _clean_enum(payload.gender, _ALLOWED_GENDERS, "gender")
-    current_user.profession = _clean_optional(payload.profession)
-    current_user.marital_status = _clean_enum(payload.marital_status, _ALLOWED_MARITAL, "marital status")
-    current_user.friend_gender_preference = _clean_enum(payload.friend_gender_preference, _ALLOWED_GENDER_PREFS, "friend gender preference")
-    current_user.friend_marital_preference = _clean_enum(payload.friend_marital_preference, _ALLOWED_MARITAL_PREFS, "friend marital preference")
-    current_user.interests = _clean_interests(payload.interests)
+    if "cover_photo_urls" in fields_set:
+        current_user.cover_photo_urls = _validate_cover_photo_urls(db, user=current_user, urls=payload.cover_photo_urls or [])
+    if "date_of_birth" in fields_set:
+        current_user.date_of_birth = payload.date_of_birth
+    if "gender" in fields_set:
+        current_user.gender = _clean_enum(payload.gender, _ALLOWED_GENDERS, "gender")
+    if "profession" in fields_set:
+        current_user.profession = _clean_optional(payload.profession)
+    if "marital_status" in fields_set:
+        current_user.marital_status = _clean_enum(payload.marital_status, _ALLOWED_MARITAL, "marital status")
+    if "friend_gender_preference" in fields_set:
+        current_user.friend_gender_preference = _clean_enum(payload.friend_gender_preference, _ALLOWED_GENDER_PREFS, "friend gender preference")
+    if "friend_marital_preference" in fields_set:
+        current_user.friend_marital_preference = _clean_enum(payload.friend_marital_preference, _ALLOWED_MARITAL_PREFS, "friend marital preference")
+    if "interests" in fields_set:
+        current_user.interests = _clean_interests(payload.interests or [])
+
     db.add(current_user)
     db.commit()
     db.refresh(current_user)

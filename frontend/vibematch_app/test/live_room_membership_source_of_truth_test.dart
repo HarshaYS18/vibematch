@@ -119,6 +119,61 @@ void main() {
     );
   });
 
+  test('authoritative pending snapshot clears a resolved pending request', () {
+    LiveRoomMembershipService.markPending(
+      roomId: 'VM100',
+      userId: '6418001001',
+    );
+
+    LiveRoomMembershipService.applyBackendPendingSnapshot(
+      roomId: 'VM100',
+      pendingUserIds: const <String>{},
+    );
+
+    expect(
+      LiveRoomMembershipService.statusFor(
+        roomId: 'VM100',
+        userId: '6418001001',
+      ),
+      LiveRoomMembershipStatus.guest,
+    );
+  });
+
+  test('authoritative pending snapshot does not downgrade confirmed membership', () {
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const {'6418001001': true},
+    );
+
+    LiveRoomMembershipService.applyBackendPendingSnapshot(
+      roomId: 'VM100',
+      pendingUserIds: const <String>{},
+    );
+
+    expect(
+      LiveRoomMembershipService.isRoomMember(
+        roomId: 'VM100',
+        userId: 'user_6418001001',
+      ),
+      isTrue,
+    );
+  });
+
+  test('authoritative pending snapshot normalizes public user aliases', () {
+    LiveRoomMembershipService.applyBackendPendingSnapshot(
+      roomId: 'VM100',
+      pendingUserIds: const {'user_6418001001'},
+    );
+
+    expect(
+      LiveRoomMembershipService.isPending(
+        roomId: 'VM100',
+        userId: '6418001001',
+      ),
+      isTrue,
+    );
+  });
+
   test('clearAll removes account-scoped room membership projection', () {
     LiveRoomMembershipService.applyBackendMembershipSnapshot(
       roomId: 'VM100',
